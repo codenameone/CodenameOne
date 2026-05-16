@@ -193,26 +193,22 @@ public final class Graphics {
             return;
         }
         if (matrixMode()) {
-            // Compose T(x, y) onto the impl-side matrix, same way scale/
-            // rotate do. We *also* bump the xTranslate/yTranslate shadow
-            // accumulator so getTranslateX/getTranslateY (and the framework
-            // callers in Form/Label/Component/Container/FontImage/
-            // LinearGradientPaint/TextSelection) keep returning legacy
-            // semantics. The shadow is NOT added to draw coords -- tx(x) /
-            // ty(y) skip it in matrix mode -- so this isn't a double shift.
-            xTranslate += x;
-            yTranslate += y;
+            // Matrix-only: compose T(x, y) onto the impl-side matrix, same
+            // way scale/rotate do. Deliberately do NOT bump xTranslate /
+            // yTranslate -- carrying a shadow accumulator alongside the
+            // matrix made bypass-Graphics paths (Label.drawLabelComponent,
+            // Component painter cache) double-count, since they add
+            // getTranslateX() onto coords *and* the impl then applies the
+            // matrix that already encodes the same translate.
+            //
+            // getTranslateX / getTranslateY in matrix mode read the
+            // translate component directly off the impl matrix, which is
+            // correct as long as the matrix is a pure translation when
+            // they're called -- the framework painting chain only stacks
+            // translates, so this holds for every snapshot-reset caller
+            // (Form.paintGlassImpl, Container.paintComponent,
+            // Component.paintIntersectingComponentsAbove, etc).
             impl.translateMatrix(nativeGraphics, x, y);
-            // userTransform composition under matrix mode is
-            // T(xTranslate) * userTransform (no terminal T(-xTranslate)
-            // because impl coords aren't pre-shifted in this mode). Re-set
-            // the impl matrix every translate so it tracks the latest
-            // shadow accumulator.
-            if (userTransform != null) {
-                Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
-                composed.concatenate(userTransform);
-                impl.setTransform(nativeGraphics, composed);
-            }
             return;
         }
         xTranslate += x;
@@ -237,9 +233,16 @@ public final class Graphics {
     public int getTranslateX() {
         if (impl.isTranslationSupported()) {
             return impl.getTranslateX(nativeGraphics);
-        } else {
-            return xTranslate;
         }
+        if (matrixMode()) {
+            // Matrix mode: read the translate component off the impl-side
+            // matrix. Reliable while the matrix is a pure translation, which
+            // is the only state in which framework callers read this value
+            // (snapshot-reset patterns in Form/Container/Component happen
+            // before any user scale/rotate has been composed in).
+            return (int) impl.getTransform(nativeGraphics).getTranslateX();
+        }
+        return xTranslate;
     }
 
     /// Returns the current y translate value
@@ -250,9 +253,11 @@ public final class Graphics {
     public int getTranslateY() {
         if (impl.isTranslationSupported()) {
             return impl.getTranslateY(nativeGraphics);
-        } else {
-            return yTranslate;
         }
+        if (matrixMode()) {
+            return (int) impl.getTransform(nativeGraphics).getTranslateY();
+        }
+        return yTranslate;
     }
 
     /// Returns the current color

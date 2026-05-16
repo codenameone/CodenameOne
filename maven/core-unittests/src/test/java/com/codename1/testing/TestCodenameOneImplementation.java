@@ -7,6 +7,7 @@ import com.codename1.db.Database;
 import com.codename1.db.Row;
 import com.codename1.db.RowExt;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.Transform;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
@@ -1931,6 +1932,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         translateMatrixInvoked = true;
         lastTranslateMatrixX = x;
         lastTranslateMatrixY = y;
+        if (nativeGraphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) nativeGraphics;
+            g.matrixTranslateX += x;
+            g.matrixTranslateY += y;
+        }
+    }
+
+    @Override
+    public Transform getTransform(Object graphics) {
+        // Production Graphics.getTranslateX/Y reads through this method when
+        // matrix mode is on. We return a pure translation built from the
+        // per-Graphics accumulator translateMatrix has been mutating, so the
+        // matrix-mode unit tests can verify the translate flows end-to-end.
+        if (graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            return Transform.makeTranslation(g.matrixTranslateX, g.matrixTranslateY);
+        }
+        return Transform.makeIdentity();
     }
 
     @Override
@@ -3820,6 +3839,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int clipHeight;
         int translateX;
         int translateY;
+        // Matrix-translation accumulator. translateMatrix() updates this so
+        // matrix-mode Graphics.getTranslateX() (which reads through
+        // impl.getTransform(ng).getTranslateX()) sees the right value.
+        // Separate from translateX/translateY because the production
+        // contract is that matrix-mode does NOT bump the integer accumulator.
+        float matrixTranslateX;
+        float matrixTranslateY;
         TestFont font;
         TestImage image;
 

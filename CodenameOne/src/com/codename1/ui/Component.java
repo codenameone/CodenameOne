@@ -8656,8 +8656,15 @@ public class Component implements Animation, StyleListener, Editable {
                 } else {
                     s = getStyle();
                 }
-                int x = rect.getX() + g.getTranslateX();
-                int y = rect.getY() + g.getTranslateY();
+                // In matrix-translation mode (Graphics.useMatrixTranslation)
+                // the impl-side matrix already encodes the framework's
+                // painting-chain translates -- impl.paintComponentBackground
+                // (called at the bottom of this method) draws through that
+                // matrix, so passing absolute coords (legacy path) would
+                // double-count. Pass component-local coords in matrix mode
+                // and let the matrix carry the offset.
+                int x = rect.getX() + (Graphics.useMatrixTranslation ? 0 : g.getTranslateX());
+                int y = rect.getY() + (Graphics.useMatrixTranslation ? 0 : g.getTranslateY());
                 int width = rect.getSize().getWidth();
                 int height = rect.getSize().getHeight();
                 Image img = s.getBgImage();

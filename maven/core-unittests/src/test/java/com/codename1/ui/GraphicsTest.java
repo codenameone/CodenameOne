@@ -202,9 +202,11 @@ class GraphicsTest extends UITestBase {
     @Test
     void testMatrixModeTranslatePushesToImplMatrix() {
         // When useMatrixTranslation is on AND the impl advertises support,
-        // g.translate(dx, dy) must call impl.translateMatrix and keep the
-        // shadow xTranslate accumulator in step (for legacy
-        // getTranslateX/Y consumers in Form/Component/Label/etc.).
+        // g.translate(dx, dy) routes ONLY through impl.translateMatrix --
+        // no shadow xTranslate accumulator. getTranslateX/Y reads the
+        // translate component from the impl matrix (the stub's getTransform
+        // returns Transform.makeTranslation of the per-Graphics matrix
+        // translate accumulator translateMatrix has been mutating).
         Graphics.useMatrixTranslation = true;
         implementation.setTranslateMatrixSupported(true);
 
@@ -216,7 +218,7 @@ class GraphicsTest extends UITestBase {
         assertFalse(implementation.wasTranslateInvoked(),
                 "matrix path must NOT call the legacy impl.translate hook");
         assertEquals(5, graphics.getTranslateX(),
-                "shadow accumulator must follow matrix translate so Form/Component callers keep working");
+                "getTranslateX must read the translate component off the impl matrix");
         assertEquals(7, graphics.getTranslateY());
     }
 
