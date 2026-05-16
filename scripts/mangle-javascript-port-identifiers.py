@@ -105,6 +105,16 @@ EXCLUDE = frozenset({
     # path gets a chance to run.
     "com_codename1_html5_js_",
     "com_codename1_impl_html5_JSOImplementations_",
+    # TeaVM-era JSO interface package (LocalForage, JQuery, WebSQL, Popover,
+    # FileChooser, PhotoCapture, ...). port.js registers
+    # ``"com_codename1_teavm_ext_"`` as a classPrefixes entry; without
+    # excluding the LITERAL string here the mangler rewrites it to
+    # ``"$xx"`` so the runtime prefix check (``className.indexOf(prefix)
+    # === 0`` against unmangled JSO-receiver class names) never matches
+    # and ``isJsoBridgeClass`` returns false. The cascade is the same
+    # ``Missing virtual method cn1_s_config_..._LocalForageImpl`` symptom
+    # that motivated registering the prefix in the first place.
+    "com_codename1_teavm_ext_",
 })
 
 
@@ -248,6 +258,13 @@ _JSO_BRIDGE_MARKER = "com_codename1_html5_js_JSObject"
 _JSO_BRIDGE_CLASS_PREFIXES = (
     "com_codename1_html5_js_",
     "com_codename1_impl_html5_JSOImplementations_",
+    # See the matching EXCLUDE entry above. Mirroring the prefix here
+    # marks ``com_codename1_teavm_ext_*`` interface class names as JSO
+    # bridge classes for the BFS exclusion walk, so any per-class
+    # identifier the bundle happens to ship for them (rare -- TeaVM
+    # JSO interfaces typically have no classdef) also survives the
+    # mangle pass.
+    "com_codename1_teavm_ext_",
 )
 
 
