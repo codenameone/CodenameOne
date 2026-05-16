@@ -93,7 +93,10 @@ public final class LinearGradient extends Gradient {
         if (pN - p0 < 1e-4f) {
             return;
         }
-        float x0 = out[0], y0 = out[1], x1 = out[2], y1 = out[3];
+        float x0 = out[0];
+        float y0 = out[1];
+        float x1 = out[2];
+        float y1 = out[3];
         out[0] = x0 + p0 * (x1 - x0);
         out[1] = y0 + p0 * (y1 - y0);
         out[2] = x0 + pN * (x1 - x0);
