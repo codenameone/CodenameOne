@@ -109,4 +109,37 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("ffffff", theme.get("Button.fgColor"));
     }
 
+    @Test
+    public void testCompilesSideBorderShorthand() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+
+        compiler.compile("SideCommand{border:none;border-bottom:2px solid #cccccc;}", resource, "Theme");
+
+        Hashtable theme = resource.getTheme("Theme");
+        assertTrue(theme.get("SideCommand.border") instanceof CSSBorder);
+        String css = ((CSSBorder) theme.get("SideCommand.border")).toCSSString();
+        assertTrue(css.contains("border-style:none none solid none"));
+        assertTrue(css.contains("border-width:"));
+        assertTrue(css.contains("2px"));
+        assertTrue(css.contains("#ccccccff"));
+    }
+
+    @Test
+    public void testCompilesSideBorderLonghands() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+
+        compiler.compile(
+                "SideCommand{border:none;border-top-width:3px;border-top-style:dashed;border-top-color:#ff0000;}",
+                resource, "Theme");
+
+        Hashtable theme = resource.getTheme("Theme");
+        assertTrue(theme.get("SideCommand.border") instanceof CSSBorder);
+        String css = ((CSSBorder) theme.get("SideCommand.border")).toCSSString();
+        assertTrue(css.contains("border-style:dashed none none none"));
+        assertTrue(css.contains("3px"));
+        assertTrue(css.contains("#ff0000ff"));
+    }
+
 }
