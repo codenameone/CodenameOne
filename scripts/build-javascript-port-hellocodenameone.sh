@@ -278,19 +278,15 @@ fi
 # under Cloudflare Pages' 25 MiB per-file limit and matches the competitive
 # TeaVM-like sizes we publish from the website.
 if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
-  # Identifier mangling is on by default, matching the initializr build.
-  # The mangler rewrites ``cn1_*`` / class-name string literals in lockstep
-  # across every worker-side file (including ``X__impl`` twins) so port.js's
-  # runtime reflection still resolves. The screenshot CI exercises the full
-  # set of hellocodenameone tests against this output so flips here are
-  # validated end-to-end. Set ``DISABLE_JS_IDENT_MANGLING=1`` to debug
-  # unmangled symbol names.
-  if [ "${DISABLE_JS_IDENT_MANGLING:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
+  # Identifier mangling is opt-in; see the matching block in
+  # build-javascript-port-initializr.sh for the rationale. port.js's
+  # runtime reflection (key.indexOf("cn1_") scans + "cn1_" + owner +
+  # suffix string concat) breaks if we rename those identifiers.
+  if [ "${ENABLE_JS_IDENT_MANGLING:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
     bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
     map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
     mkdir -p "$(dirname "$map_path")"
     python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
-      --min-occurrences 1 \
       --map-output "$map_path" "$DIST_DIR" || \
       bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
   fi
