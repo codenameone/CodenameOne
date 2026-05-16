@@ -2988,30 +2988,49 @@ function* adaptVirtualResult(result) {
   }
   return result;
 }
+// adaptVirtualResult inlined into each cn1_iv* helper below to skip the
+// extra generator allocation per virtual call. The helper itself was a
+// ``function*`` -- every invocation allocated a generator object whose
+// only purpose was to forward via ``yield*`` to the resolved method (if
+// it was a generator) or return the value directly. Inlining halves
+// per-call allocator pressure on the hot virtual-dispatch path. Sync /
+// async resolution semantics are unchanged.
 function* cn1_iv0(target, mid) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target));
+  const r = cn1_ivResolve(target, mid)(target);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 function* cn1_iv1(target, mid, a0) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0));
+  const r = cn1_ivResolve(target, mid)(target, a0);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 function* cn1_iv2(target, mid, a0, a1) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1));
+  const r = cn1_ivResolve(target, mid)(target, a0, a1);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 function* cn1_iv3(target, mid, a0, a1, a2) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1, a2));
+  const r = cn1_ivResolve(target, mid)(target, a0, a1, a2);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 function* cn1_iv4(target, mid, a0, a1, a2, a3) {
   if (target == null) { yield* throwNullPointerException(); }
-  return yield* adaptVirtualResult(cn1_ivResolve(target, mid)(target, a0, a1, a2, a3));
+  const r = cn1_ivResolve(target, mid)(target, a0, a1, a2, a3);
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 function* cn1_ivN(target, mid, args) {
   if (target == null) { yield* throwNullPointerException(); }
   const method = cn1_ivResolve(target, mid);
-  return yield* adaptVirtualResult(method.apply(null, [target].concat(args)));
+  const r = method.apply(null, [target].concat(args));
+  if (r && typeof r.next === "function") { return yield* r; }
+  return r;
 }
 global.cn1_iv0 = cn1_iv0;
 global.cn1_iv1 = cn1_iv1;
