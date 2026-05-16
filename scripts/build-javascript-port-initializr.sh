@@ -567,47 +567,19 @@ fi
 # default-credentials XHR couldn't reuse the preloaded bytes. The
 # bare ``fetch(url)`` call sidesteps that mismatch.
 #
-# We DON'T preload ``assets/iOS7Theme.res`` because
-# HTML5Implementation.getArrayBufferInputStream appends
-# ``?v=<getBuildVersion()>`` to ``assets/`` paths -- the preload URL
-# would need the same query string to match. The build version is
-# resolved at runtime so we'd have to special-case it here. Theme
-# at the bundle root (no ``assets/`` prefix) gets no cache-buster
-# so it preloads cleanly.
-if [ -f "$DIST_DIR/index.html" ] && ! grep -q "<!-- cn1-prefetch -->" "$DIST_DIR/index.html"; then
-  prefetch_file="$(mktemp)"
-  cat > "$prefetch_file" <<'PREFETCH'
-<script>/* cn1-prefetch */
-// Same-origin fetch to populate the HTTP cache before the worker
-// issues its blocking sync XHR for the same URL. We don't await
-// the response -- the browser handles the rest in the background.
-//
-// ``assets/iOS7Theme.res`` includes the ``?v=1.0`` query that
-// HTML5Implementation.getArrayBufferInputStream appends at sync-
-// XHR time. Build version is hardcoded to "1.0" by the build
-// script's ByteCodeTranslator invocation so this query string is
-// stable.
-try {
-  fetch('theme.res').catch(function(){});
-  fetch('assets/iOS7Theme.res?v=1.0').catch(function(){});
-} catch (e) {}
-</script>
-<!-- cn1-prefetch -->
-PREFETCH
-  python3 - "$DIST_DIR/index.html" "$prefetch_file" <<'PYEOF'
-import sys, pathlib
-html_path = pathlib.Path(sys.argv[1])
-prefetch_path = pathlib.Path(sys.argv[2])
-html = html_path.read_text(encoding='utf-8')
-inject = prefetch_path.read_text(encoding='utf-8')
-needle = '<script src="js/push.js"></script>'
-if needle in html:
-  html = html.replace(needle, inject + needle, 1)
-  html_path.write_text(html, encoding='utf-8')
-PYEOF
-  rm -f "$prefetch_file"
-  bj_log "Patched index.html with cn1-prefetch theme.res hint"
-fi
+# Note: an earlier ``cn1-prefetch`` <script> here issued
+# ``fetch('theme.res')`` / ``fetch('assets/iOS7Theme.res?v=1.0')`` to
+# warm the HTTP cache before the worker's sync XHR fired. Measured cost
+# on the deployed PR preview: the prefetch and the worker XHR both went
+# to the network at full size -- Cloudflare Pages returns
+# ``cache-control: public, max-age=0, must-revalidate`` for static
+# assets, which forces every cache lookup to revalidate against the
+# server, and the worker's sync XHR doesn't share connection-level state
+# with the page's prior fetch. Net result: 1.5 MiB downloaded twice on
+# every cold load. Pulled the prefetch; the worker hits the same URLs
+# directly. If we later switch to async asset loading or fix the
+# cache-control header on the deploy, the warm-cache idea is worth
+# revisiting.
 
 # --- Post-translation minimisation pass -------------------------------------
 # A raw ByteCodeTranslator JS bundle for Initializr is ~90 MiB and consists
