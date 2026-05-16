@@ -1265,11 +1265,18 @@ public final class Graphics {
             // dereferences the argument via Transform.setTransform, NPEing
             // the entire paint frame. Route through impl.resetAffine
             // instead, which every port implements as "matrix -> identity".
+            //
+            // userTransform is intentionally left null in matrix mode. The
+            // field exists for the legacy T(xt) * M * T(-xt) conjugation
+            // dance, which matrix mode does not perform. Keeping it null
+            // also means getTransform() reads straight off the impl matrix
+            // -- so framework callers that save+restore via getTransform /
+            // setTransform see the real current matrix state, not a stale
+            // userTransform snapshot from a previous setTransform call.
+            userTransform = null;
             if (transform == null || transform.isIdentity()) {
-                userTransform = null;
                 impl.resetAffine(nativeGraphics);
             } else {
-                userTransform = transform.copy();
                 impl.setTransform(nativeGraphics, transform);
             }
             return;
