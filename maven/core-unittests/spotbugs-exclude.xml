@@ -113,6 +113,25 @@
     </Match>
 
     <!--
+    Graphics.useMatrixTranslation is a public static opt-in flag written by
+    app init code (e.g. HelloCodenameOne.kt) in *other* modules, so SpotBugs
+    sees the field as "unwritten" and "non-final but should be" inside the
+    core module. It must stay mutable (callers flip it once at startup) and
+    public (the only knob developers have to opt into the matrix-translate
+    path).
+    -->
+    <Match>
+        <Class name="com.codename1.ui.Graphics" />
+        <Field name="useMatrixTranslation" />
+        <Bug pattern="MS_SHOULD_BE_FINAL" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.ui.Graphics" />
+        <Field name="useMatrixTranslation" />
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
+
+    <!--
     This rule prevents Class.newInstance() which we generally avoid anyway.
     However, the solution is to use java.beans or reflection to create a class
     via its constructor. That's a problem since that API isn't available in

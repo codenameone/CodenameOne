@@ -1258,9 +1258,20 @@ public final class Graphics {
             // painting-chain translates across this call must save the
             // pre-call matrix (getTransform) and apply their transform on
             // top via Transform.concatenate.
-            userTransform = transform != null && !transform.isIdentity()
-                    ? transform.copy() : null;
-            impl.setTransform(nativeGraphics, transform);
+            //
+            // Special case: setTransform(null) / setTransform(identity)
+            // must NOT be forwarded as `null` to impl.setTransform on every
+            // port -- Android's AndroidAsyncView.setTransform unconditionally
+            // dereferences the argument via Transform.setTransform, NPEing
+            // the entire paint frame. Route through impl.resetAffine
+            // instead, which every port implements as "matrix -> identity".
+            if (transform == null || transform.isIdentity()) {
+                userTransform = null;
+                impl.resetAffine(nativeGraphics);
+            } else {
+                userTransform = transform.copy();
+                impl.setTransform(nativeGraphics, transform);
+            }
             return;
         }
         if (transform != null && !transform.isIdentity()
