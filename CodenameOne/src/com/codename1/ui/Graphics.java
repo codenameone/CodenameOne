@@ -1363,7 +1363,7 @@ public final class Graphics {
 
     /// Fills a multi-stop linear gradient at an arbitrary angle.
     ///
-    /// Angle follows CSS convention: 0° points up, 90° right, 180° down, 270° left.
+    /// Angle follows CSS convention: 0 deg points up, 90 right, 180 down, 270 left.
     ///
     /// #### Parameters
     /// - `colors`: ARGB color stops (length >= 2)
@@ -1387,7 +1387,7 @@ public final class Graphics {
     }
 
     /// Fills a conic / sweep gradient. `fromAngleDegrees` follows the CSS conic-gradient
-    /// convention (0° points up, sweep clockwise).
+    /// convention (0 deg points up, sweep clockwise).
     public void fillConicGradient(int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
         if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
             return;

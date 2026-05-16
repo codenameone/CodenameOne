@@ -16,7 +16,7 @@ import com.codename1.ui.plaf.Style;
 /// screenshot.
 ///
 /// The test also asserts that each UIID actually carries the expected
-/// background type byte and a non-null gradient descriptor — that way a
+/// background type byte and a non-null gradient descriptor - that way a
 /// silent CSS compiler regression (e.g. dropping support for the conic form,
 /// or falling back to a rasterized image because of a mismatched alpha
 /// short-circuit) shows up as an explicit test failure even before the
@@ -40,7 +40,7 @@ public class CssGradientsScreenshotTest extends BaseTest {
         form.setUIID("GraphicsForm");
 
         Container grid = new Container(new GridLayout(4, 2));
-        // Index-aligned with UIIDS — one expected background type per tile.
+        // Index-aligned with UIIDS - one expected background type per tile.
         byte[] expectedBgTypes = {
                 Style.BACKGROUND_GRADIENT_LINEAR,
                 Style.BACKGROUND_GRADIENT_LINEAR,

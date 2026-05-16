@@ -3428,7 +3428,7 @@ public abstract class CodenameOneImplementation {
         drawImage(graphics, img, x, y);
     }
 
-    /// Conic / sweep gradient (no cycle mode — conic naturally wraps).
+    /// Conic / sweep gradient (no cycle mode - conic naturally wraps).
     public void fillConicGradient(Object graphics, int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
         if (width <= 0 || height <= 0) {
             return;
@@ -3439,7 +3439,7 @@ public abstract class CodenameOneImplementation {
             for (int px = 0; px < width; px++) {
                 double dx = px + 0.5 - centerX;
                 double dy = py + 0.5 - centerY;
-                // CSS conic-gradient: 0° at top (north), sweep clockwise.
+                // CSS conic-gradient: 0 deg at top (north), sweep clockwise.
                 double theta = MathUtil.atan2(dx, -dy) - fromRad;
                 double normalized = theta / (Math.PI * 2.0);
                 normalized -= Math.floor(normalized);
@@ -3503,7 +3503,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /// In-place region blur for CSS backdrop-filter:blur(). Default returns false
-    /// signalling no in-place support — caller falls back to snapshot+blur.
+    /// signalling no in-place support - caller falls back to snapshot+blur.
     public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
         return false;
     }

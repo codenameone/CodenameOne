@@ -129,7 +129,7 @@ CssGradientRepeatingRadial {
     background: repeating-radial-gradient(circle at center, #ffffff, #ffffff 8%, #cc3344 8%, #cc3344 16%);
 }
 
-/* filter: blur(...) — exercised against an inline image background so the
+/* filter: blur(...) - exercised against an inline image background so the
    blurred result reflects both the source image and the compiled filterBlur
    theme property. */
 CssFilterBlurNone {

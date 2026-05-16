@@ -13965,7 +13965,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedImage snap = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
             java.awt.GraphicsConfiguration gc = ng.getDeviceConfiguration();
             BufferedImage dest = (gc != null) ? gc.createCompatibleImage(width, height, java.awt.Transparency.TRANSLUCENT) : snap;
-            // Java2D doesn't easily let us read back from the destination — fall back.
+            // Java2D doesn't easily let us read back from the destination - fall back.
             return false;
         } catch (Throwable t) {
             return false;
