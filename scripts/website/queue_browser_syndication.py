@@ -2,22 +2,29 @@
 """Append browser-only syndication tasks to syndication-queue.json.
 
 This script is the bridge between the daily CI cron (which knows which
-posts are eligible for syndication) and the Codename One Syndicator
-Firefox extension (which runs inside the user's logged-in Firefox to
-drive Medium/DZone editors past Cloudflare).
+posts are eligible for syndication) and a local syndication tool that
+runs on the maintainer's machine and drives Medium / DZone / Hashnode
+editors from inside a signed-in browser session.
 
 Daily flow:
 
-  1. CI runs the API syndicator (foojay, dev.to, hashnode) directly.
+  1. CI runs the API syndicator (dev.to) and the Playwright syndicator
+     (foojay) directly.
   2. CI runs *this* script for `medium,dzone` (or whatever browser
      platforms are configured) — it appends a task entry to
      syndication-queue.json for every eligible post that does not
      already have an entry in syndication-state.json for that platform.
-  3. The committed queue file is what the extension polls. When the
-     user's Firefox is online, the extension processes pending tasks.
-  4. The extension's popup surfaces a JSON patch the user can paste into
-     syndication-state.json (or a small local script can ingest the
-     extension's results).
+  3. The committed queue file is what the local tool reads. When it
+     runs on the maintainer's machine it processes pending tasks
+     against the already-signed-in browser session.
+  4. The local tool writes the resulting URLs back into
+     syndication-state.json.
+
+Hashnode is *not* queued here: their free public GraphQL API shut down
+on 2026-05-13, but Hashnode's web editor is reachable from
+``syndicate_browser_posts.py`` directly via a saved Playwright
+storageState, so it is driven inline by that script (HashnodeAdapter)
+instead of going through this queue.
 
 Tasks are deduplicated by id (`<platform>:<slug>`).
 """

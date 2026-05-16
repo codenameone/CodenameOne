@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Syndicate Codename One Hugo blog posts to dev.to and Hashnode.
+"""Syndicate Codename One Hugo blog posts to dev.to.
 
 Selects the oldest blog post under ``docs/website/content/blog`` that:
 
@@ -11,6 +11,12 @@ For each unsyndicated platform on the chosen post the script POSTs the
 content with ``canonical_url`` pointing back at the original on
 ``www.codenameone.com`` and records the resulting URL / id in
 ``scripts/website/syndication-state.json``.
+
+Hashnode used to be driven from here too, but Hashnode shut down their
+free public GraphQL API on 2026-05-13 and moved it behind a paid /
+allow-listed offering. Hashnode is now syndicated via the Firefox
+extension queue alongside Medium and DZone — see
+``queue_browser_syndication.py``.
 
 Designed to run from a daily GitHub Action with only the Python standard
 library available.
@@ -53,14 +59,8 @@ _HUGO_FOOTER_RE = re.compile(r"\n\s*---\s*\n+##\s*Discussion\b.*\Z", re.DOTALL |
 _HUGO_SHORTCODE_RE = re.compile(r"\{\{<[^>]*>\}\}|\{\{%[^%]*%\}\}")
 
 DEVTO_TAGS = ["java", "mobile", "android", "ios"]
-HASHNODE_TAGS = [
-    {"slug": "java", "name": "Java"},
-    {"slug": "mobile", "name": "Mobile"},
-    {"slug": "android", "name": "Android"},
-    {"slug": "ios", "name": "iOS"},
-]
 
-DEFAULT_PLATFORMS = "devto,hashnode"
+DEFAULT_PLATFORMS = "devto"
 
 
 @dataclass
@@ -325,60 +325,6 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str, draft: bool =
     }
 
 
-def publish_to_hashnode(post: Post, body_markdown: str, token: str, publication_id: str,
-                        draft: bool = False) -> dict[str, Any]:
-    if draft:
-        mutation = """
-        mutation CreateDraft($input: CreateDraftInput!) {
-          createDraft(input: $input) {
-            draft { id slug }
-          }
-        }
-        """.strip()
-    else:
-        mutation = """
-        mutation PublishPost($input: PublishPostInput!) {
-          publishPost(input: $input) {
-            post { id slug url }
-          }
-        }
-        """.strip()
-
-    input_obj: dict[str, Any] = {
-        "title": post.title,
-        "contentMarkdown": body_markdown,
-        "publicationId": publication_id,
-        "tags": HASHNODE_TAGS,
-        "originalArticleURL": post.canonical_url,
-    }
-    cover = post.cover_image
-    if cover:
-        input_obj["coverImageOptions"] = {"coverImageURL": cover}
-    subtitle = str(post.front_matter.get("description") or "").strip()
-    if subtitle:
-        input_obj["subtitle"] = subtitle[:250]
-
-    response = http_post_json(
-        "https://gql.hashnode.com",
-        headers={"Authorization": token},
-        payload={"query": mutation, "variables": {"input": input_obj}},
-    )
-    if response.get("errors"):
-        raise RuntimeError(f"hashnode GraphQL errors: {response['errors']}")
-    data = response.get("data") or {}
-    if draft:
-        node = data.get("createDraft", {}).get("draft", {})
-        url = f"https://hashnode.com/draft/{node.get('id')}" if node.get("id") else None
-    else:
-        node = data.get("publishPost", {}).get("post", {})
-        url = node.get("url")
-    return {
-        "id": node.get("id"),
-        "url": url,
-        "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-    }
-
-
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Do not call any APIs; print what would happen.")
@@ -421,8 +367,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def is_platform_configured(platform: str) -> bool:
     if platform == "devto":
         return bool(os.environ.get("DEVTO_API_KEY"))
-    if platform == "hashnode":
-        return bool(os.environ.get("HASHNODE_TOKEN") and os.environ.get("HASHNODE_PUBLICATION_ID"))
     return False
 
 
@@ -476,14 +420,6 @@ def main(argv: list[str]) -> int:
             if platform == "devto":
                 result = publish_to_devto(
                     candidate, body_markdown, os.environ["DEVTO_API_KEY"],
-                    draft=args.draft_mode,
-                )
-            elif platform == "hashnode":
-                result = publish_to_hashnode(
-                    candidate,
-                    body_markdown,
-                    os.environ["HASHNODE_TOKEN"],
-                    os.environ["HASHNODE_PUBLICATION_ID"],
                     draft=args.draft_mode,
                 )
             else:
