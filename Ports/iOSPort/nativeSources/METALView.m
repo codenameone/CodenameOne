@@ -228,16 +228,28 @@ extern BOOL isRetinaBug();
 
 
 -(void)updateFrameBufferSize:(int)w h:(int)h {
-    // Ignore the passed w/h -- CodenameOne_GLViewController.m calls this with
-    // logical points (self.view.bounds.size), but the Metal drawable and
-    // projection must be in physical pixels. The GL path tolerates the
-    // logical-point argument because EAGLView.updateFrameBufferSize: is a
-    // no-op (dimensions get read back from the renderbuffer after the layer
-    // is bound). For Metal we always compute from our own layer bounds.
-    CGSize sz = self.bounds.size;
-    CGFloat s = self.contentScaleFactor;
-    int pw = (int)(sz.width * s);
-    int ph = (int)(sz.height * s);
+    // Trust caller-supplied physical-pixel dimensions; fall back to bounds
+    // only if the caller passes 0. Reading self.bounds alone is unsafe
+    // during rotation: viewWillTransitionToSize: in CodenameOne_GLView-
+    // Controller fires BEFORE UIKit updates the view's bounds, so a
+    // bounds-derived size matches the cached (old) framebuffer dimensions
+    // and the early-return below would leave screenTexture, the projection
+    // matrix and stencil texture at the previous orientation. CAMetalLayer's
+    // drawableSize is auto-resized by UIKit on rotation, so the next
+    // drawFrame would blit the old-sized screenTexture into the new-sized
+    // drawable -- portrait content lands in a corner of the landscape
+    // drawable and the remaining pixels read back uninitialised, surfacing
+    // as the smeared/pink frames reported in #4954. The callers in this
+    // file (initWithCoder, layoutSubviews) and the GLViewController callers
+    // all pass physical pixels.
+    int pw = w;
+    int ph = h;
+    if (pw <= 0 || ph <= 0) {
+        CGSize sz = self.bounds.size;
+        CGFloat s = self.contentScaleFactor;
+        pw = (int)(sz.width * s);
+        ph = (int)(sz.height * s);
+    }
     if (pw <= 0 || ph <= 0) return;
     if (pw == framebufferWidth && ph == framebufferHeight) {
         return;

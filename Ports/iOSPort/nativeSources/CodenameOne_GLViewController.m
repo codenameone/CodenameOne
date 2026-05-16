@@ -2540,7 +2540,7 @@ bool lockDrawing;
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
-    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
@@ -3282,9 +3282,14 @@ BOOL prefersStatusBarHidden = NO;
     }
     
     // simply create a property of 'BOOL' type
-    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    // Pass physical pixels: viewWillTransitionToSize: fires before UIKit
+    // updates the view's bounds, so on the Metal backend the EAGLView's
+    // bounds read would still return the previous orientation. The
+    // METALView resize logic trusts these parameters; the EAGLView
+    // implementation is a no-op (#4954).
+    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     [[self eaglView] deleteFramebuffer];
-    
+
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     
@@ -3325,7 +3330,7 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 
-    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    [[self eaglView] updateFrameBufferSize:(int)(self.view.bounds.size.width * scaleValue) h:(int)(self.view.bounds.size.height * scaleValue)];
     [[self eaglView] deleteFramebuffer];
 
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
