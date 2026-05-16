@@ -118,6 +118,20 @@ final class JavascriptSuspensionAnalysis {
                 // so we keep the CHA-sync optimization but pair it
                 // with ``cn1_ivAdapt`` wrappers at every hand-written
                 // ``yield* translatedFn(args)`` call site.
+                //
+                // ``hasVirtualDispatch`` is required in the seed
+                // because the emitter hardcodes ``yield* cn1_iv*`` at
+                // every INVOKEVIRTUAL / INVOKEINTERFACE call site (see
+                // ``JavascriptMethodGenerator.appendVirtualDispatch``
+                // -- there is no ``cn1_ivs*`` synchronous virtual
+                // dispatcher, and 3 prior attempts to add one all hit
+                // runtime errors per
+                // ``project_jsport_suspension_tightening_failure``
+                // memory). A method emitted as plain ``function``
+                // cannot contain ``yield*``, so any method with even
+                // ONE virtual call must be a generator. Tightening
+                // the sync set further requires landing the sync
+                // virtual dispatcher first.
                 if (m.isNative()
                         || m.isSynchronizedMethod()
                         || hasMonitorOps(m)
