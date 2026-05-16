@@ -78,9 +78,6 @@ public final class GradientDescriptor {
     // conic
     private float fromAngleDegrees;
 
-    public GradientDescriptor() {
-    }
-
     public byte getKind() {
         return kind;
     }
@@ -196,7 +193,8 @@ public final class GradientDescriptor {
     public void computeRadii(int width, int height, float[] out) {
         float cx = relativeCenterX * width;
         float cy = relativeCenterY * height;
-        float rx, ry;
+        float rx;
+        float ry;
         switch (radialExtent) {
             case EXTENT_CLOSEST_SIDE:
                 rx = Math.min(cx, width - cx);
