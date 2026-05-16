@@ -567,71 +567,19 @@ fi
 # default-credentials XHR couldn't reuse the preloaded bytes. The
 # bare ``fetch(url)`` call sidesteps that mismatch.
 #
-# Main-thread asset preload + ``window.cn1Assets`` population. Has two
-# wins:
-#   1. The two boot ``.res`` fetches (``theme.res``, ``iOS7Theme.res``)
-#      go to the network in PARALLEL via ``fetch()`` instead of the
-#      worker's two sequential sync XHRs (currently ~919 ms wall in
-#      total).
-#   2. Once each prefetch resolves, the bytes are stuffed into
-#      ``window.cn1Assets[<key>]`` as a data URL. The worker's
-#      ``getArrayBufferInputStream`` already short-circuits via
-#      ``getBundledAssetAsDataURL`` when a matching entry is present
-#      (no XHR is issued), so the second wall-clock ``.res`` fetch
-#      disappears entirely.
-# The previous ``cn1-prefetch`` <script> only kicked off ``fetch()``
-# calls without storing the result, so Cloudflare's
-# ``cache-control: max-age=0, must-revalidate`` forced the worker's
-# sync XHR to refetch the full body. Storing the bytes side-steps the
-# cache entirely.
-if [ -f "$DIST_DIR/index.html" ] && ! grep -q "<!-- cn1-prefetch -->" "$DIST_DIR/index.html"; then
-  prefetch_file="$(mktemp)"
-  cat > "$prefetch_file" <<'PREFETCH'
-<script>/* cn1-prefetch */
-window.cn1Assets = window.cn1Assets || {};
-(function () {
-  function _toDataUrl(blob) {
-    return new Promise(function (resolve) {
-      var r = new FileReader();
-      r.onloadend = function () { resolve(r.result); };
-      r.onerror = function () { resolve(null); };
-      r.readAsDataURL(blob);
-    });
-  }
-  function _preload(url, key) {
-    try {
-      fetch(url).then(function (r) { return r.ok ? r.blob() : null; })
-        .then(function (b) { return b ? _toDataUrl(b) : null; })
-        .then(function (d) { if (d) { window.cn1Assets[key] = d; } })
-        .catch(function () {});
-    } catch (e) {}
-  }
-  // ``getBundledAssetAsDataURL`` keys on the basename after the FIRST
-  // slash (see js/fontmetrics.js): ``theme.res`` stays ``theme.res``,
-  // ``assets/iOS7Theme.res`` becomes ``iOS7Theme.res``.
-  // ``HTML5Implementation.getArrayBufferInputStream`` checks the
-  // bundled-asset path BEFORE the ``?v=`` query mangling, so we
-  // match the pre-mangled URL form.
-  _preload('theme.res', 'theme.res');
-  _preload('assets/iOS7Theme.res?v=1.0', 'iOS7Theme.res');
-})();
-</script>
-<!-- cn1-prefetch -->
-PREFETCH
-  python3 - "$DIST_DIR/index.html" "$prefetch_file" <<'PYEOF'
-import sys, pathlib
-html_path = pathlib.Path(sys.argv[1])
-prefetch_path = pathlib.Path(sys.argv[2])
-html = html_path.read_text(encoding='utf-8')
-inject = prefetch_path.read_text(encoding='utf-8')
-needle = '<script src="js/push.js"></script>'
-if needle in html:
-  html = html.replace(needle, inject + needle, 1)
-  html_path.write_text(html, encoding='utf-8')
-PYEOF
-  rm -f "$prefetch_file"
-  bj_log "Patched index.html with cn1-prefetch theme.res / iOS7Theme.res into cn1Assets"
-fi
+# Note: an earlier ``cn1-prefetch`` <script> here issued
+# ``fetch('theme.res')`` / ``fetch('assets/iOS7Theme.res?v=1.0')`` to
+# warm the HTTP cache before the worker's sync XHR fired. Measured cost
+# on the deployed PR preview: the prefetch and the worker XHR both went
+# to the network at full size -- Cloudflare Pages returns
+# ``cache-control: public, max-age=0, must-revalidate`` for static
+# assets, which forces every cache lookup to revalidate against the
+# server, and the worker's sync XHR doesn't share connection-level state
+# with the page's prior fetch. Net result: 1.5 MiB downloaded twice on
+# every cold load. Pulled the prefetch; the worker hits the same URLs
+# directly. If we later switch to async asset loading or fix the
+# cache-control header on the deploy, the warm-cache idea is worth
+# revisiting.
 
 # --- Post-translation minimisation pass -------------------------------------
 # A raw ByteCodeTranslator JS bundle for Initializr is ~90 MiB and consists
