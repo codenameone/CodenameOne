@@ -128,6 +128,14 @@ class StickyHeaderContainerTest extends UITestBase {
         assertEquals(StickyHeaderContainer.TRANSITION_NONE, sticky.getTransitionStyle());
         sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
         assertEquals(StickyHeaderContainer.TRANSITION_SLIDE, sticky.getTransitionStyle());
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_COVER);
+        assertEquals(StickyHeaderContainer.TRANSITION_COVER, sticky.getTransitionStyle());
+    }
+
+    @FormTest
+    void headerFadeOutDefaultsToFalse() {
+        StickyHeaderContainer sticky = new StickyHeaderContainer();
+        assertFalse(sticky.isHeaderFadeOut());
     }
 
     @FormTest
@@ -309,6 +317,87 @@ class StickyHeaderContainerTest extends UITestBase {
         assertEquals(1, sticky.getActiveSectionIndex());
         assertEquals(255, sticky.getStickyHost().getStyle().getOpacity());
         assertEquals(baseY, sticky.getStickyHost().getY());
+    }
+
+    @FormTest
+    void coverStyleKeepsStickyHostInPlaceDuringOverlap() {
+        // COVER's whole point is that the pinned header stays put while
+        // the rising header progressively slides on top of it. The
+        // overlay paint that draws the rising header above the slot is
+        // exercised in the visual layer; here we verify the underlying
+        // host state stays fixed (no slide, full opacity by default).
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_COVER);
+
+        sticky.setScrollPosition(100);
+        sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
+        assertTrue(sticky.getStickyHost().isVisible());
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 20);
+        sticky.updateSticky();
+        assertTrue(sticky.isTransitionInProgress(),
+                "expected push to be in flight for COVER");
+        assertEquals(baseY, sticky.getStickyHost().getY(),
+                "COVER must not shift the host while overlapping");
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity(),
+                "COVER alone keeps the host fully opaque");
+        assertTrue(sticky.getStickyHost().isVisible(),
+                "COVER must keep the host visible during the overlap");
+
+        sticky.setScrollPosition(SECTION_STRIDE + 10);
+        sticky.updateSticky();
+        assertEquals(1, sticky.getActiveSectionIndex());
+        assertEquals(baseY, sticky.getStickyHost().getY());
+    }
+
+    @FormTest
+    void headerFadeOutAppliesToSlide() {
+        // The standalone fade-out flag must apply on top of SLIDE: the
+        // host both shifts up by the push offset AND drops in opacity.
+        // This replaces the legacy single-purpose TRANSITION_FADE with
+        // a composable flag, so the same behaviour is reachable via
+        // SLIDE + setHeaderFadeOut(true).
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_SLIDE);
+        sticky.setHeaderFadeOut(true);
+
+        sticky.setScrollPosition(100);
+        sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity());
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 25);
+        sticky.updateSticky();
+        int alpha = sticky.getStickyHost().getStyle().getOpacity();
+        assertTrue(alpha > 100 && alpha < 160,
+                "fade alpha should be roughly half-way through, was " + alpha);
+        assertEquals(baseY - 25, sticky.getStickyHost().getY(),
+                "SLIDE + headerFadeOut must still shift the host up");
+    }
+
+    @FormTest
+    void headerFadeOutAppliesToCover() {
+        // headerFadeOut composes with COVER: the host stays at baseY
+        // (cover does not shift the pinned header) but its opacity
+        // drops in proportion to push progress so the user sees A
+        // dissolve while B slides over it.
+        StickyHeaderContainer sticky = build(3);
+        sticky.setTransitionStyle(StickyHeaderContainer.TRANSITION_COVER);
+        sticky.setHeaderFadeOut(true);
+
+        sticky.setScrollPosition(100);
+        sticky.updateSticky();
+        int baseY = sticky.getStickyHost().getY();
+        assertEquals(255, sticky.getStickyHost().getStyle().getOpacity());
+
+        sticky.setScrollPosition(SECTION_STRIDE - HEADER_HEIGHT + 25);
+        sticky.updateSticky();
+        int alpha = sticky.getStickyHost().getStyle().getOpacity();
+        assertTrue(alpha > 100 && alpha < 160,
+                "fade alpha should be roughly half-way through, was " + alpha);
+        assertEquals(baseY, sticky.getStickyHost().getY(),
+                "COVER + headerFadeOut must keep the host fixed in the slot");
     }
 
     @FormTest

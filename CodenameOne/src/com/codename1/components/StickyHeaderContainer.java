@@ -41,12 +41,13 @@ import java.util.List;
 /// or sectioned material lists. As the next section's header rises into the
 /// pinned slot the previous header is replaced through a configurable
 /// scroll-driven transition: a directional slide where the rising header
-/// pushes the pinned one up and out, an instant cover where the rising
-/// header simply slides over the pinned one, or a fade where the pinned
-/// header fades to transparency as the next section closes the gap.
-/// Transitions are driven by scroll position so the visual stays in sync
-/// with the user's gesture and there is no time-based animation that lags
-/// behind a slow drag or skips ahead on a fling.
+/// pushes the pinned one up and out, or a cover where the rising header
+/// progressively slides on top of the pinned one. The outgoing header can
+/// optionally fade out alongside either transition via
+/// [#setHeaderFadeOut(boolean)]. Transitions are driven by scroll position
+/// so the visual stays in sync with the user's gesture and there is no
+/// time-based animation that lags behind a slow drag or skips ahead on a
+/// fling.
 ///
 /// Sections are added with `addSection(header, content)`. The header is a
 /// real component that participates in the scroll: when it is the active
@@ -72,20 +73,37 @@ import java.util.List;
 ///
 /// @author Shai Almog
 public class StickyHeaderContainer extends Container {
-    /// Replace the pinned header without a fade or shift. The pinned
-    /// header stays in place until the rising section reaches the slot
-    /// top, at which point the swap is instant. The rising header is
-    /// hidden behind the pinned slot during the overlap.
+    /// Replace the pinned header without any visible movement of the
+    /// pinned header. The rising section's header stays hidden behind
+    /// the pinned slot during the overlap and the swap is instant once
+    /// it reaches the slot top. Generally [#TRANSITION_COVER] is a more
+    /// useful choice, since with `TRANSITION_NONE` the rising header
+    /// disappears under the pinned one with no visual feedback that the
+    /// swap is approaching. Kept for backward compatibility.
     public static final int TRANSITION_NONE = 0;
     /// As the next section's header rises into the pinned slot from below
     /// it pushes the pinned header up and out of the slot in sync with
     /// the scroll, replacing it once the rising header reaches the top.
     public static final int TRANSITION_SLIDE = 1;
-    /// As the next section's header rises into the pinned slot from below
-    /// the pinned header both slides up and fades to transparency, so
-    /// it dissolves out of the slot while the rising header takes its
-    /// place. The swap happens once the rising header reaches the top.
+    /// Convenience equivalent to [#TRANSITION_SLIDE] combined with
+    /// [#setHeaderFadeOut(boolean)] set to `true`: the pinned header
+    /// both slides up and fades to transparency as the rising header
+    /// closes the gap. Prefer composing
+    /// `setTransitionStyle(TRANSITION_SLIDE)` with
+    /// `setHeaderFadeOut(true)` -- or
+    /// `setTransitionStyle(TRANSITION_COVER)` with
+    /// `setHeaderFadeOut(true)` -- when you want a fade-out on top of
+    /// another transition. Kept for backward compatibility.
     public static final int TRANSITION_FADE = 2;
+    /// As the next section's header rises into the pinned slot from
+    /// below it progressively slides on top of the pinned header,
+    /// covering it from the bottom up while the pinned header stays
+    /// fixed in the slot. The swap happens once the rising header
+    /// reaches the slot top, at which point it has fully replaced the
+    /// pinned one with no jump in position. Combine with
+    /// [#setHeaderFadeOut(boolean)] to also fade the covered header out
+    /// during the overlap.
+    public static final int TRANSITION_COVER = 3;
 
     private final ScrollContainer scroller;
     private final Container stickyHost;
@@ -95,6 +113,7 @@ public class StickyHeaderContainer extends Container {
 
     private int transitionStyle = TRANSITION_SLIDE;
     private int transitionDurationMillis;
+    private boolean headerFadeOut;
 
     /// Pixels of overlap between the pinned header's slot and the next
     /// section's header. `0` means the next section is still fully below
@@ -148,6 +167,33 @@ public class StickyHeaderContainer extends Container {
                 updateSticky(scrollY);
             }
         });
+    }
+
+    /// Paints the COVER overlay on top of the pinned slot: when the
+    /// transition style is [#TRANSITION_COVER] and a push is in flight,
+    /// the rising section's header is rendered again above the pinned
+    /// host so it visibly slides over the pinned header instead of
+    /// being hidden underneath it. The natural paint in the scroller is
+    /// at the same viewport position, so re-painting the header after
+    /// `super.paint(g)` simply moves it to the top of the z-order in
+    /// the slot region; outside that region the second paint draws over
+    /// identical scroller content and is invisible. No-op for any other
+    /// transition style or when no swap is mid-flight.
+    @Override
+    public void paint(Graphics g) {
+        super.paint(g);
+        if (transitionStyle != TRANSITION_COVER || pushOffset <= 0 || activeIndex < 0) {
+            return;
+        }
+        int nextIdx = activeIndex + 1;
+        if (nextIdx >= sections.size()) {
+            return;
+        }
+        Component rising = sections.get(nextIdx).header;
+        if (rising.getParent() != scroller || !rising.isVisible()) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        rising.paintComponent(g);
     }
 
     /// Overlay host that always paints its parent's background under the
@@ -264,9 +310,12 @@ public class StickyHeaderContainer extends Container {
 
     /// Selects how the pinned header is replaced when the next section
     /// rises into the slot. One of [#TRANSITION_NONE], [#TRANSITION_SLIDE]
-    /// (default) or [#TRANSITION_FADE].
+    /// (default), [#TRANSITION_FADE] or [#TRANSITION_COVER]. The fade-out
+    /// of the pinned header is a separate, composable concern controlled
+    /// by [#setHeaderFadeOut(boolean)].
     public void setTransitionStyle(int style) {
-        if (style != TRANSITION_NONE && style != TRANSITION_SLIDE && style != TRANSITION_FADE) {
+        if (style != TRANSITION_NONE && style != TRANSITION_SLIDE
+                && style != TRANSITION_FADE && style != TRANSITION_COVER) {
             throw new IllegalArgumentException("Unknown transition style: " + style);
         }
         if (this.transitionStyle == style) {
@@ -281,6 +330,30 @@ public class StickyHeaderContainer extends Container {
 
     public int getTransitionStyle() {
         return transitionStyle;
+    }
+
+    /// When `true` the pinned header fades to transparency in proportion
+    /// to the push progress as the next section rises into the slot.
+    /// This is independent of the transition style and composes with
+    /// [#TRANSITION_SLIDE] (slide + fade), [#TRANSITION_COVER] (cover +
+    /// fade) and [#TRANSITION_NONE] (fade only). [#TRANSITION_FADE]
+    /// implies the fade-out behaviour regardless of this flag.
+    /// Defaults to `false`.
+    public void setHeaderFadeOut(boolean fade) {
+        if (this.headerFadeOut == fade) {
+            return;
+        }
+        this.headerFadeOut = fade;
+        applyPushVisuals();
+        if (isInitialized()) {
+            repaint();
+        }
+    }
+
+    /// Returns whether the pinned header is configured to fade out
+    /// during a swap. See [#setHeaderFadeOut(boolean)].
+    public boolean isHeaderFadeOut() {
+        return headerFadeOut;
     }
 
     /// Retained for API compatibility. Transitions are now scroll-driven so
@@ -525,50 +598,46 @@ public class StickyHeaderContainer extends Container {
             return;
         }
         int activeH = activeHeightFor(activeIndex);
+        // TRANSITION_FADE is a legacy convenience for "slide + fade out";
+        // outside of that, the fade is governed solely by the separate
+        // headerFadeOut flag.
+        boolean fadeOutgoing = headerFadeOut || transitionStyle == TRANSITION_FADE;
+        int alpha = 255;
+        if (fadeOutgoing && activeH > 0) {
+            alpha = 255 - (pushOffset * 255) / activeH;
+            if (alpha < 0) {
+                alpha = 0;
+            } else if (alpha > 255) {
+                alpha = 255;
+            }
+        }
         switch (transitionStyle) {
-            case TRANSITION_SLIDE: {
-                stickyHost.setY(stickyHostBaseY - pushOffset);
-                stickyHost.getAllStyles().setOpacity(255);
-                stickyHost.setVisible(true);
-                break;
-            }
-            case TRANSITION_NONE: {
-                // Keep the pinned header in place at full opacity. The
-                // rising section's header is below the slot in the
-                // scroller and stays hidden behind the pinned host until
-                // the swap, which is instant -- that is the "no
-                // transition" semantic. Hiding the host here would
-                // expose scroller content (e.g. the previous section's
-                // last entry) where the slot used to be.
-                stickyHost.setY(stickyHostBaseY);
-                stickyHost.getAllStyles().setOpacity(255);
-                stickyHost.setVisible(true);
-                break;
-            }
+            case TRANSITION_SLIDE:
             case TRANSITION_FADE: {
-                // Combined slide-and-fade so the rising header is
+                // FADE shares SLIDE's movement so the rising header is
                 // visibly filling the slot from below while the pinned
                 // header dissolves on its way out. With a fade-only
                 // implementation the user sees the slot become empty as
                 // the pinned header alpha drops, since the rising
                 // header is still well below the slot top.
-                int alpha = 255;
-                if (activeH > 0) {
-                    alpha = 255 - (pushOffset * 255) / activeH;
-                    if (alpha < 0) {
-                        alpha = 0;
-                    } else if (alpha > 255) {
-                        alpha = 255;
-                    }
-                }
                 stickyHost.setY(stickyHostBaseY - pushOffset);
-                stickyHost.getAllStyles().setOpacity(alpha);
-                stickyHost.setVisible(true);
                 break;
             }
-            default:
+            case TRANSITION_COVER:
+            case TRANSITION_NONE:
+            default: {
+                // Keep the pinned header in place. For COVER the rising
+                // header is painted on top of the slot in paint(g) so
+                // the user sees the cover progress; for NONE the rising
+                // section stays hidden behind the pinned host until the
+                // swap, which is instant. Hiding the host in NONE would
+                // expose scroller content where the slot used to be.
+                stickyHost.setY(stickyHostBaseY);
                 break;
+            }
         }
+        stickyHost.getAllStyles().setOpacity(alpha);
+        stickyHost.setVisible(true);
     }
 
     private final class StickyOverlayLayout extends Layout {
