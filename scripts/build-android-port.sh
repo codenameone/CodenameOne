@@ -139,11 +139,15 @@ fi
 mkdir -p Ports/Android/src
 cp Themes/AndroidMaterialTheme.res Ports/Android/src/AndroidMaterialTheme.res
 
-# Include `designer` in the build set so changes under maven/css-compiler/
+# Rebuild the `designer` module first so changes under maven/css-compiler/
 # are picked up by the maven plugin's CSS compile step. The designer module's
 # jar-with-dependencies embeds css-compiler classes (CSSTheme etc.); the
 # maven plugin's CompileCSSMojo runs designer_1.jar to compile theme.css ->
-# theme.res. Without `-pl designer`, a cached ~/.m2/repository restores the
-# previous build's designer.jar even when CSSTheme.java has changed - so
-# new gradient / filter parsing additions silently miss the app's theme.res.
-run_maven -q -f maven/pom.xml -pl android,designer -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
+# theme.res. Without an explicit designer install, a cached ~/.m2/repository
+# restores the previous build's designer.jar even when CSSTheme.java has
+# changed - so new gradient / filter parsing additions silently miss the
+# app's theme.res. Done as a separate invocation (with -Plocal-dev-javase)
+# because `designer` -> `javase-svg` -> `javase`, and the javase port only
+# resolves its CEF dependency under that profile.
+run_maven -q -f maven/pom.xml -pl designer -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries,local-dev-javase -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
+run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
