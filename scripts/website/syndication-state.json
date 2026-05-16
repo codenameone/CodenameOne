@@ -28,6 +28,21 @@
         "url": "https://dzone.com/content/3653548/edit.html",
         "syndicated_at": "2026-05-09T16:48:46+00:00"
       }
+    },
+    "metal-and-skins": {
+      "devto": {
+        "id": 3678044,
+        "url": "https://dev.to/codenameone/metal-and-skins-4e00",
+        "syndicated_at": "2026-05-15T13:34:26+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/draft/67a41962e690bb4ecd9fd9b8",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-05-15T18:42:17+00:00"
+      }
     }
   }
 }

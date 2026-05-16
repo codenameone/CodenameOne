@@ -1,5 +1,5 @@
 {
-  "_comment": "Queue of browser-only syndication tasks consumed by the Codename One Syndicator Firefox extension. The extension polls https://raw.githubusercontent.com/codenameone/CodenameOne/master/scripts/website/syndication-queue.json and processes any task whose id is not already in the user's local 'completed_tasks' list. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow.",
+  "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
       "id": "medium:liquid-glass-material-3-modern-native-themes",
