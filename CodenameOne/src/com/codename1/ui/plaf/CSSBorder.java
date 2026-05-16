@@ -210,31 +210,13 @@ public class CSSBorder extends Border {
                 return border.borderSideWidth(side, cssPropertyValue);
             }
         });
-        decorators.put("border-width-" + sideName, new Decorator() {
-            @Override
-            public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
-                return border.borderSideWidth(side, cssPropertyValue);
-            }
-        });
         decorators.put("border-" + sideName + "-style", new Decorator() {
             @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderSideStyle(side, cssPropertyValue);
             }
         });
-        decorators.put("border-style-" + sideName, new Decorator() {
-            @Override
-            public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
-                return border.borderSideStyle(side, cssPropertyValue);
-            }
-        });
         decorators.put("border-" + sideName + "-color", new Decorator() {
-            @Override
-            public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
-                return border.borderSideColor(side, cssPropertyValue);
-            }
-        });
-        decorators.put("border-color-" + sideName, new Decorator() {
             @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderSideColor(side, cssPropertyValue);
@@ -1138,32 +1120,37 @@ public class CSSBorder extends Border {
     }
 
     private CSSBorder borderSide(int side, String value) {
-        ensureStrokeDefaults();
-        String[] parts = Util.split(value, " ");
-        boolean foundWidth = false;
-        boolean foundStyle = false;
-        boolean foundColor = false;
-        for (String part : parts) {
-            String token = part.trim();
-            if (token.length() == 0) {
-                continue;
+        try {
+            ensureStrokeDefaults();
+            String[] parts = Util.split(value, " ");
+            boolean foundWidth = false;
+            boolean foundStyle = false;
+            boolean foundColor = false;
+            for (String part : parts) {
+                String token = part.trim();
+                if (token.length() == 0) {
+                    continue;
+                }
+                if (!foundWidth && BorderStroke.validateThickness(token)) {
+                    borderSideWidth(side, token);
+                    foundWidth = true;
+                    continue;
+                }
+                if (!foundStyle && validateBorderStyle(token)) {
+                    borderSideStyle(side, token);
+                    foundStyle = true;
+                    continue;
+                }
+                if (!foundColor && Color.validate(token)) {
+                    borderSideColor(side, token);
+                    foundColor = true;
+                    continue;
+                }
+                throw new IllegalArgumentException("Unsupported border side token " + token);
             }
-            if (!foundWidth && BorderStroke.validateThickness(token)) {
-                borderSideWidth(side, token);
-                foundWidth = true;
-                continue;
-            }
-            if (!foundStyle && validateBorderStyle(token)) {
-                borderSideStyle(side, token);
-                foundStyle = true;
-                continue;
-            }
-            if (!foundColor && Color.validate(token)) {
-                borderSideColor(side, token);
-                foundColor = true;
-                continue;
-            }
-            throw new IllegalArgumentException("Unsupported border side token " + token);
+        } catch (Throwable t) {
+            Log.e(t);
+            throw new RuntimeException("Failed parsing border side: " + value, t);
         }
         return this;
     }

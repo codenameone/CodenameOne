@@ -125,4 +125,21 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertTrue(css.contains("#ccccccff"));
     }
 
+    @Test
+    public void testCompilesSideBorderLonghands() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+
+        compiler.compile(
+                "SideCommand{border:none;border-top-width:3px;border-top-style:dashed;border-top-color:#ff0000;}",
+                resource, "Theme");
+
+        Hashtable theme = resource.getTheme("Theme");
+        assertTrue(theme.get("SideCommand.border") instanceof CSSBorder);
+        String css = ((CSSBorder) theme.get("SideCommand.border")).toCSSString();
+        assertTrue(css.contains("border-style:dashed none none none"));
+        assertTrue(css.contains("3px"));
+        assertTrue(css.contains("#ff0000ff"));
+    }
+
 }
