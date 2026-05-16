@@ -1135,6 +1135,27 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 }
             });
         }
+
+        @Override
+        public void fillGradient(final com.codename1.ui.Gradient gradient, final int x, final int y, final int width, final int height) {
+            if (alpha == 0 || gradient == null) {
+                return;
+            }
+            final int al = alpha;
+            // Capture a defensive copy so async replay sees the gradient as it
+            // was when the op was queued, immune to caller mutation.
+            final com.codename1.ui.Gradient g = gradient.copy();
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.setAlpha(al);
+                    underlying.fillGradient(g, x, y, width, height);
+                }
+                public String toString() {
+                    return "fillGradient";
+                }
+            });
+        }
         
         class AndroidStyleCache {
             AsyncPaintPosition backgroundPainter;
