@@ -305,6 +305,32 @@ public class CSSTheme {
          * Parses an arbitrary-angle, multi-stop linear gradient. When
          * {@code repeating} is true the resulting descriptor uses CYCLE_REPEAT.
          */
+        /// Flute's SAC parser only special-cases `linear-gradient` and
+        /// `radial-gradient` function names; for `conic-gradient` and
+        /// `repeating-*-gradient` it falls through to a generic function
+        /// parse that wraps bare identifiers in `attr(...)` (SAC_ATTR) instead
+        /// of emitting SAC_IDENT. The keyword token itself sits in the
+        /// ATTR's stringValue. Treat the two interchangeably so the position
+        /// / shape / extent keywords parse the same in both layouts.
+        private static boolean isIdentLike(ScaledUnit u) {
+            int t = u.getLexicalUnitType();
+            return t == LexicalUnit.SAC_IDENT || t == LexicalUnit.SAC_ATTR;
+        }
+
+        private static String identValue(ScaledUnit u) {
+            String s = u.getStringValue();
+            if (u.getLexicalUnitType() == LexicalUnit.SAC_ATTR && s != null) {
+                int paren = s.indexOf('(');
+                if (paren >= 0) {
+                    int end = s.lastIndexOf(')');
+                    if (end > paren) {
+                        return s.substring(paren + 1, end).trim();
+                    }
+                }
+            }
+            return s;
+        }
+
         private void parseLinearGradientExtended(ScaledUnit background, boolean repeating) {
             ScaledUnit fn = background;
             // Already passed by isGradient check.
@@ -326,14 +352,12 @@ public class CSSTheme {
                 if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
                     p = (ScaledUnit) p.getNextLexicalUnit();
                 }
-            } else if (p.getLexicalUnitType() == LexicalUnit.SAC_IDENT
-                    && "to".equals(p.getStringValue())) {
+            } else if (isIdentLike(p) && "to".equals(identValue(p))) {
                 ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
                 if (nx == null) { reason = "Bad 'to' clause"; return; }
-                String side1 = nx.getStringValue();
+                String side1 = identValue(nx);
                 ScaledUnit nx2 = (ScaledUnit) nx.getNextLexicalUnit();
-                String side2 = (nx2 != null && nx2.getLexicalUnitType() == LexicalUnit.SAC_IDENT)
-                        ? nx2.getStringValue() : null;
+                String side2 = (nx2 != null && isIdentLike(nx2)) ? identValue(nx2) : null;
                 angle = cssSideToAngle(side1, side2);
                 p = (side2 != null ? (ScaledUnit) nx2.getNextLexicalUnit() : (ScaledUnit) nx.getNextLexicalUnit());
                 if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
@@ -365,8 +389,8 @@ public class CSSTheme {
             // Consume optional shape / extent / at-position clauses until a comma.
             while (p != null && p.getLexicalUnitType() != LexicalUnit.SAC_OPERATOR_COMMA) {
                 int t = p.getLexicalUnitType();
-                if (t == LexicalUnit.SAC_IDENT) {
-                    String s = p.getStringValue();
+                if (isIdentLike(p)) {
+                    String s = identValue(p);
                     if ("circle".equals(s)) {
                         shape = RadialGradient.SHAPE_CIRCLE;
                         sawShapeOrExtent = true;
@@ -446,9 +470,8 @@ public class CSSTheme {
             boolean consumedHeader = false;
             // Optional "from <angle>" and "at <pos>" prefix.
             while (p != null && p.getLexicalUnitType() != LexicalUnit.SAC_OPERATOR_COMMA) {
-                int t = p.getLexicalUnitType();
-                if (t == LexicalUnit.SAC_IDENT) {
-                    String s = p.getStringValue();
+                if (isIdentLike(p)) {
+                    String s = identValue(p);
                     if ("from".equals(s)) {
                         ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
                         if (nx != null && (nx.getLexicalUnitType() == LexicalUnit.SAC_DEGREE
@@ -463,8 +486,8 @@ public class CSSTheme {
                         consumedHeader = true;
                     } else if ("at".equals(s)) {
                         ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
-                        if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
-                            float[] pos = cssPositionKeyword(nx.getStringValue());
+                        if (nx != null && isIdentLike(nx)) {
+                            float[] pos = cssPositionKeyword(identValue(nx));
                             cx = pos[0]; cy = pos[1];
                             p = nx;
                         } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
@@ -6502,6 +6525,9 @@ public class CSSTheme {
                             switch (value.getFunctionName()) {
                                 case "linear-gradient" :
                                 case "radial-gradient" :
+                                case "conic-gradient" :
+                                case "repeating-linear-gradient" :
+                                case "repeating-radial-gradient" :
                                     style.put("background", value);
                                     break;
                                 case "rgb" :
@@ -7365,6 +7391,12 @@ public class CSSTheme {
         switch (color.getLexicalUnitType()) {
             case LexicalUnit.SAC_IDENT:
             case LexicalUnit.SAC_STRING_VALUE:
+            case LexicalUnit.SAC_ATTR:
+                // Flute reports bare identifiers inside non-special-cased
+                // gradient functions (conic-gradient, repeating-*-gradient)
+                // as SAC_ATTR with stringValue = "attr(red)". Treat them the
+                // same as SAC_IDENT - the existing attr(...) unwrap below
+                // handles the wrapper either way.
                 String colorStr = color.getStringValue();
                 if ("none".equals(colorStr)) {
                     return null;
