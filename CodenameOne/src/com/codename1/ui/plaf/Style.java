@@ -89,6 +89,12 @@ public class Style {
     public static final String BACKGROUND_ALIGNMENT = "bgAlign";
     /// Background attribute name for the theme hashtable
     public static final String BACKGROUND_GRADIENT = "bgGradient";
+    /// Extended gradient descriptor attribute (multi-stop, angled, conic, repeating).
+    public static final String GRADIENT_DESCRIPTOR = "bgGradientEx";
+    /// CSS filter:blur() radius in pixels.
+    public static final String FILTER_BLUR = "filterBlur";
+    /// CSS backdrop-filter:blur() radius in pixels.
+    public static final String BACKDROP_FILTER_BLUR = "backdropFilterBlur";
     /// Font attribute name for the theme hashtable
     public static final String FONT = "font";
     /// Transparency attribute name for the theme hashtable
@@ -179,6 +185,19 @@ public class Style {
     public static final byte BACKGROUND_GRADIENT_LINEAR_HORIZONTAL = (byte) 7;
     /// Indicates the background for the style would use a radial gradient
     public static final byte BACKGROUND_GRADIENT_RADIAL = (byte) 8;
+    /// Multi-stop linear gradient at an arbitrary angle. Driven by the gradient
+    /// descriptor attached via setGradientDescriptor(); legacy
+    /// setBackgroundGradientStartColor/EndColor are ignored for this type.
+    public static final byte BACKGROUND_GRADIENT_LINEAR = (byte) 35;
+    /// Multi-stop radial gradient with full CSS shape/extent control. Driven by
+    /// the gradient descriptor.
+    public static final byte BACKGROUND_GRADIENT_RADIAL_FULL = (byte) 36;
+    /// Conic / sweep gradient. Driven by the gradient descriptor.
+    public static final byte BACKGROUND_GRADIENT_CONIC = (byte) 37;
+    /// Repeating multi-stop linear gradient (CSS repeating-linear-gradient).
+    public static final byte BACKGROUND_GRADIENT_REPEATING_LINEAR = (byte) 38;
+    /// Repeating multi-stop radial gradient (CSS repeating-radial-gradient).
+    public static final byte BACKGROUND_GRADIENT_REPEATING_RADIAL = (byte) 39;
     /// Indicates no text decoration
     public static final byte TEXT_DECORATION_NONE = (byte) 0;
     /// Indicates underline
@@ -259,6 +278,9 @@ public class Style {
     private static final int SURFACE_MODIFIED = 131072;
     private static final int FG_ALPHA_MODIFIED = 262144;
     private static final int ICON_GAP_MODIFIED = 524288;
+    private static final int GRADIENT_DESCRIPTOR_MODIFIED = 1048576;
+    private static final int FILTER_BLUR_MODIFIED = 2097152;
+    private static final int BACKDROP_FILTER_BLUR_MODIFIED = 4194304;
     float[] padding = new float[4];
     float[] margin = new float[4];
     /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
@@ -292,6 +314,9 @@ public class Style {
     private byte backgroundType = BACKGROUND_IMAGE_SCALED;
     private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;
     private Object[] backgroundGradient;
+    private GradientDescriptor gradientDescriptor;
+    private float filterBlurRadius;
+    private float backdropFilterBlurRadius;
     private Border border = null;
     private int align = Component.LEFT;
     private int textDecoration; // Used for underline, strikethru etc. (See TEXT_DECORATION_* constants)
@@ -346,6 +371,11 @@ public class Style {
             backgroundGradient = new Object[style.backgroundGradient.length];
             System.arraycopy(style.backgroundGradient, 0, backgroundGradient, 0, backgroundGradient.length);
         }
+        if (style.gradientDescriptor != null) {
+            gradientDescriptor = style.gradientDescriptor.copy();
+        }
+        filterBlurRadius = style.filterBlurRadius;
+        backdropFilterBlurRadius = style.backdropFilterBlurRadius;
     }
 
     /// Creates a new style with the given attributes
@@ -2655,6 +2685,102 @@ public class Style {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }
             firePropertyChanged(BACKGROUND_GRADIENT);
+        }
+    }
+
+    /// Extended (multi-stop / angled / conic / repeating) gradient descriptor.
+    /// May be null if this Style uses no extended gradient. Required when
+    /// backgroundType is one of the BACKGROUND_GRADIENT_LINEAR /
+    /// BACKGROUND_GRADIENT_RADIAL_FULL / BACKGROUND_GRADIENT_CONIC /
+    /// BACKGROUND_GRADIENT_REPEATING_* values.
+    public GradientDescriptor getGradientDescriptor() {
+        return gradientDescriptor;
+    }
+
+    /// Sets the extended gradient descriptor. Pass null to clear it.
+    public void setGradientDescriptor(GradientDescriptor descriptor) {
+        setGradientDescriptor(descriptor, false);
+    }
+
+    /// Internal setter variant honoring the override flag.
+    public void setGradientDescriptor(GradientDescriptor descriptor, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setGradientDescriptor(descriptor, override);
+            }
+            return;
+        }
+        this.gradientDescriptor = descriptor;
+        if (!override) {
+            modifiedFlag |= GRADIENT_DESCRIPTOR_MODIFIED;
+        }
+        firePropertyChanged(GRADIENT_DESCRIPTOR);
+    }
+
+    /// CSS filter:blur() radius applied to the component's foreground (the
+    /// component itself, after it has been painted). 0 disables the filter.
+    public float getFilterBlurRadius() {
+        return filterBlurRadius;
+    }
+
+    public void setFilterBlurRadius(float radius) {
+        setFilterBlurRadius(radius, false);
+    }
+
+    public void setFilterBlurRadius(float radius, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setFilterBlurRadius(radius, override);
+            }
+            return;
+        }
+        if (this.filterBlurRadius != radius) {
+            this.filterBlurRadius = radius;
+            if (!override) {
+                modifiedFlag |= FILTER_BLUR_MODIFIED;
+            }
+            firePropertyChanged(FILTER_BLUR);
+        }
+    }
+
+    /// CSS backdrop-filter:blur() radius applied to whatever is painted behind
+    /// the component before this component is drawn. 0 disables the filter.
+    public float getBackdropFilterBlurRadius() {
+        return backdropFilterBlurRadius;
+    }
+
+    public void setBackdropFilterBlurRadius(float radius) {
+        setBackdropFilterBlurRadius(radius, false);
+    }
+
+    public void setBackdropFilterBlurRadius(float radius, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setBackdropFilterBlurRadius(radius, override);
+            }
+            return;
+        }
+        if (this.backdropFilterBlurRadius != radius) {
+            this.backdropFilterBlurRadius = radius;
+            if (!override) {
+                modifiedFlag |= BACKDROP_FILTER_BLUR_MODIFIED;
+            }
+            firePropertyChanged(BACKDROP_FILTER_BLUR);
+        }
+    }
+
+    /// Returns true when the backgroundType requires the extended gradient
+    /// descriptor (i.e. legacy 2-color start/end accessors are not sufficient).
+    public boolean isExtendedGradientBackground() {
+        switch (backgroundType) {
+            case BACKGROUND_GRADIENT_LINEAR:
+            case BACKGROUND_GRADIENT_RADIAL_FULL:
+            case BACKGROUND_GRADIENT_CONIC:
+            case BACKGROUND_GRADIENT_REPEATING_LINEAR:
+            case BACKGROUND_GRADIENT_REPEATING_RADIAL:
+                return true;
+            default:
+                return false;
         }
     }
 

@@ -8263,6 +8263,82 @@ public class JavaSEPort extends CodenameOneImplementation {
         nativeGraphics.fillOval(x+1, y+1, width-2, height-2);
     }
 
+    private static Color[] toAwtColors(int[] argb) {
+        Color[] out = new Color[argb.length];
+        for (int i = 0; i < argb.length; i++) {
+            out[i] = new Color(argb[i], true);
+        }
+        return out;
+    }
+
+    private static MultipleGradientPaint.CycleMethod cycle(byte c) {
+        switch (c) {
+            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT:
+                return MultipleGradientPaint.CycleMethod.REPEAT;
+            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REFLECT:
+                return MultipleGradientPaint.CycleMethod.REFLECT;
+            default:
+                return MultipleGradientPaint.CycleMethod.NO_CYCLE;
+        }
+    }
+
+    @Override
+    public void fillLinearGradientWithStops(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+        checkEDT();
+        Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
+        try {
+            double rad = Math.toRadians(angleDegrees);
+            double sinA = Math.sin(rad), cosA = Math.cos(rad);
+            double cx = x + width * 0.5, cy = y + height * 0.5;
+            double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);
+            float x0 = (float) (cx - sinA * half), y0 = (float) (cy + cosA * half);
+            float x1 = (float) (cx + sinA * half), y1 = (float) (cy - cosA * half);
+            LinearGradientPaint paint = new LinearGradientPaint(
+                    new java.awt.geom.Point2D.Float(x0, y0),
+                    new java.awt.geom.Point2D.Float(x1, y1),
+                    positions, toAwtColors(colors), cycle(cycleMethod));
+            ng.setPaint(paint);
+            ng.fillRect(x, y, width, height);
+        } finally {
+            ng.dispose();
+        }
+    }
+
+    @Override
+    public void fillRadialGradientWithStops(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float centerX, float centerY,
+            float radiusX, float radiusY, byte cycleMethod) {
+        checkEDT();
+        Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
+        try {
+            float r = Math.max(radiusX, radiusY);
+            RadialGradientPaint paint = new RadialGradientPaint(
+                    new java.awt.geom.Point2D.Float(x + centerX, y + centerY),
+                    r <= 0 ? 1f : r,
+                    new java.awt.geom.Point2D.Float(x + centerX, y + centerY),
+                    positions, toAwtColors(colors), cycle(cycleMethod));
+            if (Math.abs(radiusX - radiusY) > 0.01f && radiusX > 0 && radiusY > 0) {
+                java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
+                t.translate(x + centerX, y + centerY);
+                t.scale(radiusX / r, radiusY / r);
+                t.translate(-(x + centerX), -(y + centerY));
+                ng.transform(t);
+            }
+            ng.setPaint(paint);
+            ng.fillRect(x, y, width, height);
+        } finally {
+            ng.dispose();
+        }
+    }
+
+    @Override
+    public void fillConicGradient(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
+        // Java2D has no native conic gradient; rasterize via the default impl.
+        super.fillConicGradient(graphics, colors, positions, x, y, width, height, centerX, centerY, fromAngleDegrees);
+    }
+
     
     
     /**
@@ -13862,13 +13938,38 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public Image gaussianBlurImage(Image image, float radius) {
         GaussianFilter gf = new GaussianFilter(radius);
-        Image bim = Image.createImage(image.getWidth(), image.getHeight());        
-        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());        
+        Image bim = Image.createImage(image.getWidth(), image.getHeight());
+        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());
         return new NativeImage(blurredImage);
     }
 
     public boolean isGaussianBlurSupported() {
         return true;
+    }
+
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        Graphics2D ng = getGraphics(graphics);
+        // The target buffer the simulator paints into is typically a BufferedImage
+        // accessible via getDeviceConfiguration().createCompatibleImage during paint.
+        // For backdrop-filter we snapshot whatever the destination shows under the
+        // rectangle, blur it, and draw it back. Falling back to false signals the
+        // caller to use the snapshot+drawImage path instead.
+        try {
+            java.awt.geom.AffineTransform tx = ng.getTransform();
+            int sx = (int) Math.round(tx.getTranslateX()) + x;
+            int sy = (int) Math.round(tx.getTranslateY()) + y;
+            BufferedImage snap = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            java.awt.GraphicsConfiguration gc = ng.getDeviceConfiguration();
+            BufferedImage dest = (gc != null) ? gc.createCompatibleImage(width, height, java.awt.Transparency.TRANSLUCENT) : snap;
+            // Java2D doesn't easily let us read back from the destination — fall back.
+            return false;
+        } catch (Throwable t) {
+            return false;
+        }
     }
  
     class NativeImage extends Image {

@@ -790,6 +790,11 @@ class AndroidGraphics {
                     case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
                     case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                     case Style.BACKGROUND_GRADIENT_RADIAL:
+                    case Style.BACKGROUND_GRADIENT_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                    case Style.BACKGROUND_GRADIENT_CONIC:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL:
                         drawGradientBackground(s, x, y, width, height);
                         //canvas.restore();
                         return;
@@ -817,6 +822,40 @@ class AndroidGraphics {
                         x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
                         s.getBackgroundGradientRelativeSize());
                 return;
+            case Style.BACKGROUND_GRADIENT_LINEAR:
+            case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR: {
+                com.codename1.ui.plaf.GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    byte cycle = s.getBackgroundType() == Style.BACKGROUND_GRADIENT_REPEATING_LINEAR
+                            ? com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillLinearGradientWithStops(g.getColors(), g.getPositions(), x, y, width, height, g.getAngleDegrees(), cycle);
+                    return;
+                }
+                break;
+            }
+            case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+            case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+                com.codename1.ui.plaf.GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    float[] r = new float[4];
+                    g.computeRadii(width, height, r);
+                    byte cycle = s.getBackgroundType() == Style.BACKGROUND_GRADIENT_REPEATING_RADIAL
+                            ? com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillRadialGradientWithStops(g.getColors(), g.getPositions(), x, y, width, height, r[0], r[1], r[2], r[3], cycle);
+                    return;
+                }
+                break;
+            }
+            case Style.BACKGROUND_GRADIENT_CONIC: {
+                com.codename1.ui.plaf.GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    float cx = g.getRelativeCenterX() * width;
+                    float cy = g.getRelativeCenterY() * height;
+                    fillConicGradient(g.getColors(), g.getPositions(), x, y, width, height, cx, cy, g.getFromAngleDegrees());
+                    return;
+                }
+                break;
+            }
         }
         setColor(s.getBgColor());
         fillRectImpl(x, y, width, height, s.getBgTransparency());
@@ -893,6 +932,138 @@ class AndroidGraphics {
         unapplyTransform();
         canvas.restore();
         
+    }
+
+    /// Paints an extended-gradient background (multi-stop, angled linear,
+    /// full radial, conic, repeating) using the descriptor. Invoked from the
+    /// async legacy paint path when the recorded backgroundType is one of the
+    /// extended BACKGROUND_GRADIENT_* values.
+    public void paintExtendedGradientBackground(byte bgType, int bgColor, byte bgTransparency,
+            com.codename1.ui.plaf.GradientDescriptor g, int x, int y, int width, int height) {
+        if (width <= 0 || height <= 0 || g == null || g.getColors() == null) {
+            setColor(bgColor);
+            fillRectImpl(x, y, width, height, bgTransparency);
+            return;
+        }
+        canvas.save();
+        applyTransform();
+        try {
+            switch (bgType) {
+                case Style.BACKGROUND_GRADIENT_LINEAR:
+                case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR: {
+                    byte cycle = bgType == Style.BACKGROUND_GRADIENT_REPEATING_LINEAR
+                            ? com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillLinearGradientWithStops(g.getColors(), g.getPositions(),
+                            x, y, width, height, g.getAngleDegrees(), cycle);
+                    return;
+                }
+                case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+                    float[] r = new float[4];
+                    g.computeRadii(width, height, r);
+                    byte cycle = bgType == Style.BACKGROUND_GRADIENT_REPEATING_RADIAL
+                            ? com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillRadialGradientWithStops(g.getColors(), g.getPositions(),
+                            x, y, width, height, r[0], r[1], r[2], r[3], cycle);
+                    return;
+                }
+                case Style.BACKGROUND_GRADIENT_CONIC: {
+                    float cx = g.getRelativeCenterX() * width;
+                    float cy = g.getRelativeCenterY() * height;
+                    fillConicGradient(g.getColors(), g.getPositions(),
+                            x, y, width, height, cx, cy, g.getFromAngleDegrees());
+                    return;
+                }
+            }
+            setColor(bgColor);
+            fillRectImpl(x, y, width, height, bgTransparency);
+        } finally {
+            unapplyTransform();
+            canvas.restore();
+        }
+    }
+
+    private static Shader.TileMode tile(byte cycleMethod) {
+        switch (cycleMethod) {
+            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REPEAT:
+                return Shader.TileMode.REPEAT;
+            case com.codename1.ui.plaf.GradientDescriptor.CYCLE_REFLECT:
+                return Shader.TileMode.MIRROR;
+            default:
+                return Shader.TileMode.CLAMP;
+        }
+    }
+
+    public void fillLinearGradientWithStops(int[] colors, float[] positions,
+            int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        paint.setAlpha(255);
+        double rad = Math.toRadians(angleDegrees);
+        double sinA = Math.sin(rad), cosA = Math.cos(rad);
+        double cx = x + width * 0.5, cy = y + height * 0.5;
+        double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);
+        float x0 = (float) (cx - sinA * half), y0 = (float) (cy + cosA * half);
+        float x1 = (float) (cx + sinA * half), y1 = (float) (cy - cosA * half);
+        paint.setShader(new LinearGradient(x0, y0, x1, y1, colors, positions, tile(cycleMethod)));
+        canvas.save();
+        applyTransform();
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        unapplyTransform();
+        canvas.restore();
+    }
+
+    public void fillRadialGradientWithStops(int[] colors, float[] positions,
+            int x, int y, int width, int height,
+            float centerX, float centerY, float radiusX, float radiusY, byte cycleMethod) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        paint.setAlpha(255);
+        float r = Math.max(radiusX, radiusY);
+        canvas.save();
+        applyTransform();
+        if (Math.abs(radiusX - radiusY) > 0.01f && radiusX > 0 && radiusY > 0) {
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.postTranslate(-(x + centerX), -(y + centerY));
+            m.postScale(radiusX / r, radiusY / r);
+            m.postTranslate(x + centerX, y + centerY);
+            canvas.concat(m);
+        }
+        paint.setShader(new RadialGradient(x + centerX, y + centerY,
+                r <= 0 ? 1f : r, colors, positions, tile(cycleMethod)));
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        unapplyTransform();
+        canvas.restore();
+    }
+
+    public void fillConicGradient(int[] colors, float[] positions,
+            int x, int y, int width, int height,
+            float centerX, float centerY, float fromAngleDegrees) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        paint.setAlpha(255);
+        // Android's SweepGradient starts at the positive X axis and sweeps
+        // counter-clockwise. CSS conic-gradient starts at top (-Y) and sweeps
+        // clockwise. Compose a rotation matrix on the shader to match.
+        android.graphics.Matrix sm = new android.graphics.Matrix();
+        sm.preRotate(fromAngleDegrees - 90f, x + centerX, y + centerY);
+        SweepGradient sg = new SweepGradient(x + centerX, y + centerY, colors, positions);
+        sg.setLocalMatrix(sm);
+        paint.setShader(sg);
+        canvas.save();
+        applyTransform();
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        unapplyTransform();
+        canvas.restore();
     }
 
     public int concatenateAlpha(int alpha) {

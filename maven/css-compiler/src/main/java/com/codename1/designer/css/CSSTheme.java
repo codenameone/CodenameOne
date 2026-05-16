@@ -34,6 +34,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationAccessor;
 import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.plaf.GradientDescriptor;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -160,14 +161,18 @@ public class CSSTheme {
     
     static boolean isGradient(LexicalUnit background) {
         if (background != null) {
-            if (background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "linear-gradient".equals(background.getFunctionName())) {
-                return true;
-            } else if (background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "radial-gradient".equals(background.getFunctionName())) {
-                return true;
+            if (background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION) {
+                String fn = background.getFunctionName();
+                if ("linear-gradient".equals(fn)
+                        || "radial-gradient".equals(fn)
+                        || "conic-gradient".equals(fn)
+                        || "repeating-linear-gradient".equals(fn)
+                        || "repeating-radial-gradient".equals(fn)) {
+                    return true;
+                }
             }
         }
         return false;
-        
     }
     
     class ImageMetadata {
@@ -226,37 +231,368 @@ public class CSSTheme {
     static class CN1Gradient {
         /**
          * One of {@link Style#BACKGROUND_GRADIENT_LINEAR_HORIZONTAL}, {@link Style#BACKGROUND_GRADIENT_LINEAR_VERTICAL}, or
-         * {@link Style#BACKGROUND_GRADIENT_RADIAL}.
+         * {@link Style#BACKGROUND_GRADIENT_RADIAL} for the legacy two-color simple
+         * cases; or one of {@link Style#BACKGROUND_GRADIENT_LINEAR}, {@link Style#BACKGROUND_GRADIENT_RADIAL_FULL},
+         * {@link Style#BACKGROUND_GRADIENT_CONIC}, {@link Style#BACKGROUND_GRADIENT_REPEATING_LINEAR} or
+         * {@link Style#BACKGROUND_GRADIENT_REPEATING_RADIAL} when {@link #extendedDescriptor} is set.
          */
         int type;
-        
+
         int startColor;
         int endColor;
         float gradientX;
         float gradientY;
         float size;
         byte bgTransparency;
-        
+
         String reason;
-        
+
         /**
-         * Flag to indicate whether this gradient is valid
-         * Only gradients that can be completely reproduced using CN1
-         * are valid.   E.g. if the opacity of the start color is different than
-         * the end color, or there are multiple stages, or other parameters
-         * that can't be expressed as a CN1 gradient style, then this gradient won't 
-         * be used and a 9-piece border will be generated as a fallback.
+         * Set when the gradient is a richer form than the legacy two-color
+         * cases (multi-stop, angled linear, conic, repeating, full-radial).
+         * When non-null the resource emits a bgGradientEx theme entry and
+         * background-type is one of the extended BACKGROUND_GRADIENT_* values.
+         */
+        GradientDescriptor extendedDescriptor;
+
+        /**
+         * Flag to indicate whether this gradient is valid.  Both the legacy
+         * two-color cases and the extended descriptor cases set this true once
+         * parsing succeeds; image-border fallback is only used for gradients
+         * that fail both parsers.
          */
         boolean valid;
-        
+
         void parse(ScaledUnit background) {
-            if (background != null) {
-                if (background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "linear-gradient".equals(background.getFunctionName())) {
+            if (background != null && background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION) {
+                String fn = background.getFunctionName();
+                if ("linear-gradient".equals(fn)) {
                     parseLinearGradient(background);
-                } else if (background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION && "radial-gradient".equals(background.getFunctionName())) {
+                    if (!valid) {
+                        parseLinearGradientExtended(background, false);
+                    }
+                } else if ("radial-gradient".equals(fn)) {
                     parseRadialGradient(background);
+                    if (!valid) {
+                        parseRadialGradientExtended(background, false);
+                    }
+                } else if ("conic-gradient".equals(fn)) {
+                    parseConicGradient(background);
+                } else if ("repeating-linear-gradient".equals(fn)) {
+                    parseLinearGradientExtended(background, true);
+                } else if ("repeating-radial-gradient".equals(fn)) {
+                    parseRadialGradientExtended(background, true);
                 }
             }
+        }
+
+        /**
+         * Parses an arbitrary-angle, multi-stop linear gradient. When
+         * {@code repeating} is true the resulting descriptor uses CYCLE_REPEAT.
+         */
+        private void parseLinearGradientExtended(ScaledUnit background, boolean repeating) {
+            ScaledUnit fn = background;
+            // Already passed by isGradient check.
+            ScaledUnit p = (ScaledUnit) fn.getParameters();
+            if (p == null) {
+                reason = "Empty linear-gradient parameters";
+                return;
+            }
+            float angle = 180f; // CSS default for linear-gradient is "to bottom" (180deg)
+            // Optionally consume an angle or "to <side>" prefix terminated by comma.
+            if (p.getLexicalUnitType() == LexicalUnit.SAC_DEGREE
+                    || p.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
+                double v = p.getNumericValue();
+                if (p.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
+                    v = v * 180.0 / Math.PI;
+                }
+                angle = (float) v;
+                p = (ScaledUnit) p.getNextLexicalUnit();
+                if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    p = (ScaledUnit) p.getNextLexicalUnit();
+                }
+            } else if (p.getLexicalUnitType() == LexicalUnit.SAC_IDENT
+                    && "to".equals(p.getStringValue())) {
+                ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
+                if (nx == null) { reason = "Bad 'to' clause"; return; }
+                String side1 = nx.getStringValue();
+                ScaledUnit nx2 = (ScaledUnit) nx.getNextLexicalUnit();
+                String side2 = (nx2 != null && nx2.getLexicalUnitType() == LexicalUnit.SAC_IDENT)
+                        ? nx2.getStringValue() : null;
+                angle = cssSideToAngle(side1, side2);
+                p = (side2 != null ? (ScaledUnit) nx2.getNextLexicalUnit() : (ScaledUnit) nx.getNextLexicalUnit());
+                if (p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    p = (ScaledUnit) p.getNextLexicalUnit();
+                }
+            }
+            ParsedStops st = parseStops(p);
+            if (st == null || st.colors.length < 2) {
+                reason = "Could not parse stops for linear-gradient";
+                return;
+            }
+            extendedDescriptor = new GradientDescriptor()
+                    .setKind(GradientDescriptor.KIND_LINEAR)
+                    .setAngleDegrees(angle)
+                    .setCycleMethod(repeating ? GradientDescriptor.CYCLE_REPEAT : GradientDescriptor.CYCLE_NONE)
+                    .setStops(st.colors, st.positions);
+            this.type = repeating ? Style.BACKGROUND_GRADIENT_REPEATING_LINEAR : Style.BACKGROUND_GRADIENT_LINEAR;
+            this.bgTransparency = (byte) 0xff;
+            this.valid = true;
+        }
+
+        private void parseRadialGradientExtended(ScaledUnit background, boolean repeating) {
+            ScaledUnit p = (ScaledUnit) background.getParameters();
+            if (p == null) { reason = "Empty radial-gradient parameters"; return; }
+            byte shape = GradientDescriptor.SHAPE_ELLIPSE;
+            byte extent = GradientDescriptor.EXTENT_FARTHEST_CORNER;
+            float cx = 0.5f, cy = 0.5f;
+            float rx = 1f, ry = 1f;
+            boolean sawShapeOrExtent = false;
+            boolean sawAt = false;
+            // Consume optional shape / extent / at-position clauses until a comma.
+            while (p != null && p.getLexicalUnitType() != LexicalUnit.SAC_OPERATOR_COMMA) {
+                int t = p.getLexicalUnitType();
+                if (t == LexicalUnit.SAC_IDENT) {
+                    String s = p.getStringValue();
+                    if ("circle".equals(s)) {
+                        shape = GradientDescriptor.SHAPE_CIRCLE;
+                        sawShapeOrExtent = true;
+                    } else if ("ellipse".equals(s)) {
+                        shape = GradientDescriptor.SHAPE_ELLIPSE;
+                        sawShapeOrExtent = true;
+                    } else if ("closest-side".equals(s)) {
+                        extent = GradientDescriptor.EXTENT_CLOSEST_SIDE; sawShapeOrExtent = true;
+                    } else if ("closest-corner".equals(s)) {
+                        extent = GradientDescriptor.EXTENT_CLOSEST_CORNER; sawShapeOrExtent = true;
+                    } else if ("farthest-side".equals(s)) {
+                        extent = GradientDescriptor.EXTENT_FARTHEST_SIDE; sawShapeOrExtent = true;
+                    } else if ("farthest-corner".equals(s)) {
+                        extent = GradientDescriptor.EXTENT_FARTHEST_CORNER; sawShapeOrExtent = true;
+                    } else if ("at".equals(s)) {
+                        sawAt = true;
+                    } else if (sawAt) {
+                        float[] pos = cssPositionKeyword(s);
+                        cx = pos[0];
+                        cy = pos[1];
+                    } else {
+                        reason = "Unrecognized radial-gradient ident: " + s; return;
+                    }
+                } else if (t == LexicalUnit.SAC_PERCENTAGE) {
+                    if (sawAt) {
+                        // first percentage is X, second is Y
+                        float v = (float) (p.getNumericValue() / 100f);
+                        ScaledUnit n = (ScaledUnit) p.getNextLexicalUnit();
+                        if (n != null && n.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                            cx = v;
+                            cy = (float) (n.getNumericValue() / 100f);
+                            p = n;
+                        } else {
+                            cx = v;
+                        }
+                        sawShapeOrExtent = true;
+                    } else {
+                        // explicit radius
+                        rx = (float) (p.getNumericValue() / 100f);
+                        ScaledUnit n = (ScaledUnit) p.getNextLexicalUnit();
+                        if (n != null && n.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                            ry = (float) (n.getNumericValue() / 100f);
+                            p = n;
+                        } else {
+                            ry = rx;
+                        }
+                        extent = GradientDescriptor.EXTENT_EXPLICIT;
+                        sawShapeOrExtent = true;
+                    }
+                }
+                p = (ScaledUnit) p.getNextLexicalUnit();
+            }
+            if (sawShapeOrExtent && p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                p = (ScaledUnit) p.getNextLexicalUnit();
+            }
+            ParsedStops st = parseStops(p);
+            if (st == null || st.colors.length < 2) {
+                reason = "Could not parse stops for radial-gradient";
+                return;
+            }
+            extendedDescriptor = new GradientDescriptor()
+                    .setKind(GradientDescriptor.KIND_RADIAL)
+                    .setRadialShape(shape)
+                    .setRadialExtent(extent)
+                    .setRelativeCenterX(cx)
+                    .setRelativeCenterY(cy)
+                    .setRelativeRadiusX(rx)
+                    .setRelativeRadiusY(ry)
+                    .setCycleMethod(repeating ? GradientDescriptor.CYCLE_REPEAT : GradientDescriptor.CYCLE_NONE)
+                    .setStops(st.colors, st.positions);
+            this.type = repeating ? Style.BACKGROUND_GRADIENT_REPEATING_RADIAL : Style.BACKGROUND_GRADIENT_RADIAL_FULL;
+            this.bgTransparency = (byte) 0xff;
+            this.valid = true;
+        }
+
+        private void parseConicGradient(ScaledUnit background) {
+            ScaledUnit p = (ScaledUnit) background.getParameters();
+            if (p == null) { reason = "Empty conic-gradient parameters"; return; }
+            float fromAngle = 0f;
+            float cx = 0.5f, cy = 0.5f;
+            boolean consumedHeader = false;
+            // Optional "from <angle>" and "at <pos>" prefix.
+            while (p != null && p.getLexicalUnitType() != LexicalUnit.SAC_OPERATOR_COMMA) {
+                int t = p.getLexicalUnitType();
+                if (t == LexicalUnit.SAC_IDENT) {
+                    String s = p.getStringValue();
+                    if ("from".equals(s)) {
+                        ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
+                        if (nx != null && (nx.getLexicalUnitType() == LexicalUnit.SAC_DEGREE
+                                || nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN)) {
+                            double v = nx.getNumericValue();
+                            if (nx.getLexicalUnitType() == LexicalUnit.SAC_RADIAN) {
+                                v = v * 180.0 / Math.PI;
+                            }
+                            fromAngle = (float) v;
+                            p = nx;
+                        }
+                        consumedHeader = true;
+                    } else if ("at".equals(s)) {
+                        ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
+                        if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_IDENT) {
+                            float[] pos = cssPositionKeyword(nx.getStringValue());
+                            cx = pos[0]; cy = pos[1];
+                            p = nx;
+                        } else if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                            cx = (float) (nx.getNumericValue() / 100f);
+                            ScaledUnit ny = (ScaledUnit) nx.getNextLexicalUnit();
+                            if (ny != null && ny.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                                cy = (float) (ny.getNumericValue() / 100f);
+                                p = ny;
+                            } else {
+                                p = nx;
+                            }
+                        }
+                        consumedHeader = true;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+                p = (ScaledUnit) p.getNextLexicalUnit();
+            }
+            if (consumedHeader && p != null && p.getLexicalUnitType() == LexicalUnit.SAC_OPERATOR_COMMA) {
+                p = (ScaledUnit) p.getNextLexicalUnit();
+            }
+            ParsedStops st = parseStops(p);
+            if (st == null || st.colors.length < 2) {
+                reason = "Could not parse stops for conic-gradient";
+                return;
+            }
+            extendedDescriptor = new GradientDescriptor()
+                    .setKind(GradientDescriptor.KIND_CONIC)
+                    .setRelativeCenterX(cx)
+                    .setRelativeCenterY(cy)
+                    .setFromAngleDegrees(fromAngle)
+                    .setStops(st.colors, st.positions);
+            this.type = Style.BACKGROUND_GRADIENT_CONIC;
+            this.bgTransparency = (byte) 0xff;
+            this.valid = true;
+        }
+
+        private static float cssSideToAngle(String s1, String s2) {
+            // Canonical CSS "to <side>" -> angle in CSS degrees (0=up, 90=right).
+            if (s2 == null) {
+                if ("top".equals(s1)) return 0f;
+                if ("right".equals(s1)) return 90f;
+                if ("bottom".equals(s1)) return 180f;
+                if ("left".equals(s1)) return 270f;
+            } else {
+                // diagonals
+                if (("top".equals(s1) && "right".equals(s2)) || ("right".equals(s1) && "top".equals(s2))) return 45f;
+                if (("bottom".equals(s1) && "right".equals(s2)) || ("right".equals(s1) && "bottom".equals(s2))) return 135f;
+                if (("bottom".equals(s1) && "left".equals(s2)) || ("left".equals(s1) && "bottom".equals(s2))) return 225f;
+                if (("top".equals(s1) && "left".equals(s2)) || ("left".equals(s1) && "top".equals(s2))) return 315f;
+            }
+            return 180f;
+        }
+
+        private static float[] cssPositionKeyword(String s) {
+            float cx = 0.5f, cy = 0.5f;
+            if ("left".equals(s)) cx = 0f;
+            else if ("right".equals(s)) cx = 1f;
+            else if ("top".equals(s)) cy = 0f;
+            else if ("bottom".equals(s)) cy = 1f;
+            return new float[]{cx, cy};
+        }
+
+        private static final class ParsedStops {
+            int[] colors;
+            float[] positions;
+        }
+
+        /// Parses a comma-separated stops list (color, color stop?, ...) into
+        /// arrays of ARGB ints and [0,1] positions. Missing positions are
+        /// auto-distributed linearly between the surrounding fixed positions.
+        private static ParsedStops parseStops(ScaledUnit start) {
+            if (start == null) return null;
+            java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
+            java.util.ArrayList<Float> positions = new java.util.ArrayList<>();
+            ScaledUnit p = start;
+            while (p != null) {
+                int t = p.getLexicalUnitType();
+                if (t == LexicalUnit.SAC_OPERATOR_COMMA) {
+                    p = (ScaledUnit) p.getNextLexicalUnit();
+                    continue;
+                }
+                int rgb;
+                int alpha;
+                try {
+                    rgb = getColorInt(p);
+                    Integer a = getColorAlphaInt(p);
+                    alpha = a == null ? 0xff : a.intValue();
+                } catch (RuntimeException ex) {
+                    return null;
+                }
+                int argb = (alpha << 24) | (rgb & 0xffffff);
+                ScaledUnit nx = (ScaledUnit) p.getNextLexicalUnit();
+                Float pos = null;
+                if (nx != null && nx.getLexicalUnitType() == LexicalUnit.SAC_PERCENTAGE) {
+                    pos = (float) (nx.getNumericValue() / 100f);
+                    nx = (ScaledUnit) nx.getNextLexicalUnit();
+                }
+                colors.add(argb);
+                positions.add(pos);
+                p = nx;
+            }
+            if (colors.isEmpty()) return null;
+            int n = colors.size();
+            if (positions.get(0) == null) positions.set(0, 0f);
+            if (positions.get(n - 1) == null) positions.set(n - 1, 1f);
+            // distribute null positions evenly between fixed anchors
+            for (int i = 1; i < n - 1; i++) {
+                if (positions.get(i) == null) {
+                    int j = i;
+                    while (j < n && positions.get(j) == null) j++;
+                    float p0 = positions.get(i - 1);
+                    float p1 = (j < n && positions.get(j) != null) ? positions.get(j) : 1f;
+                    int span = (j - (i - 1));
+                    for (int k = i; k < j; k++) {
+                        positions.set(k, p0 + (p1 - p0) * ((k - (i - 1)) / (float) span));
+                    }
+                    i = j - 1;
+                }
+            }
+            // enforce monotonic positions
+            float prev = positions.get(0);
+            for (int i = 1; i < n; i++) {
+                if (positions.get(i) < prev) positions.set(i, prev);
+                prev = positions.get(i);
+            }
+            ParsedStops st = new ParsedStops();
+            st.colors = new int[n];
+            st.positions = new float[n];
+            for (int i = 0; i < n; i++) {
+                st.colors[i] = colors.get(i);
+                st.positions[i] = positions.get(i);
+            }
+            return st;
         }
         
         private XYVal parseTransformCoordVal(String val) {
@@ -709,7 +1045,8 @@ public class CSSTheme {
         }
         
         Object[] getThemeBgGradient() {
-            if (!valid) {
+            if (!valid || extendedDescriptor != null) {
+                // Extended descriptor cases are emitted via bgGradientEx instead.
                 return null;
             }
             return new Object[]{
@@ -720,7 +1057,7 @@ public class CSSTheme {
                 size
             };
         }
-        
+
         byte getBgTransparency() {
             if (valid) {
                 return 0;
@@ -1708,6 +2045,15 @@ public class CSSTheme {
     /// Element so a base `Button { color: var(--accent) }` rule still
     /// emits a binding for the per-state `Button.press#fgColor` even when
     /// `Button.pressed` did not redeclare `color`.
+    /// Writes a filter-blur theme entry when radius > 0; otherwise clears it.
+    private void emitFilterBlur(EditableResources res, String themeKey, float radius) {
+        if (radius > 0f) {
+            res.setThemeProperty(themeName, themeKey, Float.valueOf(radius));
+        } else {
+            res.setThemeProperty(themeName, themeKey, null);
+        }
+    }
+
     private void emitColorBinding(EditableResources res, String themeName, String themeKey, Element stateEl, String cssProperty) {
         if (stateEl == null) {
             return;
@@ -1953,6 +2299,26 @@ public class CSSTheme {
                 res.setThemeProperty(themeName, pressedId+"#bgType", el.getThemeBgType(pressedStyles));
                 currToken = "disabled bgType";
                 res.setThemeProperty(themeName, disabledId+"#bgType", el.getThemeBgType(disabledStyles));
+
+                currToken = "bgGradientEx";
+                res.setThemeProperty(themeName, unselId+".bgGradientEx", el.getThemeGradientDescriptor(unselectedStyles));
+                currToken = "selected bgGradientEx";
+                res.setThemeProperty(themeName, selId+"#bgGradientEx", el.getThemeGradientDescriptor(selectedStyles));
+                currToken = "pressed bgGradientEx";
+                res.setThemeProperty(themeName, pressedId+"#bgGradientEx", el.getThemeGradientDescriptor(pressedStyles));
+                currToken = "disabled bgGradientEx";
+                res.setThemeProperty(themeName, disabledId+"#bgGradientEx", el.getThemeGradientDescriptor(disabledStyles));
+
+                currToken = "filterBlur";
+                emitFilterBlur(res, unselId+".filterBlur", el.getFilterBlurRadius(unselectedStyles));
+                emitFilterBlur(res, selId+"#filterBlur", el.getFilterBlurRadius(selectedStyles));
+                emitFilterBlur(res, pressedId+"#filterBlur", el.getFilterBlurRadius(pressedStyles));
+                emitFilterBlur(res, disabledId+"#filterBlur", el.getFilterBlurRadius(disabledStyles));
+                currToken = "backdropFilterBlur";
+                emitFilterBlur(res, unselId+".backdropFilterBlur", el.getBackdropFilterBlurRadius(unselectedStyles));
+                emitFilterBlur(res, selId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(selectedStyles));
+                emitFilterBlur(res, pressedId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(pressedStyles));
+                emitFilterBlur(res, disabledId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(disabledStyles));
                 currToken = "derive";
                 res.setThemeProperty(themeName, unselId+".derive", el.getThemeDerive(unselectedStyles, ""));
                 currToken = "selected derive";
@@ -4134,8 +4500,49 @@ public class CSSTheme {
                     
         }
         public boolean hasFilter(Map<String,LexicalUnit> style) {
-            
-            return false;
+            return parseBlurRadius((LexicalUnit) style.get("filter")) > 0f
+                    || parseBlurRadius((LexicalUnit) style.get("backdrop-filter")) > 0f;
+        }
+
+        /// Returns the filter:blur() radius in pixels, or 0 if absent.
+        public float getFilterBlurRadius(Map<String,LexicalUnit> style) {
+            return parseBlurRadius((LexicalUnit) style.get("filter"));
+        }
+
+        /// Returns the backdrop-filter:blur() radius in pixels, or 0 if absent.
+        public float getBackdropFilterBlurRadius(Map<String,LexicalUnit> style) {
+            return parseBlurRadius((LexicalUnit) style.get("backdrop-filter"));
+        }
+
+        /// Returns the extended gradient descriptor for the given style, or
+        /// null if the style does not declare an extended gradient.
+        public GradientDescriptor getThemeGradientDescriptor(Map<String,LexicalUnit> style) {
+            ScaledUnit background = (ScaledUnit) style.get("background");
+            if (background != null && background.isCN1Gradient()) {
+                CN1Gradient g = background.getCN1Gradient();
+                if (g.valid && g.extendedDescriptor != null) {
+                    return g.extendedDescriptor;
+                }
+            }
+            return null;
+        }
+
+        /// Parses a single `blur(<length>)` function from a filter / backdrop-filter
+        /// declaration and returns the radius in pixels. Only blur() is supported.
+        private float parseBlurRadius(LexicalUnit filter) {
+            while (filter != null) {
+                if (filter.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION
+                        && "blur".equals(filter.getFunctionName())) {
+                    LexicalUnit p = filter.getParameters();
+                    if (p instanceof ScaledUnit) {
+                        return ((ScaledUnit) p).getPixelValue();
+                    } else if (p != null) {
+                        return p.getFloatValue();
+                    }
+                }
+                filter = filter.getNextLexicalUnit();
+            }
+            return 0f;
         }
         
         private boolean usesRoundBorder(Map<String, LexicalUnit> style) {
@@ -4175,7 +4582,7 @@ public class CSSTheme {
                 return false;
             }
             
-            if (b.hasBorderRadius() || (b.hasGradient() && !isCN1Gradient) || b.hasBoxShadow() || hasFilter(style) || b.hasUnequalBorders() || !b.isStyleNativelySupported() || usesPointUnitsInBorder(style)) {
+            if (b.hasBorderRadius() || (b.hasGradient() && !isCN1Gradient) || b.hasBoxShadow() || b.hasUnequalBorders() || !b.isStyleNativelySupported() || usesPointUnitsInBorder(style)) {
                 // We might need to generate a background image
                 // We first need to determine if this can be done with a 9-piece border
                 // or if we'll need to stretch it.
@@ -4250,7 +4657,7 @@ public class CSSTheme {
                 return false;
             }
             
-            if (b.hasBorderRadius() || (b.hasGradient() && !isCN1Gradient) || b.hasBoxShadow() || hasFilter(style) || b.hasUnequalBorders() || !b.isStyleNativelySupported() || usesPointUnitsInBorder(style)) {
+            if (b.hasBorderRadius() || (b.hasGradient() && !isCN1Gradient) || b.hasBoxShadow() || b.hasUnequalBorders() || !b.isStyleNativelySupported() || usesPointUnitsInBorder(style)) {
                 LexicalUnit width = style.get("width");
                 LexicalUnit height = style.get("height");
                 
@@ -5715,6 +6122,16 @@ public class CSSTheme {
 
             case "surface" : {
                 style.put("surface", value);
+                break;
+            }
+
+            case "filter" : {
+                style.put("filter", value);
+                break;
+            }
+
+            case "backdrop-filter" : {
+                style.put("backdrop-filter", value);
                 break;
             }
                 

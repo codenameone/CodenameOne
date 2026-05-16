@@ -2655,6 +2655,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void fillLinearGradientWithStops(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+        if(!asyncView) {
+            super.fillLinearGradientWithStops(graphics, colors, positions, x, y, width, height, angleDegrees, cycleMethod);
+            return;
+        }
+        ((AndroidGraphics)graphics).fillLinearGradientWithStops(colors, positions, x, y, width, height, angleDegrees, cycleMethod);
+    }
+
+    @Override
+    public void fillRadialGradientWithStops(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float centerX, float centerY,
+            float radiusX, float radiusY, byte cycleMethod) {
+        if(!asyncView) {
+            super.fillRadialGradientWithStops(graphics, colors, positions, x, y, width, height, centerX, centerY, radiusX, radiusY, cycleMethod);
+            return;
+        }
+        ((AndroidGraphics)graphics).fillRadialGradientWithStops(colors, positions, x, y, width, height, centerX, centerY, radiusX, radiusY, cycleMethod);
+    }
+
+    @Override
+    public void fillConicGradient(Object graphics, int[] colors, float[] positions,
+            int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
+        if(!asyncView) {
+            super.fillConicGradient(graphics, colors, positions, x, y, width, height, centerX, centerY, fromAngleDegrees);
+            return;
+        }
+        ((AndroidGraphics)graphics).fillConicGradient(colors, positions, x, y, width, height, centerX, centerY, fromAngleDegrees);
+    }
+
+    @Override
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
         if(AndroidAsyncView.legacyPaintLogic) {
             super.drawLabelComponent(nativeGraphics, cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);

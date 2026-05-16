@@ -2380,6 +2380,18 @@ public class UIManager {
                 }
                 style.setBackgroundGradient(backgroundGradient);
             }
+            Object gradientDescriptor = themeProps.get(id + Style.GRADIENT_DESCRIPTOR);
+            if (gradientDescriptor instanceof GradientDescriptor) {
+                style.setGradientDescriptor((GradientDescriptor) gradientDescriptor);
+            }
+            Object filterBlur = themeProps.get(id + Style.FILTER_BLUR);
+            if (filterBlur instanceof Number) {
+                style.setFilterBlurRadius(((Number) filterBlur).floatValue());
+            }
+            Object backdropFilterBlur = themeProps.get(id + Style.BACKDROP_FILTER_BLUR);
+            if (backdropFilterBlur instanceof Number) {
+                style.setBackdropFilterBlurRadius(((Number) backdropFilterBlur).floatValue());
+            }
             if (bgImage != null) {
                 Image im = null;
                 if (bgImage instanceof String) {

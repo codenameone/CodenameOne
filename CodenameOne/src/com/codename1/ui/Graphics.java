@@ -1361,6 +1361,60 @@ public final class Graphics {
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 
+    /// Fills a multi-stop linear gradient at an arbitrary angle.
+    ///
+    /// Angle follows CSS convention: 0° points up, 90° right, 180° down, 270° left.
+    ///
+    /// #### Parameters
+    /// - `colors`: ARGB color stops (length >= 2)
+    /// - `positions`: stop positions in [0,1] aligned with `colors`
+    /// - `x`,`y`,`width`,`height`: target rectangle
+    /// - `angleDegrees`: gradient direction
+    /// - `cycleMethod`: one of GradientDescriptor.CYCLE_NONE / CYCLE_REPEAT / CYCLE_REFLECT
+    public void fillLinearGradientWithStops(int[] colors, float[] positions, int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
+            return;
+        }
+        impl.fillLinearGradientWithStops(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, angleDegrees, cycleMethod);
+    }
+
+    /// Fills a multi-stop radial gradient with explicit center, x/y radii and cycle mode.
+    public void fillRadialGradientWithStops(int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float radiusX, float radiusY, byte cycleMethod) {
+        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
+            return;
+        }
+        impl.fillRadialGradientWithStops(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, centerX, centerY, radiusX, radiusY, cycleMethod);
+    }
+
+    /// Fills a conic / sweep gradient. `fromAngleDegrees` follows the CSS conic-gradient
+    /// convention (0° points up, sweep clockwise).
+    public void fillConicGradient(int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
+        if (width <= 0 || height <= 0 || colors == null || colors.length < 2) {
+            return;
+        }
+        impl.fillConicGradient(nativeGraphics, colors, positions, x + xTranslate, y + yTranslate, width, height, centerX, centerY, fromAngleDegrees);
+    }
+
+    /// Returns a copy of the given image with a Gaussian blur of the given radius
+    /// applied. Equivalent to the CSS filter:blur() effect on an image.
+    public Image gaussianBlur(Image source, float radius) {
+        if (source == null || radius <= 0f) {
+            return source;
+        }
+        return impl.gaussianBlurImage(source, radius);
+    }
+
+    /// Applies a Gaussian blur to the contents already painted into the
+    /// rectangular region. Used to realize CSS backdrop-filter:blur().
+    /// Returns true if the port supports an in-place blur; otherwise the
+    /// caller should fall back to snapshot + gaussianBlur().
+    public boolean blurRegion(int x, int y, int width, int height, float radius) {
+        if (width <= 0 || height <= 0 || radius <= 0f) {
+            return true;
+        }
+        return impl.blurRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius);
+    }
+
     /// Fills a rectangle with an optionally translucent fill color
     ///
     /// #### Parameters

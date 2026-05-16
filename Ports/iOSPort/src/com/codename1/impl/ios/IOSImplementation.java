@@ -7578,6 +7578,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
+
+    // Multi-stop / angled / conic gradients fall back to the software ARGB
+    // rasterizer in CodenameOneImplementation. The result is wrapped in a
+    // NativeImage via createImage(int[],w,h) and drawn through the regular
+    // drawImage path, so transforms and clipping still apply.
+    // gaussianBlurImage already provides native CIGaussianBlur for filter:blur.
     
     public static void appendData(long peer, long data) {
         NetworkConnection n = null;

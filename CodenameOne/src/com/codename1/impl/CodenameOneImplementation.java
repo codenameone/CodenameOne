@@ -81,6 +81,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.GradientDescriptor;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
@@ -3376,6 +3377,134 @@ public abstract class CodenameOneImplementation {
             }
         }
         setColor(graphics, oldColor);
+    }
+
+    /// Multi-stop linear gradient with arbitrary angle. Default implementation
+    /// rasterizes into an ARGB pixel buffer; ports with a hardware gradient API
+    /// should override.
+    public void fillLinearGradientWithStops(Object graphics, int[] colors, float[] positions, int x, int y, int width, int height, float angleDegrees, byte cycleMethod) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int[] rgb = new int[width * height];
+        double rad = Math.toRadians(angleDegrees);
+        double sinA = Math.sin(rad);
+        double cosA = Math.cos(rad);
+        double cx = width * 0.5;
+        double cy = height * 0.5;
+        double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);
+        double len = Math.max(1.0, 2.0 * half);
+        for (int py = 0; py < height; py++) {
+            for (int px = 0; px < width; px++) {
+                double dx = px + 0.5 - cx;
+                double dy = py + 0.5 - cy;
+                double proj = dx * sinA - dy * cosA;
+                float t = (float) ((proj + half) / len);
+                rgb[py * width + px] = sampleStops(colors, positions, t, cycleMethod);
+            }
+        }
+        Object img = createImage(rgb, width, height);
+        drawImage(graphics, img, x, y);
+    }
+
+    /// Multi-stop radial gradient with explicit ellipse radii and cycle mode.
+    public void fillRadialGradientWithStops(Object graphics, int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float radiusX, float radiusY, byte cycleMethod) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int[] rgb = new int[width * height];
+        float rx = radiusX <= 0 ? 1f : radiusX;
+        float ry = radiusY <= 0 ? 1f : radiusY;
+        for (int py = 0; py < height; py++) {
+            for (int px = 0; px < width; px++) {
+                float dx = (px + 0.5f - centerX) / rx;
+                float dy = (py + 0.5f - centerY) / ry;
+                float t = (float) Math.sqrt(dx * dx + dy * dy);
+                rgb[py * width + px] = sampleStops(colors, positions, t, cycleMethod);
+            }
+        }
+        Object img = createImage(rgb, width, height);
+        drawImage(graphics, img, x, y);
+    }
+
+    /// Conic / sweep gradient (no cycle mode — conic naturally wraps).
+    public void fillConicGradient(Object graphics, int[] colors, float[] positions, int x, int y, int width, int height, float centerX, float centerY, float fromAngleDegrees) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int[] rgb = new int[width * height];
+        double fromRad = Math.toRadians(fromAngleDegrees);
+        for (int py = 0; py < height; py++) {
+            for (int px = 0; px < width; px++) {
+                double dx = px + 0.5 - centerX;
+                double dy = py + 0.5 - centerY;
+                // CSS conic-gradient: 0° at top (north), sweep clockwise.
+                double theta = Math.atan2(dx, -dy) - fromRad;
+                double normalized = theta / (Math.PI * 2.0);
+                normalized -= Math.floor(normalized);
+                float t = (float) normalized;
+                rgb[py * width + px] = sampleStops(colors, positions, t, GradientDescriptor.CYCLE_NONE);
+            }
+        }
+        Object img = createImage(rgb, width, height);
+        drawImage(graphics, img, x, y);
+    }
+
+    /// Samples a position 't' in a multi-stop gradient. Handles cycle modes.
+    /// Stops are assumed sorted with positions in [0,1]. Honors ARGB alpha.
+    protected static int sampleStops(int[] colors, float[] positions, float t, byte cycleMethod) {
+        switch (cycleMethod) {
+            case GradientDescriptor.CYCLE_REPEAT:
+                t = t - (float) Math.floor(t);
+                break;
+            case GradientDescriptor.CYCLE_REFLECT:
+                t = Math.abs(t);
+                float intp = (float) Math.floor(t);
+                float frac = t - intp;
+                if (((int) intp) % 2 == 1) {
+                    frac = 1f - frac;
+                }
+                t = frac;
+                break;
+            default:
+                if (t <= positions[0]) {
+                    return colors[0];
+                }
+                if (t >= positions[positions.length - 1]) {
+                    return colors[colors.length - 1];
+                }
+                break;
+        }
+        for (int i = 1; i < positions.length; i++) {
+            if (t <= positions[i]) {
+                float span = positions[i] - positions[i - 1];
+                float local = span <= 0 ? 0 : (t - positions[i - 1]) / span;
+                return blendArgb(colors[i - 1], colors[i], local);
+            }
+        }
+        return colors[colors.length - 1];
+    }
+
+    private static int blendArgb(int c0, int c1, float t) {
+        int a0 = (c0 >> 24) & 0xff;
+        int r0 = (c0 >> 16) & 0xff;
+        int g0 = (c0 >> 8) & 0xff;
+        int b0 = c0 & 0xff;
+        int a1 = (c1 >> 24) & 0xff;
+        int r1 = (c1 >> 16) & 0xff;
+        int g1 = (c1 >> 8) & 0xff;
+        int b1 = c1 & 0xff;
+        int a = (int) (a0 + (a1 - a0) * t + 0.5f);
+        int r = (int) (r0 + (r1 - r0) * t + 0.5f);
+        int g = (int) (g0 + (g1 - g0) * t + 0.5f);
+        int b = (int) (b0 + (b1 - b0) * t + 0.5f);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    /// In-place region blur for CSS backdrop-filter:blur(). Default returns false
+    /// signalling no in-place support — caller falls back to snapshot+blur.
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        return false;
     }
 
     private boolean checkIntersection(Object g, int y0, int x1, int x2, int y1, int y2, int[] intersections, int intersectionsCount) {
@@ -9279,6 +9408,11 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
+                case Style.BACKGROUND_GRADIENT_LINEAR:
+                case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                case Style.BACKGROUND_GRADIENT_CONIC:
+                case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+                case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
                     return;
                 default:
@@ -9312,6 +9446,43 @@ public abstract class CodenameOneImplementation {
                         x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
                         s.getBackgroundGradientRelativeSize());
                 return;
+            case Style.BACKGROUND_GRADIENT_LINEAR:
+            case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR: {
+                GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    byte cycle = s.getBackgroundType() == Style.BACKGROUND_GRADIENT_REPEATING_LINEAR
+                            ? GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillLinearGradientWithStops(nativeGraphics, g.getColors(), g.getPositions(),
+                            x, y, width, height, g.getAngleDegrees(), cycle);
+                    return;
+                }
+                break;
+            }
+            case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+            case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+                GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    float[] radii = new float[4];
+                    g.computeRadii(width, height, radii);
+                    byte cycle = s.getBackgroundType() == Style.BACKGROUND_GRADIENT_REPEATING_RADIAL
+                            ? GradientDescriptor.CYCLE_REPEAT : g.getCycleMethod();
+                    fillRadialGradientWithStops(nativeGraphics, g.getColors(), g.getPositions(),
+                            x, y, width, height, radii[0], radii[1], radii[2], radii[3], cycle);
+                    return;
+                }
+                break;
+            }
+            case Style.BACKGROUND_GRADIENT_CONIC: {
+                GradientDescriptor g = s.getGradientDescriptor();
+                if (g != null && g.getColors() != null) {
+                    float cx = g.getRelativeCenterX() * width;
+                    float cy = g.getRelativeCenterY() * height;
+                    fillConicGradient(nativeGraphics, g.getColors(), g.getPositions(),
+                            x, y, width, height, cx, cy, g.getFromAngleDegrees());
+                    return;
+                }
+                break;
+            }
             default:
                 // Style.BACKGROUND_NONE
                 if (s.getBgTransparency() != 0) {

@@ -1401,6 +1401,34 @@ public class Resources {
         return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }
 
+    /// Reads the binary form of a GradientDescriptor from the resource stream.
+    /// Layout: byte kind, byte cycleMethod, float angle,
+    /// float relCenterX, float relCenterY, byte radialShape, byte radialExtent,
+    /// float relRadiusX, float relRadiusY, float fromAngle,
+    /// int stopCount, [int color, float position] * stopCount.
+    private com.codename1.ui.plaf.GradientDescriptor readGradientDescriptor(DataInputStream input) throws IOException {
+        com.codename1.ui.plaf.GradientDescriptor g = new com.codename1.ui.plaf.GradientDescriptor();
+        g.setKind(input.readByte());
+        g.setCycleMethod(input.readByte());
+        g.setAngleDegrees(input.readFloat());
+        g.setRelativeCenterX(input.readFloat());
+        g.setRelativeCenterY(input.readFloat());
+        g.setRadialShape(input.readByte());
+        g.setRadialExtent(input.readByte());
+        g.setRelativeRadiusX(input.readFloat());
+        g.setRelativeRadiusY(input.readFloat());
+        g.setFromAngleDegrees(input.readFloat());
+        int count = input.readInt();
+        int[] colors = new int[count];
+        float[] positions = new float[count];
+        for (int i = 0; i < count; i++) {
+            colors[i] = input.readInt();
+            positions[i] = input.readFloat();
+        }
+        g.setStops(colors, positions);
+        return g;
+    }
+
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
         Hashtable theme = new Hashtable();
         String densityStr = Display.getInstance().getDensityStr();
@@ -1747,6 +1775,16 @@ public class Resources {
                             Float.valueOf(input.readFloat())
                     });
                 }
+                continue;
+            }
+
+            if (key.endsWith(Style.GRADIENT_DESCRIPTOR)) {
+                theme.put(key, readGradientDescriptor(input));
+                continue;
+            }
+
+            if (key.endsWith(Style.FILTER_BLUR) || key.endsWith(Style.BACKDROP_FILTER_BLUR)) {
+                theme.put(key, Float.valueOf(input.readFloat()));
                 continue;
             }
 

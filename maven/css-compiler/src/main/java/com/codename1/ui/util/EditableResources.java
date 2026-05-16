@@ -95,7 +95,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 12;
+    private static final short MINOR_VERSION = 13;
     private static final short MAJOR_VERSION = 1;
 
     private static final boolean IS_MAC;
@@ -1437,6 +1437,36 @@ public class EditableResources extends Resources implements TreeModel {
                                 continue;
                             }
 
+                            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT_DESCRIPTOR)) {
+                                com.codename1.ui.plaf.GradientDescriptor g = (com.codename1.ui.plaf.GradientDescriptor) theme.get(key);
+                                int[] colors = g.getColors();
+                                float[] positions = g.getPositions();
+                                StringBuilder stopsAttr = new StringBuilder();
+                                for (int si = 0; si < colors.length; si++) {
+                                    if (si > 0) stopsAttr.append(';');
+                                    stopsAttr.append(Integer.toHexString(colors[si])).append('@').append(positions[si]);
+                                }
+                                bw.write("        <gradientEx key=\"" + key + "\""
+                                        + " kind=\"" + g.getKind() + "\""
+                                        + " cycle=\"" + g.getCycleMethod() + "\""
+                                        + " angle=\"" + g.getAngleDegrees() + "\""
+                                        + " cx=\"" + g.getRelativeCenterX() + "\""
+                                        + " cy=\"" + g.getRelativeCenterY() + "\""
+                                        + " shape=\"" + g.getRadialShape() + "\""
+                                        + " extent=\"" + g.getRadialExtent() + "\""
+                                        + " rx=\"" + g.getRelativeRadiusX() + "\""
+                                        + " ry=\"" + g.getRelativeRadiusY() + "\""
+                                        + " fromAngle=\"" + g.getFromAngleDegrees() + "\""
+                                        + " stops=\"" + stopsAttr.toString() + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_BLUR)
+                                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR)) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
                             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                                 bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
                                 continue;
@@ -2142,6 +2172,34 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeFloat(((Float)gradient[2]).floatValue());
                 output.writeFloat(((Float)gradient[3]).floatValue());
                 output.writeFloat(((Float)gradient[4]).floatValue());
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT_DESCRIPTOR)) {
+                com.codename1.ui.plaf.GradientDescriptor g = (com.codename1.ui.plaf.GradientDescriptor) theme.get(key);
+                output.writeByte(g.getKind());
+                output.writeByte(g.getCycleMethod());
+                output.writeFloat(g.getAngleDegrees());
+                output.writeFloat(g.getRelativeCenterX());
+                output.writeFloat(g.getRelativeCenterY());
+                output.writeByte(g.getRadialShape());
+                output.writeByte(g.getRadialExtent());
+                output.writeFloat(g.getRelativeRadiusX());
+                output.writeFloat(g.getRelativeRadiusY());
+                output.writeFloat(g.getFromAngleDegrees());
+                int[] colors = g.getColors();
+                float[] positions = g.getPositions();
+                output.writeInt(colors.length);
+                for (int i = 0; i < colors.length; i++) {
+                    output.writeInt(colors[i]);
+                    output.writeFloat(positions[i]);
+                }
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_BLUR)
+                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
                 continue;
             }
 

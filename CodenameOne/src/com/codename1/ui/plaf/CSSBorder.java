@@ -2064,8 +2064,22 @@ public class CSSBorder extends Border {
     }
 
     private static class RadialGradient {
+        ColorStop[] colors = new ColorStop[0];
+
         private String toCSSString() {
-            throw new RuntimeException("RadialGradlient toCSSString() not implemented yet");
+            StringBuilder sb = new StringBuilder();
+            sb.append("radial-gradient(");
+            boolean first = true;
+            for (ColorStop cs : colors) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(cs.toCSSString());
+            }
+            sb.append(")");
+            return sb.toString();
         }
     }
 

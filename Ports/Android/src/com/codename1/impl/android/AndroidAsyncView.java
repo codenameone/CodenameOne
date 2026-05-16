@@ -541,6 +541,14 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
     }
     
 
+    static boolean isExtendedGradientType(byte bgType) {
+        return bgType == Style.BACKGROUND_GRADIENT_LINEAR
+                || bgType == Style.BACKGROUND_GRADIENT_RADIAL_FULL
+                || bgType == Style.BACKGROUND_GRADIENT_CONIC
+                || bgType == Style.BACKGROUND_GRADIENT_REPEATING_LINEAR
+                || bgType == Style.BACKGROUND_GRADIENT_REPEATING_RADIAL;
+    }
+
     class AsyncGraphics extends AndroidGraphics {
 
         private boolean clipIsPath;
@@ -1272,10 +1280,20 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 final float backgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
                 final float backgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
                 final float backgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
+                // Capture extended gradient descriptor so we can paint new gradient
+                // types (multi-stop, angled, conic, repeating) from the async path.
+                // Defensive copy keeps the closure immune to later Style mutations.
+                final com.codename1.ui.plaf.GradientDescriptor extDesc =
+                        s.getGradientDescriptor() == null ? null : s.getGradientDescriptor().copy();
                 pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                     @Override
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
+                        if (bgImage == null && extDesc != null && isExtendedGradientType(backgroundType)) {
+                            underlying.paintExtendedGradientBackground(backgroundType, bgColor, bgTransparency,
+                                    extDesc, x, y, width, height);
+                            return;
+                        }
                         underlying.paintComponentBackground(backgroundType, bgImage, bgColor, bgTransparency,
                                 backgroundGradientStartColor, backgroundGradientEndColor,
                                 backgroundGradientRelativeX, backgroundGradientRelativeY,
