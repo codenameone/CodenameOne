@@ -69,3 +69,93 @@ TabsColorSync {
 TabsColorSync.pressed {
     color: green;
 }
+
+/* CSS-gradient screenshot tests. Each UIID exercises one of the gradient
+   functions the CSS compiler now compiles down to a native descriptor
+   instead of a rasterized fallback image. The Java side picks each tile up
+   by UIID so the only thing under test is the compiler + Style + port
+   gradient renderer round-trip. */
+CssGradientTile {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+}
+CssGradientLinearAngled {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%);
+}
+CssGradientLinearToSide {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(to bottom right, #1d4ed8, #003);
+}
+CssGradientLinearMismatchedAlpha {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue);
+}
+CssGradientRadialFarthestCorner {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: radial-gradient(circle farthest-corner at 30% 30%, #ffffff, #001 70%);
+}
+CssGradientRadialEllipse {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: radial-gradient(ellipse closest-side at 50% 50%, #ffeeff, #002233);
+}
+CssGradientConic {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: conic-gradient(from 0deg at 50% 50%, red, yellow, green, blue, red);
+}
+CssGradientRepeatingLinear {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: repeating-linear-gradient(45deg, #eeeeee 0%, #eeeeee 5%, #cc3344 5%, #cc3344 10%);
+}
+CssGradientRepeatingRadial {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: repeating-radial-gradient(circle at center, #ffffff, #ffffff 8%, #cc3344 8%, #cc3344 16%);
+}
+
+/* filter: blur(...) — exercised against an inline image background so the
+   blurred result reflects both the source image and the compiled filterBlur
+   theme property. */
+CssFilterBlurNone {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+}
+CssFilterBlurLight {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: blur(2px);
+}
+CssFilterBlurHeavy {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: blur(8px);
+}
+CssFilterBackdrop {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+}

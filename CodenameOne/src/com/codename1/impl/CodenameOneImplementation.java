@@ -83,6 +83,7 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.GradientDescriptor;
 import com.codename1.ui.plaf.Style;
+import com.codename1.util.MathUtil;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.FailureCallback;
@@ -3439,7 +3440,7 @@ public abstract class CodenameOneImplementation {
                 double dx = px + 0.5 - centerX;
                 double dy = py + 0.5 - centerY;
                 // CSS conic-gradient: 0° at top (north), sweep clockwise.
-                double theta = Math.atan2(dx, -dy) - fromRad;
+                double theta = MathUtil.atan2(dx, -dy) - fromRad;
                 double normalized = theta / (Math.PI * 2.0);
                 normalized -= Math.floor(normalized);
                 float t = (float) normalized;

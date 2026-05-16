@@ -126,13 +126,12 @@ public class CSSBorderTest extends UITestBase {
         java.lang.reflect.Array.set(bgImagesArray, 0, bgImage);
         bgImagesField.set(border, bgImagesArray);
 
-        // Verify toCSSString
-        try {
-            border.toCSSString();
-            Assertions.fail("RadialGradient toCSSString should throw RuntimeException");
-        } catch(RuntimeException ex) {
-            // Expected
-            Assertions.assertEquals("RadialGradlient toCSSString() not implemented yet", ex.getMessage());
-        }
+        // RadialGradient.toCSSString() now produces a valid (if minimal) CSS
+        // string instead of throwing. The empty-stops case yields an empty
+        // gradient function body.
+        String css = border.toCSSString();
+        Assertions.assertNotNull(css, "toCSSString must not return null for an empty radial gradient");
+        Assertions.assertTrue(css.contains("radial-gradient("),
+                "Expected radial-gradient(...) in serialized CSS, got: " + css);
     }
 }

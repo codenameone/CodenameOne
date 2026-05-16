@@ -267,12 +267,24 @@ public class CSSTheme {
             if (background != null && background.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION) {
                 String fn = background.getFunctionName();
                 if ("linear-gradient".equals(fn)) {
-                    parseLinearGradient(background);
+                    // The legacy parser may throw on inputs that are valid CSS
+                    // but outside its narrow grammar (e.g. "to bottom right",
+                    // an IDENT it tries to read as a color). Swallow that so
+                    // the extended parser still has a chance.
+                    try {
+                        parseLinearGradient(background);
+                    } catch (RuntimeException ignored) {
+                        valid = false;
+                    }
                     if (!valid) {
                         parseLinearGradientExtended(background, false);
                     }
                 } else if ("radial-gradient".equals(fn)) {
-                    parseRadialGradient(background);
+                    try {
+                        parseRadialGradient(background);
+                    } catch (RuntimeException ignored) {
+                        valid = false;
+                    }
                     if (!valid) {
                         parseRadialGradientExtended(background, false);
                     }
