@@ -2,7 +2,7 @@
 
 WARNING: Drawing is considered a low-level API that might introduce some platform fragmentation.
 
-=== Basics - where and how do I draw manually
+=== Basics - where and how to draw manually
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] class handles drawing basics, shapes, images, and text. Developers never instantiate it directly; the Codename One API passes it in.
 
@@ -90,7 +90,7 @@ gradients to build sophisticated backgrounds and lighting effects.
 === Glass pane
 
 The `GlassPane `in Codename One is inspired by the Swing `GlassPane` & `LayeredPane` with a few twists.
-You tried to imagine how Swing developers would have implemented the glass pane knowing what they do now about painters and Swings learning curve. But first: what is the glass pane?
+You tried to imagine how Swing developers would have implemented the glass pane knowing what they do now about painters and Swings learning curve. But first: what's the glass pane?
 
 A typical Codename One application is essentially composed of 3 layers (this is a gross simplification though),
 the background painters are responsible for drawing the background of all components including the main form. The
@@ -179,7 +179,7 @@ no real equivalent to perspective transform in Java SE that you could use.
 You can show shape drawing with a simple example of a drawing app, that allows the user to tap the screen to draw a contour picture.
 
 The app works by keeping a https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath]
-in memory, and continually adding points as bezier curves. Whenever a point is added, the path is redrawn to the screen.
+in memory, and adding points as bezier curves. Whenever a point is added, the path is redrawn to the screen.
 
 The center of the app is the `DrawingCanvas` class, which extends link:https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component].
 
@@ -263,7 +263,7 @@ image::img/lineto-example.png[lineTo example,scaledwidth=20%]
 
 ==== Using bezier curves
 
-Your previous implementation of addPoint() used lines for each segment of the drawing. Let's make a change
+Your previous implementation of addPoint() used lines for each segment of the drawing. Now make a change
 to allow for smoother edges by using quadratic curves instead of lines.
 
 Codename One's `GeneralPath` class includes two methods for drawing curves:
@@ -301,7 +301,7 @@ This change should be straight forward except, perhaps, the business with the `o
 quadratic curves require two points (also to the implied starting point), you can't take the last tap
 point and the current tap point. You need a point between them to act as a control point. This is where you get
 the curve from. The control point works by exerting a sort of "gravity" on the line segment, to pull the line towards
-it. This results in the line being curved. I use the `odd` marker to alternate the control point between positions
+it. This results in the line being curved. The example uses the `odd` marker to alternate the control point between positions
 above the line and below the line.
 
 A drawing from the resulting app looks like:
@@ -312,9 +312,9 @@ image::img/quadto-example.png[Result of quadTo example,scaledwidth=20%]
 
 ==== Detecting platform support
 
-The `DrawingCanvas` example is a bit naive in that it assumes that the device supports the shape API. If I were
-to run this code on a device that doesn't support the https://www.codenameone.com/javadoc/com/codename1/ui/geom/Shape.html[Shape] API, it would draw a blank canvas where I
-expected your shape to be drawn. You can fall back gracefully if you make use of the
+The `DrawingCanvas` example is a bit naive in that it assumes that the device supports the shape API. Running this code on a device that doesn't support the https://www.codenameone.com/javadoc/com/codename1/ui/geom/Shape.html[Shape] API would draw a blank canvas where the shape was
+// vale-skip: Microsoft.Adverbs: "fall back gracefully" is a precise technical pattern (graceful degradation), not a softener.
+expected to be drawn. You can fall back gracefully if you make use of the
 https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method. For example:
 
 [source,java]
@@ -390,7 +390,7 @@ public void paint(Graphics g){
 
 === Example: drawing an analog clock
 
-In the following sections, I will implement an analog clock component. This will show three key concepts
+The following sections implement an analog clock component. This will show three key concepts
 in Codename One's graphics:
 
 1. Using the `GeneralPath` class for drawing arbitrary shapes.
@@ -422,16 +422,16 @@ public class AnalogClock extends Component {
 
 ==== Setting up the parameters
 
-Before you actually draw anything, let's take a moment to figure out what values you need to know to
+Before you actually draw anything, take a moment to figure out what values you need to know to
 draw an effective clock. Minimally, you need two values:
 
 1. The center point of the clock.
 2. The radius of the clock.
 
-Also, I am adding the following parameters to help customize how the clock is rendered:
+The clock also exposes the following parameters to help customize how it's rendered:
 
 1. *The padding* (that's: the space between the edge of the component and the edge of the clock circle.
-2. *The tick lengths*. I will be using 3 different lengths of tick marks on this clock. The longest ticks will be
+2. *The tick lengths*. The example uses 3 different lengths of tick marks on this clock. The longest ticks will be
  displayed at quarter points (that's: 12, 3, 6, and 9). Slightly shorter ticks will be displayed at the five-minute marks
  (that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short.
 
@@ -547,7 +547,7 @@ for ( int i=1; i<=12; i++){
     int tx = (int)(Math.cos(angleFrom3)*(r-longTickLen));
     int ty = (int)(-Math.sin(angleFrom3)*(r-longTickLen));
 
-    // For 6 and 12 we will shift number slightly so they are more even
+    // For 6 and 12 we will shift number slightly so they're more even
     if ( i == 6 ){
         ty -= charHeight/2;
     } else if ( i == 12 ){
@@ -585,7 +585,7 @@ image::img/numbers.png[Drawing the numbers on the watch face,scaledwidth=40%]
 ==== Drawing the hands
 
 The clock will include three hands: Hour, Minute, and Second. You will use a separate https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[GeneralPath] object
-for each hand. For the positioning/angle of each, I will use the following strategy:
+for each hand. For the positioning/angle of each, use the following strategy:
 
 1. Draw the hand at the clock center pointing toward `12` (straight up).
 2. Translate the hand slightly down so that it overlaps the center.
@@ -619,7 +619,7 @@ This requires you to calculate the angle. The `px` and `py` arguments constitute
 which, in your case will be the clock center.
 
 WARNING: The rotation pivot point is expected to be in absolute screen coordinates rather than relative
-coordinates of the component. So you need to get the absolute clock center position to perform the rotation.
+coordinates of the component. You therefore need to get the absolute clock center position to perform the rotation.
 
 [source,java]
 ----
@@ -646,10 +646,10 @@ results on your form.
 
 *Drawing the Minute And Hour Hands*:
 
-The mechanism for drawing the hour and minute hands is largely the same as for the minute hand. There are a
+The mechanism for drawing the hour and minute hands is largely the same as for the minute hand, with a
 couple of added complexities though:
 
-1. You will make these hands trapezoidal, and almost triangular rather than using a simple line. So the
+1. You will make these hands trapezoidal, and almost triangular rather than using a simple line, which means the
 `GeneralPath` construction will be slightly more complex.
 2. Calculation of the angles will be slightly more complex because they need to consider many
 parameters. For example: The hour hand angle is informed by both the hour of the day and the minute of the hour.
@@ -839,7 +839,7 @@ grow downward as illustrated below:
 .The Codename One graphics coordinate space
 image::img/coordinate_system.png[The Codename One graphics coordinate space,scaledwidth=20%]
 
-So the screen origin is at the top left corner of the screen. Given this information, consider the method
+The screen origin is at the top left corner of the screen. Given this information, consider the method
 call on the https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] context `g`:
 
 [source,java]
@@ -893,7 +893,7 @@ Usually, when you're drawing onto a `Graphics` context, you're doing so within t
 are of your drawing. you're concerned with their relative location within the coordinate. You can leave
 the positioning (and even sizing) of the coordinate up to Codename One. Thank you for reading.
 
-To show this, let's create a simple component called https://www.codenameone.com/javadoc/com/codename1/ui/geom/Rectangle.html[Rectangle] component, that draws a
+To show this, create a simple component called https://www.codenameone.com/javadoc/com/codename1/ui/geom/Rectangle.html[Rectangle] component, that draws a
 rectangle on the screen. You will use the component's position and size to dictate the size of the rectangle to be
 drawn. And you will keep a 5 pixel padding between the edge of the component and the edge of your rectangle.
 
@@ -929,7 +929,7 @@ transform and translation settings*.
 2. *All coordinates passed to the context's transformation settings are considered to be screen coordinates, and
 aren't subject to current transform and translation settings*.
 
-Let's take your `RectangleComponent` as an example. Suppose you want to rotate the rectangle by 45 degrees,
+Take your `RectangleComponent` as an example. Suppose you want to rotate the rectangle by 45 degrees,
 your first try might look something like:
 
 [source,java]
@@ -956,7 +956,7 @@ TIP: When performing rotations and transformations inside a `paint()` method, al
 transformations at the end of the method so that it doesn't pollute the rendering pipeline for later components.
 
 The behavior of this rotation will vary based on where the component is rendered on the screen. To
-show this, let's try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
+show this, try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
 
 [source,java]
 ----
@@ -980,7 +980,7 @@ This may not be an intuitive outcome since you drew 10 rectangle components, be 
 rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
 Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In
 your case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their
-containing component - so they are being clipped. A more sensible solution for your component would be to place
+containing component, and are therefore being clipped. A more sensible solution for your component would be to place
 the rotation pivot point somewhere inside the component. That way all the components would look the same.
 Some possibilities would be:
 
@@ -1023,7 +1023,7 @@ public void paint(Graphics g) {
 image::img/rotation3.png[Rotating the rectangle with the center pivot point,scaledwidth=20%]
 
 You could also use the `Graphics.setTransform()` class to apply rotations and other complex transformations
-(including 3D perspective transforms), but I will leave that for its own topic as it's a little bit more complex.
+(including 3D perspective transforms), but that belongs to its own topic as it's a little bit more complex.
 
 
 ==== Global alpha & Anti-Aliasing
@@ -1068,8 +1068,8 @@ This is because the `drawXXX()` methods for this component take coordinates rela
 === Images
 
 Codename One has a few image types: loaded, RGB (built-in), RGB (Codename One), Mutable,
-EncodedImage, SVG, MultiImage, FontImage & Timeline. There are also URLImage, FileEncodedImage, FileEncodedImageAsync,
-`StorageEncodedImage`/Async that will be covered in the IO section.
+EncodedImage, SVG, MultiImage, FontImage & Timeline. URLImage, FileEncodedImage, FileEncodedImageAsync,
+and `StorageEncodedImage`/Async also exist, and are covered in the IO section.
 
 All image types are seamless to use and will work with `drawImage` and various image related image
 API's for the most part with caveats on performance etc.
@@ -1077,7 +1077,7 @@ API's for the most part with caveats on performance etc.
 TIP: For animation images the code must invoke the `animate()` method on the image (this is done automatically by Codename One when placing the image as a background or as an icon! +
 You need to do it if you invoke `drawImage` in code rather than use a built-in component).
 
-Performance and memory wise you should read the section below carefully and be aware of the image types you use.
+Performance and memory wise you should read the section below and be aware of the image types you use.
 The Codename One designer tries to conserve memory and be "clever" by using `EncodedImage`. While these are great for low memory you need to understand the complexities of image locking and be aware that you might pay a penalty if you don't.
 
 Here are the pros/cons and logic behind every image type. This covers the logic of how it’s created:
@@ -1110,7 +1110,7 @@ NOTE: This isn't the case for all images but it's common and you prefer calculat
 
 ==== The RGB image's
 
-two types of RGB constructed images that are different from one another but since they are both technically "RGB image's" you're bundling them under the same subsection.
+two types of RGB constructed images that are different from one another but since they're both technically "RGB image's" you're bundling them under the same subsection.
 
 ===== Internal
 
@@ -1159,7 +1159,7 @@ To verify that locking might be a problem you can launch the performance monitor
 
 ==== MultiImage
 
-Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they are in no way distinguishable from `EnclodedImage`.
+Multi images don't physically exist as a concept within the Codename One API so there is no way to actually create them and they're in no way distinguishable from `EnclodedImage`.
 
 The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
 
@@ -1301,7 +1301,7 @@ hard restriction because of the way `URLImage` is implemented.
 ****
 The reason for the size restriction lies in the implementation of `URLImage`. `URLImage` is physically an animated image and so the UI thread tries to invoke its `animate()` method to refresh. The `URLImage` uses that call to check if the image was fetched and if not fetches it asynchronously.
 
-Once the image was fetched the `animate()` method returns true to refresh the UI. During the loading process the placeholder is shown, the reason for the restriction in size is that image animations can't "grow" the image. They are assumed to be fixed so the placeholder must match the dimensions of the resulting image.
+Once the image was fetched the `animate()` method returns true to refresh the UI. During the loading process the placeholder is shown, the reason for the restriction in size is that image animations can't "grow" the image. They're assumed to be fixed so the placeholder must match the dimensions of the resulting image.
 ****
 
 The simple use case is pretty trivial:
@@ -1322,7 +1322,7 @@ TIP: Since https://www.codenameone.com/javadoc/com/codename1/ui/util/ImageIO.htm
 it's working in Java SE, Android, iOS & Windows Phone.
 
 If the file in the URL contains an image that's too big it will scale it to match the size of the placeholder precisely! +
-There is also an option to fail if the sizes don't match. Notice that the image that will be saved is the scaled
+An option also exists to fail if the sizes don't match. Notice that the image that will be saved is the scaled
 image, this means you will have little overhead in downloading images that are the wrong size although you
 will get some artifacts.
 

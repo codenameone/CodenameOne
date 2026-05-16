@@ -75,7 +75,7 @@ When iterating locally with a Mac, open the generated Xcode project and run it o
 
 === Local notifications on iOS and Android
 
-Local notifications are like push notifications, except that they are initiated locally by the app, rather than remotely. They are useful for communicating information to the user while the app is running in the background, since they manifest themselves as pop-up notifications on supported devices.
+Local notifications are like push notifications, except that they're initiated locally by the app, rather than remotely. They're useful for communicating information to the user while the app is running in the background, since they manifest themselves as pop-up notifications on supported devices.
 
 TIP: To set the notification icon on Android place a 24×24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
 
@@ -158,7 +158,7 @@ NOTE: `localNotificationReceived()` is called when the user responds to the noti
 
 ==== Canceling notifications
 
-Repeating notifications will continue until they are canceled by the app. You can cancel a single notification by calling:
+Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
 
 [source,java]
 -----
@@ -179,8 +179,10 @@ beta testing. Make sure to use a release build target.
 
 === Choosing a color space for the Metal renderer
 
+// vale-skip: Microsoft.Avoid: "rendering backend" is Apple's term of art for an alternate Metal/OpenGL rendering pipeline, not a back-end server.
 When the Metal rendering backend is enabled with `ios.metal=true`, the `CAMetalLayer` is configured with the sRGB color space by default. This matches the behavior of the legacy OpenGL ES 2 backend on `CAEAGLLayer`: CG-rasterized images and gradients (which are tagged `DeviceRGB` in their `CGBitmapContext`) end up displayed with the same brightness on both backends.
 
+// vale-skip: Microsoft.Adverbs: "strictly device-RGB" is a precise color-pipeline qualifier (excluding sRGB conversion), not a softener.
 For most apps the default is the right choice. Apps that need a different color profile -- for example, wide-gamut artwork that should be displayed in Display P3, or a strictly device-RGB pipeline that matches a custom rendering toolchain -- can override the choice with the `ios.metal.colorSpace` build hint:
 
 [cols="1,3"]
@@ -209,6 +211,7 @@ For most apps the default is the right choice. Apps that need a different color 
 | Leaves `metalLayer.colorspace` unset, so Metal uses the system default for the device.
 |===
 
+// vale-skip: Microsoft.Avoid: "OpenGL ES 2 backend" names the alternate rendering pipeline, not a server.
 NOTE: The hint only takes effect when `ios.metal=true`. With the OpenGL ES 2 backend the layer is `CAEAGLLayer` and the color space is fixed by the system.
 
 === Accessing insecure URL's
@@ -228,7 +231,7 @@ For example, it seems that Apple will reject your app if you include that and do
 
 NOTE: CocoaPods remains fully supported, but it's no longer the only supported iOS dependency path. Swift Package Manager (SPM) is also supported. The current guidance is documented in this section.
 
-https://cocoapods.org/[CocoaPods] is a dependency manager for Swift and Objective-C Cocoa projects. It has over eighteen thousand libraries and can help you scale your projects elegantly. Cocoapods can be used in your Codename One project to include native iOS libraries without having to go through the hassle of bundling the actual library into your project. Rather than bundling `.h` and `.a` files in your ios/native directory, you can specify which "pods" your app uses through the `ios.pods` build hint. (There are other build hints also if you need more advanced features).
+https://cocoapods.org/[CocoaPods] is a dependency manager for Swift and Objective-C Cocoa projects. It has over eighteen thousand libraries and can help you scale your projects. Cocoapods can be used in your Codename One project to include native iOS libraries without having to go through the hassle of bundling the actual library into your project. Rather than bundling `.h` and `.a` files in your ios/native directory, you can specify which "pods" your app uses through the `ios.pods` build hint. (Other build hints also exist if you need more advanced features.)
 
 **Examples**
 

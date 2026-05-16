@@ -13,7 +13,7 @@ Push notifications provide a way to inform users that something of interest has 
 
 Messages may contain a short title and text body that will be displayed to the user in their device's messages stream. They may also specify a badge to display on the app's icon (for example: that red circle on your mail app icon that indicates how many unread messages you've), a sound to play then the message arrives, an image attachment, and a set of "actions" that the user can perform directly in the push notification.
 
-Also to messages that the user *sees*, a push notification can contain non-visual information that's *silently* sent to your app.
+In addition to messages that the user *sees*, a push notification can contain non-visual information sent to your app without any UI surfacing.
 
 
 === Implementing push support
@@ -61,7 +61,7 @@ There will be more steps required to deploy to each platform (for example: iOS r
 
 === The push lifecycle
 
-Let's take minute to go over the three callbacks in your application.
+Take a minute to go over the three callbacks in your application.
 
 ==== Registration
 
@@ -73,7 +73,7 @@ If the registration failed for some reason, the `pushRegistrationError()` callba
 
 Notice that all this happens seamlessly behind the scenes when your app loads. You don't need to start any of this workflow.
 
-NOTE: On iOS, the system permission prompt that asks the user to allow notifications is shown the first time you call `Display.getInstance().registerPush()` (or schedule a `LocalNotification`). It is no longer shown automatically when the app launches, so you can display your own rationale screen first and call `registerPush()` only after the user has agreed. This matches the Android flow. Apps that need the legacy launch-time prompt for backward compatibility can set the `ios.notificationPermissionAtLaunch=true` build hint.
+NOTE: On iOS, the system permission prompt that asks the user to allow notifications is shown the first time you call `Display.getInstance().registerPush()` (or schedule a `LocalNotification`). It's no longer shown automatically when the app launches, so you can display your own rationale screen first and call `registerPush()` only after the user has agreed. This matches the Android flow. Apps that need the legacy launch-time prompt for backward compatibility can set the `ios.notificationPermissionAtLaunch=true` build hint.
 
 ==== Sending a push notification
 
@@ -144,7 +144,7 @@ The "Push Type" drop-down allows you to select the "type" of the push message. T
 .Sending a basic hello world push from the push simulator
 image::img/push-push-simulator-test-1.png[Sending a basic Hello World push,scaledwidth=30%]
 
-Let's try a simple "hello world" push message. Select "1" from the "Push Type" drop-down menu, and enter "Hello World" into the "Send Message" field as shown above. Then press "send."
+Try a simple "hello world" push message. Select "1" from the "Push Type" drop-down menu, and enter "Hello World" into the "Send Message" field as shown above. Then press "send."
 
 Assuming your `push()` method looks like:
 
@@ -161,7 +161,7 @@ You should see the following output in your console:
 Received push message: Hello World
 ----
 
-This experiment simulated a push notification while the app is running in the foreground. Now let's simulate the case where the app isn't running, or running in the background. You can simulate this by pausing the app. Return to the Codename One simulator window, and select "Pause App" from the "Simulate" menu as shown below.
+This experiment simulated a push notification while the app is running in the foreground. Now simulate the case where the app isn't running, or running in the background. You can simulate this by pausing the app. Return to the Codename One simulator window, and select "Pause App" from the "Simulate" menu as shown below.
 
 .Pausing the app in the simulator so you can simulate push notifications while app is in the background.
 image::img/push-pause-app.png[Pausing app in the simulator,scaledwidth=30%]
@@ -504,7 +504,7 @@ Expand the "Grow" section of the left menu bar, then click on the "Cloud Messagi
 .Expand "Grow" Section and select "Cloud Messaging"
 image::img/push-fcm-grow-menu.png[Expand Grow section and select Cloud Messaging,scaledwidth=30%]
 
-On the next screen, click on the Android icon where is says `Add an app to get started`.
+On the next screen, click on the Android icon where it says `Add an app to get started`.
 
 .Click on the "Android" icon to add an Android App to the project
 image::img/push-fcm-enable-notifications.png[Click on the Android icon,scaledwidth=30%]
@@ -530,7 +530,7 @@ All you need to do here is press the "Download google-services.json" file, then 
 IMPORTANT: Firebase console directs you to copy the google-services.json file into the "app" directory of your project. Ignore this direction as it applies for Android studio projects. For Codename One, this file goes into the #native/android# directory of your project.
 
 
-There is one last piece of information that you need so that you can *send* push notifications to your app: The `FCM_SERVER_API_KEY` value.
+One last piece of information remains for you to *send* push notifications to your app: The `FCM_SERVER_API_KEY` value.
 
 Go to your project dashboard in Firebase console. Then click the "Settings" menu (the "Gear" icon next to "Project Overview" in the upper left):
 
@@ -554,7 +554,7 @@ Push on iOS is much harder to handle than the Android version, but you simplifie
 iOS push needs two more P12 certificates.
 
 IMPORTANT: Please *notice* that these are *NOT* the signing certificates! +
-They are *completely different certificates* that have nothing to do with the build process!
+They're *completely different certificates* that have nothing to do with the build process!
 
 The certificate wizard can generate these more push certificates and do a few other things if you check this flag in the end of the wizard:
 
@@ -796,4 +796,5 @@ many things to notice in the responses above:
 
 IMPORTANT: APNS (Apple's push service) returns uppercase key results. This means that code for managing the keys in your database must be case insensitive
 
+// vale-skip: Microsoft.Adverbs: "fail silently" is the precise technical contrast with returning an error, not authorial padding.
 TIP: Apple doesn't always send back a result for a device being inactive and might fail silently

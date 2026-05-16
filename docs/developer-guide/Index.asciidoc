@@ -37,7 +37,7 @@ IMPORTANT: Codename One doesn't send source code to the build cloud, compiled by
 
 ==== Why build servers
 
-The build servers let's build native iOS apps without a Mac and native Windows apps without a Windows machine. They remove the need to install and update complex toolchains and simplify the process of building a native app to a right click.
+The build servers can build native iOS apps without a Mac and native Windows apps without a Windows machine. They remove the need to install and update complex toolchains and simplify the process of building a native app to a right click.
 
 Even though the build servers streamline delivery, Codename One also supports fully local builds. You can install the toolchain on your own hardware and follow the workflows in <<maven-project-workflow>> and <<working-with-codename-one-sources>> to compile, package, and test apps without leaving your desktop environment.
 
@@ -74,7 +74,7 @@ For desktop builds Codename One uses `javapackager`, since both Macs and Windows
 
 What makes Codename One stand out is the approach it takes to UI: "`lightweight architecture.`"
 
-Lightweight architecture is the "`not so secrete sauce`" to Codename One's portability. Essentially it means all the components/widgets in Codename One are written in Java. Thus their behavior is consistent across all platforms and they are fully customizable from the developer code as they don't rely on OS internal semantics. This allows developers to preview the application accurately in the simulators and GUI builders.
+Lightweight architecture is the "`not so secrete sauce`" to Codename One's portability. Essentially it means all the components/widgets in Codename One are written in Java. Thus their behavior is consistent across all platforms and they're fully customizable from the developer code as they don't rely on OS internal semantics. This allows developers to preview the application accurately in the simulators and GUI builders.
 
 One of the big accomplishments in Codename One is its unique ability to embed "`heavyweight`" widgets into place among the "`lightweights.`" This is crucial for apps such as Uber where the cars and widgets on top are implemented as Codename One components yet below them you've the native map component.
 
@@ -134,7 +134,7 @@ In 2012 Shai and Chen formed Codename One as they left Oracle. The project has t
 
 === Core concepts of mobile programming
 
-Before you proceed, I would like to explain some universal core concepts of mobile programming that might not be intuitive. These are universal concepts that apply to mobile programming regardless of the tools you're using.
+Before you proceed, this section explains some universal core concepts of mobile programming that might not be intuitive. These are universal concepts that apply to mobile programming regardless of the tools you're using.
 
 You can skip this section if you feel you're familiar enough with the core problems/issues in mobile app development.
 
@@ -154,13 +154,13 @@ Low resolution images on high PPI devices will look either small or pixelated. H
 .How the Same Image Looks in Different Devices
 image::img/image-sizes-different-dpis.png[How the Same Image Looks in Different Devices]
 
-The exact same image will look different on each device, sometimes to a comical effect. One of the solutions for this problem is multi-images. All OS’s support the ability to define different images for various densities. I will discuss multi-images later in Chapter 2.
+The exact same image will look different on each device, sometimes to a comical effect. One of the solutions for this problem is multi-images. All OS’s support the ability to define different images for various densities. Chapter 2 discusses multi-images later in detail.
 
 This also highlights the need for working with measurements other than pixels. Codename One supports millimeters (or dips) as a unit of measurement. This is highly convenient and is a better representation of size when dealing with mobile devices.
 
 However, there is a bigger conceptual issue involved. You need to build a UI that adapts to the wide differences in form factors. You might have fewer pixels on an iPad, but because of its physical size, you would expect the app to cram more information into that space so the app won't feel like a blown-up phone application. many strategies to address that, but one of the first steps is in the layout managers. (((Layouts, Layout)))
 
-I will discuss the layout managers in depth in Chapter 2, but the core concept is that they decide where a UI element is placed based on generic logic. That way, the user interface can adapt automatically to the huge variance in display size and density.
+Chapter 2 discusses the layout managers in depth, but the core concept is that they decide where a UI element is placed based on generic logic. That way, the user interface can adapt automatically to the huge variance in display size and density.
 
 ==== Touch interface
 
@@ -258,7 +258,7 @@ Before you get to the code there are few important things you need to understand
 
 * *App Name* - This is the name of the app and the main class, it's important to get this right as it's hard to change this value later
 * *Package Name* - it's *crucial* you get this value right. Besides the difficulty of changing this after the fact, once an app is submitted to iTunes/Google Play with a specific package name this can't be changed! See the sidebar `Picking a Package Name`.
-* *Theme* - There are various types of built-in themes in Codename One, for simplicity recommend `Native` as it's a minimal starting point
+* *Theme* - Codename One ships with various built-in themes; for simplicity recommend `Native` as it's a minimal starting point
 
 .Picking a Package Name
 ****
@@ -266,9 +266,9 @@ Apple, Google and Microsoft identify applications based on their package names. 
 
 This can cause difficulties when submitting to Apple, Google, or Microsoft. Submitting to one of them is no guarantee of success when submitting to another.
 
-To come up with the right package name use a reverse domain notation. if your website is `goodstuff.co.uk` your package name should start with `uk.co.goodstuff`. I highly recommend the following guidelines for package names:
+To come up with the right package name use a reverse domain notation. if your website is `goodstuff.co.uk` your package name should start with `uk.co.goodstuff`. Follow these guidelines for package names:
 
-* *Lower Case* - some OS's are case sensitive and handling a mistake in case is painful. The Java convention is lower case and I would recommend sticking to that although it isn't a need
+* *Lower Case* - some OS's are case sensitive and handling a mistake in case is painful. The Java convention is lower case; stick to that
 
 * *Avoid Dash and Underscore* - You can't use a dash character (`-`) for a package name in Java. Underscore (`_`) doesn't work for iOS. If you want more than one word just use a deeper package e.g.: `com.mydomain.deeper.meaningful.name`
 
@@ -289,7 +289,7 @@ Use your IDE's Debug button with the Run in Simulator task to launch the simulat
 
 .Simulator vs. Emulator
 ****
-Codename One ships with a simulator similarly to the iOS toolchain which also has a simulator. Android ships with an emulator. Emulators go further. They create a virtual machine that's compatible with the device CPU and then boot the full mobile OS within that environment. This provides a proper runtime environment but is **painfully slow**.
+Codename One ships with a simulator similarly to the iOS toolchain which also has a simulator. Android ships with an emulator. Emulators go further. They create a virtual machine that's compatible with the device CPU and then boot the full mobile OS within that environment. This provides a proper runtime environment but is **slow**.
 
 Simulators rely on the fact that OS's are similar and so they leave the low-level details in place and just map the API behavior. Since Codename One relies on Java it can start simulating on top of the virtual machine on the desktop. That provides several advantages including fast development cycles and full support for all the development tools/debuggers you can use on the desktop.
 
@@ -298,7 +298,7 @@ Emulators make sense for developers who want to build OS level services for exam
 
 ==== The source code of the hello world app
 
-After clicking finish in the new project wizard you've a `HelloWorld` project with a few default settings. I will break the class down to small pieces and explain each piece starting with the enclosing class:
+After clicking finish in the new project wizard you've a `HelloWorld` project with a few default settings. The following sections break the class down to small pieces and explain each piece starting with the enclosing class:
 
 [source,java,title='HelloWorld Class']
 ----
@@ -316,7 +316,7 @@ public class HelloWorld { // <1>
 
 <3> Every app has a theme, it determines how everything within the application looks for example: colors, fonts etc.
 
-Next let's discuss the first lifecycle method `init(Object)`. I discuss the lifecycle in depth in the <<ApplicationLifecycle,Application Lifecycle Sidebar>>.
+Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth.
 
 [source,java,title='HelloWorld init(Object)']
 ----
@@ -388,7 +388,7 @@ public void start() {
 .Title and Label in the UI
 image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
 
-some complex ideas within this short snippet which I will address later in this chapter when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
+some complex ideas appear within this short snippet that this chapter addresses later when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
 
 .Application Lifecycle
 ****
@@ -443,7 +443,7 @@ public void destroy() { // <4>
 
 <4> `destroy()` is a special case. Under normal circumstances you shouldn't write code in `destroy()`. `stop()` should work for most cases
 
-that's it. Hopefully you've a general sense of the code. it's time to run on the device.
+that's it. You should now have a general sense of the code. it's time to run on the device.
 
 ==== Building and deploying on devices
 
@@ -488,7 +488,7 @@ image::img/android-certificate-generator.png[]
 .Your certificate will generate into the file `Keychain.ks` in your home directory
 TIP: Make sure to back that up and the password as losing these can have dire consequences
 
-.Should I Use a Different Certificate for Each App?
+.Should You Use a Different Certificate for Each App?
 ****
 In theory yes. In practice it's a pain... Keeping multiple certificates and managing them is a pain so you often just use one.
 
@@ -499,12 +499,12 @@ The drawback of this approach occurs when you're building an app for someone els
 
 Code signing for iOS relies on Apple as the certificate authority. This is something that doesn't exist on Android. iOS also requires provisioning as part of the certificate process and separates the process for development/release.
 
-However, first let's start with the good news:
+First, the good news:
 
 * Losing an iOS certificate is no big deal - in fact you revoke them often with no impact on shipping apps
 * Codename One has a wizard that hides most of the pain related to iOS signing
 
-In iOS Apple issues the certificates for your applications. That way the certificate is trusted by Apple and is assigned to your Apple iOS developer account. There is one important caveat: You need an iOS Developer Account and Apple charges a 99USD Annual fee for that.
+In iOS Apple issues the certificates for your applications. That way the certificate is trusted by Apple and is assigned to your Apple iOS developer account. One important caveat applies: You need an iOS Developer Account and Apple charges a 99USD Annual fee for that.
 
 TIP: The 99USD price and need have been around since the introduction of the iOS developer program for 10 years at the time of this writing. It might change at some point though
 
@@ -537,14 +537,14 @@ If you've more than one project you should use the same iOS P12 certificate file
 
 One important aspect of provisioning on iOS is the device list in the provisioning step. Apple allows you to install the app on 100 devices during development. This blocks developers from skipping the App Store altogether. it's important you list the correct UDID for the device in the list otherwise install will fail.
 
-WARNING: There are many apps and tools that offer the UDID of the device, they aren't necessarily reliable and might give a fake number!
+WARNING: Many apps and tools offer the UDID of the device, but they aren't necessarily reliable and might give a fake number!
 
 .Get the UDID of a Device
 image::img/get-device-udid.png[Get the UDID of a Device]
 
 TIP: You can right click the UDID and select #copy# to copy it
 
-The simplest and most reliable process for getting a UDID is through iTunes. I have used other approaches in the past that worked but this approach is guaranteed.
+The simplest and most reliable process for getting a UDID is through iTunes. Other approaches have worked in the past but this approach is guaranteed.
 
 NOTE: Ad hoc provisioning allows 1000 beta testers for your application but it's a more complex process that you won't discuss here although it's supported by Codename One
 

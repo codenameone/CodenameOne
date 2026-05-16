@@ -361,7 +361,7 @@ runtime overrides:
 }
 ----
 
-Bindings that reference a constant you did not override stay at
+Bindings that reference a constant you didn't override stay at
 their baked-in default, so a partial override (for example, just
 `--accent-color`) is fine.
 
@@ -412,7 +412,7 @@ the native CSS hard-codes (for example, the iOS `success` green on
 === Platform-specific UIIDs
 
 A handful of UIIDs exist only because one platform draws them
-differently from the other. They are still safe to override; you
+differently from the other. They're still safe to override; you
 just want to know which platform's screen the override is going to
 land on.
 

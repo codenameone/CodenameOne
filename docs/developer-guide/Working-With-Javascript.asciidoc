@@ -176,7 +176,7 @@ For example, If your application is hosted at http://example.com/myapp/index.htm
 
 NOTE: The HTTP standard does support cross-origin requests in the browser via the `Access-Control-Allow-Origin` HTTP header. Some web services supply this header when serving resources, but not all. The way to be make network requests to arbitrary resources is to do it through a proxy.
 
-There is a solution. The.war JavaScript distribution includes an embedded proxy servlet, and your application is configured, by default, to use this servlet. If you intend to use the.war distribution, then it **should work**. You shouldn't need to do anything to configure the proxy.
+A solution exists. The.war JavaScript distribution includes an embedded proxy servlet, and your application is configured, by default, to use this servlet. If you intend to use the.war distribution, then it **should work**. You shouldn't need to do anything to configure the proxy.
 
 If, but, you're using the.zip distribution or the single-file preview, you will need to set up a Proxy servlet and configure your application to use it for its network requests.
 
@@ -439,7 +439,7 @@ or
 
 ===== Embedding variables in URLs
 
-In some cases the URL of a library may depend on the values of some build hints in the project. For example, in the Google Maps cn1lib, the API key must be appended to the URL of the API as a GET parameter. For example, `https://maps.googleapis.com/maps/api/js?v=3.exp&key=SOME_API_KEY`, but the developer of the library doesn't want to put his own API key in the manifest file for the library. It would be better for the API key to be supplied by the developer of the actual app that uses the library and not the library itself.
+Sometimes the URL of a library may depend on the values of some build hints in the project. For example, in the Google Maps cn1lib, the API key must be appended to the URL of the API as a GET parameter. For example, `https://maps.googleapis.com/maps/api/js?v=3.exp&key=SOME_API_KEY`, but the developer of the library doesn't want to put his own API key in the manifest file for the library. It would be better for the API key to be supplied by the developer of the actual app that uses the library and not the library itself.
 
 The solution for this is to add a *variable* into the URL as follows:
 
@@ -503,6 +503,7 @@ Note: If the port number isn't specified or if it's the scheme's default port (l
 | The User-agent string identifying the browser, version etc..
 
 | `browser.language`
+// vale-skip: Microsoft.We: "US" appears inside the BCP 47 locale code "en-US", not a first-person pronoun.
 | The language code that the browser is currently set to.  (for example, en-US)
 
 | `browser.name`
@@ -526,9 +527,9 @@ For example: `MacIntel`, `Win32`, `FreeBSD i386`, "WebTV OS"
 [id="native_theme", reftext="Changing the Native Theme"]
 === Changing the native theme
 
-Since a web application could potentially be run on any platform, it isn't feasible to bundle all possible themes into the application (at least it wouldn't be efficient for most use cases). By default you've bundled the iOS7 theme for javascript applications. This means that the app will look like iOS7 on all devices: desktop, iOS, Android, WinPhone, etc...
+Since a web application could be run on any platform, bundling all possible themes into the application isn't feasible (at least it wouldn't be efficient for most use cases). By default you've bundled the iOS7 theme for javascript applications. This means that the app will look like iOS7 on all devices: desktop, iOS, Android, WinPhone, etc...
 
-You can override this behavior dynamically by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to a theme that you've included in your app. All of the native themes are available on GitHub, so you can easily copy these into your application. The best place to add the theme is in your `native/javascript` directory - so that they won't be included for other platforms.
+You can override this behavior dynamically by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to a theme that you've included in your app. All the native themes are available on GitHub, so you can copy these into your application. The best place to add the theme is in your `native/javascript` directory, which excludes them from other platforms.
 
 ==== Example: Using Android theme on Android
 
@@ -578,7 +579,7 @@ f.show();
 [id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
 === Deploying as a progressive web app
 
-Out of the box, your app is ready to be deployed as a progressive web app (PWA). That means that users can access the app directly in their browser, but once the browser determines that the user is frequenting the app, it will "politely" prompt the user to install the app on their home screen. Once installed on the home screen, the app will behave like a native app. It will continue to work while offline, and if the user launches the app, it will open without the browser's navigation bar. If you were to install the native and PWA versions of your app side by side, you would be hard pressed to find the difference - especially on newer devices.
+Out of the box, your app is ready to be deployed as a progressive web app (PWA). That means that users can access the app directly in their browser, but once the browser determines that the user is frequenting the app, it will prompt the user to install the app on their home screen. Once installed on the home screen, the app will behave like a native app. It will continue to work while offline, and if the user launches the app, it will open without the browser's navigation bar. If you were to install the native and PWA versions of your app side by side, you would be hard pressed to find the difference - especially on newer devices.
 
 Below is a screenshot from Chrome for Android where the browser is prompting the user to add the app to their home screen.
 
@@ -605,7 +606,7 @@ Build hints of the form `javascript.manifest.XXX` will be injected into the app 
 javascript.manifest.description=An app for doing cool stuff
 ----
 
-You can find a full list of available manifest keys https://developer.mozilla.org/en-US/docs/Web/Manifest[here]. The build server will automatically generate all of the icons so you don't need to worry about those. The "name" and "short_name" properties will default to the app's display name, but they can be overridden via the `javascript.manifest.name` and `javascript.manifest.short_name` build hints respectively.
+You can find a full list of available manifest keys https://developer.mozilla.org/en-US/docs/Web/Manifest[here]. The build server will automatically generate all the icons so you don't need to worry about those. The "name" and "short_name" properties will default to the app's display name, but they can be overridden via the `javascript.manifest.name` and `javascript.manifest.short_name` build hints respectively.
 
 NOTE: The `javascript.manifest.related_applications` build hint expects a JSON formatted list, like in the raw manifest file.
 
@@ -638,15 +639,16 @@ The app will also appear in their "Shelf" which you can always access at `chrome
 .Chrome App Launcher
 image::img/javascript-pwa-chrome-app-launcher.png[Chrome App Launcher,scaledwidth=20%]
 
-NOTE: The Chrome App Launcher lists apps installed both via the Chrome Web Store and via the "Add to Shelf" feature that we discuss here. The features we describe in this article are orthogonal to the Chrome Web Store and won't be affected by its closure.
+// vale-skip: proselint.Annotations: "NOTE" is the asciidoc admonition prefix here, not a TODO marker.
+NOTE: The Chrome App Launcher lists apps installed both via the Chrome Web Store and via the "Add to Shelf" feature discussed here. The features described in this article are orthogonal to the Chrome Web Store and won't be affected by its closure.
 
 === Playing media and opening links
 
-People don't like it when the browser automatically starts playing sounds, or opening links without their permission. For this reason, modern browsers generally restrict your ability to programmatically do these things, unless they are in response to a user action, like a mouse click.
+People don't like it when the browser automatically starts playing sounds, or opening links without their permission. For this reason, modern browsers restrict your ability to programmatically do these things, unless they're in response to a user action, like a mouse click.
 
 If your app needs to play media (for example, `Media.play()`), or open a link (for example, `Display.execute("...")`) without the user actually interacting physically (for example, key press or pointer press), then it will display a popup dialog confirming that the user actually wants to perform this action.
 
-In some cases this dialog may affect the utility of the app. For example, suppose you want to play a video in response to a voice command. Having to press an "OK" button after the command, may be annoying. For such cases, you can use the `platformHint.javascript.backsideHooksInterval` property to *poll* for media play requests on an authorized event.
+Sometimes this dialog may affect the utility of the app. For example, suppose you want to play a video in response to a voice command. Having to press an "OK" button after the command, may be annoying. For such cases, you can use the `platformHint.javascript.backsideHooksInterval` property to *poll* for media play requests on an authorized event.
 
 For example:
 

@@ -33,12 +33,14 @@ When faced with size issues make sure to check the size of your res file, if you
 
 === Improving performance
 
-There are quite a few things you can do as a developer to improve the performance and memory footprint of a Codename One application. This sometimes depends on specific device behaviors but some tips here are true for all devices.
+As a developer you can do quite a few things to improve the performance and memory footprint of a Codename One application. This sometimes depends on specific device behaviors but some tips here are true for all devices.
 
 The simulator contains some tools to measure performance overhead of a specific component and also detect EDT blocking logic. Other than that follow these guidelines to create more performance code:
 
-* *Avoid round rect borders* - they have a huge overhead on all platforms. Use image borders instead (counter intuitively they are MUCH faster)
+* *Avoid round rect borders* - they have a huge overhead on all platforms. Use image borders instead (counter intuitively they're MUCH faster)
+// vale-skip: Microsoft.Adverbs: "perform poorly" is a precise performance descriptor (slow / inefficient), not a softener.
 * *Avoid Gradients* - they perform poorly on most OS's. Use a background image instead
+// vale-skip: Microsoft.Adverbs: "tiling it repeatedly" describes the precise rendering operation, not authorial padding.
 * *Use larger images* when tiling or building image borders, using a 1 pixel (or event a few pixels) wide or high image and tiling it repeatedly can be expensive
 * *Shrink resource file sizes* - Otherwise data might get collected by the garbage collector and reloading data might be expensive
 * *Check that you don't have too many image lock misses* - this is discussed in the graphics section
@@ -106,7 +108,7 @@ For low-level loops (for example, Base64 encode/decode):
 
 * Prefer simple loop bodies with predictable branches.
 * Cache decode/lookup tables in primitive arrays (`int[]` lookup tables can reduce per-iteration conversion overhead).
-* Avoid adding “defensive” branches in the inner-most loop unless they are required for correctness in production inputs.
+* Avoid adding “defensive” branches in the inner-most loop unless they're required for correctness in production inputs.
 
 ===== Build configuration matters
 
@@ -147,7 +149,7 @@ performs better where native SIMD is available.
 
 ==== When to use SIMD
 
-SIMD is worth reaching for when *all* of the following hold:
+SIMD is worth reaching for when *all* the following hold:
 
 * You are processing a buffer of at least dozens of elements at a time.
 * The operation per element is simple (add, min, blend, table lookup,

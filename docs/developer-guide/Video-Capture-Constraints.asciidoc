@@ -72,7 +72,7 @@ VideoCaptureConstraints cnst = new VideoCaptureConstraints()
 
 Explicit width and height constraints aren't well supported across platforms. Android doesn't support them at all. iOS supports 3 specific sizes. Javascript supports it when running on a desktop browser or on Android - but not on iOS. Etc..
 
-let's find out if this constraint will be obeyed.
+Find out if this constraint will be obeyed.
 
 [source,java]
 ----
