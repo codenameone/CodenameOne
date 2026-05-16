@@ -193,22 +193,32 @@ public final class Graphics {
             return;
         }
         if (matrixMode()) {
-            // Matrix-only: compose T(x, y) onto the impl-side matrix, same
-            // way scale/rotate do. Deliberately do NOT bump xTranslate /
-            // yTranslate -- carrying a shadow accumulator alongside the
-            // matrix made bypass-Graphics paths (Label.drawLabelComponent,
-            // Component painter cache) double-count, since they add
-            // getTranslateX() onto coords *and* the impl then applies the
-            // matrix that already encodes the same translate.
-            //
-            // getTranslateX / getTranslateY in matrix mode read the
-            // translate component directly off the impl matrix, which is
-            // correct as long as the matrix is a pure translation when
-            // they're called -- the framework painting chain only stacks
-            // translates, so this holds for every snapshot-reset caller
-            // (Form.paintGlassImpl, Container.paintComponent,
-            // Component.paintIntersectingComponentsAbove, etc).
+            // Matrix mode: compose T(x, y) onto the impl-side matrix the
+            // same way scale/rotate do, AND keep the xTranslate/yTranslate
+            // shadow accumulator in sync. Drawing primitives use tx(x) /
+            // ty(y) which skip the shadow in matrix mode (so no double
+            // shift), but framework code paths that have to know the
+            // current screen offset for non-Graphics work -- setTransform's
+            // conjugation anchor, resetAffine's "what to put back" snapshot,
+            // and the snapshot-reset patterns in Form/Container/Component
+            // -- read it via getTranslateX/getTranslateY. The shadow is the
+            // single source of truth for that screen offset; deriving it
+            // from the impl matrix breaks once any user scale/rotate has
+            // been composed in (Transform's translateX cache freezes the
+            // moment type leaves TYPE_TRANSLATION).
+            xTranslate += x;
+            yTranslate += y;
             impl.translateMatrix(nativeGraphics, x, y);
+            if (userTransform != null) {
+                // setTransform conjugated around the *old* xTranslate; we
+                // changed it, so re-conjugate. The impl matrix in matrix
+                // mode does NOT include the terminal T(-xTranslate) because
+                // drawing primitives don't pre-shift coords, so the
+                // composed matrix here is T(xt) * userTransform.
+                Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+                composed.concatenate(userTransform);
+                impl.setTransform(nativeGraphics, composed);
+            }
             return;
         }
         xTranslate += x;
@@ -234,14 +244,12 @@ public final class Graphics {
         if (impl.isTranslationSupported()) {
             return impl.getTranslateX(nativeGraphics);
         }
-        if (matrixMode()) {
-            // Matrix mode: read the translate component off the impl-side
-            // matrix. Reliable while the matrix is a pure translation, which
-            // is the only state in which framework callers read this value
-            // (snapshot-reset patterns in Form/Container/Component happen
-            // before any user scale/rotate has been composed in).
-            return (int) impl.getTransform(nativeGraphics).getTranslateX();
-        }
+        // Matrix mode uses the same xTranslate shadow accumulator. Reading
+        // it directly is more reliable than fetching impl.getTransform()
+        // and asking for the translate component -- Transform.getTranslateX
+        // freezes its cache the moment a non-translate composition (scale,
+        // rotate) leaves TYPE_TRANSLATION, so the cached value can lag the
+        // actual matrix once user code starts mixing scale/rotate in.
         return xTranslate;
     }
 
@@ -253,9 +261,6 @@ public final class Graphics {
     public int getTranslateY() {
         if (impl.isTranslationSupported()) {
             return impl.getTranslateY(nativeGraphics);
-        }
-        if (matrixMode()) {
-            return (int) impl.getTransform(nativeGraphics).getTranslateY();
         }
         return yTranslate;
     }
@@ -1261,19 +1266,27 @@ public final class Graphics {
         // yTranslate) so its effect is independent of any prior g.translate
         // call, matching Android Skia / JavaSE Graphics2D semantics.
         if (matrixMode()) {
-            // Matrix mode: vertex coords are NOT pre-shifted, so we just
-            // compose T(xt, yt) * M (no terminal T(-xt, -yt)). Subsequent
+            // Matrix mode: vertex coords are NOT pre-shifted, so we compose
+            // T(xt, yt) * M (no terminal T(-xt, -yt)). Subsequent
             // g.translate(d) rebuilds the impl matrix as T(xt + d) * M
             // (see Graphics.translate's matrixMode branch).
-            if (transform != null && !transform.isIdentity()
-                    && (xTranslate != 0 || yTranslate != 0)) {
+            //
+            // For null/identity transform we cannot just call
+            // impl.setTransform(null) -- the impl matrix carries the
+            // framework's painting-chain translates, and overwriting it
+            // would wipe them. Reset + replay the shadow translate, same
+            // recipe resetAffine uses.
+            if (transform == null || transform.isIdentity()) {
+                userTransform = null;
+                impl.resetAffine(nativeGraphics);
+                if (xTranslate != 0 || yTranslate != 0) {
+                    impl.translateMatrix(nativeGraphics, xTranslate, yTranslate);
+                }
+            } else {
                 userTransform = transform.copy();
                 Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
                 composed.concatenate(transform);
                 impl.setTransform(nativeGraphics, composed);
-            } else {
-                userTransform = null;
-                impl.setTransform(nativeGraphics, transform);
             }
             return;
         }
@@ -1739,7 +1752,24 @@ public final class Graphics {
 
     /// Resets the affine transform to the default value
     public void resetAffine() {
-        impl.resetAffine(nativeGraphics);
+        if (matrixMode()) {
+            // In matrix mode the impl matrix carries the framework's chain
+            // of g.translate(absX, absY) calls (status bar offset, title
+            // height, container chain). impl.resetAffine wipes the matrix
+            // to identity, so a naive call here destroys those translates
+            // and every subsequent draw lands at screen origin instead of
+            // the component's position -- which broke MapComponent, Scene,
+            // CommonTransitions, and every other resetAffine caller in the
+            // framework. Replay xTranslate/yTranslate from the shadow
+            // accumulator so the matrix returns to a pure framework
+            // translate (the "baseline" caller expects after resetAffine).
+            impl.resetAffine(nativeGraphics);
+            if (xTranslate != 0 || yTranslate != 0) {
+                impl.translateMatrix(nativeGraphics, xTranslate, yTranslate);
+            }
+        } else {
+            impl.resetAffine(nativeGraphics);
+        }
         scaleX = 1;
         scaleY = 1;
         userTransform = null;

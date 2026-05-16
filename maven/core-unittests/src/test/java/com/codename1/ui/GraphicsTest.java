@@ -271,6 +271,55 @@ class GraphicsTest extends UITestBase {
     }
 
     @Test
+    void testMatrixModeResetAffinePreservesFrameworkTranslate() {
+        // resetAffine wipes the impl matrix to identity. In matrix mode the
+        // matrix carries the framework's painting-chain translates -- so a
+        // naive resetAffine destroys them and the next draw lands at screen
+        // origin. The matrix-mode branch must replay xTranslate/yTranslate
+        // onto the impl after the reset. MapComponent, Scene, and
+        // CommonTransitions all depend on this contract.
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(true);
+        implementation.resetTranslateTracking();
+
+        graphics.translate(5, 7);
+        // Pretend the user composed scale, then called resetAffine -- the
+        // stub does not track scale composition, but the call still flows
+        // through impl.resetAffine which clears its native state.
+        graphics.scale(2f, 2f);
+        graphics.resetAffine();
+
+        // resetAffine should have called translateMatrix(xTranslate,
+        // yTranslate) to put the framework translate back, so the impl sees
+        // translateMatrix(5, 7) again after the reset.
+        assertTrue(implementation.wasTranslateMatrixInvoked(),
+                "resetAffine in matrix mode must replay the framework translate via impl.translateMatrix");
+        assertEquals(5f, implementation.getLastTranslateMatrixX());
+        assertEquals(7f, implementation.getLastTranslateMatrixY());
+        // The Graphics-level shadow accumulator is untouched -- it represents
+        // the framework translate that survives resetAffine.
+        assertEquals(5, graphics.getTranslateX());
+        assertEquals(7, graphics.getTranslateY());
+    }
+
+    @Test
+    void testMatrixModeSetTransformIdentityPreservesFrameworkTranslate() {
+        // Same contract as resetAffine: setTransform(null) or
+        // setTransform(identity) must restore the framework translate
+        // instead of wiping the impl matrix to identity.
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(true);
+        implementation.resetTranslateTracking();
+
+        graphics.translate(5, 7);
+        graphics.setTransform(null);
+
+        assertTrue(implementation.wasTranslateMatrixInvoked());
+        assertEquals(5f, implementation.getLastTranslateMatrixX());
+        assertEquals(7f, implementation.getLastTranslateMatrixY());
+    }
+
+    @Test
     void testMatrixModeShapeNotPreTranslated() {
         // drawShape's legacy path manually translated the shape's vertices
         // when xTranslate != 0; in matrix mode the impl applies the matrix
