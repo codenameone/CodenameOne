@@ -50,6 +50,31 @@ public final class Graphics {
     ///
     /// - #getRenderingHints()
     public static final int RENDERING_HINT_FAST = 1;
+    /// When true, `#translate(int, int)` composes the translation onto the
+    /// impl-side affine matrix (via `#translateMatrix(float, float)`) instead
+    /// of accumulating it in a per-Graphics integer offset that's added to
+    /// every draw coordinate. Off by default for backwards compatibility with
+    /// apps that relied on the legacy "translate-then-scale multiplies the
+    /// translate" behavior. When on, `g.translate(...)` composes into the
+    /// same matrix as `g.scale` / `g.rotate`, so the container/component
+    /// painting chain (status bar offset, title-area offset, scroll position,
+    /// etc.) flows through the matrix and a user-issued `g.scale(...)` no
+    /// longer stretches those component-positioning translates.
+    ///
+    /// The flag is global because translates are issued by the framework
+    /// painting pipeline before user paint() runs; setting it per-Graphics
+    /// would race with that. Flip it once during app init.
+    ///
+    /// Only honored on ports where `CodenameOneImplementation
+    /// #isTranslateMatrixSupported()` returns true (iOS, Android, JavaSE,
+    /// HTML5 today). On ports that opt out, `g.translate` keeps using the
+    /// integer accumulator regardless of this flag.
+    ///
+    /// #### See also
+    ///
+    /// - #translateMatrix(float, float)
+    /// - #isTranslateMatrixSupported()
+    public static boolean useMatrixTranslation;
     private final CodenameOneImplementation impl;
     /// Flag that specifies that native peers are rendered "behind" the this
     /// graphics context.  The main difference is that drawPeerComponent() will
@@ -104,6 +129,29 @@ public final class Graphics {
         return translation;
     }
 
+    /// True iff the global `#useMatrixTranslation` opt-in is on *and* this
+    /// Graphics' impl actually routes `#translate(int, int)` through the
+    /// matrix. Cached at zero cost; both reads are simple field/virtual
+    /// dispatches. All call sites that decide between "matrix already has
+    /// the translate, don't shift coords" and "legacy accumulator path,
+    /// shift coords by xTranslate" gate on this.
+    private boolean matrixMode() {
+        return useMatrixTranslation && impl.isTranslateMatrixSupported();
+    }
+
+    /// Returns the x coordinate to pass to impl draw primitives. In matrix
+    /// mode the impl-side affine already encodes the translate, so we hand
+    /// the impl the raw local-coord x. In legacy mode we add the shadow
+    /// xTranslate accumulator the way every drawing method historically has.
+    private int tx(int x) {
+        return matrixMode() ? x : (xTranslate + x);
+    }
+
+    /// Y-axis counterpart to `#tx(int)`.
+    private int ty(int y) {
+        return matrixMode() ? y : (yTranslate + y);
+    }
+
     private GeneralPath tmpClipShape() {
         if (tmpClipShape == null) {
             tmpClipShape = new GeneralPath();
@@ -142,19 +190,42 @@ public final class Graphics {
     public void translate(int x, int y) {
         if (impl.isTranslationSupported()) {
             impl.translate(nativeGraphics, x, y);
-        } else {
+            return;
+        }
+        if (matrixMode()) {
+            // Compose T(x, y) onto the impl-side matrix, same way scale/
+            // rotate do. We *also* bump the xTranslate/yTranslate shadow
+            // accumulator so getTranslateX/getTranslateY (and the framework
+            // callers in Form/Label/Component/Container/FontImage/
+            // LinearGradientPaint/TextSelection) keep returning legacy
+            // semantics. The shadow is NOT added to draw coords -- tx(x) /
+            // ty(y) skip it in matrix mode -- so this isn't a double shift.
             xTranslate += x;
             yTranslate += y;
-            // The conjugation in setTransform() depends on the current
-            // xTranslate/yTranslate. If the user accumulated more
-            // translation after setting a non-identity transform,
-            // re-conjugate so the impl-side matrix stays in sync.
+            impl.translateMatrix(nativeGraphics, x, y);
+            // userTransform composition under matrix mode is
+            // T(xTranslate) * userTransform (no terminal T(-xTranslate)
+            // because impl coords aren't pre-shifted in this mode). Re-set
+            // the impl matrix every translate so it tracks the latest
+            // shadow accumulator.
             if (userTransform != null) {
                 Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
                 composed.concatenate(userTransform);
-                composed.translate(-xTranslate, -yTranslate);
                 impl.setTransform(nativeGraphics, composed);
             }
+            return;
+        }
+        xTranslate += x;
+        yTranslate += y;
+        // The conjugation in setTransform() depends on the current
+        // xTranslate/yTranslate. If the user accumulated more
+        // translation after setting a non-identity transform,
+        // re-conjugate so the impl-side matrix stays in sync.
+        if (userTransform != null) {
+            Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+            composed.concatenate(userTransform);
+            composed.translate(-xTranslate, -yTranslate);
+            impl.setTransform(nativeGraphics, composed);
         }
     }
 
@@ -287,6 +358,14 @@ public final class Graphics {
     ///
     /// the x clipping position
     public int getClipX() {
+        if (matrixMode()) {
+            // In matrix mode the impl pulls the clip's inverse-transformed
+            // bounds (see iOS NativeGraphics.loadClipBounds), which is
+            // already in matrix-local user coords. The legacy '- xTranslate'
+            // would double-subtract the translate that's now baked into the
+            // impl matrix.
+            return impl.getClipX(nativeGraphics);
+        }
         return impl.getClipX(nativeGraphics) - xTranslate;
     }
 
@@ -366,7 +445,11 @@ public final class Graphics {
     ///
     /// - #isShapeClipSupported
     public void setClip(Shape shape) {
-        if (xTranslate != 0 || yTranslate != 0) {
+        // Matrix mode: impl.setClip(Shape) applies the current impl transform
+        // to the shape itself (iOS NativeGraphics.setClip stores
+        // clip.setShape(newClip, transform)), so a manual pre-translate here
+        // would double-apply the translate.
+        if (!matrixMode() && (xTranslate != 0 || yTranslate != 0)) {
             GeneralPath p = tmpClipShape();
             p.setShape(shape, translation());
             shape = p;
@@ -380,6 +463,9 @@ public final class Graphics {
     ///
     /// the y clipping position
     public int getClipY() {
+        if (matrixMode()) {
+            return impl.getClipY(nativeGraphics);
+        }
         return impl.getClipY(nativeGraphics) - yTranslate;
     }
 
@@ -414,7 +500,7 @@ public final class Graphics {
     ///
     /// - `height`: the height of the rectangle to intersect the clip with
     public void clipRect(int x, int y, int width, int height) {
-        impl.clipRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+        impl.clipRect(nativeGraphics, tx(x), ty(y), width, height);
     }
 
     /// Updates the clipping region to match the given region exactly
@@ -429,7 +515,7 @@ public final class Graphics {
     ///
     /// - `height`: the height of the new clip rectangle.
     public void setClip(int x, int y, int width, int height) {
-        impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+        impl.setClip(nativeGraphics, tx(x), ty(y), width, height);
     }
 
     /// Pushes the current clip onto the clip stack.  It can later be restored
@@ -455,7 +541,7 @@ public final class Graphics {
     ///
     /// - `y2`: second y position
     public void drawLine(int x1, int y1, int x2, int y2) {
-        impl.drawLine(nativeGraphics, xTranslate + x1, yTranslate + y1, xTranslate + x2, yTranslate + y2);
+        impl.drawLine(nativeGraphics, tx(x1), ty(y1), tx(x2), ty(y2));
 
     }
 
@@ -472,14 +558,14 @@ public final class Graphics {
     ///
     /// - `height`: the height of the rectangle to be filled.
     public void fillRect(int x, int y, int width, int height) {
-        impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+        impl.fillRect(nativeGraphics, tx(x), ty(y), width, height);
     }
 
     /// #### Deprecated
     ///
     /// this method should have been internals
     public void drawShadow(Image img, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
-        impl.drawShadow(nativeGraphics, img.getImage(), xTranslate + x, yTranslate + y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+        impl.drawShadow(nativeGraphics, img.getImage(), tx(x), ty(y), offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
     }
 
     /// Clears rectangular area of the graphics context.  This will remove any color
@@ -504,7 +590,7 @@ public final class Graphics {
     ///
     /// - `height`: The height of the box to clear.
     public void clearRect(int x, int y, int width, int height) {
-        clearRectImpl(xTranslate + x, yTranslate + y, width, height);
+        clearRectImpl(tx(x), ty(y), width, height);
     }
 
     /// Clears rectangular area of the graphics context.  This will remove any color
@@ -544,7 +630,7 @@ public final class Graphics {
     ///
     /// - `height`: the height of the rectangle to be drawn.
     public void drawRect(int x, int y, int width, int height) {
-        impl.drawRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+        impl.drawRect(nativeGraphics, tx(x), ty(y), width, height);
     }
 
     /// Draws a rectangle in the given coordinates with the given thickness
@@ -561,7 +647,7 @@ public final class Graphics {
     ///
     /// - `thickness`: the thickness in pixels
     public void drawRect(int x, int y, int width, int height, int thickness) {
-        impl.drawRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height, thickness);
+        impl.drawRect(nativeGraphics, tx(x), ty(y), width, height, thickness);
     }
 
     /// Draws a rounded corner rectangle in the given coordinates with the arcWidth/height
@@ -581,7 +667,7 @@ public final class Graphics {
     ///
     /// - `arcHeight`: the vertical diameter of the arc at the four corners.
     public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        impl.drawRoundRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height, arcWidth, arcHeight);
+        impl.drawRoundRect(nativeGraphics, tx(x), ty(y), width, height, arcWidth, arcHeight);
     }
 
     /// Makes the current color slightly lighter, this is useful for many visual effects
@@ -636,7 +722,7 @@ public final class Graphics {
     ///
     /// - #drawRoundRect
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        impl.fillRoundRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height, arcWidth, arcHeight);
+        impl.fillRoundRect(nativeGraphics, tx(x), ty(y), width, height, arcWidth, arcHeight);
     }
 
     /// Fills a circular or elliptical arc based on the given angles and bounding
@@ -683,7 +769,7 @@ public final class Graphics {
         if (width < 1 || height < 1) {
             throw new IllegalArgumentException("Width & Height of fillAsrc must be greater than 0");
         }
-        impl.fillArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
+        impl.fillArc(nativeGraphics, tx(x), ty(y), width, height, startAngle, arcAngle);
     }
 
     /// Draws a circular or elliptical arc based on the given angles and bounding
@@ -703,7 +789,7 @@ public final class Graphics {
     ///
     /// - `arcAngle`: the angular extent of the arc, relative to the start angle.
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        impl.drawArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
+        impl.drawArc(nativeGraphics, tx(x), ty(y), width, height, startAngle, arcAngle);
     }
 
     /// Draw a string using the current font and color in the x,y coordinates. The font is drawn
@@ -731,7 +817,7 @@ public final class Graphics {
         if (current instanceof CustomFont) {
             current.drawString(this, str, x, y);
         } else {
-            impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
+            impl.drawString(nativeGraphics, nativeFont, str, tx(x), ty(y), textDecoration);
         }
     }
 
@@ -869,17 +955,17 @@ public final class Graphics {
 
 
     void drawImageWH(Object nativeImage, int x, int y, int w, int h) {
-        impl.drawImage(nativeGraphics, nativeImage, x + xTranslate, y + yTranslate, w, h);
+        impl.drawImage(nativeGraphics, nativeImage, tx(x), ty(y), w, h);
     }
 
     void drawImage(Object img, int x, int y) {
-        impl.drawImage(nativeGraphics, img, x + xTranslate, y + yTranslate);
+        impl.drawImage(nativeGraphics, img, tx(x), ty(y));
     }
 
     /// Draws an image with a MIDP trasnform for fast rotation
     void drawImage(Object img, int x, int y, int transform) {
         if (transform != 0) {
-            impl.drawImageRotated(nativeGraphics, img, x + xTranslate, y + yTranslate, transform);
+            impl.drawImageRotated(nativeGraphics, img, tx(x), ty(y), transform);
         } else {
             drawImage(img, x, y);
         }
@@ -939,7 +1025,9 @@ public final class Graphics {
     /// - #isShapeSupported
     public void drawShape(Shape shape, Stroke stroke) {
         if (isShapeSupported()) {
-            if (xTranslate != 0 || yTranslate != 0) {
+            // Matrix mode: impl applies the affine to shape vertices, so the
+            // legacy pre-translate would double-shift.
+            if (!matrixMode() && (xTranslate != 0 || yTranslate != 0)) {
                 GeneralPath p = tmpClipShape();
                 p.setShape(shape, translation());
                 shape = p;
@@ -1003,7 +1091,7 @@ public final class Graphics {
                 int clipH = getClipHeight();
                 setClip(shape);
                 clipRect(clipX, clipY, clipW, clipH);
-                if (xTranslate != 0 || yTranslate != 0) {
+                if (!matrixMode() && (xTranslate != 0 || yTranslate != 0)) {
                     GeneralPath p = tmpClipShape();
                     p.setShape(shape, translation());
                     shape = p;
@@ -1014,7 +1102,7 @@ public final class Graphics {
                 return;
 
             }
-            if (xTranslate != 0 || yTranslate != 0) {
+            if (!matrixMode() && (xTranslate != 0 || yTranslate != 0)) {
                 GeneralPath p = tmpClipShape();
                 p.setShape(shape, translation());
                 shape = p;
@@ -1167,6 +1255,23 @@ public final class Graphics {
         // off-screen. Conjugate the user's matrix with T(xTranslate,
         // yTranslate) so its effect is independent of any prior g.translate
         // call, matching Android Skia / JavaSE Graphics2D semantics.
+        if (matrixMode()) {
+            // Matrix mode: vertex coords are NOT pre-shifted, so we just
+            // compose T(xt, yt) * M (no terminal T(-xt, -yt)). Subsequent
+            // g.translate(d) rebuilds the impl matrix as T(xt + d) * M
+            // (see Graphics.translate's matrixMode branch).
+            if (transform != null && !transform.isIdentity()
+                    && (xTranslate != 0 || yTranslate != 0)) {
+                userTransform = transform.copy();
+                Transform composed = Transform.makeTranslation(xTranslate, yTranslate);
+                composed.concatenate(transform);
+                impl.setTransform(nativeGraphics, composed);
+            } else {
+                userTransform = null;
+                impl.setTransform(nativeGraphics, transform);
+            }
+            return;
+        }
         if (transform != null && !transform.isIdentity()
                 && (xTranslate != 0 || yTranslate != 0)) {
             userTransform = transform.copy();
@@ -1213,7 +1318,7 @@ public final class Graphics {
     ///
     /// - `y3`: the y coordinate of the third vertex of the triangle
     public void fillTriangle(int x1, int y1, int x2, int y2, int x3, int y3) {
-        impl.fillTriangle(nativeGraphics, xTranslate + x1, yTranslate + y1, xTranslate + x2, yTranslate + y2, xTranslate + x3, yTranslate + y3);
+        impl.fillTriangle(nativeGraphics, tx(x1), ty(y1), tx(x2), ty(y2), tx(x3), ty(y3));
     }
 
     /// Draws the RGB values based on the MIDP API of a similar name. Renders a
@@ -1246,7 +1351,7 @@ public final class Graphics {
     /// - `processAlpha`: @param processAlpha true if rgbData has an alpha channel, false if
     /// all pixels are fully opaque
     void drawRGB(int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
-        impl.drawRGB(nativeGraphics, rgbData, offset, x + xTranslate, y + yTranslate, w, h, processAlpha);
+        impl.drawRGB(nativeGraphics, rgbData, offset, tx(x), ty(y), w, h, processAlpha);
     }
 
     /// Draws a radial gradient in the given coordinates with the given colors,
@@ -1268,7 +1373,7 @@ public final class Graphics {
     ///
     /// - `height`: the height of the region to be filled
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
-        impl.fillRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height);
+        impl.fillRadialGradient(nativeGraphics, startColor, endColor, tx(x), ty(y), width, height);
     }
 
     /// Draws a radial gradient in the given coordinates with the given colors,
@@ -1294,7 +1399,7 @@ public final class Graphics {
     ///
     /// - `arcAngle`: the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        impl.fillRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, startAngle, arcAngle);
+        impl.fillRadialGradient(nativeGraphics, startColor, endColor, tx(x), ty(y), width, height, startAngle, arcAngle);
     }
 
     /// Draws a radial gradient in the given coordinates with the given colors,
@@ -1330,7 +1435,7 @@ public final class Graphics {
             fillRect(x, y, width, height, (byte) 0xff);
             return;
         }
-        impl.fillRectRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, relativeX, relativeY, relativeSize);
+        impl.fillRectRadialGradient(nativeGraphics, startColor, endColor, tx(x), ty(y), width, height, relativeX, relativeY, relativeSize);
     }
 
     /// Draws a linear gradient in the given coordinates with the given colors,
@@ -1358,7 +1463,7 @@ public final class Graphics {
             fillRect(x, y, width, height, (byte) 0xff);
             return;
         }
-        impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
+        impl.fillLinearGradient(nativeGraphics, startColor, endColor, tx(x), ty(y), width, height, horizontal);
     }
 
     /// Fills the rectangle (x, y, width, height) with the given multi-stop
@@ -1408,7 +1513,7 @@ public final class Graphics {
     ///
     /// - `alpha`: the alpha values specify semitransparency
     public void fillRect(int x, int y, int w, int h, byte alpha) {
-        impl.fillRect(nativeGraphics, x + xTranslate, y + yTranslate, w, h, alpha);
+        impl.fillRect(nativeGraphics, tx(x), ty(y), w, h, alpha);
     }
 
     /// Fills a closed polygon defined by arrays of x and y coordinates.
@@ -1426,7 +1531,8 @@ public final class Graphics {
                             int nPoints) {
         int[] cX = xPoints;
         int[] cY = yPoints;
-        if ((!impl.isTranslationSupported()) && (xTranslate != 0 || yTranslate != 0)) {
+        if ((!impl.isTranslationSupported()) && !matrixMode()
+                && (xTranslate != 0 || yTranslate != 0)) {
             cX = new int[nPoints];
             cY = new int[nPoints];
             System.arraycopy(xPoints, 0, cX, 0, nPoints);
@@ -1473,7 +1579,8 @@ public final class Graphics {
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
         int[] cX = xPoints;
         int[] cY = yPoints;
-        if ((!impl.isTranslationSupported()) && (xTranslate != 0 || yTranslate != 0)) {
+        if ((!impl.isTranslationSupported()) && !matrixMode()
+                && (xTranslate != 0 || yTranslate != 0)) {
             cX = new int[nPoints];
             cY = new int[nPoints];
             System.arraycopy(xPoints, 0, cX, 0, nPoints);
@@ -1777,6 +1884,14 @@ public final class Graphics {
     ///
     /// 6.0
     public void rotateRadians(float angle, int pivotX, int pivotY) {
+        if (matrixMode()) {
+            // Matrix mode: the impl matrix already encodes the translate, so
+            // the pivot lives in matrix-local coords. The legacy '+
+            // xTranslate' offset compensated for the per-Graphics integer
+            // accumulator, which doesn't apply here.
+            impl.rotate(nativeGraphics, angle, pivotX, pivotY);
+            return;
+        }
         impl.rotate(nativeGraphics, angle, pivotX + xTranslate, pivotY + yTranslate);
     }
 
@@ -1888,7 +2003,7 @@ public final class Graphics {
             }
             setClip(clipX, clipY, clipW, clipH);
         } else {
-            impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+            impl.tileImage(nativeGraphics, img.getImage(), tx(x), ty(y), w, h);
         }
     }
 

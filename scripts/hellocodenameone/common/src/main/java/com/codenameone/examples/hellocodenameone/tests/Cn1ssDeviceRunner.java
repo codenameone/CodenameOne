@@ -36,6 +36,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformCamera;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformPerspective;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
+import com.codenameone.examples.hellocodenameone.tests.graphics.TranslateThenScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.LargeStrokeDirtyClipTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartBubbleScreenshotTest;
@@ -133,6 +134,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DrawShape(),
             new FillShape(),
             new InscribedTriangleGrid(),
+            new TranslateThenScale(),
             new StrokeTest(),
             new Clip(),
             new ClipUnderRotation(),

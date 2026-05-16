@@ -4,6 +4,7 @@ import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
 import com.codename1.ui.Display
+import com.codename1.ui.Graphics
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
 import com.codenameone.examples.hellocodenameone.tests.KotlinUiTest
@@ -11,6 +12,14 @@ import com.codenameone.examples.hellocodenameone.tests.KotlinUiTest
 open class HelloCodenameOne : Lifecycle() {
     override fun init(context: Any?) {
         super.init(context)
+        // Opt the test app into matrix-correct g.translate: under this flag
+        // the container/component painting chain composes its translates onto
+        // the impl-side affine instead of accumulating an integer offset that
+        // gets multiplied by subsequent user g.scale calls. Required for
+        // direct-to-screen rendering in the GH-3302 inscribed-triangle /
+        // translate-then-scale screenshots to land on the same pixels as the
+        // buffered mutable-image path.
+        Graphics.useMatrixTranslation = true
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }

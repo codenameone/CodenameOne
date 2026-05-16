@@ -2,11 +2,15 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.geom.Shape;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,7 +26,17 @@ class GraphicsTest extends UITestBase {
         implementation.resetShapeTracking();
         implementation.resetClipTracking();
         implementation.setTranslationSupported(false);
+        implementation.setTranslateMatrixSupported(false);
         implementation.setShapeSupported(false);
+        Graphics.useMatrixTranslation = false;
+    }
+
+    @AfterEach
+    void cleanupGraphics() {
+        // The matrix-translation flag is static; reset it so tests after
+        // these don't inherit matrix mode and quietly diverge.
+        Graphics.useMatrixTranslation = false;
+        implementation.setTranslateMatrixSupported(false);
     }
 
     @FormTest
@@ -183,6 +197,93 @@ class GraphicsTest extends UITestBase {
         graphics.setFont(font);
         assertSame(font, graphics.getFont());
         assertSame(font.getNativeFont(), implementation.getFont(nativeGraphics));
+    }
+
+    @Test
+    void testMatrixModeTranslatePushesToImplMatrix() {
+        // When useMatrixTranslation is on AND the impl advertises support,
+        // g.translate(dx, dy) must call impl.translateMatrix and keep the
+        // shadow xTranslate accumulator in step (for legacy
+        // getTranslateX/Y consumers in Form/Component/Label/etc.).
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(true);
+
+        graphics.translate(5, 7);
+
+        assertTrue(implementation.wasTranslateMatrixInvoked());
+        assertEquals(5f, implementation.getLastTranslateMatrixX());
+        assertEquals(7f, implementation.getLastTranslateMatrixY());
+        assertFalse(implementation.wasTranslateInvoked(),
+                "matrix path must NOT call the legacy impl.translate hook");
+        assertEquals(5, graphics.getTranslateX(),
+                "shadow accumulator must follow matrix translate so Form/Component callers keep working");
+        assertEquals(7, graphics.getTranslateY());
+    }
+
+    @Test
+    void testMatrixModeDoesNotPreShiftDrawCoords() {
+        // The legacy path bakes xTranslate into impl.fillRect coords. In
+        // matrix mode the impl matrix already encodes the translate, so
+        // fillRect must arrive at the impl with the raw user coords. We
+        // keep translate values small because the stub clip is set to the
+        // 20x20 image bounds in createGraphics().
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(true);
+        implementation.clearGraphicsOperations();
+
+        graphics.translate(5, 7);
+        graphics.setColor(0xff0000);
+        graphics.fillRect(2, 1, 3, 3);
+
+        List<TestCodenameOneImplementation.FillOperation> ops =
+                implementation.getFillOperationsSnapshot();
+        assertEquals(1, ops.size(), "expected one recorded fillRect");
+        TestCodenameOneImplementation.FillOperation op = ops.get(0);
+        assertEquals(2, op.getX(),
+                "matrix mode must pass raw user-coord x; legacy mode would record 7");
+        assertEquals(1, op.getY(),
+                "matrix mode must pass raw user-coord y; legacy mode would record 8");
+    }
+
+    @Test
+    void testMatrixModeFallsBackToLegacyWhenImplOptsOut() {
+        // useMatrixTranslation is just a request: if the impl returns
+        // isTranslateMatrixSupported() == false, g.translate must keep using
+        // the integer accumulator (this is how legacy / restricted ports
+        // remain functional even after the flag is set globally in init).
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(false);
+        implementation.clearGraphicsOperations();
+
+        graphics.translate(5, 7);
+        graphics.fillRect(2, 1, 3, 3);
+
+        assertFalse(implementation.wasTranslateMatrixInvoked(),
+                "impl opted out, translate must NOT route through translateMatrix");
+        List<TestCodenameOneImplementation.FillOperation> ops =
+                implementation.getFillOperationsSnapshot();
+        assertEquals(1, ops.size());
+        assertEquals(7, ops.get(0).getX(),
+                "legacy fallback must pre-shift draw coords by xTranslate");
+        assertEquals(8, ops.get(0).getY());
+    }
+
+    @Test
+    void testMatrixModeShapeNotPreTranslated() {
+        // drawShape's legacy path manually translated the shape's vertices
+        // when xTranslate != 0; in matrix mode the impl applies the matrix
+        // to the shape itself, so we must hand the same shape instance
+        // through (no GeneralPath wrapping).
+        Graphics.useMatrixTranslation = true;
+        implementation.setTranslateMatrixSupported(true);
+        implementation.setShapeSupported(true);
+
+        graphics.translate(4, 6);
+        Rectangle rectangle = new Rectangle(0, 0, 5, 5);
+        graphics.drawShape(rectangle, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+
+        assertSame(rectangle, implementation.getLastDrawShape(),
+                "matrix mode hands the original shape to the impl; legacy mode wraps in a translated path");
     }
 
     @Test

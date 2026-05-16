@@ -103,6 +103,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int timeoutValue;
     private boolean translationSupported;
     private boolean translateInvoked;
+    private boolean translateMatrixSupported;
+    private boolean translateMatrixInvoked;
+    private float lastTranslateMatrixX;
+    private float lastTranslateMatrixY;
     private boolean shapeSupported;
     private boolean drawShapeInvoked;
     private boolean fillShapeInvoked;
@@ -1232,6 +1236,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void resetTranslateTracking() {
         translateInvoked = false;
+        translateMatrixInvoked = false;
+        lastTranslateMatrixX = 0;
+        lastTranslateMatrixY = 0;
+    }
+
+    public void setTranslateMatrixSupported(boolean translateMatrixSupported) {
+        this.translateMatrixSupported = translateMatrixSupported;
+    }
+
+    public boolean wasTranslateMatrixInvoked() {
+        return translateMatrixInvoked;
+    }
+
+    public float getLastTranslateMatrixX() {
+        return lastTranslateMatrixX;
+    }
+
+    public float getLastTranslateMatrixY() {
+        return lastTranslateMatrixY;
     }
 
     public void setShapeSupported(boolean shapeSupported) {
@@ -1896,6 +1919,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean isTranslationSupported() {
         return translationSupported;
+    }
+
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        return translateMatrixSupported;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        translateMatrixInvoked = true;
+        lastTranslateMatrixX = x;
+        lastTranslateMatrixY = y;
     }
 
     @Override
