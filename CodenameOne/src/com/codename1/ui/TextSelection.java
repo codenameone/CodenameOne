@@ -1316,22 +1316,12 @@ public class TextSelection {
             g.setColor(0x0000ff);
             int alph = g.getAlpha();
             g.setAlpha(50);
-            // Matrix mode: snapshot/identity/restore the impl matrix in
-            // place of the legacy translate-based snapshot-reset, which is
-            // a no-op in matrix mode (getTranslateX==0). After resetting,
-            // translate to selectionRoot's screen-absolute origin so the
-            // span fills below land at the same on-screen pixels as legacy.
-            Transform savedTransform = null;
-            int tx = 0;
-            int ty = 0;
-            if (Graphics.useMatrixTranslation) {
-                savedTransform = g.getTransform();
-                g.setTransform(null);
-            } else {
-                tx = g.getTranslateX();
-                ty = g.getTranslateY();
-                g.translate(-tx, -ty);
-            }
+            // Snapshot-reset translate so subsequent translate(originX,
+            // originY) lands at selectionRoot's screen-absolute origin in
+            // both modes.
+            int tx = g.matrixFrameworkTranslateX();
+            int ty = g.matrixFrameworkTranslateY();
+            g.translate(-tx, -ty);
             int originX = selectionRoot.getAbsoluteX();
             int originY = selectionRoot.getAbsoluteY();
             g.translate(originX, originY);
@@ -1357,11 +1347,7 @@ public class TextSelection {
             //g.drawRect(selectedBounds.getX(), selectedBounds.getY(), selectedBounds.getWidth(), selectedBounds.getHeight());
             g.setClip(clipX, clipY, clipW, clipH);
             g.translate(-originX, -originY);
-            if (Graphics.useMatrixTranslation) {
-                g.setTransform(savedTransform);
-            } else {
-                g.translate(tx, ty);
-            }
+            g.translate(tx, ty);
             g.setAlpha(alph);
         }
 

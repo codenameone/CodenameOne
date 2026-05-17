@@ -3031,21 +3031,13 @@ public class Component implements Animation, StyleListener, Editable {
     public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
-        // The body walks parents and paints each at its screen-absolute
-        // position, so the impl matrix must start at identity. In matrix
-        // mode the legacy snapshot-reset translate is a no-op
-        // (getTranslateX==0); save/restore the impl Transform directly.
-        Transform savedTransform = null;
-        int tx = 0;
-        int ty = 0;
-        if (Graphics.useMatrixTranslation) {
-            savedTransform = g.getTransform();
-            g.setTransform(null);
-        } else {
-            tx = g.getTranslateX();
-            ty = g.getTranslateY();
-            g.translate(-tx, -ty);
-        }
+        // Snapshot-reset translate -- matrixFrameworkTranslateX returns
+        // xTranslate in legacy mode and the matrixFrameworkX shadow in
+        // matrix mode so the parent walk below paints each ancestor at
+        // its screen-absolute position.
+        int tx = g.matrixFrameworkTranslateX();
+        int ty = g.matrixFrameworkTranslateY();
+        g.translate(-tx, -ty);
         int x1 = getAbsoluteX() + getScrollX();
         int y1 = getAbsoluteY() + getScrollY();
         int w = getWidth();
@@ -3066,11 +3058,7 @@ public class Component implements Animation, StyleListener, Editable {
             component = parent;
             parent = parent.getParent();
         }
-        if (Graphics.useMatrixTranslation) {
-            g.setTransform(savedTransform);
-        } else {
-            g.translate(tx, ty);
-        }
+        g.translate(tx, ty);
     }
 
     /// Paints the UI for the scrollbars on the component, this will be invoked only
@@ -3358,25 +3346,11 @@ public class Component implements Animation, StyleListener, Editable {
                 paintBackgroundImpl(tg);
                 putClientProperty("$FLAT", i);
             }
-            if (Graphics.useMatrixTranslation) {
-                // Matrix mode: reset matrix to identity then translate to
-                // absolute (absX, absY), draw the cached flat image,
-                // restore. The legacy "snapshot tx/ty, translate(-tx + absX,
-                // -ty + absY), draw, undo" pattern would no-op the
-                // -tx/-ty part (getTranslateX==0) and leave the matrix
-                // doubly shifted.
-                Transform saved = g.getTransform();
-                g.setTransform(null);
-                g.translate(absX, absY);
-                g.drawImage(i, 0, 0);
-                g.setTransform(saved);
-            } else {
-                int tx = g.getTranslateX();
-                int ty = g.getTranslateY();
-                g.translate(-tx + absX, -ty + absY);
-                g.drawImage(i, 0, 0);
-                g.translate(tx - absX, ty - absY);
-            }
+            int tx = g.matrixFrameworkTranslateX();
+            int ty = g.matrixFrameworkTranslateY();
+            g.translate(-tx + absX, -ty + absY);
+            g.drawImage(i, 0, 0);
+            g.translate(tx - absX, ty - absY);
             return;
         }
         drawPaintersImpl(g, par, c, x, y, w, h);

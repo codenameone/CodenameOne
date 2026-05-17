@@ -2186,39 +2186,23 @@ public class Container extends Component implements Iterable<Component> {
             paintElevatedPane(g);
         }
 
-        if (Graphics.useMatrixTranslation) {
-            // Matrix mode: snapshot/identity/restore the impl matrix in
-            // place of the legacy translate-based snapshot-reset, which
-            // would no-op (getTranslateX==0). Glass/tensile draw at
-            // screen-absolute coords via getBounds(), so the impl matrix
-            // must be identity during their paint.
-            Transform saved = g.getTransform();
-            g.setTransform(null);
-            if (sidemenuBarTranslation > 0) {
-                g.translate(sidemenuBarTranslation, 0);
-                paintGlass(g);
-                paintTensile(g);
-                g.translate(-sidemenuBarTranslation, 0);
-            } else {
-                paintGlass(g);
-                paintTensile(g);
-            }
-            g.setTransform(saved);
+        // Snapshot-reset translate so glass/tensile draw at screen-
+        // absolute coords. matrixFrameworkTranslateX returns the right
+        // anchor for both modes (legacy: xTranslate; matrix mode:
+        // matrixFrameworkX shadow).
+        int tx = g.matrixFrameworkTranslateX();
+        int ty = g.matrixFrameworkTranslateY();
+        g.translate(-tx, -ty);
+        if (sidemenuBarTranslation > 0) {
+            g.translate(sidemenuBarTranslation, 0);
+            paintGlass(g);
+            paintTensile(g);
+            g.translate(-sidemenuBarTranslation, 0);
         } else {
-            int tx = g.getTranslateX();
-            int ty = g.getTranslateY();
-            g.translate(-tx, -ty);
-            if (sidemenuBarTranslation > 0) {
-                g.translate(sidemenuBarTranslation, 0);
-                paintGlass(g);
-                paintTensile(g);
-                g.translate(-sidemenuBarTranslation, 0);
-            } else {
-                paintGlass(g);
-                paintTensile(g);
-            }
-            g.translate(tx, ty);
+            paintGlass(g);
+            paintTensile(g);
         }
+        g.translate(tx, ty);
         g.translate(-getX(), -getY());
     }
 
