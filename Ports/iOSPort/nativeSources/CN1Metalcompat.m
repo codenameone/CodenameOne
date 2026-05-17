@@ -159,14 +159,56 @@ id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void) {
 int CN1MetalFramebufferWidth(void) { return currentFramebufferWidth; }
 int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
+// Process-lifetime device + command queue cache. The original implementation
+// dereferenced [[GLViewController instance] eaglView].layer to fetch the
+// CAMetalLayer's device on every call, but -[UIView layer] is a main-thread-
+// only API. Paint runs on the Codename One EDT (a GCD background queue), and
+// any drawShape → createAlphaMask → nativePathRendererCreateTexture path
+// reaches CN1MetalDevice() from that thread. With Main Thread Checker
+// enabled Xcode aborts the process before the first form renders.
+//
+// METALView publishes its device + command queue once at initWithCoder time
+// (main thread) via CN1MetalSetDeviceAndCommandQueue; thereafter the two
+// accessors return those statics without touching any UIView property. The
+// queue identity must remain the same one METALView uses for screen
+// rendering: mutable-image setup command buffers commit to this queue and
+// rely on FIFO ordering with the screen render command buffer so subsequent
+// drawImage(mutable) samples land after the mutable's writes. Spinning up
+// a separate queue here (e.g. via newCommandQueue against the cached device)
+// breaks that ordering — Apple's cross-queue dependency tracker did not
+// preserve the visible result in the iOS Metal screenshot suite (the
+// DialogTheme TextureBackdropPainter's cached-stripe image rendered only
+// behind the dialog, not below it).
+static id<MTLDevice> cachedMetalDevice = nil;
+static id<MTLCommandQueue> cachedMetalCommandQueue = nil;
+
+void CN1MetalSetDeviceAndCommandQueue(id<MTLDevice> device, id<MTLCommandQueue> queue) {
+#ifdef CN1_USE_ARC
+    cachedMetalDevice = device;
+    cachedMetalCommandQueue = queue;
+#else
+    // MRR: hold our own retain so both stay alive even after METALView
+    // releases its references at process exit. Both are process-lifetime
+    // singletons; no matching release is intended.
+    if (cachedMetalDevice != device) {
+        [device retain];
+        [cachedMetalDevice release];
+        cachedMetalDevice = device;
+    }
+    if (cachedMetalCommandQueue != queue) {
+        [queue retain];
+        [cachedMetalCommandQueue release];
+        cachedMetalCommandQueue = queue;
+    }
+#endif
+}
+
 id<MTLDevice> CN1MetalDevice(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return ((CAMetalLayer *)mv.layer).device;
+    return cachedMetalDevice;
 }
 
 id<MTLCommandQueue> CN1MetalCommandQueue(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return mv.commandQueue;
+    return cachedMetalCommandQueue;
 }
 
 // --------------- Matrix state ---------------

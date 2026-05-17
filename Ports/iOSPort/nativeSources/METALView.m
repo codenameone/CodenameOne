@@ -138,7 +138,15 @@ extern BOOL isRetinaBug();
         metalLayer.device = MTLCreateSystemDefaultDevice();
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-        metalLayer.framebufferOnly = YES;
+        // framebufferOnly must be NO: presentFramebuffer blits screenTexture
+        // into the drawable via copyFromTexture:toTexture:, and Metal's blit
+        // validation aborts ("destinationTexture must not be a framebufferOnly
+        // texture") when the destination drawable was framebufferOnly. Debug
+        // builds with Metal API Validation enabled crash on the first paint;
+        // release builds silently produced undefined-behaviour copies on some
+        // GPUs. Trading the (small) memoryless-storage benefit for a working
+        // present path.
+        metalLayer.framebufferOnly = NO;
         // Colour space for the Metal layer. Default is sRGB so colours
         // match the GL path's CAEAGLLayer output: without it, CG-rasterised
         // images and gradients (DeviceRGB-tagged in their CGBitmapContext)
@@ -186,6 +194,12 @@ extern BOOL isRetinaBug();
 #ifndef CN1_USE_ARC
         [newQueue release];
 #endif
+        // Publish the device + queue to CN1Metalcompat so its global
+        // accessors don't have to dereference our (UIView) layer from
+        // background threads. Doing it on the main thread, exactly once,
+        // means CN1MetalDevice / CN1MetalCommandQueue become cheap static
+        // reads safe to invoke from the EDT and any background GCD queue.
+        CN1MetalSetDeviceAndCommandQueue(metalLayer.device, self.commandQueue);
         CGSize sz = self.bounds.size;
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
