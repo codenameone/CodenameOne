@@ -2083,6 +2083,27 @@ public class CSSTheme {
         }
     }
 
+    /// Writes a filter color-matrix theme entry when the matrix is non-null
+    /// and not identity; otherwise clears it.
+    private void emitFilterColorMatrix(EditableResources res, String themeKey, float[] matrix) {
+        if (matrix != null && !isIdentityColorMatrix(matrix)) {
+            res.setThemeProperty(themeName, themeKey, matrix);
+        } else {
+            res.setThemeProperty(themeName, themeKey, null);
+        }
+    }
+
+    private static boolean isIdentityColorMatrix(float[] m) {
+        if (m == null || m.length != 20) return false;
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 5; col++) {
+                float expected = (col == row) ? 1f : 0f;
+                if (Math.abs(m[row*5 + col] - expected) > 1e-5f) return false;
+            }
+        }
+        return true;
+    }
+
     private void emitColorBinding(EditableResources res, String themeName, String themeKey, Element stateEl, String cssProperty) {
         if (stateEl == null) {
             return;
@@ -2348,6 +2369,16 @@ public class CSSTheme {
                 emitFilterBlur(res, selId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(selectedStyles));
                 emitFilterBlur(res, pressedId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(pressedStyles));
                 emitFilterBlur(res, disabledId+"#backdropFilterBlur", el.getBackdropFilterBlurRadius(disabledStyles));
+                currToken = "filterColorMatrix";
+                emitFilterColorMatrix(res, unselId+".filterColorMatrix", el.getFilterColorMatrix(unselectedStyles));
+                emitFilterColorMatrix(res, selId+"#filterColorMatrix", el.getFilterColorMatrix(selectedStyles));
+                emitFilterColorMatrix(res, pressedId+"#filterColorMatrix", el.getFilterColorMatrix(pressedStyles));
+                emitFilterColorMatrix(res, disabledId+"#filterColorMatrix", el.getFilterColorMatrix(disabledStyles));
+                currToken = "backdropFilterColorMatrix";
+                emitFilterColorMatrix(res, unselId+".backdropFilterColorMatrix", el.getBackdropFilterColorMatrix(unselectedStyles));
+                emitFilterColorMatrix(res, selId+"#backdropFilterColorMatrix", el.getBackdropFilterColorMatrix(selectedStyles));
+                emitFilterColorMatrix(res, pressedId+"#backdropFilterColorMatrix", el.getBackdropFilterColorMatrix(pressedStyles));
+                emitFilterColorMatrix(res, disabledId+"#backdropFilterColorMatrix", el.getBackdropFilterColorMatrix(disabledStyles));
                 currToken = "derive";
                 res.setThemeProperty(themeName, unselId+".derive", el.getThemeDerive(unselectedStyles, ""));
                 currToken = "selected derive";
@@ -4530,7 +4561,9 @@ public class CSSTheme {
         }
         public boolean hasFilter(Map<String,LexicalUnit> style) {
             return parseBlurRadius((LexicalUnit) style.get("filter")) > 0f
-                    || parseBlurRadius((LexicalUnit) style.get("backdrop-filter")) > 0f;
+                    || parseBlurRadius((LexicalUnit) style.get("backdrop-filter")) > 0f
+                    || parseFilterColorMatrix((LexicalUnit) style.get("filter")) != null
+                    || parseFilterColorMatrix((LexicalUnit) style.get("backdrop-filter")) != null;
         }
 
         /// Returns the filter:blur() radius in pixels, or 0 if absent.
@@ -4572,6 +4605,200 @@ public class CSSTheme {
                 filter = filter.getNextLexicalUnit();
             }
             return 0f;
+        }
+
+        /// Walks the filter / backdrop-filter chain and returns the combined
+        /// 4x5 color-matrix (row-major: 4 rows of [R,G,B,A,offset]) for all
+        /// color-style filters in the chain (`brightness`, `contrast`,
+        /// `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`,
+        /// `sepia`). The `blur()` function is skipped here - it is consumed
+        /// separately by `parseBlurRadius`. Returns null if the chain has no
+        /// color filters (so identity is the default; we don't waste 20
+        /// floats per style on the identity case).
+        ///
+        /// The 5th column is the constant offset added in 0-255 RGB space.
+        /// Matrices compose in CSS order: `filter: a b c` means apply a, then
+        /// b, then c. Composition uses standard 5x5 multiplication with an
+        /// implicit [0 0 0 0 1] homogeneous row.
+        private float[] parseFilterColorMatrix(LexicalUnit filter) {
+            float[] combined = null;
+            while (filter != null) {
+                if (filter.getLexicalUnitType() == LexicalUnit.SAC_FUNCTION) {
+                    String fn = filter.getFunctionName();
+                    float[] m = colorMatrixForFunction(fn, filter.getParameters());
+                    if (m != null) {
+                        combined = (combined == null) ? m : composeColorMatrix(m, combined);
+                    }
+                }
+                filter = filter.getNextLexicalUnit();
+            }
+            return combined;
+        }
+
+        public float[] getFilterColorMatrix(Map<String,LexicalUnit> style) {
+            return parseFilterColorMatrix((LexicalUnit) style.get("filter"));
+        }
+
+        public float[] getBackdropFilterColorMatrix(Map<String,LexicalUnit> style) {
+            return parseFilterColorMatrix((LexicalUnit) style.get("backdrop-filter"));
+        }
+
+        /// Returns the 4x5 color-matrix for one CSS filter function, or null
+        /// for `blur` (handled separately) and unknown function names.
+        private float[] colorMatrixForFunction(String fn, LexicalUnit param) {
+            if (fn == null) return null;
+            if ("brightness".equals(fn)) return brightnessMatrix(filterAmount(param, 1f));
+            if ("contrast".equals(fn))   return contrastMatrix(filterAmount(param, 1f));
+            if ("grayscale".equals(fn))  return grayscaleMatrix(clamp01(filterAmount(param, 1f)));
+            if ("invert".equals(fn))     return invertMatrix(clamp01(filterAmount(param, 1f)));
+            if ("opacity".equals(fn))    return opacityMatrix(clamp01(filterAmount(param, 1f)));
+            if ("saturate".equals(fn))   return saturateMatrix(filterAmount(param, 1f));
+            if ("sepia".equals(fn))      return sepiaMatrix(clamp01(filterAmount(param, 1f)));
+            if ("hue-rotate".equals(fn)) return hueRotateMatrix(filterAngleDegrees(param));
+            return null;
+        }
+
+        /// Reads the scalar argument of a filter function. Accepts a bare
+        /// number, a percentage (divided by 100), or a missing argument
+        /// (returns `defaultValue` per the CSS filter spec defaults).
+        private float filterAmount(LexicalUnit p, float defaultValue) {
+            if (p == null) return defaultValue;
+            short type = p.getLexicalUnitType();
+            if (type == LexicalUnit.SAC_PERCENTAGE) {
+                return p.getFloatValue() / 100f;
+            }
+            if (type == LexicalUnit.SAC_INTEGER) {
+                return p.getIntegerValue();
+            }
+            return p.getFloatValue();
+        }
+
+        private float filterAngleDegrees(LexicalUnit p) {
+            if (p == null) return 0f;
+            short type = p.getLexicalUnitType();
+            float v = p.getFloatValue();
+            if (type == LexicalUnit.SAC_DEGREE) return v;
+            if (type == LexicalUnit.SAC_RADIAN) return (float)(v * 180.0 / Math.PI);
+            if (type == LexicalUnit.SAC_GRADIAN) return v * 0.9f;
+            // SAC has no `turn` constant in older flute; fall through to
+            // raw float (assume degrees).
+            return v;
+        }
+
+        private float clamp01(float v) {
+            return v < 0 ? 0 : (v > 1 ? 1 : v);
+        }
+
+        private float[] identityMatrix() {
+            return new float[] {
+                1, 0, 0, 0, 0,
+                0, 1, 0, 0, 0,
+                0, 0, 1, 0, 0,
+                0, 0, 0, 1, 0
+            };
+        }
+
+        private float[] brightnessMatrix(float b) {
+            return new float[] {
+                b, 0, 0, 0, 0,
+                0, b, 0, 0, 0,
+                0, 0, b, 0, 0,
+                0, 0, 0, 1, 0
+            };
+        }
+
+        private float[] contrastMatrix(float c) {
+            float off = (1f - c) * 127.5f;
+            return new float[] {
+                c, 0, 0, 0, off,
+                0, c, 0, 0, off,
+                0, 0, c, 0, off,
+                0, 0, 0, 1, 0
+            };
+        }
+
+        // Rec 709 luminance weights per CSS filter spec for grayscale.
+        private float[] grayscaleMatrix(float a) {
+            float lr = 0.2126f, lg = 0.7152f, lb = 0.0722f;
+            return new float[] {
+                1f - (1f - lr) * a, lg * a,             lb * a,             0, 0,
+                lr * a,             1f - (1f - lg) * a, lb * a,             0, 0,
+                lr * a,             lg * a,             1f - (1f - lb) * a, 0, 0,
+                0,                  0,                  0,                  1, 0
+            };
+        }
+
+        private float[] invertMatrix(float a) {
+            float diag = 1f - 2f * a;
+            float off  = 255f * a;
+            return new float[] {
+                diag, 0,    0,    0, off,
+                0,    diag, 0,    0, off,
+                0,    0,    diag, 0, off,
+                0,    0,    0,    1, 0
+            };
+        }
+
+        private float[] opacityMatrix(float a) {
+            return new float[] {
+                1, 0, 0, 0, 0,
+                0, 1, 0, 0, 0,
+                0, 0, 1, 0, 0,
+                0, 0, 0, a, 0
+            };
+        }
+
+        // Rec 601 weights per CSS filter spec for saturate.
+        private float[] saturateMatrix(float s) {
+            float lr = 0.213f, lg = 0.715f, lb = 0.072f;
+            return new float[] {
+                lr + (1f - lr) * s, lg - lg * s,         lb - lb * s,         0, 0,
+                lr - lr * s,         lg + (1f - lg) * s, lb - lb * s,         0, 0,
+                lr - lr * s,         lg - lg * s,         lb + (1f - lb) * s, 0, 0,
+                0,                   0,                   0,                   1, 0
+            };
+        }
+
+        private float[] sepiaMatrix(float a) {
+            float f = 1f - a;
+            return new float[] {
+                0.393f + 0.607f*f, 0.769f - 0.769f*f, 0.189f - 0.189f*f, 0, 0,
+                0.349f - 0.349f*f, 0.686f + 0.314f*f, 0.168f - 0.168f*f, 0, 0,
+                0.272f - 0.272f*f, 0.534f - 0.534f*f, 0.131f + 0.869f*f, 0, 0,
+                0,                  0,                  0,                  1, 0
+            };
+        }
+
+        // Standard SVG/CSS hue-rotate matrix.
+        private float[] hueRotateMatrix(float degrees) {
+            double rad = degrees * Math.PI / 180.0;
+            float c = (float) Math.cos(rad);
+            float s = (float) Math.sin(rad);
+            return new float[] {
+                0.213f + 0.787f*c - 0.213f*s, 0.715f - 0.715f*c - 0.715f*s, 0.072f - 0.072f*c + 0.928f*s, 0, 0,
+                0.213f - 0.213f*c + 0.143f*s, 0.715f + 0.285f*c + 0.140f*s, 0.072f - 0.072f*c - 0.283f*s, 0, 0,
+                0.213f - 0.213f*c - 0.787f*s, 0.715f - 0.715f*c + 0.715f*s, 0.072f + 0.928f*c + 0.072f*s, 0, 0,
+                0,                             0,                             0,                             1, 0
+            };
+        }
+
+        /// Composes two 4x5 matrices: result = applyFirst(input) then applySecond.
+        /// I.e. result_color = applySecond * applyFirst * input_color, where each
+        /// matrix is extended to 5x5 with a [0,0,0,0,1] homogeneous row.
+        private float[] composeColorMatrix(float[] applySecond, float[] applyFirst) {
+            float[] out = new float[20];
+            for (int row = 0; row < 4; row++) {
+                for (int col = 0; col < 5; col++) {
+                    float sum = 0f;
+                    for (int k = 0; k < 4; k++) {
+                        sum += applySecond[row*5 + k] * applyFirst[k*5 + col];
+                    }
+                    // 5th-row homogeneous coord contributes only to col == 4.
+                    if (col == 4) sum += applySecond[row*5 + 4];
+                    out[row*5 + col] = sum;
+                }
+            }
+            return out;
         }
         
         private boolean usesRoundBorder(Map<String, LexicalUnit> style) {

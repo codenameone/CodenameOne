@@ -161,3 +161,51 @@ CssFilterBackdrop {
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(12px);
 }
+
+/* Non-blur CSS filter functions. These verify the CSS compiler reduces a
+   `filter:` chain (brightness/contrast/grayscale/hue-rotate/invert/opacity/
+   saturate/sepia) to a single 4x5 color matrix on Style. Paint-time
+   integration is the same follow-up as filter:blur; the test only asserts
+   the matrix round-trips via theme.res. */
+CssFilterBrightness {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: brightness(1.5);
+}
+CssFilterContrast {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: contrast(0.6);
+}
+CssFilterGrayscale {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: grayscale(1);
+}
+CssFilterInvert {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: invert(1);
+}
+CssFilterSepia {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: sepia(0.8);
+}
+CssFilterChain {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: brightness(1.2) contrast(0.9) saturate(1.3);
+}

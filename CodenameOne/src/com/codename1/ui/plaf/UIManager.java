@@ -2392,6 +2392,14 @@ public class UIManager {
             if (backdropFilterBlur instanceof Number) {
                 style.setBackdropFilterBlurRadius(((Number) backdropFilterBlur).floatValue());
             }
+            Object filterMatrix = themeProps.get(id + Style.FILTER_COLOR_MATRIX);
+            if (filterMatrix instanceof float[]) {
+                style.setFilterColorMatrix((float[]) filterMatrix);
+            }
+            Object backdropFilterMatrix = themeProps.get(id + Style.BACKDROP_FILTER_COLOR_MATRIX);
+            if (backdropFilterMatrix instanceof float[]) {
+                style.setBackdropFilterColorMatrix((float[]) backdropFilterMatrix);
+            }
             if (bgImage != null) {
                 Image im = null;
                 if (bgImage instanceof String) {

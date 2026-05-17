@@ -95,7 +95,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 13;
+    private static final short MINOR_VERSION = 14;
     private static final short MAJOR_VERSION = 1;
 
     private static final boolean IS_MAC;
@@ -1481,6 +1481,18 @@ public class EditableResources extends Resources implements TreeModel {
                                 continue;
                             }
 
+                            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_COLOR_MATRIX)
+                                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX)) {
+                                float[] matrix = (float[]) theme.get(key);
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 0; i < matrix.length; i++) {
+                                    if (i > 0) sb.append(',');
+                                    sb.append(matrix[i]);
+                                }
+                                bw.write("        <val key=\"" + key + "\" value=\"" + sb.toString() + "\" />\n");
+                                continue;
+                            }
+
                             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                                 bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
                                 continue;
@@ -2238,6 +2250,15 @@ public class EditableResources extends Resources implements TreeModel {
             if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_BLUR)
                     || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR)) {
                 output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_COLOR_MATRIX)
+                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX)) {
+                float[] matrix = (float[]) theme.get(key);
+                for (int i = 0; i < 20; i++) {
+                    output.writeFloat(matrix[i]);
+                }
                 continue;
             }
 

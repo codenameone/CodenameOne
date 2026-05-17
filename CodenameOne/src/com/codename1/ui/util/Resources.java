@@ -1815,6 +1815,15 @@ public class Resources {
                 continue;
             }
 
+            if (key.endsWith(Style.FILTER_COLOR_MATRIX) || key.endsWith(Style.BACKDROP_FILTER_COLOR_MATRIX)) {
+                float[] matrix = new float[20];
+                for (int i = 0; i < 20; i++) {
+                    matrix[i] = input.readFloat();
+                }
+                theme.put(key, matrix);
+                continue;
+            }
+
             // thow an exception no idea what this is
             throw new IOException("Error while trying to read theme property: " + key);
         }

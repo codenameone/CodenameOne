@@ -96,6 +96,13 @@ public class Style {
     public static final String FILTER_BLUR = "filterBlur";
     /// CSS backdrop-filter:blur() radius in pixels.
     public static final String BACKDROP_FILTER_BLUR = "backdropFilterBlur";
+    /// CSS filter: 4x5 color matrix (composed from `brightness`,
+    /// `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`,
+    /// `sepia`). Stored as row-major float[20] - [R,G,B,A] x [R,G,B,A,offset].
+    /// Offset column is in 0-255 RGB space.
+    public static final String FILTER_COLOR_MATRIX = "filterColorMatrix";
+    /// CSS backdrop-filter color matrix (same layout as FILTER_COLOR_MATRIX).
+    public static final String BACKDROP_FILTER_COLOR_MATRIX = "backdropFilterColorMatrix";
     /// Font attribute name for the theme hashtable
     public static final String FONT = "font";
     /// Transparency attribute name for the theme hashtable
@@ -282,6 +289,8 @@ public class Style {
     private static final int GRADIENT_MODIFIED = 1048576;
     private static final int FILTER_BLUR_MODIFIED = 2097152;
     private static final int BACKDROP_FILTER_BLUR_MODIFIED = 4194304;
+    private static final int FILTER_COLOR_MATRIX_MODIFIED = 8388608;
+    private static final int BACKDROP_FILTER_COLOR_MATRIX_MODIFIED = 16777216;
     float[] padding = new float[4];
     float[] margin = new float[4];
     /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
@@ -318,6 +327,8 @@ public class Style {
     private Gradient gradient;
     private float filterBlurRadius;
     private float backdropFilterBlurRadius;
+    private float[] filterColorMatrix;
+    private float[] backdropFilterColorMatrix;
     private Border border = null;
     private int align = Component.LEFT;
     private int textDecoration; // Used for underline, strikethru etc. (See TEXT_DECORATION_* constants)
@@ -377,6 +388,14 @@ public class Style {
         }
         filterBlurRadius = style.filterBlurRadius;
         backdropFilterBlurRadius = style.backdropFilterBlurRadius;
+        if (style.filterColorMatrix != null) {
+            filterColorMatrix = new float[style.filterColorMatrix.length];
+            System.arraycopy(style.filterColorMatrix, 0, filterColorMatrix, 0, filterColorMatrix.length);
+        }
+        if (style.backdropFilterColorMatrix != null) {
+            backdropFilterColorMatrix = new float[style.backdropFilterColorMatrix.length];
+            System.arraycopy(style.backdropFilterColorMatrix, 0, backdropFilterColorMatrix, 0, backdropFilterColorMatrix.length);
+        }
     }
 
     /// Creates a new style with the given attributes
@@ -2767,6 +2786,56 @@ public class Style {
             }
             firePropertyChanged(BACKDROP_FILTER_BLUR);
         }
+    }
+
+    /// CSS filter color-matrix: 4x5 row-major float[20] composed from
+    /// `brightness` / `contrast` / `grayscale` / `hue-rotate` / `invert` /
+    /// `opacity` / `saturate` / `sepia`. Returns null when no color filter
+    /// is active (treat as identity).
+    public float[] getFilterColorMatrix() {
+        return filterColorMatrix;
+    }
+
+    public void setFilterColorMatrix(float[] matrix) {
+        setFilterColorMatrix(matrix, false);
+    }
+
+    public void setFilterColorMatrix(float[] matrix, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setFilterColorMatrix(matrix, override);
+            }
+            return;
+        }
+        this.filterColorMatrix = matrix;
+        if (!override) {
+            modifiedFlag |= FILTER_COLOR_MATRIX_MODIFIED;
+        }
+        firePropertyChanged(FILTER_COLOR_MATRIX);
+    }
+
+    /// CSS backdrop-filter color-matrix; same layout as `filterColorMatrix`
+    /// but applied to whatever is painted behind the component.
+    public float[] getBackdropFilterColorMatrix() {
+        return backdropFilterColorMatrix;
+    }
+
+    public void setBackdropFilterColorMatrix(float[] matrix) {
+        setBackdropFilterColorMatrix(matrix, false);
+    }
+
+    public void setBackdropFilterColorMatrix(float[] matrix, boolean override) {
+        if (proxyTo != null) {
+            for (Style s : proxyTo) {
+                s.setBackdropFilterColorMatrix(matrix, override);
+            }
+            return;
+        }
+        this.backdropFilterColorMatrix = matrix;
+        if (!override) {
+            modifiedFlag |= BACKDROP_FILTER_COLOR_MATRIX_MODIFIED;
+        }
+        firePropertyChanged(BACKDROP_FILTER_COLOR_MATRIX);
     }
 
     /// Returns true when the backgroundType requires the extended gradient
