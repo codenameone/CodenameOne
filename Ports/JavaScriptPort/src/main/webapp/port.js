@@ -3248,13 +3248,27 @@ if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.clas
 const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implementation_hideSplash";
 (function installHideSplashWorkerOverride() {
   const replacement = function*() {
-    if (typeof globalThis !== "undefined" && typeof globalThis.jQuery === "function") {
+    // The jQuery branch is for the rare scenario where this override
+    // somehow runs in a context that has real DOM access (real browser
+    // tab, jsdom, etc.). In the WORKER -- which is where this override
+    // is installed by definition (port.js loads under importScripts) --
+    // ``globalThis.jQuery`` IS defined, but only because the
+    // worker-side jQuery stub installed earlier in this same port.js
+    // satisfies translated_app.js's runtime reflection probes. That
+    // stub's ``fadeOut(ms, cb)`` calls ``cb`` and returns the stub --
+    // it does NOT actually hide the splash DOM (the DOM doesn't even
+    // exist in the worker). The whole point of this override is to
+    // route around exactly that case, so we gate the jQuery branch on
+    // ``typeof document !== "undefined"`` (workers don't have
+    // ``document``) before trusting jQuery to do anything DOM-level.
+    if (typeof document !== "undefined"
+            && typeof globalThis !== "undefined" && typeof globalThis.jQuery === "function") {
       try {
         globalThis.jQuery("div#cn1-splash").fadeOut(100, function() {
           globalThis.jQuery(this).remove();
         });
         return null;
-      } catch (_e) { /* fall through */ }
+      } catch (_e) { /* fall through to host bridge */ }
     }
     if (typeof jvm !== "undefined" && typeof jvm.invokeHostNative === "function") {
       yield jvm.invokeHostNative("__cn1_hide_splash__", []);
