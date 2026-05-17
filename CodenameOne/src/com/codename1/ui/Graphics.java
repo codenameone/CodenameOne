@@ -92,22 +92,6 @@ public final class Graphics {
     /// of any prior g.translate(). getTransform() returns this original
     /// (un-conjugated) matrix.
     private Transform userTransform;
-    /// Matrix-mode-only shadow of the framework painting chain's accumulated
-    /// translate. Maintained by `#translate(int, int)` so `#setTransform`
-    /// and `#resetAffine` can correctly conjugate the user transform around
-    /// the framework origin (i.e. impl matrix = T(matrixFrameworkX) *
-    /// userTransform), matching the legacy `T(xt) * M * T(-xt)` semantics.
-    ///
-    /// This is INTENTIONALLY NOT exposed via getTranslateX/Y. The bypass-
-    /// Graphics fast paths (Label.drawLabelComponent, BGPainter
-    /// .paintComponentBackground) read getTranslateX to compute screen-
-    /// absolute coords; in matrix mode they must pass local coords because
-    /// the impl matrix already encodes the framework translates. Leaking
-    /// this shadow into getTranslateX caused the v1/v3 "double translate"
-    /// bug. Only the conjugation math inside setTransform/resetAffine/
-    /// translate uses it.
-    private int matrixFrameworkX;
-    private int matrixFrameworkY;
     private GeneralPath tmpClipShape;
     /// A buffer shape to use when we need to transform a shape
     private int color;
@@ -210,7 +194,7 @@ public final class Graphics {
         }
         if (matrixMode()) {
             // Matrix-only: compose T(x, y) onto the impl-side matrix. The
-            // public-facing xTranslate/yTranslate stays at zero --
+            // shadow xTranslate/yTranslate accumulator stays at zero --
             // it is NOT maintained in matrix mode. Callers that need the
             // current screen-translate offset (for snapshot-reset patterns)
             // must read the impl matrix via getTransform() and restore via
@@ -219,27 +203,7 @@ public final class Graphics {
             // Component.paintIntersectingComponentsAbove,
             // Component.drawPainters (FLAT branch), TextSelection,
             // FontImage, MapComponent, Scene, CommonTransitions.
-            //
-            // We DO maintain the internal matrixFrameworkX/Y shadow because
-            // setTransform's conjugation needs to know the framework anchor
-            // to keep user transforms applying relative to the local origin
-            // -- the same role xTranslate played in the legacy
-            // T(xt) * M * T(-xt) recipe. The shadow is not exposed via
-            // getTranslateX, so bypass-Graphics paths that pass local coords
-            // don't double-shift.
-            matrixFrameworkX += x;
-            matrixFrameworkY += y;
             impl.translateMatrix(nativeGraphics, x, y);
-            if (userTransform != null) {
-                // userTransform must continue applying relative to the new
-                // framework anchor; rebuild impl = T(matrixFrameworkX) *
-                // userTransform. The translateMatrix call above already
-                // post-multiplied T(x, y) onto a stale composition, so we
-                // overwrite with the freshly conjugated matrix here.
-                Transform composed = Transform.makeTranslation(matrixFrameworkX, matrixFrameworkY);
-                composed.concatenate(userTransform);
-                impl.setTransform(nativeGraphics, composed);
-            }
             return;
         }
         xTranslate += x;
@@ -1288,37 +1252,32 @@ public final class Graphics {
         // yTranslate) so its effect is independent of any prior g.translate
         // call, matching Android Skia / JavaSE Graphics2D semantics.
         if (matrixMode()) {
-            // Matrix-mode conjugation: in legacy mode the impl matrix is
-            // T(xt) * M * T(-xt) so the user's M applies in local coords
-            // around xt. In matrix mode the impl matrix already encodes
-            // the framework translates AND drawing primitives don't
-            // pre-shift coords, so the equivalent composition is just
-            // T(matrixFrameworkX) * M (no terminal T(-matrixFrameworkX)).
-            // After this composition drawing at local (lx, ly) lands at
-            // T(matrixFrameworkX) * M * (lx, ly) -- same screen result as
-            // legacy.
+            // Matrix-only: vertex coords are NOT pre-shifted, so the impl
+            // matrix is the single source of truth. setTransform replaces
+            // it wholesale -- callers that need to preserve the framework
+            // painting-chain translates across this call must save the
+            // pre-call matrix (getTransform) and apply their transform on
+            // top via Transform.concatenate.
             //
-            // setTransform(null) / setTransform(identity) must restore the
-            // framework matrix (T(matrixFrameworkX)), NOT identity --
-            // otherwise the framework painting-chain translates would be
-            // wiped and subsequent draws would land at screen origin. We
-            // can't forward `null` to impl.setTransform directly anyway
-            // (Android's AsyncView NPEs on it).
+            // Special case: setTransform(null) / setTransform(identity)
+            // must NOT be forwarded as `null` to impl.setTransform on every
+            // port -- Android's AndroidAsyncView.setTransform unconditionally
+            // dereferences the argument via Transform.setTransform, NPEing
+            // the entire paint frame. Route through impl.resetAffine
+            // instead, which every port implements as "matrix -> identity".
+            //
+            // userTransform is intentionally left null in matrix mode. The
+            // field exists for the legacy T(xt) * M * T(-xt) conjugation
+            // dance, which matrix mode does not perform. Keeping it null
+            // also means getTransform() reads straight off the impl matrix
+            // -- so framework callers that save+restore via getTransform /
+            // setTransform see the real current matrix state, not a stale
+            // userTransform snapshot from a previous setTransform call.
+            userTransform = null;
             if (transform == null || transform.isIdentity()) {
-                userTransform = null;
-                if (matrixFrameworkX != 0 || matrixFrameworkY != 0) {
-                    impl.resetAffine(nativeGraphics);
-                    impl.translateMatrix(nativeGraphics,
-                            matrixFrameworkX, matrixFrameworkY);
-                } else {
-                    impl.resetAffine(nativeGraphics);
-                }
+                impl.resetAffine(nativeGraphics);
             } else {
-                userTransform = transform.copy();
-                Transform composed = Transform.makeTranslation(
-                        matrixFrameworkX, matrixFrameworkY);
-                composed.concatenate(transform);
-                impl.setTransform(nativeGraphics, composed);
+                impl.setTransform(nativeGraphics, transform);
             }
             return;
         }
@@ -1784,24 +1743,15 @@ public final class Graphics {
 
     /// Resets the affine transform to the default value.
     ///
-    /// In matrix-translation mode the framework painting-chain translates
-    /// are preserved (impl matrix is restored to T(matrixFrameworkX,
-    /// matrixFrameworkY)), so user paint snippets like MapComponent /
-    /// Scene / CommonTransitions / FontImage rotation continue to render
-    /// against the correct screen offset. The user's scale / rotate /
-    /// setTransform is wiped, matching the legacy semantic where
-    /// resetAffine wiped only the impl matrix while the integer
-    /// xTranslate accumulator survived.
+    /// In matrix-translation mode this wipes the impl matrix to identity,
+    /// including the framework painting-chain translates the matrix carries.
+    /// Callers that need to preserve those translates across a transform
+    /// reset (e.g. user paint snippets in MapComponent / Scene /
+    /// CommonTransitions / FontImage rotation) must save the impl matrix
+    /// via `#getTransform(com.codename1.ui.Transform)` first and restore
+    /// it via `#setTransform(com.codename1.ui.Transform)` after.
     public void resetAffine() {
-        if (matrixMode()) {
-            impl.resetAffine(nativeGraphics);
-            if (matrixFrameworkX != 0 || matrixFrameworkY != 0) {
-                impl.translateMatrix(nativeGraphics,
-                        matrixFrameworkX, matrixFrameworkY);
-            }
-        } else {
-            impl.resetAffine(nativeGraphics);
-        }
+        impl.resetAffine(nativeGraphics);
         scaleX = 1;
         scaleY = 1;
         userTransform = null;
@@ -2120,23 +2070,7 @@ public final class Graphics {
     /// - `peer`: The peer component to be drawn.
     void drawPeerComponent(PeerComponent peer) {
         if (paintPeersBehind) {
-            // clearRectImpl forwards to impl.clearRect which honours the
-            // impl matrix (iOS NativeGraphics.clearRect calls applyTransform
-            // before clearing). In matrix mode the matrix already encodes
-            // the framework painting-chain translates -- if we pass
-            // getAbsoluteX/Y here the matrix would translate the punch-hole
-            // off by another full framework offset, so the native peer
-            // would appear as a solid filled rect over the canvas at the
-            // wrong screen position. Subtract matrixFrameworkX/Y so the
-            // impl matrix applies and lands the cleared rect back at the
-            // peer's screen-absolute coords.
-            int absX = peer.getAbsoluteX();
-            int absY = peer.getAbsoluteY();
-            if (matrixMode()) {
-                absX -= matrixFrameworkX;
-                absY -= matrixFrameworkY;
-            }
-            clearRectImpl(absX, absY, peer.getWidth(), peer.getHeight());
+            clearRectImpl(peer.getAbsoluteX(), peer.getAbsoluteY(), peer.getWidth(), peer.getHeight());
         }
 
     }
