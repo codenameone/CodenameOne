@@ -390,7 +390,10 @@ See link:Images[Images]
 
 ===== Gradients
 
-The full CSS gradient range is now natively supported: `linear-gradient`, `radial-gradient`, `conic-gradient`, `repeating-linear-gradient`, and `repeating-radial-gradient` — all with arbitrary angles, unlimited multi-stop colors (with optional position hints), and full radial shape/extent control. The compiled theme resource file carries a compact descriptor and the gradient is rendered at runtime by the platform-native graphics API (Java2D on JavaSE, `LinearGradient`/`RadialGradient`/`SweepGradient` on Android, Core Graphics / Core Image on iOS). No compile-time image rasterization is needed.
+The full CSS gradient range is natively supported: `linear-gradient`, `radial-gradient`, `conic-gradient`, `repeating-linear-gradient`, and `repeating-radial-gradient` — all with arbitrary angles, unlimited multi-stop colors (with optional position hints), and full radial shape/extent control. The compiled theme resource file carries a compact descriptor and the gradient is rendered at runtime by the platform-native graphics API (Java2D on JavaSE, `LinearGradient`/`RadialGradient`/`SweepGradient` on Android, Core Graphics / Core Image on iOS).
+
+.CSS gradient functions rendered side-by-side from the framework's screenshot test (top to bottom: linear at an arbitrary angle, linear `to <side>`, linear with mismatched alphas, radial `farthest-corner`, radial ellipse, conic, repeating-linear, repeating-radial).
+image::img/css-gradients-overview.png[CSS gradient examples,300]
 
 Available since Codename One 8.1.
 
@@ -450,7 +453,10 @@ MyTarget   { background: repeating-radial-gradient(circle at center, #fff, #fff 
 
 ===== filter and backdrop-filter
 
-CSS `filter: blur(<length>)` and `backdrop-filter: blur(<length>)` are recognized at compile time and stored in the theme as per-state float radii (`filterBlur`, `backdropFilterBlur`).
+CSS `filter` and `backdrop-filter` accept a chain of functions. Two storage forms land on the corresponding `Style`:
+
+* `blur(<length>)` → `filterBlurRadius` / `backdropFilterBlurRadius` (a single pixel value).
+* `brightness`, `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`, `sepia` → `filterColorMatrix` / `backdropFilterColorMatrix` (a 4×5 color matrix; a multi-function chain composes into a single matrix in CSS order).
 
 [source,css]
 ----
@@ -462,9 +468,24 @@ MyOverlay {
 MyBlurredImage {
     filter: blur(4px);
 }
+
+MyFaded {
+    filter: brightness(0.7) contrast(1.15);
+}
+
+MyGrayscale {
+    filter: grayscale(1);
+}
+
+MySepia {
+    filter: sepia(0.8) saturate(1.1);
+}
 ----
 
-`filter:blur()` blurs the component's own painted content; `backdrop-filter:blur()` blurs whatever is painted behind the component. Only `blur()` is currently parsed — other CSS filter functions are not yet wired through. The blur radii are also exposed on `Style` (`getFilterBlurRadius()` / `getBackdropFilterBlurRadius()`) so they can be set programmatically. Hardware blur is used where available (Core Image on iOS, RenderScript/RenderEffect on Android, JHLabs `GaussianFilter` on JavaSE simulator); ports without a fast path fall back to a software Gaussian.
+.`filter: blur()` applied at a graphics primitive level — the framework's screenshot test renders RGB stripes and a gradient, then blurs both via `Graphics.gaussianBlur(...)`. Component-level paint-time integration of `filter:` declarations is in progress; until it lands, set the radius / matrix on a `Style` and consume them via the corresponding `Graphics` primitives manually.
+image::img/css-filter-blur-overview.png[CSS filter blur visual,260]
+
+`filter` applies to the component's own painted content; `backdrop-filter` applies to whatever is painted behind. The radii / matrices are also exposed on `Style` (`getFilterBlurRadius()`, `getFilterColorMatrix()`, `getBackdropFilterBlurRadius()`, `getBackdropFilterColorMatrix()`) so they can be set programmatically. Hardware blur is used where available (Core Image on iOS, RenderScript/RenderEffect on Android, JHLabs `GaussianFilter` on JavaSE simulator); ports without a fast path fall back to a software Gaussian.
 
 
 [[cn1-background-type]]
