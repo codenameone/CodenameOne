@@ -2183,6 +2183,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
         context.save();
+        // Reset to identity BEFORE the crop clip is set. Without this, if
+        // a prior drain ended with a non-identity transform on the canvas
+        // state (e.g. ClipShape's setTransform leftover that the outer
+        // save/restore preserves across drains, or the matrix-mode
+        // T(framework_anchor) the new Graphics path now stashes there),
+        // the `rect(cropX, cropY, cropW, cropH); clip();` below evaluates
+        // under that leaked transform -- the resulting clip is a
+        // rotated/scaled/translated polygon, not the intended axis-
+        // aligned crop. Ops in this drain then paint UNDER the leaked
+        // transform AND through the wrong clip, producing missing
+        // Toolbar/title regions (the chart-line, chart-pie and chart-
+        // rotated-pie JS regressions). Force identity now; the per-op
+        // SetTransform queue inside this drain still sets the per-paint
+        // transform, and the outer `restore()` pops back to whatever
+        // pre-drain state was active.
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
