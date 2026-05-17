@@ -165,32 +165,49 @@ int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 // only API. Paint runs on the Codename One EDT (a GCD background queue), and
 // any drawShape → createAlphaMask → nativePathRendererCreateTexture path
 // reaches CN1MetalDevice() from that thread. With Main Thread Checker
-// enabled Xcode aborts the process before the first form renders. Cache the
-// device + queue lazily via MTLCreateSystemDefaultDevice (thread-safe; the
-// returned device is the same singleton METALView itself uses) so neither
-// function ever touches a UIView property.
+// enabled Xcode aborts the process before the first form renders.
+//
+// METALView publishes its device + command queue once at initWithCoder time
+// (main thread) via CN1MetalSetDeviceAndCommandQueue; thereafter the two
+// accessors return those statics without touching any UIView property. The
+// queue identity must remain the same one METALView uses for screen
+// rendering: mutable-image setup command buffers commit to this queue and
+// rely on FIFO ordering with the screen render command buffer so subsequent
+// drawImage(mutable) samples land after the mutable's writes. Spinning up
+// a separate queue here (e.g. via newCommandQueue against the cached device)
+// breaks that ordering — Apple's cross-queue dependency tracker did not
+// preserve the visible result in the iOS Metal screenshot suite (the
+// DialogTheme TextureBackdropPainter's cached-stripe image rendered only
+// behind the dialog, not below it).
 static id<MTLDevice> cachedMetalDevice = nil;
 static id<MTLCommandQueue> cachedMetalCommandQueue = nil;
-static dispatch_once_t cn1MetalDeviceOnceToken;
 
-static void ensureCachedDeviceAndQueue(void) {
-    dispatch_once(&cn1MetalDeviceOnceToken, ^{
-        // MTLCreateSystemDefaultDevice returns +1 (Create-rule); hold the
-        // retain for the lifetime of the process. newCommandQueue likewise
-        // returns +1. No matching release: these are process-lifetime
-        // singletons, freed only at exit.
-        cachedMetalDevice = MTLCreateSystemDefaultDevice();
-        cachedMetalCommandQueue = [cachedMetalDevice newCommandQueue];
-    });
+void CN1MetalSetDeviceAndCommandQueue(id<MTLDevice> device, id<MTLCommandQueue> queue) {
+#ifdef CN1_USE_ARC
+    cachedMetalDevice = device;
+    cachedMetalCommandQueue = queue;
+#else
+    // MRR: hold our own retain so both stay alive even after METALView
+    // releases its references at process exit. Both are process-lifetime
+    // singletons; no matching release is intended.
+    if (cachedMetalDevice != device) {
+        [device retain];
+        [cachedMetalDevice release];
+        cachedMetalDevice = device;
+    }
+    if (cachedMetalCommandQueue != queue) {
+        [queue retain];
+        [cachedMetalCommandQueue release];
+        cachedMetalCommandQueue = queue;
+    }
+#endif
 }
 
 id<MTLDevice> CN1MetalDevice(void) {
-    ensureCachedDeviceAndQueue();
     return cachedMetalDevice;
 }
 
 id<MTLCommandQueue> CN1MetalCommandQueue(void) {
-    ensureCachedDeviceAndQueue();
     return cachedMetalCommandQueue;
 }
 

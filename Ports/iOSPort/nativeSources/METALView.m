@@ -194,6 +194,12 @@ extern BOOL isRetinaBug();
 #ifndef CN1_USE_ARC
         [newQueue release];
 #endif
+        // Publish the device + queue to CN1Metalcompat so its global
+        // accessors don't have to dereference our (UIView) layer from
+        // background threads. Doing it on the main thread, exactly once,
+        // means CN1MetalDevice / CN1MetalCommandQueue become cheap static
+        // reads safe to invoke from the EDT and any background GCD queue.
+        CN1MetalSetDeviceAndCommandQueue(metalLayer.device, self.commandQueue);
         CGSize sz = self.bounds.size;
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
