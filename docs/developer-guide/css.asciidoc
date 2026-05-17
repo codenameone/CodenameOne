@@ -189,6 +189,7 @@ The `Default` selector is special in that it will set properties on the theme's 
 === Custom properties
 
 `cn1-source-dpi`::
+// vale-skip: proselint.Very: 'Very High Res' is a labelled DPI bucket in the Codename One multi-image API, not generic intensifier prose.
 Used to specify source DPI for multi-image generation of background images. Accepted values: `0` (Not multi-image), `120` (Low res), `160` (Medium Res), `320` (Very High Res), `480` (HD), Higher than `480` (2HD). If not specified, the default value will be the value of the `defaultSourceDPIInt` theme constant, if specified, or `480`, if not specified.
 `cn1-background-type`::
 Used to explicitly specify the background-type that should be used for the class.
@@ -455,7 +456,7 @@ MyComponent {
 .45deg gradient rendered at compile-time—uses background image
 image::img/linear-gradient-45deg.png[45deg gradient rendered at compile-time - uses background image]
 
-The above example isn't supported natively because the gradient direction is 45 degrees. Codename One supports 0, 90, 180, and 270 degrees natively. So this would result in a background image being generated at compile-time with the appropriate gradient.
+The above example isn't supported natively because the gradient direction is 45 degrees. Codename One supports 0, 90, 180, and 270 degrees natively, so this example will result in a background image being generated at compile-time with the appropriate gradient.
 
 [source,css]
 ----
@@ -467,7 +468,7 @@ MyComponent {
 .Linear gradient with different alpha
 image::img/linear-gradient-diff-alpha.png[Linear gradient with different alpha]
 
-The above linear-gradient isn't supported natively because the stop colors have different transparencies. The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly). So, this would result in the gradient being generated as an image at compile-time.
+The above linear-gradient isn't supported natively because the stop colors have different transparencies. The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly). The gradient will therefore be generated as an image at compile-time.
 
 **Natively Supported `radial-gradient` Syntax**
 
@@ -602,7 +603,7 @@ Most application templates in https://www.codenameone.com/initializr[Codename On
 
 ==== Multi-Images as inputs
 
-If you've already generated images in all the appropriate sizes for all densities, you can provide them in the same file structure used by the Codename One XML resource files: The image path is a directory that contains images named after the density that they are intended to be used for. The possible names include:
+If you've already generated images in all the appropriate sizes for all densities, you can provide them in the same file structure used by the Codename One XML resource files: The image path is a directory that contains images named after the density that they're intended to be used for. The possible names include:
 
 * `verylow.png`
 * `low.png`
@@ -698,7 +699,7 @@ Images {
 }
 ----
 
-Then in Java, I might do something like:
+Then in Java, you might do something like:
 
 [source,java]
 ----
@@ -764,7 +765,7 @@ Component backgrounds in Codename One are a common source of confusion for newco
 . Background Image - You can specify an image to be used as the background for a component. Codename One includes settings to define how the image is treated, for example, scale/fill, tile, etc. If a background image is specified, it will override the background color setting - unless the image has transparent regions.
 . Image Border - You can define a 9-piece image border which will effectively cover the entire background of the component. If an image border is specified, it will override the background image of the component.
 
-A common scenario that I run into is trying to set the background color of a component and see no change when I preview your form because the style had an image background defined - which overrides your background color change.
+A common scenario you may run into is trying to set the background color of a component and seeing no change when you preview the form, because the style had an image background defined - which overrides the background color change.
 
 The potential for confusion is mitigated somewhat, but still exists when using CSS. You can make your intentions explicit by adding the `cn1-background-type` property to your style. Possible values include:
 
@@ -899,9 +900,9 @@ If you add the following to your stylesheet, it will set the default font size t
 }
 ----
 
-TIP: I have found that a value of 18 here gives best results across devices.
+TIP: A value of 18 here gives best results across devices.
 
-On the desktop, you may find that 18 is too big. You can define a default font size for tablet and desktop using `defaultDesktopFontSizeInt` and `defaultTabletFontSizeInt` respectively. I have found that a `defaultDesktopFontSizeInt` gives results that match the Mac OS default font size.
+On the desktop, you may find that 18 is too big. You can define a default font size for tablet and desktop using `defaultDesktopFontSizeInt` and `defaultTabletFontSizeInt` respectively. A `defaultDesktopFontSizeInt` value gives results that match the Mac OS default font size.
 
 [source,css]
 ----
@@ -922,7 +923,7 @@ The conversion from "screen-independent pixels" or `mm` to physical pixels uses 
 
 Net result: the same `defaultFontSizeInt: 18` may render at slightly different absolute physical sizes on an iPhone vs. an Android device of similar physical size—typically the iOS rendering is the larger of the two when both are at the platform's default text size. If you need cross-platform pixel-perfect sizing, use platform overrides (`@iOS-platform-font-size`, etc., via media queries) rather than relying on the conversion math alone.
 
-NOTE: When a new iPhone model ships with a resolution that isn't yet in the iOS PPI table, mm-based measurements will use the fallback `460ppi`, which is correct to within a few percent for every modern iPhone. If you discover a model that should use a different value (for example a future Plus/Max device that returns to `458ppi`), file an issue so the table can be updated.
+NOTE: When a new iPhone model ships with a resolution that isn't yet in the iOS PPI table, mm-based measurements will use the fallback `460ppi`, which is correct to within 1-2% for every modern iPhone. If you discover a model that should use a different value (for example a future Plus/Max device that returns to `458ppi`), file an issue so the table can be updated.
 ****
 
 ==== `text-decoration`

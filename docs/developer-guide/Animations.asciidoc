@@ -38,7 +38,7 @@ This sort of behavior creates a special case where setting the size/position mak
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LayoutAnimationsDemo.java[tag=layoutAnimations,indent=0]
 ----
 
-There are a couple of things that you should notice about this example:
+Notice these things about this example:
 
 <1> You used a button to do the animation rather than doing it on show. Since `show()` implicitly lays out the components it wouldn't have worked.
 <2> You used `hi.animateLayout(20000);`, which delegates to the `Form` content pane. If you need to animate a specific container (for example, a nested layout), call `animateLayout()` on that container instead.
@@ -59,7 +59,7 @@ image:img/layout-animation-7.png[Frame 7]
 
 While layout animations are powerful effects for adding elements into the UI and drawing attention to them. The inverse of removing an element from the UI is often more important. For example, when you delete or remove an element you want to animate it out.
 
-Layout animations don't do that since they will try to bring the animated item into place. What you want is the exact opposite of a layout animation and that's the "unlayout animation." `Container.animateUnlayout(int, int, Runnable)` and the `Form.animateUnlayout*()` helpers let's trigger this transition either asynchronously (with a completion callback) or synchronously via the `AndWait` variants.
+Layout animations don't do that since they will try to bring the animated item into place. The exact opposite of a layout animation is the "unlayout animation." `Container.animateUnlayout(int, int, Runnable)` and the `Form.animateUnlayout*()` helpers trigger this transition either asynchronously (with a completion callback) or synchronously via the `AndWait` variants.
 
 The "unlayout animation" takes a valid laid out state and shifts the components to an invalid state that you defined in advance. For example, you can fix the example above to flip the "fall" button into a "rise" button when the buttons come into place and this will allow the buttons to float back up to where they came from in the exact reverse order.
 
@@ -200,7 +200,7 @@ If the `animate` method returns true then the animation will be painted (the `pa
 
 TIP: it's important to deregister animations when they aren’t needed to conserve battery life.
 
-If you derive from a component, which has its own animation logic you might damage its animation behavior by deregistering it, so tread gently with the low-level API’s.
+If you derive from a component, which has its own animation logic you might damage its animation behavior by deregistering it, so use care with the low-level API’s.
 
 For example, you can add more animation logic using code like this:
 
@@ -282,7 +282,7 @@ TIP: Replace even works when you've a layout constraint in place for example, re
 
 ==== Slide transitions
 
-The slide transitions are used to move the `Form/Component` in a sliding motion to the side or up/down. There are 4 basic types of slide transitions:
+The slide transitions are used to move the `Form/Component` in a sliding motion to the side or up/down. Four basic types of slide transitions exist:
 
 . Slide - the most commonly used transition
 . Fast Slide - historically this provided better performance for old device types. it's no longer recommended for newer devices
@@ -333,7 +333,7 @@ image::img/transition-flip.jpg[Fade transition is probably the simplest one arou
 
 https://www.codenameone.com/javadoc/com/codename1/ui/animations/BubbleTransition.html[BubbleTransiton] morphs a component into another component using a circular growth motion.
 
-The `BubbleTransition` accepts the component that will grow into the bubble effect as one of its arguments. it's generally
+The `BubbleTransition` accepts the component that will grow into the bubble effect as one of its arguments. It's primarily
 designed for `Dialog` transitions although it could work for more creative use cases:
 
 NOTE: The code below manipulates styles and look. This is done to make the code more "self contained." Real world code should probably use the theme
@@ -383,6 +383,7 @@ iOS7+ allows swiping back one form to the previous form, Codenmae One has an API
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBind,indent=0]
 ----
 
+// vale-skip: Microsoft.Adverbs: "lazily" describes the lazy-evaluation semantics of LazyValue, a precise CS term, not a softener.
 That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
 
 [source,java]

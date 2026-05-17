@@ -208,13 +208,13 @@ Notice that https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[
 .Alignment of the text within some component types
 image::img/theme-entry-align.png[Alignment of the text within some component types]
 
-WARNING: Aligning text components to anything other than the default alignment might be a problem if they are editable. The native editing capabilities might collide with the alignment behavior.
+WARNING: Aligning text components to anything other than the default alignment might be a problem if they're editable. The native editing capabilities might collide with the alignment behavior.
 
 NOTE: Bidi/RtL layout reverses the alignment value so left becomes right and visa versa
 
 ==== Padding and margin
 
-Padding and margin are concepts derived from the CSS box model. They are slightly different in Codename One, where the border spacing is part of the padding, but other than that they are pretty similar:
+Padding and margin are concepts derived from the CSS box model. They're slightly different in Codename One, where the border spacing is part of the padding, but other than that they're pretty similar:
 
 .Padding and Margin/Box Model
 image::img/padding.png[Padding and Margin,scaledwidth=50%]
@@ -308,7 +308,7 @@ The UI for the 9-piece border you created above looks like <<theme-entry-border-
 .9-piece border in edit mode
 image::img/theme-entry-border-edit-9-piece.png[9-piece border in edit mode]
 
-You can pick the image represented by every section in the border from the combo boxes. They are organized in the same way the border is with the 9-pieces placed in the same position they would occupy when the border is rendered.
+You can pick the image represented by every section in the border from the combo boxes. They're organized in the same way the border is with the 9-pieces placed in the same position they would occupy when the border is rendered.
 
 NOTE: Notice that the other elements in the UI are disabled when the image border type is selected.
 
@@ -339,7 +339,7 @@ Empty borders enforce the removal of a border. This is important if you would li
 
 For example: Buttons have borders by default. If you would like to create a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] that's of solid color you could define the border to be empty and then use the solid color as you see fit.
 
-IMPORTANT: There is a null border which is often confused with an empty border. You should use empty border and not null border
+IMPORTANT: A null border exists and is often confused with an empty border. You should use empty border and not null border
 
 ==== Round Border
 
@@ -413,7 +413,7 @@ To avoid this always inherit only from UIID's you defined for example, `MyButton
 
 Codename One supports 3 font types:
 
-- *System fonts:* these are simplistic built-in fonts. They work on all platforms and come in one of 3 sizes. For example, they are ubiquitous and work in every platform in all languages.
+- *System fonts:* these are simplistic built-in fonts. They work on all platforms and come in one of 3 sizes. For example, they're ubiquitous and work in every platform in all languages.
 
 - *TTF files:* you can place a TTF file in the src directory of the project and it will appear in the #True Type# combo box.
 

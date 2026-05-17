@@ -8,6 +8,19 @@ from pathlib import Path
 from typing import Iterable, List
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".webp",
+    ".bmp",
+    ".ico",
+    ".tif",
+    ".tiff",
+    ".pdf",
+}
 
 
 def iter_text_files(root: Path) -> Iterable[Path]:
@@ -46,6 +59,11 @@ def main() -> None:
     for image_path in sorted(image_dir.rglob("*")):
         if not image_path.is_file():
             continue
+        # Skip non-image artifacts that may live next to images (.gitkeep,
+        # OS-generated thumbnails, editor metadata). The unused-images check
+        # only meaningfully applies to image files referenced from prose.
+        if image_path.suffix.lower() not in IMAGE_EXTENSIONS:
+            continue
         rel_path = image_path.relative_to(doc_root).as_posix()
         if any(rel_path in text for text in contents):
             continue
@@ -65,8 +83,8 @@ def main() -> None:
         print("Unused images detected:")
         for rel_path in unused:
             print(f" - {rel_path}")
-    else:
-        print("No unused images found.")
+        raise SystemExit(1)
+    print("No unused images found.")
 
 
 if __name__ == "__main__":

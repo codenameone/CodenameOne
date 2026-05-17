@@ -1,3 +1,11 @@
 book-cover.generated.svg
 book-cover.generated.png
-styles/
+# Vale syncs upstream style packages here, but the project-specific vocabulary
+# (config/vocabularies/CodenameOne) is tracked so CI runs see the same word
+# list local contributors do.
+styles/*
+!styles/config/
+styles/config/*
+!styles/config/vocabularies/
+styles/config/vocabularies/*
+!styles/config/vocabularies/CodenameOne/
