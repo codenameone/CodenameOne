@@ -950,13 +950,6 @@ public final class CommonTransitions extends Transition {
                     Component c = getDialogParent(getDestination());
                     float ratio = ((float) position) / 1000.0f;
                     if (g.isAffineSupported()) {
-                        // Matrix mode: resetAffine would clobber the
-                        // framework painting-chain translates. Save the
-                        // pre-scale matrix and restore it after drawing.
-                        Transform savedTransitionMatrix = null;
-                        if (Graphics.useMatrixTranslation) {
-                            savedTransitionMatrix = g.getTransform();
-                        }
                         g.scale(ratio, ratio);
                         int w = (int) (originalWidth * ratio);
                         int h = (int) (originalHeight * ratio);
@@ -968,11 +961,7 @@ public final class CommonTransitions extends Transition {
                         g.drawImage(buffer, currentDlgX, currentDlgY);
 
                         //paint(g, c, 0, 0);
-                        if (Graphics.useMatrixTranslation) {
-                            g.setTransform(savedTransitionMatrix);
-                        } else {
-                            g.resetAffine();
-                        }
+                        g.resetAffine();
                     } else {
                         c.setWidth((int) (originalWidth * ratio));
                         c.setHeight((int) (originalHeight * ratio));

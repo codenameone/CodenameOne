@@ -7796,27 +7796,13 @@ public final class FontImage extends Image {
             g.concatenateAlpha(fgAlpha);
         }
         if (rotated != 0) {
-            if (Graphics.useMatrixTranslation) {
-                // Matrix mode: rotation around a *local* pivot composes onto
-                // the impl matrix that already carries the framework
-                // translates, so drawing in local coords lands at the right
-                // screen position. Save the matrix up front so we can
-                // restore it after the rotation (legacy used resetAffine +
-                // translate(tX, tY) for the same effect).
-                Transform saved = g.getTransform();
-                g.rotate((float) Math.toRadians(rotated % 360),
-                        x + width / 2, y + height / 2);
-                g.drawString(text, x + width / 2 - w / 2, y + height / 2 - h / 2);
-                g.setTransform(saved);
-            } else {
-                int tX = g.getTranslateX();
-                int tY = g.getTranslateY();
-                g.translate(-tX, -tY);
-                g.rotate((float) Math.toRadians(rotated % 360), tX + x + width / 2, tY + y + height / 2);
-                g.drawString(text, tX + x + width / 2 - w / 2, tY + y + height / 2 - h / 2);
-                g.resetAffine();
-                g.translate(tX, tY);
-            }
+            int tX = g.matrixFrameworkTranslateX();
+            int tY = g.matrixFrameworkTranslateY();
+            g.translate(-tX, -tY);
+            g.rotate((float) Math.toRadians(rotated % 360), tX + x + width / 2, tY + y + height / 2);
+            g.drawString(text, tX + x + width / 2 - w / 2, tY + y + height / 2 - h / 2);
+            g.resetAffine();
+            g.translate(tX, tY);
         } else {
             g.drawString(text, x + width / 2 - w / 2, y + height / 2 - h / 2);
         }
@@ -7851,21 +7837,13 @@ public final class FontImage extends Image {
         }
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         if (rotated != 0) {
-            if (Graphics.useMatrixTranslation) {
-                Transform saved = g.getTransform();
-                g.rotate((float) Math.toRadians(rotated % 360),
-                        x + w / 2, y + h / 2);
-                g.drawString(text, x + w / 2 - ww / 2, y);
-                g.setTransform(saved);
-            } else {
-                int tX = g.getTranslateX();
-                int tY = g.getTranslateY();
-                g.translate(-tX, -tY);
-                g.rotate((float) Math.toRadians(rotated % 360), tX + x + w / 2, tY + y + h / 2);
-                g.drawString(text, tX + x + w / 2 - ww / 2, tY + y);
-                g.resetAffine();
-                g.translate(tX, tY);
-            }
+            int tX = g.matrixFrameworkTranslateX();
+            int tY = g.matrixFrameworkTranslateY();
+            g.translate(-tX, -tY);
+            g.rotate((float) Math.toRadians(rotated % 360), tX + x + w / 2, tY + y + h / 2);
+            g.drawString(text, tX + x + w / 2 - ww / 2, tY + y);
+            g.resetAffine();
+            g.translate(tX, tY);
         } else {
             g.drawString(text, x + w / 2 - ww / 2, y + h / 2 - hh / 2);
         }
