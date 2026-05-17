@@ -159,14 +159,39 @@ id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void) {
 int CN1MetalFramebufferWidth(void) { return currentFramebufferWidth; }
 int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
+// Process-lifetime device + command queue cache. The original implementation
+// dereferenced [[GLViewController instance] eaglView].layer to fetch the
+// CAMetalLayer's device on every call, but -[UIView layer] is a main-thread-
+// only API. Paint runs on the Codename One EDT (a GCD background queue), and
+// any drawShape → createAlphaMask → nativePathRendererCreateTexture path
+// reaches CN1MetalDevice() from that thread. With Main Thread Checker
+// enabled Xcode aborts the process before the first form renders. Cache the
+// device + queue lazily via MTLCreateSystemDefaultDevice (thread-safe; the
+// returned device is the same singleton METALView itself uses) so neither
+// function ever touches a UIView property.
+static id<MTLDevice> cachedMetalDevice = nil;
+static id<MTLCommandQueue> cachedMetalCommandQueue = nil;
+static dispatch_once_t cn1MetalDeviceOnceToken;
+
+static void ensureCachedDeviceAndQueue(void) {
+    dispatch_once(&cn1MetalDeviceOnceToken, ^{
+        // MTLCreateSystemDefaultDevice returns +1 (Create-rule); hold the
+        // retain for the lifetime of the process. newCommandQueue likewise
+        // returns +1. No matching release: these are process-lifetime
+        // singletons, freed only at exit.
+        cachedMetalDevice = MTLCreateSystemDefaultDevice();
+        cachedMetalCommandQueue = [cachedMetalDevice newCommandQueue];
+    });
+}
+
 id<MTLDevice> CN1MetalDevice(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return ((CAMetalLayer *)mv.layer).device;
+    ensureCachedDeviceAndQueue();
+    return cachedMetalDevice;
 }
 
 id<MTLCommandQueue> CN1MetalCommandQueue(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return mv.commandQueue;
+    ensureCachedDeviceAndQueue();
+    return cachedMetalCommandQueue;
 }
 
 // --------------- Matrix state ---------------
