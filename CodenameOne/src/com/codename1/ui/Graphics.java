@@ -2120,7 +2120,23 @@ public final class Graphics {
     /// - `peer`: The peer component to be drawn.
     void drawPeerComponent(PeerComponent peer) {
         if (paintPeersBehind) {
-            clearRectImpl(peer.getAbsoluteX(), peer.getAbsoluteY(), peer.getWidth(), peer.getHeight());
+            // clearRectImpl forwards to impl.clearRect which honours the
+            // impl matrix (iOS NativeGraphics.clearRect calls applyTransform
+            // before clearing). In matrix mode the matrix already encodes
+            // the framework painting-chain translates -- if we pass
+            // getAbsoluteX/Y here the matrix would translate the punch-hole
+            // off by another full framework offset, so the native peer
+            // would appear as a solid filled rect over the canvas at the
+            // wrong screen position. Subtract matrixFrameworkX/Y so the
+            // impl matrix applies and lands the cleared rect back at the
+            // peer's screen-absolute coords.
+            int absX = peer.getAbsoluteX();
+            int absY = peer.getAbsoluteY();
+            if (matrixMode()) {
+                absX -= matrixFrameworkX;
+                absY -= matrixFrameworkY;
+            }
+            clearRectImpl(absX, absY, peer.getWidth(), peer.getHeight());
         }
 
     }
