@@ -1311,7 +1311,7 @@ image::img/guibuilder-2-insets-dropdown-menu.png[Inset drop-down menu,scaledwidt
 Notice the "autosnap" checkbox that appears in the top-right corner of the GUI builder window.
 
 .Autosnap checkbox
-image::img/guibuilder-2-smart-insets-autosnap-checkboxes.png[Autosnap checkbox,scaledwidth=10%]
+image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Autosnap checkbox,scaledwidth=10%]
 
 Autosnap does what it sounds like: It automatically snaps two components together when you drag them near each other. This is handy for linking components together without having to explicitly link them (using the "link" button). This feature is turned on by default. If autosnap is turned off, you can still start a "snap" by holding down the ALT/Option key on your keyboard during the drag.
 
@@ -1320,7 +1320,7 @@ Autosnap does what it sounds like: It automatically snaps two components togethe
 Beside the "autosnap" checkbox is another checkbox named `Smart Insets`.
 
 .Smart insets checkbox
-image::img/guibuilder-2-smart-insets-autosnap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
+image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
 
 Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked. The heuristics are basic (it tries to link to the nearest neighbor component usually), but you will be working on improving this for future releases. This feature is turned off by default while it's still being refined. The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the GUI builder without having any knowledge of insets or reference components.
 
