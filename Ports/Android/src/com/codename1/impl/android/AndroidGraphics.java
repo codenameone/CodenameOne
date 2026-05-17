@@ -932,8 +932,13 @@ class AndroidGraphics {
             return;
         }
         boolean antialias = paint.isAntiAlias();
+        boolean dither = paint.isDither();
         paint.setStyle(Paint.Style.FILL);
-        paint.setAntiAlias(false);
+        // AA so the elliptical-radial transform doesn't stair-step the
+        // shader output along the gradient bands; dither so slow stop-to-stop
+        // transitions don't band visibly in 8-bit RGB.
+        paint.setAntiAlias(true);
+        paint.setDither(true);
         paint.setAlpha(255);
         canvas.save();
         applyTransform();
@@ -980,6 +985,7 @@ class AndroidGraphics {
             }
         } finally {
             paint.setAntiAlias(antialias);
+            paint.setDither(dither);
             paint.setShader(null);
             unapplyTransform();
             canvas.restore();

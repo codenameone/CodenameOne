@@ -165,23 +165,21 @@ Alpha: use `rgba(r, g, b, a)` where `a` is 0–255 in some compiler versions and
 
 ## Gradients
 
-The full CSS gradient range compiles down to a native `theme.res` descriptor — no compile-time image rasterization, no `Painter` workaround needed. All five functions are recognized:
+CSS gradients compile to a native `theme.res` descriptor. Supported functions:
 
-- `linear-gradient(<angle>, <stops...>)` — any angle in `deg` / `rad` / `turn`, or the canonical `to <side>` / `to <side1> <side2>` form. Two or more stops, with optional position percentages.
-- `radial-gradient([circle|ellipse] [<extent>] [at <position>], <stops...>)` — extent is one of `closest-side` / `closest-corner` / `farthest-side` / `farthest-corner` (default), or explicit radii in percent.
-- `conic-gradient([from <angle>] [at <position>], <stops...>)` — sweep gradient. CSS convention: 0° points up, sweep is clockwise.
-- `repeating-linear-gradient(...)` / `repeating-radial-gradient(...)` — same syntax as the non-repeating versions; the stop pattern tiles outward.
+- `linear-gradient(<angle>, <stops...>)` — angle in `deg` / `rad` / `turn`, or `to <side>` / `to <side1> <side2>`.
+- `radial-gradient([circle|ellipse] [<extent>] [at <position>], <stops...>)` — extent: `closest-side` / `closest-corner` / `farthest-side` / `farthest-corner` (default), or explicit radii in percent.
+- `conic-gradient([from <angle>] [at <position>], <stops...>)` — 0° points up, sweep clockwise.
+- `repeating-linear-gradient(...)` / `repeating-radial-gradient(...)` — stop pattern tiles outward.
 
 ```css
 HeroCard      { background: linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%); }
-DropShadow    { background: linear-gradient(to bottom, rgba(0,0,0,0.0), rgba(0,0,0,0.4)); }
 Spotlight     { background: radial-gradient(circle farthest-corner at 30% 30%, #fff, #001 70%); }
-EllipseBG     { background: radial-gradient(ellipse closest-side at 50% 50%, #fef, #002); }
 ColorWheel    { background: conic-gradient(from 0deg at 50% 50%, red, yellow, green, blue, red); }
-DiagonalStripes { background: repeating-linear-gradient(45deg, #eee 0px, #eee 10px, #ccc 10px, #ccc 20px); }
+DiagonalStripes { background: repeating-linear-gradient(45deg, #eee 0%, #ccc 10%); }
 ```
 
-The legacy `Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL` / `_LINEAR_HORIZONTAL` / `_RADIAL` constants still work for the simple 2-color cases (and produce a slightly smaller descriptor than the multi-stop form). For richer gradients, use the `Gradient` hierarchy (a `Paint` subclass with three concrete kinds — `LinearGradient`, `RadialGradient`, `ConicGradient` — analogous to `Shape`). Programmatically:
+Programmatically, use the `Gradient` hierarchy (`LinearGradient`, `RadialGradient`, `ConicGradient` — `Paint` subclasses analogous to `Shape`):
 
 ```java
 LinearGradient g = new LinearGradient(135f,
@@ -190,22 +188,27 @@ LinearGradient g = new LinearGradient(135f,
 card.getAllStyles().setBackgroundType(Style.BACKGROUND_GRADIENT_LINEAR);
 card.getAllStyles().setGradient(g);
 
-// Or fill directly via Graphics:
-g.fillGradient(new ConicGradient(colors, stops), 0, 0, w, h);
+// Or fill a rect directly via Graphics:
+graphics.fillGradient(g, 0, 0, w, h);
 ```
 
-The four-byte CSS background types map 1:1 to the concrete kinds: `BACKGROUND_GRADIENT_LINEAR` / `_REPEATING_LINEAR` pair with `LinearGradient`, `BACKGROUND_GRADIENT_RADIAL_FULL` / `_REPEATING_RADIAL` with `RadialGradient`, and `BACKGROUND_GRADIENT_CONIC` with `ConicGradient`. A custom `Painter` is no longer required for arbitrary gradients — only reach for that if you need a paint algorithm CSS cannot describe at all (procedural noise, sampling, etc.).
+CSS background types map 1:1: `BACKGROUND_GRADIENT_LINEAR` / `_REPEATING_LINEAR` ↔ `LinearGradient`, `BACKGROUND_GRADIENT_RADIAL_FULL` / `_REPEATING_RADIAL` ↔ `RadialGradient`, `BACKGROUND_GRADIENT_CONIC` ↔ `ConicGradient`.
 
-## Filter and backdrop-filter (blur)
+## Filter and backdrop-filter
 
-`filter: blur(<length>)` and `backdrop-filter: blur(<length>)` are recognized at compile time:
+`filter` and `backdrop-filter` accept a chain of functions:
 
 ```css
-Overlay  { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(12px); }
-BlurImg  { filter: blur(4px); }
+Overlay   { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(12px); }
+BlurImg   { filter: blur(4px); }
+Faded     { filter: brightness(0.6) contrast(1.2); }
+Grayscale { filter: grayscale(1); }
+Sepia     { filter: sepia(0.8) saturate(1.1); }
 ```
 
-`filter:blur()` blurs the component's own painted content; `backdrop-filter:blur()` blurs whatever is painted behind the component. The radii are exposed on `Style` (`getFilterBlurRadius()` / `getBackdropFilterBlurRadius()`) and round-trip through `theme.res`. Hardware blur is used where available (Core Image on iOS, RenderScript / RenderEffect on Android, JHLabs `GaussianFilter` in the simulator); ports without a fast path fall back to a software Gaussian. Only `blur()` is currently parsed — other CSS filter functions (`brightness`, `contrast`, etc.) are not yet wired through.
+Supported functions: `blur(<length>)`, `brightness(<number>)`, `contrast(<number>)`, `grayscale(<number|%>)`, `hue-rotate(<angle>)`, `invert(<number|%>)`, `opacity(<number|%>)`, `saturate(<number>)`, `sepia(<number|%>)`.
+
+`filter:` applies to the component's own painted content; `backdrop-filter:` applies to whatever is painted behind. Radii / matrices are exposed on `Style` (`getFilterBlurRadius()`, `getFilterColorMatrix()`, etc.) and round-trip through `theme.res`.
 
 ## Dark mode
 
