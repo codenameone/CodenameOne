@@ -270,11 +270,23 @@ public class MapComponent extends Container {
                 tx = -tx * (float) (scaleX - getWidth()) / sx;
                 float ty = (float) zoomCenterY / (float) getHeight();
                 ty = -ty * (float) (scaleY - getHeight()) / sy;
-                g.translate((int) tx, (int) ty);
-                g.scale(sx, sy);
-                paintmap(g);
-                g.resetAffine();
-                g.translate(-(int) tx, -(int) ty);
+                if (Graphics.useMatrixTranslation) {
+                    // Matrix mode: resetAffine wipes the impl matrix to
+                    // identity, which destroys the framework painting-chain
+                    // translates the matrix carries. Use save/restore the
+                    // impl matrix around the scale + user-translate instead.
+                    Transform savedMatrix = g.getTransform();
+                    g.translate((int) tx, (int) ty);
+                    g.scale(sx, sy);
+                    paintmap(g);
+                    g.setTransform(savedMatrix);
+                } else {
+                    g.translate((int) tx, (int) ty);
+                    g.scale(sx, sy);
+                    paintmap(g);
+                    g.resetAffine();
+                    g.translate(-(int) tx, -(int) ty);
+                }
             } else {
                 g.translate(-translateX, -translateY);
                 paintmap(g);

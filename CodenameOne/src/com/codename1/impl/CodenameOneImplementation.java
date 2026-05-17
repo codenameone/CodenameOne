@@ -802,15 +802,19 @@ public abstract class CodenameOneImplementation {
                 }
                 paintQueueTemp[iter] = null;
                 // Reset wrapper graphics to a clean state before painting
-                // the next queued animation. matrixFrameworkTranslateX
-                // returns the right shadow for either translate mode --
-                // legacy uses xTranslate, matrix mode uses the internal
-                // matrixFrameworkX. After translate(-tx, -ty) the wrapper
-                // graphics is at identity (in both modes).
-                int wtx = wrapper.matrixFrameworkTranslateX();
-                int wty = wrapper.matrixFrameworkTranslateY();
-                wrapper.translate(-wtx, -wty);
-                wrapper.resetAffine();
+                // the next queued animation. In matrix mode, resetAffine
+                // also clears the framework painting-chain translates --
+                // which is exactly what we want here, because the wrapper
+                // is the top-level graphics that *will* re-establish the
+                // chain via paintComponent below. Legacy zeroes the
+                // integer accumulator separately because resetAffine in
+                // legacy mode leaves it untouched.
+                if (Graphics.useMatrixTranslation) {
+                    wrapper.setTransform(null);
+                } else {
+                    wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                    wrapper.resetAffine();
+                }
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
                     Component cmp = (Component) ani;

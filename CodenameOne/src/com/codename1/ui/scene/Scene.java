@@ -65,7 +65,17 @@ public class Scene extends Container {
     public void paint(Graphics g) {
         super.paint(g);
         if (root != null) {
-            g.resetAffine();
+            // In matrix mode resetAffine would wipe the framework painting-
+            // chain translates that the impl matrix carries. Save/restore
+            // the impl matrix around the render call instead; the legacy
+            // path keeps using resetAffine since the integer accumulator
+            // already preserves the framework translate.
+            Transform savedMatrix = null;
+            if (Graphics.useMatrixTranslation) {
+                savedMatrix = g.getTransform();
+            } else {
+                g.resetAffine();
+            }
             int clipX = g.getClipX();
             int clipY = g.getClipY();
             int clipW = g.getClipWidth();
@@ -74,7 +84,11 @@ public class Scene extends Container {
             g.setAntiAliased(true);
             root.render(g);
             g.translate(-getX(), -getY());
-            g.resetAffine();
+            if (Graphics.useMatrixTranslation) {
+                g.setTransform(savedMatrix);
+            } else {
+                g.resetAffine();
+            }
             g.setClip(clipX, clipY, clipW, clipH);
         }
     }

@@ -151,36 +151,8 @@ public final class Graphics {
     /// dispatches. All call sites that decide between "matrix already has
     /// the translate, don't shift coords" and "legacy accumulator path,
     /// shift coords by xTranslate" gate on this.
-    boolean matrixMode() {
+    private boolean matrixMode() {
         return useMatrixTranslation && impl.isTranslateMatrixSupported();
-    }
-
-    /// Framework-internal accessor exposing the current accumulated
-    /// framework-painting-chain translate to snapshot-reset callers
-    /// (Form.paintGlassImpl, Container.paintComponent tail,
-    /// Component.paintIntersectingComponentsAbove, drawPainters $FLAT,
-    /// TextSelection, CodenameOneImplementation paint-queue wrapper). In
-    /// legacy mode `#getTranslateX()` already returns this value (the
-    /// `xTranslate` integer accumulator); in matrix mode `getTranslateX`
-    /// stays at zero (so the bypass-Graphics fast paths in
-    /// `com.codename1.ui.Label.drawLabelComponent` and
-    /// `com.codename1.ui.Component.BGPainter.paintComponentBackground`
-    /// don't double-translate) and the framework anchor lives in an
-    /// internal shadow consulted only by `setTransform` conjugation and
-    /// this getter. Returning either source from one method lets the
-    /// snapshot-reset translate-based pattern (translate(-tx, -ty); paint;
-    /// translate(tx, ty)) keep working unchanged across both modes.
-    ///
-    /// Public for cross-package framework callers in
-    /// `com.codename1.impl.CodenameOneImplementation`; not part of the
-    /// public app-facing API.
-    public int matrixFrameworkTranslateX() {
-        return matrixMode() ? matrixFrameworkX : xTranslate;
-    }
-
-    /// Y-axis counterpart to `#matrixFrameworkTranslateX()`.
-    public int matrixFrameworkTranslateY() {
-        return matrixMode() ? matrixFrameworkY : yTranslate;
     }
 
     /// Returns the x coordinate to pass to impl draw primitives. In matrix
@@ -2024,24 +1996,32 @@ public final class Graphics {
             a = Boolean.TRUE;
         }
 
-        // Use the framework anchor accessor so matrix mode (where
-        // xTranslate stays at 0 and the framework lives in
-        // matrixFrameworkX) and legacy mode (where xTranslate IS the
-        // framework) both produce a valid snapshot-reset.
-        int snapshotTx = matrixFrameworkTranslateX();
-        int snapshotTy = matrixFrameworkTranslateY();
+        // In matrix mode the framework painting-chain translates live in the
+        // impl matrix, not the integer accumulator -- so the snapshot needs
+        // the full Transform, and "reset" means setting the impl matrix to
+        // identity (not translate(-getTranslateX, -getTranslateY), which
+        // would be a no-op when getTranslateX returns 0).
+        Transform savedTransform = null;
+        if (matrixMode()) {
+            savedTransform = getTransform();
+        }
         nativeGraphicsState = new Object[]{
-                Integer.valueOf(snapshotTx),
-                Integer.valueOf(snapshotTy),
+                Integer.valueOf(getTranslateX()),
+                Integer.valueOf(getTranslateY()),
                 Integer.valueOf(getColor()),
                 Integer.valueOf(getAlpha()),
                 Integer.valueOf(getClipX()),
                 Integer.valueOf(getClipY()),
                 Integer.valueOf(getClipWidth()),
                 Integer.valueOf(getClipHeight()),
-                a, b
+                a, b,
+                savedTransform
         };
-        translate(-snapshotTx, -snapshotTy);
+        if (matrixMode()) {
+            setTransform(null);
+        } else {
+            translate(-getTranslateX(), -getTranslateY());
+        }
         setAlpha(255);
         setClip(0, 0, Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
         return nativeGraphics;
@@ -2049,7 +2029,11 @@ public final class Graphics {
 
     /// Invoke this to restore Codename One's graphics settings into the native graphics
     public void endNativeGraphicsAccess() {
-        translate(((Integer) nativeGraphicsState[0]).intValue(), ((Integer) nativeGraphicsState[1]).intValue());
+        if (matrixMode()) {
+            setTransform((Transform) nativeGraphicsState[10]);
+        } else {
+            translate(((Integer) nativeGraphicsState[0]).intValue(), ((Integer) nativeGraphicsState[1]).intValue());
+        }
         setColor(((Integer) nativeGraphicsState[2]).intValue());
         setAlpha(((Integer) nativeGraphicsState[3]).intValue());
         setClip(((Integer) nativeGraphicsState[4]).intValue(),
@@ -2138,15 +2122,14 @@ public final class Graphics {
         if (paintPeersBehind) {
             // clearRectImpl forwards to impl.clearRect which honours the
             // impl matrix (iOS NativeGraphics.clearRect calls applyTransform
-            // before clearing). In matrix mode the matrix encodes the
-            // framework painting-chain translates, so passing the screen-
-            // absolute peer coords would land the cleared rect at
-            // (matrixFrameworkX + absX) -- the native peer ends up as a
-            // solid filled rect over the canvas because the punch-hole
-            // missed it. Subtract matrixFrameworkX so the impl matrix
-            // applies and lands the cleared rect at the peer's screen
-            // position. Legacy mode keeps the raw absolute coords since
-            // the impl matrix is identity there.
+            // before clearing). In matrix mode the matrix already encodes
+            // the framework painting-chain translates -- if we pass
+            // getAbsoluteX/Y here the matrix would translate the punch-hole
+            // off by another full framework offset, so the native peer
+            // would appear as a solid filled rect over the canvas at the
+            // wrong screen position. Subtract matrixFrameworkX/Y so the
+            // impl matrix applies and lands the cleared rect back at the
+            // peer's screen-absolute coords.
             int absX = peer.getAbsoluteX();
             int absY = peer.getAbsoluteY();
             if (matrixMode()) {
