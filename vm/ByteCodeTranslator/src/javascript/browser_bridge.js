@@ -749,6 +749,77 @@
     return null;
   });
 
+  // Fallback splash-hide observer: in some configurations the Java-side
+  // ``HTML5Implementation.confirmControlView -> hideSplash`` call never
+  // reaches our worker-side override (resolved to the no-op super-class
+  // impl, or the worker main thread exits before the framework's first
+  // confirm-paint cycle). Without it, the inner ``#cn1-splash`` overlay
+  // stays on top of the painted canvas forever -- the app is rendered
+  // underneath but the user sees ``Loading...``. We watch the canvas for
+  // its first meaningful paint and tear the splash down ourselves when
+  // it appears. Cheap (one IntersectionObserver-style RAF poll, stopped
+  // as soon as the splash is gone) and idempotent with the proper
+  // ``__cn1_hide_splash__`` path (whichever fires first wins).
+  (function installSplashAutoHide() {
+    if (typeof global === 'undefined') return;
+    var doc = (global.window || global).document || global.document;
+    if (!doc) return;
+    var splash = doc.getElementById('cn1-splash');
+    var canvas = doc.querySelector('canvas');
+    if (!splash || !canvas) return;
+    var win = global.window || global;
+    var raf = win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame.bind(win) : null;
+    var hidden = false;
+    function hide() {
+      if (hidden) return;
+      hidden = true;
+      var current = doc.getElementById('cn1-splash');
+      if (!current) return;
+      // ``__cn1_hide_splash__`` handler does the same fadeOut-then-remove;
+      // call through it so logging / future hooks fire uniformly.
+      try {
+        var fn = hostBridge && hostBridge.handlers && hostBridge.handlers['__cn1_hide_splash__'];
+        if (typeof fn === 'function') { fn(); return; }
+      } catch (_e) { /* fall through */ }
+      if (current.parentNode) current.parentNode.removeChild(current);
+    }
+    var ctx = null;
+    try { ctx = canvas.getContext('2d'); } catch (_e) { ctx = null; }
+    if (!ctx || !raf) {
+      // No 2D context (worker canvas transferred, etc.) — fall back to a
+      // tight setTimeout watchdog. 8 s is long enough that an init storm
+      // that legitimately exceeds it (cold device, throttled CPU) won't
+      // race the proper hideSplash call.
+      setTimeout(hide, 8000);
+      return;
+    }
+    var checks = 0;
+    function poll() {
+      if (hidden) return;
+      if (checks++ > 600) { hide(); return; } // ~10 s @ 60 fps
+      try {
+        if (!canvas.width || !canvas.height) { raf(poll); return; }
+        // Sample a handful of pixels at fixed offsets -- a full
+        // getImageData scan every frame would burn CPU on the main
+        // thread for the entire first ~2 s of paint.
+        var w = canvas.width, h = canvas.height;
+        var samples = [
+          [w >> 1, h >> 2], [w >> 2, h >> 1], [(w * 3) >> 2, h >> 1],
+          [w >> 1, (h * 3) >> 2], [w >> 1, h >> 1]
+        ];
+        var hits = 0;
+        for (var i = 0; i < samples.length; i++) {
+          var px = ctx.getImageData(samples[i][0], samples[i][1], 1, 1).data;
+          var lum = (px[0] + px[1] + px[2]) / 3;
+          if (px[3] > 0 && lum < 240) hits++;
+        }
+        if (hits >= 2) { hide(); return; }
+      } catch (_e) { /* keep polling */ }
+      raf(poll);
+    }
+    raf(poll);
+  })();
+
   hostBridge.register('__cn1_create_custom_event__', function(request) {
     var payload = request || {};
     var type = payload.type == null ? '' : String(payload.type);
