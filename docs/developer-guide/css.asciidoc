@@ -395,8 +395,6 @@ The full CSS gradient range is natively supported: `linear-gradient`, `radial-gr
 .CSS gradient functions rendered side-by-side from the framework's screenshot test (top to bottom: linear at an arbitrary angle, linear `to <side>`, linear with mismatched alphas, radial `farthest-corner`, radial ellipse, conic, repeating-linear, repeating-radial).
 image::img/css-gradients-overview.png[CSS gradient examples,300]
 
-Available since Codename One 8.1.
-
 **`linear-gradient`**
 
 Any angle in degrees, radians, or `turn`, or the canonical `to <side>` / `to <side1> <side2>` directions. Two or more stops, each with optional position percentage; positions left blank between fixed anchors are auto-distributed.

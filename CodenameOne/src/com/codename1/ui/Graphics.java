@@ -1367,10 +1367,6 @@ public final class Graphics {
     /// (Java2D `LinearGradientPaint`/`RadialGradientPaint` on JavaSE; Android
     /// `LinearGradient`/`RadialGradient`/`SweepGradient` shaders; software
     /// rasterizer fallback elsewhere). Pass null or width/height <= 0 for a no-op.
-    ///
-    /// #### Since
-    ///
-    /// 8.1
     public void fillGradient(Gradient gradient, int x, int y, int width, int height) {
         if (gradient == null || width <= 0 || height <= 0) {
             return;

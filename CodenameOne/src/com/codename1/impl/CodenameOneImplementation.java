@@ -3380,22 +3380,20 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Fills the rectangle (x, y, width, height) with the given multi-stop
-    /// gradient. Default implementation rasterizes into an ARGB pixel buffer
-    /// via the gradient's `sampleArgb(...)` hook; ports with hardware shader
-    /// support should override.
+    /// gradient. Default implementation reuses a weakly-cached rasterization
+    /// from the Gradient (see `Gradient#getCachedRaster`) - so a gradient
+    /// painted into the same-sized rectangle on subsequent frames pays only
+    /// for the texture upload, not per-pixel re-sampling. Ports with hardware
+    /// shader support should override and draw directly through the shader.
     public void fillGradient(Object graphics, Gradient gradient, int x, int y, int width, int height) {
         if (gradient == null || width <= 0 || height <= 0) {
             return;
         }
-        int[] rgb = new int[width * height];
-        for (int py = 0; py < height; py++) {
-            int row = py * width;
-            for (int px = 0; px < width; px++) {
-                rgb[row + px] = gradient.sampleArgb(px, py, width, height);
-            }
+        com.codename1.ui.Image img = gradient.getCachedRaster(width, height);
+        if (img == null) {
+            return;
         }
-        Object img = createImage(rgb, width, height);
-        drawImage(graphics, img, x, y);
+        drawImage(graphics, img.getImage(), x, y);
     }
 
     /// In-place region blur for CSS backdrop-filter:blur(). Default returns false
