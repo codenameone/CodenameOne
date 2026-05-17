@@ -749,76 +749,57 @@
     return null;
   });
 
-  // Fallback splash-hide observer: in some configurations the Java-side
+  // Splash-hide signal. In some configurations the Java-side
   // ``HTML5Implementation.confirmControlView -> hideSplash`` call never
-  // reaches our worker-side override (resolved to the no-op super-class
+  // reaches our worker-side override (resolves to the no-op super-class
   // impl, or the worker main thread exits before the framework's first
-  // confirm-paint cycle). Without it, the inner ``#cn1-splash`` overlay
-  // stays on top of the painted canvas forever -- the app is rendered
-  // underneath but the user sees ``Loading...``. We watch the canvas for
-  // its first meaningful paint and tear the splash down ourselves when
-  // it appears. Cheap (one IntersectionObserver-style RAF poll, stopped
-  // as soon as the splash is gone) and idempotent with the proper
-  // ``__cn1_hide_splash__`` path (whichever fires first wins).
-  (function installSplashAutoHide() {
-    if (typeof global === 'undefined') return;
+  // confirm-paint cycle). Without intervention the ``#cn1-splash``
+  // overlay stays on top of the painted canvas forever -- the app is
+  // rendered underneath but the user just sees ``Loading...``.
+  //
+  // Robust signal: any time the worker emits a ``host-call-batch``
+  // containing canvas/2D paint ops we know the framework HAS reached
+  // first-paint, so we can tear the splash down. This is bound to an
+  // actual paint event from any CN1 app (every app does canvas
+  // painting through ``HTML5Graphics`` -> the JSO bridge -> these
+  // members) -- no pixel sampling, no app-specific heuristic.
+  global.__parparFirstPaintObserved = false;
+  var __cn1SplashHidden = false;
+  // Method names emitted by ``HTML5Graphics``' canvas-2D wrappers. Any
+  // of these arriving via host-call-batch means the worker has issued
+  // a real paint command.
+  var __cn1PaintOpMethods = {
+    fillRect: 1, strokeRect: 1, clearRect: 1, fillText: 1, strokeText: 1,
+    drawImage: 1, beginPath: 1, fill: 1, stroke: 1, putImageData: 1,
+    setTransform: 1, save: 1, restore: 1, clip: 1
+  };
+  function __cn1HideSplashIfPresent() {
+    if (__cn1SplashHidden) return;
+    __cn1SplashHidden = true;
     var doc = (global.window || global).document || global.document;
     if (!doc) return;
-    var splash = doc.getElementById('cn1-splash');
-    var canvas = doc.querySelector('canvas');
-    if (!splash || !canvas) return;
-    var win = global.window || global;
-    var raf = win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame.bind(win) : null;
-    var hidden = false;
-    function hide() {
-      if (hidden) return;
-      hidden = true;
-      var current = doc.getElementById('cn1-splash');
-      if (!current) return;
-      // ``__cn1_hide_splash__`` handler does the same fadeOut-then-remove;
-      // call through it so logging / future hooks fire uniformly.
-      try {
-        var fn = hostBridge && hostBridge.handlers && hostBridge.handlers['__cn1_hide_splash__'];
-        if (typeof fn === 'function') { fn(); return; }
-      } catch (_e) { /* fall through */ }
-      if (current.parentNode) current.parentNode.removeChild(current);
-    }
-    var ctx = null;
-    try { ctx = canvas.getContext('2d'); } catch (_e) { ctx = null; }
-    if (!ctx || !raf) {
-      // No 2D context (worker canvas transferred, etc.) — fall back to a
-      // tight setTimeout watchdog. 8 s is long enough that an init storm
-      // that legitimately exceeds it (cold device, throttled CPU) won't
-      // race the proper hideSplash call.
-      setTimeout(hide, 8000);
-      return;
-    }
-    var checks = 0;
-    function poll() {
-      if (hidden) return;
-      if (checks++ > 600) { hide(); return; } // ~10 s @ 60 fps
-      try {
-        if (!canvas.width || !canvas.height) { raf(poll); return; }
-        // Sample a handful of pixels at fixed offsets -- a full
-        // getImageData scan every frame would burn CPU on the main
-        // thread for the entire first ~2 s of paint.
-        var w = canvas.width, h = canvas.height;
-        var samples = [
-          [w >> 1, h >> 2], [w >> 2, h >> 1], [(w * 3) >> 2, h >> 1],
-          [w >> 1, (h * 3) >> 2], [w >> 1, h >> 1]
-        ];
-        var hits = 0;
-        for (var i = 0; i < samples.length; i++) {
-          var px = ctx.getImageData(samples[i][0], samples[i][1], 1, 1).data;
-          var lum = (px[0] + px[1] + px[2]) / 3;
-          if (px[3] > 0 && lum < 240) hits++;
-        }
-        if (hits >= 2) { hide(); return; }
-      } catch (_e) { /* keep polling */ }
-      raf(poll);
-    }
-    raf(poll);
-  })();
+    var current = doc.getElementById('cn1-splash');
+    if (!current) return;
+    try {
+      var fn = hostBridge && hostBridge.handlers && hostBridge.handlers['__cn1_hide_splash__'];
+      if (typeof fn === 'function') { fn(); return; }
+    } catch (_e) { /* fall through to manual remove */ }
+    if (current.parentNode) current.parentNode.removeChild(current);
+  }
+  global.__cn1HideSplashIfPresent = __cn1HideSplashIfPresent;
+  function __cn1MaybeMarkFirstPaint(op) {
+    if (global.__parparFirstPaintObserved) return;
+    if (!op || !op.member) return;
+    if (!__cn1PaintOpMethods[op.member]) return;
+    global.__parparFirstPaintObserved = true;
+    __cn1HideSplashIfPresent();
+  }
+  global.__cn1MaybeMarkFirstPaint = __cn1MaybeMarkFirstPaint;
+  // Backstop watchdog: even if the worker never issues a canvas op
+  // (deeply broken init), don't leave the user staring at "Loading..."
+  // forever. 12 s is comfortably longer than a normal init storm but
+  // short enough that a real hang surfaces visibly.
+  setTimeout(__cn1HideSplashIfPresent, 12000);
 
   hostBridge.register('__cn1_create_custom_event__', function(request) {
     var payload = request || {};
@@ -1802,6 +1783,12 @@
       return;
     }
     if (data.type === 'host-call') {
+      // Single round-trip JSO bridge call. Also drives the splash-hide
+      // signal (first canvas paint op tears down ``#cn1-splash``).
+      if (data.symbol === '__cn1_jso_bridge__' && data.args && data.args[0]
+              && typeof global.__cn1MaybeMarkFirstPaint === 'function') {
+        global.__cn1MaybeMarkFirstPaint(data.args[0]);
+      }
       hostBridge.invoke(data.symbol, data.args || [], target || global.__parparWorker, data.id);
       return;
     }
@@ -1814,6 +1801,13 @@
       var ops = data.ops || [];
       for (var oi = 0; oi < ops.length; oi++) {
         try {
+          // Tear the splash down on first canvas-paint op observed
+          // (see ``__cn1MaybeMarkFirstPaint`` above). Cheap object
+          // lookup -- once ``__parparFirstPaintObserved`` is true, the
+          // helper short-circuits.
+          if (typeof global.__cn1MaybeMarkFirstPaint === 'function') {
+            global.__cn1MaybeMarkFirstPaint(ops[oi]);
+          }
           hostBridge.invoke('__cn1_jso_bridge__', [ops[oi]], target || global.__parparWorker, 0);
         } catch (e) {
           if (global.console && typeof global.console.error === 'function') {
