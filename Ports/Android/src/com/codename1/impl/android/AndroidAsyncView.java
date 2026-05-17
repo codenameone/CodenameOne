@@ -760,6 +760,40 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         }
 
         @Override
+        public void translateMatrix(final float x, final float y) {
+            // Mirror the scale / rotate / setTransform overrides above:
+            // update the AsyncGraphics local transform AND queue an op so
+            // the underlying canvas's matrix is updated at playback time.
+            // Without this override, Graphics.useMatrixTranslation routes
+            // every framework g.translate(absX, absY) through
+            // impl.translateMatrix -- which inherits AndroidGraphics's
+            // local-mutation-only translateMatrix -- so the queued draw
+            // ops paint with the underlying canvas matrix that never saw
+            // any of the framework painting-chain translates, leaving the
+            // form chrome (title bar, theme buttons, etc.) painting at
+            // screen origin with no offset.
+            getTransform().translate(x, y);
+            transformDirty = true;
+            inverseTransformDirty = true;
+            clipFresh = false;
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.translateMatrix(x, y);
+                }
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+                    execute(underlying);
+                }
+
+                public String toString() {
+                    return "translateMatrix";
+                }
+            });
+        }
+
+        @Override
         public void resetAffine() {
             getTransform().setIdentity();
             transformDirty = true;
