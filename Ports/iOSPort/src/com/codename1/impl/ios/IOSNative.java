@@ -132,12 +132,21 @@ public final class IOSNative {
     native void shearGlobal(float x, float y);
 
     native void fillRectRadialGradientGlobal(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize);
-    
+
     native void fillLinearGradientGlobal(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal);
-    
+
     native void fillRectRadialGradientMutable(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize);
-    
+
     native void fillLinearGradientMutable(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal);
+
+    /// Metal-only multi-stop gradient bridge to CN1MetalFillGradient. positions
+    /// holds stopCount entries in [0, 1]; premultipliedRgba holds stopCount * 4
+    /// floats. On GL builds this method is a no-op. mutable is true when the
+    /// fill targets the current mutable image's offscreen MTLTexture.
+    native void fillGradient(int kind, int stopCount, float[] positions, float[] premultipliedRgba,
+                             int cycleMethod, float angleOrFromAngle,
+                             float cx, float cy, float rx, float ry, int shape,
+                             int x, int y, int width, int height, boolean mutable);
 
     native boolean isTablet();
     native boolean isIOS7();

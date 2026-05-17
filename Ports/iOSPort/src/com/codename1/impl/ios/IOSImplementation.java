@@ -7579,12 +7579,76 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
 
-    // Multi-stop / angled / conic gradients fall back to the software ARGB
-    // rasterizer in CodenameOneImplementation. The result is wrapped in a
-    // NativeImage via createImage(int[],w,h) and drawn through the regular
-    // drawImage path, so transforms and clipping still apply.
-    // gaussianBlurImage already provides native CIGaussianBlur for filter:blur.
-    
+    // Metal builds route the multi-stop CSS Gradient API through a pure-GPU
+    // shader (CN1MetalPipelineMultiStopGradient). GL builds (or Metal builds
+    // that can't pack the gradient into the shader's 8-stop budget) fall back
+    // to the base CodenameOneImplementation software rasterizer, which builds
+    // an ARGB raster via Gradient.sampleArgb() and uploads it through
+    // drawImage. The Java side caches that raster on the Gradient via a
+    // WeakReference so repaint storms don't re-rasterise. gaussianBlurImage
+    // wraps either the Metal-native two-pass blur or CIGaussianBlur for the
+    // filter:blur effect on Image inputs.
+    @Override
+    public void fillGradient(Object graphics, com.codename1.ui.Gradient gradient, int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
+            return;
+        }
+        if (metalRendering && gradient.getColors().length <= 8) {
+            NativeGraphics ng = (NativeGraphics) graphics;
+            ng.checkControl();
+            ng.applyTransform();
+            ng.applyClip();
+            int kind = gradient.getKind();
+            int[] argb = gradient.getColors();
+            float[] pos = gradient.getPositions();
+            int stopCount = argb.length;
+            float[] colors = new float[stopCount * 4];
+            for (int i = 0; i < stopCount; i++) {
+                int c = argb[i];
+                int a8 = (c >>> 24) & 0xff;
+                if (a8 == 0) {
+                    a8 = 0xff;
+                }
+                float a = a8 / 255f;
+                colors[i * 4] = ((c >> 16) & 0xff) / 255f * a;
+                colors[i * 4 + 1] = ((c >> 8) & 0xff) / 255f * a;
+                colors[i * 4 + 2] = (c & 0xff) / 255f * a;
+                colors[i * 4 + 3] = a;
+            }
+            float angleOrFromAngle = 0f;
+            float cx = 0.5f;
+            float cy = 0.5f;
+            float rx = 0.5f;
+            float ry = 0.5f;
+            int shape = 1;
+            if (kind == com.codename1.ui.Gradient.KIND_LINEAR) {
+                angleOrFromAngle = ((com.codename1.ui.LinearGradient) gradient).getAngleDegrees();
+            } else if (kind == com.codename1.ui.Gradient.KIND_RADIAL) {
+                com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) gradient;
+                float[] geom = new float[4];
+                rg.computeRadii(width, height, geom);
+                cx = geom[0] / width;
+                cy = geom[1] / height;
+                rx = geom[2] / width;
+                ry = geom[3] / height;
+                shape = rg.getShape();
+            } else if (kind == com.codename1.ui.Gradient.KIND_CONIC) {
+                com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) gradient;
+                angleOrFromAngle = cg.getFromAngleDegrees();
+                cx = cg.getRelativeCenterX();
+                cy = cg.getRelativeCenterY();
+            }
+            boolean mutable = !(ng instanceof GlobalGraphics);
+            nativeInstance.fillGradient(kind, stopCount, pos, colors,
+                    gradient.getCycleMethod(), angleOrFromAngle,
+                    cx, cy, rx, ry, shape,
+                    x, y, width, height, mutable);
+            return;
+        }
+        super.fillGradient(graphics, gradient, x, y, width, height);
+    }
+
+
     public static void appendData(long peer, long data) {
         NetworkConnection n = null;
         synchronized(CONNECTIONS_LOCK) {

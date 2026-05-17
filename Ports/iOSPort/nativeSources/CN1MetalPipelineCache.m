@@ -111,6 +111,37 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_solid"];
             configureStencilWriteOnly(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineMultiStopGradient:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_multistop_gradient"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineGaussianBlur:
+            // Blur passes render into intermediate / output textures that have
+            // no stencil attachment; configure the pipeline as
+            // BGRA8Unorm with blending disabled (the blur output replaces
+            // its target). The stencilAttachmentPixelFormat assignment
+            // below is overridden below for this pipeline.
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_gaussian_blur"];
+            configureBlendDisabled(desc.colorAttachments[0]);
+            // The blur pipeline runs against offscreen render targets that
+            // have no stencil attachment -- leaving the stencil format set
+            // would force a pixel-format mismatch at draw time.
+            desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
+            if (desc.vertexFunction == nil || desc.fragmentFunction == nil) {
+                NSLog(@"CN1MetalPipelineCache: shader function missing for pipeline %ld", (long)pipeline);
+                return nil;
+            }
+            {
+                NSError *blurErr = nil;
+                id<MTLRenderPipelineState> blurState =
+                    [_device newRenderPipelineStateWithDescriptor:desc error:&blurErr];
+                if (blurState == nil) {
+                    NSLog(@"CN1MetalPipelineCache: failed to create blur pipeline: %@", blurErr);
+                }
+                return blurState;
+            }
         default:
             return nil;
     }

@@ -51,6 +51,9 @@
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
+#ifdef CN1_USE_METAL
+#import "DrawMultiStopGradient.h"
+#endif
 #import <MediaPlayer/MediaPlayer.h>
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
@@ -792,22 +795,109 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
 
+#ifdef CN1_USE_METAL
+    {
+        // Metal-native blur path: run the two-pass separable Gaussian blur
+        // shader against the source texture and skip the GPU->CPU->CIImage->GPU
+        // round-trip the CIGaussianBlur path requires.
+        //
+        // The source can be either the mutable image's offscreen
+        // MTLTexture (rendered by previous ExecutableOps) or, for non-mutable
+        // sources, a fresh MTLTexture built from the GLUIImage's UIImage.
+        // Either way the result is a UIImage wrapping a freshly allocated
+        // MTLTexture; the rest of the cn1 image lifecycle expects UIImage,
+        // so we read the blurred texture back through a CGBitmapContext.
+        id<MTLDevice> device = CN1MetalDevice();
+        if (device != nil) {
+            id<MTLTexture> src = nil;
+            if ([glu mtlMutableTexture] != nil) {
+                // Drain pending ops targeting this mutable so the texture
+                // holds the pre-blur shadow rings / fill before we sample.
+                extern int displayWidth;
+                extern int displayHeight;
+                [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+                CN1MetalFlushMutableImageSync(glu);
+                src = [glu mtlMutableTexture];
+            } else {
+                src = CN1MetalTextureFromUIImage([glu getImage]);
+            }
+            if (src != nil) {
+                MTLTextureDescriptor *desc = [MTLTextureDescriptor
+                    texture2DDescriptorWithPixelFormat:src.pixelFormat
+                    width:src.width height:src.height mipmapped:NO];
+                desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+                desc.storageMode = MTLStorageModePrivate;
+                id<MTLTexture> dst = [device newTextureWithDescriptor:desc];
+                if (dst != nil) {
+                    CN1MetalGaussianBlurImage(src, dst, radius);
+                    // Read dst back into an int buffer, then build a UIImage
+                    // via CGBitmapContext. CN1MetalReadMutableImageAsUIImage
+                    // does the equivalent for mutable textures; we replicate
+                    // the path inline for the blur output (which is not
+                    // attached to a GLUIImage).
+                    NSUInteger w = dst.width;
+                    NSUInteger h = dst.height;
+                    NSUInteger bytesPerRow = w * 4;
+                    void *bytes = malloc(bytesPerRow * h);
+                    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+                    id<MTLCommandBuffer> cb = [queue commandBuffer];
+                    MTLTextureDescriptor *sharedDesc = [MTLTextureDescriptor
+                        texture2DDescriptorWithPixelFormat:dst.pixelFormat
+                        width:w height:h mipmapped:NO];
+                    sharedDesc.usage = MTLTextureUsageShaderRead;
+                    sharedDesc.storageMode = MTLStorageModeShared;
+                    id<MTLTexture> shared = [device newTextureWithDescriptor:sharedDesc];
+                    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+                    [blit copyFromTexture:dst sourceSlice:0 sourceLevel:0
+                              sourceOrigin:MTLOriginMake(0, 0, 0)
+                                sourceSize:MTLSizeMake(w, h, 1)
+                                 toTexture:shared destinationSlice:0
+                          destinationLevel:0
+                         destinationOrigin:MTLOriginMake(0, 0, 0)];
+                    [blit endEncoding];
+                    [cb commit];
+                    [cb waitUntilCompleted];
+                    [shared getBytes:bytes bytesPerRow:bytesPerRow
+                          fromRegion:MTLRegionMake2D(0, 0, w, h)
+                         mipmapLevel:0];
+
+                    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+                    // Both BGRA8Unorm (mutable) and RGBA8Unorm (UIImage-built)
+                    // are valid sources. CG expects byte-swapped BGRA on iOS
+                    // for the native byte order; we provide it via the
+                    // kCGBitmapByteOrder32Little + premultipliedFirst combo
+                    // for BGRA, else premultipliedLast for RGBA.
+                    uint32_t bitmapInfo = (dst.pixelFormat == MTLPixelFormatBGRA8Unorm)
+                        ? (kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst)
+                        : (kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast);
+                    CGContextRef ctx = CGBitmapContextCreate(bytes, w, h, 8, bytesPerRow, cs, bitmapInfo);
+                    UIImage *out = nil;
+                    if (ctx != NULL) {
+                        CGImageRef cgimg = CGBitmapContextCreateImage(ctx);
+                        if (cgimg != NULL) {
+                            out = [UIImage imageWithCGImage:cgimg];
+                            CGImageRelease(cgimg);
+                        }
+                        CGContextRelease(ctx);
+                    }
+                    CGColorSpaceRelease(cs);
+                    free(bytes);
+                    if (out != nil) {
+                        GLUIImage* gl = [[GLUIImage alloc] initWithImage:out];
+                        POOL_END();
+                        return (BRIDGE_CAST void*)gl;
+                    }
+                }
+            }
+        }
+        // Metal path could not allocate -- fall through to the CIFilter path
+        // below so we never return a nil blur result.
+    }
+#endif
+
     UIImage* original = nil;
 #ifdef CN1_USE_METAL
-    // On Metal the mutable's pixels live in mtlMutableTexture, not in
-    // [glu getImage]; the latter returns the original (likely empty)
-    // UIImage that was used to construct the GLUIImage. Read the GPU
-    // texture back to a UIImage so CIGaussianBlur sees actual pixels.
-    // Switch's createRoundThumbImage depends on this -- without it the
-    // blur runs on transparent input, returns empty, and the pre-blur
-    // shadow rings end up showing through as visible artefacts on the
-    // final thumb composite.
     if ([glu mtlMutableTexture] != nil) {
-        // Force drawFrame to drain any pending ExecutableOps for this image
-        // before sampling. Without the flush the GPU never executes the
-        // shadow-ring fillArc calls; CN1MetalReadMutableImageAsUIImage
-        // would then sample the cleared (zero-alpha) texture and the blur
-        // input is empty. Mirrors imageRgbToIntArrayImpl's drain dance.
         extern int displayWidth;
         extern int displayHeight;
         [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
@@ -2612,6 +2702,83 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     POOL_END();
+}
+
+// Multi-stop gradient bridge. Metal builds queue a DrawMultiStopGradient op so
+// matrices / clip / mutable-image targeting propagate through the standard
+// drain loop, matching the existing DrawGradient flow. GL builds have no
+// equivalent shader and the Java side never calls this method (it falls
+// through to the software rasterizer in CodenameOneImplementation).
+void com_codename1_impl_ios_IOSNative_fillGradient___int_int_float_1ARRAY_float_1ARRAY_int_float_float_float_float_float_int_int_int_int_int_boolean(
+        CN1_THREAD_STATE_MULTI_ARG
+        JAVA_OBJECT instanceObject,
+        JAVA_INT kind,
+        JAVA_INT stopCount,
+        JAVA_OBJECT positionsArr,
+        JAVA_OBJECT colorsArr,
+        JAVA_INT cycleMethod,
+        JAVA_FLOAT angleOrFromAngle,
+        JAVA_FLOAT cx,
+        JAVA_FLOAT cy,
+        JAVA_FLOAT rx,
+        JAVA_FLOAT ry,
+        JAVA_INT shape,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height,
+        JAVA_BOOLEAN mutable) {
+#ifdef CN1_USE_METAL
+    POOL_BEGIN();
+    if (positionsArr == JAVA_NULL || colorsArr == JAVA_NULL || stopCount < 2 || width <= 0 || height <= 0) {
+        POOL_END();
+        return;
+    }
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT *positions =
+        (JAVA_ARRAY_FLOAT *)((org_xmlvm_runtime_XMLVMArray *)positionsArr)
+            ->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT *colors =
+        (JAVA_ARRAY_FLOAT *)((org_xmlvm_runtime_XMLVMArray *)colorsArr)
+            ->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_FLOAT *positions = (JAVA_FLOAT *)((JAVA_ARRAY)positionsArr)->data;
+    JAVA_ARRAY_FLOAT *colors = (JAVA_FLOAT *)((JAVA_ARRAY)colorsArr)->data;
+#endif
+
+    DrawMultiStopGradient *d = [[DrawMultiStopGradient alloc]
+        initWithKind:kind
+           stopCount:stopCount
+           positions:positions
+              colors:colors
+         cycleMethod:cycleMethod
+    angleOrFromAngle:angleOrFromAngle
+                  cx:cx
+                  cy:cy
+                  rx:rx
+                  ry:ry
+               shape:shape
+                   x:x
+                   y:y
+               width:width
+              height:height];
+    if (mutable) {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) {
+#ifndef CN1_USE_ARC
+            [d release];
+#endif
+            POOL_END();
+            return;
+        }
+        [d setTarget:target];
+    }
+    [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+    [d release];
+#endif
+    POOL_END();
+#endif
 }
 
 /*
