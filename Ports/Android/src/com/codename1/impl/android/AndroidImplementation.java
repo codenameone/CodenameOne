@@ -4620,14 +4620,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(superPeerMode) {
                 Object nativeGraphics = com.codename1.ui.Accessor.getNativeGraphics(g);
 
+                // Use matrixFrameworkTranslateX -- returns g.getTranslateX
+                // in legacy mode and matrixFrameworkX (which mirrors the
+                // framework painting-chain translate that lives in the
+                // impl matrix) in matrix mode. The plain getTranslateX
+                // is intentionally zero in matrix mode and would place
+                // the peer at the component's *local* coords instead of
+                // screen-absolute.
+                int peerScreenX = getX() + g.matrixFrameworkTranslateX();
+                int peerScreenY = getY() + g.matrixFrameworkTranslateY();
                 Object o = v.getLayoutParams();
                 AndroidAsyncView.LayoutParams lp;
                 if(o instanceof AndroidAsyncView.LayoutParams) {
                     lp = (AndroidAsyncView.LayoutParams) o;
                     if (lp == null) {
                         lp = new AndroidAsyncView.LayoutParams(
-                                getX() + g.getTranslateX(),
-                                getY() + g.getTranslateY(),
+                                peerScreenX,
+                                peerScreenY,
                                 getWidth(),
                                 getHeight(), AndroidPeer.this);
                         final AndroidAsyncView.LayoutParams finalLp = lp;
@@ -4639,8 +4648,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                         lp.dirty = true;
                     } else {
-                        int x = getX() + g.getTranslateX();
-                        int y = getY() + g.getTranslateY();
+                        int x = peerScreenX;
+                        int y = peerScreenY;
                         int w = getWidth();
                         int h = getHeight();
                         if (x != lp.x || y != lp.y || w != lp.w || h != lp.h) {
@@ -4653,8 +4662,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 } else {
                     final AndroidAsyncView.LayoutParams finalLp = new AndroidAsyncView.LayoutParams(
-                            getX() + g.getTranslateX(),
-                            getY() + g.getTranslateY(),
+                            peerScreenX,
+                            peerScreenY,
                             getWidth(),
                             getHeight(), AndroidPeer.this);
                     activity.runOnUiThread(new Runnable() {
