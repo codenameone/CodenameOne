@@ -1248,6 +1248,18 @@ static simd_float4x4 savedScreenProjection;
 static int savedScreenFw = 0;
 static int savedScreenFh = 0;
 static uint32_t savedScreenStencilReference = 0;
+// currentTransform is a GLOBAL set by every SetTransform ExecutableOp's
+// execute() (via CN1MetalSetTransform). When draining a mutable
+// side-trip, the mutable target's SetTransform ops mutate this same
+// global; without saving/restoring it here, subsequent screen-target
+// ops on the drain queue read the mutable's last transform instead of
+// the screen's own framework_anchor. This shows up dramatically once
+// matrix-mode g.translate routes every framework translate through
+// SetTransform: Switches, FABs and other components whose first paint
+// lazily builds a mutable image drift off-screen, become invisible,
+// or stack at the wrong y because the screen draw that follows the
+// mutable build uses the mutable's coord system.
+static simd_float4x4 savedScreenTransform;
 static BOOL savedScreenStateValid = NO;
 
 // Build a Y-down ortho projection for an offscreen (w x h) framebuffer.
@@ -1456,6 +1468,7 @@ BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
     savedScreenFw = currentFramebufferWidth;
     savedScreenFh = currentFramebufferHeight;
     savedScreenStencilReference = currentStencilReference;
+    savedScreenTransform = currentTransform;
     savedScreenStateValid = YES;
 
     activeEncoder = enc;
@@ -1494,6 +1507,13 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image) {
         // pre-detour polygon clip's writes are still distinguishable
         // from a fresh post-detour clip (see Begin's note).
         currentStencilReference = savedScreenStencilReference;
+        // Restore the screen-side render transform. The mutable side-
+        // trip's SetTransform ops mutated this global; leaving it as the
+        // mutable's last transform would make every screen-target draw
+        // queued after this Begin/End pair (e.g. Switch's
+        // g.drawImage(track,...) following its lazy track-image build)
+        // pick up the mutable's coord system instead of the screen's.
+        currentTransform = savedScreenTransform;
         savedScreenEncoder = nil;
         savedScreenStateValid = NO;
     }
