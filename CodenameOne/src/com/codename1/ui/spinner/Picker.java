@@ -109,6 +109,19 @@ public class Picker extends Button {
     private Date startDate;
     private Date endDate;
     private VirtualInputDevice currentInput;
+    /// Supplies the initial date shown by the picker when no explicit value has
+    /// been set via `setDate(Date)`. Resolved lazily each time the picker is
+    /// opened (or `getDate()` is called against an unset picker) so it can
+    /// depend on state that changes at runtime - e.g. a reminder picker whose
+    /// default tracks "one hour before the current due date" can keep returning
+    /// fresh values as the due date moves. Null means fall back to `new Date()`.
+    private DateGetter defaultDateGetter;
+    /// True once the picker's date has been pinned by an explicit
+    /// `setDate(non-null)` call or a successful user selection. While false the
+    /// picker treats `value` as a placeholder and prefers `defaultDateGetter`
+    /// (when set) as the displayed value, so callers can install a default
+    /// after construction and still see it take effect.
+    private boolean dateValueExplicitlySet;
 
     // Variables to store the form's previous margins before showing
     // the popup dialog so that we can restore them when the popup is disposed.
@@ -131,6 +144,27 @@ public class Picker extends Button {
     /// `getDate()` returns what the picker held before editing began. Non-null only
     /// while the popup is on screen.
     private Object preEditValue;
+    /// Companion snapshot of `dateValueExplicitlySet` paired with `preEditValue`.
+    /// A custom popup button that calls `setDate(...)` flips the flag to true;
+    /// if the user then cancels we restore the original flag value so the next
+    /// open re-resolves the configured default getter instead of being stuck on
+    /// the staged date.
+    private boolean preEditDateValueExplicitlySet;
+
+    /// Functional interface that supplies the default `Date` to display when a
+    /// date-type picker is opened without an explicit value. Evaluated lazily
+    /// each time the default is needed so it can return a value that depends
+    /// on state that changes after the picker is constructed (e.g. "one hour
+    /// before the current due date").
+    ///
+    /// @see Picker#setDefaultDate(DateGetter)
+    /// @see Picker#setDefaultDate(Date)
+    public interface DateGetter {
+        /// Returns the default date the picker should show when no explicit
+        /// value has been set. Returning `null` falls back to the framework
+        /// default (`new Date()`).
+        Date get();
+    }
 
     /// Placement options for custom lightweight popup buttons.
     public static final class LightweightPopupButtonPlacement {
@@ -211,6 +245,14 @@ public class Picker extends Button {
                     evt.consume();
                     return;
                 }
+                // For date-type pickers that haven't been pinned with setDate, fold the
+                // resolved default into `value` before any show path reads it. Both
+                // showInteractionDialog() and the native/heavyweight branches below
+                // consume `value` directly, so a single priming step here is enough.
+                // The flag stays false so a Cancel that doesn't commit a new value
+                // still lets the next open re-resolve the default (useful when the
+                // getter returns a moving target like "due date - 1 hour").
+                applyDefaultDateIfNeeded();
                 if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
@@ -234,6 +276,7 @@ public class Picker extends Button {
                     Object val = Display.getInstance().showNativePicker(type, Picker.this, value, metaData);
                     if (val != null) {
                         value = val;
+                        markDateExplicitlySetIfDateType();
                         updateValue();
                     } else {
                         // cancel pressed.   Don't send the rest of the events.
@@ -291,6 +334,7 @@ public class Picker extends Button {
                                 cld.set(Calendar.MONTH, ds.getCurrentMonth() - 1);
                                 cld.set(Calendar.YEAR, ds.getCurrentYear());
                                 value = cld.getTime();
+                                dateValueExplicitlySet = true;
                             } else {
                                 evt.consume();
                             }
@@ -353,6 +397,7 @@ public class Picker extends Button {
                                 }
                                 cld.set(Calendar.MINUTE, dts.getCurrentMinute());
                                 value = cld.getTime();
+                                dateValueExplicitlySet = true;
                             } else {
                                 evt.consume();
                             }
@@ -505,11 +550,18 @@ public class Picker extends Button {
                     // (e.g. a custom "+7 days" button) so getDate() returns the
                     // value the picker held before editing began.
                     value = preEditValue;
+                    // Pair the rollback with the flag snapshot so a Cancel after a
+                    // setDate-firing custom button doesn't permanently pin the
+                    // date and silence future default-getter resolutions.
+                    dateValueExplicitlySet = preEditDateValueExplicitlySet;
                     preEditValue = null;
+                    preEditDateValueExplicitlySet = false;
                     updateValue();
                 } else {
                     preEditValue = null;
+                    preEditDateValueExplicitlySet = false;
                     value = spinner.getValue();
+                    markDateExplicitlySetIfDateType();
                     updateValue();
                     // (x, y) = (-99, -99) signals the built-in action listner
                     // to ignore this event and just propagage it to external
@@ -567,6 +619,7 @@ public class Picker extends Button {
                 // value; without this snapshot a Cancel after such a button would
                 // leak the staged value into the picker (#4897 follow-up).
                 preEditValue = value;
+                preEditDateValueExplicitlySet = dateValueExplicitlySet;
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
@@ -1202,7 +1255,11 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_DATE:
             case Display.PICKER_TYPE_DATE_AND_TIME:
                 if (!(value instanceof Date)) {
+                    // Switching from a non-date type drops whatever date the
+                    // user pinned earlier, so clear the "explicit" flag too -
+                    // a subsequent open should honor `defaultDateGetter` again.
                     value = new Date();
+                    dateValueExplicitlySet = false;
                 }
                 break;
             case Display.PICKER_TYPE_STRINGS:
@@ -1251,7 +1308,60 @@ public class Picker extends Button {
     ///
     /// the date object
     public Date getDate() {
-        return (Date) currentValue();
+        // If the popup is showing, the live wheel position wins regardless of
+        // whether a default is configured - the user is in the middle of
+        // editing and should see the in-flight value.
+        if (currentSpinner != null) {
+            return (Date) currentSpinner.getValue();
+        }
+        // No explicit setDate yet -> let the default getter take over so the
+        // value returned here matches what the picker would show if opened now.
+        if (!dateValueExplicitlySet && defaultDateGetter != null) {
+            return resolveDefaultDate();
+        }
+        return (Date) value;
+    }
+
+    /// Primes `value` with the resolved default before a date-type picker is
+    /// shown, so the existing show paths (which read `value` directly) display
+    /// the configured default. Does nothing for non-date types, when the
+    /// caller has already pinned a date with `setDate(Date)`, or when no
+    /// default getter has been configured - in that last case the picker
+    /// keeps the legacy behavior of showing whatever was in `value` (typically
+    /// the construction-time `new Date()`).
+    private void applyDefaultDateIfNeeded() {
+        if (dateValueExplicitlySet || defaultDateGetter == null) {
+            return;
+        }
+        switch (type) {
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+            case Display.PICKER_TYPE_CALENDAR:
+                Date d = defaultDateGetter.get();
+                if (d != null) {
+                    value = d;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    /// Marks the picker's date as explicitly chosen by the user once they have
+    /// successfully committed a value through any of the picker UIs. Pins the
+    /// default getter out so it doesn't keep overwriting the user's selection
+    /// on subsequent opens. Guarded on type so it doesn't pollute the flag for
+    /// non-date pickers (where the flag is unused anyway).
+    private void markDateExplicitlySetIfDateType() {
+        switch (type) {
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+            case Display.PICKER_TYPE_CALENDAR:
+                dateValueExplicitlySet = true;
+                break;
+            default:
+                break;
+        }
     }
 
     /// Sets the date, this value is used both for type date/date and time. Notice that this
@@ -1272,10 +1382,77 @@ public class Picker extends Button {
     /// - `d`: the new date
     public void setDate(Date d) {
         value = d;
+        // A null clears the explicit value, restoring the default-date behavior
+        // (so a subsequent setDefaultDate / new Date() fallback takes effect again).
+        dateValueExplicitlySet = d != null;
         if (currentSpinner != null) {
             currentSpinner.setValue(d);
         }
         updateValue();
+    }
+
+    /// Installs a dynamic default for `PICKER_TYPE_DATE`, `PICKER_TYPE_DATE_AND_TIME`,
+    /// and `PICKER_TYPE_CALENDAR` pickers. The getter is consulted every time the
+    /// picker is opened or `getDate()` is called against a picker whose date has
+    /// not been pinned by `setDate(Date)`, so dependent defaults (e.g. a reminder
+    /// that should fire one hour before a separately-tracked due date) stay in
+    /// sync with the value they depend on. Passing `null` removes the default and
+    /// reverts to `new Date()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `getter`: the supplier of the default date, or `null` to restore the
+    ///             framework default of `new Date()`
+    public void setDefaultDate(DateGetter getter) {
+        this.defaultDateGetter = getter;
+        updateValue();
+    }
+
+    /// Convenience overload that pins the picker's default to a fixed date.
+    /// Equivalent to passing a `DateGetter` that always returns `d`. Passing
+    /// `null` clears the default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the fixed default date, or `null` to restore the framework default
+    public void setDefaultDate(Date d) {
+        setDefaultDate(d == null ? null : new FixedDateGetter(d));
+    }
+
+    /// Named static wrapper for the `setDefaultDate(Date)` overload. Static
+    /// (rather than an anonymous inner class) so it does not retain a hidden
+    /// reference to the enclosing `Picker`.
+    private static final class FixedDateGetter implements DateGetter {
+        private final Date date;
+
+        FixedDateGetter(Date date) {
+            this.date = date;
+        }
+
+        @Override
+        public Date get() {
+            return date;
+        }
+    }
+
+    /// Returns the `DateGetter` previously installed via
+    /// `setDefaultDate(DateGetter)` (or the wrapper produced by the `Date`
+    /// overload), or `null` if no default has been configured.
+    public DateGetter getDefaultDate() {
+        return defaultDateGetter;
+    }
+
+    /// Resolves the date to display when the picker is opened without an
+    /// explicit value: the configured default getter's result if non-null,
+    /// otherwise a fresh `new Date()`.
+    private Date resolveDefaultDate() {
+        if (defaultDateGetter != null) {
+            Date d = defaultDateGetter.get();
+            if (d != null) {
+                return d;
+            }
+        }
+        return new Date();
     }
 
     private String twoDigits(int i) {
