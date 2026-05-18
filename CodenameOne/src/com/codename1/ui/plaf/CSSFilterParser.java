@@ -75,9 +75,6 @@ public final class CSSFilterParser {
                 continue;
             }
             float[] m = colorMatrixForFunction(name, arg);
-            if (m == null) {
-                continue;
-            }
             matrix = (matrix == null) ? m : compose(m, matrix);
         }
         if (matrix != null && isIdentity(matrix)) {
