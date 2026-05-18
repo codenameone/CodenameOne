@@ -29,6 +29,7 @@
 #import "CodenameOne_GLViewController.h"
 #import "GLUIImage.h"
 #import <CoreText/CoreText.h>
+#import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 // --------------- Static state ---------------
 
@@ -1080,110 +1081,51 @@ void CN1MetalFillGradient(int kind,
     [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }
 
-// --------------- Gaussian blur (Metal-native, replaces CIGaussianBlur) ---------------
+// --------------- Gaussian blur (Metal-native via MPS) ---------------
 //
-// Two-pass separable Gaussian blur via the cn1_fs_gaussian_blur shader.
-// Pass 1 writes from src into an intermediate texture using a horizontal
-// 13-tap kernel; pass 2 writes from the intermediate into dst with a
-// vertical kernel. The `radius` argument is passed straight through as
-// the Gaussian standard deviation - matches CIGaussianBlur's inputRadius
-// semantic (Apple treats inputRadius as sigma, not visible extent). The
-// shader caps sigma at 0.5 to avoid div-by-zero on tiny radii and scales
-// tap spacing to (sigma / 2) so the 13-tap kernel covers the full +/-3
-// sigma visible spread.
+// MPSImageGaussianBlur is the same kernel CoreImage uses internally for
+// CIGaussianBlur, so the visual output matches the GL/CIFilter reference
+// the test harness was baked against. MPS picks the kernel width
+// automatically from sigma, switches to multipass / downsampled paths
+// for very large sigmas, and is faster than a hand-rolled separable
+// fragment-shader convolution at the radii CSS filter:blur and the
+// gaussianBlur test routinely request (sigma 20-60 pixels). An earlier
+// 13-tap shader implementation was rejected because the kernel was
+// either too sparse (large sigma, every 5+ pixels skipped) or collapsed
+// into a near-box filter (small sigma, all weights ~= 1).
+//
+// `radius` is treated as the Gaussian standard deviation - matches
+// CIGaussianBlur.inputRadius. MPS requires a destination distinct from
+// the source unless the kernel reports in-place support; we always
+// provide a fresh dst so the caller's source texture is preserved.
 
 void CN1MetalGaussianBlurImage(id<MTLTexture> src, id<MTLTexture> dst, float radius) {
     if (src == nil || dst == nil || radius <= 0.0f) return;
     id<MTLDevice> device = CN1MetalDevice();
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
     if (device == nil || queue == nil) return;
-
-    ensurePipelineCache();
-    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineGaussianBlur];
-    if (state == nil) return;
-
-    NSUInteger w = src.width;
-    NSUInteger h = src.height;
-    if (w == 0 || h == 0) return;
-
-    MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:dst.pixelFormat
-        width:w height:h mipmapped:NO];
-    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-    desc.storageMode = MTLStorageModePrivate;
-    id<MTLTexture> intermediate = [device newTextureWithDescriptor:desc];
-    if (intermediate == nil) return;
-
-    id<MTLCommandBuffer> cb = [queue commandBuffer];
-    if (cb == nil) return;
+    if (src.width == 0 || src.height == 0) return;
 
     float sigma = radius;
     if (sigma < 0.5f) sigma = 0.5f;
 
-    static const float vertices[8] = {
-        -1.0f, -1.0f,
-         1.0f, -1.0f,
-        -1.0f,  1.0f,
-         1.0f,  1.0f
-    };
-    // V flipped vs the on-screen sampling convention so the blur output
-    // matches its source orientation under MTLOriginTopLeft viewport.
-    static const float texcoords[8] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        0.0f, 1.0f,
-        1.0f, 1.0f
-    };
-    // Identity matrices: the blur passes draw a full-screen triangle
-    // strip in NDC so the projection/modelView/transform pipeline must
-    // not transform the vertices.
-    CN1MetalMatrices identity;
-    memset(&identity, 0, sizeof(identity));
-    identity.projection.columns[0] = (simd_float4){ 1, 0, 0, 0 };
-    identity.projection.columns[1] = (simd_float4){ 0, 1, 0, 0 };
-    identity.projection.columns[2] = (simd_float4){ 0, 0, 1, 0 };
-    identity.projection.columns[3] = (simd_float4){ 0, 0, 0, 1 };
-    identity.modelView = identity.projection;
-    identity.transform = identity.projection;
+    MPSImageGaussianBlur *blur = [[MPSImageGaussianBlur alloc] initWithDevice:device sigma:sigma];
+    blur.edgeMode = MPSImageEdgeModeClamp;
 
-    // Pass 1: horizontal blur into intermediate.
-    {
-        MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
-        rpd.colorAttachments[0].texture = intermediate;
-        rpd.colorAttachments[0].loadAction = MTLLoadActionDontCare;
-        rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
-        id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rpd];
-        [enc setRenderPipelineState:state];
-        [enc setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
-        [enc setVertexBytes:&identity length:sizeof(identity) atIndex:1];
-        [enc setVertexBytes:texcoords length:sizeof(texcoords) atIndex:2];
-        simd_float4 params = (simd_float4){ sigma, 1.0f / (float)w, 0.0f, 0.0f };
-        [enc setFragmentBytes:&params length:sizeof(params) atIndex:0];
-        [enc setFragmentTexture:src atIndex:0];
-        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
-        [enc endEncoding];
+    id<MTLCommandBuffer> cb = [queue commandBuffer];
+    if (cb == nil) {
+#ifndef CN1_USE_ARC
+        [blur release];
+#endif
+        return;
     }
-
-    // Pass 2: vertical blur into dst.
-    {
-        MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
-        rpd.colorAttachments[0].texture = dst;
-        rpd.colorAttachments[0].loadAction = MTLLoadActionDontCare;
-        rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
-        id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rpd];
-        [enc setRenderPipelineState:state];
-        [enc setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
-        [enc setVertexBytes:&identity length:sizeof(identity) atIndex:1];
-        [enc setVertexBytes:texcoords length:sizeof(texcoords) atIndex:2];
-        simd_float4 params = (simd_float4){ sigma, 1.0f / (float)h, 1.0f, 0.0f };
-        [enc setFragmentBytes:&params length:sizeof(params) atIndex:0];
-        [enc setFragmentTexture:intermediate atIndex:0];
-        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
-        [enc endEncoding];
-    }
-
+    [blur encodeToCommandBuffer:cb sourceTexture:src destinationTexture:dst];
     [cb commit];
     [cb waitUntilCompleted];
+
+#ifndef CN1_USE_ARC
+    [blur release];
+#endif
 }
 
 // --------------- Alpha mask rendering (path-based shapes) ---------------

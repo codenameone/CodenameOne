@@ -64,7 +64,6 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
                                        // subsequent draws can stencil-test
                                        // against the reference value.
     CN1MetalPipelineMultiStopGradient, // CSS-style multi-stop gradient (linear / radial / conic).
-    CN1MetalPipelineGaussianBlur,      // Separable Gaussian blur, horizontal+vertical passes.
     CN1MetalPipelineCount
 };
 

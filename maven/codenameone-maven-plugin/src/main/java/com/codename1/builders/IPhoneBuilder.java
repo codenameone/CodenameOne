@@ -1623,6 +1623,17 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
+                if (useMetal) {
+                    // MPSImageGaussianBlur is the host-side Gaussian blur
+                    // CN1MetalGaussianBlurImage encodes; the iOS linker
+                    // needs MetalPerformanceShaders.framework or it'll fail
+                    // with an "Undefined symbols for architecture..." error
+                    // for _OBJC_CLASS_$_MPSImageGaussianBlur.
+                    if (addLibs.indexOf("MetalPerformanceShaders.framework") < 0) {
+                        addLibs += ";MetalPerformanceShaders.framework";
+                    }
+                }
+
                 if (usesPurchaseAPI) {
                     addLibs += ";StoreKit.framework";
                 }

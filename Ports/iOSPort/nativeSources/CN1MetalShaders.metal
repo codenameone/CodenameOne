@@ -333,57 +333,9 @@ fragment float4 cn1_fs_multistop_gradient(
     return cn1_grad_sample_stops(t, stopCount, positions, colors);
 }
 
-// --------- GaussianBlur pipelines (horizontal + vertical separable pass) ---------
-//
-// Two-pass separable Gaussian blur. Horizontal pass samples 13 taps along
-// the x axis, vertical pass samples 13 taps along the y axis. Sigma is
-// passed in `params.x` along with `texelSize` (1.0 / dimension) in .y so
-// the same shader handles arbitrary source sizes.
-//
-// Weights computed in-shader (exp(-0.5 * (i/sigma)^2)) so a single uniform
-// (sigma) drives the kernel -- no host-side table upload.
-//
-// Buffer layout:
-//   buffer(0): float4 params -- (sigma, texelSize, kind, 0)
-//              kind == 0 horizontal, kind == 1 vertical
-//   texture(0): source RGBA
-
-static inline float cn1_blur_weight(float i, float invSigma2) {
-    return exp(-0.5 * i * i * invSigma2);
-}
-
-fragment float4 cn1_fs_gaussian_blur(
-    VertexOutTextured in [[stage_in]],
-    constant float4 &params [[buffer(0)]],
-    texture2d<float> tex [[texture(0)]])
-{
-    constexpr sampler s(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
-    float sigma = max(params.x, 0.5);
-    float texelSize = params.y;
-    int horizontal = (int)params.z == 0 ? 1 : 0;
-    float invSigma2 = 1.0 / (sigma * sigma);
-
-    // 13-tap kernel (centre + 6 samples each side) with tap spacing scaled
-    // to (sigma / 2) pixels so the kernel covers +/-3 sigma -- the visible
-    // extent of the Gaussian -- regardless of the actual sigma value. A
-    // fixed-pixel offset (i.e. integer texelSize multiples) would only
-    // sample the very peak of the curve once sigma exceeds 6 and degenerate
-    // into a near-box filter; CSS filter:blur and the test harness routinely
-    // request radii around 20-40 pixels so this scaling is what makes the
-    // shader actually blur at high sigma. Linear sampling between adjacent
-    // pixels smooths the result for non-integer tap distances.
-    float step = sigma * 0.5;
-    float wTotal = cn1_blur_weight(0.0, invSigma2);
-    float4 acc = tex.sample(s, in.texcoord) * wTotal;
-    for (int i = 1; i <= 6; i++) {
-        float distance = (float)i * step;
-        float w = cn1_blur_weight(distance, invSigma2);
-        float2 off = horizontal != 0
-            ? float2(distance * texelSize, 0.0)
-            : float2(0.0, distance * texelSize);
-        acc += tex.sample(s, in.texcoord + off) * w;
-        acc += tex.sample(s, in.texcoord - off) * w;
-        wTotal += 2.0 * w;
-    }
-    return acc / wTotal;
-}
+// Gaussian blur is implemented via MPSImageGaussianBlur on the host side
+// (CN1Metalcompat.m) rather than a hand-rolled fragment shader. MPS picks
+// the kernel width automatically from sigma and stays accurate across the
+// full sigma range CSS filter:blur and Image.gaussianBlur request - a
+// fixed-tap shader either undersamples (large sigma) or degenerates into a
+// near-box filter (small sigma), and isn't worth carrying.
