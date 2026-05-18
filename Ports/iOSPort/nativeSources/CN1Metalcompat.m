@@ -29,7 +29,6 @@
 #import "CodenameOne_GLViewController.h"
 #import "GLUIImage.h"
 #import <CoreText/CoreText.h>
-#import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 // --------------- Static state ---------------
 
@@ -1081,52 +1080,15 @@ void CN1MetalFillGradient(int kind,
     [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }
 
-// --------------- Gaussian blur (Metal-native via MPS) ---------------
-//
-// MPSImageGaussianBlur is the same kernel CoreImage uses internally for
-// CIGaussianBlur, so the visual output matches the GL/CIFilter reference
-// the test harness was baked against. MPS picks the kernel width
-// automatically from sigma, switches to multipass / downsampled paths
-// for very large sigmas, and is faster than a hand-rolled separable
-// fragment-shader convolution at the radii CSS filter:blur and the
-// gaussianBlur test routinely request (sigma 20-60 pixels). An earlier
-// 13-tap shader implementation was rejected because the kernel was
-// either too sparse (large sigma, every 5+ pixels skipped) or collapsed
-// into a near-box filter (small sigma, all weights ~= 1).
-//
-// `radius` is treated as the Gaussian standard deviation - matches
-// CIGaussianBlur.inputRadius. MPS requires a destination distinct from
-// the source unless the kernel reports in-place support; we always
-// provide a fresh dst so the caller's source texture is preserved.
-
-void CN1MetalGaussianBlurImage(id<MTLTexture> src, id<MTLTexture> dst, float radius) {
-    if (src == nil || dst == nil || radius <= 0.0f) return;
-    id<MTLDevice> device = CN1MetalDevice();
-    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
-    if (device == nil || queue == nil) return;
-    if (src.width == 0 || src.height == 0) return;
-
-    float sigma = radius;
-    if (sigma < 0.5f) sigma = 0.5f;
-
-    MPSImageGaussianBlur *blur = [[MPSImageGaussianBlur alloc] initWithDevice:device sigma:sigma];
-    blur.edgeMode = MPSImageEdgeModeClamp;
-
-    id<MTLCommandBuffer> cb = [queue commandBuffer];
-    if (cb == nil) {
-#ifndef CN1_USE_ARC
-        [blur release];
-#endif
-        return;
-    }
-    [blur encodeToCommandBuffer:cb sourceTexture:src destinationTexture:dst];
-    [cb commit];
-    [cb waitUntilCompleted];
-
-#ifndef CN1_USE_ARC
-    [blur release];
-#endif
-}
+// Gaussian blur is intentionally not implemented at the Metal layer.
+// IOSNative.gausianBlurImage routes everything through CIGaussianBlur,
+// which is itself Metal-backed under the hood (Apple uses
+// MPSImageGaussianBlur internally) and matches the GL reference's
+// visual output - including the soft halo produced by CIGaussianBlur's
+// output-extent expansion that neither a hand-rolled separable
+// fragment-shader convolution nor a direct MPSImageGaussianBlur call
+// reproduces without significant additional bookkeeping (sigma
+// scaling, padded dst).
 
 // --------------- Alpha mask rendering (path-based shapes) ---------------
 

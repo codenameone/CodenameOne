@@ -259,12 +259,6 @@ void CN1MetalFillGradient(int kind,
                           int shape,
                           int destX, int destY, int destW, int destH);
 
-// Two-pass separable Gaussian blur. Allocates an intermediate texture for
-// the horizontal pass and writes the vertical-pass output into `dst`.
-// `src` and `dst` must have identical dimensions, RGBA-compatible
-// pixel formats, and `MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead`.
-void CN1MetalGaussianBlurImage(id<MTLTexture> src, id<MTLTexture> dst, float radius);
-
 // -------- Texture helpers for GLUIImage --------
 
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
