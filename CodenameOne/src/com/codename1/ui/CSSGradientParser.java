@@ -138,11 +138,11 @@ final class CSSGradientParser {
                 } else if ("at".equals(tok)) {
                     i++;
                     if (i < tokens.length) {
-                        cx = parsePositionCoord(tokens[i], true);
+                        cx = parsePositionCoord(tokens[i]);
                     }
                     i++;
                     if (i < tokens.length) {
-                        cy = parsePositionCoord(tokens[i], false);
+                        cy = parsePositionCoord(tokens[i]);
                     }
                     i++;
                 } else {
@@ -186,11 +186,11 @@ final class CSSGradientParser {
                 } else if ("at".equals(tok)) {
                     i++;
                     if (i < tokens.length) {
-                        cx = parsePositionCoord(tokens[i], true);
+                        cx = parsePositionCoord(tokens[i]);
                     }
                     i++;
                     if (i < tokens.length) {
-                        cy = parsePositionCoord(tokens[i], false);
+                        cy = parsePositionCoord(tokens[i]);
                     }
                     i++;
                 } else {
@@ -272,7 +272,7 @@ final class CSSGradientParser {
         return parseFloat(lower);
     }
 
-    private static float parsePositionCoord(String s, boolean horizontal) {
+    private static float parsePositionCoord(String s) {
         String lower = s.toLowerCase();
         if ("left".equals(lower) || "top".equals(lower)) {
             return 0f;
@@ -295,8 +295,8 @@ final class CSSGradientParser {
     private static Stops parseStops(List<String> parts) {
         List<Integer> colors = new ArrayList<Integer>(parts.size());
         List<Float> positions = new ArrayList<Float>(parts.size());
-        for (int i = 0; i < parts.size(); i++) {
-            String part = parts.get(i).trim();
+        for (String raw : parts) {
+            String part = raw.trim();
             int splitAt = findColorPositionSplit(part);
             String colorPart;
             String posPart;

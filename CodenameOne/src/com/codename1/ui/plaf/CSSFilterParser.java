@@ -62,8 +62,8 @@ public final class CSSFilterParser {
         List<String> calls = splitFunctions(s);
         float blurRadius = 0f;
         float[] matrix = null;
-        for (int i = 0; i < calls.size(); i++) {
-            String call = calls.get(i).trim();
+        for (String rawCall : calls) {
+            String call = rawCall.trim();
             int open = call.indexOf('(');
             if (open < 0 || !call.endsWith(")")) {
                 throw new IllegalArgumentException("Bad filter function: " + call);

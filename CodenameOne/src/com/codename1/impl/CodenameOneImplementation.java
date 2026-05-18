@@ -3389,7 +3389,7 @@ public abstract class CodenameOneImplementation {
         if (gradient == null || width <= 0 || height <= 0) {
             return;
         }
-        com.codename1.ui.Image img = gradient.getCachedRaster(width, height);
+        Image img = gradient.getCachedRaster(width, height);
         if (img == null) {
             return;
         }
