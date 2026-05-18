@@ -27,9 +27,12 @@ log() { echo "[build-native-themes] $1" >&2; }
 CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-compiler"
 CSS_SRC_ROOT="$REPO_ROOT/native-themes"
 OUT_DIR="$REPO_ROOT/Themes"
-# JavaScriptPort's runtime serves themes out of its webapp assets folder;
-# mirror the generated .res files there too so the JS port picks them up.
+# Every committed copy of the .res files that downstream consumers ship from.
+# Keeping these locations in sync here means the native-themes-sync workflow
+# can `git add` the whole set after running this script.
 JS_ASSETS_DIR="$REPO_ROOT/Ports/JavaScriptPort/src/main/webapp/assets"
+IOS_NATIVE_DIR="$REPO_ROOT/Ports/iOSPort/nativeSources"
+ANDROID_SRC_DIR="$REPO_ROOT/Ports/Android/src"
 
 # Resolve the compiler jar. Prefer a freshly-built target/ jar (so CSS compiler
 # source edits are always picked up); fall back to the installed copy in ~/.m2
@@ -84,6 +87,7 @@ ensure_jar() {
 
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
+  shift 3
   local css="$CSS_SRC_ROOT/$name/theme.css"
   local out="$OUT_DIR/$basename"
   if [ ! -f "$css" ]; then
@@ -93,17 +97,21 @@ compile_theme() {
   mkdir -p "$OUT_DIR"
   log "Compiling $name -> $out"
   java -jar "$jar" -input "$css" -output "$out"
-  if [ -d "$JS_ASSETS_DIR" ]; then
-    cp "$out" "$JS_ASSETS_DIR/$basename"
-    log "Mirrored -> $JS_ASSETS_DIR/$basename"
-  fi
+  local mirror
+  for mirror in "$@"; do
+    [ -d "$mirror" ] || mkdir -p "$mirror"
+    cp "$out" "$mirror/$basename"
+    log "Mirrored -> $mirror/$basename"
+  done
 }
 
 main() {
   local jar
   jar="$(ensure_jar)"
-  compile_theme "$jar" ios-modern iOSModernTheme.res
-  compile_theme "$jar" android-material AndroidMaterialTheme.res
+  compile_theme "$jar" ios-modern iOSModernTheme.res \
+    "$JS_ASSETS_DIR" "$IOS_NATIVE_DIR"
+  compile_theme "$jar" android-material AndroidMaterialTheme.res \
+    "$JS_ASSETS_DIR" "$ANDROID_SRC_DIR"
   log "Native themes written to $OUT_DIR/"
 }
 

@@ -417,12 +417,11 @@
             </plugin>
 
             <!--
-              Bundle the generated iOS Modern + Android Material native theme .res
-              files into the playground's classpath so the deployed JS bundle can
+              Bundle the iOS Modern + Android Material native theme .res files
+              into the playground's classpath so the deployed JS bundle can
               `Resources.openLayered("/iOSModernTheme")` from inside the live
-              preview. The files are gitignored build artifacts produced by
-              scripts/build-native-themes.sh; failonerror=false keeps standalone
-              builds working when they haven't been generated yet.
+              preview. The .res files are committed under Themes/ and kept in
+              sync by .github/workflows/native-themes-sync.yml.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -436,8 +435,8 @@
                         </goals>
                         <configuration>
                             <target>
-                                <copy todir="${project.build.outputDirectory}" failonerror="false" verbose="true">
-                                    <fileset dir="${project.basedir}/../../../Themes" erroronmissingdir="false">
+                                <copy todir="${project.build.outputDirectory}" verbose="true">
+                                    <fileset dir="${project.basedir}/../../../Themes">
                                         <include name="iOSModernTheme.res"/>
                                         <include name="AndroidMaterialTheme.res"/>
                                     </fileset>
