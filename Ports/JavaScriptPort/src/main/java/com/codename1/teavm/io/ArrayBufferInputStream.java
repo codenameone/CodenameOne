@@ -39,24 +39,57 @@ public class ArrayBufferInputStream extends InputStream {
     }
 
     @Override
+    public int read(byte[] b, int off, int length) throws IOException {
+        if (pos >= len) {
+            return -1;
+        }
+        if (length <= 0) {
+            return 0;
+        }
+        int n = length;
+        int avail = len - pos;
+        if (n > avail) {
+            n = avail;
+        }
+        // Native intrinsic: one JS-side loop copies n bytes from the
+        // backing Uint8Array into the Java byte[] without per-byte
+        // virtual dispatch through the cooperative scheduler. This
+        // collapses thousands of single-byte yields during
+        // ``Resources.load(theme.res)`` into a single non-suspending
+        // call.
+        readBulkImpl(buf, pos, b, off, n);
+        pos += n;
+        return n;
+    }
+
+    @Override
     public void reset() throws IOException {
         pos = 0;
     }
 
     @Override
     public long skip(long n) throws IOException {
-        
+
         int oldPos = pos;
-        
+
         pos += (int)n;
-        
+
         if ( pos > len ){
             pos = len;
         }
         int out = pos-oldPos;
-        
+
         return pos-oldPos;
     }
+
+    /**
+     * Native intrinsic: bulk-copy {@code length} bytes from
+     * {@code src[srcOff..]} into {@code dst[dstOff..]}. Implemented as
+     * a single JS loop in port.js so it does not pay the cooperative
+     * scheduler's per-byte yield overhead.
+     */
+    private static native void readBulkImpl(Uint8Array src, int srcOff,
+            byte[] dst, int dstOff, int length);
 
     @Override
     public int available() throws IOException {

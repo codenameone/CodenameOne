@@ -73,15 +73,15 @@ async function measureOne(url, label) {
 
   const consoleErrors = [];
   const consoleLogs = [];
+  const t0 = Date.now();
   page.on("console", (msg) => {
     const t = msg.text();
     if (msg.type() === "error") consoleErrors.push(t);
-    if (t.startsWith("PARPAR")) consoleLogs.push(t);
+    if (t.startsWith("PARPAR")) consoleLogs.push({ ms: Date.now() - t0, text: t });
   });
-
-  const t0 = Date.now();
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   const tDcl = Date.now() - t0;
+  void tDcl;
 
   // Wait for canvas existence + first meaningful render (where canvas
   // has non-white pixels). We poll because the canvas paints over time

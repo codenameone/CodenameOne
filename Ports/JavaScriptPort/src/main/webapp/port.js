@@ -950,6 +950,48 @@ if (typeof global.cn1_com_codename1_ui_PeerComponent_styleChanged_java_lang_Stri
   );
 }
 
+// Bulk Uint8Array -> Java byte[] copy. Backs
+// ``ArrayBufferInputStream.read(byte[], int, int)`` so that
+// ``DataInputStream.readFully(...)`` paths (e.g. Resources.load
+// parsing 755 KiB of theme.res) drain in one tight JS loop instead of
+// thousands of single-byte virtual dispatches through the cooperative
+// scheduler. The default ``InputStream.read(byte[], int, int)`` Java
+// fallback calls ``read()`` once per byte, which routes every byte
+// through a ``function*`` boundary -- about 750k generator
+// allocations for a single theme.res load.
+//
+// The Java byte[] is a plain JS Array with index access; storing
+// the raw 0..255 Uint8Array value is fine because the existing
+// scalar ``read()`` path already returns the unsigned byte value
+// and the rest of the runtime treats negative bytes via ``& 0xff``
+// masking on the read side.
+bindNative([
+  // Void return → no ``_R_void`` suffix; the int signature variant
+  // is registered too in case future translator versions normalise it.
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int",
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_teavm_io_ArrayBufferInputStream_readBulkImpl_com_codename1_html5_js_typedarrays_Uint8Array_int_byte_1ARRAY_int_int_R_int"
+], function*(src, srcOff, dst, dstOff, length) {
+  if (!src || length <= 0) {
+    return null;
+  }
+  // ``src`` arrives as a JSO wrapper around the underlying typed
+  // array — see ``jvm.wrapJsObject`` which stashes the raw value in
+  // ``__jsValue``. Direct index access ``src[i]`` on the wrapper
+  // returns undefined; we need the unwrapped Uint8Array.
+  const raw = (src && src.__jsValue !== undefined) ? src.__jsValue : src;
+  const n = length | 0;
+  const so = srcOff | 0;
+  const dO = dstOff | 0;
+  // ``raw`` is the JS Uint8Array; typed-array indexed loads are
+  // direct memory access. ``dst`` is a plain JS Array carrying Java
+  // byte[] metadata, so indexed store is the same as for any array.
+  for (let i = 0; i < n; i++) {
+    dst[dO + i] = raw[so + i];
+  }
+  return null;
+});
+
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
   const arr = [];
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
