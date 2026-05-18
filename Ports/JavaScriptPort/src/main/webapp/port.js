@@ -979,7 +979,7 @@ bindNative([
   // array — see ``jvm.wrapJsObject`` which stashes the raw value in
   // ``__jsValue``. Direct index access ``src[i]`` on the wrapper
   // returns undefined; we need the unwrapped Uint8Array.
-  const raw = (src && src.__jsValue !== undefined) ? src.__jsValue : src;
+  const raw = src.__jsValue !== undefined ? src.__jsValue : src;
   const n = length | 0;
   const so = srcOff | 0;
   const dO = dstOff | 0;
@@ -990,6 +990,57 @@ bindNative([
     dst[dO + i] = raw[so + i];
   }
   return null;
+});
+
+// Bulk RGBA -> ARGB pixel-buffer conversion. Backs
+// ``JavaScriptImageDataAdapter.readRgbaToArgbBulk`` which is the
+// fast-path for ``screenshot()`` and ``getRGB()``. The legacy
+// ``readRgbaToArgb(PixelReader, ...)`` path did 4 JSO virtual-dispatch
+// calls per pixel -- 4.6 million calls for a single 1280x900 frame.
+// The intrinsic does the same conversion in one tight worker-side
+// loop with zero cross-boundary cost.
+bindNative([
+  "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int",
+  "cn1_com_codename1_impl_html5_JavaScriptImageDataAdapter_readRgbaToArgbBulk_com_codename1_html5_js_typedarrays_Uint8ClampedArray_int_1ARRAY_int_R_void"
+], function*(src, dst, offset) {
+  if (!src || !dst) {
+    return null;
+  }
+  // Unwrap the JSO wrapper to the raw Uint8ClampedArray; direct
+  // index access on the wrapper returns undefined (see the same
+  // unwrap in ``ArrayBufferInputStream_readBulkImpl`` above).
+  const raw = src.__jsValue !== undefined ? src.__jsValue : src;
+  const len = raw.length | 0;
+  const dO = offset | 0;
+  for (let i = 0, j = dO; i < len; i += 4, j++) {
+    const r = raw[i];
+    const g = raw[i + 1];
+    const b = raw[i + 2];
+    const a = raw[i + 3];
+    // ARGB packed int. ``| 0`` to keep the result a 32-bit signed
+    // integer (Java int) instead of an unsigned >2^31 value.
+    dst[j] = ((a << 24) | (r << 16) | (g << 8) | b) | 0;
+  }
+  return null;
+});
+
+// Bulk Java byte[] -> JS Uint8Array. Backs ``BlobUtil.createBlob(byte[],
+// type)`` and ``LocalForage`` byte[] storage so they stop paying a JSO
+// virtual-dispatch per byte. ``Uint8Array.from`` reads the source via
+// the iteration protocol once and copies in one tight native loop, so
+// even multi-MiB byte[] inputs cost a single ``yield*`` boundary.
+bindNative([
+  "cn1_com_codename1_teavm_io_BlobUtil_byteArrayToUint8Array_byte_1ARRAY_R_com_codename1_html5_js_typedarrays_Uint8Array"
+], function*(bytes) {
+  if (!bytes) {
+    return jvm.wrapJsObject(new Uint8Array(0), "com_codename1_html5_js_typedarrays_Uint8Array");
+  }
+  // ``bytes`` is the Java byte[] -- a plain JS Array of 0..255
+  // numbers with byte[] metadata stamped on. ``Uint8Array.from``
+  // accepts any iterable / array-like, so this is a single
+  // native-loop copy.
+  const u8 = Uint8Array.from(bytes);
+  return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {

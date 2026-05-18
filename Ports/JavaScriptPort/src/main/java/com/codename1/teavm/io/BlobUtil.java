@@ -108,14 +108,19 @@ public class BlobUtil {
     }
     
     public static Blob createBlob(byte[] bytes, String type) {
-        int len = bytes.length;
-        Uint8Array arr = Uint8Array.create(len);
-        for (int i=0; i<len; i++){
-            arr.set(i, bytes[i]);
-        }
-        
-        return BlobUtil.createBlob(arr, type);
+        // ``byteArrayToUint8Array`` is a native intrinsic that copies the
+        // byte[] in one tight JS loop. The previous per-element
+        // ``arr.set(i, bytes[i])`` did one JSO virtual dispatch per byte,
+        // which dominated wall time for any byte[] more than a few KiB.
+        return BlobUtil.createBlob(byteArrayToUint8Array(bytes), type);
     }
+
+    /**
+     * Native intrinsic: convert a Java byte[] to a JS Uint8Array via a
+     * single ``Uint8Array.from(bytes)`` call (bound in port.js). Returns
+     * an empty Uint8Array for a null input.
+     */
+    public static native Uint8Array byteArrayToUint8Array(byte[] bytes);
     
     public static String createObjectURL(Blob blob){
         return createObjectURLNative(blob);

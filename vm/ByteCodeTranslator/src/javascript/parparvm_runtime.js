@@ -3891,9 +3891,25 @@ bindNative(["cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java
   return yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, encoding));
 });
 bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY"], function*(chars) {
-  let text = "";
-  for (let i = 0; i < chars.length; i++) {
-    text += String.fromCharCode(chars[i] | 0);
+  // The original ``text += String.fromCharCode(chars[i] | 0)`` loop
+  // is O(N) of additive string concatenation, which most JS engines
+  // optimise to a rope but still costs noticeably more than the
+  // ``apply`` form. ``String.fromCharCode.apply(null, chars)`` builds
+  // the string in one native call. JS engines cap argument counts
+  // around 65535 so chunk anything larger.
+  const charsLen = chars.length;
+  let text;
+  if (charsLen === 0) {
+    text = "";
+  } else if (charsLen <= 32768) {
+    text = String.fromCharCode.apply(null, chars);
+  } else {
+    const parts = [];
+    for (let i = 0; i < charsLen; i += 32768) {
+      const end = (i + 32768 < charsLen) ? i + 32768 : charsLen;
+      parts.push(String.fromCharCode.apply(null, chars.slice(i, end)));
+    }
+    text = parts.join("");
   }
   let encoded;
   if (typeof TextEncoder !== "undefined") {

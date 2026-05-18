@@ -14,8 +14,6 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
-import { PNG } from "pngjs";
-import pixelmatch from "pixelmatch";
 
 const args = parseArgs(process.argv.slice(2));
 const URLS = {
@@ -78,11 +76,6 @@ async function snapCanvas(page) {
     if (!c) return null;
     return c.toDataURL("image/png");
   });
-}
-
-function decodePng(dataUrl) {
-  const b64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-  return PNG.sync.read(Buffer.from(b64, "base64"));
 }
 
 async function waitForStable(page, t0) {

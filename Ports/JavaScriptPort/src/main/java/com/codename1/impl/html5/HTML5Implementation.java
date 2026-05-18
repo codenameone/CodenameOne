@@ -5041,17 +5041,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final ImageData imageData = context.getImageData(0, 0, width, height);
         final Uint8ClampedArray data = imageData.getData();
         final int[] rgb = new int[width * height];
-        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
-            @Override
-            public int get(int index) {
-                return data.get(index);
-            }
-
-            @Override
-            public int length() {
-                return data.getLength();
-            }
-        }, rgb, 0);
+        // Bulk RGBA->ARGB conversion in one JS-native loop. The legacy
+        // ``PixelReader`` path made 4 JSO virtual-dispatch calls per
+        // pixel (4.6M for a 1280x900 screenshot); the bulk intrinsic
+        // collapses that to a single ``yield*`` boundary.
+        JavaScriptImageDataAdapter.readRgbaToArgbBulk(data, rgb, 0);
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
@@ -5078,19 +5072,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         final Uint8ClampedArray dataArr = imData[0].getData();
-        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
-            @Override
-            public int get(int index) {
-                return dataArr.get(index);
-            }
-
-            @Override
-            public int length() {
-                return dataArr.getLength();
-            }
-        }, arr, offset);
-            
-        
+        // Bulk RGBA->ARGB via JS-native intrinsic; see screenshot()
+        // call above for rationale.
+        JavaScriptImageDataAdapter.readRgbaToArgbBulk(dataArr, arr, offset);
     }
 
     

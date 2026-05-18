@@ -642,10 +642,9 @@ public class LocalForage {
         private void save() throws IOException {
             byte[] bytes = this.toByteArray();
             int len = bytes.length;
-            Uint8Array arr = Uint8Array.create(len);
-            for (int i = 0; i < len; i++) {
-                arr.set(i, bytes[i]);
-            }
+            // Bulk-copy the Java byte[] into a Uint8Array in one JS
+            // call instead of paying a JSO virtual dispatch per byte.
+            Uint8Array arr = BlobUtil.byteArrayToUint8Array(bytes);
             inst.setItem(key, arr);
             if (onComplete != null) {
                 ItemSavedEvent evt = new ItemSavedEvent();
