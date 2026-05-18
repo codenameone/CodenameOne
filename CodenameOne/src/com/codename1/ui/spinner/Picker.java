@@ -1415,17 +1415,24 @@ public class Picker extends Button {
     /// #### Parameters
     ///
     /// - `d`: the fixed default date, or `null` to restore the framework default
-    public void setDefaultDate(final Date d) {
-        if (d == null) {
-            setDefaultDate((DateGetter) null);
-            return;
+    public void setDefaultDate(Date d) {
+        setDefaultDate(d == null ? null : new FixedDateGetter(d));
+    }
+
+    /// Named static wrapper for the `setDefaultDate(Date)` overload. Static
+    /// (rather than an anonymous inner class) so it does not retain a hidden
+    /// reference to the enclosing `Picker`.
+    private static final class FixedDateGetter implements DateGetter {
+        private final Date date;
+
+        FixedDateGetter(Date date) {
+            this.date = date;
         }
-        setDefaultDate(new DateGetter() {
-            @Override
-            public Date get() {
-                return d;
-            }
-        });
+
+        @Override
+        public Date get() {
+            return date;
+        }
     }
 
     /// Returns the `DateGetter` previously installed via
