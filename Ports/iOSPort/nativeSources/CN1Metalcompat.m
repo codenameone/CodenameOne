@@ -1085,8 +1085,12 @@ void CN1MetalFillGradient(int kind,
 // Two-pass separable Gaussian blur via the cn1_fs_gaussian_blur shader.
 // Pass 1 writes from src into an intermediate texture using a horizontal
 // 13-tap kernel; pass 2 writes from the intermediate into dst with a
-// vertical kernel. Sigma defaults to (radius / 2) following CIGaussianBlur's
-// convention; the shader caps it at 0.5 to avoid div-by-zero on tiny radii.
+// vertical kernel. The `radius` argument is passed straight through as
+// the Gaussian standard deviation - matches CIGaussianBlur's inputRadius
+// semantic (Apple treats inputRadius as sigma, not visible extent). The
+// shader caps sigma at 0.5 to avoid div-by-zero on tiny radii and scales
+// tap spacing to (sigma / 2) so the 13-tap kernel covers the full +/-3
+// sigma visible spread.
 
 void CN1MetalGaussianBlurImage(id<MTLTexture> src, id<MTLTexture> dst, float radius) {
     if (src == nil || dst == nil || radius <= 0.0f) return;
@@ -1113,7 +1117,7 @@ void CN1MetalGaussianBlurImage(id<MTLTexture> src, id<MTLTexture> dst, float rad
     id<MTLCommandBuffer> cb = [queue commandBuffer];
     if (cb == nil) return;
 
-    float sigma = radius * 0.5f;
+    float sigma = radius;
     if (sigma < 0.5f) sigma = 0.5f;
 
     static const float vertices[8] = {

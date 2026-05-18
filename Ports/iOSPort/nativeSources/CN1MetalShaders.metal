@@ -363,16 +363,24 @@ fragment float4 cn1_fs_gaussian_blur(
     int horizontal = (int)params.z == 0 ? 1 : 0;
     float invSigma2 = 1.0 / (sigma * sigma);
 
-    // 13-tap kernel (centre + 6 samples each side). Sigma >= 6 saturates
-    // a much wider kernel; in practice CSS filter:blur(N) maps to a
-    // pixel radius around N and the visible spread stays within ~3*sigma.
+    // 13-tap kernel (centre + 6 samples each side) with tap spacing scaled
+    // to (sigma / 2) pixels so the kernel covers +/-3 sigma -- the visible
+    // extent of the Gaussian -- regardless of the actual sigma value. A
+    // fixed-pixel offset (i.e. integer texelSize multiples) would only
+    // sample the very peak of the curve once sigma exceeds 6 and degenerate
+    // into a near-box filter; CSS filter:blur and the test harness routinely
+    // request radii around 20-40 pixels so this scaling is what makes the
+    // shader actually blur at high sigma. Linear sampling between adjacent
+    // pixels smooths the result for non-integer tap distances.
+    float step = sigma * 0.5;
     float wTotal = cn1_blur_weight(0.0, invSigma2);
     float4 acc = tex.sample(s, in.texcoord) * wTotal;
     for (int i = 1; i <= 6; i++) {
-        float w = cn1_blur_weight((float)i, invSigma2);
+        float distance = (float)i * step;
+        float w = cn1_blur_weight(distance, invSigma2);
         float2 off = horizontal != 0
-            ? float2((float)i * texelSize, 0.0)
-            : float2(0.0, (float)i * texelSize);
+            ? float2(distance * texelSize, 0.0)
+            : float2(0.0, distance * texelSize);
         acc += tex.sample(s, in.texcoord + off) * w;
         acc += tex.sample(s, in.texcoord - off) * w;
         wTotal += 2.0 * w;
