@@ -103,3 +103,7 @@ dependency-reduced-pom.xml
 package-lock.json
 package.json
 .claude/
+
+# Local screenshot/perf bench output
+/artifacts/
+
