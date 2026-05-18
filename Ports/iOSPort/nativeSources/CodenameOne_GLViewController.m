@@ -3708,6 +3708,72 @@ BOOL prefersStatusBarHidden = NO;
      }*/
 }
 
+#ifdef CN1_USE_METAL
+-(void)flushOpsForMutableImage:(GLUIImage*)image {
+    if (image == nil) return;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        // Partition the upcoming queue: ops targeting `image` get
+        // extracted (they're what we need to execute right now so a
+        // follow-up readback sees the painted pixels); everything else
+        // -- the form's SetTransform / Draw ops, ops for OTHER mutable
+        // images, ClipShape state -- stays in the queue and drains at
+        // the next normal drawFrame. The global flushBuffer used to
+        // drain everything; that left the form's NativeGraphics.
+        // transformApplied flag stale relative to the Metal currentTransform
+        // (which CN1MetalBeginFrame resets to identity each frame), so
+        // the form's follow-up drawImage / drawString lacked a preceding
+        // SetTransform op and rendered at currentTransform=identity at
+        // the next drain. Visible: Switch's track/thumb lands at screen
+        // (local_x, local_y) in matrix mode.
+        NSMutableArray *opsForImage = [[NSMutableArray alloc] init];
+        NSMutableArray *remainingOps = [[NSMutableArray alloc] init];
+        @synchronized([CodenameOne_GLViewController instance]) {
+            for (ExecutableOp *op in self->upcomingTarget) {
+                if ([op target] == image) {
+                    [opsForImage addObject:op];
+                } else {
+                    [remainingOps addObject:op];
+                }
+            }
+            [self->upcomingTarget setArray:remainingOps];
+        }
+        if ([opsForImage count] == 0) {
+#ifndef CN1_USE_ARC
+            [opsForImage release];
+            [remainingOps release];
+#endif
+            return;
+        }
+        // Open a fresh mutable encoder for this image. Begin saves the
+        // current screen state (encoder/projection/framebuffer/stencil/
+        // transform) so the followup End can restore -- so even though
+        // we're mid-paint and currentTransform may carry a leftover
+        // form/mutable matrix from a prior drain, the side-trip ends
+        // with currentTransform back where it was.
+        BOOL encoderOpen = CN1MetalBeginMutableImageDraw(image);
+        if (!encoderOpen) {
+#ifndef CN1_USE_ARC
+            [opsForImage release];
+            [remainingOps release];
+#endif
+            return;
+        }
+        for (ExecutableOp *op in opsForImage) {
+            [op executeWithClipping];
+        }
+        CN1MetalEndMutableImageDraw(image);
+        // Now the mutable's MTLCommandBuffer is committed; the caller
+        // (typically gausianBlurImage in IOSNative.m) can call
+        // CN1MetalFlushMutableImageSync(image) to waitUntilCompleted
+        // before reading back the texture.
+#ifndef CN1_USE_ARC
+        [opsForImage release];
+        [remainingOps release];
+#endif
+    });
+}
+#endif
+
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y {
 	POOL_BEGIN();
     UIColor* col = UIColorFromRGB(color,alpha);

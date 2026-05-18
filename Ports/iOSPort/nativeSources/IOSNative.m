@@ -809,9 +809,27 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     UIImage* original = nil;
 #ifdef CN1_USE_METAL
     if ([glu mtlMutableTexture] != nil) {
-        extern int displayWidth;
-        extern int displayHeight;
-        [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+        // Drain any pending ExecutableOps targeting THIS specific mutable
+        // image so the GPU executes the shadow-ring fillArc calls before
+        // CN1MetalReadMutableImageAsUIImage samples the texture.
+        //
+        // Previously this called the global flushBuffer, which drained the
+        // entire upcoming queue (form ops too) and triggered a full
+        // drawFrame mid-paint. That worked for the readback but left
+        // form-side NativeGraphics state (transformApplied / clipApplied)
+        // stale relative to the iOS Metal globals, so the next form draw
+        // queued without a preceding SetTransform op and rendered at
+        // currentTransform=identity at the *next* drawFrame --
+        // visible as Switch's track/thumb landing at screen (local_x,
+        // local_y) instead of the component's screen position
+        // (matrix-mode SwitchTheme / kotlin failures).
+        //
+        // flushOpsForMutableImage only walks the queue and executes the
+        // ops whose target == glu, leaving form ops in place. The form's
+        // SetTransform / Draw ops stay in upcomingTarget so the next
+        // drawFrame drains them in their original order against the
+        // correct currentTransform.
+        [[CodenameOne_GLViewController instance] flushOpsForMutableImage:glu];
         original = CN1MetalReadMutableImageAsUIImage(glu);
     }
     if (original == nil) {

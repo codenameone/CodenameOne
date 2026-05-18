@@ -238,6 +238,27 @@ MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecord
 -(BOOL)isPaintFinished;
 -(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
 
+#ifdef CN1_USE_METAL
+// Drain only the ExecutableOps queued against `image` (target == image),
+// leaving every other op untouched in the upcoming queue. Opens a fresh
+// mutable encoder for the image, executes the extracted ops against it,
+// and commits -- so a follow-up CN1MetalFlushMutableImageSync(image) call
+// can waitUntilCompleted on the buffer and read back actual pixels.
+//
+// Why not just call flushBuffer here? flushBuffer drains the *entire*
+// upcoming queue, including the form's SetTransform / Draw ops, then
+// drawFrame's CN1MetalBeginFrame resets the global currentTransform to
+// identity at the start of the *next* drawFrame. The form's
+// NativeGraphics.transformApplied flag stays true through that round-
+// trip, so the next form draw queues with no preceding SetTransform op
+// and executes against currentTransform=identity at the next drain --
+// every Switch / FAB / etc. whose first paint blurs a mutable thumb
+// lands at screen (local_x, local_y). The targeted drain keeps the
+// form's ops in the queue exactly where they were, so they drain in
+// order against the correct currentTransform.
+-(void)flushOpsForMutableImage:(GLUIImage*)image;
+#endif
+
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
