@@ -15,7 +15,7 @@ To enable this for Android, define `android.googleAdUnitId=ca-app-pub-8610616152
 .Google Play ads
 image::img/google-play-ads.png[Google Play ads,scaledwidth=20%]
 
-There is a special ad unit ID for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you get test ads during development. This matters because you aren't allowed to click your own ads. When it's time for a production release, replace it with the real value you generated in AdMob.
+A special ad unit ID exists for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you get test ads during development. This matters because you aren't allowed to click your own ads. When it's time for a production release, replace it with the real value you generated in AdMob.
 
 === In-app purchase
 
@@ -27,10 +27,11 @@ in-app purchase support centers around the set of SKUs you want to sell. Each pr
 
 ==== Types of products
 
-There are 4 classifications for products:
+Four classifications for products exist:
 
 1. **Non-consumable Product** - This is a product that the user purchases once to "own." They can't re-buy it. One example is a product that upgrades your app to a "Pro" version.
 2. **Consumable Product** - This is a product that the user can buy more than once. For example, you might have a product for "10 Credits" that lets the user buy items in a game.
+// vale-skip: Microsoft.Auto: "auto-renewed" matches the App Store / Play Store wording for the renewal action; rewriting it as "autorenewed" diverges from Apple and Google's documented terminology.
 3. **Non-Renewable Subscription** - A subscription that you buy once, and won't be "auto-renewed" by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all the user's devices. This means that non-renewable subscriptions require that you've a server that keeps track of the subscriptions.
 4. **Renewable Subscriptions** - A subscription that the app store manages. The user will be automatically billed when the subscription period ends, and the subscription will renew.
 
@@ -131,7 +132,7 @@ In the simulator, clicking on the "Buy World" button will bring up a prompt to a
 .Approving the purchase in the simulator
 image::img/iap-demo2.png[Approving the purchase in the simulator,scaledwidth=30%]
 
-Now if I try to buy the product again, it pops up the dialog to let's know that I already own it.
+Now if you try to buy the product again, it pops up the dialog to let you know that you already own it.
 
 .In App buy already owned
 image::img/iap-demo3.png[In App buy already owned,scaledwidth=20%]
@@ -199,11 +200,14 @@ NOTE: When you set up the products in the iTunes store you will need to mark the
 As you discussed before, there are two types of subscriptions:
 
 . Non-renewable
+// vale-skip: Microsoft.Auto: "Auto-renewable" matches Apple's documented subscription type.
 . Auto-renewable
 
-Non-renewable subscriptions are the same as consumable products, except that they are shareable across devices. Auto-renewable subscriptions will continue as long as the user doesn't cancel the subscription. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and the app-store handles the management details itself.
+// vale-skip: Microsoft.Auto: "Auto-renewable" matches Apple's documented subscription type.
+Non-renewable subscriptions are the same as consumable products, except that they're shareable across devices. Auto-renewable subscriptions will continue as long as the user doesn't cancel the subscription. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and the app-store handles the management details itself.
 
-NOTE:  The concept of an "Non-renewable" subscription is unique to iTunes. Google Play has no formal similar option. To create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a *regular product* in Google play, and a Non-renewable subscription in the iTunes store. You'll learn more about that in a later post when you go into the specifics of app store setup.
+// vale-skip: proselint.Annotations: "NOTE" is the asciidoc admonition prefix here, not a TODO marker.
+NOTE: The concept of an "Non-renewable" subscription is unique to iTunes. Google Play has no formal similar option. To create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a *regular product* in Google play, and a Non-renewable subscription in the iTunes store. You'll learn more about that in a later post when you go into the specifics of app store setup.
 
 IMPORTANT:  The `Purchase` class includes both a `purchase()` method and a `subscribe()` method. On some platforms it makes no difference which one you use, but on Android it matters. If the product is set up as a subscription in Google Play, then you *must* use `subscribe()` to buy the product. If it's set up as a regular product, then you *must* use `purchase()`.  Since you enter "Non-renewable" subscriptions as regular products in the play store, you would use the `purchase()` method.
 
@@ -283,9 +287,9 @@ public static final String[] PRODUCTS = {
 };
 ----
 
-Notice that you create two separate SKUs for the 1 month and 1 year subscription.  **Each subscription period must have its own SKU**.  I have created an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you'll see in the examples ahead, because the APIs for checking status and expiry date of a subscription take the SKUs in a "subscription group" as input.
+Notice that you create two separate SKUs for the 1 month and 1 year subscription.  **Each subscription period must have its own SKU**.  The example uses an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you'll see in the examples ahead, because the APIs for checking status and expiry date of a subscription take the SKUs in a "subscription group" as input.
 
-NOTE: Different SKUs that sell the same service/product but for different periods form a "subscription group."  Conceptually, customers aren't subscribing to a particular SKU, they are subscribing to the subscription group of which that SKU is a member. As an example, if a user purchases a 1 month subscription to "the world," they are actually subscribing to "the world" subscription group.
+NOTE: Different SKUs that sell the same service/product but for different periods form a "subscription group."  Conceptually, customers aren't subscribing to a particular SKU, they're subscribing to the subscription group of which that SKU is a member. As an example, if a user purchases a 1 month subscription to "the world," they're actually subscribing to "the world" subscription group.
 
 It's up to you to know the grouping of your SKUs. Any methods in the `Purchase` class that check subscription status or expiry date of a SKU should be passed *all* SKUs of that subscription group. For example, If you want to know if the user is subscribed to the `SKU_WORLD_1_MONTH` subscription, it would not be enough to call `iap.isSubscribed(SKU_WORLD_1_MONTH)`, because that wouldn't consider if the user had purchased a 1 year subscription. The correct way is to always call `iap.isSubscribed(SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR)`, or `iap.isSubscribed(PRODUCTS)` since you have placed both SKUs into your PRODUCTS array.
 
@@ -325,7 +329,7 @@ public void init(Object context) {
 }
 ----
 
-These methods are designed to be asynchronous since real-world apps will always be connecting to some sort of network service. So, instead of returning a value, both of these methods are passed instances of the `SuccessCallback` class. It's important to make sure to call `callback.onSuccess()` *ALWAYS* when the methods have completed, even if there is an error, or the Buy class will just assume that you're taking a long time to complete the task, and will continue to wait for you to finish.
+These methods are designed to be asynchronous since real-world apps will always be connecting to some sort of network service. Instead of returning a value, both of these methods are passed instances of the `SuccessCallback` class. It's important to make sure to call `callback.onSuccess()` *ALWAYS* when the methods have completed, even if there is an error, or the Buy class will just assume that you're taking a long time to complete the task, and will continue to wait for you to finish.
 
 Once implemented, your `fetchReceipts()` method will look like:
 
@@ -431,7 +435,7 @@ NOTE: The iTunes store and Play store have no knowledge of your subscription dur
 
 ===== Synchronizing receipts
 
-In order for your app to provide you with current data about the user's subscriptions and expiry dates, you need to synchronize the receipts with your receipt store.  `Purchase` provides a set of methods for doing this. You'll call one of them inside the `start()` method, and I may resynchronize at other strategic times if I suspect that the information may have changed.
+In order for your app to provide you with current data about the user's subscriptions and expiry dates, you need to synchronize the receipts with your receipt store.  `Purchase` provides a set of methods for doing this. You'll call one of them inside the `start()` method, and you may resynchronize at other strategic times if you suspect that the information may have changed.
 
 The following methods can be used for synchronization:
 
@@ -605,25 +609,32 @@ image::img/in-app-purchase-subscription-toastbar-success.png[Upon successful buy
 
 ==== Summary
 
-This section demonstrated how to set up an app to use non-renewable subscriptions using in-app purchase. Non-renewable subscriptions are the same as regular consumable products except for the fact that they are shared by all the user's devices, and thus, require a server component. The app store has no knowledge of the duration of your non-renewable subscriptions. It's up to you to specify the expiry date of purchased subscriptions on their receipts when they are submitted. Google play doesn't formally have a "non-renewable" subscription product type. To implement them in Google play, you would just set up a regular product. It's how you handle it internally that makes it a subscription, and not just a regular product.
+This section demonstrated how to set up an app to use non-renewable subscriptions using in-app purchase. Non-renewable subscriptions are the same as regular consumable products except for the fact that they're shared by all the user's devices, and thus, require a server component. The app store has no knowledge of the duration of your non-renewable subscriptions. It's up to you to specify the expiry date of purchased subscriptions on their receipts when they're submitted. Google play doesn't formally have a "non-renewable" subscription product type. To implement them in Google play, you would just set up a regular product. It's how you handle it internally that makes it a subscription, and not just a regular product.
 
 Codename One uses the `Receipt` class as the foundation for its subscriptions infrastructure. You, as the developer, are responsible for implementing the `ReceiptStore` interface to provide the receipts. The `Purchase` instance will load receipts from your ReceiptStore, and use them to determine whether the user is subscribed to a subscription, and when the subscription expires.
 
+// vale-skip: Microsoft.Auto: "Auto-Renewable" is Apple's documented product type and is reproduced verbatim here.
 ==== Auto-Renewable subscriptions
 
+// vale-skip: Microsoft.Auto: "Auto-renewable" matches Apple/Google's documented subscription type.
 Auto-renewable subscriptions provide, arguably, an easier path to recurring revenue than non-renewable subscriptions because all the subscription stuff is handled by the app store. You defer almost entirely to the app store (iTunes for iOS, and Play for Android) for billing and management.
 
 If there is a down-side, it would be that you are also subject to the rules of each app store - and they take their cut of the revenue.
 
+// vale-skip: Microsoft.Auto: "auto-renewable" matches Apple's documented terminology for the subscription type.
 . For more information about Apple's auto-renewable subscription features and rules see https://developer.apple.com/app-store/subscriptions/[this document].
 . For more information about subscriptions in Google play, see https://developer.android.com/google/play/billing/billing_subscriptions.html[this document].
 
-==== Auto-Renewable vs Non-Renewable.  best choice
+// vale-skip: Microsoft.Auto: "Auto-Renewable" matches Apple's documented product type used as a heading anchor.
+==== Auto-Renewable vs Non-Renewable: Choosing between them
 
+// vale-skip: Microsoft.Auto: Multiple references to Apple/Google's "auto-renewable" subscription terminology.
 When deciding between auto-renewable and non-renewable subscriptions, as always, the answer will depend on your needs and preferences. Auto-renewables are nice because it takes the process out of your hands. You just get paid. On the other hand, there are valid reasons to want to use non-renewables. For example, You can't cancel an auto-renewable subscription for a user. They have to do that themselves. You may also want more control over the subscription and renewal process, in which case a non-renewable might make more sense.
 
+// vale-skip: Microsoft.Auto: References Apple/Google's documented "auto-renewable" subscription type and a third-party blog URL containing the same term.
 NOTE: Some developers https://marco.org/2013/12/02/auto-renewable-subscriptions[are opposed to auto-renewable subscriptions]. There isn't enough information to make a solid recommendation on this matter.
 
+// vale-skip: Microsoft.Auto: "auto-renewable" matches Apple's documented subscription type.
 On a practical level, if you are using auto-renewable subscriptions (and so subscription products in the Google play store) you must use the `Purchase.subscribe(sku)` method for initiating the purchase workflow. For non-renewable subscriptions (and so regular products in the Google play store), you must use the `Purchase.purchase(sku)` method.
 
 ==== Learning by example
@@ -696,7 +707,7 @@ If you're not sure how to create a data source, see your https://www.codenameone
 
 At this point you should be able to test out the project in the Codename One simulator to make sure it's working.
 
-1. Build and Run the server project in Netbeans. You may need to tell it which application server you wish to run it on. I am running it on the Glassfish 4.1 that comes bundled with Netbeans.
+1. Build and Run the server project in Netbeans. You may need to tell it which application server you wish to run it on. This example runs on the Glassfish 4.1 that comes bundled with Netbeans.
 2. Build and run the client project in Netbeans. This should open the Codename One simulator.
 
 When the app first opens you'll see a screen as follows:
@@ -723,7 +734,7 @@ image::img/iap3-successful-purchase.png[After successful buy,scaledwidth=20%]
 
 NOTE: This project is set up to use an expedited expiry date schedule for purchases from the simulator.  1 month = 5 minutes.  3 months = 15 minutes. This helps for testing. That's why your expiry date may be different than expected.
 
-Just to verify that the receipt was inserted, you should check the contents of your "RECEIPTS" table in your database. In Netbeans, I can do this from the "Services" pane. Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select `View Data`.  This will open a data table similar the following:
+Just to verify that the receipt was inserted, you should check the contents of your "RECEIPTS" table in your database. In Netbeans, you can do this from the "Services" pane. Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select `View Data`.  This will open a data table similar the following:
 
 .Receipts table after insertion
 image::img/iap3-view-table-data.png[Receipts table after insertion,scaledwidth=20%]
@@ -740,7 +751,7 @@ If you delete the receipt from your database, then press the "Synchronize Receip
 
 ====== Troubleshooting
 
-Let's not pretend that everything worked for you on the first try. There's a lot that could go wrong here. If you make a purchase and nothing appears to happen, the first thing you should do is check the Network Monitor in the simulator ("Simulate" > "Network" > "Network Monitor"). You should see a list of network requests. Some will be GET requests and there will be at least one POST request. Check the response of these requests to see if they succeeded.
+Don't pretend that everything worked on the first try. There's a lot that could go wrong here. If you make a purchase and nothing appears to happen, the first thing you should do is check the Network Monitor in the simulator ("Simulate" > "Network" > "Network Monitor"). You should see a list of network requests. Some will be GET requests and there will be at least one POST request. Check the response of these requests to see if they succeeded.
 
 Also check the Glassfish server log to see if there is an exception.
 
@@ -748,11 +759,11 @@ Common problems would be that the URL you have set in the client app for `endpoi
 
 ==== Looking at the source of the app
 
-Now that you've set up and built the app, let's take a look at the source code so you can see how it all works.
+Now that you've set up and built the app, take a look at the source code so you can see how it all works.
 
 ===== Client side
 
-I use the https://github.com/shannah/cn1-generic-webservice-client[Generic Webservice Client Library] from inside your `ReceiptStore` implementation to load receipts from the web service, and insert new receipts to the database.
+The example uses the https://github.com/shannah/cn1-generic-webservice-client[Generic Webservice Client Library] from inside your `ReceiptStore` implementation to load receipts from the web service, and insert new receipts to the database.
 
 The source for your ReceiptStore is as follows:
 
@@ -842,7 +853,7 @@ private RESTfulWebServiceClient createRESTClient(String url) {
 
 ===== Server-Side
 
-On the server-side, your REST controller is a standard JAX-RS REST interface. I used Netbeans web service wizard to generate it and then modified it to suit your purposes. The methods of the `ReceiptsFacadeREST` class pertaining to the REST API are shown here:
+On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
 
 [source,java]
 ----
@@ -886,7 +897,7 @@ The magic happens inside that `validateAndSaveReceipt()` method, which You'll co
 
 ====== Notifications
 
-It's important to note that you won't be notified by apple or google when changes are made to subscriptions. It's up to you to periodically "poll" their web service to find if any changes have been made. Changes you would be interested in are primarily renewals and cancellations. To deal with this, set up a method to run periodically (once-per day might be enough). For testing, I actually set it up to run once per minute as shown below:
+It's important to note that you won't be notified by apple or google when changes are made to subscriptions. It's up to you to periodically "poll" their web service to find if any changes have been made. Changes you would be interested in are primarily renewals and cancellations. To deal with this, set up a method to run periodically (once-per day might be enough). For testing, the example below sets it up to run once per minute:
 
 [source,java]
 ----
@@ -920,11 +931,12 @@ public void validateSubscriptionsCron() {
 
 That method finds all the receipts in the database that haven't been validated in some period of time, and validates it. Again, the magic happens inside the `validateAndSaveReceipt()` method which you cover later.
 
+// vale-skip: Microsoft.Auto: "auto-renewing" matches Google Play's documented subscription terminology.
 NOTE: This example only checks receipts from the iTunes and Play stores because those are the only stores that support auto-renewing subscriptions in Codename One.
 
 ==== The CN1-IAP-Validator library
 
-For this tutorial, I created a library to handle receipt validation in a way that hides as much of the complexity as possible. It supports both Google Play receipts and iTunes receipts.
+For this tutorial, the example uses a purpose-built library to handle receipt validation in a way that hides as much of the complexity as possible. It supports both Google Play receipts and iTunes receipts.
 
 The general usage is as follows:
 
@@ -949,7 +961,7 @@ As you can see from this snippet, the complexity of receipt validation has been 
 2. `GOOGLE_DEVELOPER_API_CLIENT_ID` - A client ID that you'll get from the google developer API console when you set up your API service credentials.
 3. `GOOGLE_DEVELOPER_PRIVATE_KEY` - A PKCS8 encoded string with an RSA private key that you'll receive at the same time as the `GOOGLE_DEVELOPER_API_CLIENT_ID`.
 
-I will go through the steps to get these values soon.
+The next section walks through the steps to get these values.
 
 ==== The `validateAndSaveReceipt()` method
 
@@ -1091,21 +1103,21 @@ private Receipts[] validateAndSaveReceipt(Receipts receipt) {
 as a non-renewable receipt, and you'll calculate the expiry date using an "accelerated" clock to assist in testing.
 
 
-NOTE:  In many of the code snippets for the Server-side code, you'll see references to both a `Receipts` class and a `Receipt` class. I know this is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the "receipts" table of your SQL database. The `Receipt` class is `com.codename1.payment.Receipt`.  It's used to interface with the IAP validation library.
+NOTE:  In many of the code snippets for the Server-side code, you'll see references to both a `Receipts` class and a `Receipt` class. This is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the "receipts" table of your SQL database. The `Receipt` class is `com.codename1.payment.Receipt`.  It's used to interface with the IAP validation library.
 
 
 ==== Google play setup
 
 ===== Creating the app in Google play
 
-To test out in-app purchase on an Android device, you'll need to create an app the https://play.google.com/apps/publish/[Google Play Developer Console].  I won't describe the process in this section, but there is plenty of information around the internet on how to do this. Some useful references for this include:
+To test out in-app purchase on an Android device, you'll need to create an app the https://play.google.com/apps/publish/[Google Play Developer Console]. This section doesn't describe the process, but plenty of information around the internet covers how to do this. Some useful references for this include:
 
 . https://developer.android.com/distribute/googleplay/start.html[Getting Started With Publishing] - If you don't already have an account with Google to publish your apps.
 . https://developer.android.com/distribute/tools/launch-checklist.html[Launch Checklist]
 
 ====== Graphics, icons, etc
 
-You are required to upload some screenshots and feature graphics. Don't waste time making these perfect. For the screenshots, you can just use the "Screenshot" option in the simulator.  (Use the Nexus 5 skin). For the feature graphics, I used https://www.norio.be/android-feature-graphic-generator/[this site] that will generate the graphics in the correct dimensions for Google Play. You can also just leave the icon as the default Codename One icon.
+You are required to upload some screenshots and feature graphics. Don't waste time making these perfect. For the screenshots, you can just use the "Screenshot" option in the simulator.  (Use the Nexus 5 skin). For the feature graphics, this example uses https://www.norio.be/android-feature-graphic-generator/[this site] that will generate the graphics in the correct dimensions for Google Play. You can also just leave the icon as the default Codename One icon.
 
 ====== Creating test accounts
 
@@ -1113,7 +1125,7 @@ IMPORTANT: You can't buy in-app products from your app using your publisher acco
 
 To test your app, you need to set up a test account. A test account must be associated with a real gmail email address. If you have a domain that's managed by Google apps, then you can also use an address from that domain.
 
-The full process for testing in-app billing can be found in https://developer.android.com/google/play/billing/billing_testing.html[this google document].  But, I personally found this documentation difficult to follow.
+The full process for testing in-app billing can be found in https://developer.android.com/google/play/billing/billing_testing.html[this google document]; the documentation is dense and can be difficult to follow.
 
 For your purposes, you'll need to set up a tester list in Google Play. Choose "Settings" > `Tester Lists`.  Then create a list with all the email address that you want to have treated as test accounts. Any purchases made by these email addresses will be treated as "Sandbox" purchases, and won't require real money to change hands.
 
@@ -1151,7 +1163,7 @@ IMPORTANT: Since you will be adding products as "Subscriptions" in the pay store
 .Add new product dialog
 image::img/iap3-play-add-new-product.png[Add new product dialog,scaledwidth=30%]
 
-Now fill in the form. You can choose your own price and name for the product. The following is a screenshot of the options I chose.
+Now fill in the form. You can choose your own price and name for the product. The following is a screenshot of the options selected for this example.
 
 .Add product to google
 image::img/iap3-add-product-google.png[Add product to google]
@@ -1193,8 +1205,8 @@ image::img/iap3-credentials-dropdown.png[Credentials dropdown,scaledwidth=20%]
 +
 .Create service account key
 image::img/iap3-create-service-account-key.png[Create service account key,scaledwidth=20%]
-7. Enter anything you like for the `Service account name`.  For the role, you'll select "Project" > "Owner" for now just so you don't run into permissions issues. You'll probably want to investigate further to fine a more limited role that only allows receipt verification, but for now, I don't want any unnecessary road blocks for getting this to work. You're probably going to run into "permission denied" errors at first anyways, so the fewer reasons for this, the better.
-8. It will auto-generate an account ID for you.
+7. Enter anything you like for the `Service account name`.  For the role, you'll select "Project" > "Owner" for now just so you don't run into permissions issues. You'll probably want to investigate further to fine a more limited role that only allows receipt verification, but for now, avoid any unnecessary road blocks for getting this to work. You're probably going to run into "permission denied" errors at first anyways, so the fewer reasons for this, the better.
+8. It will autogenerate an account ID for you.
 9., for the `Key type`, select `JSON`.  Then click the "Create" button.
 
 This should prompt the download of a JSON file that will have contents like the following:
@@ -1247,7 +1259,7 @@ image::img/iap3-link-to-api.png[Link to API,scaledwidth=20%]
 +
 .Grant access
 image::img/iap3-grant-access.png[Grant access,scaledwidth=20%]
-4. This will open a dialog titled `Add New User`.  Leave everything default, except change the "Role" to `Administrator`. This provides "ALL" permissions to this account, which probably isn't a good idea for production. Later on, after everything is working, you can circle back and try to refine permissions. For this tutorial, I just want to pull out all the potential road blocks.
+4. This will open a dialog titled `Add New User`.  Leave everything default, except change the "Role" to `Administrator`. This provides "ALL" permissions to this account, which probably isn't a good idea for production. Later on, after everything is working, you can circle back and try to refine permissions. For this tutorial, the goal is to remove all potential road blocks.
 +
 .New User
 image::img/iap3-new-user.png[New User,scaledwidth=30%]
@@ -1285,6 +1297,7 @@ The process to add products in iTunes connect is outlined https://developer.appl
 . **iapdemo.noads.month.auto** - The 1 month subscription.
 . **iapdemo.noads.3month.auto** - The 3 month subscription.
 
+// vale-skip: Microsoft.Auto: "auto-renewable" matches Apple's documented subscription type.
 Just make sure you add them as auto-renewable subscriptions, and that you specify the appropriate renewal periods. Use the SKU as the product ID.  Both of these products will be added to the same subscription group. Call the group whatever you like.
 
 ===== Creating test accounts
@@ -1322,4 +1335,4 @@ Change this to `false`.
 
 If you rebuild and run the server project, and wait for the `validateSubscriptionsCron()` method to run, it should check the receipt. After about a minute (or less), you'll see the text "----------- VALIDATING RECEIPTS ---------" written to the Glassfish log file, followed by some output from connecting to the iTunes validation service. If all went well, you should see your receipt expiration date updated in the database. If not, you'll likely see some exception stack traces in the Glassfish log.
 
-NOTE: Sandbox receipts in the iTunes store are set to run on an accelerated schedule. A 1 month subscription is actually 5 minutes, 3 months is 15 minutes etc...  Also sandbox subscriptions don't seem to persist in perpetuity until the user has cancelled it. I have found that they renew only 4 or 5 times before they are allowed to lapse by Apple.
+NOTE: Sandbox receipts in the iTunes store are set to run on an accelerated schedule. A 1 month subscription is actually 5 minutes, 3 months is 15 minutes etc...  Also sandbox subscriptions don't seem to persist in perpetuity until the user has cancelled it. In practice they renew only 4 or 5 times before they're allowed to lapse by Apple.

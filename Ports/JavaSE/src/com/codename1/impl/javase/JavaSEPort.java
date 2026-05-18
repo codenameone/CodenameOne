@@ -5726,7 +5726,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private void deepRevaliate(com.codename1.ui.Container c) {
+    private static void deepRevaliate(com.codename1.ui.Container c) {
         c.setShouldCalcPreferredSize(true);
         for (int iter = 0; iter < c.getComponentCount(); iter++) {
             com.codename1.ui.Component cmp = c.getComponentAt(iter);
@@ -5933,15 +5933,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void refreshThemeOnly() {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                UIManager.getInstance().refreshTheme();
-                Form curr = Display.getInstance().getCurrent();
-                if (curr != null) {
-                    deepRevaliate(curr);
-                    curr.revalidate();
-                    curr.repaint();
-                }
+                applyThemeOnlyRefresh(Display.getInstance().getCurrent());
             }
         });
+    }
+
+    /// Refreshes the active theme on the given form in place. Extracted so
+    /// the simulator's Dark/Light + Larger Text menu actions and the unit
+    /// test that guards them share the exact same sequence:
+    ///
+    /// 1. `UIManager.refreshTheme()` rebuilds themeProps and clears the
+    ///    style cache.
+    /// 2. `Form.refreshTheme(true)` walks the live component tree and
+    ///    re-resolves each Style, so the displayed components actually
+    ///    pick up the new fonts / colors. Without this step the user sees
+    ///    no change until they navigate away and back or restart the
+    ///    simulator -- the bug reported in issue #4963.
+    /// 3. `deepRevaliate` + `revalidate` + `repaint` redo layout against
+    ///    the new font metrics so a taller font actually claims more
+    ///    pixels on screen.
+    static void applyThemeOnlyRefresh(Form curr) {
+        UIManager.getInstance().refreshTheme();
+        if (curr == null) {
+            return;
+        }
+        curr.refreshTheme(true);
+        deepRevaliate(curr);
+        curr.revalidate();
+        curr.repaint();
     }
 
 

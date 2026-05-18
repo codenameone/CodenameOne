@@ -281,6 +281,14 @@ id<MTLDevice> CN1MetalDevice(void);
 // drawing.
 id<MTLCommandQueue> CN1MetalCommandQueue(void);
 
+// Called once by METALView.initWithCoder (main thread) to publish the
+// view's MTLDevice + MTLCommandQueue. CN1MetalDevice / CN1MetalCommandQueue
+// then return these without touching any UIView property. Keeping the
+// queue identity stable with METALView is required: mutable-image setup
+// commits share-and-FIFO with the screen render command buffer, so
+// drawImage of a mutable can rely on its prior writes being ordered.
+void CN1MetalSetDeviceAndCommandQueue(id<MTLDevice> device, id<MTLCommandQueue> queue);
+
 // -------- Phase 3 v2: mutable-image rendering --------
 //
 // Mutable images render via the same ExecutableOp queue as the screen.

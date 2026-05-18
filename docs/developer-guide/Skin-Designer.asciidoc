@@ -46,7 +46,7 @@ the grid tells you when you're looking at a clamped subset.
 
 image::img/skin-designer/skin-designer-stage-2-source.png[Source picker with three large cards: Pick a shape, Upload an image, Blank rectangle,role="text-center"]
 
-There are three ways to seed the skin's body image:
+Three ways exist to seed the skin's body image:
 
 [[skin-designer-source-shape]]
 *Pick a shape* — generates the device frame procedurally from a small
@@ -232,7 +232,7 @@ monospaceFontFamily=SF Mono
 
 NOTE: The wizard intentionally does *not* write `smallFontSize`,
 `mediumFontSize`, or `largeFontSize`. When those are absent the
-simulator auto-derives them from `pixelMilliRatio` (`med = round(2.6
+simulator automatically derives them from `pixelMilliRatio` (`med = round(2.6
 * ppmm)`, `sm = 2 * ppmm`, `la = 3.3 * ppmm`), which is what you
 want on high-PPI screens. Writing iOS-style point values (12 / 15 /
 22) into the file used to make text render at sub-millimeter sizes

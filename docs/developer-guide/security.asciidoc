@@ -2,7 +2,7 @@
 
 Security is a "big word." It implies many things and that's also true for the mobile app development so before you get started lets try to define the scope of security.
 
-You will deal with application security and its communication mechanisms while ignoring everything beyond that scope. Let's start with a simple fact:
+You will deal with application security and its communication mechanisms while ignoring everything beyond that scope. Start with a simple fact:
 
 ____
 Codename One applications are secure on the devices by the nature of the mobile OS security.
@@ -23,7 +23,7 @@ Each section below discusses some attack vectors against applications and how th
 
 === Constant obfuscation
 
-One of the first things a hacker will do when compromising an app is look at it. For example, if I want to exploit a bank's login UI I would look at the label next to the login and then search for it in the decompiled code. if the UI has the String "enter user name and password" I can search for that.
+One of the first things a hacker will do when compromising an app is look at it. For example, an attacker wanting to exploit a bank's login UI would look at the label next to the login and then search for it in the decompiled code. If the UI has the String "enter user name and password" they can search for that.
 
 It won't lead directly to a hack or exploit, but it will narrow down the area of the code where you should look and it makes the first step that much easier. Obfuscation helps as it removes descriptive method names but it can't hide the Strings you use in constants. If an app has a secret key within obfuscating it can make a difference (albeit a slight difference).
 
@@ -54,11 +54,11 @@ You might be concerned about the secret, then this would make it slightly harder
 private static final String SECRET = Util.xorDecode("RW1tI3Ema219KmpidGFhdTFhdnE1Yn9xajQ1MjM=");
 ----
 
-Notice that this is **not secure**, if you've a crucial value that must not be found you need to store it in the server. There is no alternative because everything that's sent to the client can be compromised by a determined hacker.
+Notice that this **isn't secure**, if you've a crucial value that must not be found you need to store it in the server. No alternative exists because everything that's sent to the client can be compromised by a determined hacker.
 
 TIP: Use the comment to help you find the string in the code
 
-Codename One's built-in user-specific constants are obfuscated with this method. For example, an app built with Codename One carries some internal data such as the user who built the app, which is now obfuscated. The following small app encodes strings so you can copy and paste them into your app easily:
+Codename One's built-in user-specific constants are obfuscated with this method. For example, an app built with Codename One carries some internal data such as the user who built the app, which is now obfuscated. The following small app encodes strings so you can copy and paste them into your app:
 
 [source,java]
 ----
@@ -190,7 +190,7 @@ Android launched with RSA1024/SHA1 as the signing certificates. This was good en
 
 ==== The bad news
 
-There is a downside...
+A downside exists...
 
 Google introduced that capability in Android 4.3 so using these new keys will break compatibility with older devices. If you're building a highly secure app this is probably a tradeoff you should accept. If not this might not be worth it for some theoretical benefit.
 
@@ -214,11 +214,11 @@ TIP: What if the router grabs the server's certificate and communicates with Goo
 
 This won't work since the data you send to the server is encrypted with the certificate from the server.
 
-TIP: So what if the router sends its own "fake certificate"?
+TIP: What if the router sends its own "fake certificate"?
 
 That won't work either. All certificates are signed by a "certificate authority" indicating that a google.com certificate is valid.
 
-TIP: What if I was able to get your fake certificate authorized by a real certificate authority?
+TIP: What if an attacker could get a fake certificate authorized by a real certificate authority?
 
 **that's a problem!**
 

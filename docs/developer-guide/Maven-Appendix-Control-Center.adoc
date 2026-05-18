@@ -31,7 +31,7 @@ image::img/netbeans-open-control-center.png[]
 
 ==== Opening Codename One settings from Eclipse
 
-Press the image:img/eclipse-run-as-button.png[] button, and select the "_My Project_ Settings" option. (Where _My Project_ is the name of your project). E.g.
+Press the image:img/eclipse-run-as-button.png[] button, and select the "_Your project_ Settings" option (where _Your project_ is the name of your project). For example:
 
 image:img/eclipse-open-settings.png[]
 

@@ -9,11 +9,11 @@ The good news is that this is a "one time issue" and once it's done the work bec
 
 This section uses some terms that you might not be familiar with if you haven't used cryptography or built mobile apps before. Here is a quick "FAQ" covering some common terms/concepts in this section.
 
-==== What is a certificate
+==== What's a certificate
 
 Certificates use cryptographic principals to "sign" data (for example, an application). Think of them as you would think of a company stamp, you use them to sign an app so users know who it's from.
 
-==== What is provisioning
+==== What's provisioning
 
 Provisioning provides the hints/guidelines for the application install. For example, if an application needs some service from the OS such as push it can request that with provisioning.
 
@@ -27,7 +27,7 @@ Android uses self signed certificates which don't use a signing authority so any
 
 The logic with the Android approach is that a signature indicates that you're the same person who earlier shipped the app. Hence an app will be updated with the exact same certificate.
 
-==== What is UDID
+==== What's UDID
 
 The UDID is the Universal Device Identifier. It identifies mobile devices uniquely, notice that some operating systems for example, iOS block access to this value due to privacy concerns.
 
@@ -36,17 +36,17 @@ You need the iOS device UDID value during development to add the device into the
 IMPORTANT: don't use an app to get the UDID! +
 Most return the wrong value. Use the Finder device summary (macOS), Apple Configurator, or a trusted service such as http://get.udid.io/ which seems to work rather well
 
-==== Should I reuse the same certificate for all apps
+==== Should you reuse the same certificate for all apps
 
 For iOS yes. it's designed to work in that way.
 
-You would recommend it for all platforms for simplicity but some developers prefer creating per-application certificates for Android. The advantage here is that you can transfer ownership of the application later on without giving away what is effectively "you house keys."
+You would recommend it for all platforms for simplicity but some developers prefer creating per-application certificates for Android. The advantage here is that you can transfer ownership of the application later on without giving away what's effectively "your house keys."
 
 
 [[certificate-wizard]]
 === iOS signing wizard
 
-Codename One features a wizard to generate certificates/provisioning for iOS without requiring a Mac or deep understanding of the signing process for iOS. There is still support for manually generating the P12/provisioning files when necessary but for most intents and purposes using the wizard will simplify this error prone process.
+Codename One features a wizard to generate certificates/provisioning for iOS without requiring a Mac or deep understanding of the signing process for iOS. Support still exists for manually generating the P12/provisioning files when necessary but for most intents and purposes using the wizard will simplify this error prone process.
 
 To generate your certificates and profiles, open project's properties and click on "iOS" in the left menu. This will show the "iOS Signing" panel that includes fields to select your certificates and mobile provisioning profiles.
 
@@ -109,8 +109,8 @@ A typical iOS app has at least two certificates:
 
 - Distribution - this is used when you're ready to upload your app to App Store Connect whether for final shipping or beta testing. Notice that you can't install a distribution build on your own device. You need to upload it to App Store Connect.
 
-- There are two push certificates, they are separate from the signing certificates. don't confuse them! +
-They are used to authenticate with Apple when sending push messages.
+- Two push certificates exist, separate from the signing certificates. don't confuse them! +
+They're used to authenticate with Apple when sending push messages.
 ****
 
 ==== App IDs and provisioning profiles
@@ -208,7 +208,7 @@ In the devices section add device ids for the development devices you want to su
 .Add devices
 image::img/ios-add-devices.png[Add devices,scaledwidth=30%]
 
-Create an application id; it should match the package identifier of your application perfectly!
+Create an application id; it must match the package identifier of your application exactly!
 
 .Create application id
 image::img/ios-create-app-id.png[Create application id,scaledwidth=30%]

@@ -379,7 +379,7 @@ This applies to the layout managers (except for group layout) and most component
 
 Some strings in iOS need to be localized using iOS's native mechanisms - namely providing _*.lproj_ directories with _.strings_ files. For example, if you want the app to have a different bundle display name for each language, or you want to translate the "UsageDescription" strings of your Info.plist into many languages, you would need to use iOS' https://developer.apple.com/localization/[native localization facilities].
 
-===== Example: localizing the app name
+===== Example: Localizing the app name
 
 The app name, as it's displayed to the user, is defined in using the _CFBundleDisplayName_ key of the app's Info.plist file., this will be automatically set to your app's display name, as defined in your _codenameone_settings.properties_ file. This works fine if your app will have the same name in every locale, but suppose you want your app to take on a different name in French than in English. For example: You want your app to be called "Hello App" for English-speaking users, and "Bonjour App" for French-speaking users.
 
@@ -416,7 +416,7 @@ Legacy Ant projects have a different directory structure. They have no equivalen
 TIP: Whenever possible, migrate legacy builds to Maven to take advantage of the modern workflow. See <<maven-project-workflow>> for automated migration options.
 ****
 
-===== Example: localization app usage description strings
+===== Example: Localization app usage description strings
 
 iOS requires you to supply usage descriptions for many features that will be displayed to the user when the app requests permission to use the feature. For example, the https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription?language=objc[NSCameraUsageDescription] string must be provided if your app needs to use the camera. You can specify these values as build hints using the pattern `ios.NSXXXUsageDescription=This feature is needed blah blah`. In the `NSCameraUsageDescription` case, you might include the build hint:
 
@@ -469,7 +469,7 @@ On Android the build generates locale-qualified drawable resources at every dens
 
 No code changes are required—Android's resource framework switches icons when the locale changes.
 
-When you supply a region-qualified icon (such as `cn1_icon_ar_AE.png`) without a matching language-only variant, the build also emits the *default* (non-localized) icon into `drawable-<lang>/` and the matching `mipmap-*-<lang>/` directories. This barrier is required because Android's resource resolver (API 24+) walks every child of the parent locale when it can't find an exact or parent-language match, and would otherwise pick `ar-rAE` for, say, an `ar-PK` device. The barrier short-circuits that lookup so only devices whose region matches the supplied variant receive the localized icon. If you also ship a language-only file (for example `cn1_icon_ar.png`) it is used as the barrier instead, so you keep full control of the fallback icon for Arabic speakers outside AE.
+When you supply a region-qualified icon (such as `cn1_icon_ar_AE.png`) without a matching language-only variant, the build also emits the *default* (non-localized) icon into `drawable-<lang>/` and the matching `mipmap-*-<lang>/` directories. This barrier is required because Android's resource resolver (API 24+) walks every child of the parent locale when it can't find an exact or parent-language match, and would otherwise pick `ar-rAE` for, say, an `ar-PK` device. The barrier short-circuits that lookup so only devices whose region matches the supplied variant receive the localized icon. If you also ship a language-only file (for example `cn1_icon_ar.png`) it's used as the barrier instead, so you keep full control of the fallback icon for Arabic speakers outside AE.
 
 ===== iOS behaviour
 
@@ -504,6 +504,7 @@ Location position = LocationManager.getLocationManager().getCurrentLocationSync(
 
 IMPORTANT: In order for location to work on iOS you *MUST* define the build hint `ios.locationUsageDescription` and describe why your application needs access to location. Otherwise you won't get location updates!
 
+// vale-skip: Microsoft.Adverbs: "repeatedly" is the precise frequency contrast with "once" here, not authorial padding.
 The `getCurrentLocationSync()` method is good for cases where you need to fetch a current location once and not repeatedly query location. It activates the GPS then turns it off to avoid excessive battery usage. For example, if an application needs to track motion or position over time it should use the location listener API to track location as such:
 
 TIP: Notice that there is a method called `getCurrentLocation()` which will return the current state and might not be right for some cases.
@@ -532,7 +533,7 @@ Because of the nature of background location the API is non-trivial. It starts w
 
 Instead of passing a `LocationListener` instance you need to pass a `Class` object instance. This is important because background location might be invoked when the app isn't running and an object would need to be allocated.
 
-Notice that you should *NOT* perform long operations in the background listener callback. IOS wake-up time is limited to about 10 seconds and the app could get killed if it exceeds that time slice.
+Notice that you *shouldn't* perform long operations in the background listener callback. IOS wake-up time is limited to about 10 seconds and the app could get killed if it exceeds that time slice.
 
 Notice that the listener can also send events when the app is in the foreground, so it's recommended to check the app state before deciding how to process this event. You can use `Display.isMinimized()` to determine if the app is running or in the background.
 
@@ -1001,7 +1002,7 @@ hi.getToolbar().addCommandToRightBar("", icon, (ev) -> {
 hi.add(BorderLayout.CENTER, iv);
 ----
 
-TIP: There is no need for a screenshot as it will look identical to the capture image screenshot above
+TIP: No need for a screenshot as it will look identical to the capture image screenshot above
 
 The last value is the type of content picked which can be one of:
 `Display.GALLERY_ALL`, `Display.GALLERY_VIDEO` or `Display.GALLERY_IMAGE`.
@@ -1172,7 +1173,7 @@ if(!fb.isUserLoggedIn()){
 ----
 
 IMPORTANT: All these values are from the web version of the app! +
-They are used in the simulator and on "unsupported"
+They're used in the simulator and on "unsupported"
 platforms as a fallback. Android and iOS will use the
 native login
 
@@ -1200,7 +1201,7 @@ TIP: Notice that this won't always prompt the user, but its required to verify t
 [[google-login-section]]
 === Google Sign-In
 
-Google Login is a bit of a moving target, as they are creating new APIs and deprecating old ones. Codename One 3.7 and earlier used the Google+ API for sign-in, which is now deprecated. While this API still works, it's no longer useful on iOS as it redirects to Safari to perform login, and Apple no longer allows this practice.
+Google Login is a bit of a moving target, as they're creating new APIs and deprecating old ones. Codename One 3.7 and earlier used the Google+ API for sign-in, which is now deprecated. While this API still works, it's no longer useful on iOS as it redirects to Safari to perform login, and Apple no longer allows this practice.
 
 The new, approved API is called Google Sign-In. Rather than using Safari to handle login (on iOS), it uses an embedded web view, which *is* permitted by Apple.
 
@@ -1458,7 +1459,7 @@ Codename One has two basic ways to create new components:
 Components such as https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html[Tabs] subclass `Container` which make a lot of sense for that component since it's physically a `Container`.
 
 For example,
-components like https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton], https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[SpanButton] & https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[SpanLabel] don't necessarily seem like the right candidate for compositing but they are all `Container` subclasses.
+components like https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton], https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[SpanButton] & https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[SpanLabel] don't necessarily seem like the right candidate for compositing but they're all `Container` subclasses.
 
 Using a `Container` provides you a lot of flexibility in layout & functionality for a specific component. `MultiButton`
 is a great example of that. it's a `Container` internally that's composed of 5 labels and a `Button`.
@@ -1670,11 +1671,11 @@ The real value is for 3rd party cn1lib authors. For example: Google Maps or Pars
 
 === Easy thread
 
-Working with threads is ranked as one of the least intuitive and painful tasks in programming. This is such an error prone task that some platforms/languages took the route of avoiding threads entirely. I needed to convert some code to work on a separate thread but I still wanted the ability to communicate and transfer data from that thread.
+Working with threads is ranked as one of the least intuitive and painful tasks in programming. This is such an error prone task that some platforms/languages took the route of avoiding threads entirely. A typical scenario: you need to convert some code to work on a separate thread but you still want the ability to communicate and transfer data from that thread.
 
-This is possible in Java but non-trivial, the thing is that this is easy to do in Codename One with tools such as `callSerially` I can let arbitrary code run on the EDT. Why not offer that to any random thread?
+This is possible in Java but non-trivial, the thing is that this is easy to do in Codename One with tools such as `callSerially` that let arbitrary code run on the EDT. Why not offer that to any random thread?
 
-that's why I created `EasyThread` which takes some concepts of Codeame One's threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and synchronize the data back into the EDT as needed...
+That's why `EasyThread` exists: it takes some concepts of Codename One's threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and synchronize the data back into the EDT as needed...
 
 Easy thread can be created like this:
 
@@ -1699,7 +1700,7 @@ e.run((success) -> success.onSuccess(doThisOnTheThread()), (myResult) -> onEDTGo
 
 Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. this code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
 
-These asynchronous calls make things a bit painful to wade thru so instead I chose to wrap them in a simplified synchronous version:
+These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 
 [source,java]
 ----
@@ -1747,9 +1748,9 @@ Removing the jars, build, private folder etc. makes a lot of sense but there are
 
 ==== cn1lib's
 
-You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. However, I didn't exclude cn1libs... That was an omission since the original project you committed didn't have cn1libs. However, should you commit a binary file to git?
+You will notice you excluded the jars which are stored under lib and you exclude the Codename One source zip. However, cn1libs aren't excluded... That was an omission since the original project you committed didn't have cn1libs. However, should you commit a binary file to git?
 
-I don't know. Git isn't good with binaries but cn1libs make sense. In another project that did have a cn1lib I did this:
+It's a fair question. Git isn't good with binaries but committing cn1libs can still make sense. In another project that did have a cn1lib the approach was this:
 
 ----
 

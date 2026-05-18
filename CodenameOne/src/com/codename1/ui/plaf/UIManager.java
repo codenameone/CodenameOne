@@ -75,6 +75,14 @@ public class UIManager {
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     private boolean useLargerTextScale;
+    /// Tracks the original (unscaled) Font we replaced in themeProps when
+    /// [#applyLargerTextScaleToThemeFonts] last ran. Without this, each scale
+    /// change derives from the previously-scaled font and compounds, so going
+    /// XL -> XXL over-scales and going XXL -> Large never shrinks back. The
+    /// parallel scaledFontDerived map records the Font we wrote, so we only
+    /// restore entries that the theme has not overwritten in the meantime.
+    private final Map<String, Font> scaledFontOriginals = new HashMap<String, Font>();
+    private final Map<String, Font> scaledFontDerived = new HashMap<String, Font>();
     /// The resource bundle allows us to implicitly localize the UI on the fly, once its
     /// installed all internal application strings query the resource bundle and extract
     /// their values from this table if applicable.
@@ -2042,6 +2050,26 @@ public class UIManager {
     }
 
     private void applyLargerTextScaleToThemeFonts() {
+        // Roll back any prior scaling we applied so this pass always derives
+        // from the original installed font. Without the rollback, repeated
+        // refreshes compound (each scale multiplies the previously-derived
+        // pixel size) and a return to scale 1.0 never actually shrinks fonts.
+        if (!scaledFontOriginals.isEmpty()) {
+            for (Map.Entry<String, Font> entry : scaledFontOriginals.entrySet()) {
+                String key = entry.getKey();
+                Object current = themeProps.get(key);
+                Font derived = scaledFontDerived.get(key);
+                // Only restore when the theme still holds the Font we wrote;
+                // an intervening setThemeProps/addThemeProps may have replaced
+                // it with a new original we must keep.
+                if (current == derived) { //NOPMD CompareObjectsWithEquals
+                    themeProps.put(key, entry.getValue());
+                }
+            }
+            scaledFontOriginals.clear();
+            scaledFontDerived.clear();
+        }
+
         float scale = getEffectiveLargerTextScale();
         if (scale <= 1f) {
             return;
@@ -2052,8 +2080,11 @@ public class UIManager {
             }
             Object value = entry.getValue();
             if (value instanceof Font) {
-                Font scaled = scaleFontForLargerText((Font) value, scale);
-                if (scaled != value) { //NOPMD CompareObjectsWithEquals
+                Font original = (Font) value;
+                Font scaled = scaleFontForLargerText(original, scale);
+                if (scaled != original) { //NOPMD CompareObjectsWithEquals
+                    scaledFontOriginals.put(entry.getKey(), original);
+                    scaledFontDerived.put(entry.getKey(), scaled);
                     entry.setValue(scaled);
                 }
             }

@@ -4,7 +4,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -90,7 +89,42 @@ public class IsApiSupported {
             }
         }
         if (candidates.isEmpty()) return null;
-        candidates.sort(Comparator.comparing((Path p) -> p.getFileName().toString()).reversed());
+        candidates.sort((a, b) -> compareVersions(versionOf(b), versionOf(a)));
         return candidates.get(0);
+    }
+
+    private static String versionOf(Path jar) {
+        Path versionDir = jar.getParent();
+        return versionDir == null ? "" : versionDir.getFileName().toString();
+    }
+
+    private static int compareVersions(String left, String right) {
+        String[] leftParts = left.split("-", 2);
+        String[] rightParts = right.split("-", 2);
+        int numeric = compareNumericVersions(leftParts[0], rightParts[0]);
+        if (numeric != 0) return numeric;
+        String leftSuffix = leftParts.length > 1 ? leftParts[1] : "";
+        String rightSuffix = rightParts.length > 1 ? rightParts[1] : "";
+        return leftSuffix.compareTo(rightSuffix);
+    }
+
+    private static int compareNumericVersions(String left, String right) {
+        String[] leftParts = left.split("\\.");
+        String[] rightParts = right.split("\\.");
+        int max = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < max; i++) {
+            int comparison = Integer.compare(versionPart(leftParts, i), versionPart(rightParts, i));
+            if (comparison != 0) return comparison;
+        }
+        return 0;
+    }
+
+    private static int versionPart(String[] parts, int index) {
+        if (index >= parts.length) return 0;
+        try {
+            return Integer.parseInt(parts[index]);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 }
