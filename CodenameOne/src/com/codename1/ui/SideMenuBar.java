@@ -1812,7 +1812,7 @@ public class SideMenuBar extends MenuBar {
                 // right after starting the async dispose, so if the
                 // command invoked a modal Dialog.show() the Dialog's
                 // event pump took over the EDT before
-                // detachToolbarLayeredPane could fire — leaving the
+                // detachToolbarLayeredPane could fire -- leaving the
                 // dim backdrop visible after the Dialog was dismissed.
                 Display.getInstance().getCurrent().getToolbar().closeSideMenu(new Runnable() {
                     @Override
