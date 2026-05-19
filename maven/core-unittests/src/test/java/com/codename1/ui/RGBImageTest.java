@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Transform;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,5 +73,106 @@ class RGBImageTest extends UITestBase {
         Image canvas = Image.createImage(4, 4);
         Graphics g = canvas.getGraphics();
         g.drawImage(image, 0, 0);
+    }
+
+    // Regression test for https://github.com/codenameone/CodenameOne/issues/4188:
+    // the (w, h) overload of drawImage used to fall through Image#drawImage, which
+    // dispatches through the (null) native peer and renders nothing. The new
+    // override pushes a translate + scale affine transform onto the graphics
+    // context and emits drawRGB at native size, so the platform pipeline applies
+    // the scaling.
+    @FormTest
+    void testScaledDrawImageIntegerScale() {
+        int red = 0xffff0000;
+        int green = 0xff00ff00;
+        int blue = 0xff0000ff;
+        int white = 0xffffffff;
+        RGBImage source = new RGBImage(new int[]{red, green, blue, white}, 2, 2);
+
+        Image canvas = Image.createImage(4, 4, 0xff000000);
+        Graphics g = canvas.getGraphics();
+        g.drawImage(source, 0, 0, 4, 4);
+
+        int[] actual = canvas.getRGB();
+        int[] expected = new int[]{
+                red,   red,   green, green,
+                red,   red,   green, green,
+                blue,  blue,  white, white,
+                blue,  blue,  white, white
+        };
+        assertArrayEquals(expected, actual,
+                "2x integer upscale of RGBImage should replicate each source pixel into a 2x2 block");
+    }
+
+    @FormTest
+    void testScaledDrawImageAtOffset() {
+        int red = 0xffff0000;
+        int green = 0xff00ff00;
+        int blue = 0xff0000ff;
+        int white = 0xffffffff;
+        int bg = 0xff000000;
+        RGBImage source = new RGBImage(new int[]{red, green, blue, white}, 2, 2);
+
+        Image canvas = Image.createImage(6, 6, bg);
+        Graphics g = canvas.getGraphics();
+        g.drawImage(source, 1, 1, 4, 4);
+
+        int[] actual = canvas.getRGB();
+        int[] expected = new int[]{
+                bg,  bg,    bg,    bg,    bg,    bg,
+                bg,  red,   red,   green, green, bg,
+                bg,  red,   red,   green, green, bg,
+                bg,  blue,  blue,  white, white, bg,
+                bg,  blue,  blue,  white, white, bg,
+                bg,  bg,    bg,    bg,    bg,    bg
+        };
+        assertArrayEquals(expected, actual,
+                "Scaled draw at (1,1) of a 4x4 region should land within the inner 4x4 of a 6x6 canvas");
+    }
+
+    @FormTest
+    void testScaledDrawImageDownscale() {
+        int red = 0xffff0000;
+        int green = 0xff00ff00;
+        int blue = 0xff0000ff;
+        int white = 0xffffffff;
+        int[] src = new int[16];
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                int color;
+                if (row < 2 && col < 2) color = red;
+                else if (row < 2) color = green;
+                else if (col < 2) color = blue;
+                else color = white;
+                src[row * 4 + col] = color;
+            }
+        }
+        RGBImage source = new RGBImage(src, 4, 4);
+
+        Image canvas = Image.createImage(2, 2, 0xff000000);
+        Graphics g = canvas.getGraphics();
+        g.drawImage(source, 0, 0, 2, 2);
+
+        int[] actual = canvas.getRGB();
+        int[] expected = new int[]{red, green, blue, white};
+        assertArrayEquals(expected, actual,
+                "2x integer downscale should pick one representative pixel per source quadrant");
+    }
+
+    @FormTest
+    void testScaledDrawImagePreservesPriorTransform() {
+        RGBImage source = createSampleImage();
+
+        Image canvas = Image.createImage(4, 4, 0xff000000);
+        Graphics g = canvas.getGraphics();
+        Transform before = Transform.makeIdentity();
+        g.getTransform(before);
+
+        g.drawImage(source, 0, 0, 4, 4);
+
+        Transform after = Transform.makeIdentity();
+        g.getTransform(after);
+        assertTrue(before.equals(after),
+                "drawImage(w,h) must restore the graphics transform it modified");
     }
 }
