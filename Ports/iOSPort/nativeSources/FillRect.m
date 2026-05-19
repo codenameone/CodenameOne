@@ -202,11 +202,35 @@ extern int CN1DbgPolygonClipSeq;
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
     //_glEnableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
+    GLubyte pixelBeforeP2[4] = {0,0,0,0};
+    GLubyte pixelBeforeP1[4] = {0,0,0,0};
+    BOOL probeThisDraw = (CN1DbgRemainingOps >= 0 && color == 0xff0000 && x < 0 && width > 1000) || (CN1DbgRemainingOps >= 0 && color == 0xff0000 && x > 0 && x < 100 && width > 1000);
+    if (probeThisDraw) {
+        // Y in glReadPixels is bottom-up; iPhone 16e is 2556 tall at 3x scale = 7668 fb pixels?
+        // Use viewport height.
+        GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
+        glReadPixels(873, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelBeforeP2);
+        glReadPixels(300, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelBeforeP1);
+    }
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    if (probeThisDraw) {
+        GLubyte pixelAfterP2[4] = {0,0,0,0};
+        GLubyte pixelAfterP1[4] = {0,0,0,0};
+        GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
+        glFinish();
+        glReadPixels(873, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelAfterP2);
+        glReadPixels(300, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelAfterP1);
+        NSLog(@"CN1SS:DBG FillRect.draw px=(873,870) before=(%d,%d,%d,%d) after=(%d,%d,%d,%d) panel1@(300,870) before=(%d,%d,%d,%d) after=(%d,%d,%d,%d) color=0x%06x x=%d",
+              pixelBeforeP2[0], pixelBeforeP2[1], pixelBeforeP2[2], pixelBeforeP2[3],
+              pixelAfterP2[0], pixelAfterP2[1], pixelAfterP2[2], pixelAfterP2[3],
+              pixelBeforeP1[0], pixelBeforeP1[1], pixelBeforeP1[2], pixelBeforeP1[3],
+              pixelAfterP1[0], pixelAfterP1[1], pixelAfterP1[2], pixelAfterP1[3],
+              color, x);
+    }
     //GLErrorLog;
     //_glDisableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
-    
+
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
 
