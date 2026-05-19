@@ -443,3 +443,5 @@ jobs:
             pages deploy docs/website/public
             --project-name=${{ env.CF_PAGES_PROJECT_NAME }}
             --branch=${{ env.CF_PAGES_PRODUCTION_BRANCH }}
+
+# touched to retrigger Hugo workflow (path filter matches this file)
