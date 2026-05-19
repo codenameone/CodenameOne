@@ -37,7 +37,9 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-# iOSModernTheme.res is committed under Ports/iOSPort/nativeSources/ and kept
-# in sync by .github/workflows/native-themes-sync.yml. For local iteration on
+# maven/ios/pom.xml pulls Themes/iOSModernTheme.res directly into nativeios.jar,
+# so no pre-staging copy under Ports/iOSPort/nativeSources/ is needed. The .res
+# is committed under Themes/ and kept in sync by
+# .github/workflows/native-themes-sync.yml. For local iteration on
 # native-themes/ios-modern/theme.css, run scripts/build-native-themes.sh.
 "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Djava.awt.headless=true clean install "$@"

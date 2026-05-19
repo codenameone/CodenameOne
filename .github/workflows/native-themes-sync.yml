@@ -67,15 +67,11 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # All six committed copies are written by build-native-themes.sh.
-          # Each downstream consumer (simulator fat-jar, nativeios.jar, the
-          # Android port jar, the JS webapp, the BuildDaemon's sibling cn1
-          # checkout) ships from its own committed copy with no extra cp step.
-          git add Themes/iOSModernTheme.res Themes/AndroidMaterialTheme.res \
-                  Ports/JavaScriptPort/src/main/webapp/assets/iOSModernTheme.res \
-                  Ports/JavaScriptPort/src/main/webapp/assets/AndroidMaterialTheme.res \
-                  Ports/iOSPort/nativeSources/iOSModernTheme.res \
-                  Ports/Android/src/AndroidMaterialTheme.res
+          # Themes/ holds the single source of truth. Each downstream consumer
+          # (nativeios.jar, the Android port jar, the simulator fat-jar, the
+          # BuildDaemon's sibling cn1 checkout) copies from Themes/ at its own
+          # build time, so this workflow only commits these two files.
+          git add Themes/iOSModernTheme.res Themes/AndroidMaterialTheme.res
           if git diff --staged --quiet; then
             echo "No .res changes; nothing to commit."
             exit 0

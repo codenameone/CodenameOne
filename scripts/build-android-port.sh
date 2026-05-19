@@ -131,7 +131,9 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-# AndroidMaterialTheme.res is committed under Ports/Android/src/ and kept in
-# sync by .github/workflows/native-themes-sync.yml. For local iteration on
-# native-themes/android-material/theme.css, run scripts/build-native-themes.sh.
+# maven/android/pom.xml pulls Themes/AndroidMaterialTheme.res directly into
+# the Android port jar (resource entry on Themes/), so no pre-staging copy
+# under Ports/Android/src/ is needed. The .res is committed under Themes/ and
+# kept in sync by .github/workflows/native-themes-sync.yml. For local iteration
+# on native-themes/android-material/theme.css, run scripts/build-native-themes.sh.
 run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"

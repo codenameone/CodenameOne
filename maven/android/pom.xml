@@ -280,6 +280,18 @@
                         <resource>
                             <directory>${src.dir}</directory>
                         </resource>
+                        <!-- Themes/AndroidMaterialTheme.res is the single
+                             source of truth; pull it into the Android port
+                             jar here instead of pre-staging a copy under
+                             Ports/Android/src/. The .res is committed and
+                             kept in sync by
+                             .github/workflows/native-themes-sync.yml. -->
+                        <resource>
+                            <directory>${project.basedir}/../../Themes</directory>
+                            <includes>
+                                <include>AndroidMaterialTheme.res</include>
+                            </includes>
+                        </resource>
                     </resources>
 
 

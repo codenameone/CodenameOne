@@ -1,0 +1,5 @@
+# Mirrors of Themes/*.res written by scripts/build-native-themes.sh so a local
+# JS port run can fetch them as webapp assets. The canonical .res lives in
+# Themes/ and is committed; this mirror is a build artifact.
+iOSModernTheme.res
+AndroidMaterialTheme.res
