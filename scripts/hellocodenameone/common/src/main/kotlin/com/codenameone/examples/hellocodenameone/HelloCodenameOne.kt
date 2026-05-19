@@ -19,7 +19,12 @@ open class HelloCodenameOne : Lifecycle() {
         // direct-to-screen rendering in the GH-3302 inscribed-triangle /
         // translate-then-scale screenshots to land on the same pixels as the
         // buffered mutable-image path.
-        Graphics.useMatrixTranslation = true
+        //
+        // The default is on; CI also runs the suite with the flag off via
+        // `-Dcodename1.arg.matrixTranslation=false` so regressions in the
+        // legacy code path get caught alongside the matrix-mode coverage.
+        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", "true")
+        Graphics.useMatrixTranslation = "true".equals(matrixFlag, ignoreCase = true)
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }

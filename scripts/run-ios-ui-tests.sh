@@ -180,6 +180,33 @@ else
   SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
 fi
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
+
+# Optional overlay directory: files here win against $SCREENSHOT_REF_DIR for
+# the same basename. Used by the Metal matrix-translation pass to point at
+# screenshots-metal-matrix/ over the base screenshots-metal/, so tests that
+# produce identical renders in both modes share a single golden while tests
+# that diverge (inscribed-triangle, translate-then-scale, etc.) have a
+# mode-specific override without duplicating the entire golden set.
+if [ -n "${SCREENSHOT_REF_OVERLAY_DIR:-}" ]; then
+  if [ ! -d "$SCREENSHOT_REF_OVERLAY_DIR" ]; then
+    ri_log "SCREENSHOT_REF_OVERLAY_DIR override '$SCREENSHOT_REF_OVERLAY_DIR' is not a directory" >&2
+    exit 3
+  fi
+  SCREENSHOT_REF_OVERLAY_DIR="$(cd "$SCREENSHOT_REF_OVERLAY_DIR" && pwd)"
+  STAGED_REF_DIR="$SCREENSHOT_TMP_DIR/golden-staged"
+  mkdir -p "$STAGED_REF_DIR"
+  # Copy base then overlay so overlay files win.
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$SCREENSHOT_REF_DIR/" "$STAGED_REF_DIR/"
+    rsync -a "$SCREENSHOT_REF_OVERLAY_DIR/" "$STAGED_REF_DIR/"
+  else
+    cp -R "$SCREENSHOT_REF_DIR"/. "$STAGED_REF_DIR/"
+    cp -R "$SCREENSHOT_REF_OVERLAY_DIR"/. "$STAGED_REF_DIR/"
+  fi
+  ri_log "Merged $SCREENSHOT_REF_OVERLAY_DIR over $SCREENSHOT_REF_DIR into $STAGED_REF_DIR"
+  SCREENSHOT_REF_DIR="$STAGED_REF_DIR"
+fi
+
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"

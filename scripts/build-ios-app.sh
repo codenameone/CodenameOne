@@ -71,6 +71,12 @@ bia_log "Using JAVAC from JAVA17_HOME for demo compilation:"
 "$JAVA17_HOME/bin/javac" -version
 IOS_UISCENE="${IOS_UISCENE:-true}"
 bia_log "Building sample app with ios.uiscene=${IOS_UISCENE}"
+# Controls Graphics.useMatrixTranslation in the test app
+# (scripts/hellocodenameone/common/src/main/kotlin/.../HelloCodenameOne.kt
+# reads codename1.arg.matrixTranslation). Default on; CI flips it off in a
+# parallel job to validate the legacy code path under iOS Metal.
+MATRIX_TRANSLATION="${MATRIX_TRANSLATION:-true}"
+bia_log "Building sample app with matrixTranslation=${MATRIX_TRANSLATION}"
 EXTRA_IOS_ARGS=()
 if [ -n "${IOS_DEPENDENCY_ARGS:-}" ]; then
   # shellcheck disable=SC2206
@@ -188,6 +194,7 @@ bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
     -Dmaven.compiler.fork=true
     -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac"
     -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}"
+    -Dcodename1.arg.matrixTranslation="${MATRIX_TRANSLATION}"
     -Dopen=false
   )
   if [ ${#EXTRA_IOS_ARGS[@]} -gt 0 ]; then

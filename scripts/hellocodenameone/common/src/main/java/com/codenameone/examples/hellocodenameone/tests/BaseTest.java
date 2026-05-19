@@ -33,6 +33,18 @@ public abstract class BaseTest extends AbstractTest {
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {
+                if (!shouldTakeScreenshot()) {
+                    // Tests that opt out via shouldTakeScreenshot() still
+                    // run their paint logic (to exercise the API) but
+                    // never emit a screenshot, so the CI comparison won't
+                    // flag a missing reference. The runner is unblocked
+                    // immediately via done().
+                    registerReadyCallback(this, () -> {
+                        System.out.println("CN1SS:INFO:test=" + imageName + " screenshot=skipped");
+                        BaseTest.this.done();
+                    });
+                    return;
+                }
                 registerReadyCallback(this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, BaseTest.this::done);
                 });

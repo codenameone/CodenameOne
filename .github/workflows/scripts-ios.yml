@@ -387,6 +387,15 @@ jobs:
           # the Metal backend will not be pixel-identical to the GL
           # baselines (especially once CoreText glyph rendering lands).
           SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal
+          # The matrix-translation flag is on by default in this job
+          # (HelloCodenameOne.kt reads codename1.arg.matrixTranslation,
+          # build-ios-app.sh passes the MATRIX_TRANSLATION env through).
+          # Overlay the matrix-mode-specific goldens on top of the base set
+          # so the few tests that diverge between modes (inscribed-triangle,
+          # translate-then-scale, etc.) check against their matrix-mode
+          # reference while every other test still compares against the
+          # single shared base golden.
+          SCREENSHOT_REF_OVERLAY_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-matrix
           # Override the PR comment marker / preview path / title so this
           # job posts its own comment instead of overwriting the GL job's
           # comment (both jobs ran with the same default marker before, so
@@ -450,6 +459,221 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ui-tests-metal
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-ios-metal-legacy:
+    # Companion job to build-ios-metal: runs the same iOS Metal screenshot
+    # suite with Graphics.useMatrixTranslation off (codename1.arg.matrixTranslation=false)
+    # so any regression that legacy callers would see on Metal gets caught
+    # before the opt-in flag is enabled in real apps. The base golden set
+    # in scripts/ios/screenshots-metal/ tracks legacy-mode renders; the
+    # matrix-mode job overlays the per-test differences from
+    # scripts/ios/screenshots-metal-matrix/ on top.
+    continue-on-error: true
+    needs: build-port
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    timeout-minutes: 45
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-metal-legacy-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      MATRIX_TRANSLATION: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-ios-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-ios-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Install Metal Toolchain
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
+            exit 1
+          fi
+          echo "Using $XCODE_APP"
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+        timeout-minutes: 10
+
+      - name: Enable Metal backend for hellocodenameone
+        run: |
+          set -euo pipefail
+          SETTINGS=scripts/hellocodenameone/common/codenameone_settings.properties
+          if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
+            sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=true|' "$SETTINGS"
+          else
+            awk '
+              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
+                print
+                print "codename1.arg.ios.metal=true"
+                next
+              }
+              { print }
+            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+          fi
+          echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
+          grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
+
+      - name: Build sample iOS app and compile workspace (Metal, legacy mode)
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run iOS UI screenshot tests (Metal, legacy mode)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-legacy
+          # Legacy mode reads against the base Metal goldens with no
+          # matrix-mode overlay -- the goal here is to catch regressions
+          # in the legacy code path that the opt-in flag should leave
+          # untouched.
+          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_IOS_METAL_LEGACY_COMMENT -->'
+          CN1SS_PREVIEW_SUBDIR: ios-metal-legacy
+          CN1SS_REPORT_TITLE: 'iOS Metal (legacy mode) screenshot updates'
+          CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed in legacy mode.'
+          CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal-legacy]'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "reference dir='${SCREENSHOT_REF_DIR}'"
+
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 30
+
+      - name: Publish Metal-legacy screenshot summary
+        if: always()
+        env:
+          COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-legacy/screenshot-compare.json
+          COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-legacy/screenshot-comment.md
+        run: |
+          set -eu
+          {
+            echo "## iOS Metal screenshot comparison (legacy mode)"
+            echo
+            echo "Ran with \`codename1.arg.matrixTranslation=false\` so the legacy code path is exercised under iOS Metal."
+            echo "Golden images: \`scripts/ios/screenshots-metal/\` (no matrix overlay)."
+            echo
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
+            elif [ -s "$COMMENT_MD" ]; then
+              cat "$COMMENT_MD"
+            else
+              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=Metal legacy-mode screenshot comparison::${NOTICE}"
+            fi
+          fi
+
+      - name: Upload iOS Metal legacy artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-tests-metal-legacy
           path: artifacts
           if-no-files-found: warn
           retention-days: 14

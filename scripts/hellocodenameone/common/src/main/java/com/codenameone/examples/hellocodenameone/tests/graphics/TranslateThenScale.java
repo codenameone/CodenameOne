@@ -28,6 +28,17 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
 public class TranslateThenScale extends AbstractGraphicsScreenshotTest {
 
     @Override
+    public boolean shouldTakeScreenshot() {
+        // This test exists specifically to verify matrix-translation mode
+        // (Graphics.useMatrixTranslation). Under legacy mode the form-direct
+        // panels render the bug it documents -- there is no useful golden
+        // to compare against. Skip the screenshot capture in legacy mode so
+        // the CI legacy-mode pass doesn't flag a missing reference for a
+        // test that's intentionally matrix-mode-only.
+        return Graphics.useMatrixTranslation;
+    }
+
+    @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0xeeeeee);
         g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
