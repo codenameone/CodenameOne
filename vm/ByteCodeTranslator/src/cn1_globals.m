@@ -688,16 +688,6 @@ void codenameOneGCMark() {
                     }
                 }
                 markStatics(d);
-                // Drain the worklist before unblocking the thread so that every object
-                // transitively reachable from this thread's roots is fully marked while the
-                // thread is still paused. Without this, the iterative mark would defer field
-                // scans until the final drain at the end of codenameOneGCMark -- giving the
-                // mutator a window between unblock and drain where it can read a still-grey
-                // field into a new local and then null the field. The captured object would
-                // never be visited by mark and would be incorrectly reclaimed by sweep. The
-                // recursive implementation didn't have this race because it transitively
-                // marked everything before unblocking.
-                gcMarkDrain(d);
                 if(!agressiveAllocator) {
                     t->threadBlockedByGC = JAVA_FALSE;
                 } else {
