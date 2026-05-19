@@ -2186,12 +2186,8 @@ public class Container extends Component implements Iterable<Component> {
             paintElevatedPane(g);
         }
 
-        // Snapshot-reset translate so glass/tensile draw at screen-
-        // absolute coords. matrixFrameworkTranslateX returns the right
-        // anchor for both modes (legacy: xTranslate; matrix mode:
-        // matrixFrameworkX shadow).
-        int tx = g.matrixFrameworkTranslateX();
-        int ty = g.matrixFrameworkTranslateY();
+        int tx = g.getTranslateX();
+        int ty = g.getTranslateY();
         g.translate(-tx, -ty);
         if (sidemenuBarTranslation > 0) {
             g.translate(sidemenuBarTranslation, 0);

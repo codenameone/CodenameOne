@@ -1117,13 +1117,8 @@ public class Form extends Container {
             return;
         }
         if (glassPane != null) {
-            // matrixFrameworkTranslateX returns xTranslate in legacy mode
-            // and the matrixFrameworkX shadow in matrix mode; the translate-
-            // based snapshot reset brings the impl matrix to identity in
-            // both modes so glassPane.paint draws at the form's screen
-            // coords via getBounds().
-            int tx = g.matrixFrameworkTranslateX();
-            int ty = g.matrixFrameworkTranslateY();
+            int tx = g.getTranslateX();
+            int ty = g.getTranslateY();
             g.translate(-tx, -ty);
             glassPane.paint(g, getBounds());
             g.translate(tx, ty);

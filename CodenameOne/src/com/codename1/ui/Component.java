@@ -3031,12 +3031,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
-        // Snapshot-reset translate -- matrixFrameworkTranslateX returns
-        // xTranslate in legacy mode and the matrixFrameworkX shadow in
-        // matrix mode so the parent walk below paints each ancestor at
-        // its screen-absolute position.
-        int tx = g.matrixFrameworkTranslateX();
-        int ty = g.matrixFrameworkTranslateY();
+        int tx = g.getTranslateX();
+        int ty = g.getTranslateY();
+
         g.translate(-tx, -ty);
         int x1 = getAbsoluteX() + getScrollX();
         int y1 = getAbsoluteY() + getScrollY();
@@ -3059,6 +3056,7 @@ public class Component implements Animation, StyleListener, Editable {
             parent = parent.getParent();
         }
         g.translate(tx, ty);
+
     }
 
     /// Paints the UI for the scrollbars on the component, this will be invoked only
@@ -3346,8 +3344,8 @@ public class Component implements Animation, StyleListener, Editable {
                 paintBackgroundImpl(tg);
                 putClientProperty("$FLAT", i);
             }
-            int tx = g.matrixFrameworkTranslateX();
-            int ty = g.matrixFrameworkTranslateY();
+            int tx = g.getTranslateX();
+            int ty = g.getTranslateY();
             g.translate(-tx + absX, -ty + absY);
             g.drawImage(i, 0, 0);
             g.translate(tx - absX, ty - absY);

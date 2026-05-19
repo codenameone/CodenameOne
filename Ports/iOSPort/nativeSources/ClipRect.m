@@ -38,16 +38,6 @@ extern float currentScaleX;
 extern float currentScaleY;
 extern float scaleValue;
 
-// matrix-translate-flag debug probe (#3302). Set to N>0 when a polygon
-// clip is applied; subsequent draw ops decrement and emit one CN1DBG
-// line each. Lets us reconstruct, from the CI artifact log, the exact
-// sequence of (transform, color, geometry) that lands at the FillRect
-// op which fails to render in iOS GL panel 2 of graphics-clip-under-
-// rotation. Without this probe the polygon-clip / FillRect / stencil
-// interaction is opaque from outside the simulator.
-int CN1DbgRemainingOps = 0;
-int CN1DbgPolygonClipSeq = 0;
-
 @implementation ClipRect
 static CGRect drawingRect;
 
@@ -143,14 +133,6 @@ static CGRect drawingRect;
 #else
 #ifdef USE_ES2
     if ( texture != 0 || numPoints > 0 ){
-        CN1DbgPolygonClipSeq++;
-        CN1DbgRemainingOps = 6;
-        if (numPoints > 0) {
-            // Emit ALL polygon vertices to compare winding / shape between panel 1 (renders) and panel 2 (missing red).
-            for (int i = 0; i < numPoints; i++) {
-                NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d v[%d]=(%f,%f)", CN1DbgPolygonClipSeq, i, xPoints[i], yPoints[i]);
-            }
-        }
         clipX = x; clipY=y; clipW=width; clipH=height;
         glClearStencil(0x0);
         glEnable(GL_STENCIL_TEST);
@@ -184,31 +166,7 @@ static CGRect drawingRect;
         clipIsTexture = YES;
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         [super clipBlock:NO];
-
-        // Probe: render a 4x4 magenta marker at panel 1 polygon center (300, 870)
-        // and at panel 2 polygon center (873, 870). With stencil test now bound
-        // to EQUAL,1, only the panel whose polygon stencil covers the marker
-        // pixel will see magenta. In the final composite we can read the pixel
-        // at those locations -- if (873, 870) is magenta, panel 2's polygon
-        // stencil DOES include the center and the FillRect bug is downstream;
-        // if it's still gray, the polygon-clip render itself missed that
-        // pixel. The marker is small enough to be invisible-ish but readable.
-        if (numPoints > 0) {
-            GLKMatrix4 savedXform = glGetTransformES2();
-            glSetTransformES2(GLKMatrix4Identity);
-            FillRect *fr = [[FillRect alloc] initWithArgs:0xff00ff a:255 xpos:298 ypos:868 w:4 h:4];
-            [fr execute];
-#ifndef CN1_USE_ARC
-            [fr release];
-#endif
-            FillRect *fr2 = [[FillRect alloc] initWithArgs:0xff00ff a:255 xpos:871 ypos:868 w:4 h:4];
-            [fr2 execute];
-#ifndef CN1_USE_ARC
-            [fr2 release];
-#endif
-            glSetTransformES2(savedXform);
-        }
-
+        
         return;
     }
 

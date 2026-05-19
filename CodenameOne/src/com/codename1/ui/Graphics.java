@@ -96,16 +96,10 @@ public final class Graphics {
     /// translate. Maintained by `#translate(int, int)` so `#setTransform`
     /// can conjugate the user transform around the framework origin --
     /// `impl matrix = T(matrixFrameworkX, matrixFrameworkY) * userTransform`
-    /// -- matching the legacy `T(xt) * M * T(-xt)` recipe. Snapshot-reset
-    /// callers read it via `#matrixFrameworkTranslateX()`/`Y()` to do the
-    /// translate-based "bring matrix to identity then restore" dance the
-    /// legacy code does with `getTranslateX()`.
-    ///
-    /// Intentionally NOT exposed via `#getTranslateX()` -- bypass-Graphics
-    /// fast paths (Label.drawLabelComponent, BGPainter
-    /// .paintComponentBackground) read getTranslateX to compute coords for
-    /// direct impl calls, and in matrix mode the impl matrix already
-    /// encodes the translate so any addition would double-shift.
+    /// -- matching the legacy `T(xt) * M * T(-xt)` recipe.
+    /// `getTranslateX()`/`Y()` returns this in matrix mode so the legacy
+    /// snapshot-reset idiom (`g.translate(-getTranslateX(), -getTranslateY())`)
+    /// keeps working without any callsite changes.
     private int matrixFrameworkX;
     private int matrixFrameworkY;
     private GeneralPath tmpClipShape;
@@ -153,46 +147,6 @@ public final class Graphics {
     /// shift coords by xTranslate" gate on this.
     private boolean matrixMode() {
         return useMatrixTranslation && impl.isTranslateMatrixSupported();
-    }
-
-    /// Framework-internal accessor returning the current accumulated
-    /// framework painting-chain translate. In legacy mode this is the
-    /// `xTranslate` integer accumulator; in matrix mode it is the
-    /// `matrixFrameworkX` shadow that mirrors the impl matrix translate.
-    /// Snapshot-reset callers in Form.paintGlassImpl,
-    /// Container.paintComponent tail, Component.paintIntersectingComponents-
-    /// Above, drawPainters $FLAT, TextSelection, FontImage rotation,
-    /// Graphics.beginNativeGraphicsAccess, and the
-    /// CodenameOneImplementation paint-queue wrapper use this for the
-    /// translate-based "bring matrix to identity for screen-absolute
-    /// drawing, restore" pattern -- the legacy recipe works in both modes
-    /// because matrix-mode g.translate composes onto the impl matrix and
-    /// matrixFrameworkX/Y stays in sync.
-    ///
-    /// `getTranslateX()` stays at zero in matrix mode -- bypass-Graphics
-    /// paths read that and would double-shift if it leaked the matrix
-    /// anchor. This separate getter is for framework callers that
-    /// explicitly want the screen offset.
-    public int matrixFrameworkTranslateX() {
-        // Legacy mode: delegate to getTranslateX so this is a strict
-        // no-op behavioural change vs. the master callsites that used
-        // getTranslateX directly. On ports whose impl maintains its own
-        // translate accumulator (iOS GL etc.) getTranslateX reads from
-        // impl, not the Java-side `xTranslate` -- returning xTranslate
-        // here would give zero and the snapshot-reset translate(-tx,-ty)
-        // would no-op, leaving the wrapper at the parent's coords.
-        if (matrixMode()) {
-            return matrixFrameworkX;
-        }
-        return getTranslateX();
-    }
-
-    /// Y-axis counterpart to `#matrixFrameworkTranslateX()`.
-    public int matrixFrameworkTranslateY() {
-        if (matrixMode()) {
-            return matrixFrameworkY;
-        }
-        return getTranslateY();
     }
 
     /// Returns the x coordinate to pass to impl draw primitives. In matrix
@@ -250,15 +204,11 @@ public final class Graphics {
         }
         if (matrixMode()) {
             // Matrix-only: compose T(x, y) onto the impl-side matrix. The
-            // public-facing xTranslate/yTranslate stays at zero --
-            // bypass-Graphics paths read getTranslateX and would double-
-            // shift. The internal matrixFrameworkX/Y shadow tracks the
-            // same framework anchor so setTransform's conjugation and
-            // snapshot-reset callsites via matrixFrameworkTranslateX have
-            // a consistent reference. If userTransform is set the impl
-            // matrix needs to stay at T(matrixFrameworkX) * userTransform;
-            // rebuild it here to absorb the new translate without
-            // duplicating the user transform.
+            // xTranslate/yTranslate integer accumulator stays at zero in
+            // matrix mode; matrixFrameworkX/Y shadows the impl-matrix
+            // translate so setTransform's conjugation has a consistent
+            // reference and getTranslateX/Y can keep returning the right
+            // anchor for legacy snapshot-reset callsites.
             matrixFrameworkX += x;
             matrixFrameworkY += y;
             impl.translateMatrix(nativeGraphics, x, y);
@@ -289,16 +239,20 @@ public final class Graphics {
     ///
     /// the current x translate value
     public int getTranslateX() {
+        // Matrix mode: the integer xTranslate accumulator stays at zero;
+        // matrixFrameworkX is the shadow that mirrors the impl-side affine
+        // translation. Master callsites that use getTranslateX as the
+        // snapshot-reset anchor (`g.translate(-getTranslateX(), -getTranslateY())`)
+        // or to compute screen position from local coords therefore need
+        // matrixFrameworkX here -- not the zero accumulator -- so the
+        // legacy idiom keeps working under the opt-in flag without
+        // touching the master callsite.
+        if (matrixMode()) {
+            return matrixFrameworkX;
+        }
         if (impl.isTranslationSupported()) {
             return impl.getTranslateX(nativeGraphics);
         }
-        // In matrix mode the integer accumulator is intentionally never
-        // bumped (the impl matrix is the single source of truth). Returning
-        // zero here is correct as the "amount you would add to a local
-        // coord to get the screen-absolute coord that drawing primitives
-        // *currently apply on top of*" -- which is zero, because drawing
-        // primitives no longer add it. Callers that need the actual
-        // screen offset (snapshot-reset patterns) must use getTransform().
         return xTranslate;
     }
 
@@ -308,6 +262,9 @@ public final class Graphics {
     ///
     /// the current y translate value
     public int getTranslateY() {
+        if (matrixMode()) {
+            return matrixFrameworkY;
+        }
         if (impl.isTranslationSupported()) {
             return impl.getTranslateY(nativeGraphics);
         }
@@ -1338,10 +1295,10 @@ public final class Graphics {
             // framework matrix T(matrixFrameworkX, matrixFrameworkY), NOT
             // a true identity -- otherwise subsequent paint calls would
             // land at screen origin instead of the component's screen
-            // position. Snapshot-reset patterns that need a true identity
-            // matrix use translate-based reset via
-            // matrixFrameworkTranslateX (see the framework callsites
-            // catalogued in Form.paintGlassImpl etc.).
+            // position. The legacy snapshot-reset idiom
+            // `g.translate(-getTranslateX(), -getTranslateY())` brings the
+            // matrix to identity in both modes since getTranslateX/Y now
+            // returns matrixFrameworkX/Y in matrix mode.
             if (transform == null || transform.isIdentity()) {
                 userTransform = null;
                 impl.resetAffine(nativeGraphics);
@@ -2034,12 +1991,8 @@ public final class Graphics {
             a = Boolean.TRUE;
         }
 
-        // Snapshot the framework anchor (xTranslate in legacy mode,
-        // matrixFrameworkX in matrix mode) and zero it via translate so
-        // the native graphics is handed over at screen-absolute origin in
-        // both modes.
-        int tx = matrixFrameworkTranslateX();
-        int ty = matrixFrameworkTranslateY();
+        int tx = getTranslateX();
+        int ty = getTranslateY();
         nativeGraphicsState = new Object[]{
                 Integer.valueOf(tx),
                 Integer.valueOf(ty),

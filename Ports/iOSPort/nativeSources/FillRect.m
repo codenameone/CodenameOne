@@ -109,45 +109,10 @@ static GLuint getOGLProgram(){
     return self;
 }
 #ifdef USE_ES2
-extern int CN1DbgRemainingOps;
-extern int CN1DbgPolygonClipSeq;
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalFillRect(color, alpha, x, y, width, height);
 #else
-    if (CN1DbgRemainingOps > 0) {
-        GLKMatrix4 t = glGetTransformES2();
-        GLboolean stencilOn = glIsEnabled(GL_STENCIL_TEST);
-        GLint stencilFunc = 0, stencilRef = 0, stencilMask = 0, stencilWriteMask = 0;
-        glGetIntegerv(GL_STENCIL_FUNC, &stencilFunc);
-        glGetIntegerv(GL_STENCIL_REF, &stencilRef);
-        glGetIntegerv(GL_STENCIL_VALUE_MASK, &stencilMask);
-        glGetIntegerv(GL_STENCIL_WRITEMASK, &stencilWriteMask);
-        GLboolean scissorOn = glIsEnabled(GL_SCISSOR_TEST);
-        GLint scissor[4] = {0,0,0,0};
-        glGetIntegerv(GL_SCISSOR_BOX, scissor);
-        GLboolean depthOn = glIsEnabled(GL_DEPTH_TEST);
-        GLboolean cullOn = glIsEnabled(GL_CULL_FACE);
-        GLboolean blendOn = glIsEnabled(GL_BLEND);
-        GLint colorMask[4] = {0,0,0,0};
-        glGetIntegerv(GL_COLOR_WRITEMASK, colorMask);
-        GLint viewport[4] = {0,0,0,0};
-        glGetIntegerv(GL_VIEWPORT, viewport);
-        GLint stencilBits = 0;
-        glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
-        GLint fbId = 0;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbId);
-        NSLog(@"CN1SS:DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f stencil=%d func=0x%x ref=%d mask=0x%x writeMask=0x%x scissor=%d box=(%d,%d,%d,%d) depth=%d cull=%d blend=%d colorMask=%d%d%d%d viewport=(%d,%d,%d,%d) stencilBits=%d fb=%d",
-              CN1DbgPolygonClipSeq, CN1DbgRemainingOps, color, alpha, x, y, width, height,
-              t.m[12], t.m[13], t.m[0], t.m[5],
-              stencilOn, stencilFunc, stencilRef, stencilMask, stencilWriteMask,
-              scissorOn, scissor[0], scissor[1], scissor[2], scissor[3],
-              depthOn, cullOn, blendOn,
-              colorMask[0], colorMask[1], colorMask[2], colorMask[3],
-              viewport[0], viewport[1], viewport[2], viewport[3],
-              stencilBits, fbId);
-        CN1DbgRemainingOps--;
-    }
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));
     //GlColorFromRGB(color, alpha);
@@ -202,35 +167,11 @@ extern int CN1DbgPolygonClipSeq;
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
     //_glEnableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
-    GLubyte pixelBeforeP2[4] = {0,0,0,0};
-    GLubyte pixelBeforeP1[4] = {0,0,0,0};
-    BOOL probeThisDraw = (CN1DbgRemainingOps >= 0 && color == 0xff0000 && x < 0 && width > 1000) || (CN1DbgRemainingOps >= 0 && color == 0xff0000 && x > 0 && x < 100 && width > 1000);
-    if (probeThisDraw) {
-        // Y in glReadPixels is bottom-up; iPhone 16e is 2556 tall at 3x scale = 7668 fb pixels?
-        // Use viewport height.
-        GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
-        glReadPixels(873, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelBeforeP2);
-        glReadPixels(300, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelBeforeP1);
-    }
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    if (probeThisDraw) {
-        GLubyte pixelAfterP2[4] = {0,0,0,0};
-        GLubyte pixelAfterP1[4] = {0,0,0,0};
-        GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
-        glFinish();
-        glReadPixels(873, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelAfterP2);
-        glReadPixels(300, vp[3] - 870, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixelAfterP1);
-        NSLog(@"CN1SS:DBG FillRect.draw px=(873,870) before=(%d,%d,%d,%d) after=(%d,%d,%d,%d) panel1@(300,870) before=(%d,%d,%d,%d) after=(%d,%d,%d,%d) color=0x%06x x=%d",
-              pixelBeforeP2[0], pixelBeforeP2[1], pixelBeforeP2[2], pixelBeforeP2[3],
-              pixelAfterP2[0], pixelAfterP2[1], pixelAfterP2[2], pixelAfterP2[3],
-              pixelBeforeP1[0], pixelBeforeP1[1], pixelBeforeP1[2], pixelBeforeP1[3],
-              pixelAfterP1[0], pixelAfterP1[1], pixelAfterP1[2], pixelAfterP1[3],
-              color, x);
-    }
     //GLErrorLog;
     //_glDisableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
-
+    
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
 
