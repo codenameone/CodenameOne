@@ -455,7 +455,7 @@ And build the project. The project should build OK, and if you run it, you shoul
 
 === Adding menus to the simulator
 
-A cn1lib can contribute menu items to the Codename One simulator's menu bar. This is the same affordance the framework itself uses for the Skins / Native Theme / Simulate menus — opened up so library authors can expose backend-specific actions (e.g. "Add a simulated peripheral", "Inject a push notification", "Switch backend") without users having to write any Swing code or instrument their app.
+A cn1lib can contribute menu items to the Codename One simulator's menu bar. This is the same affordance the framework itself uses for the Skins / Native Theme / Simulate menus — opened up so library authors can expose backend-specific actions (for example, "Add a simulated peripheral," "Inject a push notification," or "Switch backend") without users having to write any Swing code or instrument their app.
 
 The same menu metadata is visible to CN1 unit tests, so a test can introspect what a library exposes and drive the same action methods directly.
 
@@ -485,7 +485,7 @@ No groups, no submenus, no priority — flat by design. If you need ordering rel
 
 ==== The action method
 
-The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can freely call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally.
+The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally.
 
 [source,java]
 ----
@@ -507,7 +507,7 @@ public final class Hooks {
 
 The `Display.isInitialized()` guard is a useful pattern when the same static methods are also called from JUnit tests that don't run inside a live CN1 simulator — the state mutation runs in both contexts, only the UI feedback is skipped.
 
-==== Worked example: cn1-bluetooth
+==== Worked example using cn1-bluetooth
 
 The `cn1-bluetooth` cn1lib ships a JavaSE port with two backends: a scriptable in-memory simulator and a real-hardware backend that talks to a native helper (CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). Both are useful in different stages of development, and the menu lets the user choose between them and exercise the simulator without writing any test scaffolding.
 
@@ -564,7 +564,7 @@ In practice you usually don't need this — the same static methods on `Bluetoot
 
 ==== What's intentionally not exposed
 
-* *Swing types.* `JMenu`, `JMenuItem`, `KeyStroke` and friends do not appear in the contract. The simulator UX may change shape (toolbar, command palette, sidebar) and cn1libs shouldn't have to follow.
+* *Swing types.* `JMenu`, `JMenuItem`, `KeyStroke` and friends don't appear in the contract. The simulator UX may change shape (toolbar, command palette, sidebar) and cn1libs shouldn't have to follow.
 * *Submenus, separators, priority.* The metadata is a flat list with no hierarchy. If you want grouping, ship multiple `simulator-hooks.properties` files in separate jars — each becomes its own menu.
 * *Long-running work on the EDT.* Hook methods run on the CN1 EDT; if you need to do I/O, fire-and-forget a `new Thread(...)` from the method or use `CN.invokeAndBlock` so you don't block the UI.
 
