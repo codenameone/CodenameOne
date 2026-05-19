@@ -500,7 +500,8 @@ public class Toolbar extends Container {
 
         @Override
         public void run() {
-            if (--remaining == 0) {
+            remaining--;
+            if (remaining == 0) {
                 delegate.run();
             }
         }
