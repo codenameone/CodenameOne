@@ -9,6 +9,17 @@ on:
       - 'scripts/initializr/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
+      # The Initializr/playground/skindesigner JS bundles are built from
+      # JavaScriptPort sources and the ParparVM translator at workflow
+      # time, so a change in either also needs to redeploy the website.
+      # Without these paths a JS-port bug fix (e.g. dialog rendering
+      # in be3bc6dcd) sits in the branch with no Cloudflare preview
+      # refresh until an unrelated docs change happens to trigger
+      # the workflow.
+      - 'Ports/JavaScriptPort/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/JavaAPI/**'
+      - 'CodenameOne/src/**'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -19,6 +30,10 @@ on:
       - 'scripts/initializr/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
+      - 'Ports/JavaScriptPort/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/JavaAPI/**'
+      - 'CodenameOne/src/**'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
 
