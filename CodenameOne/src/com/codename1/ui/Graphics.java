@@ -1361,6 +1361,39 @@ public final class Graphics {
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 
+    /// Fills the rectangle (x, y, width, height) with the given multi-stop
+    /// gradient. The Gradient may be a `LinearGradient`, `RadialGradient`, or
+    /// `ConicGradient` - the port picks the right native shader path
+    /// (Java2D `LinearGradientPaint`/`RadialGradientPaint` on JavaSE; Android
+    /// `LinearGradient`/`RadialGradient`/`SweepGradient` shaders; software
+    /// rasterizer fallback elsewhere). Pass null or width/height <= 0 for a no-op.
+    public void fillGradient(Gradient gradient, int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
+            return;
+        }
+        impl.fillGradient(nativeGraphics, gradient, x + xTranslate, y + yTranslate, width, height);
+    }
+
+    /// Returns a copy of the given image with a Gaussian blur of the given radius
+    /// applied. Equivalent to the CSS filter:blur() effect on an image.
+    public Image gaussianBlur(Image source, float radius) {
+        if (source == null || radius <= 0f) {
+            return source;
+        }
+        return impl.gaussianBlurImage(source, radius);
+    }
+
+    /// Applies a Gaussian blur to the contents already painted into the
+    /// rectangular region. Used to realize CSS backdrop-filter:blur().
+    /// Returns true if the port supports an in-place blur; otherwise the
+    /// caller should fall back to snapshot + gaussianBlur().
+    public boolean blurRegion(int x, int y, int width, int height, float radius) {
+        if (width <= 0 || height <= 0 || radius <= 0f) {
+            return true;
+        }
+        return impl.blurRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, radius);
+    }
+
     /// Fills a rectangle with an optionally translucent fill color
     ///
     /// #### Parameters

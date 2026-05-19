@@ -860,6 +860,11 @@ public abstract class StyleParser {
                 "gradient_radial", (int) Style.BACKGROUND_GRADIENT_RADIAL,
                 "gradient_linear_horizontal", (int) Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
                 "gradient_linear_vertical", (int) Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL,
+                "gradient_linear", (int) Style.BACKGROUND_GRADIENT_LINEAR,
+                "gradient_radial_full", (int) Style.BACKGROUND_GRADIENT_RADIAL_FULL,
+                "gradient_conic", (int) Style.BACKGROUND_GRADIENT_CONIC,
+                "gradient_repeating_linear", (int) Style.BACKGROUND_GRADIENT_REPEATING_LINEAR,
+                "gradient_repeating_radial", (int) Style.BACKGROUND_GRADIENT_REPEATING_RADIAL,
                 "none", (int) Style.BACKGROUND_NONE
         };
         int len = types.length;

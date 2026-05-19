@@ -2411,6 +2411,26 @@ public class UIManager {
                 }
                 style.setBackgroundGradient(backgroundGradient);
             }
+            Object gradient = themeProps.get(id + Style.GRADIENT);
+            if (gradient instanceof com.codename1.ui.Gradient) {
+                style.setGradient((com.codename1.ui.Gradient) gradient);
+            }
+            Object filterBlur = themeProps.get(id + Style.FILTER_BLUR);
+            if (filterBlur instanceof Number) {
+                style.setFilterBlurRadius(((Number) filterBlur).floatValue());
+            }
+            Object backdropFilterBlur = themeProps.get(id + Style.BACKDROP_FILTER_BLUR);
+            if (backdropFilterBlur instanceof Number) {
+                style.setBackdropFilterBlurRadius(((Number) backdropFilterBlur).floatValue());
+            }
+            Object filterMatrix = themeProps.get(id + Style.FILTER_COLOR_MATRIX);
+            if (filterMatrix instanceof float[]) {
+                style.setFilterColorMatrix((float[]) filterMatrix);
+            }
+            Object backdropFilterMatrix = themeProps.get(id + Style.BACKDROP_FILTER_COLOR_MATRIX);
+            if (backdropFilterMatrix instanceof float[]) {
+                style.setBackdropFilterColorMatrix((float[]) backdropFilterMatrix);
+            }
             if (bgImage != null) {
                 Image im = null;
                 if (bgImage instanceof String) {

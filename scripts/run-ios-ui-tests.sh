@@ -628,6 +628,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   launch_simulator_app() {
     local target="$1"
     local attempt=1
+    local max_attempts=5
     while true; do
       local output
       if output="$(xcrun simctl launch "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
@@ -635,12 +636,25 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
         return 0
       fi
       printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] simctl launch failed (attempt $attempt): $output" >> "$LAUNCH_LOG"
-      if [ "$attempt" -ge 2 ]; then
+      if [ "$attempt" -ge "$max_attempts" ]; then
         return 1
       fi
       ri_log "simctl launch failed (attempt $attempt), retrying"
+      # "Application unknown to FrontBoard" is a classic Xcode 26 Simulator
+      # registration race: simctl install reports success before FrontBoard's
+      # app database has caught up. The standard workaround is to bounce
+      # FrontBoard via launchctl - this forces a rescan. If that fails, we
+      # fall back to reinstalling the .app bundle so the registration kicks
+      # off again. Both are no-ops on the success path.
+      if printf '%s' "$output" | grep -q "unknown to FrontBoard"; then
+        ri_log "FrontBoard could not locate $BUNDLE_IDENTIFIER; bouncing FrontBoard + reinstalling app"
+        xcrun simctl spawn "$target" launchctl kickstart -k system/com.apple.FrontBoard.systemappservices >/dev/null 2>&1 || true
+        xcrun simctl uninstall "$target" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+        sleep 2
+        xcrun simctl install "$target" "$APP_BUNDLE_PATH" >/dev/null 2>&1 || true
+      fi
       xcrun simctl bootstatus "$target" -b >/dev/null 2>&1 || true
-      sleep 5
+      sleep $((attempt * 5))
       attempt=$((attempt + 1))
     done
   }

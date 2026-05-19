@@ -111,6 +111,11 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_solid"];
             configureStencilWriteOnly(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineMultiStopGradient:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_multistop_gradient"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
         default:
             return nil;
     }

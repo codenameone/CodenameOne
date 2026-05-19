@@ -227,6 +227,7 @@ public class CSSBorder extends Border {
     private final Resources res;
     private Color backgroundColor;
     private BackgroundImage[] backgroundImages;
+    private com.codename1.ui.Gradient backgroundGradient;
     private BorderImage borderImage;
     private BorderStroke[] stroke;
     private BoxShadow boxShadow;
@@ -708,6 +709,15 @@ public class CSSBorder extends Border {
 
             }
 
+            if (backgroundGradient != null) {
+                int[] oldClip = g.getClip();
+                g.setClip(p);
+                g.clipRect(oldClip[0], oldClip[1], oldClip[2], oldClip[3]);
+                g.fillGradient(backgroundGradient,
+                        (int) contentRect.getX(), (int) contentRect.getY(),
+                        (int) contentRect.getWidth(), (int) contentRect.getHeight());
+                g.setClip(oldClip);
+            }
             if (hasBackgroundImages()) {
                 int[] oldClip = g.getClip();
                 g.setClip(p);
@@ -1258,6 +1268,15 @@ public class CSSBorder extends Border {
     ///
     /// Self for chaining.
     public CSSBorder backgroundImage(String cssDirective) {
+        String trimmed = cssDirective == null ? "" : cssDirective.trim();
+        // A leading gradient function: route through Gradient.parseCss and
+        // paint via fillGradient rather than treating the directive as a list
+        // of url() entries. Comma-separated stop lists would otherwise be
+        // broken by the naive split below.
+        if (isGradientFunction(trimmed)) {
+            backgroundGradient = com.codename1.ui.Gradient.parseCss(trimmed);
+            return this;
+        }
         String[] parts = Util.split(cssDirective, ",");
         List<Image> imgs = new ArrayList<Image>();
         for (String part : parts) {
@@ -1287,6 +1306,15 @@ public class CSSBorder extends Border {
         }
         return backgroundImage(imgs.toArray(new Image[imgs.size()]));
 
+    }
+
+    private static boolean isGradientFunction(String s) {
+        String lower = s.toLowerCase();
+        return lower.startsWith("linear-gradient(")
+                || lower.startsWith("radial-gradient(")
+                || lower.startsWith("conic-gradient(")
+                || lower.startsWith("repeating-linear-gradient(")
+                || lower.startsWith("repeating-radial-gradient(");
     }
 
     /// Sets the background image of the border.
@@ -2110,6 +2138,8 @@ public class CSSBorder extends Border {
     }
 
     private static class ColorStop {
+        static final ColorStop[] EMPTY = new ColorStop[0];
+
         Color color = new Color("#000000");
         int position = 0;
 
@@ -2127,7 +2157,7 @@ public class CSSBorder extends Border {
 
     private static class LinearGradient {
         //float angle;
-        ColorStop[] colors = new ColorStop[0];
+        ColorStop[] colors = ColorStop.EMPTY;
 
         double directionRadian() {
             //return angle * Math.PI / 180.0;
@@ -2156,8 +2186,22 @@ public class CSSBorder extends Border {
     }
 
     private static class RadialGradient {
+        ColorStop[] colors = ColorStop.EMPTY;
+
         private String toCSSString() {
-            throw new RuntimeException("RadialGradlient toCSSString() not implemented yet");
+            StringBuilder sb = new StringBuilder();
+            sb.append("radial-gradient(");
+            boolean first = true;
+            for (ColorStop cs : colors) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(cs.toCSSString());
+            }
+            sb.append(")");
+            return sb.toString();
         }
     }
 
