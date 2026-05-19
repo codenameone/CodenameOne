@@ -2429,17 +2429,27 @@ static CodenameOne_GLViewController *sharedSingleton;
     if (window == nil) window = self.view.window;
     CGFloat width = (window != nil) ? window.bounds.size.width : self.view.bounds.size.width;
     if (width < 1) width = 1;
-    CGFloat statusBarHeight = 44.0;
+    // Match the proxy frame to the real status-bar strip, which is also where
+    // CN1's Toolbar StatusBar Container sits (it uses setSafeArea(true), so
+    // its height tracks safeAreaInsets.top). Earlier revisions hard-coded a
+    // 44pt minimum here, but on iPhones without a notch (status bar = 20pt)
+    // that turned the proxy into a window-level touch sink that swallowed
+    // taps in the 20-44pt strip -- right where toolbar content sits below
+    // the StatusBar Container. See #4978.
+    CGFloat statusBarHeight = 0.0;
     if (@available(iOS 11.0, *)) {
-        CGFloat inset = self.view.safeAreaInsets.top;
-        if (inset > statusBarHeight) {
-            statusBarHeight = inset;
-        }
+        statusBarHeight = self.view.safeAreaInsets.top;
     }
-    // Cap to a sensible upper bound -- iPhone Pro Max with Dynamic Island is
-    // around 60pt; never exceed 80pt of touch area.
+    if (statusBarHeight <= 0) {
+        // Pre-iOS 11, or safe-area insets not yet populated, fall back to
+        // the legacy status-bar frame.
+        statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+    }
+    // Floor of 1pt keeps the proxy non-empty so iOS still routes
+    // UIStatusBarTapAction to it when the status bar is hidden. Cap at 80pt
+    // for unusual device modes (Dynamic Island is ~59pt today).
+    if (statusBarHeight < 1) statusBarHeight = 1;
     if (statusBarHeight > 80) statusBarHeight = 80;
-    if (statusBarHeight < 20) statusBarHeight = 20;
     cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
     cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
@@ -3320,6 +3330,12 @@ BOOL prefersStatusBarHidden = NO;
     safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
     safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
     safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
+
+    // Status-bar tap proxy height tracks safeAreaInsets.top, so refresh it
+    // here so rotations and other safe-area changes keep the proxy aligned
+    // with the real status-bar strip (and don't leak touch interception
+    // into the rest of the toolbar).
+    [self cn1UpdateStatusBarTapProxyFrame];
 
     lockDrawing = NO;
     repaintUI();
