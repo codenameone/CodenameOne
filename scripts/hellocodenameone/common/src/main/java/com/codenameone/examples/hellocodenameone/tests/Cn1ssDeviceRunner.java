@@ -382,7 +382,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // re-enable so JS-port regressions surface as pixel diffs
                 // against scripts/javascript/screenshots/graphics-draw-image-rect.png.
                 // || "DrawImage".equals(testName)
-                || "GaussianBlur".equals(testName)
+                // GaussianBlur was historically skipped because the JS port had
+                // no blur impl -- ``gaussianBlurImage`` fell through to the
+                // no-op default in CodenameOneImplementation. Implemented in
+                // HTML5Implementation via canvas2d ``ctx.filter = blur(<r>px)``,
+                // so flip this on. The previous JS golden was captured against
+                // the no-op state (4 identical crisp cells); deleted alongside
+                // this skip removal so CI re-baselines it against the real blur
+                // output on the first clean pass.
+                // || "GaussianBlur".equals(testName)
                 || "DrawLine".equals(testName)
                 || "DrawRect".equals(testName)
                 || "DrawRoundRect".equals(testName)

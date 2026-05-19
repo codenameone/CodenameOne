@@ -30,6 +30,8 @@ public interface JavaScriptRenderingBackend {
     void writeImageData(HTMLCanvasElement canvas, ImageData imageData, int width, int height);
     void scaleLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
     void scaleMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
+    void blurLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int width, int height, float radius);
+    void blurMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int width, int height, float radius);
     Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException;
     void repaintCurrentForm();
 }

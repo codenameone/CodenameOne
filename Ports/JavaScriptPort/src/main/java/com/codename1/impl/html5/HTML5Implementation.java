@@ -324,6 +324,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
+        public void blurLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int width, int height, float radius) {
+            applyBlurToCanvas(canvas, image, width, height, radius);
+        }
+
+        @Override
+        public void blurMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int width, int height, float radius) {
+            applyBlurToCanvas(canvas, sourceCanvas, width, height, radius);
+        }
+
+        @Override
         public Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException {
             return BlobUtil.canvasToBlob(canvas, mimeType, quality);
         }
@@ -5707,6 +5717,79 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean areMutableImagesFast() {
         return true;
+    }
+
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        if (image == null) {
+            return image;
+        }
+        NativeImage src = (NativeImage) image.getImage();
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 0 || h <= 0) {
+            return image;
+        }
+        NativeImage blurred = new NativeImage();
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(w, h,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
+                            }
+                        });
+        blurred.width = buffer.getWidth();
+        blurred.height = buffer.getHeight();
+        attachMutableImageSurface(blurred, buffer.getGraphics());
+        if (src.img != null && !src.loaded) {
+            src.load();
+        }
+        if (src.img != null && src.loaded) {
+            renderingBackend.blurLoadedImageToCanvas(buffer.getCanvas(), src.img, w, h, radius);
+        } else if (src.mutableGraphics != null) {
+            renderingBackend.blurMutableSurfaceToCanvas(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
+        }
+        return Image.createImage(blurred);
+    }
+
+    // Apply CSS canvas2d ``filter: blur(<r>px)`` to the destination context,
+    // drawImage the source onto it (which bakes the blur into the destination
+    // pixels), then clear the filter so the canvas is reusable. The CSS blur
+    // radius is the Gaussian stddev in pixels — matches what iOS CIGaussianBlur
+    // and JavaSE JHLabs GaussianFilter expect for the ``radius`` arg the
+    // existing tests use. Supported in Chromium, Firefox, and Safari since
+    // 2018; no graceful fallback needed (we already report support via
+    // isGaussianBlurSupported, and the JS port has no pre-2018 target).
+    @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
+            "var ctx = dst.getContext('2d');\n"
+            + "ctx.save();\n"
+            + "ctx.filter = 'blur(' + radius + 'px)';\n"
+            + "ctx.drawImage(src, 0, 0, w, h);\n"
+            + "ctx.filter = 'none';\n"
+            + "ctx.restore();")
+    private static native void applyBlurToCanvas(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
+
+    private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
+        applyBlurToCanvas(dst, (JSObject)src, w, h, radius);
+    }
+
+    private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
+        applyBlurToCanvas(dst, (JSObject)src, w, h, radius);
     }
     
     
