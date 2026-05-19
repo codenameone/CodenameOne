@@ -2655,6 +2655,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void fillGradient(Object graphics, com.codename1.ui.Gradient gradient,
+            int x, int y, int width, int height) {
+        // Always route Android multi-stop gradients through the native Shader
+        // path - the software rasterizer in the base impl would otherwise
+        // allocate a per-call ARGB buffer on the Bitmap-graphics path used by
+        // mutable images, which on Android emulator hardware GCs heavily for
+        // conic / large fills (the case that hung the instrumentation suite).
+        ((AndroidGraphics) graphics).fillGradient(gradient, x, y, width, height);
+    }
+
+    @Override
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
         if(AndroidAsyncView.legacyPaintLogic) {
             super.drawLabelComponent(nativeGraphics, cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);

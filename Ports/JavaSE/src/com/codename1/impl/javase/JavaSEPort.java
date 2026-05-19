@@ -5726,7 +5726,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private void deepRevaliate(com.codename1.ui.Container c) {
+    private static void deepRevaliate(com.codename1.ui.Container c) {
         c.setShouldCalcPreferredSize(true);
         for (int iter = 0; iter < c.getComponentCount(); iter++) {
             com.codename1.ui.Component cmp = c.getComponentAt(iter);
@@ -5933,15 +5933,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void refreshThemeOnly() {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                UIManager.getInstance().refreshTheme();
-                Form curr = Display.getInstance().getCurrent();
-                if (curr != null) {
-                    deepRevaliate(curr);
-                    curr.revalidate();
-                    curr.repaint();
-                }
+                applyThemeOnlyRefresh(Display.getInstance().getCurrent());
             }
         });
+    }
+
+    /// Refreshes the active theme on the given form in place. Extracted so
+    /// the simulator's Dark/Light + Larger Text menu actions and the unit
+    /// test that guards them share the exact same sequence:
+    ///
+    /// 1. `UIManager.refreshTheme()` rebuilds themeProps and clears the
+    ///    style cache.
+    /// 2. `Form.refreshTheme(true)` walks the live component tree and
+    ///    re-resolves each Style, so the displayed components actually
+    ///    pick up the new fonts / colors. Without this step the user sees
+    ///    no change until they navigate away and back or restart the
+    ///    simulator -- the bug reported in issue #4963.
+    /// 3. `deepRevaliate` + `revalidate` + `repaint` redo layout against
+    ///    the new font metrics so a taller font actually claims more
+    ///    pixels on screen.
+    static void applyThemeOnlyRefresh(Form curr) {
+        UIManager.getInstance().refreshTheme();
+        if (curr == null) {
+            return;
+        }
+        curr.refreshTheme(true);
+        deepRevaliate(curr);
+        curr.revalidate();
+        curr.repaint();
     }
 
 
@@ -8261,6 +8280,102 @@ public class JavaSEPort extends CodenameOneImplementation {
         Paint p = new RadialGradientPaint(x+width/2, y+height/2, width/2, new float[]{0,1}, new Color[]{new Color(startColor), new Color(endColor)});
         nativeGraphics.setPaint(p);
         nativeGraphics.fillOval(x+1, y+1, width-2, height-2);
+    }
+
+    private static Color[] toAwtColors(int[] argb) {
+        Color[] out = new Color[argb.length];
+        for (int i = 0; i < argb.length; i++) {
+            out[i] = new Color(argb[i], true);
+        }
+        return out;
+    }
+
+    private static MultipleGradientPaint.CycleMethod cycle(byte c) {
+        switch (c) {
+            case com.codename1.ui.Gradient.CYCLE_REPEAT:
+                return MultipleGradientPaint.CycleMethod.REPEAT;
+            case com.codename1.ui.Gradient.CYCLE_REFLECT:
+                return MultipleGradientPaint.CycleMethod.REFLECT;
+            default:
+                return MultipleGradientPaint.CycleMethod.NO_CYCLE;
+        }
+    }
+
+    @Override
+    public void fillGradient(Object graphics, com.codename1.ui.Gradient gradient,
+            int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
+            return;
+        }
+        checkEDT();
+        if (gradient instanceof com.codename1.ui.LinearGradient) {
+            fillLinearGradientNative(graphics, (com.codename1.ui.LinearGradient) gradient,
+                    x, y, width, height);
+            return;
+        }
+        if (gradient instanceof com.codename1.ui.RadialGradient) {
+            fillRadialGradientNative(graphics, (com.codename1.ui.RadialGradient) gradient,
+                    x, y, width, height);
+            return;
+        }
+        // Java2D has no native conic / sweep gradient; fall back to the
+        // software rasterizer in the base impl. The conic kernel allocates a
+        // single ARGB buffer the size of the rectangle.
+        super.fillGradient(graphics, gradient, x, y, width, height);
+    }
+
+    private void fillLinearGradientNative(Object graphics, com.codename1.ui.LinearGradient g,
+            int x, int y, int width, int height) {
+        Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
+        try {
+            float[] ep = new float[4];
+            g.computeShaderEndpoints(width, height, ep);
+            // Java2D's LinearGradientPaint requires distinct start/end points
+            // (rejects start == end). Fall back to drawing the first color if
+            // the gradient line collapses (zero-area rect, etc.).
+            if (Math.abs(ep[0] - ep[2]) < 0.001f && Math.abs(ep[1] - ep[3]) < 0.001f) {
+                ng.setColor(new Color(g.getColors()[0], true));
+                ng.fillRect(x, y, width, height);
+                return;
+            }
+            LinearGradientPaint paint = new LinearGradientPaint(
+                    new java.awt.geom.Point2D.Float(x + ep[0], y + ep[1]),
+                    new java.awt.geom.Point2D.Float(x + ep[2], y + ep[3]),
+                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    cycle(g.getCycleMethod()));
+            ng.setPaint(paint);
+            ng.fillRect(x, y, width, height);
+        } finally {
+            ng.dispose();
+        }
+    }
+
+    private void fillRadialGradientNative(Object graphics, com.codename1.ui.RadialGradient g,
+            int x, int y, int width, int height) {
+        Graphics2D ng = (Graphics2D) getGraphics(graphics).create();
+        try {
+            float[] geom = new float[4];
+            g.computeShaderRadii(width, height, geom);
+            float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];
+            float r = Math.max(rx, ry);
+            RadialGradientPaint paint = new RadialGradientPaint(
+                    new java.awt.geom.Point2D.Float(x + cx, y + cy),
+                    r <= 0 ? 1f : r,
+                    new java.awt.geom.Point2D.Float(x + cx, y + cy),
+                    g.getNormalizedPositions(), toAwtColors(g.getColors()),
+                    cycle(g.getCycleMethod()));
+            if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
+                java.awt.geom.AffineTransform t = new java.awt.geom.AffineTransform();
+                t.translate(x + cx, y + cy);
+                t.scale(rx / r, ry / r);
+                t.translate(-(x + cx), -(y + cy));
+                ng.transform(t);
+            }
+            ng.setPaint(paint);
+            ng.fillRect(x, y, width, height);
+        } finally {
+            ng.dispose();
+        }
     }
 
     
@@ -13862,13 +13977,38 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public Image gaussianBlurImage(Image image, float radius) {
         GaussianFilter gf = new GaussianFilter(radius);
-        Image bim = Image.createImage(image.getWidth(), image.getHeight());        
-        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());        
+        Image bim = Image.createImage(image.getWidth(), image.getHeight());
+        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());
         return new NativeImage(blurredImage);
     }
 
     public boolean isGaussianBlurSupported() {
         return true;
+    }
+
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        Graphics2D ng = getGraphics(graphics);
+        // The target buffer the simulator paints into is typically a BufferedImage
+        // accessible via getDeviceConfiguration().createCompatibleImage during paint.
+        // For backdrop-filter we snapshot whatever the destination shows under the
+        // rectangle, blur it, and draw it back. Falling back to false signals the
+        // caller to use the snapshot+drawImage path instead.
+        try {
+            java.awt.geom.AffineTransform tx = ng.getTransform();
+            int sx = (int) Math.round(tx.getTranslateX()) + x;
+            int sy = (int) Math.round(tx.getTranslateY()) + y;
+            BufferedImage snap = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            java.awt.GraphicsConfiguration gc = ng.getDeviceConfiguration();
+            BufferedImage dest = (gc != null) ? gc.createCompatibleImage(width, height, java.awt.Transparency.TRANSLUCENT) : snap;
+            // Java2D doesn't easily let us read back from the destination - fall back.
+            return false;
+        } catch (Throwable t) {
+            return false;
+        }
     }
  
     class NativeImage extends Image {

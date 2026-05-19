@@ -541,6 +541,14 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
     }
     
 
+    static boolean isExtendedGradientType(byte bgType) {
+        return bgType == Style.BACKGROUND_GRADIENT_LINEAR
+                || bgType == Style.BACKGROUND_GRADIENT_RADIAL_FULL
+                || bgType == Style.BACKGROUND_GRADIENT_CONIC
+                || bgType == Style.BACKGROUND_GRADIENT_REPEATING_LINEAR
+                || bgType == Style.BACKGROUND_GRADIENT_REPEATING_RADIAL;
+    }
+
     class AsyncGraphics extends AndroidGraphics {
 
         private boolean clipIsPath;
@@ -1127,6 +1135,27 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 }
             });
         }
+
+        @Override
+        public void fillGradient(final com.codename1.ui.Gradient gradient, final int x, final int y, final int width, final int height) {
+            if (alpha == 0 || gradient == null) {
+                return;
+            }
+            final int al = alpha;
+            // Capture a defensive copy so async replay sees the gradient as it
+            // was when the op was queued, immune to caller mutation.
+            final com.codename1.ui.Gradient g = gradient.copy();
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.setAlpha(al);
+                    underlying.fillGradient(g, x, y, width, height);
+                }
+                public String toString() {
+                    return "fillGradient";
+                }
+            });
+        }
         
         class AndroidStyleCache {
             AsyncPaintPosition backgroundPainter;
@@ -1272,10 +1301,19 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 final float backgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
                 final float backgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
                 final float backgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
+                // Capture extended gradient so we can paint new gradient
+                // types (multi-stop, angled, conic, repeating) from the async path.
+                // Defensive copy keeps the closure immune to later Style mutations.
+                final com.codename1.ui.Gradient extGradient =
+                        s.getGradient() == null ? null : s.getGradient().copy();
                 pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                     @Override
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
+                        if (bgImage == null && extGradient != null && isExtendedGradientType(backgroundType)) {
+                            underlying.fillGradient(extGradient, x, y, width, height);
+                            return;
+                        }
                         underlying.paintComponentBackground(backgroundType, bgImage, bgColor, bgTransparency,
                                 backgroundGradientStartColor, backgroundGradientEndColor,
                                 backgroundGradientRelativeX, backgroundGradientRelativeY,

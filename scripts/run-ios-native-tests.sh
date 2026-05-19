@@ -56,7 +56,49 @@ DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TE
   | grep -v "placeholder" \
   | head -n 1 \
   | sed 's#^#platform=iOS Simulator,id=#' || true)"
+
+# `xcodebuild -showdestinations` on GitHub Actions macOS runners sometimes
+# only lists the "Any iOS Simulator Device" placeholder when no simulator has
+# been created yet for the current Xcode. Fall back to creating a runtime
+# device from the latest available iOS runtime + an iPhone device type so
+# we don't fail with "Unable to find a device" before tests can even run.
 if [ -z "$DESTINATION" ]; then
+  ri_log "No concrete iOS Simulator destination from -showdestinations; querying simctl"
+  EXISTING_ID="$(xcrun simctl list -j devices available 2>/dev/null \
+    | python3 -c 'import json,sys
+data=json.load(sys.stdin)
+for runtime, devs in data.get("devices", {}).items():
+    if "iOS" not in runtime:
+        continue
+    for d in devs:
+        if d.get("isAvailable") and "iPhone" in d.get("name",""):
+            print(d["udid"]); sys.exit(0)' 2>/dev/null || true)"
+  if [ -n "$EXISTING_ID" ]; then
+    ri_log "Reusing existing iPhone simulator $EXISTING_ID"
+    DESTINATION="platform=iOS Simulator,id=$EXISTING_ID"
+  else
+    LATEST_RUNTIME="$(xcrun simctl list -j runtimes available 2>/dev/null \
+      | python3 -c 'import json,sys
+runtimes=[r for r in json.load(sys.stdin).get("runtimes",[]) if r.get("isAvailable") and r.get("identifier","").startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]
+runtimes.sort(key=lambda r: r.get("version",""), reverse=True)
+print(runtimes[0]["identifier"] if runtimes else "")' 2>/dev/null || true)"
+    LATEST_DEVICE_TYPE="$(xcrun simctl list -j devicetypes 2>/dev/null \
+      | python3 -c 'import json,sys
+types=[t["identifier"] for t in json.load(sys.stdin).get("devicetypes",[]) if "iPhone" in t.get("name","")]
+types.sort(reverse=True)
+print(types[0] if types else "")' 2>/dev/null || true)"
+    if [ -n "$LATEST_RUNTIME" ] && [ -n "$LATEST_DEVICE_TYPE" ]; then
+      ri_log "Creating throwaway simulator (device=$LATEST_DEVICE_TYPE runtime=$LATEST_RUNTIME)"
+      NEW_ID="$(xcrun simctl create "cn1-native-tests" "$LATEST_DEVICE_TYPE" "$LATEST_RUNTIME" 2>/dev/null || true)"
+      if [ -n "$NEW_ID" ]; then
+        DESTINATION="platform=iOS Simulator,id=$NEW_ID"
+      fi
+    fi
+  fi
+fi
+
+if [ -z "$DESTINATION" ]; then
+  ri_log "Falling back to name-based destination (will fail if no iPhone 16 is installed)"
   DESTINATION="platform=iOS Simulator,name=iPhone 16"
 fi
 

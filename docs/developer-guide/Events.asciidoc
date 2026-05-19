@@ -57,7 +57,7 @@ b.addActionListener((ev) ->
 
 Notice that the click will work whether the button was touched using a mouse, finger or keypad shortcut seamlessly with an action listener. Many components work with action events for example, buttons, text components, slider etc.
 
-There are quite a few types of high-level event types that are more specific to requirements.
+Quite a few high-level event types exist that are more specific to requirements.
 
 ===== Types of action events
 
@@ -165,7 +165,7 @@ in the Codename One AutoCompleteTextField.
 event, thus allowing the UI to refresh.
 
 // HTML_ONLY_START
-There is a exhaustive example of search that's implemented using the `DataChangedListener` in the https://www.codenameone.com/manual/components.html#Advanced-search-code[Toolbar section].
+An exhaustive example of search implemented using the `DataChangedListener` appears in the https://www.codenameone.com/manual/components.html#Advanced-search-code[Toolbar section].
 // HTML_ONLY_END
 ////
 //PDF_ONLY
@@ -210,7 +210,7 @@ public class CustomToolbar extends Toolbar implements ScrollListener {
 ----
 
 // HTML_ONLY_START
-NOTE: There is a better way of implementing this exact effect using title animations https://www.codenameone.com/manual/components.html#title-animations-section[illustrated here].
+NOTE: A better way of implementing this exact effect uses title animations https://www.codenameone.com/manual/components.html#title-animations-section[illustrated here].
 // HTML_ONLY_END
 ////
 //PDF_ONLY
@@ -237,7 +237,7 @@ for the component class but not a important event for general user code. it's re
 
 ==== Component state change events
 
-Component instances now publish lifecycle hooks that fire when they become initialized on a form and when they are removed. You can subscribe with https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#addStateChangeListener-com.codename1.ui.events.ActionListener-[Component.addStateChangeListener()] to receive https://www.codenameone.com/javadoc/com/codename1/ui/events/ComponentStateChangeEvent.html[ComponentStateChangeEvent] instances that show whether the component is transitioning to the initialized state. This is useful for running setup or teardown logic alongside focus, scroll, and selection listeners.
+Component instances now publish lifecycle hooks that fire when they become initialized on a form and when they're removed. You can subscribe with https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#addStateChangeListener-com.codename1.ui.events.ActionListener-[Component.addStateChangeListener()] to receive https://www.codenameone.com/javadoc/com/codename1/ui/events/ComponentStateChangeEvent.html[ComponentStateChangeEvent] instances that show whether the component is transitioning to the initialized state. This is useful for running setup or teardown logic alongside focus, scroll, and selection listeners.
 
 ==== Event dispatcher
 
@@ -302,6 +302,7 @@ Each of those has advantages and disadvantages, specifically:
 
 |Block current functionality
 |Yes, just avoid super
+// vale-skip: Microsoft.Adverbs: "Partially" is the cell value for an event-consume scope, a precise classification, not authorial padding.
 |Partially (event consume)
 |No
 |===

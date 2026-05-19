@@ -2,7 +2,7 @@
 
 === JAR resources
 
-Resources packaged within the "JAR" don't belong in this section of the developer guide, but they are often confused with `Storage` and `FileSystemStorage`, so this is a good place to clarify them.
+Resources packaged within the "JAR" don't belong in this section of the developer guide, but they're often confused with `Storage` and `FileSystemStorage`, so this is a good place to clarify them.
 
 You can place arbitrary files within the `src` directory of a Codename One project. The file is packaged into the final distribution. In standard Java SE you can do something like:
 
@@ -44,7 +44,7 @@ https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] is ac
 
 The `Storage` API also provides convenient methods to write objects to `Storage` and read them back with `readObject` and `writeObject`.
 
-TIP: Objects in `Storage` are deleted when an app is uninstalled, but they are retained between application updates. A notable exception is Android, which on some devices keeps objects in `Storage` after uninstalling an app. To force Android to remove them on uninstall, use the build hint `android.allowBackup=false`.
+TIP: Objects in `Storage` are deleted when an app is uninstalled, but they're retained between application updates. A notable exception is Android, which on some devices keeps objects in `Storage` after uninstalling an app. To force Android to remove them on uninstall, use the build hint `android.allowBackup=false`.
 
 The sample code below demonstrates listing storage content, adding and viewing entries, and deleting entries:
 
@@ -216,12 +216,13 @@ hi.show();
 .Simple sample of a tree for the FileSystemStorage API
 image::img/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage API,scaledwidth=20%]
 
+// vale-skip: Microsoft.HeadingPunctuation: "vs." is an abbreviation for "versus" — the period belongs to the abbreviation, not to a heading-end terminator.
 ==== Storage vs. file system
 
 The question of storage vs. file system is often confusing for novice mobile developers. This embeds two separate questions:
 
 - Why are there 2 API's where one would have worked?
-- Which one should I pick?
+- Which one should you pick?
 
 The main reasons for the 2 API's are technical. Many OS's provide 2 ways of accessing data specific to the app and this is reflected within the API. For example: on Android the `FileSystemStorage` maps to API's such as `java.io.FileInputStream` whereas the `Storage` maps to `Context.openFileInput()`.
 
@@ -405,7 +406,7 @@ NetworkManager.getInstance().addToQueue(request);
 
 TIP: Notice that overriding `buildRequestBody(OutputStream)` will work for `POST` requests and will replace writing the arguments
 
-IMPORTANT: You don't need to close the output/input streams passed to the request methods. They are implicitly cleaned up.
+IMPORTANT: You don't need to close the output/input streams passed to the request methods. They're implicitly cleaned up.
 
 `NetworkManager` also supports synchronous requests which work in a similar way to `Dialog` through the `invokeAndBlock` call and thus don't block the EDT footnote:[Event Dispatch Thread] illegally. For example: you can do something like this:
 
@@ -446,7 +447,7 @@ NetworkManager.getInstance().updateThreadCount(4);
 
 All the callbacks in the `ConnectionRequest` occur on the network thread and *not on the EDT*!
 
-There is one exception to this rule which is the `postResponse()` method designed to update the UI after the networking code completes.
+One exception to this rule exists: the `postResponse()` method, designed to update the UI after the networking code completes.
 
 IMPORTANT: Never change the UI from a `ConnectionRequest` callback. You can either use a listener on the `ConnectionRequest`, use `postResponse()` (which is the exception to this rule) or wrap your UI code with `callSerially`.
 
@@ -583,7 +584,7 @@ two distinct placed where you can handle a networking error:
 
 Notice that the `NetworkManager` error handler takes precedence thus allowing you to define a global policy for network error handling by consuming errors.
 
-For example: if I would like to block all network errors from showing anything to the user I could do something like this:
+For example: to block all network errors from showing anything to the user you could do something like this:
 
 [source,java]
 ----
@@ -1246,7 +1247,7 @@ image::img/network-monitor.png[Debugging Network Connections,scaledwidth=20%]
 
 Codename One includes a Network Monitor tool which you can access through the simulator menu option. This tool reflects all the requests made through the connection requests and displays them in the left pane. This allows you to track issues in your code/web service and see everything the is "going through the wire."
 
-This is a useful tool for optimizing and for figuring out what is happening with your server connection logic.
+This is a useful tool for optimizing and for figuring out what's happening with your server connection logic.
 
 ==== Simpler downloads
 
@@ -1268,7 +1269,7 @@ Both of which simplify the whole process of downloading a file.
 Codename One has many ways to download an image and the general recommendation is the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage].
 For example, the `URLImage` assumes that you know the size of the image in advance or that you're willing to resize it. In that regard it works great for some use cases but not so much for others.
 
-The download methods mentioned above are great alternatives but they are a bit verbose when working with images and don't provide fine grained control over the `ConnectionRequest` for example: making a `POST` request to get an image.
+The download methods mentioned above are great alternatives but they're a bit verbose when working with images and don't provide fine grained control over the `ConnectionRequest` for example: making a `POST` request to get an image.
 
 TIP: Adding global headers is another use case but you can use
 https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html#addDefaultHeader-java.lang.String-java.lang.String-[addDefaultHeader]
@@ -1291,7 +1292,7 @@ This effectively maps the `ConnectionRequest` directly to a https://www.codename
 
 `URLImage` is great. It changed the way you do some things in Codename One.
 
-For example, when you introduced it you didn't have support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is a "no brainer" but JavaScript seems to work so why would it need a special case?
+For example, when you introduced it you didn't have support for the cache filesystem or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is an obvious choice, but JavaScript seems to work so why would it need a special case?
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 
@@ -1313,7 +1314,7 @@ If you do use this approach it would be far more efficient when running in the J
 
 === Rest API
 
-The `Rest` API makes it easy to invoke a restfull webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. if I want to get a parsed JSON result from a URL you could do:
+The `Rest` API makes it easy to invoke a restfull webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. To get a parsed JSON result from a URL you could do:
 
 [source,java]
 ----
@@ -1327,14 +1328,14 @@ For a lot of REST requests this will fail because you need to add an HTTP header
 Map<String, Object> jsonData = Rest.get(myUrl).acceptJson().getAsJsonMap().getResponseData();
 ----
 
-You can also do POST requests as easily:
+POST requests use the same builder pattern:
 
 [source,java]
 ----
 Map<String, Object> jsonData = Rest.post(myUrl).body(bodyValueAsString).getAsJsonMap().getResponseData();
 ----
 
-Notice the usage of post and the body builder method. There are MANY methods in the builder class that cover pretty much everything you would expect and then some when it comes to the needs of rest services.
+Notice the usage of post and the body builder method. MANY methods exist in the builder class that cover pretty much everything you would expect and then some when it comes to the needs of rest services.
 
 Some highlights that are easy to miss:
 
@@ -1348,7 +1349,7 @@ Some highlights that are easy to miss:
 * `.cacheMode(...)` and `.postParameters(...)` expose the same knobs as
  `ConnectionRequest`, keeping you in the fluent API even for advanced tweaks.
 
-I changed the code in the kitchen sink webservice sample to use this API. I was able to make it shorter and more readable without sacrificing anything.
+The code in the kitchen sink webservice sample was updated to use this API. The result is shorter and more readable without sacrificing anything.
 
 ==== Rest in practice - twilio
 
@@ -1442,7 +1443,7 @@ if(result.getResponseData() != null) {
 
 The Webservice Wizard can be invoked directly from the plugin. It generates stubs for the client side that allow performing simple method invocations on the server. It also generates a servlet that can be installed on any servlet container to intercept client side calls.
 
-There are limits to the types of values that can be passed through the webservice wizard protocol but it's highly efficient since it's a binary protocol and extensible thru object externalization. All methods are provided both as asynchronous and synchronous calls for the convenience of the developer.
+The types of values that can be passed through the webservice wizard protocol have limits, but it's highly efficient since it's a binary protocol and extensible thru object externalization. All methods are provided both as asynchronous and synchronous calls for the convenience of the developer.
 
 .The first step in creating a client/server connection using the webservice wizard is to create a web application
 image::img/webservice-wizard-step1-create-webapp.png[The first step in creating a client/server connection using the webservice wizard is to create a web application,scaledwidth=40%]
@@ -1450,7 +1451,7 @@ image::img/webservice-wizard-step1-create-webapp.png[The first step in creating 
 .Any name will do
 image::img/webservice-wizard-step2-any-name-will-do.png[Any name will do,scaledwidth=40%]
 
-You should have a server setup locally. I use Tomcat since it's trivial and I don't need much but there are many great Java webservers out there and this should work with all them!
+You should have a server setup locally. The example uses Tomcat since it's trivial and the requirements are modest, but many great Java webservers exist and this should work with all them!
 
 .Setup your webserver in the IDE
 image::img/webservice-wizard-step3-setup-your-webserver.png[Setup your webserver in the IDE,scaledwidth=40%]
@@ -1589,7 +1590,7 @@ non-trivial as it requires a delicate balance if you want to test the server res
 
 HTTP provides two ways to do that the https://en.wikipedia.org/wiki/HTTP_ETag[ETag] and
 https://developer.mozilla.org/en-You/docs/Web/HTTP/Headers/Last-Modified[Last-Modified]. While both are
-great they are non-trivial to use and by no definition seamless.
+great they're non-trivial to use and by no definition seamless.
 
 You added an experimental feature to connection request that allows you to set the caching mode to one of
 4 states either globally or per connection request:
@@ -2050,20 +2051,20 @@ The properties are effectively the getters/setters for example: `subject`, `when
 that are crucial:
 
 - They can be manipulated in runtime by a tool that had no knowledge of them during compile time
-- They are observable - a tool can monitor changes to a value of a property
+- They're observable - a tool can monitor changes to a value of a property
 - They can have meta-data associated with them
 
 These features are crucial since properties allow you all kinds of magic for example: hibernate/ORM uses properties to bind
 Java objects to a database representation, jaxb does it to parse XML directly into Java objects and GUI builders
-use them to let's customize UI's visually.
+use them to customize UI's visually.
 
-POJO's don't support most of that so pretty much all Java based tools use a lot of reflection & bytecode manipulation. This works but has a lot of downsides for example: say I want to map an object both to the Database and to XML/JSON.
+POJO's don't support most of that so pretty much all Java based tools use a lot of reflection & bytecode manipulation. This works but has a lot of downsides for example: say you want to map an object both to the Database and to XML/JSON.
 
 Would the bytecode manipulation collide?
 
 Would it result in duplicate efforts?
 
-And how do I write custom generic code that uses such abilities? Do I need to manipulate the VM?
+And how do you write custom generic code that uses such abilities? Do you need to manipulate the VM?
 
 ==== Properties in Java
 
@@ -2087,7 +2088,7 @@ public class Meeting implements PropertyBusinessObject {
 }
 ----
 
-This looks a bit like a handful so let's start with usage which might clarify a few things then dig into the class itself.
+This looks a bit like a handful, so start with usage which might clarify a few things, then dig into the class itself.
 
 When you used a POJO you did this:
 
@@ -2151,7 +2152,7 @@ that's why you've the index object and the `PropertyBusinessObject` interface (w
 The `PropertyIndex` class provides meta data for the surrounding class including the list of the properties within.
 It allows enumerating the properties and iterating over them making them accessible to all tools.
 
-Furthermore all properties are observable with the property change listener. I can write this to instantly print
+Furthermore all properties are observable with the property change listener. You can write this to instantly print
 out any change made to the property:
 
 [source,java]
@@ -2216,8 +2217,8 @@ but sqlite isn't big iron so it might be good enough.
 
 ===== Constructors
 
-One of the problematic issues with constructors is that any change starts propagating everywhere. If I have
-fields in the constructor and I add a new field later I need to keep the old constructor for compatibility.
+One of the problematic issues with constructors is that any change starts propagating everywhere. If you have
+fields in the constructor and you add a new field later you need to keep the old constructor for compatibility.
 
 you added a new syntax:
 
@@ -2247,7 +2248,7 @@ meet.when.set(new Date());
 
 ===== Seamless serialization
 
-Lets assume I have an object called `Contacts` which includes contact information of contact for example:
+Suppose you have an object called `Contacts` which includes contact information for example:
 
 [source,java]
 ----
@@ -2403,7 +2404,7 @@ You ignored functions, joins, transactions and a lot of other SQL capabilities.
 
 You can use SQL directly to use all these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised but if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
 
-You will notice you mapped auto-increment so you will try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
+You will notice you mapped autoincrement so you will try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
 
 ====== Caching/Collision
 
@@ -2436,7 +2437,7 @@ This would customize all entry keys to start with `MySettings-` instead of `Sett
 
 ===== UI binding
 
-One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class let's say you've a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
+One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class, say you've a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
 
 [source,java]
 ----
@@ -2510,7 +2511,7 @@ resp.add(c.rank.getLabel()).
         add(rankTf);
 ----
 
-<1> Notice I use the label of the property which allows better encapsulation
+<1> Notice the use of the property's label, which allows better encapsulation
 <2> You can bind picker seamlessly
 <3> You can bind many radio buttons to a single property to allow the user to select the gender, notice that labels and values can be different for example: "Male" selection will translate to "M" as the value
 <4> Numeric bindings "work"
@@ -2523,9 +2524,9 @@ image::img/properties-demo-binding.png[Properties form for the contact,scaledwid
 // vale-skip: Microsoft.ComplexWords/TooWordy — 'an additional version' reads correctly; 'an more version' is ungrammatical.
 You skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. that's a bit advanced for now but I might discuss this later.
 
-For example, the big thing I "skipped" was the return value... `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows you to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
+For example, the big thing "skipped" earlier was the return value... `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows you to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
 
-Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where you've an "OK" button and want the changes to the UI to update the properties when "OK" is pressed (this might not matter if you keep different instances of the object). When auto-commit is on (the default which you can change through `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it's off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
+Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where you've an "OK" button and want the changes to the UI to update the properties when "OK" is pressed (this might not matter if you keep different instances of the object). When autocommit is on (the default which you can change through `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it's off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
 
 `commit()` applies the changes in the UI to the properties, `rollback()` restores the UI to the values from the properties object (useful for a "reset changes" button).
 
@@ -2550,7 +2551,7 @@ Container cnt = iui.createEditUI(myContact, true); // <3>
 <2> This implements the `gender` toggle button selection, you provide a hint to the UI so labels and values differ
 <3> You create the UI from the screenshot above with one line and it's seamlessly bound to the properties of myContact. The second argument indicates the "auto commit" status.
 
-This still carries most of the flexibilities of the regular binding for example: I can still get a binding object using:
+This still carries most of the flexibilities of the regular binding for example: you can still get a binding object using:
 
 [source,java]
 ----

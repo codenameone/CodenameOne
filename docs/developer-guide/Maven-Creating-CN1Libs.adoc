@@ -17,7 +17,7 @@ You may be wondering why the .cn1lib format is even necessary. Why not just dist
 
 . *cn1libs can contain platform-specific native sources* that make use of native APIs on the various platforms. For example, they can contain Objective-C code which will be compiled on the build server when deploying on iOS.
 . *Codename One library projects perform a compliance check* at the time that the library is compiled to ensure it only uses supported Codename One APIs. This provides a sort of "certification" that the library will be compatible with Codename One application projects.
-. *Codename One libraries can include CSS files and build hints* which will be appended to the build hints of application projects when they are built.
+. *Codename One libraries can include CSS files and build hints* which will be appended to the build hints of application projects when they're built.
 
 // vale-skip: Microsoft.ComplexWords/TooWordy — 'an additional compliance check' reads correctly; 'an more compliance check' is ungrammatical.
 All that said, you *can* still distribute libraries as plain old jars and include them in your Maven Codename One projects as *jar* dependencies. Codename One application projects will perform an additional compliance check to ensure that the jar is compatible, and the build will fail if it uses APIs that aren't available in Codename One.
@@ -156,7 +156,7 @@ This will create a new libary project for you at the location you specified.
 
 ==== Project structure
 
-Let's take a look at the project that was created. it's a multi-module Maven project with the following modules:
+Take a look at the project that was created. It's a multi-module Maven project with the following modules:
 
 common::
 The module where you'll add all your cross-platform code and CSS, and build hint configuration. This module is in the "common" directory of the main project.
@@ -174,7 +174,7 @@ tests::
 An application project for writing unit tests against your library. This module is in the "tests" directory of the main project.
 
 
-===== IntelliJ IDEA IDEA
+===== IntelliJ IDEA
 
 The project inspector will look like:
 
@@ -192,7 +192,7 @@ The project inspector will look like:
 
 image::img/netbeans-myfirstlibrary-project-inspector.png[]
 
-This top-level view of the modules doesn't provide a clear view of the project landscape, but, since 99% of your development will occur inside the `common` submodule. Let's open that "common" sub-module project as well and take a peek.
+This top-level view of the modules doesn't provide a clear view of the project landscape, but, since 99% of your development will occur inside the `common` submodule. Open that "common" sub-module project as well and take a peek.
 
 Right click on the "Common" sub-module, and select "Open Project" as shown below:
 
@@ -202,19 +202,20 @@ With the common subproject open, the project inspector will look like:
 
 image::img/netbeans-myfirstlibrary-project-inspector-with-common.png[]
 
-In this screenshot I have expanded "Source Packages" and "Other Sources/css" to highlight where your Java source files and CSS source files will be located.
+In this screenshot, "Source Packages" and "Other Sources/css" are expanded to highlight where your Java source files and CSS source files will be located.
 
 The project inspector hides a few important files, but, so here is a screenshot of the File inspector for the common project:
 
+// vale-skip: Microsoft.FirstPerson: "my" is part of the literal image filename `netbeans-my-first-library-...`, not author voice.
 image::img/netbeans-my-first-library-file-inspector-common.png[]
 
-===== Eclipse IDE IDE
+===== Eclipse IDE
 
 The package explorer will look like:
 
 image::img/eclipse-cn1lib-package-explorer.png[]
 
-In this screenshot, I have expanded the _common/src/main/css_ and _common/src/main/java_ directories as this is where most of your module source will go.
+In this screenshot, the _common/src/main/css_ and _common/src/main/java_ directories are expanded since this is where most of your module source will go.
 
 ===== Command line
 
@@ -353,7 +354,7 @@ To build the library, run the "install" goal on the root module as follows:
 mvn install
 ----
 
-===== IntelliJ IDEA IDEA
+===== IntelliJ IDEA
 
 Press the "build" image:img/intellij-build-icon.png[] button on the toolbar.
 
@@ -367,7 +368,7 @@ IMPORTANT: You must build the root module and not one of the submodules.
 
 Or you could have selected the "root" module in the project explorer and pressed the "build" image:img/netbeans-build-button.png[] button on the toolbar.
 
-===== Eclipse IDE IDE
+===== Eclipse IDE
 
 Right click on the "root" module in the project explorer and select _Run as_ > _Maven Install_
 
@@ -384,7 +385,7 @@ That being said, you may still want to distribute your library as a.cn1lib file 
 
 ==== Editing Java Code
 
-To get acquainted with your project, let's add a "Hello World" Java class that you want to make available as part of your cn1lib.
+To get acquainted with your project, add a "Hello World" Java class that you want to make available as part of your cn1lib.
 
 Add a new class inside the "common/src/main/java" directory with package `com.example`, and name `HelloWorld`. Enter the following contents into the class:
 
@@ -403,7 +404,7 @@ Now build the library again. (See <<building-library>>).
 
 ==== Using the library in an application project
 
-Now that you've built your library and added a Java class, let's try adding it as a dependency in an application project. If you haven't yet created an application project, do that now. See <<creating-app-project>> for instructions on creating a new application project.
+Now that you've built your library and added a Java class, try adding it as a dependency in an application project. If you haven't yet created an application project, do that now. See <<creating-app-project>> for instructions on creating a new application project.
 
 Open the common/pom.xml file of your application project.
 
@@ -443,7 +444,7 @@ In this case you would add the following XML snippet to the `<dependencies>` sec
 
 IMPORTANT: Notice that you appended "-lib" to the `artifactId`. This is because you're including the "lib" module of your library project as the dependency, and not the root module. Also the `<type>pom</type>` is important as it indicates that this is a pom dependency - not a regular jar dependency.
 
-Now let's try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
+Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
 
 [source,java]
 ----

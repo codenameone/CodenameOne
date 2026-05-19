@@ -159,14 +159,56 @@ id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void) {
 int CN1MetalFramebufferWidth(void) { return currentFramebufferWidth; }
 int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
+// Process-lifetime device + command queue cache. The original implementation
+// dereferenced [[GLViewController instance] eaglView].layer to fetch the
+// CAMetalLayer's device on every call, but -[UIView layer] is a main-thread-
+// only API. Paint runs on the Codename One EDT (a GCD background queue), and
+// any drawShape → createAlphaMask → nativePathRendererCreateTexture path
+// reaches CN1MetalDevice() from that thread. With Main Thread Checker
+// enabled Xcode aborts the process before the first form renders.
+//
+// METALView publishes its device + command queue once at initWithCoder time
+// (main thread) via CN1MetalSetDeviceAndCommandQueue; thereafter the two
+// accessors return those statics without touching any UIView property. The
+// queue identity must remain the same one METALView uses for screen
+// rendering: mutable-image setup command buffers commit to this queue and
+// rely on FIFO ordering with the screen render command buffer so subsequent
+// drawImage(mutable) samples land after the mutable's writes. Spinning up
+// a separate queue here (e.g. via newCommandQueue against the cached device)
+// breaks that ordering — Apple's cross-queue dependency tracker did not
+// preserve the visible result in the iOS Metal screenshot suite (the
+// DialogTheme TextureBackdropPainter's cached-stripe image rendered only
+// behind the dialog, not below it).
+static id<MTLDevice> cachedMetalDevice = nil;
+static id<MTLCommandQueue> cachedMetalCommandQueue = nil;
+
+void CN1MetalSetDeviceAndCommandQueue(id<MTLDevice> device, id<MTLCommandQueue> queue) {
+#ifdef CN1_USE_ARC
+    cachedMetalDevice = device;
+    cachedMetalCommandQueue = queue;
+#else
+    // MRR: hold our own retain so both stay alive even after METALView
+    // releases its references at process exit. Both are process-lifetime
+    // singletons; no matching release is intended.
+    if (cachedMetalDevice != device) {
+        [device retain];
+        [cachedMetalDevice release];
+        cachedMetalDevice = device;
+    }
+    if (cachedMetalCommandQueue != queue) {
+        [queue retain];
+        [cachedMetalCommandQueue release];
+        cachedMetalCommandQueue = queue;
+    }
+#endif
+}
+
 id<MTLDevice> CN1MetalDevice(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return ((CAMetalLayer *)mv.layer).device;
+    return cachedMetalDevice;
 }
 
 id<MTLCommandQueue> CN1MetalCommandQueue(void) {
-    METALView *mv = (METALView *)[[CodenameOne_GLViewController instance] eaglView];
-    return mv.commandQueue;
+    return cachedMetalCommandQueue;
 }
 
 // --------------- Matrix state ---------------
@@ -939,6 +981,114 @@ void CN1MetalDrawGradient(int type, int startColor, int endColor,
         }
     }
 }
+
+// --------------- Multi-stop gradient (CSS Gradient API) ---------------
+//
+// Single pipeline handles linear / radial / conic. Header + geometry +
+// up-to-8 stops are packed into 4 fragment constant buffers (see
+// cn1_fs_multistop_gradient in CN1MetalShaders.metal for the layout).
+// Inputs that exceed CN1_METAL_GRAD_MAX_STOPS are downsampled by the
+// caller -- we don't silently truncate here because the gradient looks
+// visibly wrong with a hard truncation.
+
+void CN1MetalFillGradient(int kind,
+                          int stopCount,
+                          const float *positions,
+                          const float *premultipliedRgba,
+                          int cycleMethod,
+                          float angleDegreesOrFromAngle,
+                          float cx, float cy, float rx, float ry,
+                          int shape,
+                          int destX, int destY, int destW, int destH) {
+    if (activeEncoder == nil || pipelineCache == nil) return;
+    if (destW <= 0 || destH <= 0) return;
+    if (stopCount < 2 || positions == NULL || premultipliedRgba == NULL) return;
+    if (stopCount > CN1_METAL_GRAD_MAX_STOPS) {
+        stopCount = CN1_METAL_GRAD_MAX_STOPS;
+    }
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineMultiStopGradient];
+    if (state == nil) return;
+    bindPipelineStateIfChanged(state);
+
+    float vertices[8] = {
+        (float)destX,             (float)destY,
+        (float)(destX + destW),   (float)destY,
+        (float)destX,             (float)(destY + destH),
+        (float)(destX + destW),   (float)(destY + destH)
+    };
+    static const float texcoords[8] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        0.0f, 1.0f,
+        1.0f, 1.0f
+    };
+
+    simd_float4 header = (simd_float4){
+        (float)kind,
+        (float)cycleMethod,
+        (float)stopCount,
+        (float)shape
+    };
+
+    simd_float4 geom;
+    if (kind == 0) {
+        // CSS 0deg points up; the shader uses (sin, -cos) so that
+        // dot(p, axis) is positive going from top to bottom for 180deg
+        // and from left to right for 90deg.
+        float rad = angleDegreesOrFromAngle * (float)(M_PI / 180.0);
+        geom = (simd_float4){ sinf(rad), -cosf(rad), 0.0f, 0.0f };
+    } else if (kind == 1) {
+        geom = (simd_float4){ cx, cy, rx, ry };
+    } else {
+        float rad = angleDegreesOrFromAngle * (float)(M_PI / 180.0);
+        geom = (simd_float4){ cx, cy, rad, 0.0f };
+    }
+
+    // Pack positions into ceil(N/4) float4s. Pad unused slots with the
+    // last position so the shader's tail walk falls through cleanly even
+    // if stopCount happens to coincide with a multiple of 4.
+    simd_float4 packedPositions[2];
+    float lastPos = positions[stopCount - 1];
+    for (int i = 0; i < 8; i++) {
+        float v = (i < stopCount) ? positions[i] : lastPos;
+        int p = i >> 2;
+        int s = i & 3;
+        if (s == 0) packedPositions[p].x = v;
+        else if (s == 1) packedPositions[p].y = v;
+        else if (s == 2) packedPositions[p].z = v;
+        else             packedPositions[p].w = v;
+    }
+
+    simd_float4 packedColors[CN1_METAL_GRAD_MAX_STOPS];
+    for (int i = 0; i < CN1_METAL_GRAD_MAX_STOPS; i++) {
+        int srcIdx = (i < stopCount) ? i : stopCount - 1;
+        packedColors[i] = (simd_float4){
+            premultipliedRgba[srcIdx * 4 + 0],
+            premultipliedRgba[srcIdx * 4 + 1],
+            premultipliedRgba[srcIdx * 4 + 2],
+            premultipliedRgba[srcIdx * 4 + 3]
+        };
+    }
+
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    [activeEncoder setFragmentBytes:&header length:sizeof(header) atIndex:0];
+    [activeEncoder setFragmentBytes:&geom length:sizeof(geom) atIndex:1];
+    [activeEncoder setFragmentBytes:packedPositions length:sizeof(packedPositions) atIndex:2];
+    [activeEncoder setFragmentBytes:packedColors length:sizeof(packedColors) atIndex:3];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+// Gaussian blur is intentionally not implemented at the Metal layer.
+// IOSNative.gausianBlurImage routes everything through CIGaussianBlur,
+// which is itself Metal-backed under the hood (Apple uses
+// MPSImageGaussianBlur internally) and matches the GL reference's
+// visual output - including the soft halo produced by CIGaussianBlur's
+// output-extent expansion that neither a hand-rolled separable
+// fragment-shader convolution nor a direct MPSImageGaussianBlur call
+// reproduces without significant additional bookkeeping (sigma
+// scaling, padded dst).
 
 // --------------- Alpha mask rendering (path-based shapes) ---------------
 

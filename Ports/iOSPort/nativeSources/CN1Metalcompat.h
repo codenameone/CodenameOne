@@ -63,8 +63,14 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
                                        // pixels inside a polygon clip shape so
                                        // subsequent draws can stencil-test
                                        // against the reference value.
+    CN1MetalPipelineMultiStopGradient, // CSS-style multi-stop gradient (linear / radial / conic).
     CN1MetalPipelineCount
 };
+
+// Max stops supported by the multi-stop gradient pipeline. Mirrored in
+// CN1MetalShaders.metal as CN1_GRAD_MAX_STOPS. Inputs with more stops
+// are downsampled on the C side before upload.
+#define CN1_METAL_GRAD_MAX_STOPS 8
 
 // -------- Uniform struct matching CN1MetalShaders.metal --------
 // Vertex stage receives this struct at buffer index 1.
@@ -229,6 +235,30 @@ void CN1MetalDrawGradient(int type, int startColor, int endColor,
                           int x, int y, int width, int height,
                           float relativeX, float relativeY, float relativeSize);
 
+// Multi-stop gradient fill matching the CSS Gradient (linear / radial / conic)
+// API. The shader handles cycle modes NONE / REPEAT / REFLECT; stops with
+// `stopCount > CN1_METAL_GRAD_MAX_STOPS` must be downsampled by the caller.
+//
+//   kind:                0 = linear, 1 = radial, 2 = conic
+//   stopCount:           number of stops (2..CN1_METAL_GRAD_MAX_STOPS)
+//   positions[stopCount] 0..1 stop positions
+//   premultipliedRgba    stopCount * 4 floats (R, G, B, A premultiplied)
+//   cycleMethod:         0 = NONE, 1 = REPEAT, 2 = REFLECT
+//   angleDegreesOrFromAngle: linear angle (CSS deg, 0=up) or conic from-angle
+//   cx, cy:              radial / conic centre, 0..1 in rect-relative texcoords
+//   rx, ry:              radial radii, 0..1 in rect-relative texcoords
+//   shape:               radial 0 = circle, 1 = ellipse (unused for linear/conic)
+//   destX, destY, destW, destH: rectangle in framebuffer pixel coordinates.
+void CN1MetalFillGradient(int kind,
+                          int stopCount,
+                          const float *positions,
+                          const float *premultipliedRgba,
+                          int cycleMethod,
+                          float angleDegreesOrFromAngle,
+                          float cx, float cy, float rx, float ry,
+                          int shape,
+                          int destX, int destY, int destW, int destH);
+
 // -------- Texture helpers for GLUIImage --------
 
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
@@ -243,6 +273,14 @@ id<MTLDevice> CN1MetalDevice(void);
 // buffers allocate from this queue so they share scheduling with screen
 // drawing.
 id<MTLCommandQueue> CN1MetalCommandQueue(void);
+
+// Called once by METALView.initWithCoder (main thread) to publish the
+// view's MTLDevice + MTLCommandQueue. CN1MetalDevice / CN1MetalCommandQueue
+// then return these without touching any UIView property. Keeping the
+// queue identity stable with METALView is required: mutable-image setup
+// commits share-and-FIFO with the screen render command buffer, so
+// drawImage of a mutable can rely on its prior writes being ordered.
+void CN1MetalSetDeviceAndCommandQueue(id<MTLDevice> device, id<MTLCommandQueue> queue);
 
 // -------- Phase 3 v2: mutable-image rendering --------
 //

@@ -99,6 +99,27 @@ public class CSSBorderTest extends UITestBase {
     }
 
     @FormTest
+    public void testBackgroundImageGradientString() {
+        // CSSBorder should parse CSS gradient strings passed via the
+        // background-image directive at runtime - same syntax the build-time
+        // compiler accepts.
+        CSSBorder border = new CSSBorder();
+        border.backgroundImage("linear-gradient(45deg, #ff0000 0%, #00ff00 100%)");
+
+        Component c = new Component() {};
+        c.setSize(new com.codename1.ui.geom.Dimension(80, 80));
+
+        Image buffer = Image.createImage(80, 80);
+        // Painting must not throw - and the rasterized output must include
+        // pixels that are neither pure red nor pure white (the buffer
+        // background), proving the gradient pixels reached the buffer.
+        border.paintBorderBackground(buffer.getGraphics(), c);
+        int sample = buffer.getRGB()[80 * 40 + 40];
+        Assertions.assertTrue((sample & 0xff000000) != 0,
+                "Mid-rect pixel should be non-transparent after gradient paint");
+    }
+
+    @FormTest
     public void testRadialGradient() throws Exception {
         // Use reflection to test RadialGradient
         CSSBorder border = new CSSBorder((Resources)null);
@@ -126,13 +147,12 @@ public class CSSBorderTest extends UITestBase {
         java.lang.reflect.Array.set(bgImagesArray, 0, bgImage);
         bgImagesField.set(border, bgImagesArray);
 
-        // Verify toCSSString
-        try {
-            border.toCSSString();
-            Assertions.fail("RadialGradient toCSSString should throw RuntimeException");
-        } catch(RuntimeException ex) {
-            // Expected
-            Assertions.assertEquals("RadialGradlient toCSSString() not implemented yet", ex.getMessage());
-        }
+        // RadialGradient.toCSSString() now produces a valid (if minimal) CSS
+        // string instead of throwing. The empty-stops case yields an empty
+        // gradient function body.
+        String css = border.toCSSString();
+        Assertions.assertNotNull(css, "toCSSString must not return null for an empty radial gradient");
+        Assertions.assertTrue(css.contains("radial-gradient("),
+                "Expected radial-gradient(...) in serialized CSS, got: " + css);
     }
 }

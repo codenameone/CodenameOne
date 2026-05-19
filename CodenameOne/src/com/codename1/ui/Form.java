@@ -694,24 +694,78 @@ public class Form extends Container {
         }
     }
 
+    /// Locates the scrollable-Y descendant that is actually visible to the
+    /// user inside the Form viewport. Used by the status-bar tap -> scroll-to-top
+    /// path on iOS.
+    ///
+    /// Strategy: collect every visible scrollable-Y descendant whose absolute
+    /// bounds intersect the Form viewport, pick the one with the largest
+    /// visible (intersected) area, and tiebreak in favor of a scroller that
+    /// is currently scrolled (`getScrollY() > 0`). A naive depth-first walk
+    /// would return the first scrollable in tree order, which picks the
+    /// hidden first tab inside a `Tabs` instead of the on-screen one.
     Component findScrollableChild(Container c) {
-        if (c.isScrollableY()) {
-            return c;
+        if (c == null) {
+            return null;
         }
-        int count = c.getComponentCount();
-        for (int iter = 0; iter < count; iter++) {
-            Component comp = c.getComponentAt(iter);
-            if (comp.isScrollableY()) {
-                return comp;
-            }
-            if (comp instanceof Container) {
-                Component chld = findScrollableChild((Container) comp);
-                if (chld != null) {
-                    return chld;
-                }
+        Form f = c.getComponentForm();
+        int vx;
+        int vy;
+        int vw;
+        int vh;
+        if (f != null) {
+            vx = f.getAbsoluteX();
+            vy = f.getAbsoluteY();
+            vw = f.getWidth();
+            vh = f.getHeight();
+        } else {
+            vx = c.getAbsoluteX();
+            vy = c.getAbsoluteY();
+            vw = c.getWidth();
+            vh = c.getHeight();
+        }
+        Component[] best = new Component[1];
+        long[] bestArea = new long[]{-1L};
+        int[] bestScrolled = new int[]{-1};
+        collectVisibleScrollableY(c, vx, vy, vw, vh, best, bestArea, bestScrolled);
+        return best[0];
+    }
+
+    private void collectVisibleScrollableY(Component cmp, int vx, int vy, int vw, int vh,
+            Component[] best, long[] bestArea, int[] bestScrolled) {
+        if (cmp == null || !cmp.isVisible()) {
+            return;
+        }
+        int ax = cmp.getAbsoluteX();
+        int ay = cmp.getAbsoluteY();
+        int aw = cmp.getWidth();
+        int ah = cmp.getHeight();
+        int ix1 = Math.max(vx, ax);
+        int iy1 = Math.max(vy, ay);
+        int ix2 = Math.min(vx + vw, ax + aw);
+        int iy2 = Math.min(vy + vh, ay + ah);
+        int iw = ix2 - ix1;
+        int ih = iy2 - iy1;
+        if (iw <= 0 || ih <= 0) {
+            return;
+        }
+        if (cmp.isScrollableY()) {
+            long area = (long) iw * (long) ih;
+            int scrolled = cmp.getScrollY() > 0 ? 1 : 0;
+            if (area > bestArea[0]
+                    || (area == bestArea[0] && scrolled > bestScrolled[0])) {
+                bestArea[0] = area;
+                bestScrolled[0] = scrolled;
+                best[0] = cmp;
             }
         }
-        return null;
+        if (cmp instanceof Container) {
+            Container container = (Container) cmp;
+            int count = container.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                collectVisibleScrollableY(container.getComponentAt(i), vx, vy, vw, vh, best, bestArea, bestScrolled);
+            }
+        }
     }
 
     /// {@inheritDoc}

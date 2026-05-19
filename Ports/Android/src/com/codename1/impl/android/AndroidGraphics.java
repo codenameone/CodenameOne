@@ -790,6 +790,11 @@ class AndroidGraphics {
                     case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
                     case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                     case Style.BACKGROUND_GRADIENT_RADIAL:
+                    case Style.BACKGROUND_GRADIENT_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                    case Style.BACKGROUND_GRADIENT_CONIC:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+                    case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL:
                         drawGradientBackground(s, x, y, width, height);
                         //canvas.restore();
                         return;
@@ -817,6 +822,18 @@ class AndroidGraphics {
                         x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
                         s.getBackgroundGradientRelativeSize());
                 return;
+            case Style.BACKGROUND_GRADIENT_LINEAR:
+            case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+            case Style.BACKGROUND_GRADIENT_CONIC:
+            case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+            case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+                com.codename1.ui.Gradient g = s.getGradient();
+                if (g != null) {
+                    fillGradient(g, x, y, width, height);
+                    return;
+                }
+                break;
+            }
         }
         setColor(s.getBgColor());
         fillRectImpl(x, y, width, height, s.getBgTransparency());
@@ -893,6 +910,86 @@ class AndroidGraphics {
         unapplyTransform();
         canvas.restore();
         
+    }
+
+    private static Shader.TileMode tile(byte cycleMethod) {
+        switch (cycleMethod) {
+            case com.codename1.ui.Gradient.CYCLE_REPEAT:
+                return Shader.TileMode.REPEAT;
+            case com.codename1.ui.Gradient.CYCLE_REFLECT:
+                return Shader.TileMode.MIRROR;
+            default:
+                return Shader.TileMode.CLAMP;
+        }
+    }
+
+    /// Fills the rectangle with the given Gradient using the appropriate
+    /// native Android Shader. Invoked from `Graphics.fillGradient` and from
+    /// the background-painting path when the Style carries an extended
+    /// gradient.
+    public void fillGradient(com.codename1.ui.Gradient g, int x, int y, int width, int height) {
+        if (g == null || width <= 0 || height <= 0) {
+            return;
+        }
+        boolean antialias = paint.isAntiAlias();
+        boolean dither = paint.isDither();
+        paint.setStyle(Paint.Style.FILL);
+        // AA so the elliptical-radial transform doesn't stair-step the
+        // shader output along the gradient bands; dither so slow stop-to-stop
+        // transitions don't band visibly in 8-bit RGB.
+        paint.setAntiAlias(true);
+        paint.setDither(true);
+        paint.setAlpha(255);
+        canvas.save();
+        applyTransform();
+        try {
+            if (g instanceof com.codename1.ui.LinearGradient) {
+                com.codename1.ui.LinearGradient lg = (com.codename1.ui.LinearGradient) g;
+                float[] ep = new float[4];
+                lg.computeShaderEndpoints(width, height, ep);
+                paint.setShader(new LinearGradient(
+                        x + ep[0], y + ep[1], x + ep[2], y + ep[3],
+                        lg.getColors(), lg.getNormalizedPositions(), tile(lg.getCycleMethod())));
+                canvas.drawRect(x, y, x + width, y + height, paint);
+            } else if (g instanceof com.codename1.ui.RadialGradient) {
+                com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
+                float[] geom = new float[4];
+                rg.computeShaderRadii(width, height, geom);
+                float cx = geom[0], cy = geom[1], rx = geom[2], ry = geom[3];
+                float r = Math.max(rx, ry);
+                if (Math.abs(rx - ry) > 0.01f && rx > 0 && ry > 0) {
+                    android.graphics.Matrix m = new android.graphics.Matrix();
+                    m.postTranslate(-(x + cx), -(y + cy));
+                    m.postScale(rx / r, ry / r);
+                    m.postTranslate(x + cx, y + cy);
+                    canvas.concat(m);
+                }
+                paint.setShader(new RadialGradient(
+                        x + cx, y + cy, r <= 0 ? 1f : r,
+                        rg.getColors(), rg.getNormalizedPositions(), tile(rg.getCycleMethod())));
+                canvas.drawRect(x, y, x + width, y + height, paint);
+            } else if (g instanceof com.codename1.ui.ConicGradient) {
+                com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;
+                float cx = cg.getRelativeCenterX() * width;
+                float cy = cg.getRelativeCenterY() * height;
+                // Android's SweepGradient starts at the positive X axis and
+                // sweeps counter-clockwise. CSS conic-gradient starts at top
+                // (-Y) and sweeps clockwise. Compose a rotation on the shader.
+                android.graphics.Matrix sm = new android.graphics.Matrix();
+                sm.preRotate(cg.getFromAngleDegrees() - 90f, x + cx, y + cy);
+                SweepGradient sg = new SweepGradient(
+                        x + cx, y + cy, cg.getColors(), cg.getPositions());
+                sg.setLocalMatrix(sm);
+                paint.setShader(sg);
+                canvas.drawRect(x, y, x + width, y + height, paint);
+            }
+        } finally {
+            paint.setAntiAlias(antialias);
+            paint.setDither(dither);
+            paint.setShader(null);
+            unapplyTransform();
+            canvas.restore();
+        }
     }
 
     public int concatenateAlpha(int alpha) {

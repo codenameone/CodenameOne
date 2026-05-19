@@ -69,6 +69,8 @@
         <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
+        <module>cn1app-archetype</module>
+        <module>cn1lib-archetype</module>
     </modules>
     <dependencyManagement>
         <dependencies>
@@ -377,7 +379,15 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.21.0</version>
+                    <!-- Pinned uniformly to 3.2.5 so the JUnit Jupiter
+                         discovery and the `surefire.failIfNoSpecifiedTests`
+                         flag are available everywhere. (PR #4929 pinned
+                         codenameone-javase to 3.2.5 in isolation, which
+                         caused designer.yml to fail when `-Dtest=...` is
+                         forwarded into a module without matching tests
+                         because the old `failIfNoTests` flag is silently
+                         ignored by 3.x.) -->
+                    <version>3.2.5</version>
                 </plugin>
 
                 <plugin>

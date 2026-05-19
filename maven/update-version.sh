@@ -44,6 +44,25 @@ echo "Version: $version"
 mvn versions:set -DnewVersion=$version
 mvn versions:commit
 
+# Archetype metadata and IT fixtures: mvn versions:set does not reach inside
+# the archetype-resources templates or the IT archetype.properties files, so
+# bump the embedded version references by hand. Mirrors what the historical
+# cn1-maven-archetypes/update-version.sh did before the archetypes were
+# inlined into this repo.
+for a in cn1app-archetype cn1lib-archetype; do
+  f=./$a/src/main/resources/META-INF/maven/archetype-metadata.xml
+  [ -f "$f" ] && perl -pi -e "s/<defaultValue>$oldVersion<\/defaultValue>/<defaultValue>$version<\/defaultValue>/g" "$f"
+  # cn1app-archetype ships basic + netbeans ITs; cn1lib-archetype only ships
+  # basic. Skip missing fixtures rather than tripping perl with -i.
+  for proj in basic netbeans; do
+    f=./$a/src/test/resources/projects/$proj/archetype.properties
+    if [ -f "$f" ]; then
+      perl -pi -e "s/^cn1Version=$oldVersion\$/cn1Version=$version/g" "$f"
+      perl -pi -e "s/^cn1PluginVersion=$oldVersion\$/cn1PluginVersion=$version/g" "$f"
+    fi
+  done
+done
+
 echo "Committing version change in git"
 git add -u .
 # Note: the -u is to prevent adding files that aren't added to git yet.  Only changed

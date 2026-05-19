@@ -72,7 +72,7 @@ jobs:
           mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
               -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true \
               -Dcn1.binaries="${CN1_BINARIES}" \
-              -Dtest=SimpleXmlParserTest -DfailIfNoTests=false test
+              -Dtest=SimpleXmlParserTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Verify designer CLI CSS compilation
         run: |

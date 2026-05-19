@@ -15,6 +15,6 @@ mvn cn1:update
 newVersion::
 (Optional) The version to update to. This should be a version number available on Maven central. Will accept a value of "LATEST" to cause it to resolve to the latest version available on Maven central.
 +
-If this parameter is omitted, then it will be implicitly set to `LATEST`, but it won't update the `cn1.version` or `cn1.plugin.version` properties if they are set to a SNAPSHOT version.
+If this parameter is omitted, then it will be implicitly set to `LATEST`, but it won't update the `cn1.version` or `cn1.plugin.version` properties if they're set to a SNAPSHOT version.
 
 See <<updating>> for more information about updating Codename One.

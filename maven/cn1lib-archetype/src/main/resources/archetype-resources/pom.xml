@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <packaging>pom</packaging>
+
+    <name>${artifactId}</name>
+    <description>Codename One ${artifactId} library</description>
+    <url>https://www.codenameone.com</url>
+
+    <licenses>
+        <license>
+            <name>GPL v2 With Classpath Exception</name>
+            <url>https://openjdk.java.net/legal/gplv2+ce.html</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <!-- UNCOMMENT AND COMPLETE THIS SECTION IF PUBLISHING TO MAVEN CENTRAL -->
+    <!--
+    <developers>
+        <developer>
+            <id>exampleId</id>
+            <name>FirstName LastName</name>
+            <email>yourname@example.com</email>
+            <timezone>-8</timezone>
+        </developer>
+
+    </developers>
+
+    -->
+    <!-- UNCOMMENT AND COMPLETE THIS SECTION IF PUBLISHING TO MAVEN CENTRAL
+        ME => Your Github Username
+        MYREPO => Your github repository name.
+    -->
+    <!--
+    <scm>
+        <url>https://github.com/ME/MYREPO</url>
+        <connection>scm:git:git@github.com:ME/MYREPO.git</connection>
+    </scm>
+    -->
+
+	  
+    <properties>
+        <cn1.plugin.version>${cn1PluginVersion}</cn1.plugin.version>
+        <cn1.version>${cn1Version}</cn1.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <java.version>1.8</java.version>
+        <java-tests.version>11</java-tests.version>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <!-- ${javaVersion} resolves via archetype-post-generate.groovy:
+             "auto" -> 17 on JDK >= 17, otherwise 8. -->
+        <maven.compiler.source>${javaVersion}</maven.compiler.source>
+        <maven.compiler.target>${javaVersion}</maven.compiler.target>
+        <cn1lib.name>${artifactId}</cn1lib.name>
+        <kotlin.version>${kotlinVersion}</kotlin.version>
+        <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
+        <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
+    </properties>
+    <modules>
+        <module>common</module>
+        <module>android</module>
+        <module>ios</module>
+        <module>javascript</module>
+        <module>javase</module>
+        <module>win</module>
+        <module>lib</module>
+    </modules>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>java-runtime</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-stdlib</artifactId>
+                <version>${kotlin.version}</version>
+            </dependency>
+    
+            <!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-annotations-jvm -->
+            <!-- https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+            <dependency>
+                <groupId>org.jetbrains</groupId>
+                <artifactId>annotations</artifactId>
+                <version>13.0</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+			
+    <build>
+        <pluginManagement>
+            <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                                <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                            </sourceDirs>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <goals> 
+                            <goal>test-compile</goal> 
+                        </goals>
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>${project.basedir}/src/test/kotlin</sourceDir>
+                                <sourceDir>${project.basedir}/src/test/java</sourceDir>
+                            </sourceDirs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                    </plugin>
+                    
+                    <plugin>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-maven-plugin</artifactId>
+                        <version>${cn1.plugin.version}</version>
+                    </plugin>
+        </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.9</version>
+                <executions>
+                    <execution>
+                        <id>build-javadoc</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <phase>post-integration-test</phase>
+                        <configuration>
+                            <quiet>true</quiet>
+                        </configuration>
+                    </execution>
+                </executions>
+
+                <configuration>
+                    <!-- ${javaVersion} -> 17 or 8 via archetype-post-generate.groovy -->
+                    <source>${javaVersion}</source>
+                    <show>protected</show>
+                    <failOnError>false</failOnError>
+                    <!-- UNCOMMENT and modify to use Asciidoc for Javadocs
+                    <doclet>org.asciidoctor.Asciidoclet</doclet>
+                    <docletArtifact>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoclet</artifactId>
+                        <version>1.5.6</version>
+                    </docletArtifact>
+                    <overview>../common/src/main/resources/overview.adoc</overview>
+                    <additionalparam>
+                        -\-base-dir ${project.basedir}
+                        -\-attribute "name=${project.name}"
+                        -\-attribute "version=${project.version}"
+                        -\-attribute "title-link=https://github.com/shannah/CodeRAD[${project.name} ${project.version}]"
+                    </additionalparam>
+                    <offlineLinks>
+                        <offlineLink>
+                            <url>https://www.codenameone.com/javadoc/</url>
+                            <location>${basedir}/../javadoc-dependencies/com.codename1</location>
+                        </offlineLink>
+                    </offlineLinks>
+                    -->
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+
+    <!-- The sign-artifacts profile is used for signing artifacts when you deploy to Maven
+        central.  In order for this to work, you also need to add the following to your
+        settings.xml file:
+
+        <profiles>
+            <profile>
+              <id>sign-artifacts</id>
+              <activation><activeByDefault>true</activeByDefault></activation>
+              <properties>
+                  <gpg.passphrase>YOUR_PASSPHRASE</gpg.passphrase>
+              </properties>
+            </profile>
+        </profiles>
+        <servers>
+            <server>
+              <id>nexus-staging</id>
+              <username>YOUR_USERNAME</username>
+              <password>YOUR_PASSWORD</password>
+            </server>
+        </servers>
+    -->
+
+    <profiles>
+        <profile>
+            <id>sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <passphrase>${gpg.passphrase}</passphrase>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+    <distributionManagement>
+        <repository>
+            <id>nexus-staging</id>
+            <name>Nexus Release Repository</name>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+</project>

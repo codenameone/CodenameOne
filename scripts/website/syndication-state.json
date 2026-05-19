@@ -28,6 +28,37 @@
         "url": "https://dzone.com/content/3653548/edit.html",
         "syndicated_at": "2026-05-09T16:48:46+00:00"
       }
+    },
+    "metal-and-skins": {
+      "devto": {
+        "id": 3678044,
+        "url": "https://dev.to/codenameone/metal-and-skins-4e00",
+        "syndicated_at": "2026-05-15T13:34:26+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/draft/67a41962e690bb4ecd9fd9b8",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-05-15T18:42:17+00:00"
+      },
+      "foojay": {
+        "id": 123840,
+        "url": "https://foojay.io/wp-admin/post.php?post=123840&action=edit",
+        "preview_url": "https://foojay.io/?p=123840",
+        "featured_media_id": 123839,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-05-16T13:31:58+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/f08d6680b1cf/edit",
+        "syndicated_at": "2026-05-18T13:52:17+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3655676/edit.html",
+        "syndicated_at": "2026-05-18T13:53:16+00:00"
+      }
     }
   }
 }

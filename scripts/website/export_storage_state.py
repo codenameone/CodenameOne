@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Export a logged-in browser session for syndication targets that block
 password-based automation (Medium has no password login at all; DZone
-gates its login form behind invisible reCAPTCHA).
+gates its login form behind invisible reCAPTCHA; Hashnode shut down
+their free public GraphQL API in May 2026 and the only remaining path
+is the web editor).
 
 Two paths:
 
@@ -18,6 +20,7 @@ Examples:
 
     python3 scripts/website/export_storage_state.py --site medium --from-firefox-profile
     python3 scripts/website/export_storage_state.py --site dzone --browser firefox
+    python3 scripts/website/export_storage_state.py --site hashnode --from-firefox-profile
 """
 
 from __future__ import annotations
@@ -60,6 +63,17 @@ SITE_PROFILES: dict[str, dict] = {
         "is_logged_in": lambda cookies: any(
             c.get("name") == "remember-me" or (c.get("name") or "").startswith("dz")
             and (c.get("name") or "") not in ("dzuuid",)  # dzuuid is anonymous
+            for c in cookies
+        ),
+    },
+    "hashnode": {
+        "signin_url": "https://hashnode.com/login",
+        "cookie_host_glob": "%hashnode.com",
+        # Hashnode's web app authenticates the session with a single
+        # `hashnode-session` cookie on hashnode.com. Its presence (and
+        # non-trivial length) signals a signed-in session.
+        "is_logged_in": lambda cookies: any(
+            c.get("name") == "hashnode-session" and len(c.get("value") or "") > 32
             for c in cookies
         ),
     },

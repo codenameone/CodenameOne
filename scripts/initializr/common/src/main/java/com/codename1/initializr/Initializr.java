@@ -196,6 +196,14 @@ public class Initializr extends Lifecycle {
         initWebsiteThemeSync(form);
         form.show();
         notifyWebsiteUiReady();
+        // Free any zips left over from previous sessions so users who already filled their
+        // browser quota recover on the next page load instead of having to clear site data
+        // by hand. Runs off the EDT because each LocalForage op blocks on a JS callback.
+        Display.getInstance().startThread(new Runnable() {
+            public void run() {
+                GeneratorModel.cleanupGeneratedZips();
+            }
+        }, "initializr-storage-cleanup").start();
     }
 
     private void notifyWebsiteUiReady() {

@@ -2429,17 +2429,27 @@ static CodenameOne_GLViewController *sharedSingleton;
     if (window == nil) window = self.view.window;
     CGFloat width = (window != nil) ? window.bounds.size.width : self.view.bounds.size.width;
     if (width < 1) width = 1;
-    CGFloat statusBarHeight = 44.0;
+    // Match the proxy frame to the real status-bar strip, which is also where
+    // CN1's Toolbar StatusBar Container sits (it uses setSafeArea(true), so
+    // its height tracks safeAreaInsets.top). Earlier revisions hard-coded a
+    // 44pt minimum here, but on iPhones without a notch (status bar = 20pt)
+    // that turned the proxy into a window-level touch sink that swallowed
+    // taps in the 20-44pt strip -- right where toolbar content sits below
+    // the StatusBar Container. See #4978.
+    CGFloat statusBarHeight = 0.0;
     if (@available(iOS 11.0, *)) {
-        CGFloat inset = self.view.safeAreaInsets.top;
-        if (inset > statusBarHeight) {
-            statusBarHeight = inset;
-        }
+        statusBarHeight = self.view.safeAreaInsets.top;
     }
-    // Cap to a sensible upper bound -- iPhone Pro Max with Dynamic Island is
-    // around 60pt; never exceed 80pt of touch area.
+    if (statusBarHeight <= 0) {
+        // Pre-iOS 11, or safe-area insets not yet populated, fall back to
+        // the legacy status-bar frame.
+        statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+    }
+    // Floor of 1pt keeps the proxy non-empty so iOS still routes
+    // UIStatusBarTapAction to it when the status bar is hidden. Cap at 80pt
+    // for unusual device modes (Dynamic Island is ~59pt today).
+    if (statusBarHeight < 1) statusBarHeight = 1;
     if (statusBarHeight > 80) statusBarHeight = 80;
-    if (statusBarHeight < 20) statusBarHeight = 20;
     cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
     cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
@@ -2540,7 +2550,7 @@ bool lockDrawing;
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
-    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
@@ -3282,9 +3292,14 @@ BOOL prefersStatusBarHidden = NO;
     }
     
     // simply create a property of 'BOOL' type
-    [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
+    // Pass physical pixels: viewWillTransitionToSize: fires before UIKit
+    // updates the view's bounds, so on the Metal backend the EAGLView's
+    // bounds read would still return the previous orientation. The
+    // METALView resize logic trusts these parameters; the EAGLView
+    // implementation is a no-op (#4954).
+    [[self eaglView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     [[self eaglView] deleteFramebuffer];
-    
+
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     
@@ -3316,6 +3331,12 @@ BOOL prefersStatusBarHidden = NO;
     safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
     safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
 
+    // Status-bar tap proxy height tracks safeAreaInsets.top, so refresh it
+    // here so rotations and other safe-area changes keep the proxy aligned
+    // with the real status-bar strip (and don't leak touch interception
+    // into the rest of the toolbar).
+    [self cn1UpdateStatusBarTapProxyFrame];
+
     lockDrawing = NO;
     repaintUI();
 }
@@ -3325,7 +3346,7 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 
-    [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    [[self eaglView] updateFrameBufferSize:(int)(self.view.bounds.size.width * scaleValue) h:(int)(self.view.bounds.size.height * scaleValue)];
     [[self eaglView] deleteFramebuffer];
 
     displayWidth = (int)self.view.bounds.size.width * scaleValue;

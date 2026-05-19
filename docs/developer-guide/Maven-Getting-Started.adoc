@@ -17,7 +17,7 @@ mvn -v
 
 Both should report Java 11 or newer. The Codename One Maven plugin checks the
 runtime JDK version when you invoke `mvn cn1:run` or `mvn cn1:debug` and fails
-fast with a friendly message if it is older than 11. Build-only goals (such as
+fast with a friendly message if it's older than 11. Build-only goals (such as
 `-Pexecutable-jar`) still work on older JDKs.
 
 [#creating-app-project]
@@ -35,7 +35,7 @@ The starter projects are based on the <<cn1app-archetype>>.
 
 [TIP]
 ====
-The following tutorials provide step-by-step instructions for getting started with bare-bones app templates. Those tutorials are a better starting place for Codename One development than this manual, as they are written in tutorial form.
+The following tutorials provide step-by-step instructions for getting started with bare-bones app templates. Those tutorials are a better starting place for Codename One development than this manual, as they're written in tutorial form.
 
 **Java Getting Started Tutorial:**
 
@@ -224,9 +224,9 @@ Select the _MyApp - Run Simulator_ option from this menu.
 If all goes well it should open in the Codename One simulator.
 
 
-==== Example: migrating kitchen sink app
+==== Example: Migrating kitchen sink app
 
-Let's consider a concrete example, now. Download the KitchenSink Ant project from https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip[here] and extract it.
+Consider a concrete example, now. Download the KitchenSink Ant project from https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip[here] and extract it.
 
 The following is a bash script that uses curl to download this project as a zip file, and then converts it to a fully functional Maven project.
 
@@ -263,18 +263,18 @@ NOTE: See https://maven.apache.org/guides/introduction/introduction-to-dependenc
 
 With Codename One projects, there are a few caveats (see <<compliance-check>>), and a few added nicities that make it easier to find and install add-on libraries in your project (see <<managing-addons-in-control-center>>).
 
-==== Which `pom.xml` do I add the `<dependency>` snippet to
+==== Which `pom.xml` to add the `<dependency>` snippet to
 
-Let's assume that you've a Maven `<dependency>` snippet that you've copied from Maven central, and it's burning a hole in your clipboard while you're trying to figure out where to paste it into your project.
+Suppose you've a Maven `<dependency>` snippet that you've copied from Maven central, and it's burning a hole in your clipboard while you're trying to figure out where to paste it into your project.
 Codename One application projects, being multi-module projects, have more than one `pom.xml` file; One per module.
 
-**Question:** Which pom.xml file do I paste your snippet into?
+**Question:** Which pom.xml file should you paste the snippet into?
 
 **Answer:** common/pom.xml (almost always).
 
 The "common" module is where all your Codename One application resides. It houses your Java and Kotlin files, your CSS files, your GUI builder files, your Codename One configuration files (that is, `codenameone_settings.properties`). Pretty much everything. The things you'd place in the other modules (for example, `Java SE`, `ios`, etc...) are your platform-specific native interface implementations; And in many applications you won't need any of that.
 
-So, when adding dependencies into your app, you'll almost always place them inside the pom.xml file for the "common" module.
+When adding dependencies into your app, you'll therefore almost always place them inside the pom.xml file for the "common" module.
 
 TIP: You can add dependencies without needing to change XML configuration files using the Control Center. See <<managing-addons-in-control-center>>.
 
@@ -299,9 +299,9 @@ These modules don't use Maven for their dependencies (Android may deserve a smal
 ****
 
 [#maven-dependency-example]
-==== Example: adding Google maps dependency via Maven central
+==== Example: Adding Google maps dependency via Maven central
 
-Let's add the GoogleMaps library to your app as a maven dependency.
+Add the GoogleMaps library to your app as a maven dependency.
 
 As described in the https://github.com/codenameone/codenameone-google-maps#maven-dependency[GoogleMaps cn1lib README], the dependency snippet is:
 
@@ -352,7 +352,7 @@ If the compliance check fails (that is, the app uses unsupported APIs), the buil
 [#managing-addons-in-control-center]
 ==== Managing Add-Ons in control center
 
-As I mention throughout this guide, the best place to find and install add-ons for your project is in the Codename One Control Center (aka Codename One Preferences. aka Codename One Settings). See <<settings>>.
+As mentioned throughout this guide, the best place to find and install add-ons for your project is in the Codename One Control Center (aka Codename One Preferences. aka Codename One Settings). See <<settings>>.
 
 From the dashboard, select "Advanced Settings" > "Extensions" in the navigation menu on the left as shown below:
 
@@ -362,7 +362,7 @@ This will bring up a list of available Codename One extensions as shown below:
 
 image::img/control-center-extensions.png[Control center extensions page]
 
-As an example, let's install the "Google Maps" library.
+As an example, install the "Google Maps" library.
 
 Type in "Maps" into the search box, and it should narrow the options down to three libraries as shown below:
 
