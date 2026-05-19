@@ -378,7 +378,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "DrawArc".equals(testName)
                 || "DrawGradient".equals(testName)
                 || "DrawGradientStops".equals(testName)
-                || "DrawImage".equals(testName)
+                // DrawImage golden landed for JS port in <THIS PR commit>;
+                // re-enable so JS-port regressions surface as pixel diffs
+                // against scripts/javascript/screenshots/graphics-draw-image-rect.png.
+                // || "DrawImage".equals(testName)
                 || "GaussianBlur".equals(testName)
                 || "DrawLine".equals(testName)
                 || "DrawRect".equals(testName)
@@ -392,7 +395,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "FillRoundRect".equals(testName)
                 || "FillShape".equals(testName)
                 || "FillTriangle".equals(testName)
-                || "InscribedTriangleGrid".equals(testName)
+                // InscribedTriangleGrid golden landed for JS port in <THIS PR commit>;
+                // re-enable so per-cell triangle/box rendering regressions surface.
+                // || "InscribedTriangleGrid".equals(testName)
                 || "Rotate".equals(testName)
                 || "Scale".equals(testName)
                 || "StrokeTest".equals(testName)
