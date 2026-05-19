@@ -96,6 +96,8 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
+import com.codename1.security.Biometrics;
+import com.codename1.security.SecureStorage;
 import com.codename1.media.AbstractMedia;
 import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
@@ -4555,6 +4557,87 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulateMenu.add(pushSim);
+
+        JMenu biometricMenu = new JMenu("Biometric Simulation");
+
+        final JCheckBoxMenuItem bioAvailable = new JCheckBoxMenuItem("Hardware Available",
+                pref.getBoolean("BiometricSim.available", false));
+        JavaSEBiometrics.simAvailable = bioAvailable.isSelected();
+        bioAvailable.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simAvailable = bioAvailable.isSelected();
+                pref.putBoolean("BiometricSim.available", bioAvailable.isSelected());
+            }
+        });
+        biometricMenu.add(bioAvailable);
+
+        biometricMenu.addSeparator();
+
+        final JCheckBoxMenuItem bioFace = new JCheckBoxMenuItem("Face ID Enrolled",
+                pref.getBoolean("BiometricSim.face", false));
+        JavaSEBiometrics.simFaceEnrolled = bioFace.isSelected();
+        bioFace.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simFaceEnrolled = bioFace.isSelected();
+                pref.putBoolean("BiometricSim.face", bioFace.isSelected());
+            }
+        });
+        biometricMenu.add(bioFace);
+
+        final JCheckBoxMenuItem bioTouch = new JCheckBoxMenuItem("Touch ID Enrolled",
+                pref.getBoolean("BiometricSim.touch", false));
+        JavaSEBiometrics.simTouchEnrolled = bioTouch.isSelected();
+        bioTouch.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simTouchEnrolled = bioTouch.isSelected();
+                pref.putBoolean("BiometricSim.touch", bioTouch.isSelected());
+            }
+        });
+        biometricMenu.add(bioTouch);
+
+        final JCheckBoxMenuItem bioIris = new JCheckBoxMenuItem("Iris Enrolled",
+                pref.getBoolean("BiometricSim.iris", false));
+        JavaSEBiometrics.simIrisEnrolled = bioIris.isSelected();
+        bioIris.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simIrisEnrolled = bioIris.isSelected();
+                pref.putBoolean("BiometricSim.iris", bioIris.isSelected());
+            }
+        });
+        biometricMenu.add(bioIris);
+
+        biometricMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Next authenticate() Outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        String savedOutcome = pref.get("BiometricSim.outcome", JavaSEBiometrics.SimOutcome.SUCCEED.name());
+        try {
+            JavaSEBiometrics.nextOutcome = JavaSEBiometrics.SimOutcome.valueOf(savedOutcome);
+        } catch (IllegalArgumentException ex) {
+            JavaSEBiometrics.nextOutcome = JavaSEBiometrics.SimOutcome.SUCCEED;
+        }
+        JavaSEBiometrics.SimOutcome[] outcomes = JavaSEBiometrics.SimOutcome.values();
+        for (int i = 0; i < outcomes.length; i++) {
+            final JavaSEBiometrics.SimOutcome outcome = outcomes[i];
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(outcome.name(),
+                    outcome == JavaSEBiometrics.nextOutcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEBiometrics.nextOutcome = outcome;
+                    pref.put("BiometricSim.outcome", outcome.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        biometricMenu.add(outcomeMenu);
+
+        simulateMenu.add(biometricMenu);
 
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
@@ -11724,6 +11807,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             return new String[] {"desktop", "tablet"};
         }
         return platformOverrides;
+    }
+
+    private JavaSEBiometrics biometrics;
+    private JavaSESecureStorage secureStorage;
+
+    @Override
+    public Biometrics getBiometrics() {
+        if (biometrics == null) {
+            biometrics = new JavaSEBiometrics();
+        }
+        return biometrics;
+    }
+
+    @Override
+    public SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new JavaSESecureStorage((JavaSEBiometrics) getBiometrics());
+        }
+        return secureStorage;
     }
 
     public LocationManager getLocationManager() {

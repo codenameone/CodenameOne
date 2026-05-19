@@ -628,6 +628,42 @@ public final class IOSNative {
 
     native void cancelLocalNotification(String id);
 
+    // --- Biometrics (LocalAuthentication.framework) -------------------------
+
+    /** True when LAContext.canEvaluatePolicy(deviceOwnerAuthenticationWithBiometrics) succeeds. */
+    native boolean isBiometricsSupported();
+
+    /** Same as {@link #isBiometricsSupported()} but also requires at least one biometric to be enrolled. */
+    native boolean canAuthenticateBiometric();
+
+    /** Bitmask: bit 0 = FINGERPRINT (Touch ID), bit 1 = FACE (Face ID). */
+    native int getAvailableBiometricTypes();
+
+    /**
+     * Triggers an asynchronous biometric prompt. Native code calls back into
+     * {@code IOSBiometrics.nativeAuthSuccess(int)} or
+     * {@code IOSBiometrics.nativeAuthError(int, int, String)} with the same
+     * requestId.
+     */
+    native void authenticateBiometric(int requestId, String reason);
+
+    /** Invalidates the LAContext so the in-flight prompt resolves with LAErrorAppCancel. */
+    native void stopBiometricAuthentication();
+
+    // --- Secure storage (Security.framework keychain) -----------------------
+
+    /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */
+    native void setSecureStorageAccessGroup(String accessGroup);
+
+    /** Async keychain read; result via IOSSecureStorage.nativeStorageStringResult / nativeStorageError. */
+    native void secureStorageGet(int requestId, String reason, String account);
+
+    /** Async keychain write; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
+    native void secureStorageSet(int requestId, String reason, String account, String value);
+
+    /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
+    native void secureStorageRemove(int requestId, String reason, String account);
+
     native long gausianBlurImage(long peer, float radius);
     
     /**

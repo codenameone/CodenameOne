@@ -733,6 +733,18 @@ public class AndroidGradleBuilder extends Executor {
 
         // Augment the xpermissions request arg with explicit android.permissions.XXX build hints
         xPermissions = request.getArg("android.xpermissions", "");
+
+        // USE_BIOMETRIC is a "normal" permission (no runtime prompt) required by
+        // com.codename1.security.Biometrics. Inject it unconditionally so apps
+        // don't have to remember the build hint; if the user already declared
+        // it in xpermissions we leave their version alone.
+        if (!xPermissions.contains("android.permission.USE_BIOMETRIC")) {
+            xPermissions = "    <uses-permission android:name=\"android.permission.USE_BIOMETRIC\" />\n" + xPermissions;
+        }
+        if (!xPermissions.contains("android.permission.USE_FINGERPRINT")) {
+            xPermissions = "    <uses-permission android:name=\"android.permission.USE_FINGERPRINT\" android:maxSdkVersion=\"28\" />\n" + xPermissions;
+        }
+
         debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
             String permName = xPerm.substring(xPerm.lastIndexOf(".")+1);

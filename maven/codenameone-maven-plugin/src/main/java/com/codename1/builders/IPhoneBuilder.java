@@ -1565,6 +1565,15 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // LocalAuthentication is required by com.codename1.security.Biometrics
+            // (Touch ID / Face ID). Always link it -- the framework is ubiquitous
+            // (iOS 8+) and tiny, and apps that never call Biometrics pay nothing.
+            if (addLibs == null || addLibs.length() == 0) {
+                addLibs = "LocalAuthentication.framework";
+            } else if (!addLibs.toLowerCase().contains("localauthentication")) {
+                addLibs = addLibs + ";LocalAuthentication.framework";
+            }
+
             try {
                 if (!runPods && googleAdUnitId != null && googleAdUnitId.length() > 0) {
                     unzip(getResourceAsStream("/google-play-services_lib-ios.zip"), classesDir, buildinRes, buildinRes);

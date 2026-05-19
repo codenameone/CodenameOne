@@ -37,6 +37,8 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.security.Biometrics;
+import com.codename1.security.SecureStorage;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
@@ -4267,6 +4269,21 @@ public final class Display extends CN1Constants {
     /// LocationManager Object
     public LocationManager getLocationManager() {
         return impl.getLocationManager();
+    }
+
+    /// Returns the platform biometric authentication entry point. Prefer
+    /// {@link com.codename1.security.Biometrics#getInstance()} in application
+    /// code --- it handles the fallback to a no-op stub when the current port
+    /// does not implement biometrics.
+    public Biometrics getBiometrics() {
+        return impl.getBiometrics();
+    }
+
+    /// Returns the platform biometric-gated secure storage. Prefer
+    /// {@link com.codename1.security.SecureStorage#getInstance()} in
+    /// application code.
+    public SecureStorage getSecureStorage() {
+        return impl.getSecureStorage();
     }
 
     /// This method tries to invoke the device native camera to capture images.
