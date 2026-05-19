@@ -1585,6 +1585,7 @@ public class AndroidGradleBuilder extends Executor {
             new File(assetsDir, "CN1Resource.res").delete();
             new File(assetsDir, "androidTheme.res").delete();
             new File(assetsDir, "android_holo_light.res").delete();
+            new File(assetsDir, "AndroidMaterialTheme.res").delete();
         }
         if (getAndroidPortSrcJar() == null) {
             try {
@@ -1602,6 +1603,12 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
         }
 
+        // The Android port jar ships all three native themes
+        // (AndroidMaterialTheme.res, android_holo_light.res, androidTheme.res).
+        // Strip the .apk down to the one the runtime will actually load based
+        // on the effective theme mode, mirroring
+        // AndroidImplementation.installNativeTheme.
+        deleteInactiveAndroidThemes(assetsDir, resolveAndroidThemeMode(request));
 
         // We need to choose the correct PlayServices class file for the version of play services
         // we are building for.
@@ -4950,6 +4957,50 @@ public class AndroidGradleBuilder extends Executor {
             if (directory.isDirectory()) {
                 log("Deleting directory " + directory);
                 delTree(directory, true);
+            }
+        }
+    }
+
+    /// Mirrors AndroidImplementation.installNativeTheme's mode resolution so
+    /// the builder can pick the same .res the runtime will load. Order:
+    /// and.themeMode > cn1.androidTheme > nativeTheme/cn1.nativeTheme >
+    /// and.hololight > default (hololight).
+    private static String resolveAndroidThemeMode(BuildRequest request) {
+        String mode = request.getArg("and.themeMode", request.getArg("cn1.androidTheme", null));
+        if (mode == null) {
+            String shared = request.getArg("nativeTheme", request.getArg("cn1.nativeTheme", null));
+            if ("modern".equalsIgnoreCase(shared)) {
+                mode = "material";
+            } else if ("legacy".equalsIgnoreCase(shared)) {
+                mode = "hololight";
+            } else if ("true".equalsIgnoreCase(request.getArg("and.hololight", "false"))) {
+                mode = "legacy";
+            } else {
+                mode = "hololight";
+            }
+        } else {
+            mode = mode.toLowerCase();
+        }
+        return mode;
+    }
+
+    /// Removes the Android native theme .res files that the runtime won't
+    /// load based on the effective theme mode. The Android port jar ships
+    /// all three (AndroidMaterialTheme, android_holo_light, androidTheme);
+    /// the builder strips the .apk down to the one this build wants. Mirrors
+    /// the mode -> theme mapping in AndroidImplementation.installNativeTheme.
+    private static void deleteInactiveAndroidThemes(File assetsDir, String androidMode) {
+        String keep;
+        if ("material".equals(androidMode) || "modern".equals(androidMode) || "auto".equals(androidMode)) {
+            keep = "AndroidMaterialTheme.res";
+        } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
+            keep = "android_holo_light.res";
+        } else {
+            keep = "androidTheme.res";
+        }
+        for (String themeFile : new String[] {"AndroidMaterialTheme.res", "android_holo_light.res", "androidTheme.res"}) {
+            if (!themeFile.equals(keep)) {
+                new File(assetsDir, themeFile).delete();
             }
         }
     }
