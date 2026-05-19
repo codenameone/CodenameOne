@@ -109,10 +109,19 @@ static GLuint getOGLProgram(){
     return self;
 }
 #ifdef USE_ES2
+extern int CN1DbgRemainingOps;
+extern int CN1DbgPolygonClipSeq;
 -(void)execute {
 #ifdef CN1_USE_METAL
     CN1MetalFillRect(color, alpha, x, y, width, height);
 #else
+    if (CN1DbgRemainingOps > 0) {
+        GLKMatrix4 t = glGetTransformES2();
+        NSLog(@"CN1DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f",
+              CN1DbgPolygonClipSeq, CN1DbgRemainingOps, color, alpha, x, y, width, height,
+              t.m[12], t.m[13], t.m[0], t.m[5]);
+        CN1DbgRemainingOps--;
+    }
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));
     //GlColorFromRGB(color, alpha);

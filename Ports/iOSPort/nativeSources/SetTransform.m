@@ -50,11 +50,23 @@ static BOOL currentTransformInitialized = NO;
     return self; 
 }
 
+extern int CN1DbgRemainingOps;
+extern int CN1DbgPolygonClipSeq;
+
 -(void)execute
 {
 #ifdef CN1_USE_METAL
     CN1MetalSetTransform(m);
 #else
+    if (CN1DbgRemainingOps > 0) {
+        NSLog(@"CN1DBG SetTransform.exec polySeq=%d remaining=%d m=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
+              CN1DbgPolygonClipSeq, CN1DbgRemainingOps,
+              m.m[0], m.m[1], m.m[2], m.m[3],
+              m.m[4], m.m[5], m.m[6], m.m[7],
+              m.m[8], m.m[9], m.m[10], m.m[11],
+              m.m[12], m.m[13], m.m[14], m.m[15]);
+        CN1DbgRemainingOps--;
+    }
     glSetTransformES2(m);
 #endif
 }
