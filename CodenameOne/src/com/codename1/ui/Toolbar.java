@@ -473,22 +473,36 @@ public class Toolbar extends Container {
             }
             return;
         }
-        final int pending = (leftShowing ? 1 : 0) + (rightShowing ? 1 : 0);
-        final int[] remaining = {pending};
-        Runnable countdown = onFinish == null ? null : new Runnable() {
-            @Override
-            public void run() {
-                remaining[0]--;
-                if (remaining[0] == 0) {
-                    onFinish.run();
-                }
-            }
-        };
+        int pending = (leftShowing ? 1 : 0) + (rightShowing ? 1 : 0);
+        Runnable countdown = onFinish == null ? null : new CloseSideMenuCountdown(pending, onFinish);
         if (leftShowing) {
             closeLeftSideMenu(countdown);
         }
         if (rightShowing) {
             closeRightSideMenu(countdown);
+        }
+    }
+
+    /// Runnable that decrements a counter and fires its delegate when
+    /// the counter reaches zero. Used by [#closeSideMenu(Runnable)][closeSideMenu]
+    /// to wait for both left and right dispose animations when both
+    /// side menus are open. Declared as a static nested class so the
+    /// Runnable does not retain an implicit reference to the
+    /// surrounding Toolbar instance.
+    private static final class CloseSideMenuCountdown implements Runnable {
+        private int remaining;
+        private final Runnable delegate;
+
+        CloseSideMenuCountdown(int remaining, Runnable delegate) {
+            this.remaining = remaining;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void run() {
+            if (--remaining == 0) {
+                delegate.run();
+            }
         }
     }
 
