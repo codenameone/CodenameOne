@@ -577,18 +577,12 @@ void collectThreadResources(struct ThreadLocalData *current)
     }
 }
 static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
-extern int recursionKey;
 
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 void codenameOneGCMark() {
     currentGcMarkValue++;
-    // Advance the per-cycle dedupe key for force-mode traversal. Without this,
-    // refcount==recursionKey state would persist across GC cycles and the
-    // dedupe-skip in gcMarkObject's force branch only worked by coincidence
-    // (recursionKey stayed at 1, matching the gcMalloc default of refcount=1).
-    recursionKey++;
     init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
     struct ThreadLocalData* d = getThreadLocalData();
@@ -1251,15 +1245,6 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     }
     obj->__codenameOneGcMark = currentGcMarkValue;
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
-    if(force) {
-        // Record that this object has been visited in force mode this cycle, so a
-        // subsequent force-true visit from another root takes the dedupe-skip in
-        // the already-marked branch above instead of re-pushing for a redundant
-        // re-scan. Previously this was only set on the second-and-later visits,
-        // which meant pinned objects (refcount=999999) got one wasteful extra
-        // traversal per cycle.
-        obj->__codenameOneReferenceCount = recursionKey;
-    }
     if(obj->__codenameOneParentClsReference->markFunction != 0) {
         gcMarkWorklistPush(obj, force);
     }
