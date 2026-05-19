@@ -688,6 +688,17 @@ void codenameOneGCMark() {
                     }
                 }
                 markStatics(d);
+                // Drain the worklist before unblocking the thread so that every object
+                // transitively reachable from this thread's roots is fully marked while the
+                // thread is still paused -- matching the snapshot-at-the-beginning property
+                // the recursive implementation had. Without this drain, an unblocked mutator
+                // can read a still-grey field reference into a new local and null the field;
+                // the captured object would never be visited by the final drain, sweep would
+                // reclaim it, and a later monitorEnter on its freed pthread_mutex_t would
+                // silently deadlock. Earlier attempts at this drain hung at app startup
+                // because the overflow rescan path had a cursor-reset bug; with that fixed
+                // below, the drain runs to completion in O(reachable) time.
+                gcMarkDrain(d);
                 if(!agressiveAllocator) {
                     t->threadBlockedByGC = JAVA_FALSE;
                 } else {
