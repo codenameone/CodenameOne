@@ -3,9 +3,13 @@ package com.codenameone.examples.javase.tests;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextField;
+import com.codename1.ui.Toolbar;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.layouts.BorderLayout;
@@ -26,11 +30,26 @@ public class SimulatorModeTestApp {
     private Form current;
 
     public void init(Object context) {
+        Toolbar.setGlobalToolbar(true);
+        boolean appThemeInstalled = false;
         try {
             Resources theme = Resources.openLayered("/theme");
             UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+            appThemeInstalled = true;
         } catch (Exception ignored) {
-            // Fallback to default theme if test resource isn't available.
+            // No app theme bundled - fall through to native-theme-only
+            // path below so the screenshot still reflects the user's
+            // Native Theme menu pick.
+        }
+        if (!appThemeInstalled && Display.getInstance().hasNativeTheme()) {
+            // JavaSEPort.loadSkinFile has already cached the
+            // simulatorNativeTheme pick as nativeThemeRes, but nothing
+            // has pushed it into UIManager. Installing it directly
+            // lights up the iOS Modern / Android Material chrome in
+            // the captured screenshot; without this the form renders
+            // with the bare DefaultLookAndFeel and the screenshots
+            // for every theme look identical.
+            Display.getInstance().installNativeTheme();
         }
     }
 
@@ -41,14 +60,33 @@ public class SimulatorModeTestApp {
         }
         String mode = System.getProperty("cn1.test.window.mode", "unknown");
         Form form = new Form("JavaSE Simulator Test", new BorderLayout());
+        // The Toolbar carries most of the visual identity of a native
+        // theme (title bar color, font, status-bar treatment), so we
+        // need the global Toolbar in place for the screenshot to look
+        // different across themes.
+        Toolbar tb = form.getToolbar();
+        tb.setTitle("JavaSE Simulator Test");
+        tb.addMaterialCommandToSideMenu("Settings", com.codename1.ui.FontImage.MATERIAL_SETTINGS,
+                evt -> { /* placeholder */ });
+
         form.add(BorderLayout.NORTH, new Label("Window mode: " + mode));
 
         com.codename1.ui.Container body = new com.codename1.ui.Container(BoxLayout.y());
         body.add(new Label("Robot validation baseline"));
-        body.add(new Button("Primary Action"));
+        Button primary = new Button("Primary Action");
+        primary.setUIID("RaisedButton");
+        body.add(primary);
         Button dialogButton = new Button("Open Dialog");
         dialogButton.addActionListener(evt -> Dialog.show("Mode", "Current mode: " + mode, "OK", null));
         body.add(dialogButton);
+        // Add a few more theme-bearing components so the screenshot
+        // captures more than just two flat buttons. CheckBox + TextField
+        // pick up theme-specific colors and metrics that diverge
+        // visibly between iOS Modern, Android Material and the legacy
+        // pair.
+        body.add(new CheckBox("Enable feature"));
+        TextField tf = new TextField("", "Text field hint", 20, TextField.ANY);
+        body.add(tf);
 
         // Native-theme verification: when the harness sets
         // cn1.test.expectedNativeTheme, query JavaSEPort for the
@@ -61,7 +99,9 @@ public class SimulatorModeTestApp {
         String expectedNativeTheme = System.getProperty("cn1.test.expectedNativeTheme");
         if (expectedNativeTheme != null && !expectedNativeTheme.isEmpty()) {
             String diagnostic = reportNativeThemeResult(expectedNativeTheme);
-            body.add(new Label(diagnostic));
+            Label diagLabel = new Label(diagnostic);
+            diagLabel.setUIID("Label");
+            body.add(diagLabel);
         }
 
         form.add(BorderLayout.CENTER, body);
