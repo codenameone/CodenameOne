@@ -131,25 +131,21 @@ extern int CN1DbgPolygonClipSeq;
         GLboolean blendOn = glIsEnabled(GL_BLEND);
         GLint colorMask[4] = {0,0,0,0};
         glGetIntegerv(GL_COLOR_WRITEMASK, colorMask);
-        // Read stencil byte at the screen-pixel that should be inside the
-        // panel polygon. For panel 2 settled paint that's around (873, 870)
-        // screen coords; convert to GL coords (Y-up) by displayHeight - y.
-        // glReadPixels w/ GL_STENCIL_INDEX may not be supported on all sims --
-        // wrap in try and clear error after.
-        GLubyte stencilPixel = 0xff;
-        glReadPixels(873, [CodenameOne_GLViewController instance].view.bounds.size.height * 3 - 870, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, &stencilPixel);
-        GLint glErr = glGetError();
-        GLubyte stencilPixelPanel1 = 0xff;
-        glReadPixels(300, [CodenameOne_GLViewController instance].view.bounds.size.height * 3 - 870, 1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, &stencilPixelPanel1);
-        glGetError();
-        NSLog(@"CN1SS:DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f stencil=%d func=0x%x ref=%d mask=0x%x writeMask=0x%x scissor=%d box=(%d,%d,%d,%d) depth=%d cull=%d blend=%d colorMask=%d%d%d%d stencilAt873_870=%d stencilAt300_870=%d readErr=0x%x",
+        GLint viewport[4] = {0,0,0,0};
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        GLint stencilBits = 0;
+        glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
+        GLint fbId = 0;
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbId);
+        NSLog(@"CN1SS:DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f stencil=%d func=0x%x ref=%d mask=0x%x writeMask=0x%x scissor=%d box=(%d,%d,%d,%d) depth=%d cull=%d blend=%d colorMask=%d%d%d%d viewport=(%d,%d,%d,%d) stencilBits=%d fb=%d",
               CN1DbgPolygonClipSeq, CN1DbgRemainingOps, color, alpha, x, y, width, height,
               t.m[12], t.m[13], t.m[0], t.m[5],
               stencilOn, stencilFunc, stencilRef, stencilMask, stencilWriteMask,
               scissorOn, scissor[0], scissor[1], scissor[2], scissor[3],
               depthOn, cullOn, blendOn,
               colorMask[0], colorMask[1], colorMask[2], colorMask[3],
-              stencilPixel, stencilPixelPanel1, glErr);
+              viewport[0], viewport[1], viewport[2], viewport[3],
+              stencilBits, fbId);
         CN1DbgRemainingOps--;
     }
     //[UIColorFromRGB(color, alpha) set];
