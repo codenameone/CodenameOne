@@ -51,6 +51,9 @@
 #import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
+#ifdef CN1_USE_METAL
+#import "DrawMultiStopGradient.h"
+#endif
 #import <MediaPlayer/MediaPlayer.h>
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
@@ -792,22 +795,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
 
+    // The blur runs through CIGaussianBlur for both GL and Metal builds.
+    // CIGaussianBlur is itself Metal-backed under the hood (Apple uses
+    // MPSImageGaussianBlur internally for it), and its inputRadius
+    // semantic plus output-extent expansion are what the test goldens
+    // and CSS filter:blur expectations were baked against. A direct
+    // MPSImageGaussianBlur call from this layer can't reproduce the
+    // same visual without empirically matching sigma scaling and
+    // padding the dst by ~3 sigma; not worth the complexity when the
+    // CIFilter path is already correct and the read-back cost is paid
+    // once per blur invocation (not per frame).
+
     UIImage* original = nil;
 #ifdef CN1_USE_METAL
-    // On Metal the mutable's pixels live in mtlMutableTexture, not in
-    // [glu getImage]; the latter returns the original (likely empty)
-    // UIImage that was used to construct the GLUIImage. Read the GPU
-    // texture back to a UIImage so CIGaussianBlur sees actual pixels.
-    // Switch's createRoundThumbImage depends on this -- without it the
-    // blur runs on transparent input, returns empty, and the pre-blur
-    // shadow rings end up showing through as visible artefacts on the
-    // final thumb composite.
     if ([glu mtlMutableTexture] != nil) {
-        // Force drawFrame to drain any pending ExecutableOps for this image
-        // before sampling. Without the flush the GPU never executes the
-        // shadow-ring fillArc calls; CN1MetalReadMutableImageAsUIImage
-        // would then sample the cleared (zero-alpha) texture and the blur
-        // input is empty. Mirrors imageRgbToIntArrayImpl's drain dance.
         extern int displayWidth;
         extern int displayHeight;
         [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
@@ -2612,6 +2613,83 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     POOL_END();
+}
+
+// Multi-stop gradient bridge. Metal builds queue a DrawMultiStopGradient op so
+// matrices / clip / mutable-image targeting propagate through the standard
+// drain loop, matching the existing DrawGradient flow. GL builds have no
+// equivalent shader and the Java side never calls this method (it falls
+// through to the software rasterizer in CodenameOneImplementation).
+void com_codename1_impl_ios_IOSNative_fillGradient___int_int_float_1ARRAY_float_1ARRAY_int_float_float_float_float_float_int_int_int_int_int_boolean(
+        CN1_THREAD_STATE_MULTI_ARG
+        JAVA_OBJECT instanceObject,
+        JAVA_INT kind,
+        JAVA_INT stopCount,
+        JAVA_OBJECT positionsArr,
+        JAVA_OBJECT colorsArr,
+        JAVA_INT cycleMethod,
+        JAVA_FLOAT angleOrFromAngle,
+        JAVA_FLOAT cx,
+        JAVA_FLOAT cy,
+        JAVA_FLOAT rx,
+        JAVA_FLOAT ry,
+        JAVA_INT shape,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height,
+        JAVA_BOOLEAN mutable) {
+#ifdef CN1_USE_METAL
+    POOL_BEGIN();
+    if (positionsArr == JAVA_NULL || colorsArr == JAVA_NULL || stopCount < 2 || width <= 0 || height <= 0) {
+        POOL_END();
+        return;
+    }
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT *positions =
+        (JAVA_ARRAY_FLOAT *)((org_xmlvm_runtime_XMLVMArray *)positionsArr)
+            ->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT *colors =
+        (JAVA_ARRAY_FLOAT *)((org_xmlvm_runtime_XMLVMArray *)colorsArr)
+            ->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_FLOAT *positions = (JAVA_FLOAT *)((JAVA_ARRAY)positionsArr)->data;
+    JAVA_ARRAY_FLOAT *colors = (JAVA_FLOAT *)((JAVA_ARRAY)colorsArr)->data;
+#endif
+
+    DrawMultiStopGradient *d = [[DrawMultiStopGradient alloc]
+        initWithKind:kind
+           stopCount:stopCount
+           positions:positions
+              colors:colors
+         cycleMethod:cycleMethod
+    angleOrFromAngle:angleOrFromAngle
+                  cx:cx
+                  cy:cy
+                  rx:rx
+                  ry:ry
+               shape:shape
+                   x:x
+                   y:y
+               width:width
+              height:height];
+    if (mutable) {
+        GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
+        if (target == nil) {
+#ifndef CN1_USE_ARC
+            [d release];
+#endif
+            POOL_END();
+            return;
+        }
+        [d setTarget:target];
+    }
+    [CodenameOne_GLViewController upcoming:d];
+#ifndef CN1_USE_ARC
+    [d release];
+#endif
+    POOL_END();
+#endif
 }
 
 /*

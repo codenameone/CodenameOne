@@ -81,6 +81,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.Gradient;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
@@ -3376,6 +3377,29 @@ public abstract class CodenameOneImplementation {
             }
         }
         setColor(graphics, oldColor);
+    }
+
+    /// Fills the rectangle (x, y, width, height) with the given multi-stop
+    /// gradient. Default implementation reuses a weakly-cached rasterization
+    /// from the Gradient (see `Gradient#getCachedRaster`) - so a gradient
+    /// painted into the same-sized rectangle on subsequent frames pays only
+    /// for the texture upload, not per-pixel re-sampling. Ports with hardware
+    /// shader support should override and draw directly through the shader.
+    public void fillGradient(Object graphics, Gradient gradient, int x, int y, int width, int height) {
+        if (gradient == null || width <= 0 || height <= 0) {
+            return;
+        }
+        Image img = gradient.getCachedRaster(width, height);
+        if (img == null) {
+            return;
+        }
+        drawImage(graphics, img.getImage(), x, y);
+    }
+
+    /// In-place region blur for CSS backdrop-filter:blur(). Default returns false
+    /// signalling no in-place support - caller falls back to snapshot+blur.
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        return false;
     }
 
     private boolean checkIntersection(Object g, int y0, int x1, int x2, int y1, int y2, int[] intersections, int intersectionsCount) {
@@ -9279,6 +9303,11 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
+                case Style.BACKGROUND_GRADIENT_LINEAR:
+                case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+                case Style.BACKGROUND_GRADIENT_CONIC:
+                case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+                case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
                     return;
                 default:
@@ -9312,6 +9341,18 @@ public abstract class CodenameOneImplementation {
                         x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
                         s.getBackgroundGradientRelativeSize());
                 return;
+            case Style.BACKGROUND_GRADIENT_LINEAR:
+            case Style.BACKGROUND_GRADIENT_RADIAL_FULL:
+            case Style.BACKGROUND_GRADIENT_CONIC:
+            case Style.BACKGROUND_GRADIENT_REPEATING_LINEAR:
+            case Style.BACKGROUND_GRADIENT_REPEATING_RADIAL: {
+                Gradient g = s.getGradient();
+                if (g != null) {
+                    fillGradient(nativeGraphics, g, x, y, width, height);
+                    return;
+                }
+                break;
+            }
             default:
                 // Style.BACKGROUND_NONE
                 if (s.getBgTransparency() != 0) {

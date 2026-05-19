@@ -69,3 +69,143 @@ TabsColorSync {
 TabsColorSync.pressed {
     color: green;
 }
+
+/* CSS-gradient screenshot tests. Each UIID exercises one of the gradient
+   functions the CSS compiler now compiles down to a native descriptor
+   instead of a rasterized fallback image. The Java side picks each tile up
+   by UIID so the only thing under test is the compiler + Style + port
+   gradient renderer round-trip. */
+CssGradientTile {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+}
+CssGradientLinearAngled {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%);
+}
+CssGradientLinearToSide {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(to bottom right, #1d4ed8, #003);
+}
+CssGradientLinearMismatchedAlpha {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue);
+}
+CssGradientRadialFarthestCorner {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: radial-gradient(circle farthest-corner at 30% 30%, #ffffff, #001 70%);
+}
+CssGradientRadialEllipse {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: radial-gradient(ellipse closest-side at 50% 50%, #ffeeff, #002233);
+}
+CssGradientConic {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: conic-gradient(from 0deg at 50% 50%, red, yellow, green, blue, red);
+}
+CssGradientRepeatingLinear {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: repeating-linear-gradient(45deg, #eeeeee 0%, #cc3344 10%);
+}
+CssGradientRepeatingRadial {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: repeating-radial-gradient(circle at center, #ffffff 0%, #cc3344 16%);
+}
+
+/* filter / backdrop-filter UIIDs. These verify the CSS compiler stores the
+   blur radius on the Style; actual paint-time blurring is not yet wired
+   through the component paint pipeline (it lands as a follow-up using
+   Graphics.gaussianBlur), so we don't take a screenshot of these tiles -
+   the test only asserts the Style fields round-trip. */
+CssFilterBlurNone {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+}
+CssFilterBlurLight {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: blur(2px);
+}
+CssFilterBlurHeavy {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: blur(8px);
+}
+CssFilterBackdrop {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+}
+
+/* Non-blur CSS filter functions. These verify the CSS compiler reduces a
+   `filter:` chain (brightness/contrast/grayscale/hue-rotate/invert/opacity/
+   saturate/sepia) to a single 4x5 color matrix on Style. Paint-time
+   integration is the same follow-up as filter:blur; the test only asserts
+   the matrix round-trips via theme.res. */
+CssFilterBrightness {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: brightness(1.5);
+}
+CssFilterContrast {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: contrast(0.6);
+}
+CssFilterGrayscale {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: grayscale(1);
+}
+CssFilterInvert {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: invert(1);
+}
+CssFilterSepia {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: sepia(0.8);
+}
+CssFilterChain {
+    padding: 0px;
+    margin: 0.5mm;
+    border: none;
+    background: linear-gradient(45deg, #ff0080, #40e0d0);
+    filter: brightness(1.2) contrast(0.9) saturate(1.3);
+}

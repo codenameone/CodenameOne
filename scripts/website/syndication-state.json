@@ -50,6 +50,14 @@
         "featured_media_id": 123839,
         "yoast_meta_set": true,
         "syndicated_at": "2026-05-16T13:31:58+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/f08d6680b1cf/edit",
+        "syndicated_at": "2026-05-18T13:52:17+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3655676/edit.html",
+        "syndicated_at": "2026-05-18T13:53:16+00:00"
       }
     }
   }

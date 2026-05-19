@@ -165,9 +165,50 @@ Alpha: use `rgba(r, g, b, a)` where `a` is 0–255 in some compiler versions and
 
 ## Gradients
 
-CN1 supports a small subset of gradient backgrounds. Linear and radial gradients can be configured per UIID, but the syntax is more restricted than full CSS. The canonical way to set a gradient is via the `Style` class (see `Style.setBackgroundType` constants — `BACKGROUND_GRADIENT_LINEAR_VERTICAL`, `BACKGROUND_GRADIENT_LINEAR_HORIZONTAL`, `BACKGROUND_GRADIENT_RADIAL`). The CSS compiler accepts an equivalent shorthand for these — start with a constant lookup in the `Style` JavaDoc and translate to CSS only after confirming the variant is supported.
+CSS gradients compile to a native `theme.res` descriptor. Supported functions:
 
-For arbitrary CSS-style gradients (`linear-gradient(135deg, ...)` with multiple stops), the supported path is a programmatic `Painter` set via `comp.getAllStyles().setBgPainter(...)` — it's not a CSS feature.
+- `linear-gradient(<angle>, <stops...>)` — angle in `deg` / `rad` / `turn`, or `to <side>` / `to <side1> <side2>`.
+- `radial-gradient([circle|ellipse] [<extent>] [at <position>], <stops...>)` — extent: `closest-side` / `closest-corner` / `farthest-side` / `farthest-corner` (default), or explicit radii in percent.
+- `conic-gradient([from <angle>] [at <position>], <stops...>)` — 0° points up, sweep clockwise.
+- `repeating-linear-gradient(...)` / `repeating-radial-gradient(...)` — stop pattern tiles outward.
+
+```css
+HeroCard      { background: linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%); }
+Spotlight     { background: radial-gradient(circle farthest-corner at 30% 30%, #fff, #001 70%); }
+ColorWheel    { background: conic-gradient(from 0deg at 50% 50%, red, yellow, green, blue, red); }
+DiagonalStripes { background: repeating-linear-gradient(45deg, #eee 0%, #ccc 10%); }
+```
+
+Programmatically, use the `Gradient` hierarchy (`LinearGradient`, `RadialGradient`, `ConicGradient` — `Paint` subclasses analogous to `Shape`):
+
+```java
+LinearGradient g = new LinearGradient(135f,
+        new int[]   { 0xffff0080, 0xffff8c00, 0xff40e0d0 },
+        new float[] { 0f,         0.5f,       1f });
+card.getAllStyles().setBackgroundType(Style.BACKGROUND_GRADIENT_LINEAR);
+card.getAllStyles().setGradient(g);
+
+// Or fill a rect directly via Graphics:
+graphics.fillGradient(g, 0, 0, w, h);
+```
+
+CSS background types map 1:1: `BACKGROUND_GRADIENT_LINEAR` / `_REPEATING_LINEAR` ↔ `LinearGradient`, `BACKGROUND_GRADIENT_RADIAL_FULL` / `_REPEATING_RADIAL` ↔ `RadialGradient`, `BACKGROUND_GRADIENT_CONIC` ↔ `ConicGradient`.
+
+## Filter and backdrop-filter
+
+`filter` and `backdrop-filter` accept a chain of functions:
+
+```css
+Overlay   { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(12px); }
+BlurImg   { filter: blur(4px); }
+Faded     { filter: brightness(0.6) contrast(1.2); }
+Grayscale { filter: grayscale(1); }
+Sepia     { filter: sepia(0.8) saturate(1.1); }
+```
+
+Supported functions: `blur(<length>)`, `brightness(<number>)`, `contrast(<number>)`, `grayscale(<number|%>)`, `hue-rotate(<angle>)`, `invert(<number|%>)`, `opacity(<number|%>)`, `saturate(<number>)`, `sepia(<number|%>)`.
+
+`filter:` applies to the component's own painted content; `backdrop-filter:` applies to whatever is painted behind. Radii / matrices are exposed on `Style` (`getFilterBlurRadius()`, `getFilterColorMatrix()`, etc.) and round-trip through `theme.res`.
 
 ## Dark mode
 

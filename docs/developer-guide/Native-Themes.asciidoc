@@ -571,7 +571,12 @@ opt-in to a diagonal-stripe textured backdrop on the form
 widgets show their see-through tint against the stripes; opaque
 widgets cover the stripes entirely.
 
-A real backdrop blur (`UIVisualEffectView` on iOS, `RenderEffect` on
-Android) lands as a separate native primitive in a future release.
-The current rgba approximation is the closest the framework can do
-without that primitive.
+CSS `backdrop-filter: blur(<length>)` and `filter: blur(<length>)` are
+now recognized by the compiler and persisted in the theme as the
+`backdropFilterBlur` and `filterBlur` Style properties (also reachable
+programmatically via `Style#getBackdropFilterBlurRadius()` /
+`Style#getFilterBlurRadius()`). Image-level blur is hardware-accelerated
+(`CIGaussianBlur` on iOS, `RenderScript` / `RenderEffect` on Android,
+JHLabs `GaussianFilter` in the simulator). Painting the blur into the
+component framebuffer is still being wired up; until that lands, the
+rgba approximation above remains useful for translucent surfaces.

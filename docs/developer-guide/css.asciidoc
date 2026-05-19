@@ -391,140 +391,100 @@ See link:Images[Images]
 
 ===== Gradients
 
-Both the `linear-gradient` and `radial-gradient` CSS functions are fully supported by this library. If Codename One is capable of rendering the gradient natively then the theme resource file generated will include encoded parameters for the gradients. If the gradient isn't supported by Codename One, then the module will fall back to an image background which it generates at compile-time. it's preferable to try to stick to gradients that Codename One supports natively. This will result in a smaller theme resource file since it doesn't need to generate any images for the gradient.
+The full CSS gradient range is natively supported: `linear-gradient`, `radial-gradient`, `conic-gradient`, `repeating-linear-gradient`, and `repeating-radial-gradient` — all with arbitrary angles, unlimited multi-stop colors (with optional position hints), and full radial shape/extent control. The compiled theme resource file carries a compact descriptor and the gradient is rendered at runtime by the platform-native graphics API (Java2D on JavaSE, `LinearGradient`/`RadialGradient`/`SweepGradient` on Android, Core Graphics / Core Image on iOS).
 
-**Natively Supported `linear-gradient` Syntax**
+.CSS gradient functions rendered side-by-side from the framework's screenshot test (top to bottom: linear at an arbitrary angle, linear `to <side>`, linear with mismatched alphas, radial `farthest-corner`, radial ellipse, conic, repeating-linear, repeating-radial).
+image::img/css-gradients-overview.png[CSS gradient examples,300]
 
-In order for a linear gradient to be natively supported by Codename One, the following properties must be met:
+**`linear-gradient`**
 
-. The gradient function has two color stops, and these colors have the same opacity.
-. The gradient is either horizontal or vertical. (e.g Direction can be `0deg`, `90deg`, `180deg`, or `270deg`.
-
-**Examples**
+Any angle in degrees, radians, or `turn`, or the canonical `to <side>` / `to <side1> <side2>` directions. Two or more stops, each with optional position percentage; positions left blank between fixed anchors are autodistributed.
 
 [source,css]
 ----
-MyContainer {
-   background: linear-gradient(0deg, #ccc, #666);
+/* 2-color cardinal direction (still supported, smallest descriptor) */
+MyContainer { background: linear-gradient(0deg, #ccc, #666); }
+MyContainer { background: linear-gradient(to top, #ccc, #666); }
+
+/* Arbitrary angle */
+MyContainer { background: linear-gradient(45deg, #eaeaea, #666666); }
+
+/* Multi-stop with positions */
+MyButton { background: linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%); }
+
+/* Diagonal direction keyword */
+MyForm { background: linear-gradient(to bottom right, #f06, #003); }
+
+/* Mismatched alphas are fine — the gradient is no longer rejected */
+MyComponent { background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue); }
+----
+
+**`radial-gradient`**
+
+Full CSS radial syntax: `circle` or `ellipse`, any of the four extent keywords (`closest-side` / `closest-corner` / `farthest-side` / `farthest-corner`, defaulting to `farthest-corner`), explicit radii as percentages, an optional `at <position>` clause with side keywords or percentages, and two or more multi-stop colors.
+
+[source,css]
+----
+MyContainer { background: radial-gradient(circle, gray, white); }
+MyContainer { background: radial-gradient(ellipse closest-side at 25% 75%, #fff, #000); }
+MyContainer { background: radial-gradient(circle farthest-corner at right, #ffe, #066 60%, #001 100%); }
+----
+
+**`conic-gradient`**
+
+Sweep / pie-style gradient. Optional `from <angle>` (CSS convention: 0° points up, sweep is clockwise) and `at <position>` prefix, followed by the stop list.
+
+[source,css]
+----
+MyContainer { background: conic-gradient(red, yellow, green, blue, red); }
+MyContainer { background: conic-gradient(from 45deg at 50% 50%, #f06 0%, #fc0 25%, #0c6 50%, #06f 75%, #f06 100%); }
+----
+
+**`repeating-linear-gradient` / `repeating-radial-gradient`**
+
+Identical syntax to their non-repeating counterparts. The stop pattern tiles outward to fill the bounding box, ideal for stripes and rings.
+
+[source,css]
+----
+MyStripe   { background: repeating-linear-gradient(45deg, #eee 0px, #eee 10px, #ccc 10px, #ccc 20px); }
+MyTarget   { background: repeating-radial-gradient(circle at center, #fff, #fff 8px, #c33 8px, #c33 16px); }
+----
+
+===== filter and backdrop-filter
+
+CSS `filter` and `backdrop-filter` accept a chain of functions. Two storage forms land on the corresponding `Style`:
+
+* `blur(<length>)` → `filterBlurRadius` / `backdropFilterBlurRadius` (a single pixel value).
+* `brightness`, `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`, `sepia` → `filterColorMatrix` / `backdropFilterColorMatrix` (a 4×5 color matrix; a multi-function chain composes into a single matrix in CSS order).
+
+[source,css]
+----
+MyOverlay {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+}
+
+MyBlurredImage {
+    filter: blur(4px);
+}
+
+MyFaded {
+    filter: brightness(0.7) contrast(1.15);
+}
+
+MyGrayscale {
+    filter: grayscale(1);
+}
+
+MySepia {
+    filter: sepia(0.8) saturate(1.1);
 }
 ----
 
-.Native linear gradient 0 degrees
-image::img/linear-gradient-0deg.png[Native linear gradient 0 degrees]
+.`filter: blur()` applied at a graphics primitive level — the framework's screenshot test renders RGB stripes and a gradient, then blurs both via `Graphics.gaussianBlur(...)`. Component-level paint-time integration of `filter:` declarations is in progress; until it lands, set the radius / matrix on a `Style` and consume them via the corresponding `Graphics` primitives manually.
+image::img/css-filter-blur-overview.png[CSS filter blur visual,260]
 
-[source,css]
-----
-MyContainer {
-    background: linear-gradient(to top, #ccc, #666);
-}
-----
-
-.Native linear gradient to top
-image::img/linear-gradient-to-top.png[Native linear gradient to top]
-
-[source,css]
-----
-MyContainer {
-    background: linear-gradient(90deg, #ccc, #666);
-}
-----
-
-.Native linear gradient 90deg
-image::img/linear-gradient-90deg.png[Native linear gradient 90deg]
-
-[source,css]
-----
-MyContainer {
-    background: linear-gradient(to left, #ccc, #666);
-}
-----
-
-.Native linear gradient to left
-image::img/linear-gradient-to-left.png[Native linear gradient to left]
-
-**Unsupported `linear-gradient` syntax**
-
-The following are some examples of linear gradients that aren't supported natively by Codename One, and will result in a background image to be generated at compile-time:
-
-[source,css]
-----
-MyComponent {
-    background: linear-gradient(45deg, #eaeaea, #666666);
-}
-----
-
-.45deg gradient rendered at compile-time—uses background image
-image::img/linear-gradient-45deg.png[45deg gradient rendered at compile-time - uses background image]
-
-The above example isn't supported natively because the gradient direction is 45 degrees. Codename One supports 0, 90, 180, and 270 degrees natively, so this example will result in a background image being generated at compile-time with the appropriate gradient.
-
-[source,css]
-----
-MyComponent {
-    background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue);
-}
-----
-
-.Linear gradient with different alpha
-image::img/linear-gradient-diff-alpha.png[Linear gradient with different alpha]
-
-The above linear-gradient isn't supported natively because the stop colors have different transparencies. The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly). The gradient will therefore be generated as an image at compile-time.
-
-**Natively Supported `radial-gradient` Syntax**
-
-The following syntax is supported natively for radial gradients. Other syntaxes are also supported by the CSS library, but they will use compile-time image generation for the gradients rather than generating them at runtime.
-
-[source,css]
-----
-background: radial-gradient(circle [closest-side] [at <position>], <color stop>, <color stop>)
-----
-
-* `<position>`: The position using either offset keywords or percentages.
-* `<color stop>`: Either a color alone, or a color followed by a percentage. 0% indicates that color begins at center of the circle. 100% indicates that the color begins at the closest edge of the bounding box. Higher/lower values (>0%) will shift the color further or closer to circle's center. If the first color stop is set to a non-zero value, the gradient can't be rendered natively by Codename One, and an image of the gradient will instead be generated at compile-time.
-
-More complex gradients are supported by this library, but they will be generated at compile-time. For more information about the `radial-gradient` CSS function see https://developer.mozilla.org/en-You/docs/Web/CSS/radial-gradient[its MDN Wiki page].
-
-**Examples**
-
-[source,css]
-----
-MyContainer {
-    background: radial-gradient(circle, gray, white);
-}
-----
-
-.Radial gradient 0 to 100
-image::img/radial-gradient-c100.png[Radial gradient 0 to 100]
-
-[source,css]
-----
-MyContainer {
-    background: radial-gradient(circle, gray, white 200%);
-}
-----
-
-.Radial gradient 0 to 200
-image::img/radial-gradient-c200.png[Radial gradient 0 to 200]
-
-[source,css]
-----
-MyContainer {
-    background: radial-gradient(circle at left, gray, white);
-}
-----
-
-.Radial gradient at left
-image::img/radial-gradient-xeq0.png[Radial gradient at left]
-
-[source,css]
-----
-MyContainer {
-    background: radial-gradient(circle at right, gray, white);
-}
-----
-
-.Radial gradient at right
-image::img/radial-gradient-xeq1.png[Radial gradient at right]
+`filter` applies to the component's own painted content; `backdrop-filter` applies to whatever is painted behind. The radii / matrices are also exposed on `Style` (`getFilterBlurRadius()`, `getFilterColorMatrix()`, `getBackdropFilterBlurRadius()`, `getBackdropFilterColorMatrix()`) so they can be set programmatically. Hardware blur is used where available (Core Image on iOS, RenderScript/RenderEffect on Android, JHLabs `GaussianFilter` on JavaSE simulator); ports without a fast path fall back to a software Gaussian.
 
 
 [[cn1-background-type]]

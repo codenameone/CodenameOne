@@ -95,7 +95,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 12;
+    private static final short MINOR_VERSION = 14;
     private static final short MAJOR_VERSION = 1;
 
     private static final boolean IS_MAC;
@@ -1437,6 +1437,62 @@ public class EditableResources extends Resources implements TreeModel {
                                 continue;
                             }
 
+                            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT)) {
+                                com.codename1.ui.Gradient g = (com.codename1.ui.Gradient) theme.get(key);
+                                int[] colors = g.getColors();
+                                float[] positions = g.getPositions();
+                                StringBuilder stopsAttr = new StringBuilder();
+                                for (int si = 0; si < colors.length; si++) {
+                                    if (si > 0) stopsAttr.append(';');
+                                    stopsAttr.append(Integer.toHexString(colors[si])).append('@').append(positions[si]);
+                                }
+                                float angle = (g instanceof com.codename1.ui.LinearGradient)
+                                        ? ((com.codename1.ui.LinearGradient) g).getAngleDegrees() : 0f;
+                                float cx = 0.5f, cy = 0.5f, rx = 1f, ry = 1f, fromAngle = 0f;
+                                byte shape = 0, extent = 0;
+                                if (g instanceof com.codename1.ui.RadialGradient) {
+                                    com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
+                                    cx = rg.getRelativeCenterX(); cy = rg.getRelativeCenterY();
+                                    shape = rg.getShape(); extent = rg.getExtent();
+                                    rx = rg.getRelativeRadiusX(); ry = rg.getRelativeRadiusY();
+                                } else if (g instanceof com.codename1.ui.ConicGradient) {
+                                    com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;
+                                    cx = cg.getRelativeCenterX(); cy = cg.getRelativeCenterY();
+                                    fromAngle = cg.getFromAngleDegrees();
+                                }
+                                bw.write("        <gradientEx key=\"" + key + "\""
+                                        + " kind=\"" + g.getKind() + "\""
+                                        + " cycle=\"" + g.getCycleMethod() + "\""
+                                        + " angle=\"" + angle + "\""
+                                        + " cx=\"" + cx + "\""
+                                        + " cy=\"" + cy + "\""
+                                        + " shape=\"" + shape + "\""
+                                        + " extent=\"" + extent + "\""
+                                        + " rx=\"" + rx + "\""
+                                        + " ry=\"" + ry + "\""
+                                        + " fromAngle=\"" + fromAngle + "\""
+                                        + " stops=\"" + stopsAttr.toString() + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_BLUR)
+                                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR)) {
+                                bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
+                                continue;
+                            }
+
+                            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_COLOR_MATRIX)
+                                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX)) {
+                                float[] matrix = (float[]) theme.get(key);
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 0; i < matrix.length; i++) {
+                                    if (i > 0) sb.append(',');
+                                    sb.append(matrix[i]);
+                                }
+                                bw.write("        <val key=\"" + key + "\" value=\"" + sb.toString() + "\" />\n");
+                                continue;
+                            }
+
                             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                                 bw.write("        <val key=\"" + key + "\" value=\"" + theme.get(key) + "\" />\n");
                                 continue;
@@ -2142,6 +2198,67 @@ public class EditableResources extends Resources implements TreeModel {
                 output.writeFloat(((Float)gradient[2]).floatValue());
                 output.writeFloat(((Float)gradient[3]).floatValue());
                 output.writeFloat(((Float)gradient[4]).floatValue());
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.GRADIENT)) {
+                com.codename1.ui.Gradient g = (com.codename1.ui.Gradient) theme.get(key);
+                output.writeByte(g.getKind());
+                output.writeByte(g.getCycleMethod());
+                // Linear-specific (angle). 0 for non-linear kinds.
+                output.writeFloat(g instanceof com.codename1.ui.LinearGradient
+                        ? ((com.codename1.ui.LinearGradient) g).getAngleDegrees() : 0f);
+                // Center (radial + conic share these; linear ignores them).
+                float relCx = 0.5f;
+                float relCy = 0.5f;
+                byte radialShape = 0;
+                byte radialExtent = 0;
+                float relRx = 1f;
+                float relRy = 1f;
+                float fromAngle = 0f;
+                if (g instanceof com.codename1.ui.RadialGradient) {
+                    com.codename1.ui.RadialGradient rg = (com.codename1.ui.RadialGradient) g;
+                    relCx = rg.getRelativeCenterX();
+                    relCy = rg.getRelativeCenterY();
+                    radialShape = rg.getShape();
+                    radialExtent = rg.getExtent();
+                    relRx = rg.getRelativeRadiusX();
+                    relRy = rg.getRelativeRadiusY();
+                } else if (g instanceof com.codename1.ui.ConicGradient) {
+                    com.codename1.ui.ConicGradient cg = (com.codename1.ui.ConicGradient) g;
+                    relCx = cg.getRelativeCenterX();
+                    relCy = cg.getRelativeCenterY();
+                    fromAngle = cg.getFromAngleDegrees();
+                }
+                output.writeFloat(relCx);
+                output.writeFloat(relCy);
+                output.writeByte(radialShape);
+                output.writeByte(radialExtent);
+                output.writeFloat(relRx);
+                output.writeFloat(relRy);
+                output.writeFloat(fromAngle);
+                int[] colors = g.getColors();
+                float[] positions = g.getPositions();
+                output.writeInt(colors.length);
+                for (int i = 0; i < colors.length; i++) {
+                    output.writeInt(colors[i]);
+                    output.writeFloat(positions[i]);
+                }
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_BLUR)
+                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if(key.endsWith(com.codename1.ui.plaf.Style.FILTER_COLOR_MATRIX)
+                    || key.endsWith(com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX)) {
+                float[] matrix = (float[]) theme.get(key);
+                for (int i = 0; i < 20; i++) {
+                    output.writeFloat(matrix[i]);
+                }
                 continue;
             }
 

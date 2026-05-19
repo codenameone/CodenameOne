@@ -12,7 +12,9 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
+import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradientStops;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
+import com.codenameone.examples.hellocodenameone.tests.graphics.GaussianBlur;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawLine;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawRect;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawRoundRect;
@@ -122,6 +124,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DrawImage(),
             new DrawStringDecorated(),
             new DrawGradient(),
+            new DrawGradientStops(),
+            new GaussianBlur(),
             new FillPolygon(),
             new AffineScale(),
             new Scale(),
@@ -198,6 +202,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SpanLabelThemeScreenshotTest(),
             new DarkLightShowcaseThemeScreenshotTest(),
             new PaletteOverrideThemeScreenshotTest(),
+            new CssGradientsScreenshotTest(),
+            new CssFilterBlurScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -312,7 +318,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "FloatingActionButtonThemeScreenshotTest".equals(testName)
                 || "SpanLabelThemeScreenshotTest".equals(testName)
                 || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName);
+                || "PaletteOverrideThemeScreenshotTest".equals(testName)
+                || "CssGradientsScreenshotTest".equals(testName)
+                || "CssFilterBlurScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {
@@ -369,7 +377,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "ClipUnderRotation".equals(testName)
                 || "DrawArc".equals(testName)
                 || "DrawGradient".equals(testName)
+                || "DrawGradientStops".equals(testName)
                 || "DrawImage".equals(testName)
+                || "GaussianBlur".equals(testName)
                 || "DrawLine".equals(testName)
                 || "DrawRect".equals(testName)
                 || "DrawRoundRect".equals(testName)
