@@ -1805,8 +1805,21 @@ public class SideMenuBar extends MenuBar {
         @Override
         public void actionPerformed(final ActionEvent evt) {
             if (Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
-                Display.getInstance().getCurrent().getToolbar().closeSideMenu();
-                cmd.actionPerformed(evt);
+                // Issue #4979: fire the command *after* the side-menu
+                // dispose animation has finished and the Toolbar's
+                // layered-pane dim backdrop has been detached. The
+                // previous code ran cmd.actionPerformed synchronously
+                // right after starting the async dispose, so if the
+                // command invoked a modal Dialog.show() the Dialog's
+                // event pump took over the EDT before
+                // detachToolbarLayeredPane could fire — leaving the
+                // dim backdrop visible after the Dialog was dismissed.
+                Display.getInstance().getCurrent().getToolbar().closeSideMenu(new Runnable() {
+                    @Override
+                    public void run() {
+                        cmd.actionPerformed(evt);
+                    }
+                });
                 return;
             }
             if (transitionRunning) {

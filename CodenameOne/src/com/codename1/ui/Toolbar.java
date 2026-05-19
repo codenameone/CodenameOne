@@ -439,12 +439,76 @@ public class Toolbar extends Container {
 
     /// Closes the current side menu
     public void closeSideMenu() {
-        closeLeftSideMenu();
-        closeRightSideMenu();
+        closeSideMenu(null);
+    }
+
+    /// Closes the current side menu and invokes `onFinish` once the
+    /// side-menu dispose animation has completed and the Toolbar
+    /// layered-pane dim has been detached. When no side menu is
+    /// currently open `onFinish` runs synchronously.
+    ///
+    /// Tapping a command in the on-top side menu was previously
+    /// implemented as `closeSideMenu()` followed by a synchronous
+    /// `cmd.actionPerformed(evt)` on the same EDT call. If the command
+    /// then showed a modal Dialog, the Dialog's event pump took over
+    /// before the dispose animation had a chance to advance, the
+    /// `detachToolbarLayeredPane` callback never fired, and the dim
+    /// backdrop stayed visible after the Dialog was dismissed (issue
+    /// #4979). `SideMenuBar.actionPerformed` now routes the
+    /// command-fire through this `onFinish`, so the layered pane is
+    /// guaranteed to be detached before the command runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: callback to invoke once the side menu is closed,
+    /// or `null` to skip
+    public void closeSideMenu(final Runnable onFinish) {
+        boolean leftShowing = onTopSideMenu && sidemenuDialog != null && sidemenuDialog.isShowing();
+        boolean rightShowing = onTopSideMenu && rightSidemenuDialog != null && rightSidemenuDialog.isShowing();
+        if (!leftShowing && !rightShowing) {
+            closeLeftSideMenu();
+            closeRightSideMenu();
+            if (onFinish != null) {
+                onFinish.run();
+            }
+            return;
+        }
+        final int pending = (leftShowing ? 1 : 0) + (rightShowing ? 1 : 0);
+        final int[] remaining = {pending};
+        Runnable countdown = onFinish == null ? null : new Runnable() {
+            @Override
+            public void run() {
+                remaining[0]--;
+                if (remaining[0] == 0) {
+                    onFinish.run();
+                }
+            }
+        };
+        if (leftShowing) {
+            closeLeftSideMenu(countdown);
+        }
+        if (rightShowing) {
+            closeRightSideMenu(countdown);
+        }
     }
 
     /// Closes the left side menu
     public void closeLeftSideMenu() {
+        closeLeftSideMenu(null);
+    }
+
+    /// Closes the left side menu and invokes `onFinish` once the
+    /// dispose animation has completed and the Toolbar layered-pane
+    /// dim has been detached. When no left side menu is currently
+    /// open `onFinish` runs synchronously. See
+    /// [#closeSideMenu(Runnable)][closeSideMenu] for rationale (issue
+    /// #4979).
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: callback to invoke once the menu is closed, or
+    /// `null` to skip
+    public void closeLeftSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
                 final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
@@ -452,6 +516,9 @@ public class Toolbar extends Container {
                     @Override
                     public void run() {
                         detachToolbarLayeredPane(cnt);
+                        if (onFinish != null) {
+                            onFinish.run();
+                        }
                     }
                 };
                 if (!isRTL()) {
@@ -459,14 +526,33 @@ public class Toolbar extends Container {
                 } else {
                     sidemenuDialog.disposeToTheRight(onDisposed);
                 }
+                return;
             }
         } else {
             SideMenuBar.closeCurrentMenu();
+        }
+        if (onFinish != null) {
+            onFinish.run();
         }
     }
 
     /// Closes the right side menu
     public void closeRightSideMenu() {
+        closeRightSideMenu(null);
+    }
+
+    /// Closes the right side menu and invokes `onFinish` once the
+    /// dispose animation has completed and the Toolbar layered-pane
+    /// dim has been detached. When no right side menu is currently
+    /// open `onFinish` runs synchronously. See
+    /// [#closeSideMenu(Runnable)][closeSideMenu] for rationale (issue
+    /// #4979).
+    ///
+    /// #### Parameters
+    ///
+    /// - `onFinish`: callback to invoke once the menu is closed, or
+    /// `null` to skip
+    public void closeRightSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
                 final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
@@ -474,6 +560,9 @@ public class Toolbar extends Container {
                     @Override
                     public void run() {
                         detachToolbarLayeredPane(cnt);
+                        if (onFinish != null) {
+                            onFinish.run();
+                        }
                     }
                 };
                 if (!isRTL()) {
@@ -481,7 +570,11 @@ public class Toolbar extends Container {
                 } else {
                     rightSidemenuDialog.disposeToTheLeft(onDisposed);
                 }
+                return;
             }
+        }
+        if (onFinish != null) {
+            onFinish.run();
         }
     }
 
