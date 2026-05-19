@@ -117,9 +117,19 @@ extern int CN1DbgPolygonClipSeq;
 #else
     if (CN1DbgRemainingOps > 0) {
         GLKMatrix4 t = glGetTransformES2();
-        NSLog(@"CN1SS:DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f",
+        GLboolean stencilOn = glIsEnabled(GL_STENCIL_TEST);
+        GLint stencilFunc = 0, stencilRef = 0, stencilMask = 0;
+        glGetIntegerv(GL_STENCIL_FUNC, &stencilFunc);
+        glGetIntegerv(GL_STENCIL_REF, &stencilRef);
+        glGetIntegerv(GL_STENCIL_VALUE_MASK, &stencilMask);
+        GLboolean scissorOn = glIsEnabled(GL_SCISSOR_TEST);
+        GLint scissor[4] = {0,0,0,0};
+        glGetIntegerv(GL_SCISSOR_BOX, scissor);
+        NSLog(@"CN1SS:DBG FillRect.exec polySeq=%d remaining=%d color=0x%06x alpha=%d x,y,w,h=%d,%d,%d,%d t.tx=%f t.ty=%f t.m00=%f t.m11=%f stencil=%d func=0x%x ref=%d mask=0x%x scissor=%d box=(%d,%d,%d,%d)",
               CN1DbgPolygonClipSeq, CN1DbgRemainingOps, color, alpha, x, y, width, height,
-              t.m[12], t.m[13], t.m[0], t.m[5]);
+              t.m[12], t.m[13], t.m[0], t.m[5],
+              stencilOn, stencilFunc, stencilRef, stencilMask,
+              scissorOn, scissor[0], scissor[1], scissor[2], scissor[3]);
         CN1DbgRemainingOps--;
     }
     //[UIColorFromRGB(color, alpha) set];

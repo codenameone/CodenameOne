@@ -146,22 +146,10 @@ static CGRect drawingRect;
         CN1DbgPolygonClipSeq++;
         CN1DbgRemainingOps = 6;
         if (numPoints > 0) {
-            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d numPoints=%d first=(%f,%f) last=(%f,%f) bbox=...", CN1DbgPolygonClipSeq, numPoints, xPoints[0], yPoints[0], xPoints[numPoints-1], yPoints[numPoints-1]);
-            float minX = xPoints[0], maxX = xPoints[0], minY = yPoints[0], maxY = yPoints[0];
-            for (int i = 1; i < numPoints; i++) {
-                if (xPoints[i] < minX) minX = xPoints[i];
-                if (xPoints[i] > maxX) maxX = xPoints[i];
-                if (yPoints[i] < minY) minY = yPoints[i];
-                if (yPoints[i] > maxY) maxY = yPoints[i];
+            // Emit ALL polygon vertices to compare winding / shape between panel 1 (renders) and panel 2 (missing red).
+            for (int i = 0; i < numPoints; i++) {
+                NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d v[%d]=(%f,%f)", CN1DbgPolygonClipSeq, i, xPoints[i], yPoints[i]);
             }
-            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d bbox x=[%f,%f] y=[%f,%f]", CN1DbgPolygonClipSeq, minX, maxX, minY, maxY);
-            GLKMatrix4 cur = glGetTransformES2();
-            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d preTransform=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
-                  CN1DbgPolygonClipSeq,
-                  cur.m[0], cur.m[1], cur.m[2], cur.m[3],
-                  cur.m[4], cur.m[5], cur.m[6], cur.m[7],
-                  cur.m[8], cur.m[9], cur.m[10], cur.m[11],
-                  cur.m[12], cur.m[13], cur.m[14], cur.m[15]);
         }
         clipX = x; clipY=y; clipW=width; clipH=height;
         glClearStencil(0x0);
