@@ -188,6 +188,14 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
         return cn1View.onTouchEvent(event);
     }
 
+    @Override
+    public boolean onHoverEvent(MotionEvent event) {
+        if (cn1View.onHoverEvent(event)) {
+            return true;
+        }
+        return super.onHoverEvent(event);
+    }
+
     public AndroidGraphics getGraphics() {
         return cn1View.buffy;
     }
