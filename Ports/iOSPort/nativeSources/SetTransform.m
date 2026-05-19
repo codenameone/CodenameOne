@@ -59,7 +59,7 @@ extern int CN1DbgPolygonClipSeq;
     CN1MetalSetTransform(m);
 #else
     if (CN1DbgRemainingOps > 0) {
-        NSLog(@"CN1DBG SetTransform.exec polySeq=%d remaining=%d m=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
+        NSLog(@"CN1SS:DBG SetTransform.exec polySeq=%d remaining=%d m=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
               CN1DbgPolygonClipSeq, CN1DbgRemainingOps,
               m.m[0], m.m[1], m.m[2], m.m[3],
               m.m[4], m.m[5], m.m[6], m.m[7],

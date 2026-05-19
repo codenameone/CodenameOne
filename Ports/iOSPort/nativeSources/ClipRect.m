@@ -146,7 +146,7 @@ static CGRect drawingRect;
         CN1DbgPolygonClipSeq++;
         CN1DbgRemainingOps = 6;
         if (numPoints > 0) {
-            NSLog(@"CN1DBG ClipRect.polygon seq=%d numPoints=%d first=(%f,%f) last=(%f,%f) bbox=...", CN1DbgPolygonClipSeq, numPoints, xPoints[0], yPoints[0], xPoints[numPoints-1], yPoints[numPoints-1]);
+            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d numPoints=%d first=(%f,%f) last=(%f,%f) bbox=...", CN1DbgPolygonClipSeq, numPoints, xPoints[0], yPoints[0], xPoints[numPoints-1], yPoints[numPoints-1]);
             float minX = xPoints[0], maxX = xPoints[0], minY = yPoints[0], maxY = yPoints[0];
             for (int i = 1; i < numPoints; i++) {
                 if (xPoints[i] < minX) minX = xPoints[i];
@@ -154,9 +154,9 @@ static CGRect drawingRect;
                 if (yPoints[i] < minY) minY = yPoints[i];
                 if (yPoints[i] > maxY) maxY = yPoints[i];
             }
-            NSLog(@"CN1DBG ClipRect.polygon seq=%d bbox x=[%f,%f] y=[%f,%f]", CN1DbgPolygonClipSeq, minX, maxX, minY, maxY);
+            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d bbox x=[%f,%f] y=[%f,%f]", CN1DbgPolygonClipSeq, minX, maxX, minY, maxY);
             GLKMatrix4 cur = glGetTransformES2();
-            NSLog(@"CN1DBG ClipRect.polygon seq=%d preTransform=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
+            NSLog(@"CN1SS:DBG ClipRect.polygon seq=%d preTransform=[%f %f %f %f / %f %f %f %f / %f %f %f %f / %f %f %f %f]",
                   CN1DbgPolygonClipSeq,
                   cur.m[0], cur.m[1], cur.m[2], cur.m[3],
                   cur.m[4], cur.m[5], cur.m[6], cur.m[7],
