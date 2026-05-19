@@ -174,12 +174,25 @@ public final class Graphics {
     /// anchor. This separate getter is for framework callers that
     /// explicitly want the screen offset.
     public int matrixFrameworkTranslateX() {
-        return matrixMode() ? matrixFrameworkX : xTranslate;
+        // Legacy mode: delegate to getTranslateX so this is a strict
+        // no-op behavioural change vs. the master callsites that used
+        // getTranslateX directly. On ports whose impl maintains its own
+        // translate accumulator (iOS GL etc.) getTranslateX reads from
+        // impl, not the Java-side `xTranslate` -- returning xTranslate
+        // here would give zero and the snapshot-reset translate(-tx,-ty)
+        // would no-op, leaving the wrapper at the parent's coords.
+        if (matrixMode()) {
+            return matrixFrameworkX;
+        }
+        return getTranslateX();
     }
 
     /// Y-axis counterpart to `#matrixFrameworkTranslateX()`.
     public int matrixFrameworkTranslateY() {
-        return matrixMode() ? matrixFrameworkY : yTranslate;
+        if (matrixMode()) {
+            return matrixFrameworkY;
+        }
+        return getTranslateY();
     }
 
     /// Returns the x coordinate to pass to impl draw primitives. In matrix
