@@ -52,6 +52,26 @@ await page.addInitScript(() => {
   window.__cn1OpTraceArmed = false;
   const proto = CanvasRenderingContext2D.prototype;
   const seqRef = { n: 0 };
+  // Assign each unique canvas a small numeric id so we can tell
+  // foreground/off-screen contexts apart in the op log. Off-screen
+  // image-backed canvases never appear in the DOM, so the heuristic
+  // is "first context to appear that's the document's visible canvas
+  // gets id=main, all others get id=N".
+  const canvasIds = new WeakMap();
+  let nextId = 0;
+  function ctxId(ctx) {
+    const c = ctx && ctx.canvas;
+    if (!c) return "?";
+    let id = canvasIds.get(c);
+    if (id != null) return id;
+    if (typeof document !== "undefined" && c.parentNode != null) {
+      id = "main";
+    } else {
+      id = `off${nextId++}`;
+    }
+    canvasIds.set(c, id);
+    return id;
+  }
   function wrap(name) {
     const orig = proto[name];
     if (typeof orig !== "function") return;
@@ -69,7 +89,7 @@ await page.addInitScript(() => {
           return String(x);
         });
         try {
-          window.__opLog({ seq: seqRef.n++, m: name, a: simpleArgs, t: performance.now() });
+          window.__opLog({ seq: seqRef.n++, m: name, a: simpleArgs, t: performance.now(), ctx: ctxId(this) });
         } catch {}
       }
       return orig.apply(this, a);
@@ -87,13 +107,20 @@ page.on("console", (m) => {
   const t = m.text();
   const ms = Date.now() - t0;
   events.push({ ms, type: m.type(), text: t });
+  // Light progress log so we can see where we are in the suite from
+  // the script output too.
+  if (t.startsWith("CN1SS:INFO:suite starting") || t.includes("graphics-clip-under-rotation")) {
+    console.error(`+${ms}ms ${t.substring(0, 100)}`);
+  }
   if (t.includes("CN1SS:INFO:suite starting test=ClipUnderRotation")) {
     armedAt = ms;
-    page.evaluate(() => { window.__cn1OpTraceArmed = true; }).catch(() => {});
+    console.error(`+${ms}ms >>> ARMED tracer`);
+    page.evaluate(() => { window.__cn1OpTraceArmed = true; }).catch((e) => console.error("arm-eval-err", e.message));
   }
   // Stop tracing once chunks have been emitted (test screenshot done)
   if (t.includes("CN1SS:INFO:test=graphics-clip-under-rotation chunks=") && armedAt) {
     disarmedAt = ms;
+    console.error(`+${ms}ms >>> DISARMED tracer`);
     page.evaluate(() => { window.__cn1OpTraceArmed = false; }).catch(() => {});
   }
 });
@@ -120,12 +147,22 @@ if (!armedAt) {
 console.error(`Tracing armed at +${armedAt}ms, disarmed at +${disarmedAt || "timeout"}ms`);
 console.error(`Captured ${ops.length} canvas ops`);
 
-// Write op log
+// Write op log (with ctx id per op)
 const lines = ops.map((o) => {
-  return `${Math.round(o.t).toString().padStart(6)}ms #${o.seq.toString().padStart(5)} ${o.m}(${o.a.map((a) => (typeof a === "number" ? a.toFixed(2) : JSON.stringify(a))).join(", ")})`;
+  return `${Math.round(o.t).toString().padStart(6)}ms [${(o.ctx || "?").padEnd(4)}] #${o.seq.toString().padStart(5)} ${o.m}(${o.a.map((a) => (typeof a === "number" ? a.toFixed(2) : JSON.stringify(a))).join(", ")})`;
 });
 fs.writeFileSync(OUT, lines.join("\n"));
 console.error(`Wrote op log to ${OUT}`);
+
+// Per-ctx op count
+const byCtx = new Map();
+for (const o of ops) {
+  byCtx.set(o.ctx || "?", (byCtx.get(o.ctx || "?") || 0) + 1);
+}
+console.error("Ops per context:");
+for (const [k, v] of [...byCtx.entries()].sort((a, b) => b[1] - a[1])) {
+  console.error(`  ${k}: ${v}`);
+}
 
 // Quick analysis: count setTransform calls and their matrices
 const setTransforms = ops.filter(o => o.m === "setTransform");

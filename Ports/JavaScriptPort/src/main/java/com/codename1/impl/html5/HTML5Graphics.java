@@ -529,6 +529,17 @@ public class HTML5Graphics {
         } else {
             setClip(frame.rect.getX(), frame.rect.getY(), frame.rect.getWidth(), frame.rect.getHeight());
         }
+        // Re-sync canvas transform to the Java-side value. The ClipRect/
+        // ClipShape op's own context.restore() pops the transform back to
+        // whatever was saved at the matching clip's save() -- which under
+        // a rotated pushClip/popClip pair is the rotation, not identity.
+        // The ops' inline setTransform(identity) reset is silently swallowed
+        // on off-screen contexts via the cooperative-scheduler virtual-
+        // dispatch path; a SetTransform op (proven @JSBody bridge) always
+        // lands. See ClipUnderRotation, where the green sentinel at (2,2)
+        // got drawn at the rotated location and clipped out without this.
+        setTransformChanged();
+        applyTransform();
     }
     
     private void clipShape(Shape shape) {
