@@ -3784,6 +3784,35 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * Discovers cn1lib-contributed simulator menu items via
+     * {@link SimulatorHookLoader} and groups them by menu name. The UX shell
+     * (this method, today) translates the neutral {@link SimulatorHook} list
+     * into Swing widgets; the contract that cn1libs depend on is the
+     * properties file + static method, not these JMenu/JMenuItem types.
+     */
+    private List<JMenu> buildExtensionMenus() {
+        List<SimulatorHook> hooks = SimulatorHookLoader.load();
+        LinkedHashMap<String, JMenu> byName = new LinkedHashMap<String, JMenu>();
+        for (final SimulatorHook hook : hooks) {
+            JMenu menu = byName.get(hook.getMenuName());
+            if (menu == null) {
+                menu = new JMenu(hook.getMenuName());
+                registerMenuWithBlit(menu);
+                byName.put(hook.getMenuName(), menu);
+            }
+            JMenuItem item = new JMenuItem(hook.getLabel());
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    hook.getInvoke().run();
+                }
+            });
+            menu.add(item);
+        }
+        return new ArrayList<JMenu>(byName.values());
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -5025,6 +5054,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(toolsMenu);
             bar.add(skinMenu);
             bar.add(createNativeThemeMenu(frm));
+            for (JMenu extensionMenu : buildExtensionMenus()) {
+                bar.add(extensionMenu);
+            }
             bar.add(helpMenu);
         }
 
