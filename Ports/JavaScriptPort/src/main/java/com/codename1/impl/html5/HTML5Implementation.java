@@ -8188,11 +8188,90 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public int getWidth(){
+            awaitNaturalDimensions();
             return JavaScriptNativeImageAdapter.resolveWidth(imageModel);
         }
-        
+
         public int getHeight(){
+            awaitNaturalDimensions();
             return JavaScriptNativeImageAdapter.resolveHeight(imageModel);
+        }
+
+        /**
+         * Block briefly (up to ~200 ms total) until the underlying
+         * {@code HTMLImageElement} exposes a positive natural width,
+         * so that {@link #getWidth()} / {@link #getHeight()} don't
+         * fall through to the hard-coded 10-pixel fallback in
+         * {@link JavaScriptNativeImageAdapter} during the gap between
+         * {@code createNativeImage()} returning and the main thread
+         * finishing decode of the Blob-backed image.
+         *
+         * <p>Without this wait, {@link com.codename1.ui.EncodedImage}
+         * caches the fallback 10 in its own width/height field on the
+         * first call and never re-queries, which manifests in image
+         * borders (e.g. the Initializr {@code PopupDialog} 9-piece
+         * border) as a visible strip of unpainted background showing
+         * the underlying form. The async {@code load} event later
+         * fires and a repaint is scheduled, but {@code EncodedImage}
+         * is still serving the cached 10 so the redraw is identical
+         * and the gap persists.</p>
+         *
+         * <p>For theme PNGs (decoded from in-memory Blob bytes) the
+         * main thread typically finishes decode within a millisecond
+         * or two, so this wait almost never reaches its outer
+         * deadline. The 200 ms cap exists for the pathological case
+         * (decoder errored, host unreachable) so a single broken
+         * image can't stall layout forever.</p>
+         */
+        private void awaitNaturalDimensions() {
+            if (img == null) {
+                return;
+            }
+            if (loaded || error) {
+                return;
+            }
+            if (img.getNaturalWidth() > 0) {
+                return;
+            }
+            // Outer deadline: total wall-time we'll block layout for
+            // a single image. 200 ms is generous for any local Blob
+            // decode and harmlessly short for the network/error case.
+            long deadline = System.currentTimeMillis() + 200;
+            // ``Thread.sleep`` in the JS-port worker is a cooperative
+            // yield, so the listener installed in ``load()`` (which
+            // runs on the main thread and posts a callback back into
+            // the worker) gets a chance to update ``loadState`` and
+            // bump ``naturalWidth`` during these short naps.
+            while (img.getNaturalWidth() <= 0 && !error
+                    && System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(2);
+                } catch (InterruptedException ignored) {
+                    break;
+                }
+            }
+            // Once the natural size is known, refresh the cached
+            // ``loaded``/``width``/``height`` fields from ``loadState``
+            // so a subsequent ``getWidth()`` short-circuits via the
+            // ``loaded`` flag rather than re-polling the host.
+            if (img.getNaturalWidth() > 0 && !loaded) {
+                JavaScriptAsyncImageLoadCoordinator.handleLoad(loadState,
+                        img.getNaturalWidth(), img.getNaturalHeight());
+                loaded = loadState.isLoaded();
+                width = loadState.getWidth();
+                height = loadState.getHeight();
+            } else if (img.getNaturalWidth() <= 0 && !error) {
+                // Timed out without the host ever exposing a natural
+                // size. Latch ``error`` so the next ``getWidth()``
+                // returns immediately via the fallback path instead
+                // of paying another 200 ms wait per call. The async
+                // ``load`` listener will still flip ``loaded`` to
+                // true if the image eventually decodes, at which
+                // point ``resolveWidth`` starts returning the real
+                // dimension again.
+                JavaScriptAsyncImageLoadCoordinator.handleError(loadState);
+                error = true;
+            }
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y, int width, int height){
