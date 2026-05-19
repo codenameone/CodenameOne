@@ -576,6 +576,8 @@ void collectThreadResources(struct ThreadLocalData *current)
         }
     }
 }
+static void gcMarkDrain(CODENAME_ONE_THREAD_STATE);
+
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
@@ -701,6 +703,10 @@ void codenameOneGCMark() {
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
     }
+
+    // Drain the worklist that the calls above populated. gcMarkObject no longer recurses
+    // through reference fields, so we need an explicit drain pass before sweep runs.
+    gcMarkDrain(d);
 }
 
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
@@ -1161,6 +1167,54 @@ typedef void (*gcMarkFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj
 //JAVA_OBJECT* recursionBlocker = 0;
 //int recursionBlockerPosition = 0;
 int recursionKey = 1;
+
+// Iterative mark using an explicit worklist. The previous implementation recursed
+// through reference fields, building one C stack frame per Java reference traversed.
+// iOS gives secondary pthreads a ~512KB stack, so a chain of a few thousand references
+// (linked list, parse tree, deeply nested container) would SIGBUS the GC thread.
+// Issue #3136.
+//
+// gcMarkObject now sets the mark bit and pushes onto a fixed worklist. gcMarkDrain
+// pops entries and invokes their per-class mark function, which calls gcMarkObject on
+// each reference field -- push, not recurse. If the worklist fills, the offending
+// object is still marked (so sweep preserves it) but its field scan is deferred to
+// the heap-rescan pass: walk the live-object table, re-invoke mark functions on
+// already-marked objects to pick up children that were skipped on overflow. Idempotent
+// because already-marked children are no-ops in gcMarkObject.
+//
+// CN1_GC_MARK_WORKLIST_SIZE is overridable at compile time (e.g. via -D in the Xcode
+// build settings or the maven plugin). 4096 entries is ~64KB on 64-bit -- covers all
+// realistic graphs. Pathological fan-out (multi-million-element object arrays) will
+// still complete correctly via the rescan slow path.
+#ifndef CN1_GC_MARK_WORKLIST_SIZE
+#define CN1_GC_MARK_WORKLIST_SIZE 4096
+#endif
+
+struct gcMarkWorklistEntry {
+    JAVA_OBJECT obj;
+    JAVA_BOOLEAN force;
+};
+
+static struct gcMarkWorklistEntry gcMarkWorklist[CN1_GC_MARK_WORKLIST_SIZE];
+static int gcMarkWorklistTop = 0;
+static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
+// Set whenever gcMarkObject transitions an object from unmarked to marked. Used by
+// the overflow-rescan loop to detect a fixed point: if a rescan+drain pass marks
+// nothing new, the reachable set is fully closed under "marked" and we're done --
+// otherwise we'd spin forever re-pushing the same marked-and-already-scanned
+// objects when the marked set is larger than the worklist.
+static JAVA_BOOLEAN gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
+
+static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
+    if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+        gcMarkWorklistOverflow = JAVA_TRUE;
+        return;
+    }
+    gcMarkWorklist[gcMarkWorklistTop].obj = obj;
+    gcMarkWorklist[gcMarkWorklistTop].force = force;
+    gcMarkWorklistTop++;
+}
+
 void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     if(obj == JAVA_NULL || obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
@@ -1173,19 +1227,16 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                 return;
             }
             obj->__codenameOneReferenceCount = recursionKey;
-            obj->__codenameOneGcMark = currentGcMarkValue;
-            gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
-            if(fp != 0) {
-                fp(threadStateData, obj, force);
+            if(obj->__codenameOneParentClsReference->markFunction != 0) {
+                gcMarkWorklistPush(obj, force);
             }
         }
         return;
-        
     }
     obj->__codenameOneGcMark = currentGcMarkValue;
-    gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
-    if(fp != 0) {
-        fp(threadStateData, obj, force);
+    gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
+    if(obj->__codenameOneParentClsReference->markFunction != 0) {
+        gcMarkWorklistPush(obj, force);
     }
 }
 
@@ -1200,6 +1251,53 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
         for(int iter = 0 ; iter < arr->length ; iter++) {
             if(data[iter] != JAVA_NULL) {
                 gcMarkObject(threadStateData, data[iter], force);
+            }
+        }
+    }
+}
+
+// Pops worklist entries and runs their mark functions. On overflow, rescans the live
+// heap to find marked-but-unscanned objects (whose children got dropped because the
+// worklist was full when we tried to push them). Terminates when the worklist drains
+// without overflow, OR when a rescan + drain marks nothing new (fixed point: the
+// reachable set is fully marked).
+static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
+    JAVA_BOOLEAN justRescanned = JAVA_FALSE;
+    while(JAVA_TRUE) {
+        while(gcMarkWorklistTop > 0) {
+            gcMarkWorklistTop--;
+            JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
+            JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
+            gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
+            if(fp != 0) {
+                fp(threadStateData, obj, force);
+            }
+        }
+        if(justRescanned && !gcMarkFoundUnmarkedChildInPass) {
+            // A rescan-and-drain marked no new objects; the marked set is closed.
+            // Even if overflow got re-raised by pushing already-marked objects, doing
+            // another rescan would walk the same set and find the same nothing-new.
+            return;
+        }
+        if(!gcMarkWorklistOverflow) {
+            return;
+        }
+        gcMarkWorklistOverflow = JAVA_FALSE;
+        gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
+        justRescanned = JAVA_TRUE;
+        int total = currentSizeOfAllObjectsInHeap;
+        for(int iter = 0 ; iter < total ; iter++) {
+            JAVA_OBJECT o = allObjectsInHeap[iter];
+            if(o != JAVA_NULL && o->__codenameOneGcMark == currentGcMarkValue) {
+                if(o->__codenameOneParentClsReference->markFunction != 0) {
+                    gcMarkWorklistPush(o, JAVA_FALSE);
+                    if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
+                        // Drain what we've gathered, then continue rescanning the heap.
+                        // The progress check above guarantees termination when the
+                        // marked set is closed.
+                        break;
+                    }
+                }
             }
         }
     }
