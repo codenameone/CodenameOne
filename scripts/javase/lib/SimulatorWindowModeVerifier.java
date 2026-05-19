@@ -33,6 +33,14 @@ public class SimulatorWindowModeVerifier {
             Path projectDir = prepareCodenameOneSettings();
             Path prefsRoot = configureSimulatorPreferences(parsed, projectDir);
 
+            // Native-theme scenarios write the result line to this
+            // sentinel so the verifier can read it after capturing the
+            // screenshot. Path lives in the temp project so different
+            // scenario runs don't trample each other.
+            Path nativeThemeSentinel = parsed.nativeTheme != null
+                    ? projectDir.resolve("native-theme-result.txt")
+                    : null;
+
             List<String> cmd = new ArrayList<String>();
             String javaExec = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
             cmd.add(javaExec);
@@ -55,6 +63,10 @@ public class SimulatorWindowModeVerifier {
                 cmd.add("-Dcn1.simulator.autoTestRecorder=true");
                 cmd.add("-Dcn1.simulator.autoTestRecorderRecord=true");
             }
+            if (parsed.nativeTheme != null) {
+                cmd.add("-Dcn1.test.expectedNativeTheme=" + parsed.nativeTheme);
+                cmd.add("-Dcn1.test.nativeThemeResultFile=" + nativeThemeSentinel.toAbsolutePath());
+            }
             if (parsed.skinPath != null && parsed.skinPath.length() > 0) {
                 cmd.add("-Dskin=" + parsed.skinPath);
                 cmd.add("-Ddskin=" + parsed.skinPath);
@@ -67,7 +79,17 @@ public class SimulatorWindowModeVerifier {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(projectDir.toFile());
             pb.redirectErrorStream(true);
-            pb.inheritIO();
+            if (parsed.nativeTheme != null) {
+                // Capture output to a log so we can also confirm the
+                // result line on stdout if the sentinel file isn't
+                // written for some reason. Without the redirect the
+                // inherited stdout would be swallowed by the JVM and
+                // unavailable to the assertion below.
+                Path logPath = projectDir.resolve("simulator-output.log");
+                pb.redirectOutput(logPath.toFile());
+            } else {
+                pb.inheritIO();
+            }
             child = pb.start();
 
             waitForSimulatorWarmup(Duration.ofSeconds("network-monitor".equals(parsed.scenario) ? 12 : 8));
@@ -80,7 +102,13 @@ public class SimulatorWindowModeVerifier {
             if (!ImageIO.write(image, "png", screenshotPath.toFile())) {
                 throw new AssertionError("No PNG writer available; screenshot was not written");
             }
-            System.out.println("[javase-verifier] screenshot=" + screenshotPath + " mode=" + parsed.mode + " scenario=" + parsed.scenario);
+            System.out.println("[javase-verifier] screenshot=" + screenshotPath
+                    + " mode=" + parsed.mode + " scenario=" + parsed.scenario
+                    + (parsed.nativeTheme != null ? " nativeTheme=" + parsed.nativeTheme : ""));
+
+            if (parsed.nativeTheme != null) {
+                assertNativeThemeApplied(parsed, nativeThemeSentinel, projectDir);
+            }
             exitCode = 0;
         } catch (Throwable t) {
             t.printStackTrace(System.err);
@@ -129,6 +157,40 @@ public class SimulatorWindowModeVerifier {
         }
     }
 
+    /**
+     * Reads the result line written by {@code SimulatorModeTestApp}
+     * during simulator startup and verifies it reports a PASS. The
+     * sentinel file is preferred since it lands the line atomically;
+     * we fall back to the captured stdout log if the sentinel is
+     * missing (e.g. the app's init threw before the report ran).
+     */
+    private static void assertNativeThemeApplied(Args args, Path sentinel, Path projectDir) throws Exception {
+        String line = null;
+        if (sentinel != null && Files.exists(sentinel)) {
+            line = new String(Files.readAllBytes(sentinel), StandardCharsets.UTF_8).trim();
+        }
+        if (line == null || line.isEmpty()) {
+            Path log = projectDir.resolve("simulator-output.log");
+            if (Files.exists(log)) {
+                for (String l : Files.readAllLines(log, StandardCharsets.UTF_8)) {
+                    if (l.startsWith("[native-theme-test]")) {
+                        line = l.trim();
+                        break;
+                    }
+                }
+            }
+        }
+        if (line == null || line.isEmpty()) {
+            throw new AssertionError("Native theme test produced no result line for "
+                    + args.nativeTheme + " (sentinel=" + sentinel + ")");
+        }
+        System.out.println("[javase-verifier] native-theme assertion: " + line);
+        if (!line.contains("result=PASS")) {
+            throw new AssertionError("Native theme " + args.nativeTheme
+                    + " was not loaded by the simulator: " + line);
+        }
+    }
+
     private static Path prepareCodenameOneSettings() throws Exception {
         Path tempProject = Files.createTempDirectory("cn1-javase-sim-project");
         Path settings = tempProject.resolve("codenameone_settings.properties");
@@ -147,6 +209,14 @@ public class SimulatorWindowModeVerifier {
         System.setProperty("java.util.prefs.userRoot", prefsRoot.toAbsolutePath().toString());
         Preferences prefs = Preferences.userNodeForPackage(com.codename1.impl.javase.JavaSEPort.class);
         prefs.putBoolean("Portrait", !"landscape".equals(args.scenario));
+        if (args.nativeTheme != null) {
+            // Mirrors exactly what the "Native Theme" menu writes when
+            // the user picks an explicit theme - this is the lever the
+            // simulator menu acts on, so testing the lever directly
+            // covers the menu's reload path without driving the menu
+            // via AWT events.
+            prefs.put("simulatorNativeTheme", args.nativeTheme);
+        }
         prefs.flush();
         return prefsRoot;
     }
@@ -157,13 +227,16 @@ public class SimulatorWindowModeVerifier {
         final String simClasspath;
         final String skinPath;
         final String scenario;
+        final String nativeTheme;
 
-        private Args(String mode, String screenshotPath, String simClasspath, String skinPath, String scenario) {
+        private Args(String mode, String screenshotPath, String simClasspath, String skinPath, String scenario,
+                String nativeTheme) {
             this.mode = mode;
             this.screenshotPath = screenshotPath;
             this.simClasspath = simClasspath;
             this.skinPath = skinPath;
             this.scenario = scenario;
+            this.nativeTheme = nativeTheme;
         }
 
         static Args parse(String[] args) {
@@ -172,6 +245,7 @@ public class SimulatorWindowModeVerifier {
             String simClasspath = null;
             String skinPath = null;
             String scenario = "default";
+            String nativeTheme = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 if ("--mode".equals(arg) && i + 1 < args.length) {
@@ -184,6 +258,8 @@ public class SimulatorWindowModeVerifier {
                     skinPath = args[++i];
                 } else if ("--scenario".equals(arg) && i + 1 < args.length) {
                     scenario = args[++i];
+                } else if ("--native-theme".equals(arg) && i + 1 < args.length) {
+                    nativeTheme = args[++i];
                 }
             }
             if (!"single".equals(mode) && !"multi".equals(mode)) {
@@ -195,7 +271,7 @@ public class SimulatorWindowModeVerifier {
             if (simClasspath == null || simClasspath.trim().isEmpty()) {
                 throw new IllegalArgumentException("--sim-classpath is required");
             }
-            return new Args(mode, screenshot, simClasspath, skinPath, scenario);
+            return new Args(mode, screenshot, simClasspath, skinPath, scenario, nativeTheme);
         }
     }
 }
