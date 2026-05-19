@@ -701,20 +701,11 @@ public class IPhoneBuilder extends Executor {
         }
         stopwatch.split("Extract Libs");
 
-        // nativeios.jar ships all three native themes (iOSModernTheme.res,
-        // iOS7Theme.res, iPhoneTheme.res). Delete the ones that don't match
-        // the effective iosMode so the .ipa carries only the theme the
-        // runtime will load. IOSImplementation.installNativeTheme maps
-        // mode->theme as: modern/liquid -> iOSModernTheme.res,
-        // ios7/flat/auto -> iOS7Theme.res, anything else -> iPhoneTheme.res.
-        deleteInactiveIosThemes(buildinRes, iosMode);
-
         if(request.getArg("noExtraResources", "false").equals("true")) {
             new File(buildinRes, "CN1Resource.res").delete();
-            new File(buildinRes, "iPhoneTheme.res").delete();
+            new File(buildinRes, "IPhoneTheme.res").delete();
             new File(buildinRes, "iOS7Theme.res").delete();
-            new File(buildinRes, "iOSModernTheme.res").delete();
-        }
+        } 
 
 
         if (useMetal) {
@@ -3657,34 +3648,12 @@ public class IPhoneBuilder extends Executor {
                 out.append(sep);
             }
             out.append(str);
-
+        
         }
         return out.toString();
     }
 
-    /// Removes the iOS native theme .res files that the runtime won't load
-    /// based on the effective iosMode. nativeios.jar always ships all three
-    /// (iOSModernTheme, iOS7Theme, iPhoneTheme); the builder strips down to
-    /// the one this build actually wants so the .ipa doesn't carry dead
-    /// theme bytes. Mirrors the mode -> theme mapping in
-    /// IOSImplementation.installNativeTheme.
-    private static void deleteInactiveIosThemes(File buildinRes, String iosMode) {
-        String mode = iosMode == null ? "auto" : iosMode.toLowerCase();
-        String keep;
-        if (mode.equals("modern") || mode.equals("liquid")) {
-            keep = "iOSModernTheme.res";
-        } else if (mode.equals("ios7") || mode.equals("flat") || mode.equals("auto")) {
-            keep = "iOS7Theme.res";
-        } else {
-            keep = "iPhoneTheme.res";
-        }
-        for (String themeFile : new String[] {"iOSModernTheme.res", "iOS7Theme.res", "iPhoneTheme.res"}) {
-            if (!themeFile.equals(keep)) {
-                new File(buildinRes, themeFile).delete();
-            }
-        }
-    }
 
 
-
+            
 }
