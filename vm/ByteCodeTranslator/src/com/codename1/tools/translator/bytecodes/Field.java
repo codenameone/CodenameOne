@@ -344,35 +344,33 @@ public class Field extends Instruction implements AssignableExpression {
                     valueOpAppended = true;
                     targetOpAppended = true;
                 } else {
+                    // Pop semantics here matter: C does not specify the order of
+                    // function argument evaluation, so emitting
+                    // "set_field_X(POP_DOUBLE(), POP_OBJ())" can pop the operands
+                    // in the wrong order on iOS (clang). This manifests when the
+                    // value and target both come from the stack (e.g. after a
+                    // chained assignment "a.x = a.y = expr" that produces a
+                    // dup2_x1 + two putfields). Always read with PEEK and pop
+                    // separately. See issue #3108.
                     switch(desc.charAt(0)) {
                         case 'L':
                         case '[':
-                            b.append("PEEK_OBJ");
-                            //if(useThis) {
-                            //    b.append("(1), __cn1ThisObject);\n    SP--;\n");
-                            //} else {
-                                b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
-                            //}
-                                sbOut.append(b);
+                            b.append("PEEK_OBJ(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
+                            sbOut.append(b);
                             return;
                         case 'D':
-                            b.append("POP_DOUBLE");
+                            b.append("PEEK_DOUBLE(1), PEEK_OBJ(2));\n    SP -= 2;\n");
                             break;
                         case 'F':
-                            b.append("POP_FLOAT");
+                            b.append("PEEK_FLOAT(1), PEEK_OBJ(2));\n    SP -= 2;\n");
                             break;
                         case 'J':
-                            b.append("POP_LONG");
+                            b.append("PEEK_LONG(1), PEEK_OBJ(2));\n    SP -= 2;\n");
                             break;
                         default:
-                            b.append("POP_INT");
+                            b.append("PEEK_INT(1), PEEK_OBJ(2));\n    SP -= 2;\n");
                             break;
                     }
-                    //if(useThis) {
-                    //    b.append("(), __cn1ThisObject);\n");
-                    //} else {
-                        b.append("(), POP_OBJ());\n");
-                    //}
                 }
                 break;
             }
