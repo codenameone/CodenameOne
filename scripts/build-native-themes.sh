@@ -28,7 +28,9 @@ CSS_COMPILER_MODULE="$REPO_ROOT/maven/css-compiler"
 CSS_SRC_ROOT="$REPO_ROOT/native-themes"
 OUT_DIR="$REPO_ROOT/Themes"
 # JavaScriptPort's runtime serves themes out of its webapp assets folder;
-# mirror the generated .res files there too so the JS port picks them up.
+# mirror the generated .res files there too so a local JS port run picks them
+# up. The mirror is gitignored - Themes/ is the single source of truth, and
+# the port poms (maven/ios, maven/android) consume it directly at build time.
 JS_ASSETS_DIR="$REPO_ROOT/Ports/JavaScriptPort/src/main/webapp/assets"
 
 # Resolve the compiler jar. Prefer a freshly-built target/ jar (so CSS compiler

@@ -15,6 +15,7 @@ import com.codename1.ui.plaf.StyleParser.MarginInfo;
 import com.codename1.ui.plaf.StyleParser.PaddingInfo;
 import com.codename1.ui.plaf.StyleParser.ScalarValue;
 import com.codename1.ui.plaf.StyleParser.StyleInfo;
+import java.lang.reflect.Field;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -215,7 +216,7 @@ class BorderAndPlafTest extends UITestBase {
     }
 
     @FormTest
-    void testRoundBorderShadowSpreadAndPaintingCaches() {
+    void testRoundBorderShadowSpreadAndPaintingCaches() throws Exception {
         RoundBorder border = RoundBorder.create().shadowSpread(3).shadowBlur(4f).shadowOpacity(128).uiid(false);
         com.codename1.ui.Label label = new com.codename1.ui.Label();
         label.setWidth(20);
@@ -223,19 +224,17 @@ class BorderAndPlafTest extends UITestBase {
         label.setX(0);
         label.setY(0);
         border.paintBorderBackground(graphics, label);
-        RoundBorder.CacheValue cacheValue = null;
-        Object baseCache = label.getClientProperty("cn1$$-rbcache");
-        if (baseCache instanceof RoundBorder.CacheValue) {
-            cacheValue = (RoundBorder.CacheValue) baseCache;
-        }
-        for (int i = 0; cacheValue == null && i < 50; i++) {
-            Object cached = label.getClientProperty("cn1$$-rbcache" + (i + 1));
-            if (cached instanceof RoundBorder.CacheValue) {
-                cacheValue = (RoundBorder.CacheValue) cached;
-                break;
-            }
-        }
-        assertNotNull(cacheValue);
+        // RoundBorder stores its cache under "cn1$$-rbcache" + instanceVal where
+        // instanceVal is a per-instance id off a static counter. Read the actual
+        // instanceVal off this border so the lookup doesn't depend on how many
+        // RoundBorder instances earlier tests in the same JVM happened to mint.
+        Field instanceValField = RoundBorder.class.getDeclaredField("instanceVal");
+        instanceValField.setAccessible(true);
+        int instanceVal = instanceValField.getInt(border);
+        Object cached = label.getClientProperty("cn1$$-rbcache" + instanceVal);
+        assertNotNull(cached, "RoundBorder.paintBorderBackground should populate the cache under cn1$$-rbcache" + instanceVal);
+        assertTrue(cached instanceof RoundBorder.CacheValue);
+        RoundBorder.CacheValue cacheValue = (RoundBorder.CacheValue) cached;
         assertEquals(label.getWidth(), cacheValue.img.getWidth());
         assertTrue(border.getMinimumHeight() > 0);
         assertTrue(border.getMinimumWidth() > 0);
