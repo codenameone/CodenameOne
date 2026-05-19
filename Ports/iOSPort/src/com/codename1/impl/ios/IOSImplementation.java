@@ -1248,6 +1248,87 @@ public class IOSImplementation extends CodenameOneImplementation {
         super.pointerDragged(x, y);
     }
 
+    // Sentinel keycodes forwarded from the native iOS hardware-keyboard handler
+    // for non-printable keys. Values match Android's DROID_IMPL_KEY_* sentinels
+    // so apps can write platform-agnostic key handlers.
+    static final int IOS_IMPL_KEY_LEFT = -23446;
+    static final int IOS_IMPL_KEY_RIGHT = -23447;
+    static final int IOS_IMPL_KEY_UP = -23448;
+    static final int IOS_IMPL_KEY_DOWN = -23449;
+    static final int IOS_IMPL_KEY_FIRE = -23450;
+    static final int IOS_IMPL_KEY_BACKSPACE = -23453;
+    static final int IOS_IMPL_KEY_ENTER = -23460;
+    static final int IOS_IMPL_KEY_TAB = -23461;
+    static final int IOS_IMPL_KEY_ESCAPE = -23462;
+    static final int IOS_IMPL_KEY_HOME = -23463;
+    static final int IOS_IMPL_KEY_END = -23464;
+    static final int IOS_IMPL_KEY_PAGE_UP = -23465;
+    static final int IOS_IMPL_KEY_PAGE_DOWN = -23466;
+    static final int IOS_IMPL_KEY_INSERT = -23467;
+    static final int IOS_IMPL_KEY_FORWARD_DEL = -23468;
+    static final int IOS_IMPL_KEY_F1 = -23469;
+    static final int IOS_IMPL_KEY_F2 = -23470;
+    static final int IOS_IMPL_KEY_F3 = -23471;
+    static final int IOS_IMPL_KEY_F4 = -23472;
+    static final int IOS_IMPL_KEY_F5 = -23473;
+    static final int IOS_IMPL_KEY_F6 = -23474;
+    static final int IOS_IMPL_KEY_F7 = -23475;
+    static final int IOS_IMPL_KEY_F8 = -23476;
+    static final int IOS_IMPL_KEY_F9 = -23477;
+    static final int IOS_IMPL_KEY_F10 = -23478;
+    static final int IOS_IMPL_KEY_F11 = -23479;
+    static final int IOS_IMPL_KEY_F12 = -23480;
+
+    public static void keyPressedCallback(int keyCode) {
+        if (dropEvents) {
+            return;
+        }
+        Display.getInstance().keyPressed(keyCode);
+    }
+
+    public static void keyReleasedCallback(int keyCode) {
+        if (dropEvents) {
+            return;
+        }
+        Display.getInstance().keyReleased(keyCode);
+    }
+
+    public static void pointerHoverPressedCallback(int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerHoverPressed(singleDimensionX, singleDimensionY);
+    }
+
+    public static void pointerHoverCallback(int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerHover(singleDimensionX, singleDimensionY);
+    }
+
+    public static void pointerHoverReleasedCallback(int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        singleDimensionX[0] = x; singleDimensionY[0] = y;
+        instance.pointerHoverReleased(singleDimensionX, singleDimensionY);
+    }
+
+    protected void pointerHover(final int[] x, final int[] y) {
+        super.pointerHover(x, y);
+    }
+
+    protected void pointerHoverPressed(final int[] x, final int[] y) {
+        super.pointerHoverPressed(x, y);
+    }
+
+    protected void pointerHoverReleased(final int[] x, final int[] y) {
+        super.pointerHoverReleased(x, y);
+    }
+
     static void sizeChangedImpl(int w, int h) {
         instance.sizeChanged(w, h);
     }

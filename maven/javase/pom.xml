@@ -146,11 +146,10 @@
                                      simulator fat jar so JavaSEPort.loadSkinFile can
                                      load the right .res based on the current skin's
                                      platformName (or the Simulator "Native Theme"
-                                     menu override). failonerror=false lets the
-                                     simulator still build if
-                                     scripts/build-native-themes.sh hasn't produced
-                                     the modern .res files yet. -->
-                                <copy todir="${project.build.outputDirectory}" failonerror="false">
+                                     menu override). All .res files are committed
+                                     under Themes/; the modern pair is regenerated
+                                     by .github/workflows/native-themes-sync.yml. -->
+                                <copy todir="${project.build.outputDirectory}">
                                     <fileset dir="${project.basedir}/../../Themes">
                                         <include name="iOSModernTheme.res"/>
                                         <include name="AndroidMaterialTheme.res"/>

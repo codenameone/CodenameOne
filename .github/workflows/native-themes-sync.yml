@@ -1,0 +1,80 @@
+name: Native Themes Sync
+
+# After every push to master that touches the native-theme CSS sources,
+# the CSS compiler, or the build script, regenerate the shipped
+# `.res` files and commit them straight back to master (no PR). Every
+# downstream pipeline (port builds, BuildDaemon, archetypes, website)
+# just consumes the committed `.res` instead of rebuilding it, so this
+# workflow is the single producer.
+#
+# Pushes made with GITHUB_TOKEN do not retrigger workflow runs, so the
+# commit-back step cannot loop.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'native-themes/**'
+      - 'maven/css-compiler/**'
+      - 'scripts/build-native-themes.sh'
+      - '.github/workflows/native-themes-sync.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-themes-sync
+  cancel-in-progress: false
+
+jobs:
+  rebuild-and-commit:
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Use JDK 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> $GITHUB_ENV
+          echo "${JAVA_HOME_8}/bin" >> $GITHUB_PATH
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+
+      - name: Build css-compiler
+        run: |
+          cd maven
+          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+
+      - name: Rebuild native themes
+        run: ./scripts/build-native-themes.sh
+
+      - name: Commit and push regenerated .res files
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Themes/ holds the single source of truth. Each downstream consumer
+          # (nativeios.jar, the Android port jar, the simulator fat-jar, the
+          # BuildDaemon's sibling cn1 checkout) copies from Themes/ at its own
+          # build time, so this workflow only commits these two files.
+          git add Themes/iOSModernTheme.res Themes/AndroidMaterialTheme.res
+          if git diff --staged --quiet; then
+            echo "No .res changes; nothing to commit."
+            exit 0
+          fi
+          git commit -m "ci: auto-regenerate native theme .res files"
+          git push

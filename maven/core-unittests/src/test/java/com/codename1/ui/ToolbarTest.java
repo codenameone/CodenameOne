@@ -136,7 +136,7 @@ class ToolbarTest extends UITestBase {
     }
 
     @FormTest
-    void rightSideMenuCommandsDispatch() {
+    void rightSideMenuCommandsDispatch() throws Exception {
         implementation.setBuiltinSoundsEnabled(false);
         Toolbar.setOnTopSideMenu(true);
 
@@ -158,6 +158,14 @@ class ToolbarTest extends UITestBase {
         Button rightButton = toolbar.findCommandComponent(rightSide);
         assertNotNull(rightButton, "Right side menu button should be created");
 
+        // Issue #4979: command dispatch from the side menu is deferred
+        // to the dispose-animation onFinish so the dim layered pane is
+        // fully detached before the command runs. The test EDT cannot
+        // tick wall-clock animations while blocked on the test body,
+        // so disable the dispose animation to make the deferred fire
+        // synchronous.
+        disableSideMenuAnimation(toolbar, "rightSidemenuDialog");
+
         int px = rightButton.getAbsoluteX() + rightButton.getWidth() / 2;
         int py = rightButton.getAbsoluteY() + rightButton.getHeight() / 2;
         rightButton.pointerPressed(px, py);
@@ -170,6 +178,17 @@ class ToolbarTest extends UITestBase {
         form.getAnimationManager().flush();
         flushSerialCalls();
         awaitAnimations(form);
+    }
+
+    private static void disableSideMenuAnimation(Toolbar toolbar, String dialogFieldName) throws Exception {
+        java.lang.reflect.Field dialogField = Toolbar.class.getDeclaredField(dialogFieldName);
+        dialogField.setAccessible(true);
+        Object dialog = dialogField.get(toolbar);
+        if (dialog == null) {
+            return;
+        }
+        java.lang.reflect.Method setAnimateShow = dialog.getClass().getMethod("setAnimateShow", boolean.class);
+        setAnimateShow.invoke(dialog, false);
     }
 
     @FormTest
@@ -287,6 +306,82 @@ class ToolbarTest extends UITestBase {
             return ((java.util.Collection<?>) queue).contains(form);
         }
         return false;
+    }
+
+    /// Regression test for issue #4979: tapping a command in the
+    /// on-top side menu used to run cmd.actionPerformed synchronously
+    /// right after kicking off the side menu's async dispose
+    /// animation. If the command then showed a modal Dialog (the
+    /// archetype's default `hello()` does exactly this) the Dialog's
+    /// event pump stole the EDT before the dispose animation could
+    /// advance, the detachToolbarLayeredPane onFinish never fired,
+    /// and the dim backdrop stayed visible after the Dialog was
+    /// dismissed.
+    ///
+    /// The fix routes the command-fire through the new
+    /// closeSideMenu(Runnable) onFinish, so the layered pane is
+    /// guaranteed to be detached *before* the command runs. The
+    /// assertion below checks that ordering directly: when the
+    /// command's listener fires, the Toolbar layered pane must
+    /// already be gone.
+    @FormTest
+    void sideMenuCommandFiresAfterLayeredPaneDetach() throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+
+        Form form = Display.getInstance().getCurrent();
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        // Capture the *specific* dim layered-pane instance via this
+        // array so the listener can check that exact reference. We
+        // cannot just call form.getFormLayeredPane(Toolbar.class,
+        // false) inside the listener because that method is
+        // get-or-create — once the original pane is removed it would
+        // hand back a brand new attached Container.
+        final Container[] capturedPane = new Container[1];
+        final boolean[] paneAttachedWhenCommandFired = {true};
+        final int[] invocation = {0};
+        Command hello = toolbar.addCommandToSideMenu("Hello", null, evt -> {
+            Container p = capturedPane[0];
+            paneAttachedWhenCommandFired[0] = p != null && p.getParent() != null;
+            invocation[0]++;
+        });
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+        assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after open");
+        capturedPane[0] = form.getFormLayeredPane(Toolbar.class, false);
+        assertNotNull(capturedPane[0], "Toolbar layered pane must exist while menu is open");
+        assertNotNull(capturedPane[0].getParent(), "Layered pane must be attached while menu is open");
+
+        // Make the dispose synchronous so we don't depend on the
+        // animation thread inside the test; the bug we are pinning
+        // down is about ordering between the dispose onFinish and the
+        // command-fire, not about the animation duration.
+        disableSideMenuAnimation(toolbar, "sidemenuDialog");
+
+        // Dispatch through the same path the side-menu button click
+        // would take — the CommandWrapper.actionPerformed branch that
+        // does the close-then-fire dance.
+        Button helloButton = toolbar.findCommandComponent(hello);
+        assertNotNull(helloButton, "Side menu command should have a button while menu is open");
+        int px = helloButton.getAbsoluteX() + helloButton.getWidth() / 2;
+        int py = helloButton.getAbsoluteY() + helloButton.getHeight() / 2;
+        helloButton.pointerPressed(px, py);
+        helloButton.pointerReleased(px, py);
+        flushSerialCalls();
+
+        assertEquals(1, invocation[0], "Command listener should have fired exactly once");
+        assertFalse(paneAttachedWhenCommandFired[0],
+                "Issue #4979: command listener must run *after* the Toolbar layered pane "
+                        + "is detached so a modal Dialog opened by the command cannot leave "
+                        + "the dim backdrop visible behind it");
     }
 
     /// Regression test for the JavaScript port "ghost side menu +

@@ -124,18 +124,30 @@ public class MultiArray extends Instruction {
                 break;
                 
             case 3:
-                b.append("    PUSH_OBJ(alloc3DArray(threadStateData, POP_INT(), ");
+                // alloc3DArray params are (innermost, middle, outermost).
+                // JVM stack: outermost at the bottom, innermost-of-specified at
+                // the top, so after "SP -= dims" SP[0]..SP[dims-1] hold the
+                // values outermost..innermost. Any unspecified inner dims are
+                // passed as -1.
+                //
+                // Emitting "alloc3DArray(td, POP_INT(), POP_INT(), POP_INT())"
+                // is unsafe -- C does not specify function argument evaluation
+                // order, so clang on iOS can pop them in reverse and silently
+                // swap the dimensions. Use PEEK semantics with explicit SP
+                // adjustment instead (same pattern as the 2D case above and
+                // the PUTFIELD fix from issue #3108).
+                b.append("    SP -= ").append(dims).append("; PUSH_OBJ(alloc3DArray(threadStateData, ");
                 switch(dims) {
                     case 1:
-                        b.append("-1, -1");
+                        b.append("-1, -1, (*SP).data.i");
                         break;
-                        
+
                     case 2:
-                        b.append("POP_INT(), -1");
+                        b.append("-1, (*(SP+1)).data.i, (*SP).data.i");
                         break;
-                        
+
                     case 3:
-                        b.append("POP_INT(), POP_INT()");
+                        b.append("(*(SP+2)).data.i, (*(SP+1)).data.i, (*SP).data.i");
                         break;
                 }
                 b.append(", &class_array3__");
@@ -152,24 +164,26 @@ public class MultiArray extends Instruction {
                 }
                 b.append("))); /* MULTIANEWARRAY */\n");
                 break;
-                
+
             case 4:
-                b.append("    PUSH_OBJ(alloc4DArray(threadStateData, POP_INT(), ");
+                // See comment on case 3 -- same rationale. alloc4DArray params
+                // are (innermost, depth-2, depth-3, outermost).
+                b.append("    SP -= ").append(dims).append("; PUSH_OBJ(alloc4DArray(threadStateData, ");
                 switch(dims) {
                     case 1:
-                        b.append("-1, -1, -1");
+                        b.append("-1, -1, -1, (*SP).data.i");
                         break;
-                        
+
                     case 2:
-                        b.append("POP_INT(), -1, -1");
+                        b.append("-1, -1, (*(SP+1)).data.i, (*SP).data.i");
                         break;
-                        
+
                     case 3:
-                        b.append("POP_INT(), POP_INT(), -1");
+                        b.append("-1, (*(SP+2)).data.i, (*(SP+1)).data.i, (*SP).data.i");
                         break;
-                        
+
                     case 4:
-                        b.append("POP_INT(), POP_INT(), POP_INT()");
+                        b.append("(*(SP+3)).data.i, (*(SP+2)).data.i, (*(SP+1)).data.i, (*SP).data.i");
                         break;
                 }
                 b.append(", &class_array4__");

@@ -54,7 +54,6 @@ public class CodenameOneView {
     AndroidGraphics buffy = null;
     private Canvas canvas;
     private AndroidImplementation implementation = null;
-    private final KeyCharacterMap keyCharacterMap;
     private final Rect bounds = new Rect();
     private boolean fireKeyDown = false;
     //private volatile boolean created = false;
@@ -87,9 +86,6 @@ public class CodenameOneView {
             androidView.setWillNotDraw(true);
             this.buffy = new AndroidGraphics(implementation, null, false);
         }
-
-        this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);
-
 
         /**
          * From the docs: "Change whether this view is one of the set of
@@ -380,15 +376,62 @@ public class CodenameOneView {
                 return AndroidImplementation.DROID_IMPL_KEY_BACKSPACE;
             case KeyEvent.KEYCODE_BACK:
                 return AndroidImplementation.DROID_IMPL_KEY_BACK;
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                return AndroidImplementation.DROID_IMPL_KEY_ENTER;
+            case KeyEvent.KEYCODE_TAB:
+                return AndroidImplementation.DROID_IMPL_KEY_TAB;
+            case KeyEvent.KEYCODE_ESCAPE:
+                return AndroidImplementation.DROID_IMPL_KEY_ESCAPE;
+            case KeyEvent.KEYCODE_MOVE_HOME:
+                return AndroidImplementation.DROID_IMPL_KEY_HOME;
+            case KeyEvent.KEYCODE_MOVE_END:
+                return AndroidImplementation.DROID_IMPL_KEY_END;
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return AndroidImplementation.DROID_IMPL_KEY_PAGE_UP;
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return AndroidImplementation.DROID_IMPL_KEY_PAGE_DOWN;
+            case KeyEvent.KEYCODE_INSERT:
+                return AndroidImplementation.DROID_IMPL_KEY_INSERT;
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                return AndroidImplementation.DROID_IMPL_KEY_FORWARD_DEL;
+            case KeyEvent.KEYCODE_F1:
+                return AndroidImplementation.DROID_IMPL_KEY_F1;
+            case KeyEvent.KEYCODE_F2:
+                return AndroidImplementation.DROID_IMPL_KEY_F2;
+            case KeyEvent.KEYCODE_F3:
+                return AndroidImplementation.DROID_IMPL_KEY_F3;
+            case KeyEvent.KEYCODE_F4:
+                return AndroidImplementation.DROID_IMPL_KEY_F4;
+            case KeyEvent.KEYCODE_F5:
+                return AndroidImplementation.DROID_IMPL_KEY_F5;
+            case KeyEvent.KEYCODE_F6:
+                return AndroidImplementation.DROID_IMPL_KEY_F6;
+            case KeyEvent.KEYCODE_F7:
+                return AndroidImplementation.DROID_IMPL_KEY_F7;
+            case KeyEvent.KEYCODE_F8:
+                return AndroidImplementation.DROID_IMPL_KEY_F8;
+            case KeyEvent.KEYCODE_F9:
+                return AndroidImplementation.DROID_IMPL_KEY_F9;
+            case KeyEvent.KEYCODE_F10:
+                return AndroidImplementation.DROID_IMPL_KEY_F10;
+            case KeyEvent.KEYCODE_F11:
+                return AndroidImplementation.DROID_IMPL_KEY_F11;
+            case KeyEvent.KEYCODE_F12:
+                return AndroidImplementation.DROID_IMPL_KEY_F12;
             default:
                 return keyCode;
         }
     }
 
     public boolean onKeyUpDown(boolean down, int keyCode, KeyEvent event) {
-        keyCode = this.internalKeyCodeTranslate(keyCode);
+        // Capture the raw Android keycode before translation so we can ask the
+        // KeyEvent for the unicode mapping (event.getUnicodeChar expects the
+        // device's native keycode, not our negative sentinels).
+        final int rawKeyCode = keyCode;
+        keyCode = internalKeyCodeTranslate(keyCode);
 
-        switch (keyCode) {
+        switch (rawKeyCode) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_SEARCH:
@@ -396,26 +439,19 @@ public class CodenameOneView {
             case KeyEvent.KEYCODE_SHIFT_RIGHT:
             case KeyEvent.KEYCODE_ALT_LEFT:
             case KeyEvent.KEYCODE_ALT_RIGHT:
+            case KeyEvent.KEYCODE_CTRL_LEFT:
+            case KeyEvent.KEYCODE_CTRL_RIGHT:
+            case KeyEvent.KEYCODE_META_LEFT:
+            case KeyEvent.KEYCODE_META_RIGHT:
+            case KeyEvent.KEYCODE_FUNCTION:
+            case KeyEvent.KEYCODE_CAPS_LOCK:
+            case KeyEvent.KEYCODE_NUM_LOCK:
+            case KeyEvent.KEYCODE_SCROLL_LOCK:
             case KeyEvent.KEYCODE_SYM:
-            return false;
-            case KeyEvent.KEYCODE_ENTER:
-                if(Display.getInstance().getProperty("sendEnterKey", "false").equals("true")) {
-                	if (down) {
-                        Display.getInstance().keyPressed(keyCode);
-                    } else {
-                        Display.getInstance().keyReleased(keyCode);
-                    }
-               	    return false;
-                }
-                break;
-                
+                return false;
             default:
         }
 
-        if (event.getRepeatCount() > 0) {
-            // skip repeats
-            return true;
-        }
         if (this.implementation.getCurrentForm() == null) {
             /**
              * make sure a form has been set before we can send events to the
@@ -425,6 +461,21 @@ public class CodenameOneView {
             return true;
         }
 
+        // ENTER is gated for back-compat: on touch keyboards Enter is the IME
+        // "done" action, so apps historically had to opt in via sendEnterKey.
+        // Default it on when a hardware (alpha) keyboard generated the event
+        // so BT/Chromebook keyboards just work.
+        if (keyCode == AndroidImplementation.DROID_IMPL_KEY_ENTER) {
+            boolean optIn = Display.getInstance().getProperty("sendEnterKey", "false").equals("true");
+            if (!optIn && !isHardwareKeyboardEvent(event)) {
+                return false;
+            }
+        }
+
+        if (event.getRepeatCount() > 0) {
+            // skip repeats
+            return true;
+        }
 
         if (keyCode == AndroidImplementation.DROID_IMPL_KEY_FIRE) {
             this.fireKeyDown = down;
@@ -443,59 +494,55 @@ public class CodenameOneView {
             }
         }
 
-        switch (keyCode) {
-
-            case AndroidImplementation.DROID_IMPL_KEY_MENU:
-                //if the native commands are used don't handle the keycode
-                if (Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
-                    return false;
-                }
-            case AndroidImplementation.DROID_IMPL_KEY_BACK:
-            case AndroidImplementation.DROID_IMPL_KEY_DOWN:
-            case AndroidImplementation.DROID_IMPL_KEY_UP:
-            case AndroidImplementation.DROID_IMPL_KEY_LEFT:
-            case AndroidImplementation.DROID_IMPL_KEY_RIGHT:
-            case AndroidImplementation.DROID_IMPL_KEY_FIRE:
-            case AndroidImplementation.DROID_IMPL_KEY_CLEAR:
-            case AndroidImplementation.DROID_IMPL_KEY_BACKSPACE:
-                // directly pass to display.
-                if (down) {
-                    Display.getInstance().keyPressed(keyCode);
-                } else {
-                    Display.getInstance().keyReleased(keyCode);
-                }
-                return true;
-
-            default:
-
-                /**
-                 * Codename One's TextField does not seem to work well if two
-                 * keyup-keydown sequences of different keys are not strictly
-                 * sequential. so we pass the up event of a character right
-                 * after the down event. this is exactly the behavior of the
-                 * BlackBerry implementation from this repository and has worked
-                 * well for me. i guess this should be changed as soon as the
-                 * TextField changes.
-                 */
-                int meta = 0;
-                if (event.isShiftPressed()) {
-                    meta |= KeyEvent.META_SHIFT_ON;
-                }
-                if (event.isAltPressed()) {
-                    meta |= KeyEvent.META_ALT_ON;
-                }
-                if (event.isSymPressed()) {
-                    meta |= KeyEvent.META_SYM_ON;
-                }
-                final int nextchar = this.keyCharacterMap.get(keyCode, meta);
-                if (down) {
-                    Display.getInstance().keyPressed(nextchar);
-                } else {
-                    Display.getInstance().keyReleased(nextchar);
-                }
-                return true;
-
+        // Any key our translator mapped to a negative CN1 sentinel is forwarded
+        // verbatim. The MENU sentinel still defers to the platform when native
+        // commands are enabled.
+        if (keyCode < 0) {
+            if (keyCode == AndroidImplementation.DROID_IMPL_KEY_MENU
+                    && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
+                return false;
+            }
+            if (down) {
+                Display.getInstance().keyPressed(keyCode);
+            } else {
+                Display.getInstance().keyReleased(keyCode);
+            }
+            return true;
         }
+
+        /**
+         * Codename One's TextField does not seem to work well if two
+         * keyup-keydown sequences of different keys are not strictly
+         * sequential. so we pass the up event of a character right
+         * after the down event. this is exactly the behavior of the
+         * BlackBerry implementation from this repository and has worked
+         * well for me. i guess this should be changed as soon as the
+         * TextField changes.
+         */
+        // Use the KeyEvent's own device mapping rather than the cached
+        // BUILT_IN_KEYBOARD map: BT/USB keyboards on Android resolve their
+        // own layout through KeyEvent.getUnicodeChar, including the full
+        // meta state (SHIFT/ALT/CTRL/FN/CAPS).
+        final int nextchar = event.getUnicodeChar(event.getMetaState());
+        if (nextchar == 0) {
+            // Non-printable key we don't translate (e.g. KEYCODE_BREAK,
+            // media keys). Consume it silently rather than firing keyPressed(0).
+            return true;
+        }
+        if (down) {
+            Display.getInstance().keyPressed(nextchar);
+        } else {
+            Display.getInstance().keyReleased(nextchar);
+        }
+        return true;
+    }
+
+    private static boolean isHardwareKeyboardEvent(KeyEvent event) {
+        android.view.InputDevice device = event.getDevice();
+        if (device != null) {
+            return device.getKeyboardType() == android.view.KeyCharacterMap.ALPHA;
+        }
+        return event.getDeviceId() != android.view.KeyCharacterMap.VIRTUAL_KEYBOARD;
     }
 
     private boolean cn1GrabbedPointer = false;
@@ -607,6 +654,32 @@ public class CodenameOneView {
         }
 
         return consumeEvent;
+    }
+
+    /**
+     * Routes Android hover events (mouse / stylus moving over the surface
+     * without a button pressed) into Codename One's pointerHover pipeline so
+     * external pointing devices on Android (BT mouse, Chromebook trackpad,
+     * stylus) drive hover-aware components.
+     */
+    public boolean onHoverEvent(MotionEvent event) {
+        if (this.implementation.getCurrentForm() == null) {
+            return false;
+        }
+        final int x = (int) event.getX();
+        final int y = (int) event.getY();
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_HOVER_ENTER:
+                this.implementation.pointerHoverPressed(x, y);
+                return true;
+            case MotionEvent.ACTION_HOVER_MOVE:
+                this.implementation.pointerHover(x, y);
+                return true;
+            case MotionEvent.ACTION_HOVER_EXIT:
+                this.implementation.pointerHoverReleased(x, y);
+                return true;
+        }
+        return false;
     }
 
     public AndroidGraphics getGraphics() {
