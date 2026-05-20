@@ -472,25 +472,28 @@ public abstract class Purchase {
         }
     }
 
-    /// Removes a receipt from pending purchases.
+    /// Removes a receipt from pending purchases.  Receipts with a non-null
+    /// `transactionId` are matched on `transactionId`; receipts whose
+    /// `transactionId` is null fall back to matching on `sku`, `storeCode`,
+    /// `purchaseDate` and `orderData` so that the receipt is still removed
+    /// from the queue and `synchronizeReceipts` doesn't re-submit it forever.
     ///
     /// #### Parameters
     ///
-    /// - `transactionId`: the transaction id
+    /// - `target`: the receipt to remove
     ///
     /// #### Returns
     ///
-    /// the removed receipt
-    private Receipt removePendingPurchase(String transactionId) {
+    /// the removed receipt, or null if no matching receipt was found
+    private Receipt removePendingPurchase(Receipt target) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             Receipt found = null;
             for (Receipt r : pendingPurchases) {
-                if (r.getTransactionId() != null && r.getTransactionId().equals(transactionId)) {
+                if (receiptsMatch(r, target)) {
                     found = r;
                     break;
-
                 }
             }
             if (found != null) {
@@ -501,6 +504,25 @@ public abstract class Purchase {
                 return null;
             }
         }
+    }
+
+    private static boolean receiptsMatch(Receipt a, Receipt b) {
+        String aTx = a.getTransactionId();
+        String bTx = b.getTransactionId();
+        if (aTx != null && bTx != null) {
+            return aTx.equals(bTx);
+        }
+        if (aTx != null || bTx != null) {
+            return false;
+        }
+        return nullSafeEquals(a.getSku(), b.getSku())
+                && nullSafeEquals(a.getStoreCode(), b.getStoreCode())
+                && nullSafeEquals(a.getPurchaseDate(), b.getPurchaseDate())
+                && nullSafeEquals(a.getOrderData(), b.getOrderData());
+    }
+
+    private static boolean nullSafeEquals(Object a, Object b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     public final void synchronizeReceipts() {
@@ -552,19 +574,24 @@ public abstract class Purchase {
             if (!pending.isEmpty() && receiptStore != null) {
 
                 final Receipt receipt = pending.get(0);
-                receiptStore.submitReceipt(pending.get(0), new SuccessCallback<Boolean>() {
+                receiptStore.submitReceipt(receipt, new SuccessCallback<Boolean>() {
 
                     @Override
                     public void onSucess(Boolean submitSucceeded) {
+                        // Reset syncInProgress before doing any work that can
+                        // throw so that a failure here doesn't permanently
+                        // wedge synchronizeReceipts in the "in progress"
+                        // state for the rest of the app's lifetime.
+                        syncInProgress = false;
                         if (submitSucceeded) {
-                            removePendingPurchase(receipt.getTransactionId());
-                            syncInProgress = false;
-
-                            // If the submit succeeded we need to refetch
-                            // so we set this to zero here.
-                            synchronizeReceipts(0, callback);
+                            removePendingPurchase(receipt);
+                            // Continue draining the queue.  The original
+                            // callback is already registered in
+                            // synchronizeReceiptsCallbacks; passing null here
+                            // avoids registering it again and firing it once
+                            // per drained receipt.
+                            synchronizeReceipts(0, null);
                         } else {
-                            syncInProgress = false;
                             fireSynchronizeReceiptsCallbacks(false);
                         }
                     }
