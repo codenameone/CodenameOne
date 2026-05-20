@@ -253,7 +253,13 @@ public final class SimulatorHookLoader {
         return new Runnable() {
             @Override
             public void run() {
-                Display.getInstance().callSerially(new Runnable() {
+                // callSeriallyAndWait so a caller off the EDT (e.g. a CN1
+                // UnitTest's runTest() running on the main thread) blocks
+                // until the hook completes; otherwise the test would
+                // assert state changes before the EDT got to run the
+                // action. On the EDT itself, callSeriallyAndWait runs the
+                // body inline without re-entering the dispatch queue.
+                Display.getInstance().callSeriallyAndWait(new Runnable() {
                     @Override
                     public void run() {
                         try {
