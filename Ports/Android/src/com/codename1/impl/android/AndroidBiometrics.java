@@ -29,6 +29,9 @@ import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Looper;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
 
 import com.codename1.io.Log;
 import com.codename1.security.AuthenticationOptions;
@@ -39,8 +42,13 @@ import com.codename1.security.Biometrics;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 /**
  * Android backing for {@link Biometrics}. Uses
@@ -60,6 +68,13 @@ public final class AndroidBiometrics extends Biometrics {
     // FingerprintManager constants not in the cn1-binaries android.jar.
     private static final int FINGERPRINT_ERROR_NO_FINGERPRINTS = 11;
     private static final int FINGERPRINT_ERROR_HW_NOT_PRESENT = 12;
+
+    // Probe key tying biometric success to a real KeyStore unlock so the
+    // success callback cannot be bypassed by app hooking tools (Frida etc.).
+    // See CodeQL alert "Insecure local authentication" (java/android/insecure-local-authentication).
+    private static final String PROBE_KEY_ID = "CN1BiometricsAuthProbeKey";
+    private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
+    private static final byte[] PROBE_PLAINTEXT = new byte[]{0x42};
 
     // BiometricPrompt error codes (API 28+) -- values are stable per AOSP.
     static final int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1;
@@ -177,6 +192,15 @@ public final class AndroidBiometrics extends Biometrics {
         final String description = opts == null ? null : opts.getDescription();
 
         pending = result;
+        // Initialise a CryptoObject-backed Cipher that the OS will unlock
+        // ONLY if real biometric authentication succeeds. The success callback
+        // then performs a doFinal() against the unlocked cipher; if a hooking
+        // tool bypasses the callback, doFinal() throws and the result fails.
+        final Cipher probeCipher = initProbeCipher(result);
+        if (probeCipher == null) {
+            // initProbeCipher already errored the result.
+            return result;
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             runOnUi(new Runnable() {
                 @Override
@@ -185,13 +209,20 @@ public final class AndroidBiometrics extends Biometrics {
                         cancellationSignal.cancel();
                     }
                     cancellationSignal = new CancellationSignal();
-                    BiometricsApi29.authenticate(AndroidNativeUtil.getActivity(),
+                    BiometricsApi29.authenticateWithCipher(
+                            AndroidNativeUtil.getActivity(),
                             title, subtitle, description, negative,
+                            probeCipher,
                             cancellationSignal,
-                            new BiometricsApi29.AuthCallback() {
+                            new BiometricsApi29.CipherAuthCallback() {
                                 @Override
-                                public void onSuccess() {
-                                    completeSuccess(result);
+                                public void onSuccess(Object authedCipher) {
+                                    if (verifyProbeCipher((Cipher) authedCipher)) {
+                                        completeSuccess(result);
+                                    } else {
+                                        completeError(result, BiometricError.AUTHENTICATION_FAILED,
+                                                "Probe cipher rejected -- biometric success may have been spoofed");
+                                    }
                                 }
 
                                 @Override
@@ -202,12 +233,12 @@ public final class AndroidBiometrics extends Biometrics {
                 }
             });
         } else {
-            authenticateLegacy(result);
+            authenticateLegacy(result, probeCipher);
         }
         return result;
     }
 
-    private void authenticateLegacy(final AsyncResource<Boolean> result) {
+    private void authenticateLegacy(final AsyncResource<Boolean> result, final Cipher probeCipher) {
         runOnUi(new Runnable() {
             @Override
             public void run() {
@@ -246,7 +277,14 @@ public final class AndroidBiometrics extends Biometrics {
                     @Override
                     public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
                         cs.cancel();
-                        completeSuccess(result);
+                        Cipher authedCipher = r.getCryptoObject() == null
+                                ? probeCipher : r.getCryptoObject().getCipher();
+                        if (verifyProbeCipher(authedCipher)) {
+                            completeSuccess(result);
+                        } else {
+                            completeError(result, BiometricError.AUTHENTICATION_FAILED,
+                                    "Probe cipher rejected -- biometric success may have been spoofed");
+                        }
                     }
 
                     @Override
@@ -258,9 +296,99 @@ public final class AndroidBiometrics extends Biometrics {
                         }
                     }
                 };
-                fpm.authenticate(null, cs, 0, cb, null);
+                fpm.authenticate(new FingerprintManager.CryptoObject(probeCipher), cs, 0, cb, null);
             }
         });
+    }
+
+    /// Initialises an AES/CBC/PKCS7 Cipher under the Keystore probe key in
+    /// ENCRYPT_MODE. The Keystore enforces user-authentication-required, so
+    /// the Cipher only finalises after a real biometric prompt completes
+    /// (see [CodeQL "Insecure local authentication"](https://github.com/codenameone/CodenameOne/security/code-scanning)).
+    /// Returns `null` and errors the result if the key cannot be created or
+    /// initialised.
+    private Cipher initProbeCipher(AsyncResource<Boolean> result) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+                ks.load(null);
+                SecretKey key = (SecretKey) ks.getKey(PROBE_KEY_ID, null);
+                if (key == null) {
+                    createProbeKey();
+                    key = (SecretKey) ks.getKey(PROBE_KEY_ID, null);
+                    if (key == null) {
+                        completeError(result, BiometricError.UNKNOWN,
+                                "Failed to create biometric probe key");
+                        return null;
+                    }
+                }
+                Cipher c = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES
+                        + "/" + KeyProperties.BLOCK_MODE_CBC
+                        + "/" + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+                c.init(Cipher.ENCRYPT_MODE, key);
+                return c;
+            } catch (KeyPermanentlyInvalidatedException e) {
+                // User enrolled new biometrics since the probe key was created.
+                // Delete it and retry once -- the next iteration recreates it.
+                deleteProbeKey();
+            } catch (Throwable t) {
+                Log.e(t);
+                completeError(result, BiometricError.UNKNOWN,
+                        "Failed to initialise biometric probe cipher: " + t.getMessage());
+                return null;
+            }
+        }
+        completeError(result, BiometricError.KEY_REVOKED,
+                "Biometric probe key permanently invalidated");
+        return null;
+    }
+
+    private void createProbeKey() {
+        try {
+            KeyGenParameterSpec.Builder b = new KeyGenParameterSpec.Builder(PROBE_KEY_ID,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                    .setUserAuthenticationRequired(true);
+            // Invalidate the probe key whenever the user enrols a new biometric;
+            // this is the security property CodeQL is asking us to enforce.
+            if (Build.VERSION.SDK_INT >= 24) {
+                b.setInvalidatedByBiometricEnrollment(true);
+            }
+            KeyGenerator kg = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+            kg.init(b.build());
+            kg.generateKey();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private void deleteProbeKey() {
+        try {
+            KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+            ks.load(null);
+            ks.deleteEntry(PROBE_KEY_ID);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    /// Performs the actual cryptographic operation on the biometric-unlocked
+    /// Cipher. Returning `true` proves the user really authenticated; throws
+    /// indicate the success callback was reached without a valid biometric
+    /// unlock and the call must be rejected.
+    private boolean verifyProbeCipher(Cipher authedCipher) {
+        if (authedCipher == null) {
+            return false;
+        }
+        try {
+            authedCipher.doFinal(PROBE_PLAINTEXT);
+            return true;
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
     }
 
     void completeSuccess(final AsyncResource<Boolean> result) {
