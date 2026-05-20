@@ -47,7 +47,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.UnrecoverableEntryException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
@@ -383,8 +382,6 @@ public final class AndroidSecureStorage extends SecureStorage {
             keyStore().load(null);
             return (SecretKey) keyStore.getKey(KEY_ID, null);
         } catch (UnrecoverableKeyException e) {
-            keyRevoked = true;
-        } catch (UnrecoverableEntryException e) {
             keyRevoked = true;
         } catch (KeyStoreException e) {
             Log.e(e);

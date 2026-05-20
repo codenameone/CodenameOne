@@ -61,7 +61,7 @@ public final class AndroidBiometrics extends Biometrics {
     private static final int FINGERPRINT_ERROR_NO_FINGERPRINTS = 11;
     private static final int FINGERPRINT_ERROR_HW_NOT_PRESENT = 12;
 
-    // BiometricPrompt error codes (API 28+) — values are stable per AOSP.
+    // BiometricPrompt error codes (API 28+) -- values are stable per AOSP.
     static final int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1;
     static final int BIOMETRIC_ERROR_HW_NOT_PRESENT = 12;
     static final int BIOMETRIC_ERROR_LOCKOUT = 7;
