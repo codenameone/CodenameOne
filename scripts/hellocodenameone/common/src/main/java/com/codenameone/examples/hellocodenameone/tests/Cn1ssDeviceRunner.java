@@ -318,10 +318,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static boolean isJsSkippedThemeTest(String testName) {
         // The native-theme fidelity tests (each emits a light+dark PNG pair)
         // matter for iOS/Android/JavaSE where the user actually looks at
-        // visual output. The JS port run has a tight 150s browser-lifetime
-        // budget that doesn't accommodate another 13 x 2 captures; skip them
-        // here. Re-enable selectively when we move the JS port to a
-        // longer-lived harness.
+        // visual output. NO JS-port goldens exist yet for the theme tests, so
+        // their first JS run needs to capture a new baseline rather than diff
+        // against an existing one. ``CssGradientsScreenshotTest`` is excluded
+        // -- its JS golden (css-gradients.png) has been around long enough to
+        // compare against. ``CssFilterBlurScreenshotTest`` depends on the
+        // gaussian-blur impl (now landed) but hasn't been baselined yet.
         return "ButtonThemeScreenshotTest".equals(testName)
                 || "TextFieldThemeScreenshotTest".equals(testName)
                 || "CheckBoxRadioThemeScreenshotTest".equals(testName)
@@ -336,7 +338,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "SpanLabelThemeScreenshotTest".equals(testName)
                 || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
                 || "PaletteOverrideThemeScreenshotTest".equals(testName)
-                || "CssGradientsScreenshotTest".equals(testName)
                 || "CssFilterBlurScreenshotTest".equals(testName);
     }
 
@@ -358,6 +359,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // refuses to attempt them on HTML5 until the port emits chunks
         // reliably. The validation stays on iOS/Android so dropped chunks
         // still surface as failures there.
+        // The truncation diagnosis is dated -- bulk-read fix (c5080d78b) and
+        // Cn1ssChunkTools gap detection landed since this list was drawn up,
+        // so most of these should be re-evaluated. Keeping the screenshot
+        // tests skipped here pending a focused per-test investigation.
+        // Graphics tests and chart tests have all been flipped on since
+        // their JS goldens already exist on disk; only ClipUnderRotation
+        // stays skipped (active bug, see project_jsport_clip_under_rotation_open).
         return "KotlinUiTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
@@ -371,74 +379,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "StickyHeaderScreenshotTest".equals(testName)
                 || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
                 || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
-                // graphics tests
-                || "AffineScale".equals(testName)
-                || "Clip".equals(testName)
-                || "ClipUnderRotation".equals(testName)
-                || "DrawArc".equals(testName)
-                || "DrawGradient".equals(testName)
-                || "DrawGradientStops".equals(testName)
-                // DrawImage golden landed for JS port in <THIS PR commit>;
-                // re-enable so JS-port regressions surface as pixel diffs
-                // against scripts/javascript/screenshots/graphics-draw-image-rect.png.
-                // || "DrawImage".equals(testName)
-                // GaussianBlur was historically skipped because the JS port had
-                // no blur impl -- ``gaussianBlurImage`` fell through to the
-                // no-op default in CodenameOneImplementation. Implemented in
-                // HTML5Implementation via canvas2d ``ctx.filter = blur(<r>px)``,
-                // so flip this on. The previous JS golden was captured against
-                // the no-op state (4 identical crisp cells); deleted alongside
-                // this skip removal so CI re-baselines it against the real blur
-                // output on the first clean pass.
-                // || "GaussianBlur".equals(testName)
-                || "DrawLine".equals(testName)
-                || "DrawRect".equals(testName)
-                || "DrawRoundRect".equals(testName)
-                || "DrawShape".equals(testName)
-                || "DrawString".equals(testName)
-                || "DrawStringDecorated".equals(testName)
-                || "FillArc".equals(testName)
-                || "FillPolygon".equals(testName)
-                || "FillRect".equals(testName)
-                || "FillRoundRect".equals(testName)
-                || "FillShape".equals(testName)
-                || "FillTriangle".equals(testName)
-                // InscribedTriangleGrid golden landed for JS port in <THIS PR commit>;
-                // re-enable so per-cell triangle/box rendering regressions surface.
-                // || "InscribedTriangleGrid".equals(testName)
-                || "Rotate".equals(testName)
-                || "Scale".equals(testName)
-                || "StrokeTest".equals(testName)
-                || "TileImage".equals(testName)
-                || "TransformCamera".equals(testName)
-                || "TransformPerspective".equals(testName)
-                || "TransformRotation".equals(testName)
-                || "TransformTranslation".equals(testName)
-                // Chart screenshot tests: each ChartComponent renders ~12-30
-                // styled primitives plus axis labels and a legend, so the
-                // chunked PNG/JPEG output ends up in the 30-60KB range per
-                // test. The JS port's 150s browser-lifetime budget can't
-                // afford 14 of those on top of the existing screenshot suite
-                // -- on the previous run every chart test came back empty
-                // because the EDT had already started the suite-shutdown
-                // fast-forward by the time they were invoked. Re-enable
-                // selectively when the JS port moves to a longer-lived
-                // harness; chart-package coverage stays on iOS / Android /
-                // JavaSE in the meantime.
-                || "ChartLineScreenshotTest".equals(testName)
-                || "ChartCubicLineScreenshotTest".equals(testName)
-                || "ChartBarScreenshotTest".equals(testName)
-                || "ChartStackedBarScreenshotTest".equals(testName)
-                || "ChartRangeBarScreenshotTest".equals(testName)
-                || "ChartScatterScreenshotTest".equals(testName)
-                || "ChartBubbleScreenshotTest".equals(testName)
-                || "ChartPieScreenshotTest".equals(testName)
-                || "ChartDoughnutScreenshotTest".equals(testName)
-                || "ChartRadarScreenshotTest".equals(testName)
-                || "ChartTimeChartScreenshotTest".equals(testName)
-                || "ChartCombinedXYScreenshotTest".equals(testName)
-                || "ChartTransformScreenshotTest".equals(testName)
-                || "ChartRotatedScreenshotTest".equals(testName);
+                // Whole-form rotation bug in ``graphics-clip-under-rotation``
+                // -- the bridge logs report identity setTransform but the
+                // captured PNG shows the form rotated. 2b6f31864 fixed the
+                // off-screen mutable-image transform leak which is one
+                // contributing factor; the whole-form symptom may also be
+                // resolved but has not been verified in CI yet, so this stays
+                // skipped until a post-fix run confirms.
+                || "ClipUnderRotation".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
