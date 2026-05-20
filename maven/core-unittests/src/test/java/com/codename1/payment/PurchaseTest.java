@@ -24,6 +24,7 @@ class PurchaseTest extends UITestBase {
     private static final String RECEIPTS_STORAGE = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_STORAGE = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_STORAGE = "PendingPurchases.dat";
+    private static final String PROCESSED_STORAGE = "ProcessedPurchases.dat";
 
     private TestPurchase purchase;
 
@@ -56,6 +57,7 @@ class PurchaseTest extends UITestBase {
         storage.deleteStorageFile(RECEIPTS_STORAGE);
         storage.deleteStorageFile(RECEIPTS_REFRESH_STORAGE);
         storage.deleteStorageFile(PENDING_STORAGE);
+        storage.deleteStorageFile(PROCESSED_STORAGE);
         ReceiptStore clearingStore = new ReceiptStore() {
             public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
                 callback.onSucess(new Receipt[0]);
@@ -286,6 +288,49 @@ class PurchaseTest extends UITestBase {
                 "Synchronize callback must fire exactly once, not once per drained receipt");
         assertTrue(result[0]);
         assertEquals(3, store.getSubmittedReceipts().size());
+    }
+
+    @FormTest
+    void testPostReceiptSkipsReceiptThatWasAlreadySuccessfullySubmitted() {
+        // Simulate iOS StoreKit redelivering a transaction across app
+        // sessions: the same transactionId arrives via postReceipt after
+        // it was already successfully submitted in a prior cycle.
+        TestReceiptStore store = new TestReceiptStore();
+        purchase.setReceiptStore(store);
+
+        long purchaseTime = System.currentTimeMillis();
+        Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "pro", "tx-redelivery", purchaseTime, "order-1");
+        flushSerialCalls();
+
+        assertEquals(1, store.getSubmittedReceipts().size());
+        assertTrue(purchase.getPendingPurchases().isEmpty());
+
+        // Same transactionId arrives again (e.g. iOS redelivery on the
+        // next app launch).  Framework should drop it before it reaches
+        // the pending queue, so submitReceipt is not invoked a second
+        // time.
+        Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "pro", "tx-redelivery", purchaseTime, "order-1");
+        flushSerialCalls();
+
+        assertEquals(1, store.getSubmittedReceipts().size(),
+                "Receipt with already-processed transactionId must not be re-submitted");
+        assertTrue(purchase.getPendingPurchases().isEmpty());
+    }
+
+    @FormTest
+    void testPostReceiptSkipsDuplicateTransactionIdAlreadyPending() {
+        // Same transactionId queued twice before any sync happens (e.g.
+        // native layer fires postReceipt twice for one transaction).
+        // The second add must be silently dropped so the receipt is only
+        // submitted once when sync runs.
+        long purchaseTime = System.currentTimeMillis();
+        Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "pro", "tx-dupe", purchaseTime, "order-1");
+        Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "pro", "tx-dupe", purchaseTime, "order-1");
+        flushSerialCalls();
+
+        List<Receipt> pending = purchase.getPendingPurchases();
+        assertEquals(1, pending.size(),
+                "Duplicate transactionId enqueued before sync should be dropped at addPendingPurchase");
     }
 
     @EdtTest

@@ -52,6 +52,7 @@ public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
+    private static final String PROCESSED_PURCHASE_KEY = "ProcessedPurchases.dat";
     private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
@@ -458,7 +459,15 @@ public abstract class Purchase {
         }
     }
 
-    /// Adds a receipt to be pushed to the server.
+    /// Adds a receipt to be pushed to the server.  Receipts whose
+    /// `transactionId` has already been successfully submitted to the
+    /// `ReceiptStore` (recorded in the persistent processed set) or is
+    /// already sitting in the pending queue are silently dropped.  This
+    /// closes the abstraction so the user's `ReceiptStore.submitReceipt`
+    /// is invoked at most once per `transactionId` across the lifetime of
+    /// the install, regardless of platform-level redelivery quirks
+    /// (e.g. iOS StoreKit redelivering an unfinished transaction across
+    /// app sessions, or sandbox subscription renewals).
     ///
     /// #### Parameters
     ///
@@ -466,9 +475,58 @@ public abstract class Purchase {
     private void addPendingPurchase(Receipt receipt) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
-            List<Receipt> pendingPurchases = getPendingPurchases();
-            pendingPurchases.add(receipt);
-            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            String txId = receipt.getTransactionId();
+            if (txId != null) {
+                if (getProcessedTransactionIds().contains(txId)) {
+                    return;
+                }
+                List<Receipt> pendingPurchases = getPendingPurchases();
+                for (Receipt r : pendingPurchases) {
+                    if (txId.equals(r.getTransactionId())) {
+                        return;
+                    }
+                }
+                pendingPurchases.add(receipt);
+                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            } else {
+                // Receipts without a transactionId can't be tracked in the
+                // processed set; fall back to enqueueing and let the
+                // synchronize path drain them.  receiptsMatch handles
+                // removal correctly when transactionId is null on both
+                // sides.
+                List<Receipt> pendingPurchases = getPendingPurchases();
+                pendingPurchases.add(receipt);
+                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            }
+        }
+    }
+
+    /// Returns the persistent list of transactionIds that have already
+    /// been successfully submitted to the `ReceiptStore`.  The caller
+    /// must hold `PENDING_PURCHASE_LOCK`.
+    @SuppressWarnings("unchecked")
+    private List<String> getProcessedTransactionIds() {
+        Storage s = Storage.getInstance();
+        if (s.exists(PROCESSED_PURCHASE_KEY)) {
+            return (List<String>) s.readObject(PROCESSED_PURCHASE_KEY);
+        }
+        return new ArrayList<String>();
+    }
+
+    /// Records that the receipt with the given transactionId has been
+    /// successfully submitted to the `ReceiptStore`, so future
+    /// `addPendingPurchase` calls with the same transactionId skip the
+    /// enqueue.
+    private void recordProcessedTransactionId(String txId) {
+        if (txId == null) {
+            return;
+        }
+        synchronized (PENDING_PURCHASE_LOCK) {
+            List<String> processed = getProcessedTransactionIds();
+            if (!processed.contains(txId)) {
+                processed.add(txId);
+                Storage.getInstance().writeObject(PROCESSED_PURCHASE_KEY, processed);
+            }
         }
     }
 
@@ -584,6 +642,12 @@ public abstract class Purchase {
                         // state for the rest of the app's lifetime.
                         syncInProgress = false;
                         if (submitSucceeded) {
+                            // Record the transactionId before removing the
+                            // receipt from pending so a parallel
+                            // postReceipt re-enqueue (e.g. iOS redelivery)
+                            // is dropped by addPendingPurchase rather than
+                            // sneaking back into the queue.
+                            recordProcessedTransactionId(receipt.getTransactionId());
                             removePendingPurchase(receipt);
                             // Continue draining the queue.  The original
                             // callback is already registered in
