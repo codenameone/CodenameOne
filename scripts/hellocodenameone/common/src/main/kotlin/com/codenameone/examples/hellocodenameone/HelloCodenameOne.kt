@@ -20,16 +20,23 @@ open class HelloCodenameOne : Lifecycle() {
         // translate-then-scale screenshots to land on the same pixels as the
         // buffered mutable-image path.
         //
-        // The default is on; CI also runs the suite with the flag off via
-        // `-Dcodename1.arg.matrixTranslation=false` so regressions in the
-        // legacy code path get caught alongside the matrix-mode coverage.
-        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", "true")
-        Graphics.useMatrixTranslation = "true".equals(matrixFlag, ignoreCase = true)
+        // Scoped to iOS only: this feature targets the iOS Metal backend
+        // (where direct-to-screen affine drift is observable). Leaving it
+        // on for the JavaScript / Android / desktop ports would change
+        // pixel output for tests that already have green baselines on
+        // those platforms without delivering the GH-3302 fix that motivated
+        // the work. CI flips the iOS suite into matrix-off mode through
+        // `-Dcodename1.arg.matrixTranslation=false` so the legacy code
+        // path also gets regression coverage.
+        val platform = Display.getInstance().platformName
+        val isIos = "ios".equals(platform, ignoreCase = true)
+        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", if (isIos) "true" else "false")
+        Graphics.useMatrixTranslation = isIos && "true".equals(matrixFlag, ignoreCase = true)
         // Diagnostic: print the resolved flag value to the CI log so we
         // can confirm the build hint round-tripped to the runtime
         // correctly (e.g. validate that the build-ios-metal-legacy job
         // really runs with matrix mode off).
-        System.out.println("CN1SS:INFO:matrixTranslation=" + Graphics.useMatrixTranslation + " property=" + matrixFlag)
+        System.out.println("CN1SS:INFO:matrixTranslation=" + Graphics.useMatrixTranslation + " property=" + matrixFlag + " platform=" + platform)
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
