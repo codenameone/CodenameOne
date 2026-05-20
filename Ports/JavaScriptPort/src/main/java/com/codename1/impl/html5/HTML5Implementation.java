@@ -5767,6 +5767,127 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return Image.createImage(blurred);
     }
 
+    @Override
+    public boolean isAntiAliasingSupported() {
+        // Canvas2D primitive paths (stroke/fill/clip) are ALWAYS antialiased
+        // -- there is no way to disable it. ``setAntiAliased(false)`` falls
+        // through to a state-tracking-only no-op below; tests that assert
+        // crisp vs antialiased rendering will see identical antialiased
+        // pixels on the JS port across both panes.
+        return true;
+    }
+
+    @Override
+    public boolean isAntiAliasedTextSupported() {
+        // Same story for ``fillText``/``strokeText`` -- canvas2d always
+        // antialiases glyphs via the platform's text rasterizer.
+        return true;
+    }
+
+    @Override
+    public void setAntiAliased(Object graphics, boolean a) {
+        g(graphics).getRenderState().setAntiAliased(a);
+    }
+
+    @Override
+    public boolean isAntiAliased(Object graphics) {
+        return g(graphics).getRenderState().isAntiAliased();
+    }
+
+    @Override
+    public void setAntiAliasedText(Object graphics, boolean a) {
+        g(graphics).getRenderState().setAntiAliasedText(a);
+    }
+
+    @Override
+    public boolean isAntiAliasedText(Object graphics) {
+        return g(graphics).getRenderState().isAntiAliasedText();
+    }
+
+    @Override
+    public void setRenderingHints(Object graphics, int hints) {
+        g(graphics).getRenderState().setRenderingHints(hints);
+    }
+
+    @Override
+    public int getRenderingHints(Object graphics) {
+        return g(graphics).getRenderState().getRenderingHints();
+    }
+
+    @Override
+    public boolean cacheLinearGradients() {
+        // Match iOS: rasterize gradients on-the-fly via Canvas2D
+        // ``createLinearGradient`` (called from the fillLinearGradient path)
+        // instead of allocating a cached Image. Avoids 1-2-LSB drift at
+        // gradient extremes between the cached raster and the live ramp.
+        return false;
+    }
+
+    @Override
+    public boolean cacheRadialGradients() {
+        return false;
+    }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        // Canvas2D shadow* is hardware-accelerated on every modern browser,
+        // but ``isDrawShadowFast`` gates ``RoundBorder``/``RoundRectBorder``
+        // skipping shadow caching. Match iOS (false) so the shadow image is
+        // cached and re-used rather than re-rasterized on every paint -- the
+        // CSS shadow path is "fast" per pixel but the surrounding setup
+        // (color/blur/offset state changes, save/restore) is per-call.
+        return false;
+    }
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        if (image == null) {
+            return;
+        }
+        NativeImage src = (NativeImage) image;
+        if (src.img != null && !src.loaded) {
+            src.load();
+        }
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        CanvasRenderingContext2D ctx = g(graphics).getContext();
+        if (ctx == null) {
+            return;
+        }
+        // Use canvas2d's built-in shadow rendering. The trick: drawImage with
+        // shadowColor + shadowOffset set casts the shadow at (drawX + offset,
+        // drawY + offset). To get ONLY the shadow on the destination (not the
+        // source silhouette too -- the caller draws the actual component
+        // separately), draw the source far off-canvas so its silhouette is
+        // outside the clip, but compensate shadowOffsetX/Y so the shadow lands
+        // at (x + offsetX, y + offsetY). ``spreadRadius`` is folded into the
+        // blur on this path (canvas2d has no native spread); approximation is
+        // acceptable for the typical zero-spread CN1 callers and matches
+        // Android RenderEffect behavior closely enough that shadow-using
+        // theme tests should be re-baselined per-port anyway.
+        final int parkX = -16384;
+        final int parkY = -16384;
+        ctx.save();
+        ctx.setShadowColor(HTML5Graphics.colorWithAlpha(((Math.round(opacity * 255f) & 0xFF) << 24) | (color & 0xFFFFFF)));
+        ctx.setShadowOffsetX(x + offsetX - parkX);
+        ctx.setShadowOffsetY(y + offsetY - parkY);
+        ctx.setShadowBlur(Math.max(0, blurRadius + spreadRadius));
+        if (src.img != null && src.loaded) {
+            ctx.drawImage(src.img, parkX, parkY);
+        } else if (src.mutableGraphics != null) {
+            ctx.drawImage(src.mutableGraphics.getCanvas(), parkX, parkY);
+        }
+        ctx.restore();
+    }
+
     // Apply CSS canvas2d ``filter: blur(<r>px)`` to the destination context,
     // drawImage the source onto it (which bakes the blur into the destination
     // pixels), then clear the filter so the canvas is reusable. The CSS blur

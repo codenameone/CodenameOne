@@ -13,6 +13,13 @@ public final class JavaScriptRenderState<F> {
     private F font;
     private int color;
     private int alpha = 0xff;
+    // Canvas2D primitive paths are always AA; the toggle only meaningfully
+    // affects ``drawImage`` smoothing. Track the requested state so
+    // ``isAntiAliased{Text}`` returns what the caller last set even when
+    // ``setAntiAliased(false)`` cannot disable path AA in canvas2d.
+    private boolean antiAliased = true;
+    private boolean antiAliasedText = true;
+    private int renderingHints;
 
     public ClipState getClipState() {
         return clipState;
@@ -40,5 +47,29 @@ public final class JavaScriptRenderState<F> {
 
     public void setAlpha(int alpha) {
         this.alpha = alpha;
+    }
+
+    public boolean isAntiAliased() {
+        return antiAliased;
+    }
+
+    public void setAntiAliased(boolean antiAliased) {
+        this.antiAliased = antiAliased;
+    }
+
+    public boolean isAntiAliasedText() {
+        return antiAliasedText;
+    }
+
+    public void setAntiAliasedText(boolean antiAliasedText) {
+        this.antiAliasedText = antiAliasedText;
+    }
+
+    public int getRenderingHints() {
+        return renderingHints;
+    }
+
+    public void setRenderingHints(int renderingHints) {
+        this.renderingHints = renderingHints;
     }
 }
