@@ -96,10 +96,17 @@ public final class Graphics {
     /// translate. Maintained by `#translate(int, int)` so `#setTransform`
     /// can conjugate the user transform around the framework origin --
     /// `impl matrix = T(matrixFrameworkX, matrixFrameworkY) * userTransform`
-    /// -- matching the legacy `T(xt) * M * T(-xt)` recipe.
-    /// `getTranslateX()`/`Y()` returns this in matrix mode so the legacy
-    /// snapshot-reset idiom (`g.translate(-getTranslateX(), -getTranslateY())`)
-    /// keeps working without any callsite changes.
+    /// -- matching the legacy `T(xt) * M * T(-xt)` recipe. Snapshot-reset
+    /// callers (Form glass paint, Container glass/tensile, FontImage
+    /// rotation, etc.) read it via `#matrixFrameworkTranslateX()` to do
+    /// the translate-based "bring impl matrix to identity then restore"
+    /// dance the legacy code does with `getTranslateX()`.
+    ///
+    /// Intentionally NOT exposed via `#getTranslateX()` -- bypass-Graphics
+    /// fast paths (Label.drawLabelComponent, BGPainter
+    /// .paintComponentBackground) read getTranslateX to compute coords for
+    /// direct impl calls, and in matrix mode the impl matrix already
+    /// encodes the translate so any addition would double-shift.
     private int matrixFrameworkX;
     private int matrixFrameworkY;
     private GeneralPath tmpClipShape;
@@ -233,26 +240,56 @@ public final class Graphics {
         }
     }
 
+    /// Framework-internal accessor returning the current accumulated
+    /// framework painting-chain translate, in BOTH modes. Legacy mode
+    /// returns the `xTranslate` integer accumulator (which equals the
+    /// framework anchor in legacy semantics). Matrix mode returns the
+    /// `matrixFrameworkX` shadow that mirrors the impl-matrix translate.
+    /// Either way, callers can do the translate-based
+    /// `g.translate(-tx, -ty); ...; g.translate(tx, ty);` reset and have
+    /// the impl matrix end up at identity for the snapshot-reset paint
+    /// block.
+    ///
+    /// `getTranslateX()` is intentionally NOT matrix-aware -- bypass-
+    /// Graphics fast paths (Label.drawLabelComponent, BGPainter
+    /// .paintComponentBackground, etc.) read getTranslateX to compute the
+    /// "amount drawing primitives currently shift by" and add it to
+    /// coords passed straight to impl draw calls. In matrix mode the impl
+    /// matrix already encodes the framework translate; making
+    /// getTranslateX return matrixFrameworkX there would double-shift
+    /// those direct-impl callers. Snapshot-reset patterns use this
+    /// separate getter and the two semantics stay distinct.
+    public int matrixFrameworkTranslateX() {
+        if (matrixMode()) {
+            return matrixFrameworkX;
+        }
+        return getTranslateX();
+    }
+
+    /// Y-axis counterpart to `#matrixFrameworkTranslateX()`.
+    public int matrixFrameworkTranslateY() {
+        if (matrixMode()) {
+            return matrixFrameworkY;
+        }
+        return getTranslateY();
+    }
+
     /// Returns the current x translate value
     ///
     /// #### Returns
     ///
     /// the current x translate value
     public int getTranslateX() {
-        // Matrix mode: the integer xTranslate accumulator stays at zero;
-        // matrixFrameworkX is the shadow that mirrors the impl-side affine
-        // translation. Master callsites that use getTranslateX as the
-        // snapshot-reset anchor (`g.translate(-getTranslateX(), -getTranslateY())`)
-        // or to compute screen position from local coords therefore need
-        // matrixFrameworkX here -- not the zero accumulator -- so the
-        // legacy idiom keeps working under the opt-in flag without
-        // touching the master callsite.
-        if (matrixMode()) {
-            return matrixFrameworkX;
-        }
         if (impl.isTranslationSupported()) {
             return impl.getTranslateX(nativeGraphics);
         }
+        // Matrix mode keeps `xTranslate` at zero on purpose -- the impl
+        // matrix is the single source of truth for the framework anchor
+        // there, and bypass-Graphics fast paths add this value to coords
+        // passed directly to impl draws, which would double-shift if it
+        // leaked the matrix anchor. Callers that want the framework
+        // anchor for snapshot-reset semantics use
+        // `#matrixFrameworkTranslateX()` instead.
         return xTranslate;
     }
 
@@ -262,9 +299,6 @@ public final class Graphics {
     ///
     /// the current y translate value
     public int getTranslateY() {
-        if (matrixMode()) {
-            return matrixFrameworkY;
-        }
         if (impl.isTranslationSupported()) {
             return impl.getTranslateY(nativeGraphics);
         }
@@ -1991,8 +2025,8 @@ public final class Graphics {
             a = Boolean.TRUE;
         }
 
-        int tx = getTranslateX();
-        int ty = getTranslateY();
+        int tx = matrixFrameworkTranslateX();
+        int ty = matrixFrameworkTranslateY();
         nativeGraphicsState = new Object[]{
                 Integer.valueOf(tx),
                 Integer.valueOf(ty),

@@ -3031,8 +3031,8 @@ public class Component implements Animation, StyleListener, Editable {
     public void paintIntersectingComponentsAbove(Graphics g) {
         Container parent = getParent();
         Component component = this;
-        int tx = g.getTranslateX();
-        int ty = g.getTranslateY();
+        int tx = g.matrixFrameworkTranslateX();
+        int ty = g.matrixFrameworkTranslateY();
 
         g.translate(-tx, -ty);
         int x1 = getAbsoluteX() + getScrollX();
@@ -3344,8 +3344,8 @@ public class Component implements Animation, StyleListener, Editable {
                 paintBackgroundImpl(tg);
                 putClientProperty("$FLAT", i);
             }
-            int tx = g.getTranslateX();
-            int ty = g.getTranslateY();
+            int tx = g.matrixFrameworkTranslateX();
+            int ty = g.matrixFrameworkTranslateY();
             g.translate(-tx + absX, -ty + absY);
             g.drawImage(i, 0, 0);
             g.translate(tx - absX, ty - absY);

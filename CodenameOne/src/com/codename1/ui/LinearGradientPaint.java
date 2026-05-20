@@ -200,8 +200,8 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         if (getTransform() != null) {
             t2.concatenate(getTransform());
         }
-        int tx = g.getTranslateX();
-        int ty = g.getTranslateY();
+        int tx = g.matrixFrameworkTranslateX();
+        int ty = g.matrixFrameworkTranslateY();
         g.translate(-tx, -ty);
 
         t2.translate((float) (startX + tx), (float) (startY + ty));

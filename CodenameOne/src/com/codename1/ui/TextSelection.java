@@ -1318,9 +1318,10 @@ public class TextSelection {
             g.setAlpha(50);
             // Snapshot-reset translate so subsequent translate(originX,
             // originY) lands at selectionRoot's screen-absolute origin in
-            // both modes.
-            int tx = g.getTranslateX();
-            int ty = g.getTranslateY();
+            // both modes (matrixFrameworkTranslateX returns the right
+            // anchor under Graphics.useMatrixTranslation).
+            int tx = g.matrixFrameworkTranslateX();
+            int ty = g.matrixFrameworkTranslateY();
             g.translate(-tx, -ty);
             int originX = selectionRoot.getAbsoluteX();
             int originY = selectionRoot.getAbsoluteY();

@@ -4626,8 +4626,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     lp = (AndroidAsyncView.LayoutParams) o;
                     if (lp == null) {
                         lp = new AndroidAsyncView.LayoutParams(
-                                getX() + g.getTranslateX(),
-                                getY() + g.getTranslateY(),
+                                getX() + g.matrixFrameworkTranslateX(),
+                                getY() + g.matrixFrameworkTranslateY(),
                                 getWidth(),
                                 getHeight(), AndroidPeer.this);
                         final AndroidAsyncView.LayoutParams finalLp = lp;
@@ -4639,8 +4639,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                         lp.dirty = true;
                     } else {
-                        int x = getX() + g.getTranslateX();
-                        int y = getY() + g.getTranslateY();
+                        int x = getX() + g.matrixFrameworkTranslateX();
+                        int y = getY() + g.matrixFrameworkTranslateY();
                         int w = getWidth();
                         int h = getHeight();
                         if (x != lp.x || y != lp.y || w != lp.w || h != lp.h) {
@@ -4653,8 +4653,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 } else {
                     final AndroidAsyncView.LayoutParams finalLp = new AndroidAsyncView.LayoutParams(
-                            getX() + g.getTranslateX(),
-                            getY() + g.getTranslateY(),
+                            getX() + g.matrixFrameworkTranslateX(),
+                            getY() + g.matrixFrameworkTranslateY(),
                             getWidth(),
                             getHeight(), AndroidPeer.this);
                     activity.runOnUiThread(new Runnable() {

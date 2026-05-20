@@ -7796,8 +7796,8 @@ public final class FontImage extends Image {
             g.concatenateAlpha(fgAlpha);
         }
         if (rotated != 0) {
-            int tX = g.getTranslateX();
-            int tY = g.getTranslateY();
+            int tX = g.matrixFrameworkTranslateX();
+            int tY = g.matrixFrameworkTranslateY();
             g.translate(-tX, -tY);
             g.rotate((float) Math.toRadians(rotated % 360), tX + x + width / 2, tY + y + height / 2);
             g.drawString(text, tX + x + width / 2 - w / 2, tY + y + height / 2 - h / 2);
@@ -7837,8 +7837,8 @@ public final class FontImage extends Image {
         }
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         if (rotated != 0) {
-            int tX = g.getTranslateX();
-            int tY = g.getTranslateY();
+            int tX = g.matrixFrameworkTranslateX();
+            int tY = g.matrixFrameworkTranslateY();
             g.translate(-tX, -tY);
             g.rotate((float) Math.toRadians(rotated % 360), tX + x + w / 2, tY + y + h / 2);
             g.drawString(text, tX + x + w / 2 - ww / 2, tY + y);

@@ -2186,8 +2186,8 @@ public class Container extends Component implements Iterable<Component> {
             paintElevatedPane(g);
         }
 
-        int tx = g.getTranslateX();
-        int ty = g.getTranslateY();
+        int tx = g.matrixFrameworkTranslateX();
+        int ty = g.matrixFrameworkTranslateY();
         g.translate(-tx, -ty);
         if (sidemenuBarTranslation > 0) {
             g.translate(sidemenuBarTranslation, 0);

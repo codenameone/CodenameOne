@@ -1117,8 +1117,8 @@ public class Form extends Container {
             return;
         }
         if (glassPane != null) {
-            int tx = g.getTranslateX();
-            int ty = g.getTranslateY();
+            int tx = g.matrixFrameworkTranslateX();
+            int ty = g.matrixFrameworkTranslateY();
             g.translate(-tx, -ty);
             glassPane.paint(g, getBounds());
             g.translate(tx, ty);

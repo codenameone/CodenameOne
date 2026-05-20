@@ -801,7 +801,12 @@ public abstract class CodenameOneImplementation {
                     continue;
                 }
                 paintQueueTemp[iter] = null;
-                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                // Snapshot-reset uses matrixFrameworkTranslateX (returns
+                // the framework anchor in both modes) so the wrapper
+                // graphics starts each queued paint at identity in matrix
+                // mode too; bare getTranslateX returns zero there and the
+                // translate would no-op.
+                wrapper.translate(-wrapper.matrixFrameworkTranslateX(), -wrapper.matrixFrameworkTranslateY());
                 wrapper.resetAffine();
                 wrapper.setClip(0, 0, dwidth, dheight);
                 if (ani instanceof Component) {
