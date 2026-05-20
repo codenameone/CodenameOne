@@ -28,43 +28,41 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Cross-platform registry of named actions that the JavaSE simulator exposes.
- *
- * <p>The simulator scans cn1libs (and the app itself) for
- * {@code META-INF/codenameone/simulator-hooks.properties} files; each hook
- * declared there is registered here under {@code namespace:id} keys. Tests
- * and tooling that live in the cross-platform {@code common/} project can
- * invoke a hook by id through {@link com.codename1.ui.CN#execute(String)}
- * (which forwards to {@link #execute(String)}) without referencing any
- * JavaSE-specific class.</p>
- *
- * <p>On Android, iOS, JavaScript and other production targets this registry
- * is always empty, so {@code execute} returns {@code false} — that's the
- * "running outside a simulator" signal.</p>
- *
- * <p>Hooks can be menu-backed (shipped with a label and visible in the
- * simulator's menu bar) or API-only (no label, callable by id only). Tests
- * that want behavioral coverage of cn1lib internals lean on the API-only
- * form so the menu UX stays focused on actions a human would click.</p>
- */
+/// Cross-platform registry of named actions that the JavaSE simulator exposes.
+///
+/// The simulator scans cn1libs (and the app itself) for
+/// `META-INF/codenameone/simulator-hooks.properties` files; each hook
+/// declared there is registered here under `namespace:id` keys. Tests
+/// and tooling that live in the cross-platform `common/` project can
+/// invoke a hook by id through [com.codename1.ui.CN#executeHook(String)]
+/// (which forwards to [#execute(String)]) without referencing any
+/// JavaSE-specific class.
+///
+/// On Android, iOS, JavaScript and other production targets this registry
+/// is always empty, so `execute` returns `false` — that's the
+/// "running outside a simulator" signal.
+///
+/// Hooks can be menu-backed (shipped with a label and visible in the
+/// simulator's menu bar) or API-only (no label, callable by id only). Tests
+/// that want behavioral coverage of cn1lib internals lean on the API-only
+/// form so the menu UX stays focused on actions a human would click.
 public final class SimulatorHookExecutor {
 
     private static volatile Map<String, Runnable> hooks = Collections.emptyMap();
 
     private SimulatorHookExecutor() {}
 
-    /**
-     * Invokes the action registered under {@code hookId}. Returns {@code true}
-     * if a hook with that id was found and dispatched, {@code false}
-     * otherwise. Invocation is delegated to whatever the registering code
-     * configured (the JavaSE port wraps each hook in
-     * {@code Display.callSerially}, so menu actions and tests run on the
-     * CN1 EDT).
-     *
-     * @param hookId opaque id of the form {@code namespace:hook} (the exact
-     *               value the hook author chose in the properties file).
-     */
+    /// Invokes the action registered under `hookId`. Returns `true`
+    /// if a hook with that id was found and dispatched, `false`
+    /// otherwise. Invocation is delegated to whatever the registering code
+    /// configured (the JavaSE port wraps each hook in
+    /// `Display.callSeriallyAndWait`, so menu actions and tests run on the
+    /// CN1 EDT and the call is synchronous from off-EDT callers).
+    ///
+    /// #### Parameters
+    ///
+    /// - `hookId`: opaque id of the form `namespace:hook` (the exact
+    ///   value the hook author chose in the properties file).
     public static boolean execute(String hookId) {
         if (hookId == null) {
             return false;
@@ -77,29 +75,23 @@ public final class SimulatorHookExecutor {
         return true;
     }
 
-    /**
-     * Returns {@code true} if a hook with the given id is registered.
-     * Useful for tests that want to skip themselves gracefully when running
-     * on a platform that doesn't expose the relevant cn1lib hook.
-     */
+    /// Returns `true` if a hook with the given id is registered.
+    /// Useful for tests that want to skip themselves gracefully when running
+    /// on a platform that doesn't expose the relevant cn1lib hook.
     public static boolean isRegistered(String hookId) {
         return hookId != null && hooks.containsKey(hookId);
     }
 
-    /**
-     * Diagnostic view of every registered id. Returns an unmodifiable
-     * snapshot — never null. Intended for tests/inspectors; ordinary app
-     * code shouldn't need this.
-     */
+    /// Diagnostic view of every registered id. Returns an unmodifiable
+    /// snapshot — never null. Intended for tests/inspectors; ordinary app
+    /// code shouldn't need this.
     public static Collection<String> registeredIds() {
         return Collections.unmodifiableCollection(hooks.keySet());
     }
 
-    /**
-     * Replaces the entire registry. The JavaSE port calls this every time
-     * it rebuilds the simulator menu (e.g., after a reload). On non-simulator
-     * targets nothing calls it and the registry stays empty.
-     */
+    /// Replaces the entire registry. The JavaSE port calls this every time
+    /// it rebuilds the simulator menu (e.g., after a reload). On non-simulator
+    /// targets nothing calls it and the registry stays empty.
     public static void register(Map<String, Runnable> registered) {
         if (registered == null || registered.isEmpty()) {
             hooks = Collections.emptyMap();
