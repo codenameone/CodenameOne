@@ -25,10 +25,11 @@ package com.codename1.security;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
+import java.util.Collections;
 import java.util.List;
 
 /// Entry point for biometric authentication (Touch ID, Face ID, fingerprint,
-/// Android BiometricPrompt). Obtain the platform implementation via
+/// Android `BiometricPrompt`). Obtain the platform implementation via
 /// [#getInstance()]; the returned subclass is owned by the active port.
 ///
 /// A typical unlock flow:
@@ -53,61 +54,92 @@ import java.util.List;
 /// failure path completes with a [BiometricException] so callers can branch
 /// on the typed [BiometricError].
 ///
-/// This class is the parallel of Flutter's `local_auth` surface. On platforms
-/// without biometric support (desktop simulator with the "Available"
-/// simulator menu item unchecked, or older Android devices),
-/// [#canAuthenticate()] returns `false` and
-/// [#authenticate(AuthenticationOptions)] completes with
-/// [BiometricError#NOT_AVAILABLE].
-public abstract class Biometrics {
+/// #### Platform support
+///
+/// - **iOS** -- uses `LocalAuthentication.framework` (`LAContext`). Touch ID
+///   and Face ID on supported devices. Add the `ios.NSFaceIDUsageDescription`
+///   build hint when targeting Face ID hardware.
+/// - **Android** -- uses `BiometricPrompt` on API 29+ (Android 10) and the
+///   legacy `FingerprintManager` on API 23-28. Fingerprint, face, and iris
+///   modalities are reported per `PackageManager` features.
+/// - **JavaSE simulator** -- behaves as a real device with no enrolled
+///   biometrics by default. The `Simulate -> Biometric Simulation` submenu
+///   in the simulator lets you toggle hardware availability, enrolled
+///   modalities, and the outcome of the next [#authenticate(String)] call.
+/// - **All other platforms (desktop deploy, JavaScript, ...)** -- this base
+///   class is returned as-is and acts as a non-supporting fallback:
+///   [#isSupported()] / [#canAuthenticate()] return `false` and
+///   [#authenticate(String)] completes with [BiometricError#NOT_AVAILABLE].
+///   Application code does not need platform `if` statements -- always
+///   gate biometrics on [#canAuthenticate()] before invoking the prompt.
+///
+/// This class is the Codename One parallel of Flutter's `local_auth` API.
+public class Biometrics {
 
-    private static final Biometrics FALLBACK = new StubBiometrics();
-
-    /// Subclasses are constructed by the port; not for application use.
+    /// Subclasses are constructed by the port. Application code obtains the
+    /// active instance via [#getInstance()].
     protected Biometrics() {
     }
 
     /// Returns the platform-specific singleton owned by the current port.
-    /// Ports that do not implement biometrics get a no-op fallback that
-    /// reports [BiometricError#NOT_AVAILABLE].
+    /// On ports that do not implement biometrics this returns a base
+    /// [Biometrics] instance whose methods report the device as
+    /// unsupported, so calling code never needs a `null` check or a
+    /// platform-specific `if`.
     public static Biometrics getInstance() {
         Biometrics b = Display.getInstance().getBiometrics();
-        return b != null ? b : FALLBACK;
+        return b != null ? b : DEFAULT;
     }
+
+    private static final Biometrics DEFAULT = new Biometrics();
 
     /// Returns `true` when biometric hardware exists on the device,
     /// regardless of whether the user has enrolled biometrics. Combine with
-    /// [#canAuthenticate()] to gate UI affordances: show the "Use biometrics"
-    /// toggle when `isSupported()` is true, but only invoke
+    /// [#canAuthenticate()] to gate UI affordances: show the "Use
+    /// biometrics" toggle when `isSupported()` is true, but only invoke
     /// [#authenticate(AuthenticationOptions)] when `canAuthenticate()` is
-    /// also true.
-    public abstract boolean isSupported();
+    /// also true. Returns `false` on the fallback base class.
+    public boolean isSupported() {
+        return false;
+    }
 
     /// Returns `true` when the device is ready to authenticate right now:
     /// hardware present, at least one biometric enrolled, and not in a
-    /// locked-out state.
-    public abstract boolean canAuthenticate();
+    /// locked-out state. Returns `false` on the fallback base class.
+    public boolean canAuthenticate() {
+        return false;
+    }
 
     /// Lists the biometric modalities currently enrolled. On iOS this is
     /// [BiometricType#FINGERPRINT] or [BiometricType#FACE]; on Android the
     /// list may contain [BiometricType#IRIS] as well, and Android API 30+
-    /// adds [BiometricType#STRONG] / [BiometricType#WEAK] authenticator class
-    /// tags.
+    /// adds [BiometricType#STRONG] / [BiometricType#WEAK] authenticator
+    /// class tags.
     ///
     /// #### Returns
     ///
     /// an empty list when nothing is enrolled or the device is unsupported
-    public abstract List<BiometricType> getAvailableBiometrics();
+    public List<BiometricType> getAvailableBiometrics() {
+        return Collections.emptyList();
+    }
 
     /// Prompts the user to authenticate. The returned `AsyncResource`
     /// completes with `true` on success, or with a [BiometricException] on
     /// failure (consult [BiometricException#getError()] for the typed code).
+    /// On the fallback base class this completes immediately with
+    /// [BiometricError#NOT_AVAILABLE] so callers don't need to platform-
+    /// check before invoking.
     ///
     /// #### Parameters
     ///
     /// - `opts`: non-null configuration; [AuthenticationOptions#setReason(String)]
     ///   should be set
-    public abstract AsyncResource<Boolean> authenticate(AuthenticationOptions opts);
+    public AsyncResource<Boolean> authenticate(AuthenticationOptions opts) {
+        AsyncResource<Boolean> r = new AsyncResource<Boolean>();
+        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,
+                "Biometric authentication is not available on this platform"));
+        return r;
+    }
 
     /// Convenience for `authenticate(new AuthenticationOptions().setReason(reason))`.
     public AsyncResource<Boolean> authenticate(String reason) {
@@ -121,6 +153,8 @@ public abstract class Biometrics {
     /// #### Returns
     ///
     /// `true` when a call was cancelled; `false` when no authentication was
-    /// pending
-    public abstract boolean stopAuthentication();
+    /// pending. Always `false` on the fallback base class.
+    public boolean stopAuthentication() {
+        return false;
+    }
 }

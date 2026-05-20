@@ -105,19 +105,16 @@ public final class AndroidSecureStorage extends SecureStorage {
                     "Android API 23 required for biometric secure storage"));
             return result;
         }
-        runAuthenticatedCipher(reason, account, Cipher.ENCRYPT_MODE, result, new CipherWork<Boolean>() {
-            @Override
-            public Boolean run(Cipher c) throws Exception {
-                byte[] enc = c.doFinal(value.getBytes("UTF-8"));
-                SharedPreferences sp = AndroidNativeUtil.getActivity()
-                        .getApplicationContext()
-                        .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                sp.edit()
-                        .putString("v_" + account, Base64.encodeToString(enc, Base64.DEFAULT))
-                        .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
-                        .apply();
-                return Boolean.TRUE;
-            }
+        runAuthenticatedCipher(reason, account, Cipher.ENCRYPT_MODE, result, c -> {
+            byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+            SharedPreferences sp = AndroidNativeUtil.getActivity()
+                    .getApplicationContext()
+                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            sp.edit()
+                    .putString("v_" + account, Base64.encodeToString(enc, Base64.DEFAULT))
+                    .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
+                    .apply();
+            return Boolean.TRUE;
         });
         return result;
     }
@@ -138,16 +135,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                     "No secure storage entry for account: " + account));
             return result;
         }
-        runAuthenticatedCipher(reason, account, Cipher.DECRYPT_MODE, result, new CipherWork<String>() {
-            @Override
-            public String run(Cipher c) throws Exception {
-                SharedPreferences sp2 = AndroidNativeUtil.getActivity()
-                        .getApplicationContext()
-                        .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                byte[] enc = Base64.decode(sp2.getString("v_" + account, ""), Base64.DEFAULT);
-                byte[] dec = c.doFinal(enc);
-                return new String(dec, "UTF-8");
-            }
+        runAuthenticatedCipher(reason, account, Cipher.DECRYPT_MODE, result, c -> {
+            SharedPreferences sp2 = AndroidNativeUtil.getActivity()
+                    .getApplicationContext()
+                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            byte[] enc = Base64.decode(sp2.getString("v_" + account, ""), Base64.DEFAULT);
+            byte[] dec = c.doFinal(enc);
+            return new String(dec, "UTF-8");
         });
         return result;
     }
@@ -306,24 +300,18 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private <V> void succeedResult(final AsyncResource<V> result, final V value) {
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!result.isDone()) {
-                    result.complete(value);
-                }
+        Display.getInstance().callSerially(() -> {
+            if (!result.isDone()) {
+                result.complete(value);
             }
         });
     }
 
     private static <V> void failResult(final AsyncResource<V> result,
                                        final BiometricError err, final String msg) {
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!result.isDone()) {
-                    result.error(new BiometricException(err, msg));
-                }
+        Display.getInstance().callSerially(() -> {
+            if (!result.isDone()) {
+                result.error(new BiometricException(err, msg));
             }
         });
     }

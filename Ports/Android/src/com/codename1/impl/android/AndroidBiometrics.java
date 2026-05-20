@@ -125,53 +125,52 @@ public final class AndroidBiometrics extends Biometrics {
         if (Build.VERSION.SDK_INT < 23) {
             return out;
         }
-        runOnUi(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Activity act = AndroidNativeUtil.getActivity();
-                    PackageManager pm = act.getPackageManager();
-                    boolean okBio = false;
-                    if (Build.VERSION.SDK_INT >= 29) {
-                        if (!AndroidNativeUtil.checkForPermission("android.permission.USE_BIOMETRIC",
-                                "Authorize using biometrics")) {
-                            return;
-                        }
-                        okBio = BiometricsApi29.canAuthenticate(act);
-                    } else {
-                        if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,
-                                "Authorize using fingerprint")) {
-                            return;
-                        }
-                        FingerprintManager fpm = (FingerprintManager)
-                                act.getSystemService(Activity.FINGERPRINT_SERVICE);
-                        okBio = fpm != null && fpm.isHardwareDetected()
-                                && fpm.hasEnrolledFingerprints();
-                    }
-                    if (!okBio) {
-                        return;
-                    }
-                    if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
-                        FingerprintManager fpm = (FingerprintManager)
-                                act.getSystemService(Activity.FINGERPRINT_SERVICE);
-                        if (fpm != null && fpm.hasEnrolledFingerprints()) {
-                            out.add(BiometricType.FINGERPRINT);
-                        }
-                    }
-                    if (Build.VERSION.SDK_INT >= 29) {
-                        if (pm.hasSystemFeature("android.hardware.biometrics.face")) {
-                            out.add(BiometricType.FACE);
-                        }
-                        if (pm.hasSystemFeature("android.hardware.biometrics.iris")) {
-                            out.add(BiometricType.IRIS);
-                        }
-                    }
-                } catch (Throwable t) {
-                    Log.e(t);
+        runOnUi(() -> collectAvailableBiometrics(out));
+        return out;
+    }
+
+    private static void collectAvailableBiometrics(List<BiometricType> out) {
+        try {
+            Activity act = AndroidNativeUtil.getActivity();
+            PackageManager pm = act.getPackageManager();
+            boolean okBio;
+            if (Build.VERSION.SDK_INT >= 29) {
+                if (!AndroidNativeUtil.checkForPermission("android.permission.USE_BIOMETRIC",
+                        "Authorize using biometrics")) {
+                    return;
+                }
+                okBio = BiometricsApi29.canAuthenticate(act);
+            } else {
+                if (!AndroidNativeUtil.checkForPermission(Manifest.permission.USE_FINGERPRINT,
+                        "Authorize using fingerprint")) {
+                    return;
+                }
+                FingerprintManager fpm = (FingerprintManager)
+                        act.getSystemService(Activity.FINGERPRINT_SERVICE);
+                okBio = fpm != null && fpm.isHardwareDetected()
+                        && fpm.hasEnrolledFingerprints();
+            }
+            if (!okBio) {
+                return;
+            }
+            if (pm.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
+                FingerprintManager fpm = (FingerprintManager)
+                        act.getSystemService(Activity.FINGERPRINT_SERVICE);
+                if (fpm != null && fpm.hasEnrolledFingerprints()) {
+                    out.add(BiometricType.FINGERPRINT);
                 }
             }
-        });
-        return out;
+            if (Build.VERSION.SDK_INT >= 29) {
+                if (pm.hasSystemFeature("android.hardware.biometrics.face")) {
+                    out.add(BiometricType.FACE);
+                }
+                if (pm.hasSystemFeature("android.hardware.biometrics.iris")) {
+                    out.add(BiometricType.IRIS);
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     @Override
@@ -400,12 +399,9 @@ public final class AndroidBiometrics extends Biometrics {
             return;
         }
         pending = null;
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!result.isDone()) {
-                    result.complete(Boolean.TRUE);
-                }
+        Display.getInstance().callSerially(() -> {
+            if (!result.isDone()) {
+                result.complete(Boolean.TRUE);
             }
         });
     }
@@ -416,12 +412,9 @@ public final class AndroidBiometrics extends Biometrics {
             return;
         }
         pending = null;
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!result.isDone()) {
-                    result.error(new BiometricException(err, msg));
-                }
+        Display.getInstance().callSerially(() -> {
+            if (!result.isDone()) {
+                result.error(new BiometricException(err, msg));
             }
         });
     }

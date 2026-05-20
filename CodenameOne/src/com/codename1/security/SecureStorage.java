@@ -25,9 +25,9 @@ package com.codename1.security;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
-/// Biometric-gated secure storage backed by the platform keychain. Reading an
-/// entry prompts the user for biometric authentication; writing or deleting
-/// may or may not, depending on the platform.
+/// Biometric-gated secure storage backed by the platform keychain. Reading
+/// an entry prompts the user for biometric authentication; writing or
+/// deleting may or may not, depending on the platform.
 ///
 /// Entries are bound to the current set of enrolled biometrics. If the user
 /// adds a fingerprint, enrols a new face, or disables device security, every
@@ -38,45 +38,90 @@ import com.codename1.util.AsyncResource;
 ///
 /// Use this for short, secret strings (auth tokens, refresh tokens,
 /// encryption keys). For larger data, encrypt with a key stored here.
-public abstract class SecureStorage {
+///
+/// #### Platform support
+///
+/// - **iOS** -- backed by Security.framework (`SecItemAdd` /
+///   `SecItemCopyMatching` / `SecItemDelete`) with
+///   `kSecAccessControlTouchIDCurrentSet`. Sharing entries with App
+///   Extensions requires both the `ios.keychainAccessGroup` build hint AND
+///   a call to [#setKeychainAccessGroup(String)] passing the same
+///   Team-ID-prefixed group identifier.
+/// - **Android** -- AES/CBC/PKCS7 ciphertext stored in `SharedPreferences`
+///   with the key in the `AndroidKeyStore`, locked via
+///   `setUserAuthenticationRequired(true)`. The `BiometricPrompt` (API 29+)
+///   or `FingerprintManager` (API 23-28) unlocks the cipher for one
+///   operation per prompt.
+/// - **JavaSE simulator** -- backed by `java.util.prefs.Preferences`, gated
+///   on the same Biometric Simulation menu used by [Biometrics]. Useful for
+///   testing the round-trip and `KEY_REVOKED` paths without a device.
+/// - **All other platforms** -- this base class is returned as-is and acts
+///   as a non-supporting fallback: every method completes with
+///   [BiometricError#NOT_AVAILABLE]. Application code does not need
+///   platform `if` statements.
+public class SecureStorage {
 
-    private static final SecureStorage FALLBACK = new StubSecureStorage();
-
-    /// Subclasses are constructed by the port; not for application use.
+    /// Subclasses are constructed by the port. Application code obtains the
+    /// active instance via [#getInstance()].
     protected SecureStorage() {
     }
 
     /// Returns the platform-specific singleton owned by the current port.
-    /// Ports that do not implement secure storage get a no-op fallback that
-    /// reports [BiometricError#NOT_AVAILABLE].
+    /// On ports that do not implement secure storage this returns a base
+    /// [SecureStorage] instance whose methods report
+    /// [BiometricError#NOT_AVAILABLE].
     public static SecureStorage getInstance() {
         SecureStorage s = Display.getInstance().getSecureStorage();
-        return s != null ? s : FALLBACK;
+        return s != null ? s : DEFAULT;
     }
 
+    private static final SecureStorage DEFAULT = new SecureStorage();
+
     /// Retrieves a previously-stored entry, prompting for biometric
-    /// authentication. The returned `AsyncResource` completes with the value,
-    /// or with a [BiometricException] on failure (including
+    /// authentication. The returned `AsyncResource` completes with the
+    /// value, or with a [BiometricException] on failure (including
     /// [BiometricError#KEY_REVOKED] when biometrics have been re-enrolled
-    /// since the entry was written).
-    public abstract AsyncResource<String> get(String reason, String account);
+    /// since the entry was written). On the fallback base class this
+    /// completes immediately with [BiometricError#NOT_AVAILABLE].
+    public AsyncResource<String> get(String reason, String account) {
+        AsyncResource<String> r = new AsyncResource<String>();
+        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,
+                "Secure storage is not available on this platform"));
+        return r;
+    }
 
     /// Stores or overwrites a value for the given account. On iOS the user
     /// is typically not prompted (Apple's keychain accepts writes without
     /// re-authenticating); on Android the user is prompted because the
-    /// underlying cipher requires biometric authentication.
-    public abstract AsyncResource<Boolean> set(String reason, String account, String value);
+    /// underlying cipher requires biometric authentication. On the fallback
+    /// base class this completes immediately with
+    /// [BiometricError#NOT_AVAILABLE].
+    public AsyncResource<Boolean> set(String reason, String account, String value) {
+        AsyncResource<Boolean> r = new AsyncResource<Boolean>();
+        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,
+                "Secure storage is not available on this platform"));
+        return r;
+    }
 
-    /// Removes a previously-stored entry. No authentication is required since
-    /// deletion does not reveal the value.
-    public abstract AsyncResource<Boolean> remove(String reason, String account);
+    /// Removes a previously-stored entry. No authentication is required
+    /// since deletion does not reveal the value. On the fallback base class
+    /// this completes immediately with [BiometricError#NOT_AVAILABLE].
+    public AsyncResource<Boolean> remove(String reason, String account) {
+        AsyncResource<Boolean> r = new AsyncResource<Boolean>();
+        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,
+                "Secure storage is not available on this platform"));
+        return r;
+    }
 
     /// Configures the iOS keychain access group for sharing entries between
     /// the main app and its extensions. The argument must include the Team
-    /// ID prefix (e.g. `"ABCDE12345.group.com.example.app"`). Pass `null` or
-    /// empty to clear. Ignored on non-iOS platforms.
+    /// ID prefix (e.g. `"ABCDE12345.group.com.example.app"`). Pass `null`
+    /// or empty to clear. Ignored on non-iOS platforms and on the fallback
+    /// base class.
     ///
     /// The `ios.keychainAccessGroup` build hint must declare the same group
     /// in the app's entitlements for this to work.
-    public abstract void setKeychainAccessGroup(String group);
+    public void setKeychainAccessGroup(String group) {
+        // No-op fallback.
+    }
 }

@@ -281,6 +281,7 @@ public class AndroidGradleBuilder extends Executor {
     private String playFlag;
 
     private boolean capturePermission;
+    private boolean usesBiometrics;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -733,17 +734,6 @@ public class AndroidGradleBuilder extends Executor {
 
         // Augment the xpermissions request arg with explicit android.permissions.XXX build hints
         xPermissions = request.getArg("android.xpermissions", "");
-
-        // USE_BIOMETRIC is a "normal" permission (no runtime prompt) required by
-        // com.codename1.security.Biometrics. Inject it unconditionally so apps
-        // don't have to remember the build hint; if the user already declared
-        // it in xpermissions we leave their version alone.
-        if (!xPermissions.contains("android.permission.USE_BIOMETRIC")) {
-            xPermissions = "    <uses-permission android:name=\"android.permission.USE_BIOMETRIC\" />\n" + xPermissions;
-        }
-        if (!xPermissions.contains("android.permission.USE_FINGERPRINT")) {
-            xPermissions = "    <uses-permission android:name=\"android.permission.USE_FINGERPRINT\" android:maxSdkVersion=\"28\" />\n" + xPermissions;
-        }
 
         debug("Adding android permissions...");
         for (String xPerm : ANDROID_PERMISSIONS) {
@@ -1259,6 +1249,9 @@ public class AndroidGradleBuilder extends Executor {
                         getAccountsPermission = true;
                     }
 
+                    if (cls.indexOf("com/codename1/security/") == 0) {
+                        usesBiometrics = true;
+                    }
                 }
 
 
@@ -1351,6 +1344,22 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
         }
+
+        // Inject USE_BIOMETRIC / USE_FINGERPRINT only when the app actually
+        // touches com.codename1.security (Biometrics / SecureStorage). Both
+        // are "normal" permissions (no runtime prompt) so injecting them
+        // when used is invisible to the user; apps that never reference the
+        // API see no manifest change. If the developer already declared
+        // either permission via android.xpermissions we leave it alone.
+        if (usesBiometrics) {
+            if (!xPermissions.contains("android.permission.USE_BIOMETRIC")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.USE_BIOMETRIC\" />\n" + xPermissions;
+            }
+            if (!xPermissions.contains("android.permission.USE_FINGERPRINT")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.USE_FINGERPRINT\" android:maxSdkVersion=\"28\" />\n" + xPermissions;
+            }
+        }
+
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
         if (useFCM) {
             request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");

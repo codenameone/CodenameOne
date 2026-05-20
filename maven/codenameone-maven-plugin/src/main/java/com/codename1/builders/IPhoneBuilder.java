@@ -83,6 +83,7 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesBiometrics;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -645,6 +646,9 @@ public class IPhoneBuilder extends Executor {
                     }
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
+                    }
+                    if (!usesBiometrics && cls.indexOf("com/codename1/security/") == 0) {
+                        usesBiometrics = true;
                     }
                 }
 
@@ -1565,13 +1569,16 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
-            // LocalAuthentication is required by com.codename1.security.Biometrics
-            // (Touch ID / Face ID). Always link it -- the framework is ubiquitous
-            // (iOS 8+) and tiny, and apps that never call Biometrics pay nothing.
-            if (addLibs == null || addLibs.length() == 0) {
-                addLibs = "LocalAuthentication.framework";
-            } else if (!addLibs.toLowerCase().contains("localauthentication")) {
-                addLibs = addLibs + ";LocalAuthentication.framework";
+            // LocalAuthentication is required only when the app actually uses
+            // com.codename1.security.Biometrics / SecureStorage. The scanner
+            // above sets usesBiometrics if any com/codename1/security/ class
+            // is referenced; apps that don't touch the API pay nothing.
+            if (usesBiometrics) {
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "LocalAuthentication.framework";
+                } else if (!addLibs.toLowerCase().contains("localauthentication")) {
+                    addLibs = addLibs + ";LocalAuthentication.framework";
+                }
             }
 
             try {
