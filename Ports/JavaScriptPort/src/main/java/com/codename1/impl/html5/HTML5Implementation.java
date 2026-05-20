@@ -5759,12 +5759,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (src.img != null && !src.loaded) {
             src.load();
         }
-        if (src.img != null && src.loaded) {
-            renderingBackend.blurLoadedImageToCanvas(buffer.getCanvas(), src.img, w, h, radius);
-        } else if (src.mutableGraphics != null) {
-            renderingBackend.blurMutableSurfaceToCanvas(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
+        // Wrap in try/catch so a blur failure cannot escape the async paint
+        // pipeline -- an uncaught exception there kills the screenshot test
+        // runner and halts the rest of the suite. Returning the source image
+        // makes blur a visual no-op when something goes wrong, which is the
+        // pre-PR-4795 behaviour anyway (default impl never blurred).
+        try {
+            if (src.img != null && src.loaded) {
+                renderingBackend.blurLoadedImageToCanvas(buffer.getCanvas(), src.img, w, h, radius);
+            } else if (src.mutableGraphics != null) {
+                renderingBackend.blurMutableSurfaceToCanvas(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
+            } else {
+                return image;
+            }
+        } catch (Throwable t) {
+            logBlurFailureOnce(t);
+            return image;
         }
         return Image.createImage(blurred);
+    }
+
+    private static volatile boolean blurFailureLogged;
+
+    private static void logBlurFailureOnce(Throwable t) {
+        if (blurFailureLogged) {
+            return;
+        }
+        blurFailureLogged = true;
+        System.out.println("CN1SS:DIAG:gaussianBlur:failed=" + t);
     }
 
     @Override
@@ -5896,17 +5918,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // existing tests use. Supported in Chromium, Firefox, and Safari since
     // 2018; no graceful fallback needed (we already report support via
     // isGaussianBlurSupported, and the JS port has no pre-2018 target).
-    // ``dst`` and ``src`` may arrive here as JSO wrappers (``__jsValue``
-    // carrying the real DOM node). Indexing ``dst.getContext`` straight
-    // through the wrapper would throw ``getContext is not a function`` --
-    // see ``readBulkImpl`` in port.js for the same unwrap.
+    // The translator already auto-unwraps Object-typed @JSBody params via
+    // ``jvm.unwrapJsValue(__cn1Arg<N>)`` (see appendJsBodyMethod in
+    // JavascriptMethodGenerator). Despite that, on the first attempt ``dst``
+    // here was not a canvas (getContext missing) -- diagnose by logging the
+    // actual shape of the value before throwing, so the next CI surfaces what
+    // type the buffer canvas is arriving as.
     @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
-            "var d = dst.__jsValue !== undefined ? dst.__jsValue : dst;\n"
-            + "var s = src.__jsValue !== undefined ? src.__jsValue : src;\n"
-            + "var ctx = d.getContext('2d');\n"
+            "if (typeof dst.getContext !== 'function') {\n"
+            + "  var dk = '';\n"
+            + "  try { dk = Object.keys(dst || {}).slice(0, 12).join('|'); } catch (e) {}\n"
+            + "  console.log('CN1SS:DIAG:applyBlur:dst type=' + typeof dst\n"
+            + "    + ' ctor=' + (dst && dst.constructor && dst.constructor.name)\n"
+            + "    + ' tag=' + (dst && dst.tagName)\n"
+            + "    + ' keys=' + dk);\n"
+            + "  return;\n"
+            + "}\n"
+            + "var ctx = dst.getContext('2d');\n"
             + "ctx.save();\n"
             + "ctx.filter = 'blur(' + radius + 'px)';\n"
-            + "ctx.drawImage(s, 0, 0, w, h);\n"
+            + "ctx.drawImage(src, 0, 0, w, h);\n"
             + "ctx.filter = 'none';\n"
             + "ctx.restore();")
     private static native void applyBlurToCanvas(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
