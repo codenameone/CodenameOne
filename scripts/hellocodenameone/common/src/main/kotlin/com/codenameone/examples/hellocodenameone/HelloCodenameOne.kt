@@ -20,32 +20,33 @@ open class HelloCodenameOne : Lifecycle() {
         // translate-then-scale screenshots to land on the same pixels as the
         // buffered mutable-image path.
         //
-        // Scoped to iOS only: this feature targets the iOS Metal backend
-        // (where direct-to-screen affine drift is observable). Leaving it
-        // on for the JavaScript / Android / desktop ports would change
-        // pixel output for tests that already have green baselines on
-        // those platforms without delivering the GH-3302 fix that motivated
-        // the work. CI flips the iOS suite into matrix-off mode through
+        // Default-on across all platforms whose impl supports translateMatrix
+        // (matrixMode() in Graphics already short-circuits to legacy on
+        // platforms where it isn't supported). The JS goldens in
+        // scripts/javascript/screenshots/ were promoted to matrix-mode
+        // renderings in 4eb1ef3df (the StatusBar component paints correctly
+        // under matrix mode where it collapsed to zero height under legacy),
+        // so flipping JS to legacy mode here would re-diff 17 charts +
+        // graphics tests against their promoted goldens. CI overrides the
+        // iOS suite into matrix-off mode through
         // `-Dcodename1.arg.matrixTranslation=false` so the legacy code
-        // path also gets regression coverage.
-        // Exact-string matching on purpose: the Kotlin `equals(...,
+        // path also gets regression coverage on Metal.
+        //
+        // Exact-string `==` matching on purpose: the Kotlin `equals(...,
         // ignoreCase = true)` extension compiles to a kotlin.text.StringsKt
         // call, and the ParparVM-translated JavaScript port doesn't bundle
         // StringsKt, so the Kotlin form blows up at class init with
         // `Unknown class kotlin_text_StringsKt` and the browser harness
-        // hangs waiting for the suite to start. The platform name is
-        // already lowercase (`"ios"`, see also the `"HTML5"` check below)
-        // and the matrixTranslation build hint is set to lowercase
-        // `true`/`false` by CI, so case folding isn't needed here.
-        val platform = Display.getInstance().platformName
-        val isIos = platform == "ios"
-        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", if (isIos) "true" else "false")
-        Graphics.useMatrixTranslation = isIos && matrixFlag == "true"
+        // hangs waiting for the suite to start. The matrixTranslation
+        // build hint is set to lowercase `true`/`false` by CI, so case
+        // folding isn't needed here.
+        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", "true")
+        Graphics.useMatrixTranslation = matrixFlag == "true"
         // Diagnostic: print the resolved flag value to the CI log so we
         // can confirm the build hint round-tripped to the runtime
         // correctly (e.g. validate that the build-ios-metal-legacy job
         // really runs with matrix mode off).
-        System.out.println("CN1SS:INFO:matrixTranslation=" + Graphics.useMatrixTranslation + " property=" + matrixFlag + " platform=" + platform)
+        System.out.println("CN1SS:INFO:matrixTranslation=" + Graphics.useMatrixTranslation + " property=" + matrixFlag)
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
