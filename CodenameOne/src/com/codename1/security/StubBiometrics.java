@@ -32,9 +32,6 @@ import java.util.List;
 /// fails every authentication with [BiometricError#NOT_AVAILABLE].
 final class StubBiometrics extends Biometrics {
 
-    StubBiometrics() {
-    }
-
     @Override
     public boolean isSupported() {
         return false;

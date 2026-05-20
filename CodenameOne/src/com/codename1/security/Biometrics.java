@@ -61,7 +61,7 @@ import java.util.List;
 /// [BiometricError#NOT_AVAILABLE].
 public abstract class Biometrics {
 
-    private static Biometrics fallback;
+    private static final Biometrics FALLBACK = new StubBiometrics();
 
     /// Subclasses are constructed by the port; not for application use.
     protected Biometrics() {
@@ -72,13 +72,7 @@ public abstract class Biometrics {
     /// reports [BiometricError#NOT_AVAILABLE].
     public static Biometrics getInstance() {
         Biometrics b = Display.getInstance().getBiometrics();
-        if (b != null) {
-            return b;
-        }
-        if (fallback == null) {
-            fallback = new StubBiometrics();
-        }
-        return fallback;
+        return b != null ? b : FALLBACK;
     }
 
     /// Returns `true` when biometric hardware exists on the device,

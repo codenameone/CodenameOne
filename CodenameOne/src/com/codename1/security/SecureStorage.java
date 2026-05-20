@@ -40,7 +40,7 @@ import com.codename1.util.AsyncResource;
 /// encryption keys). For larger data, encrypt with a key stored here.
 public abstract class SecureStorage {
 
-    private static SecureStorage fallback;
+    private static final SecureStorage FALLBACK = new StubSecureStorage();
 
     /// Subclasses are constructed by the port; not for application use.
     protected SecureStorage() {
@@ -51,13 +51,7 @@ public abstract class SecureStorage {
     /// reports [BiometricError#NOT_AVAILABLE].
     public static SecureStorage getInstance() {
         SecureStorage s = Display.getInstance().getSecureStorage();
-        if (s != null) {
-            return s;
-        }
-        if (fallback == null) {
-            fallback = new StubSecureStorage();
-        }
-        return fallback;
+        return s != null ? s : FALLBACK;
     }
 
     /// Retrieves a previously-stored entry, prompting for biometric

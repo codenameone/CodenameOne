@@ -42,9 +42,6 @@ public final class AuthenticationOptions {
     private boolean stickyAuth;
     private boolean showDialogOnAndroid = true;
 
-    public AuthenticationOptions() {
-    }
-
     public String getReason() {
         return reason;
     }

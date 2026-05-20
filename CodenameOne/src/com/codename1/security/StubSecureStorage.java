@@ -28,9 +28,6 @@ import com.codename1.util.AsyncResource;
 /// has not overridden `getSecureStorage()`.
 final class StubSecureStorage extends SecureStorage {
 
-    StubSecureStorage() {
-    }
-
     @Override
     public AsyncResource<String> get(String reason, String account) {
         AsyncResource<String> r = new AsyncResource<String>();
