@@ -5896,11 +5896,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // existing tests use. Supported in Chromium, Firefox, and Safari since
     // 2018; no graceful fallback needed (we already report support via
     // isGaussianBlurSupported, and the JS port has no pre-2018 target).
+    // ``dst`` and ``src`` may arrive here as JSO wrappers (``__jsValue``
+    // carrying the real DOM node). Indexing ``dst.getContext`` straight
+    // through the wrapper would throw ``getContext is not a function`` --
+    // see ``readBulkImpl`` in port.js for the same unwrap.
     @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
-            "var ctx = dst.getContext('2d');\n"
+            "var d = dst.__jsValue !== undefined ? dst.__jsValue : dst;\n"
+            + "var s = src.__jsValue !== undefined ? src.__jsValue : src;\n"
+            + "var ctx = d.getContext('2d');\n"
             + "ctx.save();\n"
             + "ctx.filter = 'blur(' + radius + 'px)';\n"
-            + "ctx.drawImage(src, 0, 0, w, h);\n"
+            + "ctx.drawImage(s, 0, 0, w, h);\n"
             + "ctx.filter = 'none';\n"
             + "ctx.restore();")
     private static native void applyBlurToCanvas(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
