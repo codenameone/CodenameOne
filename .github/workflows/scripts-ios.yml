@@ -406,7 +406,12 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # The matrix-on suite runs the full 111-test cycle plus the 5ms
+        # iOS chunk-emit delay added to keep the legacy job from hanging
+        # under back-pressure on the sim log pipeline. The combined wall
+        # clock has been observed at ~30 min on macOS runners, so leave
+        # a 50% margin on top of the legacy job's ~24 min runtime.
+        timeout-minutes: 45
 
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
@@ -628,7 +633,10 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # Match the matrix-on Metal job's bumped timeout (45 min) so the
+        # legacy code path also has runway above its ~24 min observed
+        # runtime with the 5ms iOS chunk-emit delay applied.
+        timeout-minutes: 45
 
       - name: Publish Metal-legacy screenshot summary
         if: always()
