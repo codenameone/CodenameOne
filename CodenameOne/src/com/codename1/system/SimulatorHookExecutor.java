@@ -32,20 +32,21 @@ import java.util.Map;
 ///
 /// The simulator scans cn1libs (and the app itself) for
 /// `META-INF/codenameone/simulator-hooks.properties` files; each hook
-/// declared there is registered here under `namespace:id` keys. Tests
-/// and tooling that live in the cross-platform `common/` project can
-/// invoke a hook by id through [com.codename1.ui.CN#executeHook(String)]
-/// (which forwards to [#execute(String)]) without referencing any
-/// JavaSE-specific class.
+/// declared there is registered here under `namespace:itemN` keys. The
+/// JavaSE port hooks into [com.codename1.ui.CN#execute(String)] /
+/// [com.codename1.ui.CN#canExecute(String)] so cross-platform code (such
+/// as a CN1 UnitTest under `common/`) can invoke a hook via the same
+/// `execute` it would use for any other URL, with no JavaSE-only import.
 ///
 /// On Android, iOS, JavaScript and other production targets this registry
-/// is always empty, so `execute` returns `false` — that's the
-/// "running outside a simulator" signal.
+/// is always empty, so `execute` returns `false` and `isRegistered` is
+/// always `false` -- the "running outside a simulator" signal.
 ///
 /// Hooks can be menu-backed (shipped with a label and visible in the
-/// simulator's menu bar) or API-only (no label, callable by id only). Tests
-/// that want behavioral coverage of cn1lib internals lean on the API-only
-/// form so the menu UX stays focused on actions a human would click.
+/// simulator's menu bar) or API-only (no label, callable by URL only).
+/// Tests that want behavioral coverage of cn1lib internals lean on the
+/// API-only form so the menu UX stays focused on actions a human would
+/// click.
 public final class SimulatorHookExecutor {
 
     private static volatile Map<String, Runnable> hooks = Collections.emptyMap();
@@ -83,7 +84,7 @@ public final class SimulatorHookExecutor {
     }
 
     /// Diagnostic view of every registered id. Returns an unmodifiable
-    /// snapshot — never null. Intended for tests/inspectors; ordinary app
+    /// snapshot -- never null. Intended for tests/inspectors; ordinary app
     /// code shouldn't need this.
     public static Collection<String> registeredIds() {
         return Collections.unmodifiableCollection(hooks.keySet());

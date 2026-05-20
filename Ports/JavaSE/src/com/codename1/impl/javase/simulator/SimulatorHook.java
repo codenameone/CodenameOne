@@ -29,7 +29,7 @@ package com.codename1.impl.javase.simulator;
  * <p>Hooks are positional within each {@code simulator-hooks.properties}
  * file: {@code item1} is the first menu entry, {@code item2} the second,
  * etc. A hook with a non-empty {@link #getLabel() label} renders as a menu
- * item; a label-less hook is API-only — invisible in the menu but still
+ * item; a label-less hook is API-only -- invisible in the menu but still
  * callable via {@code CN.execute("namespace:itemN")} for test scaffolding.</p>
  */
 public final class SimulatorHook {
@@ -53,7 +53,7 @@ public final class SimulatorHook {
     /** 1-based position of this item within its properties file. */
     public int getIndex() { return index; }
 
-    /** URL passed to {@code CN.execute} to trigger this hook — {@code namespace + ":item" + index}. */
+    /** URL passed to {@code CN.execute} to trigger this hook -- {@code namespace + ":item" + index}. */
     public String getExecutorKey() { return namespace + ":item" + index; }
 
     /** Display title of the menu this hook belongs to (one per properties file). */

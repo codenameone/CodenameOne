@@ -489,7 +489,7 @@ Required keys:
 
 Optional keys:
 
-`namespace`:: Identifier used for the `CN.execute` lookup, e.g. `bluetooth` for a URL like `bluetooth:item1`. Defaults to lowercased, ASCII-slugified `name` (`Push Notifications!` → `push-notifications`). Set this explicitly when you want a different identifier from the display name.
+`namespace`:: Identifier used for the `CN.execute` lookup (for example, `bluetooth` for a URL like `bluetooth:item1`). Defaults to lowercased, ASCII-slugified `name` (`Push Notifications!` → `push-notifications`). Set this explicitly when you want a different identifier from the display name.
 `labelN`:: Display text for the matching `itemN`. Omit entirely to make the hook API-only — registered with `CN.execute` but hidden from the menu.
 
 No groups, no submenus, no priority — flat by design. If you need ordering relative to another cn1lib, you can't have it: discovery order wins, and that's intentional so the contract stays small and the future simulator UX can re-render this metadata however it likes.

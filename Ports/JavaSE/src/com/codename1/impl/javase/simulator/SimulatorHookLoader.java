@@ -54,7 +54,7 @@ import java.util.Properties;
  * item2=com.example.bt.sim.Hooks#addDemoPeripheral
  * label2=Add demo peripheral
  *
- * # Label omitted → API-only hook. Callable from tests via
+ * # Label omitted -> API-only hook. Callable from tests via
  * # CN.execute("bluetooth:item3"), invisible in the menu.
  * item3=com.example.bt.sim.Hooks#primeReadFailure
  * </pre>
@@ -237,7 +237,7 @@ public final class SimulatorHookLoader {
             @Override
             public void run() {
                 // callSeriallyAndWait so off-EDT callers (every CN1 UnitTest's
-                // runTest()) block until the hook completes — tests would
+                // runTest()) block until the hook completes -- tests would
                 // otherwise assert state changes before the EDT got to run
                 // the action. On the EDT, callSeriallyAndWait runs the body
                 // inline without re-entering the dispatch queue.

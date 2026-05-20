@@ -686,7 +686,7 @@ public class CN extends CN1Constants {
     /// instead of being handed to the native URL opener. On Android, iOS,
     /// JavaScript and other production targets no hooks are ever registered,
     /// so a hook-style URL falls through to the normal native execute and
-    /// (almost always) becomes a no-op — tests should guard with
+    /// (almost always) becomes a no-op -- tests should guard with
     /// [#canExecute(String)] when running cross-platform.
     ///
     /// ```java
