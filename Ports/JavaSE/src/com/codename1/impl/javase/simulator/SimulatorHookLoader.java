@@ -23,6 +23,7 @@
  */
 package com.codename1.impl.javase.simulator;
 
+import com.codename1.system.SimulatorHookExecutor;
 import com.codename1.ui.Display;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -40,25 +41,34 @@ import java.util.Properties;
 
 /**
  * Discovers cn1lib-contributed simulator menu items by scanning the classpath
- * for {@code META-INF/codenameone/simulator-hooks.properties}. Each properties
- * file contributes one named section worth of items:
+ * for {@code META-INF/codenameone/simulator-hooks.properties}. Each file
+ * contributes one named group of items:
  *
  * <pre>
  * name=Bluetooth
+ * namespace=bluetooth          # optional; defaults to slugified `name`
  *
- * item1.label=Add peripheral...
- * item1.action=com.example.bt.sim.Hooks#addPeripheral
+ * item1.id=toggleAdapter       # optional; defaults to the property key (item1)
+ * item1.label=Toggle adapter
+ * item1.action=com.example.bt.sim.Hooks#toggleAdapter
  *
- * item2.label=Force disconnect
- * item2.action=com.example.bt.sim.Hooks#forceDisconnect
+ * # Label omitted → API-only hook. Callable from tests via
+ * # CN.executeHook("bluetooth:internalTrigger"), invisible in the menu.
+ * item2.id=internalTrigger
+ * item2.action=com.example.bt.sim.Hooks#internalTrigger
  * </pre>
  *
  * Actions are resolved to {@code public static void method()} via reflection
  * using the same classloader that loaded {@link Display}, so the method has
  * full access to {@code Display}, {@code NativeLookup}-installed impls, and
- * any cn1lib internals. The invocation is always dispatched on the CN1 EDT
- * via {@link Display#callSerially(Runnable)} so hook authors can freely
- * interact with the running app.
+ * any cn1lib internals. Invocations are dispatched on the CN1 EDT via
+ * {@link Display#callSerially(Runnable)} so hook authors can freely interact
+ * with the running app.
+ *
+ * In addition to returning the hook list for the menu, every successful load
+ * also registers each hook with {@link SimulatorHookExecutor} under its
+ * {@code namespace:id} key so the cross-platform
+ * {@link com.codename1.ui.CN#executeHook} entry point can drive it.
  */
 public final class SimulatorHookLoader {
 
@@ -69,9 +79,9 @@ public final class SimulatorHookLoader {
     /**
      * Discovers all hooks visible to the JavaSE port's classloader (the one
      * that loaded {@link Display}). Safe to call multiple times; each call
-     * re-scans the classpath. Errors in any single file (missing keys,
-     * unresolvable class, no such method) are logged and that entry is
-     * skipped; the rest are returned.
+     * re-scans the classpath and re-registers the executor. Errors in any
+     * single file (missing keys, unresolvable class, no such method) are
+     * logged and that entry is skipped; the rest are returned.
      */
     public static List<SimulatorHook> load() {
         ClassLoader cl = Display.class.getClassLoader();
@@ -94,6 +104,9 @@ public final class SimulatorHookLoader {
         } catch (IOException ex) {
             System.err.println("SimulatorHookLoader: failed to enumerate " + RESOURCE_PATH);
             ex.printStackTrace();
+            // Reset the registry so a previous load doesn't survive a
+            // failed scan (tests that mutate the classpath rely on this).
+            SimulatorHookExecutor.register(Collections.<String, Runnable>emptyMap());
             return out;
         }
         while (urls.hasMoreElements()) {
@@ -105,6 +118,12 @@ public final class SimulatorHookLoader {
                 t.printStackTrace();
             }
         }
+        // Republish the registry so CN.executeHook reflects what we just loaded.
+        Map<String, Runnable> registered = new LinkedHashMap<String, Runnable>();
+        for (SimulatorHook h : out) {
+            registered.put(h.getExecutorKey(), h.getInvoke());
+        }
+        SimulatorHookExecutor.register(registered);
         return out;
     }
 
@@ -123,35 +142,84 @@ public final class SimulatorHookLoader {
             return;
         }
         menuName = menuName.trim();
+        String namespace = props.getProperty("namespace");
+        if (namespace == null || namespace.trim().length() == 0) {
+            namespace = slugify(menuName);
+        } else {
+            namespace = namespace.trim();
+        }
 
         // Group keys by their "itemN" id, preserving declaration order.
         LinkedHashMap<String, String> labels = new LinkedHashMap<String, String>();
         LinkedHashMap<String, String> actions = new LinkedHashMap<String, String>();
+        LinkedHashMap<String, String> ids = new LinkedHashMap<String, String>();
         for (String key : props.orderedKeys()) {
             if (key.endsWith(".label")) {
                 labels.put(key.substring(0, key.length() - ".label".length()), props.getProperty(key));
             } else if (key.endsWith(".action")) {
                 actions.put(key.substring(0, key.length() - ".action".length()), props.getProperty(key));
+            } else if (key.endsWith(".id")) {
+                ids.put(key.substring(0, key.length() - ".id".length()), props.getProperty(key));
             }
         }
-        for (Map.Entry<String, String> entry : labels.entrySet()) {
-            String id = entry.getKey();
-            String label = entry.getValue();
-            String action = actions.get(id);
-            if (label == null || label.trim().length() == 0) {
-                System.err.println("SimulatorHookLoader: " + url + " item '" + id + "' has empty label; skipping");
-                continue;
-            }
+
+        // The union of label-keys and id-keys is the set of declared items;
+        // items can be label-less (API-only) or label-only (no explicit id,
+        // defaults to the prefix). Walk in the order labels-then-id-only so
+        // menu items come first when both forms appear in the same file.
+        LinkedHashMap<String, Boolean> itemIds = new LinkedHashMap<String, Boolean>();
+        for (String prefix : labels.keySet()) itemIds.put(prefix, Boolean.TRUE);
+        for (String prefix : ids.keySet()) {
+            if (!itemIds.containsKey(prefix)) itemIds.put(prefix, Boolean.TRUE);
+        }
+
+        for (String prefix : itemIds.keySet()) {
+            String action = actions.get(prefix);
             if (action == null || action.trim().length() == 0) {
-                System.err.println("SimulatorHookLoader: " + url + " item '" + id + "' has no matching .action; skipping");
+                System.err.println("SimulatorHookLoader: " + url + " item '" + prefix
+                        + "' has no matching .action; skipping");
                 continue;
             }
+            String label = labels.get(prefix); // may be null (API-only)
+            if (label != null) label = label.trim();
+            String explicitId = ids.get(prefix);
+            String id = explicitId != null && explicitId.trim().length() > 0
+                    ? explicitId.trim()
+                    : prefix;
             Runnable invoke = buildInvoker(cl, action.trim(), url);
             if (invoke == null) {
                 continue;
             }
-            out.add(new SimulatorHook(menuName, label.trim(), invoke));
+            out.add(new SimulatorHook(namespace, id, menuName, label, invoke));
         }
+    }
+
+    /**
+     * Reduces a free-form menu name to a stable, ASCII-only namespace token.
+     * Used when the properties file doesn't declare {@code namespace=...}
+     * explicitly. Lowercases letters, keeps digits, replaces anything else
+     * with a single hyphen, trims leading/trailing hyphens.
+     */
+    static String slugify(String name) {
+        StringBuilder sb = new StringBuilder(name.length());
+        boolean lastDash = true;
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                sb.append((char)(c + 32));
+                lastDash = false;
+            } else if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                sb.append(c);
+                lastDash = false;
+            } else if (!lastDash) {
+                sb.append('-');
+                lastDash = true;
+            }
+        }
+        // Strip trailing dash.
+        int end = sb.length();
+        while (end > 0 && sb.charAt(end - 1) == '-') end--;
+        return sb.substring(0, end);
     }
 
     private static Runnable buildInvoker(ClassLoader cl, String action, URL source) {

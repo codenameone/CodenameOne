@@ -696,6 +696,43 @@ public class CN extends CN1Constants {
         Display.impl.execute(url);
     }
 
+    /// Invokes a named action registered with the JavaSE simulator's hook
+    /// system. cn1libs (and the app) declare hooks in
+    /// `META-INF/codenameone/simulator-hooks.properties` — the same file
+    /// that powers the simulator's Bluetooth/Push/etc. menus. Each hook
+    /// gets a stable id of the form `namespace:name`, e.g.
+    /// `bluetooth:toggleAdapter`.
+    ///
+    /// On Android, iOS, JavaScript, and other production targets this
+    /// method always returns `false` because no hooks are registered —
+    /// it's the explicit "we're not running in a simulator" signal that
+    /// CN1 UnitTest suites can branch on without referencing any
+    /// platform-specific class.
+    ///
+    /// Tests in the cross-platform `common/` project that want to drive
+    /// simulator behavior (toggle a simulated Bluetooth adapter, push a
+    /// scripted GPS fix, etc.) should call this instead of touching
+    /// JavaSE-port internals via reflection.
+    ///
+    /// ```java
+    /// // In a Codename One UnitTest:
+    /// CN.executeHook("bluetooth:addDemoPeripheral");
+    /// // ...now drive the public Bluetooth API as usual.
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `hookId`: the `namespace:name` identifier the hook was registered
+    ///   under (see the cn1lib's `simulator-hooks.properties`).
+    ///
+    /// #### Returns
+    ///
+    /// - `true` if a hook with this id was found and dispatched; `false`
+    ///   when no such hook is registered (always the case off-simulator).
+    public static boolean executeHook(String hookId) {
+        return com.codename1.system.SimulatorHookExecutor.execute(hookId);
+    }
+
 
     /// Returns one of the density variables appropriate for this device, notice that
     /// density doesn't always correspond to resolution and an implementation might

@@ -3795,6 +3795,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         List<SimulatorHook> hooks = SimulatorHookLoader.load();
         LinkedHashMap<String, JMenu> byName = new LinkedHashMap<String, JMenu>();
         for (final SimulatorHook hook : hooks) {
+            // API-only hooks (no label) are still registered with the
+            // executor so CN.executeHook can drive them, but they don't
+            // appear in the menu.
+            if (!hook.hasMenuLabel()) {
+                continue;
+            }
             JMenu menu = byName.get(hook.getMenuName());
             if (menu == null) {
                 menu = new JMenu(hook.getMenuName());
