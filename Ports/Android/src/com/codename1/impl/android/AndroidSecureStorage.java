@@ -105,7 +105,20 @@ public final class AndroidSecureStorage extends SecureStorage {
                     "Android API 23 required for biometric secure storage"));
             return result;
         }
-        runAuthenticatedCipher(reason, account, Cipher.ENCRYPT_MODE, result, c -> {
+        runAuthenticatedCipher(reason, account, Cipher.ENCRYPT_MODE, result,
+                new EncryptCipherWork(account, value));
+        return result;
+    }
+
+    private static final class EncryptCipherWork implements CipherWork<Boolean> {
+        private final String account;
+        private final String value;
+        EncryptCipherWork(String account, String value) {
+            this.account = account;
+            this.value = value;
+        }
+        @Override
+        public Boolean run(Cipher c) throws Exception {
             byte[] enc = c.doFinal(value.getBytes("UTF-8"));
             SharedPreferences sp = AndroidNativeUtil.getActivity()
                     .getApplicationContext()
@@ -115,8 +128,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                     .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
                     .apply();
             return Boolean.TRUE;
-        });
-        return result;
+        }
     }
 
     @Override
@@ -135,15 +147,23 @@ public final class AndroidSecureStorage extends SecureStorage {
                     "No secure storage entry for account: " + account));
             return result;
         }
-        runAuthenticatedCipher(reason, account, Cipher.DECRYPT_MODE, result, c -> {
+        runAuthenticatedCipher(reason, account, Cipher.DECRYPT_MODE, result,
+                new DecryptCipherWork(account));
+        return result;
+    }
+
+    private static final class DecryptCipherWork implements CipherWork<String> {
+        private final String account;
+        DecryptCipherWork(String account) { this.account = account; }
+        @Override
+        public String run(Cipher c) throws Exception {
             SharedPreferences sp2 = AndroidNativeUtil.getActivity()
                     .getApplicationContext()
                     .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             byte[] enc = Base64.decode(sp2.getString("v_" + account, ""), Base64.DEFAULT);
             byte[] dec = c.doFinal(enc);
             return new String(dec, "UTF-8");
-        });
-        return result;
+        }
     }
 
     @Override
@@ -300,20 +320,44 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private <V> void succeedResult(final AsyncResource<V> result, final V value) {
-        Display.getInstance().callSerially(() -> {
+        Display.getInstance().callSerially(new SucceedResultRunnable<V>(result, value));
+    }
+
+    private static final class SucceedResultRunnable<V> implements Runnable {
+        private final AsyncResource<V> result;
+        private final V value;
+        SucceedResultRunnable(AsyncResource<V> result, V value) {
+            this.result = result;
+            this.value = value;
+        }
+        @Override
+        public void run() {
             if (!result.isDone()) {
                 result.complete(value);
             }
-        });
+        }
     }
 
     private static <V> void failResult(final AsyncResource<V> result,
                                        final BiometricError err, final String msg) {
-        Display.getInstance().callSerially(() -> {
+        Display.getInstance().callSerially(new FailResultRunnable<V>(result, err, msg));
+    }
+
+    private static final class FailResultRunnable<V> implements Runnable {
+        private final AsyncResource<V> result;
+        private final BiometricError err;
+        private final String msg;
+        FailResultRunnable(AsyncResource<V> result, BiometricError err, String msg) {
+            this.result = result;
+            this.err = err;
+            this.msg = msg;
+        }
+        @Override
+        public void run() {
             if (!result.isDone()) {
                 result.error(new BiometricException(err, msg));
             }
-        });
+        }
     }
 
     // --- Keystore / cipher helpers (faithful port of the cn1lib idioms) -----

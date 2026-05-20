@@ -32,7 +32,7 @@ b.authenticate("Unlock your account").onResult((success, err) -> {
 });
 ----
 
-Always gate the call on `canAuthenticate()` and never on `isSupported()` alone -- `isSupported()` only checks for hardware while `canAuthenticate()` also requires at least one enrolled credential and that the device is not in a locked-out state.
+Always gate the call on `canAuthenticate()` and never on `isSupported()` alone -- `isSupported()` only checks for hardware while `canAuthenticate()` also requires at least one enrolled credential and that the device isn't in a locked-out state.
 
 === Quick start -- secure storage
 
@@ -77,14 +77,14 @@ The Codename One Maven plugin (and the legacy build daemon) **automatically inje
 
 Apps that never touch the API pay nothing -- no extra framework, no extra permission.
 
-One thing the plugin will not inject: the iOS Face ID usage description. Apple rejects placeholder text, so you must supply the build hint yourself:
+One thing the plugin won't inject: the iOS Face ID usage description. Apple rejects placeholder text, so you must supply the build hint yourself:
 
 [source,properties]
 ----
 ios.NSFaceIDUsageDescription=Authenticate to securely access your account
 ----
 
-The JavaSE simulator auto-sets this hint to a default the first time biometrics is invoked, so projects developed in the simulator have a working default; you should overwrite the text before shipping.
+The JavaSE simulator automatically sets this hint to a default the first time biometrics is invoked, so projects developed in the simulator have a working default; you should overwrite the text before shipping.
 
 To share keychain entries with iOS App Extensions, set both the build hint and the runtime access group:
 
@@ -118,7 +118,7 @@ Biometrics.getInstance().authenticate(new AuthenticationOptions()
 );
 ----
 
-Unrecognised options are silently ignored, so callers can set the union without platform-checking.
+Unrecognised options are ignored, so callers can set the union without platform-checking.
 
 === Typed error handling
 
@@ -131,10 +131,10 @@ Unrecognised options are silently ignored, so callers can set the union without 
 | `NOT_ENROLLED`             | Hardware present but the user hasn't enrolled
 | `LOCKED_OUT`               | Too many failed attempts; temporary
 | `PERMANENTLY_LOCKED_OUT`   | User must unlock with passcode before biometrics can be used again
-| `PASSCODE_NOT_SET`         | Device has no PIN / pattern configured (cannot use biometrics)
+| `PASSCODE_NOT_SET`         | Device has no PIN / pattern configured (can't use biometrics)
 | `USER_CANCELED`            | User dismissed the prompt
 | `SYSTEM_CANCELED`          | OS dismissed the prompt (app backgrounded, system pre-empted)
-| `AUTHENTICATION_FAILED`    | Prompt completed but the user was not recognised
+| `AUTHENTICATION_FAILED`    | Prompt completed but the user wasn't recognised
 | `KEY_REVOKED`              | `SecureStorage` entry can no longer be decrypted (re-enrolment occurred)
 | `UNKNOWN`                  | Anything not covered above
 |===
@@ -151,7 +151,7 @@ Call `Biometrics.getInstance().stopAuthentication()` to dismiss an active prompt
 - `FACE` -- iOS Face ID; Android face recognition (API 29+).
 - `IRIS` -- a handful of Samsung devices; never on iOS.
 - `STRONG` -- Android class-3 authenticator tier (false-acceptance < 1/100,000); only Android API 30+.
-- `WEAK` -- Android class-2 authenticator tier; only Android API 30+. Cannot unlock Keystore-bound keys, so weak-only devices cannot use `SecureStorage`.
+- `WEAK` -- Android class-2 authenticator tier; only Android API 30+. Can't unlock Keystore-bound keys, so weak-only devices can't use `SecureStorage`.
 
 Never use this list to decide whether to call `authenticate()` -- always use `canAuthenticate()` for that decision.
 
@@ -169,4 +169,4 @@ When `authenticate()` is invoked, a small modal Swing dialog mirrors the platfor
 
 === Security notes
 
-The Android backing for `authenticate()` does not simply forward the OS success callback; it binds the prompt to a single-use AES probe cipher in the Android Keystore (with `setUserAuthenticationRequired(true)` and, on API 24+, `setInvalidatedByBiometricEnrollment(true)`). On success the cipher performs a real `doFinal` operation -- a hooked or spoofed success callback fails because the Keystore refuses the operation. This guards against the bypass class documented by CodeQL's `java/android/insecure-local-authentication` rule.
+The Android backing for `authenticate()` doesn't simply forward the OS success callback; it binds the prompt to a single-use AES probe cipher in the Android Keystore (with `setUserAuthenticationRequired(true)` and, on API 24+, `setInvalidatedByBiometricEnrollment(true)`). On success the cipher performs a real `doFinal` operation -- a hooked or spoofed success callback fails because the Keystore refuses the operation. This guards against the bypass class documented by CodeQL's `java/android/insecure-local-authentication` rule.

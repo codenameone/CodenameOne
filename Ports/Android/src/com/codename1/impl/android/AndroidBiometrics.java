@@ -125,8 +125,15 @@ public final class AndroidBiometrics extends Biometrics {
         if (Build.VERSION.SDK_INT < 23) {
             return out;
         }
-        runOnUi(() -> collectAvailableBiometrics(out));
+        runOnUi(new CollectAvailableBiometricsRunnable(out));
         return out;
+    }
+
+    private static final class CollectAvailableBiometricsRunnable implements Runnable {
+        private final List<BiometricType> out;
+        CollectAvailableBiometricsRunnable(List<BiometricType> out) { this.out = out; }
+        @Override
+        public void run() { collectAvailableBiometrics(out); }
     }
 
     private static void collectAvailableBiometrics(List<BiometricType> out) {
@@ -399,11 +406,18 @@ public final class AndroidBiometrics extends Biometrics {
             return;
         }
         pending = null;
-        Display.getInstance().callSerially(() -> {
+        Display.getInstance().callSerially(new CompleteSuccessRunnable(result));
+    }
+
+    private static final class CompleteSuccessRunnable implements Runnable {
+        private final AsyncResource<Boolean> result;
+        CompleteSuccessRunnable(AsyncResource<Boolean> result) { this.result = result; }
+        @Override
+        public void run() {
             if (!result.isDone()) {
                 result.complete(Boolean.TRUE);
             }
-        });
+        }
     }
 
     void completeError(final AsyncResource<Boolean> result,
@@ -412,11 +426,24 @@ public final class AndroidBiometrics extends Biometrics {
             return;
         }
         pending = null;
-        Display.getInstance().callSerially(() -> {
+        Display.getInstance().callSerially(new CompleteErrorRunnable(result, err, msg));
+    }
+
+    private static final class CompleteErrorRunnable implements Runnable {
+        private final AsyncResource<Boolean> result;
+        private final BiometricError err;
+        private final String msg;
+        CompleteErrorRunnable(AsyncResource<Boolean> result, BiometricError err, String msg) {
+            this.result = result;
+            this.err = err;
+            this.msg = msg;
+        }
+        @Override
+        public void run() {
             if (!result.isDone()) {
                 result.error(new BiometricException(err, msg));
             }
-        });
+        }
     }
 
     static BiometricError mapBiometricPromptError(int code) {
