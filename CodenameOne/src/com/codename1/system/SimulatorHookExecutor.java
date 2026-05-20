@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 /// Cross-platform registry of named actions that the JavaSE simulator exposes.
 ///
@@ -50,13 +49,22 @@ import java.util.concurrent.atomic.AtomicReference;
 /// click.
 public final class SimulatorHookExecutor {
 
-    // AtomicReference rather than a `volatile` field: same single-writer /
-    // many-reader visibility, but PMD's AvoidUsingVolatile rule (part of
-    // the JDK 8 PR CI gate) treats raw volatile as a code smell.
-    private static final AtomicReference<Map<String, Runnable>> HOOKS =
-            new AtomicReference<Map<String, Runnable>>(Collections.<String, Runnable>emptyMap());
+    // Plain field guarded by an internal lock. AtomicReference would be the
+    // natural fit but CLDC (which the core targets) doesn't ship
+    // java.util.concurrent.atomic, and `volatile` trips PMD's
+    // AvoidUsingVolatile rule on the JDK 8 PR CI gate. Synchronized
+    // accessors give the same memory-visibility guarantees and compile
+    // under every supported target.
+    private static final Object LOCK = new Object();
+    private static Map<String, Runnable> hooks = Collections.emptyMap();
 
     private SimulatorHookExecutor() {}
+
+    private static Map<String, Runnable> snapshot() {
+        synchronized (LOCK) {
+            return hooks;
+        }
+    }
 
     /// Invokes the action registered under `hookId`. Returns `true`
     /// if a hook with that id was found and dispatched, `false`
@@ -73,7 +81,10 @@ public final class SimulatorHookExecutor {
         if (hookId == null) {
             return false;
         }
-        Runnable r = HOOKS.get().get(hookId);
+        // Resolve the action under the lock, then call run() outside it
+        // -- hook actions can be long-running and may call back into
+        // register() (e.g., a "reload simulator menus" hook).
+        Runnable r = snapshot().get(hookId);
         if (r == null) {
             return false;
         }
@@ -85,24 +96,28 @@ public final class SimulatorHookExecutor {
     /// Useful for tests that want to skip themselves gracefully when running
     /// on a platform that doesn't expose the relevant cn1lib hook.
     public static boolean isRegistered(String hookId) {
-        return hookId != null && HOOKS.get().containsKey(hookId);
+        return hookId != null && snapshot().containsKey(hookId);
     }
 
     /// Diagnostic view of every registered id. Returns an unmodifiable
     /// snapshot -- never null. Intended for tests/inspectors; ordinary app
     /// code shouldn't need this.
     public static Collection<String> registeredIds() {
-        return Collections.unmodifiableCollection(HOOKS.get().keySet());
+        return Collections.unmodifiableCollection(snapshot().keySet());
     }
 
     /// Replaces the entire registry. The JavaSE port calls this every time
     /// it rebuilds the simulator menu (e.g., after a reload). On non-simulator
     /// targets nothing calls it and the registry stays empty.
     public static void register(Map<String, Runnable> registered) {
+        Map<String, Runnable> next;
         if (registered == null || registered.isEmpty()) {
-            HOOKS.set(Collections.<String, Runnable>emptyMap());
-            return;
+            next = Collections.emptyMap();
+        } else {
+            next = Collections.unmodifiableMap(new HashMap<String, Runnable>(registered));
         }
-        HOOKS.set(Collections.unmodifiableMap(new HashMap<String, Runnable>(registered)));
+        synchronized (LOCK) {
+            hooks = next;
+        }
     }
 }
