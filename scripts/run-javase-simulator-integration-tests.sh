@@ -126,6 +126,15 @@ js_log "Ensuring CLDC11 port is built (required bootclasspath for CodenameOne co
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/CLDC11/build.xml jar
 
+# Compile the CSS-driven native themes (iOSModernTheme.res,
+# AndroidMaterialTheme.res). The JavaSE ant build copies them out of
+# Themes/, with failonerror=false, so a missing pair would silently
+# produce a JavaSE.jar without the modern themes - which is precisely
+# the failure mode the native-theme verification below catches. Run
+# the compiler ourselves so a fresh checkout doesn't surprise CI.
+js_log "Building CSS-driven native themes"
+"$REPO_ROOT/scripts/build-native-themes.sh"
+
 js_log "Ensuring JavaSE port is built"
 js_log "Using Java 8 for ant build: $JAVA8_HOME_DETECTED"
 JAVA_HOME="$JAVA8_HOME_DETECTED" PATH="$JAVA8_HOME_DETECTED/bin:$PATH" ant -noinput -buildfile Ports/JavaSE/build.xml jar
@@ -175,6 +184,52 @@ for mode in "${MODES[@]}"; do
     fi
     ACTUAL_ENTRIES+=("${test_name}=$png")
   done
+done
+
+# Native-theme override regression coverage. The Simulator's "Native
+# Theme" menu writes simulatorNativeTheme and triggers a simulator
+# reload; the bundled themes (iOSModernTheme, AndroidMaterialTheme,
+# the iOS7 / Android Holo legacy themes) must all resolve through
+# JavaSEPort.loadSkinFile's override branch. We exercise each one
+# end-to-end: set the preference the menu would set, restart the
+# simulator the same way the menu does, and assert the running app
+# sees a Resources object whose first theme name matches what we'd
+# get from opening the bundled .res directly. This catches both
+# "menu wrote the wrong preference" and "preference wasn't honored
+# on reload" regressions.
+NATIVE_THEME_SCENARIOS=(
+  "iOSModernTheme"
+  "iOS7Theme"
+  "AndroidMaterialTheme"
+  "android_holo_light"
+)
+for theme_key in "${NATIVE_THEME_SCENARIOS[@]}"; do
+  case "$theme_key" in
+    iOSModernTheme) scenario_label=ios-modern ;;
+    iOS7Theme) scenario_label=ios7 ;;
+    AndroidMaterialTheme) scenario_label=android-material ;;
+    android_holo_light) scenario_label=android-holo ;;
+    *) scenario_label="$theme_key" ;;
+  esac
+  test_name="javase-single-native-theme-${scenario_label}"
+  png="$RAW_DIR/${test_name}.png"
+  js_log "Running simulator native-theme verification for ${theme_key}"
+  FULL_SIM_CLASSPATH="$CN1_CLASSPATH:$CLASS_DIR"
+  xvfb-run -a -s "-screen 0 2200x1400x24" "$JAVA_BIN" -Djava.awt.headless=false \
+    -cp "$FULL_SIM_CLASSPATH" \
+    com.codenameone.examples.javase.tests.SimulatorWindowModeVerifier \
+    --mode single \
+    --scenario "native-theme-${scenario_label}" \
+    --sim-classpath "$FULL_SIM_CLASSPATH" \
+    --skin "$SIM_SKIN_PATH" \
+    --screenshot "$png" \
+    --native-theme "$theme_key"
+
+  if [ ! -s "$png" ]; then
+    js_log "Expected screenshot was not produced for native-theme ${theme_key}" >&2
+    exit 11
+  fi
+  ACTUAL_ENTRIES+=("${test_name}=$png")
 done
 
 COMPARE_JSON="$ARTIFACTS_DIR/screenshot-compare.json"

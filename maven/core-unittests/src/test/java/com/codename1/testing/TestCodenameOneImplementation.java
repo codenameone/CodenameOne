@@ -31,6 +31,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.TextSelection;
+import com.codename1.ui.Transform;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
@@ -1317,10 +1318,41 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void resetAffine(Object nativeGraphics) {
+        if (nativeGraphics instanceof TestGraphics) {
+            ((TestGraphics) nativeGraphics).transform.setIdentity();
+        }
     }
 
     @Override
     public void scale(Object nativeGraphics, float x, float y) {
+        if (nativeGraphics instanceof TestGraphics) {
+            TestTransform t = ((TestGraphics) nativeGraphics).transform;
+            TestTransform s = new TestTransform();
+            s.setScale(x, y, 1f);
+            t.concatenate(s);
+        }
+    }
+
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        return translateMatrixSupported;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        // Tracking fields for the matrix-mode unit tests in GraphicsTest --
+        // they assert that translateMatrix() reaches this impl with the
+        // expected x/y when the opt-in flag flips production code over to
+        // the matrix path.
+        translateMatrixInvoked = true;
+        lastTranslateMatrixX = x;
+        lastTranslateMatrixY = y;
+        if (nativeGraphics instanceof TestGraphics) {
+            TestTransform t = ((TestGraphics) nativeGraphics).transform;
+            TestTransform translation = new TestTransform();
+            translation.setTranslation(x, y, 0f);
+            t.concatenate(translation);
+        }
     }
 
 
@@ -1393,6 +1425,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         TestTransform transform = new TestTransform();
         transform.setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
         return transform;
+    }
+
+    @Override
+    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
+        ((TestTransform) nativeTransform).setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
     }
 
     @Override
@@ -1922,35 +1959,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return translationSupported;
     }
 
-    @Override
-    public boolean isTranslateMatrixSupported() {
-        return translateMatrixSupported;
-    }
-
-    @Override
-    public void translateMatrix(Object nativeGraphics, float x, float y) {
-        translateMatrixInvoked = true;
-        lastTranslateMatrixX = x;
-        lastTranslateMatrixY = y;
-        if (nativeGraphics instanceof TestGraphics) {
-            TestGraphics g = (TestGraphics) nativeGraphics;
-            g.matrixTranslateX += x;
-            g.matrixTranslateY += y;
-        }
-    }
-
-    @Override
-    public Transform getTransform(Object graphics) {
-        // Production Graphics.getTranslateX/Y reads through this method when
-        // matrix mode is on. We return a pure translation built from the
-        // per-Graphics accumulator translateMatrix has been mutating, so the
-        // matrix-mode unit tests can verify the translate flows end-to-end.
-        if (graphics instanceof TestGraphics) {
-            TestGraphics g = (TestGraphics) graphics;
-            return Transform.makeTranslation(g.matrixTranslateX, g.matrixTranslateY);
-        }
-        return Transform.makeIdentity();
-    }
 
     @Override
     public void translate(Object graphics, int x, int y) {
@@ -2228,8 +2236,135 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void drawImage(Object graphics, Object img, int x, int y) {
     }
 
+    /**
+     * Rasterizes the RGB array into the destination {@link TestImage} backing the
+     * supplied graphics, applying the current affine transform stored on the
+     * {@link TestGraphics}. Used by tests that exercise scaled image draws --
+     * the production no-op was insufficient because pixel-level assertions need
+     * actual output. The mapping is inverse, nearest-neighbour, so an integer
+     * scale yields exact source pixel replication.
+     */
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
+        if (!(graphics instanceof TestGraphics) || w <= 0 || h <= 0) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (g.image == null) {
+            return;
+        }
+
+        float[] corner = new float[2];
+        float[] mapped = new float[2];
+        float minDestX = Float.POSITIVE_INFINITY, minDestY = Float.POSITIVE_INFINITY;
+        float maxDestX = Float.NEGATIVE_INFINITY, maxDestY = Float.NEGATIVE_INFINITY;
+        for (int c = 0; c < 4; c++) {
+            corner[0] = (c & 1) == 0 ? x : x + w;
+            corner[1] = (c & 2) == 0 ? y : y + h;
+            g.transform.transformPoint(corner, mapped);
+            if (mapped[0] < minDestX) minDestX = mapped[0];
+            if (mapped[1] < minDestY) minDestY = mapped[1];
+            if (mapped[0] > maxDestX) maxDestX = mapped[0];
+            if (mapped[1] > maxDestY) maxDestY = mapped[1];
+        }
+
+        int clipRight = g.clipX + Math.max(0, g.clipWidth);
+        int clipBottom = g.clipY + Math.max(0, g.clipHeight);
+        int destStartX = Math.max((int) Math.floor(minDestX), g.clipX);
+        int destStartY = Math.max((int) Math.floor(minDestY), g.clipY);
+        int destEndX = Math.min((int) Math.ceil(maxDestX), clipRight);
+        int destEndY = Math.min((int) Math.ceil(maxDestY), clipBottom);
+        if (destStartX >= destEndX || destStartY >= destEndY) {
+            return;
+        }
+
+        TestTransform inv = g.transform.createInverse();
+        int imgW = g.image.width;
+        int imgH = g.image.height;
+        float[] destSample = new float[2];
+        float[] srcSample = new float[2];
+        for (int dy = destStartY; dy < destEndY; dy++) {
+            if (dy < 0 || dy >= imgH) {
+                continue;
+            }
+            int rowOffset = dy * imgW;
+            for (int dx = destStartX; dx < destEndX; dx++) {
+                if (dx < 0 || dx >= imgW) {
+                    continue;
+                }
+                destSample[0] = dx + 0.5f;
+                destSample[1] = dy + 0.5f;
+                inv.transformPoint(destSample, srcSample);
+                int sx = (int) Math.floor(srcSample[0]) - x;
+                int sy = (int) Math.floor(srcSample[1]) - y;
+                if (sx < 0 || sx >= w || sy < 0 || sy >= h) {
+                    continue;
+                }
+                int srcIdx = offset + sy * w + sx;
+                if (srcIdx < 0 || srcIdx >= rgbData.length) {
+                    continue;
+                }
+                int srcArgb = rgbData[srcIdx];
+                int dstIdx = rowOffset + dx;
+                if (!processAlpha || (srcArgb & 0xff000000) == 0xff000000) {
+                    g.image.argb[dstIdx] = srcArgb;
+                } else {
+                    int srcAlpha = (srcArgb >>> 24) & 0xff;
+                    if (srcAlpha == 0) {
+                        continue;
+                    }
+                    int srcR = (srcArgb >>> 16) & 0xff;
+                    int srcG = (srcArgb >>> 8) & 0xff;
+                    int srcB = srcArgb & 0xff;
+                    int dstArgb = g.image.argb[dstIdx];
+                    int dstR = (dstArgb >>> 16) & 0xff;
+                    int dstG = (dstArgb >>> 8) & 0xff;
+                    int dstB = dstArgb & 0xff;
+                    int outR = (srcR * srcAlpha + dstR * (255 - srcAlpha)) / 255;
+                    int outG = (srcG * srcAlpha + dstG * (255 - srcAlpha)) / 255;
+                    int outB = (srcB * srcAlpha + dstB * (255 - srcAlpha)) / 255;
+                    g.image.argb[dstIdx] = 0xff000000 | (outR << 16) | (outG << 8) | outB;
+                }
+            }
+        }
+    }
+
+    @Override
+    public void setTransform(Object graphics, Transform transform) {
+        if (!(graphics instanceof TestGraphics)) {
+            super.setTransform(graphics, transform);
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (transform == null || transform.isIdentity()) {
+            g.transform.setIdentity();
+            return;
+        }
+        Object nativeT = transform.getNativeTransform();
+        if (nativeT instanceof TestTransform) {
+            g.transform.copyFrom((TestTransform) nativeT);
+        } else {
+            g.transform.setIdentity();
+        }
+    }
+
+    @Override
+    public Transform getTransform(Object graphics) {
+        if (!(graphics instanceof TestGraphics)) {
+            return super.getTransform(graphics);
+        }
+        TestTransform t = ((TestGraphics) graphics).transform;
+        return Transform.makeAffine(t.m00, t.m10, t.m01, t.m11, t.m02, t.m12);
+    }
+
+    @Override
+    public void getTransform(Object graphics, Transform t) {
+        if (!(graphics instanceof TestGraphics)) {
+            super.getTransform(graphics, t);
+            return;
+        }
+        TestTransform src = ((TestGraphics) graphics).transform;
+        t.setAffine(src.m00, src.m10, src.m01, src.m11, src.m02, src.m12);
     }
 
     @Override
@@ -3839,13 +3974,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int clipHeight;
         int translateX;
         int translateY;
-        // Matrix-translation accumulator. translateMatrix() updates this so
-        // matrix-mode Graphics.getTranslateX() (which reads through
-        // impl.getTransform(ng).getTranslateX()) sees the right value.
-        // Separate from translateX/translateY because the production
-        // contract is that matrix-mode does NOT bump the integer accumulator.
-        float matrixTranslateX;
-        float matrixTranslateY;
+        // Master's affine transform that scale / rotate / translateMatrix
+        // mutate. Matrix-mode Graphics.getTransform reads through here so
+        // the test impl shares a single source of truth with production,
+        // and the matrix-mode unit tests in GraphicsTest can verify the
+        // translate flows end-to-end through it.
+        final TestTransform transform = new TestTransform();
         TestFont font;
         TestImage image;
 

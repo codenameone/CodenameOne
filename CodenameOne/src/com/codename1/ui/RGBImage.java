@@ -197,6 +197,47 @@ public class RGBImage extends Image {
         g.drawRGB(rgb, 0, x, y, width, height, !opaque);
     }
 
+    /// {@inheritDoc}
+    ///
+    /// `RGBImage` has no native peer, so the inherited scaled-draw path
+    /// (`g.drawImageWH(image, ...)`) renders nothing. Instead, build a
+    /// translate + scale affine transform on top of the graphics context's
+    /// current transform and emit `drawRGB` at the image's native size --
+    /// the platform pipeline (iOS Metal, Android Skia, Graphics2D, ...)
+    /// performs the actual scaling in hardware / native code.
+    ///
+    /// `Graphics.setTransform` is used (rather than `translateMatrix` +
+    /// `scale`) because on ports where `impl.isTranslationSupported()` is
+    /// false (iOS), prior `g.translate(int, int)` calls accumulate into a
+    /// per-Graphics integer translate that is baked into draw coordinates
+    /// **before** the impl matrix is applied. A naked `translateMatrix` /
+    /// `scale` composition would therefore multiply that accumulator by
+    /// the scale factor, shifting the on-screen position. `setTransform`
+    /// conjugates the matrix with `T(xTranslate, yTranslate)`, cancelling
+    /// the accumulator so the result lands at the requested coordinates
+    /// on every port.
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        if (w == width && h == height) {
+            g.drawRGB(rgb, 0, x, y, width, height, !opaque);
+            return;
+        }
+        Transform saved = Transform.makeIdentity();
+        g.getTransform(saved);
+        try {
+            Transform scaled = saved.copy();
+            scaled.translate(x, y);
+            scaled.scale(((float) w) / width, ((float) h) / height);
+            g.setTransform(scaled);
+            g.drawRGB(rgb, 0, 0, 0, width, height, !opaque);
+        } finally {
+            g.setTransform(saved);
+        }
+    }
+
     /// Indicates if an image should be treated as opaque, this can improve support
     /// for fast drawing of RGB images without alpha support.
     @Override

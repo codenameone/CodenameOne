@@ -86,9 +86,22 @@
                                 <configuration>
                                     <target>
                                         <mkdir dir="${project.build.outputDirectory}/com/codename1/android"/>
+                                        <!-- android_port_sources.jar is the
+                                             bundle AndroidGradleBuilder unzips
+                                             into the user app's APK assets/.
+                                             AndroidMaterialTheme.res must be in
+                                             here for the runtime to find it;
+                                             pull it directly from the canonical
+                                             Themes/ copy rather than staging
+                                             into Ports/Android/src/. The .res
+                                             is kept in sync by
+                                             .github/workflows/native-themes-sync.yml. -->
                                         <zip destfile="${project.build.outputDirectory}/com/codename1/android/android_port_sources.jar">
                                             <fileset dir="${real.src.dir}" />
                                             <fileset dir="${codename1.src.dir}"/>
+                                            <fileset dir="${project.basedir}/../../Themes">
+                                                <include name="AndroidMaterialTheme.res"/>
+                                            </fileset>
                                         </zip>
                                     </target>
                                 </configuration>
@@ -279,6 +292,18 @@
                     <resources>
                         <resource>
                             <directory>${src.dir}</directory>
+                        </resource>
+                        <!-- Themes/AndroidMaterialTheme.res is the single
+                             source of truth; pull it into the Android port
+                             jar here instead of pre-staging a copy under
+                             Ports/Android/src/. The .res is committed and
+                             kept in sync by
+                             .github/workflows/native-themes-sync.yml. -->
+                        <resource>
+                            <directory>${project.basedir}/../../Themes</directory>
+                            <includes>
+                                <include>AndroidMaterialTheme.res</include>
+                            </includes>
                         </resource>
                     </resources>
 

@@ -1485,6 +1485,26 @@ void screenSizeChanged(int width, int height) {
     com_codename1_impl_ios_IOSImplementation_sizeChangedImpl___int_int(CN1_THREAD_GET_STATE_PASS_ARG width, height);
 }
 
+void keyPressedNative(int keyCode) {
+    com_codename1_impl_ios_IOSImplementation_keyPressedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG keyCode);
+}
+
+void keyReleasedNative(int keyCode) {
+    com_codename1_impl_ios_IOSImplementation_keyReleasedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG keyCode);
+}
+
+void pointerHoverPressedNative(int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pointerHoverPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
+void pointerHoverNative(int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pointerHoverCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
+void pointerHoverReleasedNative(int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pointerHoverReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
 void stringEdit(int finished, int cursorPos, NSString* text) {
     com_codename1_impl_ios_IOSImplementation_editingUpdate___java_lang_String_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG
                                                                                           fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text), cursorPos, finished != 0

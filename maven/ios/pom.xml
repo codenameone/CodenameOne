@@ -109,8 +109,21 @@
                             <target>
                                 <mkdir dir="${project.build.outputDirectory}/codenameone/iosport-bundle"/>
 
+                                <!-- Themes/iOSModernTheme.res is the single
+                                     source of truth; pull it into nativeios.jar
+                                     here instead of pre-staging a copy under
+                                     ${codename1.nativeios.dir}. The exclude on
+                                     the nativeSources fileset guarantees a
+                                     stale local copy can't shadow the canonical
+                                     one. The .res is committed and kept in sync
+                                     by .github/workflows/native-themes-sync.yml. -->
                                 <zip destfile="${project.build.directory}/codenameone/iosport-bundle/nativeios.jar">
-                                    <fileset dir="${codename1.nativeios.dir}" />
+                                    <fileset dir="${codename1.nativeios.dir}">
+                                        <exclude name="iOSModernTheme.res"/>
+                                    </fileset>
+                                    <fileset dir="${project.basedir}/../../Themes">
+                                        <include name="iOSModernTheme.res"/>
+                                    </fileset>
                                 </zip>
                                 <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" tofile="${project.build.directory}/codenameone/iosport-bundle/iOSPort.jar" overwrite="true"/>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">

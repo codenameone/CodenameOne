@@ -154,6 +154,33 @@
         <copy file="../../Themes/winTheme.res" tofile="build/classes/winTheme.res" />
         <copy file="../../Themes/iOS7Theme.res" tofile="src/iOS7Theme.res" />
         <copy file="../../Themes/iOS7Theme.res" tofile="build/classes/iOS7Theme.res" />
+        <!-- Bundle every shipped native theme so the simulator's
+             "Native Theme" menu has something to load when the user
+             picks iOS Modern / Android Material. failonerror is false
+             so the build still succeeds if scripts/build-native-themes.sh
+             hasn't generated the modern .res files yet; the maven pom
+             does the same. The legacy iPhoneTheme.res /
+             androidTheme.res / android_holo_light.res are also copied
+             so the menu works without forcing users to download
+             individual skins. -->
+        <copy todir="src" failonerror="false">
+            <fileset dir="../../Themes">
+                <include name="iOSModernTheme.res"/>
+                <include name="AndroidMaterialTheme.res"/>
+                <include name="iPhoneTheme.res"/>
+                <include name="androidTheme.res"/>
+                <include name="android_holo_light.res"/>
+            </fileset>
+        </copy>
+        <copy todir="build/classes" failonerror="false">
+            <fileset dir="../../Themes">
+                <include name="iOSModernTheme.res"/>
+                <include name="AndroidMaterialTheme.res"/>
+                <include name="iPhoneTheme.res"/>
+                <include name="androidTheme.res"/>
+                <include name="android_holo_light.res"/>
+            </fileset>
+        </copy>
         <!--copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" / -->

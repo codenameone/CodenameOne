@@ -326,6 +326,103 @@ extern void pointerPressed(int* x, int* y, int length);
 extern void pointerDragged(int* x, int* y, int length);
 extern void pointerReleased(int* x, int* y, int length);
 extern void screenSizeChanged(int width, int height);
+extern void keyPressedNative(int keyCode);
+extern void keyReleasedNative(int keyCode);
+extern void pointerHoverPressedNative(int x, int y);
+extern void pointerHoverNative(int x, int y);
+extern void pointerHoverReleasedNative(int x, int y);
+
+// Sentinel keycodes forwarded to IOSImplementation for non-printable hardware
+// keys. Values match IOS_IMPL_KEY_* in IOSImplementation.java and the Android
+// DROID_IMPL_KEY_* sentinels so cross-platform key handlers can match either.
+#define CN1_IOS_KEY_LEFT        (-23446)
+#define CN1_IOS_KEY_RIGHT       (-23447)
+#define CN1_IOS_KEY_UP          (-23448)
+#define CN1_IOS_KEY_DOWN        (-23449)
+#define CN1_IOS_KEY_BACKSPACE   (-23453)
+#define CN1_IOS_KEY_ENTER       (-23460)
+#define CN1_IOS_KEY_TAB         (-23461)
+#define CN1_IOS_KEY_ESCAPE      (-23462)
+#define CN1_IOS_KEY_HOME        (-23463)
+#define CN1_IOS_KEY_END         (-23464)
+#define CN1_IOS_KEY_PAGE_UP     (-23465)
+#define CN1_IOS_KEY_PAGE_DOWN   (-23466)
+#define CN1_IOS_KEY_INSERT      (-23467)
+#define CN1_IOS_KEY_FORWARD_DEL (-23468)
+#define CN1_IOS_KEY_F1          (-23469)
+#define CN1_IOS_KEY_F2          (-23470)
+#define CN1_IOS_KEY_F3          (-23471)
+#define CN1_IOS_KEY_F4          (-23472)
+#define CN1_IOS_KEY_F5          (-23473)
+#define CN1_IOS_KEY_F6          (-23474)
+#define CN1_IOS_KEY_F7          (-23475)
+#define CN1_IOS_KEY_F8          (-23476)
+#define CN1_IOS_KEY_F9          (-23477)
+#define CN1_IOS_KEY_F10         (-23478)
+#define CN1_IOS_KEY_F11         (-23479)
+#define CN1_IOS_KEY_F12         (-23480)
+
+// Translate a UIKey from a hardware keyboard into the integer the framework
+// expects: a negative sentinel for non-printable keys, a unicode codepoint for
+// printable characters, or 0 if we don't recognize the key.
+static int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
+    switch (key.keyCode) {
+        case UIKeyboardHIDUsageKeyboardReturnOrEnter:
+        case UIKeyboardHIDUsageKeypadEnter:
+            return CN1_IOS_KEY_ENTER;
+        case UIKeyboardHIDUsageKeyboardTab:
+            return CN1_IOS_KEY_TAB;
+        case UIKeyboardHIDUsageKeyboardEscape:
+            return CN1_IOS_KEY_ESCAPE;
+        case UIKeyboardHIDUsageKeyboardDeleteOrBackspace:
+            return CN1_IOS_KEY_BACKSPACE;
+        case UIKeyboardHIDUsageKeyboardDeleteForward:
+            return CN1_IOS_KEY_FORWARD_DEL;
+        case UIKeyboardHIDUsageKeyboardInsert:
+            return CN1_IOS_KEY_INSERT;
+        case UIKeyboardHIDUsageKeyboardHome:
+            return CN1_IOS_KEY_HOME;
+        case UIKeyboardHIDUsageKeyboardEnd:
+            return CN1_IOS_KEY_END;
+        case UIKeyboardHIDUsageKeyboardPageUp:
+            return CN1_IOS_KEY_PAGE_UP;
+        case UIKeyboardHIDUsageKeyboardPageDown:
+            return CN1_IOS_KEY_PAGE_DOWN;
+        case UIKeyboardHIDUsageKeyboardLeftArrow:
+            return CN1_IOS_KEY_LEFT;
+        case UIKeyboardHIDUsageKeyboardRightArrow:
+            return CN1_IOS_KEY_RIGHT;
+        case UIKeyboardHIDUsageKeyboardUpArrow:
+            return CN1_IOS_KEY_UP;
+        case UIKeyboardHIDUsageKeyboardDownArrow:
+            return CN1_IOS_KEY_DOWN;
+        case UIKeyboardHIDUsageKeyboardF1:  return CN1_IOS_KEY_F1;
+        case UIKeyboardHIDUsageKeyboardF2:  return CN1_IOS_KEY_F2;
+        case UIKeyboardHIDUsageKeyboardF3:  return CN1_IOS_KEY_F3;
+        case UIKeyboardHIDUsageKeyboardF4:  return CN1_IOS_KEY_F4;
+        case UIKeyboardHIDUsageKeyboardF5:  return CN1_IOS_KEY_F5;
+        case UIKeyboardHIDUsageKeyboardF6:  return CN1_IOS_KEY_F6;
+        case UIKeyboardHIDUsageKeyboardF7:  return CN1_IOS_KEY_F7;
+        case UIKeyboardHIDUsageKeyboardF8:  return CN1_IOS_KEY_F8;
+        case UIKeyboardHIDUsageKeyboardF9:  return CN1_IOS_KEY_F9;
+        case UIKeyboardHIDUsageKeyboardF10: return CN1_IOS_KEY_F10;
+        case UIKeyboardHIDUsageKeyboardF11: return CN1_IOS_KEY_F11;
+        case UIKeyboardHIDUsageKeyboardF12: return CN1_IOS_KEY_F12;
+        default: {
+            // Standalone modifier presses (Shift / Control / Option / Command /
+            // CapsLock) carry no characters; let the responder chain handle them.
+            NSString *chars = key.characters;
+            if (chars.length == 0) {
+                return 0;
+            }
+            unichar c = [chars characterAtIndex:0];
+            if (c == 0) {
+                return 0;
+            }
+            return (int)c;
+        }
+    }
+}
 
 void pointerPressedC(int* x, int* y, int length) {
     //CN1Log(@"pointerPressedC started");
@@ -2351,6 +2448,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     [super viewDidLoad];
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
+    [self cn1InstallHoverRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -2364,6 +2462,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     [super viewDidLoad];
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
+    [self cn1InstallHoverRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -2429,17 +2528,27 @@ static CodenameOne_GLViewController *sharedSingleton;
     if (window == nil) window = self.view.window;
     CGFloat width = (window != nil) ? window.bounds.size.width : self.view.bounds.size.width;
     if (width < 1) width = 1;
-    CGFloat statusBarHeight = 44.0;
+    // Match the proxy frame to the real status-bar strip, which is also where
+    // CN1's Toolbar StatusBar Container sits (it uses setSafeArea(true), so
+    // its height tracks safeAreaInsets.top). Earlier revisions hard-coded a
+    // 44pt minimum here, but on iPhones without a notch (status bar = 20pt)
+    // that turned the proxy into a window-level touch sink that swallowed
+    // taps in the 20-44pt strip -- right where toolbar content sits below
+    // the StatusBar Container. See #4978.
+    CGFloat statusBarHeight = 0.0;
     if (@available(iOS 11.0, *)) {
-        CGFloat inset = self.view.safeAreaInsets.top;
-        if (inset > statusBarHeight) {
-            statusBarHeight = inset;
-        }
+        statusBarHeight = self.view.safeAreaInsets.top;
     }
-    // Cap to a sensible upper bound -- iPhone Pro Max with Dynamic Island is
-    // around 60pt; never exceed 80pt of touch area.
+    if (statusBarHeight <= 0) {
+        // Pre-iOS 11, or safe-area insets not yet populated, fall back to
+        // the legacy status-bar frame.
+        statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+    }
+    // Floor of 1pt keeps the proxy non-empty so iOS still routes
+    // UIStatusBarTapAction to it when the status bar is hidden. Cap at 80pt
+    // for unusual device modes (Dynamic Island is ~59pt today).
+    if (statusBarHeight < 1) statusBarHeight = 1;
     if (statusBarHeight > 80) statusBarHeight = 80;
-    if (statusBarHeight < 20) statusBarHeight = 20;
     cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
     cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
@@ -2583,8 +2692,124 @@ bool lockDrawing;
                 
             default:
                 break;
-                
+
         }
+    }
+}
+
+// Hardware keyboard support (BT keyboard on iPad/iPhone, Magic Keyboard,
+// Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
+// Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
+// responder chain falls back to the existing UITextField editing path.
+- (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (@available(iOS 13.4, *)) {
+        BOOL handled = NO;
+        NSMutableSet *passthrough = nil;
+        for (UIPress *press in presses) {
+            UIKey *key = press.key;
+            if (key == nil) {
+                continue;
+            }
+            int code = cn1MapUIKeyToKeyCode(key);
+            if (code != 0) {
+                keyPressedNative(code);
+                handled = YES;
+            } else {
+                if (passthrough == nil) {
+                    passthrough = [NSMutableSet set];
+                }
+                [passthrough addObject:press];
+            }
+        }
+        if (handled) {
+            if (passthrough.count > 0) {
+                [super pressesBegan:passthrough withEvent:event];
+            }
+            return;
+        }
+    }
+    [super pressesBegan:presses withEvent:event];
+}
+
+- (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (@available(iOS 13.4, *)) {
+        BOOL handled = NO;
+        NSMutableSet *passthrough = nil;
+        for (UIPress *press in presses) {
+            UIKey *key = press.key;
+            if (key == nil) {
+                continue;
+            }
+            int code = cn1MapUIKeyToKeyCode(key);
+            if (code != 0) {
+                keyReleasedNative(code);
+                handled = YES;
+            } else {
+                if (passthrough == nil) {
+                    passthrough = [NSMutableSet set];
+                }
+                [passthrough addObject:press];
+            }
+        }
+        if (handled) {
+            if (passthrough.count > 0) {
+                [super pressesEnded:passthrough withEvent:event];
+            }
+            return;
+        }
+    }
+    [super pressesEnded:presses withEvent:event];
+}
+
+- (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (@available(iOS 13.4, *)) {
+        for (UIPress *press in presses) {
+            UIKey *key = press.key;
+            if (key == nil) {
+                continue;
+            }
+            int code = cn1MapUIKeyToKeyCode(key);
+            if (code != 0) {
+                keyReleasedNative(code);
+            }
+        }
+    }
+    [super pressesCancelled:presses withEvent:event];
+}
+
+// Hover support for BT mouse / iPad trackpad / Apple Pencil hover. Wired up
+// once viewDidLoad has run; only attaches on iOS 13.0+ where
+// UIHoverGestureRecognizer exists.
+- (void)cn1InstallHoverRecognizer {
+    if (@available(iOS 13.0, *)) {
+        UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc]
+                                           initWithTarget:self
+                                                   action:@selector(cn1HandleHover:)];
+        [self.view addGestureRecognizer:hover];
+#ifndef CN1_USE_ARC
+        [hover release];
+#endif
+    }
+}
+
+- (void)cn1HandleHover:(UIHoverGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0)) {
+    CGPoint p = [recognizer locationInView:self.view];
+    int x = (int)(p.x * scaleValue);
+    int y = (int)(p.y * scaleValue);
+    switch (recognizer.state) {
+        case UIGestureRecognizerStateBegan:
+            pointerHoverPressedNative(x, y);
+            break;
+        case UIGestureRecognizerStateChanged:
+            pointerHoverNative(x, y);
+            break;
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled:
+        case UIGestureRecognizerStateFailed:
+            pointerHoverReleasedNative(x, y);
+            break;
+        default:
+            break;
     }
 }
 
@@ -3320,6 +3545,12 @@ BOOL prefersStatusBarHidden = NO;
     safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
     safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
     safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
+
+    // Status-bar tap proxy height tracks safeAreaInsets.top, so refresh it
+    // here so rotations and other safe-area changes keep the proxy aligned
+    // with the real status-bar strip (and don't leak touch interception
+    // into the rest of the toolbar).
+    [self cn1UpdateStatusBarTapProxyFrame];
 
     lockDrawing = NO;
     repaintUI();

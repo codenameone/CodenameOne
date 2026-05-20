@@ -252,6 +252,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static final int DROID_IMPL_KEY_VOLUME_UP = -23457;
     static final int DROID_IMPL_KEY_VOLUME_DOWN = -23458;
     static final int DROID_IMPL_KEY_MUTE = -23459;
+    static final int DROID_IMPL_KEY_ENTER = -23460;
+    static final int DROID_IMPL_KEY_TAB = -23461;
+    static final int DROID_IMPL_KEY_ESCAPE = -23462;
+    static final int DROID_IMPL_KEY_HOME = -23463;
+    static final int DROID_IMPL_KEY_END = -23464;
+    static final int DROID_IMPL_KEY_PAGE_UP = -23465;
+    static final int DROID_IMPL_KEY_PAGE_DOWN = -23466;
+    static final int DROID_IMPL_KEY_INSERT = -23467;
+    static final int DROID_IMPL_KEY_FORWARD_DEL = -23468;
+    static final int DROID_IMPL_KEY_F1 = -23469;
+    static final int DROID_IMPL_KEY_F2 = -23470;
+    static final int DROID_IMPL_KEY_F3 = -23471;
+    static final int DROID_IMPL_KEY_F4 = -23472;
+    static final int DROID_IMPL_KEY_F5 = -23473;
+    static final int DROID_IMPL_KEY_F6 = -23474;
+    static final int DROID_IMPL_KEY_F7 = -23475;
+    static final int DROID_IMPL_KEY_F8 = -23476;
+    static final int DROID_IMPL_KEY_F9 = -23477;
+    static final int DROID_IMPL_KEY_F10 = -23478;
+    static final int DROID_IMPL_KEY_F11 = -23479;
+    static final int DROID_IMPL_KEY_F12 = -23480;
     static int[] leftSK = new int[]{DROID_IMPL_KEY_MENU};
 
     /**
@@ -1908,6 +1929,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     protected void pointerDragged(int[] x, int[] y) {
         super.pointerDragged(x, y);
+    }
+
+    @Override
+    protected void pointerHover(int x, int y) {
+        super.pointerHover(x, y);
+    }
+
+    @Override
+    protected void pointerHover(int[] x, int[] y) {
+        super.pointerHover(x, y);
+    }
+
+    @Override
+    protected void pointerHoverPressed(int x, int y) {
+        super.pointerHoverPressed(x, y);
+    }
+
+    @Override
+    protected void pointerHoverPressed(int[] x, int[] y) {
+        super.pointerHoverPressed(x, y);
+    }
+
+    @Override
+    protected void pointerHoverReleased(int x, int y) {
+        super.pointerHoverReleased(x, y);
+    }
+
+    @Override
+    protected void pointerHoverReleased(int[] x, int[] y) {
+        super.pointerHoverReleased(x, y);
     }
 
     @Override

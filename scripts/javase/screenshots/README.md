@@ -9,6 +9,20 @@ This directory stores baseline PNG files for JavaSE simulator integration screen
 - `javase-single-component-inspector.png`
 - `javase-single-network-monitor.png`
 - `javase-single-test-recorder.png`
+- `javase-single-native-theme-ios-modern.png`
+- `javase-single-native-theme-ios7.png`
+- `javase-single-native-theme-android-material.png`
+- `javase-single-native-theme-android-holo.png`
 
 The CI workflow compares generated simulator screenshots with these files.
 If screenshots differ (or are missing), CI uploads artifacts and posts a PR comment with visual previews.
+
+The `javase-single-native-theme-*` baselines exercise the Simulator's
+"Native Theme" menu - each one runs with the corresponding
+`simulatorNativeTheme` preference set, the same preference the menu
+writes when the user picks a theme. The captured chrome should
+visibly differ between them: iOS Modern shows rounded blue buttons
+and the modern iOS title bar, iOS 7 shows the flat 2014-era style,
+Android Material shows raised purple buttons + Material chrome, and
+Android Holo Light shows the all-caps Holo button labels in light
+blue.

@@ -755,6 +755,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final int GAME_KEY_CODE_RIGHT = -94;
     private static String nativeTheme;
     private static Resources nativeThemeRes;
+    /**
+     * The simulatorNativeTheme value that {@link #loadSkinFile(InputStream, JFrame)}
+     * last applied as the native-theme override. Useful for tests that
+     * need to verify the "Native Theme" menu's selection actually took
+     * effect on simulator reload. Null when no explicit override was
+     * resolved (e.g. the skin's embedded theme is in use).
+     */
+    private static String currentSimulatorNativeTheme;
     private static int softkeyCount = 1;
     private static boolean tablet;
     private static String DEFAULT_FONT = "Arial-plain-11";
@@ -1211,6 +1219,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     public static Resources getNativeTheme() {
         return nativeThemeRes;
+    }
+
+    /**
+     * Returns the resolved native-theme override key (e.g.
+     * "iOSModernTheme") that the simulator's last {@code loadSkinFile}
+     * applied, or null when no override was active. Used by tests to
+     * verify that the "Native Theme" menu's selection actually flowed
+     * through the simulator reload path.
+     */
+    public static String getCurrentSimulatorNativeTheme() {
+        return currentSimulatorNativeTheme;
     }
 
     public boolean hasNativeTheme() {
@@ -2950,6 +2969,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // Explicit "keep the skin's embedded theme".
                 overrideTheme = null;
             }
+            currentSimulatorNativeTheme = overrideTheme;
             if (overrideTheme != null) {
                 InputStream bundled = JavaSEPort.class.getResourceAsStream("/" + overrideTheme + ".res");
                 if (bundled != null) {
@@ -5158,15 +5178,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
-        JMenu m;
+        final JMenu skinMenu;
         if (menu == null) {
-            m = new JMenu("Skins");
-            m.setDoubleBuffered(true);
+            skinMenu = new JMenu("Skins");
+            skinMenu.setDoubleBuffered(true);
         } else {
-            m = menu;
-            m.removeAll();
+            skinMenu = menu;
+            skinMenu.removeAll();
         }
-        final JMenu skinMenu = m;
 
         // Top-level: file picker for a user-supplied .skin
         JMenuItem addSkin = new JMenuItem("Add Skin");
@@ -5191,15 +5210,25 @@ public class JavaSEPort extends CodenameOneImplementation {
                         perfMonitor.dispose();
                         perfMonitor = null;
                     }
+                    String path = picker.getDirectory() + File.separator + file;
+                    File picked = new File(path);
+                    if (picked.exists()) {
+                        // Persist immediately so the picked skin shows up
+                        // at the top level the next time the user opens
+                        // the menu, even if they dismiss the reload
+                        // before loadSkinFile finishes its own
+                        // addSkinName.
+                        addSkinName(picked.toURI().toString());
+                    }
                     String mainClass = System.getProperty("MainClass");
                     if (mainClass != null) {
                         Preferences p = Preferences.userNodeForPackage(JavaSEPort.class);
-                        p.put("skin", picker.getDirectory() + File.separator + file);
+                        p.put("skin", path);
                         deinitializeSync();
                         frm.dispose();
                         System.setProperty("reload.simulator", "true");
                     } else {
-                        loadSkinFile(picker.getDirectory() + File.separator + file, frm);
+                        loadSkinFile(path, frm);
                         refreshSkin(frm);
                     }
                 }
@@ -5208,8 +5237,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         skinMenu.add(addSkin);
 
         // Top-level: hand off to the hosted Skin Designer for building
-        // a new skin from scratch. Replaces the bundled gallery; the
-        // pre-built skins all live behind the "Legacy Skins" submenu.
+        // a new skin from scratch. The legacy OTA gallery moved into
+        // the submenu below; this is the supported way to author new
+        // skins.
         JMenuItem designerItem = new JMenuItem("Skin Designer");
         designerItem.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ae) {
@@ -5225,79 +5255,147 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         skinMenu.addSeparator();
 
+        // One ButtonGroup spans the top-level radios and the Legacy
+        // Skins submenu so the visually-selected skin is unique across
+        // both. Without this, opening the submenu shows two separate
+        // selected radios.
+        final ButtonGroup skinGroup = new ButtonGroup();
+        final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        final String currentSkin = pref.get("skin", System.getProperty("dskin"));
+        final boolean desktopSkinPref = pref.getBoolean("desktopSkin", false);
+        final boolean uwpDesktopSkinPref = pref.getBoolean("uwpDesktopSkin", false);
+
+        // Partition the configured skins. The framework default and
+        // anything the user added via "Add Skin" stay at the top level;
+        // OTA downloads from the legacy codenameone.com gallery move
+        // into the submenu so the top level isn't cluttered with old
+        // device skins most users never installed.
+        String skinNames = pref.get("skins", DEFAULT_SKINS);
+        if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
+            skinNames = DEFAULT_SKINS;
+        }
+        final List<String> topLevelSkins = new ArrayList<String>();
+        final List<String> otaSkins = new ArrayList<String>();
+        StringTokenizer tkn = new StringTokenizer(skinNames, ";");
+        while (tkn.hasMoreTokens()) {
+            String entry = tkn.nextToken();
+            String kind = classifySkin(entry);
+            if ("ota".equals(kind)) {
+                otaSkins.add(entry);
+            } else if (kind != null) {
+                topLevelSkins.add(entry);
+            }
+        }
+
+        for (String entry : topLevelSkins) {
+            JRadioButtonMenuItem item = buildSkinRadioItem(frm, entry, currentSkin, desktopSkinPref);
+            skinGroup.add(item);
+            skinMenu.add(item);
+        }
+
+        skinMenu.addSeparator();
+
+        // Desktop pseudo-skins flip the "desktopSkin" preference; they
+        // don't pick a .skin file. Modeling them as radios in the same
+        // group makes the active chrome mode visible at a glance.
+        JRadioButtonMenuItem dSkin = new JRadioButtonMenuItem("Desktop.skin",
+                desktopSkinPref && !uwpDesktopSkinPref);
+        dSkin.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                switchDesktopSkin(frm, false);
+            }
+        });
+        JRadioButtonMenuItem uwpSkin = new JRadioButtonMenuItem("UWP Desktop.skin",
+                desktopSkinPref && uwpDesktopSkinPref);
+        uwpSkin.setToolTipText("Windows 10 Desktop Skin");
+        uwpSkin.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ae) {
+                switchDesktopSkin(frm, true);
+            }
+        });
+        skinGroup.add(dSkin);
+        skinGroup.add(uwpSkin);
+        skinMenu.add(dSkin);
+        skinMenu.add(uwpSkin);
+
+        skinMenu.addSeparator();
+
+        // Legacy Skins submenu: OTA-downloaded skins from the
+        // codenameone.com gallery, plus the gallery downloader itself
+        // ("More...") and the "Reset Skins" action that clears
+        // ~/.codenameone/ back to a clean state.
         final JMenu legacyMenu = new JMenu("Legacy Skins");
         legacyMenu.setDoubleBuffered(true);
         skinMenu.add(legacyMenu);
-        populateLegacySkinsMenu(frm, legacyMenu);
+        populateLegacySkinsMenu(frm, skinMenu, legacyMenu, skinGroup, otaSkins, currentSkin, desktopSkinPref);
         return skinMenu;
     }
 
-    private void populateLegacySkinsMenu(final JFrame frm, final JMenu legacyMenu) throws MalformedURLException {
-        legacyMenu.removeAll();
-        final JMenu skinMenu = legacyMenu;
-        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (skinNames != null) {
-            if (skinNames.length() < DEFAULT_SKINS.length()) {
-                skinNames = DEFAULT_SKINS;
-            }
-            ButtonGroup skinGroup = new ButtonGroup();
-            StringTokenizer tkn = new StringTokenizer(skinNames, ";");
-            while (tkn.hasMoreTokens()) {
-                final String current = tkn.nextToken();
-                String name = current;
-                if (current.contains(":")) {
-                    try {
-                        URL u = new URL(current);
-                        File f = new File(u.getFile());
-                        if (!f.exists()) {
-                            continue;
-                        }
-                        name = f.getName();
-
-                    } catch (Exception e) {
-                        continue;
-                    }
-                } else {
-                    // remove the old builtin skins from the menu
-                    if(current.startsWith("/") && !current.equals(DEFAULT_SKIN)) {
-                        continue;
-                    }
-                }
-                String d = System.getProperty("dskin");
-                JRadioButtonMenuItem i = new JRadioButtonMenuItem(name, name.equals(pref.get("skin", d)));
-                i.addActionListener(new ActionListener() {
-
-                    public void actionPerformed(ActionEvent ae) {
-                        if (netMonitor != null) {
-                            netMonitor.dispose();
-                            netMonitor = null;
-                        }
-                        if (perfMonitor != null) {
-                            perfMonitor.dispose();
-                            perfMonitor = null;
-                        }
-                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                        pref.putBoolean("desktopSkin", false);
-                        String mainClass = System.getProperty("MainClass");
-                        if (mainClass != null) {
-                            pref.put("skin", current);
-                            frm.dispose();
-                            System.setProperty("reload.simulator", "true");
-                        } else {
-                            loadSkinFile(current, frm);
-                            refreshSkin(frm);
-                        }
-                    }
-                });
-                skinGroup.add(i);
-                skinMenu.add(i);
-            }
+    /**
+     * Categorise a stored skin path. The "skins" preference accumulates
+     * a mix of: the framework default ("/iPhoneX.skin"), file:// URIs
+     * pointing into ~/.codenameone/ (OTA downloads), and arbitrary
+     * filesystem paths the user picked via "Add Skin". Stale entries
+     * from removed bundled skins also leak in. The kind returned drives
+     * which menu the entry belongs to.
+     *
+     * @return "default" for DEFAULT_SKIN, "ota" for downloads in
+     * ~/.codenameone/, "user" for any other resolvable filesystem skin,
+     * or {@code null} when the entry should be dropped.
+     */
+    private String classifySkin(String pathOrURI) {
+        if (pathOrURI == null || pathOrURI.isEmpty()) {
+            return null;
         }
-        JMenuItem dSkin = new JMenuItem("Desktop.skin");
-        
-        dSkin.addActionListener(new ActionListener() {
+        File asFile = null;
+        if (pathOrURI.startsWith("file:") || pathOrURI.contains("://")) {
+            try {
+                asFile = new File(new URL(pathOrURI).getFile());
+            } catch (Exception e) {
+                return null;
+            }
+        } else {
+            asFile = new File(pathOrURI);
+        }
+        if (asFile != null && asFile.exists()) {
+            File otaRoot = new File(System.getProperty("user.home"), ".codenameone");
+            try {
+                String otaCanonical = otaRoot.getCanonicalPath() + File.separator;
+                if (asFile.getCanonicalPath().startsWith(otaCanonical)) {
+                    return "ota";
+                }
+            } catch (IOException ignored) {
+            }
+            return "user";
+        }
+        // Doesn't resolve on the filesystem: treat as a classpath
+        // resource. Only the current default is kept; old bundled
+        // skins were removed and would error out at load time.
+        if (DEFAULT_SKIN.equals(pathOrURI)) {
+            return "default";
+        }
+        return null;
+    }
 
+    private JRadioButtonMenuItem buildSkinRadioItem(final JFrame frm, final String skinPath,
+            final String currentSkin, final boolean desktopSkinActive) {
+        String name;
+        if (skinPath.startsWith("file:") || skinPath.contains("://")) {
+            try {
+                name = new File(new URL(skinPath).getFile()).getName();
+            } catch (Exception e) {
+                name = skinPath;
+            }
+        } else if (skinPath.startsWith("/") && !new File(skinPath).exists()) {
+            // classpath resource - drop the leading slash for display
+            name = skinPath.substring(1);
+        } else {
+            File f = new File(skinPath);
+            name = f.exists() ? f.getName() : skinPath;
+        }
+        JRadioButtonMenuItem item = new JRadioButtonMenuItem(name,
+                !desktopSkinActive && skinPath.equals(currentSkin));
+        item.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ae) {
                 if (netMonitor != null) {
                     netMonitor.dispose();
@@ -5308,47 +5406,56 @@ public class JavaSEPort extends CodenameOneImplementation {
                     perfMonitor = null;
                 }
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                pref.putBoolean("desktopSkin", true);
-                pref.putBoolean("uwpDesktopSkin", false);
+                pref.putBoolean("desktopSkin", false);
                 String mainClass = System.getProperty("MainClass");
                 if (mainClass != null) {
-                    deinitializeSync();
+                    pref.put("skin", skinPath);
                     frm.dispose();
                     System.setProperty("reload.simulator", "true");
-                } 
+                } else {
+                    loadSkinFile(skinPath, frm);
+                    refreshSkin(frm);
+                }
             }
         });
-        JMenuItem uwpSkin = new JMenuItem("UWP Desktop.skin");
-        uwpSkin.setToolTipText("Windows 10 Desktop Skin");
-        uwpSkin.addActionListener(new ActionListener() {
+        return item;
+    }
 
-            public void actionPerformed(ActionEvent ae) {
-                if (netMonitor != null) {
-                    netMonitor.dispose();
-                    netMonitor = null;
-                }
-                if (perfMonitor != null) {
-                    perfMonitor.dispose();
-                    perfMonitor = null;
-                }
-                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                pref.putBoolean("desktopSkin", true);
-                pref.putBoolean("uwpDesktopSkin", true);
-                String mainClass = System.getProperty("MainClass");
-                if (mainClass != null) {
-                    deinitializeSync();
-                    frm.dispose();
-                    System.setProperty("reload.simulator", "true");
-                } 
-            }
-        });
-        skinMenu.addSeparator();
-        skinMenu.add(dSkin);
-        skinMenu.add(uwpSkin);
-        
-        skinMenu.addSeparator();
+    private void switchDesktopSkin(JFrame frm, boolean uwp) {
+        if (netMonitor != null) {
+            netMonitor.dispose();
+            netMonitor = null;
+        }
+        if (perfMonitor != null) {
+            perfMonitor.dispose();
+            perfMonitor = null;
+        }
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        pref.putBoolean("desktopSkin", true);
+        pref.putBoolean("uwpDesktopSkin", uwp);
+        if (System.getProperty("MainClass") != null) {
+            deinitializeSync();
+            frm.dispose();
+            System.setProperty("reload.simulator", "true");
+        }
+    }
+
+    private void populateLegacySkinsMenu(final JFrame frm, final JMenu topLevelMenu, final JMenu legacyMenu,
+            final ButtonGroup skinGroup, final List<String> otaSkins, final String currentSkin,
+            final boolean desktopSkinActive) throws MalformedURLException {
+        legacyMenu.removeAll();
+
+        for (String entry : otaSkins) {
+            JRadioButtonMenuItem item = buildSkinRadioItem(frm, entry, currentSkin, desktopSkinActive);
+            skinGroup.add(item);
+            legacyMenu.add(item);
+        }
+        if (!otaSkins.isEmpty()) {
+            legacyMenu.addSeparator();
+        }
+
         JMenuItem more = new JMenuItem("More...");
-        skinMenu.add(more);
+        legacyMenu.add(more);
         more.addActionListener(new ActionListener() {
 
             @Override
@@ -5550,7 +5657,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             downloadMessage.setVisible(false);
                                             d.setVisible(false);
                                             try {
-                                                populateLegacySkinsMenu(frm, skinMenu);
+                                                // Rebuild the whole Skins menu - newly
+                                                // downloaded entries land in the Legacy
+                                                // submenu but the shared ButtonGroup
+                                                // spans both, so a partial rebuild
+                                                // would leak the previous group.
+                                                createSkinsMenu(frm, topLevelMenu);
                                             } catch (MalformedURLException ex) {
                                                 Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
                                             }
@@ -5577,15 +5689,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
 
-        skinMenu.addSeparator();
+        legacyMenu.addSeparator();
         JMenuItem reset = new JMenuItem("Reset Skins");
-        skinMenu.add(reset);
+        legacyMenu.add(reset);
         reset.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent ae) {
                     if(JOptionPane.showConfirmDialog(frm,
-                            "Are you sure you want to reset skins to default?", 
-                            "Clean Storage", 
+                            "Are you sure you want to reset skins to default?",
+                            "Clean Storage",
                             JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION){
                         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                         pref.put("skins", DEFAULT_SKINS);

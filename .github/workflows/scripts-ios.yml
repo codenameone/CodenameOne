@@ -207,18 +207,7 @@ jobs:
   build-ios-metal:
     # Mirrors build-ios but enables the Metal rendering backend via the
     # codename1.arg.ios.metal=true build hint. Keeps the GL path untouched
-    # so a regression on either path is isolated in its own job. Part of
-    # the iOS Metal port migration -- see Ports/iOSPort/METAL_PORT_STATUS.md.
-    #
-    # continue-on-error while the Metal port is still in progress:
-    # screenshot comparisons will differ from golden images until DrawString
-    # is ported and ClipRect is re-enabled (Phase 2 follow-ups tracked in
-    # METAL_PORT_STATUS.md). The Metal job still runs on every PR that
-    # touches the paths below so we can watch for new regressions and
-    # download artifacts for comparison, but a failure here won't block
-    # the PR. Flip this to false (or remove the line) once the Metal
-    # variant matches the GL variant's screenshot set.
-    continue-on-error: true
+    # so a regression on either path is isolated in its own job.
     needs: build-port
     permissions:
       contents: read
