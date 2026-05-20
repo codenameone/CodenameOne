@@ -200,15 +200,22 @@ public class RGBImage extends Image {
     /// {@inheritDoc}
     ///
     /// `RGBImage` has no native peer, so the inherited scaled-draw path
-    /// (`g.drawImageWH(image, ...)`) renders nothing. Instead, compose a
-    /// matrix-correct translate + scale onto the graphics context using
-    /// `g.translateMatrix` / `g.scale` and emit `drawRGB` at the image's
-    /// native size -- the platform pipeline (iOS Metal, Android Skia,
-    /// Graphics2D, ...) then performs the actual scaling in hardware /
-    /// native code rather than on the CPU. `translateMatrix` is used (not
-    /// the integer `translate`) so the translate composes into the impl
-    /// matrix the same way the scale does, instead of being baked into
-    /// draw coordinates before the matrix is applied.
+    /// (`g.drawImageWH(image, ...)`) renders nothing. Instead, build a
+    /// translate + scale affine transform on top of the graphics context's
+    /// current transform and emit `drawRGB` at the image's native size --
+    /// the platform pipeline (iOS Metal, Android Skia, Graphics2D, ...)
+    /// performs the actual scaling in hardware / native code.
+    ///
+    /// `Graphics.setTransform` is used (rather than `translateMatrix` +
+    /// `scale`) because on ports where `impl.isTranslationSupported()` is
+    /// false (iOS), prior `g.translate(int, int)` calls accumulate into a
+    /// per-Graphics integer translate that is baked into draw coordinates
+    /// **before** the impl matrix is applied. A naked `translateMatrix` /
+    /// `scale` composition would therefore multiply that accumulator by
+    /// the scale factor, shifting the on-screen position. `setTransform`
+    /// conjugates the matrix with `T(xTranslate, yTranslate)`, cancelling
+    /// the accumulator so the result lands at the requested coordinates
+    /// on every port.
     @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         if (w <= 0 || h <= 0) {
@@ -218,25 +225,17 @@ public class RGBImage extends Image {
             g.drawRGB(rgb, 0, x, y, width, height, !opaque);
             return;
         }
-        if (Transform.isSupported() && g.isTransformSupported() && g.isTranslateMatrixSupported()) {
-            Transform saved = Transform.makeIdentity();
-            g.getTransform(saved);
-            try {
-                g.translateMatrix(x, y);
-                g.scale(((float) w) / width, ((float) h) / height);
-                g.drawRGB(rgb, 0, 0, 0, width, height, !opaque);
-            } finally {
-                g.setTransform(saved);
-            }
-            return;
+        Transform saved = Transform.makeIdentity();
+        g.getTransform(saved);
+        try {
+            Transform scaled = saved.copy();
+            scaled.translate(x, y);
+            scaled.scale(((float) w) / width, ((float) h) / height);
+            g.setTransform(scaled);
+            g.drawRGB(rgb, 0, 0, 0, width, height, !opaque);
+        } finally {
+            g.setTransform(saved);
         }
-        // Software fallback for the (rare) graphics context that cannot
-        // compose a translate onto the impl matrix (legacy JavaScript port).
-        // Shipped iOS / Android / JavaSE ports never take this branch.
-        int[] scaled = new int[w * h];
-        int[] scratch = new int[width];
-        scaleArray(width, height, h, w, scratch, scaled);
-        g.drawRGB(scaled, 0, x, y, w, h, !opaque);
     }
 
     /// Indicates if an image should be treated as opaque, this can improve support

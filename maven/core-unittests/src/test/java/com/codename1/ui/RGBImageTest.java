@@ -159,6 +159,44 @@ class RGBImageTest extends UITestBase {
                 "2x integer downscale should pick one representative pixel per source quadrant");
     }
 
+    // Regression test for the screen-rendering case: on ports where
+    // impl.isTranslationSupported() is false (iOS), g.translate(...) calls
+    // accumulate xTranslate/yTranslate on the Graphics object and are baked
+    // into drawRGB coordinates BEFORE the impl matrix is applied. A naked
+    // translateMatrix + scale composition would multiply that accumulator
+    // by the scale factor, shifting the image off-target. The fix uses
+    // setTransform, which conjugates the matrix with T(xT, yT) so the
+    // image lands at (xT + x, yT + y) regardless of the scale factor.
+    @FormTest
+    void testScaledDrawImageRespectsPriorGraphicsTranslate() {
+        int red = 0xffff0000;
+        int green = 0xff00ff00;
+        int blue = 0xff0000ff;
+        int white = 0xffffffff;
+        int bg = 0xff000000;
+        RGBImage source = new RGBImage(new int[]{red, green, blue, white}, 2, 2);
+
+        Image canvas = Image.createImage(8, 8, bg);
+        Graphics g = canvas.getGraphics();
+        g.translate(2, 2);
+        g.drawImage(source, 0, 0, 4, 4);
+
+        int[] actual = canvas.getRGB();
+        int[] expected = new int[]{
+                bg, bg, bg,    bg,    bg,    bg,    bg, bg,
+                bg, bg, bg,    bg,    bg,    bg,    bg, bg,
+                bg, bg, red,   red,   green, green, bg, bg,
+                bg, bg, red,   red,   green, green, bg, bg,
+                bg, bg, blue,  blue,  white, white, bg, bg,
+                bg, bg, blue,  blue,  white, white, bg, bg,
+                bg, bg, bg,    bg,    bg,    bg,    bg, bg,
+                bg, bg, bg,    bg,    bg,    bg,    bg, bg
+        };
+        assertArrayEquals(expected, actual,
+                "Scaled draw should land at (xTranslate + x, yTranslate + y) -- the prior g.translate " +
+                "must not be multiplied by the scale factor");
+    }
+
     @FormTest
     void testScaledDrawImagePreservesPriorTransform() {
         RGBImage source = createSampleImage();
