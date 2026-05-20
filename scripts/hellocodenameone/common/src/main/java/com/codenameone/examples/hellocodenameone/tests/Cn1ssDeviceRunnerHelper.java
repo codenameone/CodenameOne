@@ -195,8 +195,17 @@ interface Cn1ssDeviceRunnerHelper {
         int count = 0;
 
         boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
+        boolean isIos = "ios".equals(Display.getInstance().getPlatformName());
         int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
-        int delay = isAndroid ? DELAY_ANDROID : 0;
+        // Android historically used a 50ms delay to prevent logcat
+        // buffer overflow/truncation. iOS Metal's simulator log pipeline
+        // has the same back-pressure shape under large PNGs (a fresh
+        // 187KB transition screenshot stalled chunk emission mid-stream
+        // and left the device-runner.log silent until the 30-min job
+        // timeout). Use a smaller iOS delay -- 5ms × ~280 chunks adds
+        // ~1.4s overhead per such test, still well inside the suite
+        // budget. Restricting to iOS keeps GL/JavaSE/HTML5 untouched.
+        int delay = isAndroid ? DELAY_ANDROID : (isIos ? 5 : 0);
 
         for (int pos = 0; pos < base64.length(); pos += chunkSize) {
             int end = Math.min(pos + chunkSize, base64.length());

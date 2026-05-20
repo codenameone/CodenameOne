@@ -25,6 +25,11 @@ open class HelloCodenameOne : Lifecycle() {
         // legacy code path get caught alongside the matrix-mode coverage.
         val matrixFlag = Display.getInstance().getProperty("matrixTranslation", "true")
         Graphics.useMatrixTranslation = "true".equals(matrixFlag, ignoreCase = true)
+        // Diagnostic: print the resolved flag value to the CI log so we
+        // can confirm the build hint round-tripped to the runtime
+        // correctly (e.g. validate that the build-ios-metal-legacy job
+        // really runs with matrix mode off).
+        System.out.println("CN1SS:INFO:matrixTranslation=" + Graphics.useMatrixTranslation + " property=" + matrixFlag)
         check(!Display.getInstance().isJailbrokenDevice()) {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
