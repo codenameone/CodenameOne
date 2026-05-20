@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// Cross-platform registry of named actions that the JavaSE simulator exposes.
 ///
@@ -49,7 +50,11 @@ import java.util.Map;
 /// click.
 public final class SimulatorHookExecutor {
 
-    private static volatile Map<String, Runnable> hooks = Collections.emptyMap();
+    // AtomicReference rather than a `volatile` field: same single-writer /
+    // many-reader visibility, but PMD's AvoidUsingVolatile rule (part of
+    // the JDK 8 PR CI gate) treats raw volatile as a code smell.
+    private static final AtomicReference<Map<String, Runnable>> HOOKS =
+            new AtomicReference<Map<String, Runnable>>(Collections.<String, Runnable>emptyMap());
 
     private SimulatorHookExecutor() {}
 
@@ -68,7 +73,7 @@ public final class SimulatorHookExecutor {
         if (hookId == null) {
             return false;
         }
-        Runnable r = hooks.get(hookId);
+        Runnable r = HOOKS.get().get(hookId);
         if (r == null) {
             return false;
         }
@@ -80,14 +85,14 @@ public final class SimulatorHookExecutor {
     /// Useful for tests that want to skip themselves gracefully when running
     /// on a platform that doesn't expose the relevant cn1lib hook.
     public static boolean isRegistered(String hookId) {
-        return hookId != null && hooks.containsKey(hookId);
+        return hookId != null && HOOKS.get().containsKey(hookId);
     }
 
     /// Diagnostic view of every registered id. Returns an unmodifiable
     /// snapshot -- never null. Intended for tests/inspectors; ordinary app
     /// code shouldn't need this.
     public static Collection<String> registeredIds() {
-        return Collections.unmodifiableCollection(hooks.keySet());
+        return Collections.unmodifiableCollection(HOOKS.get().keySet());
     }
 
     /// Replaces the entire registry. The JavaSE port calls this every time
@@ -95,9 +100,9 @@ public final class SimulatorHookExecutor {
     /// targets nothing calls it and the registry stays empty.
     public static void register(Map<String, Runnable> registered) {
         if (registered == null || registered.isEmpty()) {
-            hooks = Collections.emptyMap();
+            HOOKS.set(Collections.<String, Runnable>emptyMap());
             return;
         }
-        hooks = Collections.unmodifiableMap(new HashMap<String, Runnable>(registered));
+        HOOKS.set(Collections.unmodifiableMap(new HashMap<String, Runnable>(registered)));
     }
 }
