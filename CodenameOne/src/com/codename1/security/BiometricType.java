@@ -22,16 +22,14 @@
  */
 package com.codename1.security;
 
-/**
- * Enumerates the biometric authentication modalities that may be available on a
- * device. Returned from {@link Biometrics#getAvailableBiometrics()}.
- *
- * <p>{@link #FINGERPRINT} and {@link #FACE} are populated on both iOS and
- * Android. {@link #IRIS} only appears on Android devices whose hardware
- * advertises {@code PackageManager.FEATURE_IRIS}. {@link #STRONG} and
- * {@link #WEAK} reflect Android's BiometricManager authenticator class tiers
- * (class 3 and class 2) and are only populated on Android API 30+.</p>
- */
+/// Enumerates the biometric authentication modalities that may be available on
+/// a device. Returned from `Biometrics.getAvailableBiometrics()`.
+///
+/// `FINGERPRINT` and `FACE` are populated on both iOS and Android. `IRIS` only
+/// appears on Android devices whose hardware advertises
+/// `PackageManager.FEATURE_IRIS`. `STRONG` and `WEAK` reflect Android's
+/// `BiometricManager` authenticator class tiers (class 3 and class 2) and are
+/// only populated on Android API 30+.
 public enum BiometricType {
     FINGERPRINT,
     FACE,

@@ -22,17 +22,14 @@
  */
 package com.codename1.security;
 
-/**
- * Configures a single call to {@link Biometrics#authenticate(AuthenticationOptions)}.
- * Setters return {@code this} for fluent chaining; only {@link #setReason(String)}
- * is required (it maps to the iOS {@code localizedReason} and the Android
- * BiometricPrompt title fallback).
- *
- * <p>Not every option is honored on every platform &mdash; the JavaDoc on each
- * setter notes the platforms where the value is consulted. Unrecognized
- * options are silently ignored, so callers can set the union without
- * platform-checking.</p>
- */
+/// Configures a single call to [Biometrics#authenticate(AuthenticationOptions)].
+/// Setters return `this` for fluent chaining; only [#setReason(String)] is
+/// required (it maps to the iOS `localizedReason` and the Android
+/// `BiometricPrompt` title fallback).
+///
+/// Not every option is honoured on every platform -- the docs on each setter
+/// note the platforms where the value is consulted. Unrecognised options are
+/// silently ignored, so callers can set the union without platform-checking.
 public final class AuthenticationOptions {
 
     private String reason;
@@ -52,12 +49,9 @@ public final class AuthenticationOptions {
         return reason;
     }
 
-    /**
-     * The user-facing reason for prompting. On iOS this is the
-     * {@code localizedReason} passed to {@code LAContext.evaluatePolicy};
-     * on Android it is used as the BiometricPrompt title if
-     * {@link #setTitle(String)} is unset.
-     */
+    /// The user-facing reason for prompting. On iOS this is the
+    /// `localizedReason` passed to `LAContext.evaluatePolicy`; on Android it
+    /// is used as the `BiometricPrompt` title if [#setTitle(String)] is unset.
     public AuthenticationOptions setReason(String reason) {
         this.reason = reason;
         return this;
@@ -67,7 +61,7 @@ public final class AuthenticationOptions {
         return title;
     }
 
-    /** Android BiometricPrompt title. Ignored on iOS. */
+    /// Android `BiometricPrompt` title. Ignored on iOS.
     public AuthenticationOptions setTitle(String title) {
         this.title = title;
         return this;
@@ -77,7 +71,7 @@ public final class AuthenticationOptions {
         return subtitle;
     }
 
-    /** Android BiometricPrompt subtitle. Ignored on iOS. */
+    /// Android `BiometricPrompt` subtitle. Ignored on iOS.
     public AuthenticationOptions setSubtitle(String subtitle) {
         this.subtitle = subtitle;
         return this;
@@ -87,7 +81,7 @@ public final class AuthenticationOptions {
         return description;
     }
 
-    /** Android BiometricPrompt description body. Ignored on iOS. */
+    /// Android `BiometricPrompt` description body. Ignored on iOS.
     public AuthenticationOptions setDescription(String description) {
         this.description = description;
         return this;
@@ -97,7 +91,7 @@ public final class AuthenticationOptions {
         return negativeButtonText;
     }
 
-    /** Android BiometricPrompt negative button label (defaults to "Cancel"). */
+    /// Android `BiometricPrompt` negative button label (defaults to "Cancel").
     public AuthenticationOptions setNegativeButtonText(String text) {
         this.negativeButtonText = text == null ? "Cancel" : text;
         return this;
@@ -107,12 +101,10 @@ public final class AuthenticationOptions {
         return biometricOnly;
     }
 
-    /**
-     * If {@code true}, the OS prompt rejects device-credential fallback (PIN
-     * / pattern / passcode). Honored on both platforms; on Android this maps
-     * to {@code setAllowedAuthenticators(BIOMETRIC_STRONG)} or its legacy
-     * equivalent.
-     */
+    /// If `true`, the OS prompt rejects device-credential fallback (PIN /
+    /// pattern / passcode). Honoured on both platforms; on Android this maps
+    /// to `setAllowedAuthenticators(BIOMETRIC_STRONG)` or its legacy
+    /// equivalent.
     public AuthenticationOptions setBiometricOnly(boolean biometricOnly) {
         this.biometricOnly = biometricOnly;
         return this;
@@ -122,11 +114,9 @@ public final class AuthenticationOptions {
         return sensitiveTransaction;
     }
 
-    /**
-     * Hints that the operation guards a sensitive action and a class-3
-     * ("strong") biometric should be required where the platform exposes the
-     * distinction. Affects Android API 30+; advisory on iOS.
-     */
+    /// Hints that the operation guards a sensitive action and a class-3
+    /// ("strong") biometric should be required where the platform exposes the
+    /// distinction. Affects Android API 30+; advisory on iOS.
     public AuthenticationOptions setSensitiveTransaction(boolean sensitive) {
         this.sensitiveTransaction = sensitive;
         return this;
@@ -136,11 +126,9 @@ public final class AuthenticationOptions {
         return stickyAuth;
     }
 
-    /**
-     * If {@code true}, the in-progress authentication survives the app being
-     * backgrounded and resumes on foreground (Android sticky-auth semantics).
-     * No effect on iOS.
-     */
+    /// If `true`, the in-progress authentication survives the app being
+    /// backgrounded and resumes on foreground (Android sticky-auth semantics).
+    /// No effect on iOS.
     public AuthenticationOptions setStickyAuth(boolean stickyAuth) {
         this.stickyAuth = stickyAuth;
         return this;
@@ -150,12 +138,10 @@ public final class AuthenticationOptions {
         return showDialogOnAndroid;
     }
 
-    /**
-     * Controls whether the legacy {@code FingerprintManager} path (Android
-     * 6-9) draws a Codename One Dialog over the system prompt. The modern
-     * BiometricPrompt path (Android 10+) provides its own UI and ignores
-     * this flag.
-     */
+    /// Controls whether the legacy `FingerprintManager` path (Android 6-9)
+    /// draws a Codename One Dialog over the system prompt. The modern
+    /// `BiometricPrompt` path (Android 10+) provides its own UI and ignores
+    /// this flag.
     public AuthenticationOptions setShowDialogOnAndroid(boolean show) {
         this.showDialogOnAndroid = show;
         return this;

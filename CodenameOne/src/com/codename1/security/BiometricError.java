@@ -22,47 +22,42 @@
  */
 package com.codename1.security;
 
-/**
- * Typed error codes returned by {@link Biometrics} and {@link SecureStorage}
- * when an asynchronous operation fails. Callers branch on these codes via
- * {@link BiometricException#getError()} instead of string-matching error
- * messages, which makes localization and recovery logic straightforward.
- */
+/// Typed error codes returned by [Biometrics] and [SecureStorage] when an
+/// asynchronous operation fails. Callers branch on these codes via
+/// [BiometricException#getError()] instead of string-matching error messages,
+/// which makes localization and recovery logic straightforward.
 public enum BiometricError {
-    /** Biometric hardware is not present, or is disabled by policy. */
+    /// Biometric hardware is not present, or is disabled by policy.
     NOT_AVAILABLE,
 
-    /** Hardware is present but the user has not enrolled any biometrics. */
+    /// Hardware is present but the user has not enrolled any biometrics.
     NOT_ENROLLED,
 
-    /** Too many failed attempts; biometric prompt is temporarily disabled. */
+    /// Too many failed attempts; biometric prompt is temporarily disabled.
     LOCKED_OUT,
 
-    /**
-     * Too many failed attempts and the user must unlock with their device
-     * passcode or PIN before biometrics can be used again.
-     */
+    /// Too many failed attempts and the user must unlock with their device
+    /// passcode or PIN before biometrics can be used again.
     PERMANENTLY_LOCKED_OUT,
 
-    /** The device has no passcode / PIN / pattern configured. */
+    /// The device has no passcode / PIN / pattern configured.
     PASSCODE_NOT_SET,
 
-    /** The user explicitly cancelled the prompt. */
+    /// The user explicitly cancelled the prompt.
     USER_CANCELED,
 
-    /** The OS cancelled the prompt (app backgrounded, system pre-empted, etc.). */
+    /// The OS cancelled the prompt (app backgrounded, system pre-empted, etc.).
     SYSTEM_CANCELED,
 
-    /** Authentication completed but the user was not recognized. */
+    /// Authentication completed but the user was not recognized.
     AUTHENTICATION_FAILED,
 
-    /**
-     * A previously-stored {@link SecureStorage} entry can no longer be decrypted
-     * because the user enrolled new biometrics or disabled device security since
-     * the entry was written. Callers must re-prompt and re-write the entry.
-     */
+    /// A previously-stored [SecureStorage] entry can no longer be decrypted
+    /// because the user enrolled new biometrics or disabled device security
+    /// since the entry was written. Callers must re-prompt and re-write the
+    /// entry.
     KEY_REVOKED,
 
-    /** Anything not covered by the more specific codes. */
+    /// Anything not covered by the more specific codes.
     UNKNOWN
 }

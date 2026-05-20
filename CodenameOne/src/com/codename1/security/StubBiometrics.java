@@ -27,12 +27,9 @@ import com.codename1.util.AsyncResource;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * No-op Biometrics returned by {@code CodenameOneImplementation} when a port
- * has not overridden {@code getBiometrics()}. Reports the device as
- * unsupported and fails every authentication with
- * {@link BiometricError#NOT_AVAILABLE}.
- */
+/// No-op Biometrics returned by `CodenameOneImplementation` when a port has
+/// not overridden `getBiometrics()`. Reports the device as unsupported and
+/// fails every authentication with [BiometricError#NOT_AVAILABLE].
 final class StubBiometrics extends Biometrics {
 
     StubBiometrics() {

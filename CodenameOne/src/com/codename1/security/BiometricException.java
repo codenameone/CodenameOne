@@ -22,12 +22,10 @@
  */
 package com.codename1.security;
 
-/**
- * Thrown via the failure path of an {@code AsyncResource} returned by
- * {@link Biometrics} or {@link SecureStorage} when the underlying biometric or
- * keychain operation fails. {@link #getError()} returns a typed
- * {@link BiometricError} code so callers can react without string-matching.
- */
+/// Thrown via the failure path of an `AsyncResource` returned by [Biometrics]
+/// or [SecureStorage] when the underlying biometric or keychain operation
+/// fails. [#getError()] returns a typed [BiometricError] code so callers can
+/// react without string-matching.
 public class BiometricException extends Exception {
 
     private final BiometricError error;
@@ -47,7 +45,7 @@ public class BiometricException extends Exception {
         this.error = error == null ? BiometricError.UNKNOWN : error;
     }
 
-    /** Typed error code describing the failure. Never {@code null}. */
+    /// Typed error code describing the failure. Never `null`.
     public BiometricError getError() {
         return error;
     }

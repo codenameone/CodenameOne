@@ -27,54 +27,49 @@ import com.codename1.util.AsyncResource;
 
 import java.util.List;
 
-/**
- * Entry point for biometric authentication (Touch ID, Face ID, fingerprint,
- * Android BiometricPrompt). Obtain the platform implementation via
- * {@link #getInstance()}; the returned subclass is owned by the active port.
- *
- * <p>A typical unlock flow:</p>
- *
- * <pre>{@code
- * Biometrics b = Biometrics.getInstance();
- * if (!b.canAuthenticate()) {
- *     // Fall back to password
- *     return;
- * }
- * b.authenticate("Unlock your account").onResult((success, err) -> {
- *     if (err != null) {
- *         BiometricError code = ((BiometricException) err).getError();
- *         // branch on code
- *     } else {
- *         // success
- *     }
- * });
- * }</pre>
- *
- * <p>{@link #authenticate(AuthenticationOptions)} returns an
- * {@link AsyncResource} whose failure path completes with a
- * {@link BiometricException} so callers can branch on the typed
- * {@link BiometricError}.</p>
- *
- * <p>This class is the parallel of Flutter's {@code local_auth} surface.
- * On platforms without biometric support (desktop simulator with the
- * "Available" simulator menu item unchecked, or older Android devices),
- * {@link #canAuthenticate()} returns {@code false} and
- * {@link #authenticate(AuthenticationOptions)} completes with
- * {@link BiometricError#NOT_AVAILABLE}.</p>
- */
+/// Entry point for biometric authentication (Touch ID, Face ID, fingerprint,
+/// Android BiometricPrompt). Obtain the platform implementation via
+/// [#getInstance()]; the returned subclass is owned by the active port.
+///
+/// A typical unlock flow:
+///
+/// ```java
+/// Biometrics b = Biometrics.getInstance();
+/// if (!b.canAuthenticate()) {
+///     // Fall back to password
+///     return;
+/// }
+/// b.authenticate("Unlock your account").onResult((success, err) -> {
+///     if (err != null) {
+///         BiometricError code = ((BiometricException) err).getError();
+///         // branch on code
+///     } else {
+///         // success
+///     }
+/// });
+/// ```
+///
+/// [#authenticate(AuthenticationOptions)] returns an `AsyncResource` whose
+/// failure path completes with a [BiometricException] so callers can branch
+/// on the typed [BiometricError].
+///
+/// This class is the parallel of Flutter's `local_auth` surface. On platforms
+/// without biometric support (desktop simulator with the "Available"
+/// simulator menu item unchecked, or older Android devices),
+/// [#canAuthenticate()] returns `false` and
+/// [#authenticate(AuthenticationOptions)] completes with
+/// [BiometricError#NOT_AVAILABLE].
 public abstract class Biometrics {
 
     private static Biometrics fallback;
 
-    /** Subclasses are constructed by the port; not for application use. */
+    /// Subclasses are constructed by the port; not for application use.
     protected Biometrics() {
     }
 
-    /**
-     * Returns the platform-specific singleton owned by the current port.
-     * Ports that do not implement biometrics get a no-op fallback that
-     * reports {@link BiometricError#NOT_AVAILABLE}.
-     */
+    /// Returns the platform-specific singleton owned by the current port.
+    /// Ports that do not implement biometrics get a no-op fallback that
+    /// reports [BiometricError#NOT_AVAILABLE].
     public static Biometrics getInstance() {
         Biometrics b = Display.getInstance().getBiometrics();
         if (b != null) {
@@ -86,59 +81,52 @@ public abstract class Biometrics {
         return fallback;
     }
 
-    /**
-     * Returns {@code true} when biometric hardware exists on the device,
-     * regardless of whether the user has enrolled biometrics. Combine with
-     * {@link #canAuthenticate()} to gate UI affordances: show the "Use
-     * biometrics" toggle when {@code isSupported()} is true, but only invoke
-     * {@link #authenticate(AuthenticationOptions)} when {@code canAuthenticate()}
-     * is also true.
-     */
+    /// Returns `true` when biometric hardware exists on the device,
+    /// regardless of whether the user has enrolled biometrics. Combine with
+    /// [#canAuthenticate()] to gate UI affordances: show the "Use biometrics"
+    /// toggle when `isSupported()` is true, but only invoke
+    /// [#authenticate(AuthenticationOptions)] when `canAuthenticate()` is
+    /// also true.
     public abstract boolean isSupported();
 
-    /**
-     * Returns {@code true} when the device is ready to authenticate right now:
-     * hardware present, at least one biometric enrolled, and not in a
-     * locked-out state.
-     */
+    /// Returns `true` when the device is ready to authenticate right now:
+    /// hardware present, at least one biometric enrolled, and not in a
+    /// locked-out state.
     public abstract boolean canAuthenticate();
 
-    /**
-     * Lists the biometric modalities currently enrolled. On iOS this is
-     * {@link BiometricType#FINGERPRINT} or {@link BiometricType#FACE}; on
-     * Android the list may contain {@link BiometricType#IRIS} as well, and
-     * Android API 30+ adds {@link BiometricType#STRONG} / {@link BiometricType#WEAK}
-     * authenticator class tags.
-     *
-     * @return an empty list when nothing is enrolled or the device is unsupported
-     */
+    /// Lists the biometric modalities currently enrolled. On iOS this is
+    /// [BiometricType#FINGERPRINT] or [BiometricType#FACE]; on Android the
+    /// list may contain [BiometricType#IRIS] as well, and Android API 30+
+    /// adds [BiometricType#STRONG] / [BiometricType#WEAK] authenticator class
+    /// tags.
+    ///
+    /// #### Returns
+    ///
+    /// an empty list when nothing is enrolled or the device is unsupported
     public abstract List<BiometricType> getAvailableBiometrics();
 
-    /**
-     * Prompts the user to authenticate. The returned {@link AsyncResource}
-     * completes with {@code true} on success, or with a
-     * {@link BiometricException} on failure (consult
-     * {@link BiometricException#getError()} for the typed code).
-     *
-     * @param opts non-null configuration; {@link AuthenticationOptions#setReason(String)}
-     *             should be set
-     */
+    /// Prompts the user to authenticate. The returned `AsyncResource`
+    /// completes with `true` on success, or with a [BiometricException] on
+    /// failure (consult [BiometricException#getError()] for the typed code).
+    ///
+    /// #### Parameters
+    ///
+    /// - `opts`: non-null configuration; [AuthenticationOptions#setReason(String)]
+    ///   should be set
     public abstract AsyncResource<Boolean> authenticate(AuthenticationOptions opts);
 
-    /**
-     * Convenience for {@code authenticate(new AuthenticationOptions().setReason(reason))}.
-     */
+    /// Convenience for `authenticate(new AuthenticationOptions().setReason(reason))`.
     public AsyncResource<Boolean> authenticate(String reason) {
         return authenticate(new AuthenticationOptions().setReason(reason));
     }
 
-    /**
-     * Cancels an in-flight {@link #authenticate(AuthenticationOptions)} call
-     * if one is running. The pending {@link AsyncResource} completes with
-     * {@link BiometricError#USER_CANCELED}.
-     *
-     * @return {@code true} when a call was cancelled; {@code false} when no
-     *         authentication was pending
-     */
+    /// Cancels an in-flight [#authenticate(AuthenticationOptions)] call if
+    /// one is running. The pending `AsyncResource` completes with
+    /// [BiometricError#USER_CANCELED].
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a call was cancelled; `false` when no authentication was
+    /// pending
     public abstract boolean stopAuthentication();
 }

@@ -24,10 +24,8 @@ package com.codename1.security;
 
 import com.codename1.util.AsyncResource;
 
-/**
- * No-op SecureStorage returned by {@code CodenameOneImplementation} when a
- * port has not overridden {@code getSecureStorage()}.
- */
+/// No-op SecureStorage returned by `CodenameOneImplementation` when a port
+/// has not overridden `getSecureStorage()`.
 final class StubSecureStorage extends SecureStorage {
 
     StubSecureStorage() {

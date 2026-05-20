@@ -25,35 +25,30 @@ package com.codename1.security;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
-/**
- * Biometric-gated secure storage backed by the platform keychain.
- * Reading an entry prompts the user for biometric authentication; writing or
- * deleting may or may not, depending on the platform.
- *
- * <p>Entries are bound to the current set of enrolled biometrics. If the user
- * adds a fingerprint, enrolls a new face, or disables device security, every
- * stored entry is automatically invalidated and subsequent
- * {@link #get(String, String)} calls fail with
- * {@link BiometricError#KEY_REVOKED}. The application must then re-prompt the
- * user for the original value and {@link #set(String, String, String)} it
- * again.</p>
- *
- * <p>Use this for short, secret strings (auth tokens, refresh tokens,
- * encryption keys). For larger data, encrypt with a key stored here.</p>
- */
+/// Biometric-gated secure storage backed by the platform keychain. Reading an
+/// entry prompts the user for biometric authentication; writing or deleting
+/// may or may not, depending on the platform.
+///
+/// Entries are bound to the current set of enrolled biometrics. If the user
+/// adds a fingerprint, enrols a new face, or disables device security, every
+/// stored entry is automatically invalidated and subsequent
+/// [#get(String, String)] calls fail with [BiometricError#KEY_REVOKED]. The
+/// application must then re-prompt the user for the original value and
+/// [#set(String, String, String)] it again.
+///
+/// Use this for short, secret strings (auth tokens, refresh tokens,
+/// encryption keys). For larger data, encrypt with a key stored here.
 public abstract class SecureStorage {
 
     private static SecureStorage fallback;
 
-    /** Subclasses are constructed by the port; not for application use. */
+    /// Subclasses are constructed by the port; not for application use.
     protected SecureStorage() {
     }
 
-    /**
-     * Returns the platform-specific singleton owned by the current port.
-     * Ports that do not implement secure storage get a no-op fallback that
-     * reports {@link BiometricError#NOT_AVAILABLE}.
-     */
+    /// Returns the platform-specific singleton owned by the current port.
+    /// Ports that do not implement secure storage get a no-op fallback that
+    /// reports [BiometricError#NOT_AVAILABLE].
     public static SecureStorage getInstance() {
         SecureStorage s = Display.getInstance().getSecureStorage();
         if (s != null) {
@@ -65,37 +60,29 @@ public abstract class SecureStorage {
         return fallback;
     }
 
-    /**
-     * Retrieves a previously-stored entry, prompting for biometric
-     * authentication. The returned {@link AsyncResource} completes with the
-     * value, or with a {@link BiometricException} on failure (including
-     * {@link BiometricError#KEY_REVOKED} when biometrics have been re-enrolled
-     * since the entry was written).
-     */
+    /// Retrieves a previously-stored entry, prompting for biometric
+    /// authentication. The returned `AsyncResource` completes with the value,
+    /// or with a [BiometricException] on failure (including
+    /// [BiometricError#KEY_REVOKED] when biometrics have been re-enrolled
+    /// since the entry was written).
     public abstract AsyncResource<String> get(String reason, String account);
 
-    /**
-     * Stores or overwrites a value for the given account. On iOS the user is
-     * typically not prompted (Apple's keychain accepts writes without
-     * re-authenticating); on Android the user is prompted because the
-     * underlying cipher requires biometric authentication.
-     */
+    /// Stores or overwrites a value for the given account. On iOS the user
+    /// is typically not prompted (Apple's keychain accepts writes without
+    /// re-authenticating); on Android the user is prompted because the
+    /// underlying cipher requires biometric authentication.
     public abstract AsyncResource<Boolean> set(String reason, String account, String value);
 
-    /**
-     * Removes a previously-stored entry. No authentication is required since
-     * deletion does not reveal the value.
-     */
+    /// Removes a previously-stored entry. No authentication is required since
+    /// deletion does not reveal the value.
     public abstract AsyncResource<Boolean> remove(String reason, String account);
 
-    /**
-     * Configures the iOS keychain access group for sharing entries between
-     * the main app and its extensions. The argument must include the Team ID
-     * prefix (e.g. {@code "ABCDE12345.group.com.example.app"}). Pass
-     * {@code null} or empty to clear. Ignored on non-iOS platforms.
-     *
-     * <p>The {@code ios.keychainAccessGroup} build hint must declare the same
-     * group in the app's entitlements for this to work.</p>
-     */
+    /// Configures the iOS keychain access group for sharing entries between
+    /// the main app and its extensions. The argument must include the Team
+    /// ID prefix (e.g. `"ABCDE12345.group.com.example.app"`). Pass `null` or
+    /// empty to clear. Ignored on non-iOS platforms.
+    ///
+    /// The `ios.keychainAccessGroup` build hint must declare the same group
+    /// in the app's entitlements for this to work.
     public abstract void setKeychainAccessGroup(String group);
 }
