@@ -277,14 +277,18 @@ public final class AndroidBiometrics extends Biometrics {
                     @Override
                     public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult r) {
                         cs.cancel();
-                        Cipher authedCipher = r.getCryptoObject() == null
-                                ? probeCipher : r.getCryptoObject().getCipher();
-                        if (verifyProbeCipher(authedCipher)) {
-                            completeSuccess(result);
-                        } else {
+                        // Require the OS to return the same CryptoObject we
+                        // passed in, and confirm by running an actual crypto
+                        // operation on the unlocked cipher. A hooked / spoofed
+                        // success callback either lacks the CryptoObject or
+                        // hits a Keystore-locked cipher and doFinal() throws.
+                        FingerprintManager.CryptoObject crypto = r.getCryptoObject();
+                        if (crypto == null || !verifyProbeCipher(crypto.getCipher())) {
                             completeError(result, BiometricError.AUTHENTICATION_FAILED,
                                     "Probe cipher rejected -- biometric success may have been spoofed");
+                            return;
                         }
+                        completeSuccess(result);
                     }
 
                     @Override
