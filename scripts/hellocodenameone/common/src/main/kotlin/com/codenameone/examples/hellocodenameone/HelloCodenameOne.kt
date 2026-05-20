@@ -28,10 +28,16 @@ open class HelloCodenameOne : Lifecycle() {
         // the work. CI flips the iOS suite into matrix-off mode through
         // `-Dcodename1.arg.matrixTranslation=false` so the legacy code
         // path also gets regression coverage.
-        val platform = Display.getInstance().platformName
-        val isIos = "ios".equals(platform, ignoreCase = true)
-        val matrixFlag = Display.getInstance().getProperty("matrixTranslation", if (isIos) "true" else "false")
-        Graphics.useMatrixTranslation = isIos && "true".equals(matrixFlag, ignoreCase = true)
+        // Use Java-side String.equalsIgnoreCase rather than Kotlin's
+        // `equals(..., ignoreCase = true)`: the latter compiles to a
+        // kotlin.text.StringsKt call and the ParparVM-translated JavaScript
+        // port doesn't bundle StringsKt, so the Kotlin form blows up at
+        // class-init with `Unknown class kotlin_text_StringsKt` and the
+        // browser harness hangs waiting for the suite to start.
+        val platform: String? = Display.getInstance().platformName
+        val isIos = "ios".equalsIgnoreCase(platform)
+        val matrixFlag: String? = Display.getInstance().getProperty("matrixTranslation", if (isIos) "true" else "false")
+        Graphics.useMatrixTranslation = isIos && "true".equalsIgnoreCase(matrixFlag)
         // Diagnostic: print the resolved flag value to the CI log so we
         // can confirm the build hint round-tripped to the runtime
         // correctly (e.g. validate that the build-ios-metal-legacy job
