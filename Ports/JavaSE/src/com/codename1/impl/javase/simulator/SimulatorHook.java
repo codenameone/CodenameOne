@@ -24,24 +24,24 @@
 package com.codename1.impl.javase.simulator;
 
 /**
- * One named action contributed by a cn1lib (or the app) to the simulator.
+ * One positional action contributed by a cn1lib (or the app) to the simulator.
  *
- * <p>A hook is always callable by id via
- * {@link com.codename1.system.SimulatorHookExecutor#execute} (and from the
- * cross-platform {@code CN.executeHook}). A hook with a non-empty label
- * also appears in the simulator's menu bar; hooks without a label are
- * API-only — useful for test scaffolding the user wouldn't click.</p>
+ * <p>Hooks are positional within each {@code simulator-hooks.properties}
+ * file: {@code item1} is the first menu entry, {@code item2} the second,
+ * etc. A hook with a non-empty {@link #getLabel() label} renders as a menu
+ * item; a label-less hook is API-only — invisible in the menu but still
+ * callable via {@code CN.execute("namespace:itemN")} for test scaffolding.</p>
  */
 public final class SimulatorHook {
     private final String namespace;
-    private final String id;
+    private final int index;
     private final String menuName;
     private final String label;
     private final Runnable invoke;
 
-    public SimulatorHook(String namespace, String id, String menuName, String label, Runnable invoke) {
+    public SimulatorHook(String namespace, int index, String menuName, String label, Runnable invoke) {
         this.namespace = namespace;
-        this.id = id;
+        this.index = index;
         this.menuName = menuName;
         this.label = label;
         this.invoke = invoke;
@@ -50,18 +50,18 @@ public final class SimulatorHook {
     /** Stable namespace token (one per properties file). */
     public String getNamespace() { return namespace; }
 
-    /** Stable id within the namespace; the executor key is {@code namespace:id}. */
-    public String getId() { return id; }
+    /** 1-based position of this item within its properties file. */
+    public int getIndex() { return index; }
 
-    /** Fully-qualified executor key — {@code namespace + ":" + id}. */
-    public String getExecutorKey() { return namespace + ":" + id; }
+    /** URL passed to {@code CN.execute} to trigger this hook — {@code namespace + ":item" + index}. */
+    public String getExecutorKey() { return namespace + ":item" + index; }
 
     /** Display title of the menu this hook belongs to (one per properties file). */
     public String getMenuName() { return menuName; }
 
     /**
      * Display label for the menu item, or {@code null}/empty if this hook is
-     * API-only (callable through {@link #getExecutorKey()} / {@code CN.executeHook}
+     * API-only (callable through {@link #getExecutorKey()} / {@code CN.execute}
      * but invisible in the simulator menu).
      */
     public String getLabel() { return label; }

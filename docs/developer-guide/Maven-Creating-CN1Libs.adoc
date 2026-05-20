@@ -457,7 +457,7 @@ And build the project. The project should build OK, and if you run it, you shoul
 
 A cn1lib can contribute menu items to the Codename One simulator's menu bar. This is the same affordance the framework itself uses for the Skins / Native Theme / Simulate menus — opened up so library authors can expose backend-specific actions (for example, "Add a simulated peripheral," "Inject a push notification," or "Switch backend") without users having to write any Swing code or instrument their app.
 
-Each menu item also gets a stable id, and a CN1 UnitTest in the cross-platform `common/` project can invoke that id through `CN.executeHook("namespace:id")` without referencing any JavaSE-specific class. The same mechanism supports hooks with *no menu label* — useful when you want a callable from tests but no visible menu entry.
+Every menu item is also reachable from CN1 UnitTests (or any app code) through `CN.execute("namespace:itemN")` — the JavaSE port's URL execute is overloaded to recognize a registered hook url and dispatch it on the EDT instead of opening it as a browser URL. On Android, iOS, JavaScript and other production targets no hooks are registered, so a hook-style URL falls through to the normal native execute and (almost always) becomes a no-op; tests should pair `CN.execute` with `CN.canExecute` for that reason. Hooks can also be declared with no menu label, which makes them callable from tests but invisible in the menu — useful for state-priming actions a human wouldn't click.
 
 ==== The contract
 
@@ -469,28 +469,28 @@ Each cn1lib ships a properties file at a well-known classpath location. The simu
 name=Bluetooth
 namespace=bluetooth   # optional; defaults to slugified `name`
 
-# Item with label = visible in the menu AND callable via CN.executeHook
-item1.id=toggleAdapter
-item1.label=Toggle adapter on/off
-item1.action=com.example.bt.simulator.Hooks#toggleAdapter
+# Each itemN is the action; the matching labelN is the menu text.
+# Items are positional — the loader reads item1, item2, item3, ... and
+# stops at the first missing index. Don't skip numbers.
+item1=com.example.bt.simulator.Hooks#toggleAdapter
+label1=Toggle adapter on/off
 
-# Item without label = API-only; callable from tests, invisible in the menu
-item2.id=scriptFault
-item2.action=com.example.bt.simulator.Hooks#scriptFault
+item2=com.example.bt.simulator.Hooks#addDemoPeripheral
+label2=Add demo peripheral
+
+# Label omitted → API-only hook. Callable from tests, invisible in menu.
+item3=com.example.bt.simulator.Hooks#primeReadFailure
 ----
 
 Required keys:
 
-`name`:: The menu title shown in the simulator's menu bar. One menu per properties file.
-`itemN.action`:: A `fully.qualified.ClassName#staticMethodName` reference. The method must be `public static void` and take no arguments.
+`name`:: Menu title shown in the simulator's menu bar. One menu per properties file.
+`itemN`:: A `fully.qualified.ClassName#staticMethodName` reference for the Nth menu item. The method must be `public static void` and take no arguments. Items are numbered from 1 upward; the loader stops at the first missing `itemN`, so don't leave gaps.
 
 Optional keys:
 
-`namespace`:: Stable identifier for the `CN.executeHook` lookup. Defaults to lowercased, ASCII-slugified `name` (`Push Notifications!` → `push-notifications`). Set this explicitly when you want a different identifier from the display name.
-`itemN.label`:: Display text for the menu entry. Omit entirely to make the hook API-only — registered with `CN.executeHook` but hidden from the menu.
-`itemN.id`:: Stable identifier inside the namespace. Defaults to the property key (`item1`, `item2`, etc.). Set this to something meaningful when you expect tests to call the hook by name.
-
-The `itemN` part of each property key is an opaque pairing token — any string works (`item1`, `add`, `42`) as long as the matching `.action`/`.label`/`.id` keys use the same prefix. Items appear in declaration order.
+`namespace`:: Identifier used for the `CN.execute` lookup, e.g. `bluetooth` for a URL like `bluetooth:item1`. Defaults to lowercased, ASCII-slugified `name` (`Push Notifications!` → `push-notifications`). Set this explicitly when you want a different identifier from the display name.
+`labelN`:: Display text for the matching `itemN`. Omit entirely to make the hook API-only — registered with `CN.execute` but hidden from the menu.
 
 No groups, no submenus, no priority — flat by design. If you need ordering relative to another cn1lib, you can't have it: discovery order wins, and that's intentional so the contract stays small and the future simulator UX can re-render this metadata however it likes.
 
@@ -529,28 +529,24 @@ Its `simulator-hooks.properties` looks like this:
 name=Bluetooth
 namespace=bluetooth
 
-item1.id=toggleAdapter
-item1.label=Toggle adapter on/off
-item1.action=com.codename1.bluetoothle.BluetoothSimulatorHooks#toggleAdapter
+item1=com.codename1.bluetoothle.BluetoothSimulatorHooks#toggleAdapter
+label1=Toggle adapter on/off
 
-item2.id=addDemoPeripheral
-item2.label=Add demo peripheral
-item2.action=com.codename1.bluetoothle.BluetoothSimulatorHooks#addDemoPeripheral
+item2=com.codename1.bluetoothle.BluetoothSimulatorHooks#addDemoPeripheral
+label2=Add demo peripheral
 
-item3.id=switchToNativeBle
-item3.label=Switch backend → native BLE (real hardware)
-item3.action=com.codename1.bluetoothle.BluetoothSimulatorHooks#switchToNativeBle
+item3=com.codename1.bluetoothle.BluetoothSimulatorHooks#switchToNativeBle
+label3=Switch backend → native BLE (real hardware)
 
 # API-only: used by the test suite but never displayed in the menu
-item4.id=primeFailure
-item4.action=com.codename1.bluetoothle.BluetoothSimulatorHooks#primeFailure
+item4=com.codename1.bluetoothle.BluetoothSimulatorHooks#primeReadFailure
 ----
 
-When the user runs an app that depends on `cn1-bluetooth`, the simulator's menu bar gets a *Bluetooth* menu with the three labeled items. Clicking *Add demo peripheral* drops a peripheral into the in-memory simulator that the running app can then scan for, connect to, and exchange data with — without any real hardware.
+When the user runs an app that depends on `cn1-bluetooth`, the simulator's menu bar gets a *Bluetooth* menu with the three labeled items. Clicking *Add demo peripheral* drops a peripheral into the in-memory simulator that the running app can then scan for, connect to, and exchange data with — without any real hardware. `item4` is callable from tests via `CN.execute("bluetooth:item4")` but never shows up in the menu.
 
 ==== Calling hooks from CN1 unit tests
 
-CN1 unit tests (`AbstractTest` subclasses run via `mvn cn1:test`) compile under the same restrictions as the rest of the app — no reflection, no JavaSE-only imports. To drive a simulator hook from a test, call `CN.executeHook` with the `namespace:id` of the hook you want to fire:
+CN1 unit tests (`AbstractTest` subclasses run via `mvn cn1:test`) compile under the same restrictions as the rest of the app — no reflection, no JavaSE-only imports. Drive a hook the same way you'd execute any URL — `CN.execute` recognizes registered hook urls and dispatches them on the EDT:
 
 [source,java]
 ----
@@ -560,22 +556,20 @@ import com.codename1.ui.CN;
 public class BluetoothDemoTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
-        // Seed the simulator: same effect as a human clicking the menu item.
-        if (!CN.executeHook("bluetooth:addDemoPeripheral")) {
-            // Outside a CN1 simulator (e.g. running on a device): bail out
-            // gracefully — the hook isn't registered, so we can't script
-            // the state, and the test is irrelevant on real hardware.
+        // Skip cleanly off-simulator: a real device has no hook registered
+        // and CN.canExecute will not return TRUE.
+        if (!Boolean.TRUE.equals(CN.canExecute("bluetooth:item2"))) {
             return true;
         }
+        // Seed the simulator — same effect as clicking "Add demo peripheral".
+        CN.execute("bluetooth:item2");
         // ...now drive the public Bluetooth API as usual.
         return true;
     }
 }
 ----
 
-`CN.executeHook` returns `false` on platforms that don't expose the hook (Android, iOS, JavaScript, plain `java -jar` invocations), so tests can fall back cleanly. The hook always runs on the CN1 EDT.
-
-A common pattern: ship `_label_`-bearing hooks for actions a developer might want to fire manually (toggle adapter, inject notification), and ship label-less hooks for test-only state setup (`primeFailure`, `seedFixture`) that would just clutter the menu.
+A common pattern: ship label-bearing hooks for actions a developer might want to fire manually (toggle adapter, inject notification), and ship label-less hooks for test-only state setup (`primeReadFailure`, `seedFixture`) that would just clutter the menu.
 
 ==== What's intentionally not exposed
 

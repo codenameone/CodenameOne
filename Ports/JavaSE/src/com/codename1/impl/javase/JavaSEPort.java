@@ -10321,13 +10321,22 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void execute(String url) {
+        // Simulator-only intercept: a URL that matches a registered
+        // SimulatorHookExecutor entry is dispatched as a named hook
+        // (e.g. "bluetooth:item1") instead of being handed to the
+        // OS URL opener. SimulatorHookExecutor.execute returns false
+        // when no such hook is registered, so non-hook URLs fall
+        // through to the normal native behavior.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.execute(url.trim())) {
+            return;
+        }
         try {
             url = url.trim();
             if(url.startsWith("file:")) {
                 if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to open the file")){
                     return;
                 }
-                
+
                 url = new File(unfile(url)).toURI().toURL().toExternalForm();
             }
             final String fUrl = url;
@@ -10336,7 +10345,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     launchBrowserThatWorks(fUrl);
                 }
             });
-            
+
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -14855,6 +14864,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        // If this is a registered simulator hook URL, report it as
+        // executable up-front so a cross-platform CN1 UnitTest can use
+        // CN.canExecute(...) to gate hook calls behind a "we're in the
+        // simulator" check without exception-handling.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.isRegistered(url.trim())) {
+            return Boolean.TRUE;
+        }
         if(!url.startsWith("http")) {
             int pos = url.indexOf(":");
             if(pos > -1) {

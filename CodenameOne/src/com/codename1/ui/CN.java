@@ -678,7 +678,16 @@ public class CN extends CN1Constants {
         return Display.impl.canExecute(url);
     }
 
-    /// Executes the given URL on the native platform
+    /// Executes the given URL on the native platform. Also serves as the
+    /// cross-platform entry point for the JavaSE simulator's hook system:
+    /// the simulator scans cn1libs for `META-INF/codenameone/simulator-hooks.properties`,
+    /// and a URL of the form `namespace:itemN` that matches a registered hook
+    /// is intercepted by the JavaSE port and dispatched on the CN1 EDT
+    /// instead of being handed to the native URL opener. On Android, iOS,
+    /// JavaScript and other production targets no hooks are ever registered,
+    /// so a hook-style URL falls through to the normal native execute and
+    /// (almost always) becomes a no-op — tests should guard with
+    /// [#canExecute(String)] when running cross-platform.
     ///
     /// ```java
     /// Boolean can = Display.getInstance().canExecute("imdb:///find?q=godfather");
@@ -687,6 +696,11 @@ public class CN extends CN1Constants {
     /// } else {
     ///   Display.getInstance().execute("http://www.imdb.com");
     /// }
+    ///
+    /// // Driving a cn1lib's simulator hook from a CN1 UnitTest:
+    /// if (Boolean.TRUE.equals(CN.canExecute("bluetooth:item1"))) {
+    ///     CN.execute("bluetooth:item1"); // toggle the simulated adapter
+    /// }
     /// ```
     ///
     /// #### Parameters
@@ -694,43 +708,6 @@ public class CN extends CN1Constants {
     /// - `url`: the url to execute
     public static void execute(String url) {
         Display.impl.execute(url);
-    }
-
-    /// Invokes a named action registered with the JavaSE simulator's hook
-    /// system. cn1libs (and the app) declare hooks in
-    /// `META-INF/codenameone/simulator-hooks.properties` — the same file
-    /// that powers the simulator's Bluetooth/Push/etc. menus. Each hook
-    /// gets a stable id of the form `namespace:name`, e.g.
-    /// `bluetooth:toggleAdapter`.
-    ///
-    /// On Android, iOS, JavaScript, and other production targets this
-    /// method always returns `false` because no hooks are registered —
-    /// it's the explicit "we're not running in a simulator" signal that
-    /// CN1 UnitTest suites can branch on without referencing any
-    /// platform-specific class.
-    ///
-    /// Tests in the cross-platform `common/` project that want to drive
-    /// simulator behavior (toggle a simulated Bluetooth adapter, push a
-    /// scripted GPS fix, etc.) should call this instead of touching
-    /// JavaSE-port internals via reflection.
-    ///
-    /// ```java
-    /// // In a Codename One UnitTest:
-    /// CN.executeHook("bluetooth:addDemoPeripheral");
-    /// // ...now drive the public Bluetooth API as usual.
-    /// ```
-    ///
-    /// #### Parameters
-    ///
-    /// - `hookId`: the `namespace:name` identifier the hook was registered
-    ///   under (see the cn1lib's `simulator-hooks.properties`).
-    ///
-    /// #### Returns
-    ///
-    /// - `true` if a hook with this id was found and dispatched; `false`
-    ///   when no such hook is registered (always the case off-simulator).
-    public static boolean executeHook(String hookId) {
-        return com.codename1.system.SimulatorHookExecutor.execute(hookId);
     }
 
 

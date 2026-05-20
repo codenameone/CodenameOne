@@ -42,33 +42,37 @@ import java.util.Properties;
 /**
  * Discovers cn1lib-contributed simulator menu items by scanning the classpath
  * for {@code META-INF/codenameone/simulator-hooks.properties}. Each file
- * contributes one named group of items:
+ * declares one named group of positional items:
  *
  * <pre>
  * name=Bluetooth
  * namespace=bluetooth          # optional; defaults to slugified `name`
  *
- * item1.id=toggleAdapter       # optional; defaults to the property key (item1)
- * item1.label=Toggle adapter
- * item1.action=com.example.bt.sim.Hooks#toggleAdapter
+ * item1=com.example.bt.sim.Hooks#toggleAdapter
+ * label1=Toggle adapter
+ *
+ * item2=com.example.bt.sim.Hooks#addDemoPeripheral
+ * label2=Add demo peripheral
  *
  * # Label omitted → API-only hook. Callable from tests via
- * # CN.executeHook("bluetooth:internalTrigger"), invisible in the menu.
- * item2.id=internalTrigger
- * item2.action=com.example.bt.sim.Hooks#internalTrigger
+ * # CN.execute("bluetooth:item3"), invisible in the menu.
+ * item3=com.example.bt.sim.Hooks#primeReadFailure
  * </pre>
  *
- * Actions are resolved to {@code public static void method()} via reflection
- * using the same classloader that loaded {@link Display}, so the method has
- * full access to {@code Display}, {@code NativeLookup}-installed impls, and
- * any cn1lib internals. Invocations are dispatched on the CN1 EDT via
- * {@link Display#callSerially(Runnable)} so hook authors can freely interact
- * with the running app.
+ * <p>Items are positional: the loader reads {@code item1}, {@code item2},
+ * {@code item3}, ... and stops at the first missing {@code itemN}. Each
+ * {@code itemN} value is a {@code fqcn#staticMethodName} reference; the
+ * matching {@code labelN} (optional) becomes the menu item text.</p>
  *
- * In addition to returning the hook list for the menu, every successful load
- * also registers each hook with {@link SimulatorHookExecutor} under its
- * {@code namespace:id} key so the cross-platform
- * {@link com.codename1.ui.CN#executeHook} entry point can drive it.
+ * <p>Actions are resolved to {@code public static void method()} via reflection
+ * using the same classloader that loaded {@link Display}. Invocations are
+ * dispatched via {@link Display#callSeriallyAndWait(Runnable)} so menu clicks
+ * and {@code CN.execute} from off-EDT test code both run on the CN1 EDT and
+ * are synchronous to the caller.</p>
+ *
+ * <p>Every successful load also registers each hook with {@link SimulatorHookExecutor}
+ * under {@code "namespace:itemN"} keys so {@link com.codename1.ui.CN#execute(String)}
+ * can drive it cross-platform.</p>
  */
 public final class SimulatorHookLoader {
 
@@ -104,8 +108,6 @@ public final class SimulatorHookLoader {
         } catch (IOException ex) {
             System.err.println("SimulatorHookLoader: failed to enumerate " + RESOURCE_PATH);
             ex.printStackTrace();
-            // Reset the registry so a previous load doesn't survive a
-            // failed scan (tests that mutate the classpath rely on this).
             SimulatorHookExecutor.register(Collections.<String, Runnable>emptyMap());
             return out;
         }
@@ -118,7 +120,7 @@ public final class SimulatorHookLoader {
                 t.printStackTrace();
             }
         }
-        // Republish the registry so CN.executeHook reflects what we just loaded.
+        // Republish the registry so CN.execute reflects what we just loaded.
         Map<String, Runnable> registered = new LinkedHashMap<String, Runnable>();
         for (SimulatorHook h : out) {
             registered.put(h.getExecutorKey(), h.getInvoke());
@@ -128,7 +130,7 @@ public final class SimulatorHookLoader {
     }
 
     private static void loadOne(URL url, ClassLoader cl, List<SimulatorHook> out) throws IOException {
-        OrderedProperties props = new OrderedProperties();
+        Properties props = new Properties();
         InputStream in = url.openStream();
         try {
             // Reader form forces UTF-8; the default load(InputStream) is ISO-8859-1.
@@ -149,48 +151,26 @@ public final class SimulatorHookLoader {
             namespace = namespace.trim();
         }
 
-        // Group keys by their "itemN" id, preserving declaration order.
-        LinkedHashMap<String, String> labels = new LinkedHashMap<String, String>();
-        LinkedHashMap<String, String> actions = new LinkedHashMap<String, String>();
-        LinkedHashMap<String, String> ids = new LinkedHashMap<String, String>();
-        for (String key : props.orderedKeys()) {
-            if (key.endsWith(".label")) {
-                labels.put(key.substring(0, key.length() - ".label".length()), props.getProperty(key));
-            } else if (key.endsWith(".action")) {
-                actions.put(key.substring(0, key.length() - ".action".length()), props.getProperty(key));
-            } else if (key.endsWith(".id")) {
-                ids.put(key.substring(0, key.length() - ".id".length()), props.getProperty(key));
-            }
-        }
-
-        // The union of label-keys and id-keys is the set of declared items;
-        // items can be label-less (API-only) or label-only (no explicit id,
-        // defaults to the prefix). Walk in the order labels-then-id-only so
-        // menu items come first when both forms appear in the same file.
-        LinkedHashMap<String, Boolean> itemIds = new LinkedHashMap<String, Boolean>();
-        for (String prefix : labels.keySet()) itemIds.put(prefix, Boolean.TRUE);
-        for (String prefix : ids.keySet()) {
-            if (!itemIds.containsKey(prefix)) itemIds.put(prefix, Boolean.TRUE);
-        }
-
-        for (String prefix : itemIds.keySet()) {
-            String action = actions.get(prefix);
+        // Items are positional: read item1, item2, ... and stop at the
+        // first missing N. labelN is optional (no label = API-only hook).
+        int index = 1;
+        while (true) {
+            String action = props.getProperty("item" + index);
             if (action == null || action.trim().length() == 0) {
-                System.err.println("SimulatorHookLoader: " + url + " item '" + prefix
-                        + "' has no matching .action; skipping");
-                continue;
+                break;
             }
-            String label = labels.get(prefix); // may be null (API-only)
-            if (label != null) label = label.trim();
-            String explicitId = ids.get(prefix);
-            String id = explicitId != null && explicitId.trim().length() > 0
-                    ? explicitId.trim()
-                    : prefix;
-            Runnable invoke = buildInvoker(cl, action.trim(), url);
-            if (invoke == null) {
-                continue;
+            String label = props.getProperty("label" + index);
+            if (label != null) {
+                label = label.trim();
+                if (label.length() == 0) {
+                    label = null;
+                }
             }
-            out.add(new SimulatorHook(namespace, id, menuName, label, invoke));
+            Runnable invoke = buildInvoker(cl, action.trim(), url, index);
+            if (invoke != null) {
+                out.add(new SimulatorHook(namespace, index, menuName, label, invoke));
+            }
+            index++;
         }
     }
 
@@ -216,16 +196,16 @@ public final class SimulatorHookLoader {
                 lastDash = true;
             }
         }
-        // Strip trailing dash.
         int end = sb.length();
         while (end > 0 && sb.charAt(end - 1) == '-') end--;
         return sb.substring(0, end);
     }
 
-    private static Runnable buildInvoker(ClassLoader cl, String action, URL source) {
+    private static Runnable buildInvoker(ClassLoader cl, String action, URL source, int index) {
         int hash = action.indexOf('#');
         if (hash <= 0 || hash == action.length() - 1) {
-            System.err.println("SimulatorHookLoader: " + source + " has malformed action '" + action + "'; expected fqcn#methodName");
+            System.err.println("SimulatorHookLoader: " + source + " item" + index
+                    + " has malformed action '" + action + "'; expected fqcn#methodName");
             return null;
         }
         String fqcn = action.substring(0, hash).trim();
@@ -235,17 +215,20 @@ public final class SimulatorHookLoader {
         try {
             targetClass = Class.forName(fqcn, false, cl);
         } catch (ClassNotFoundException ex) {
-            System.err.println("SimulatorHookLoader: " + source + " references unknown class '" + fqcn + "'");
+            System.err.println("SimulatorHookLoader: " + source + " item" + index
+                    + " references unknown class '" + fqcn + "'");
             return null;
         }
         try {
             method = targetClass.getDeclaredMethod(methodName, new Class<?>[0]);
         } catch (NoSuchMethodException ex) {
-            System.err.println("SimulatorHookLoader: " + source + " references unknown no-arg method '" + fqcn + "#" + methodName + "'");
+            System.err.println("SimulatorHookLoader: " + source + " item" + index
+                    + " references unknown no-arg method '" + fqcn + "#" + methodName + "'");
             return null;
         }
         if (!java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
-            System.err.println("SimulatorHookLoader: " + source + " references non-static method '" + fqcn + "#" + methodName + "'");
+            System.err.println("SimulatorHookLoader: " + source + " item" + index
+                    + " references non-static method '" + fqcn + "#" + methodName + "'");
             return null;
         }
         method.setAccessible(true);
@@ -253,12 +236,11 @@ public final class SimulatorHookLoader {
         return new Runnable() {
             @Override
             public void run() {
-                // callSeriallyAndWait so a caller off the EDT (e.g. a CN1
-                // UnitTest's runTest() running on the main thread) blocks
-                // until the hook completes; otherwise the test would
-                // assert state changes before the EDT got to run the
-                // action. On the EDT itself, callSeriallyAndWait runs the
-                // body inline without re-entering the dispatch queue.
+                // callSeriallyAndWait so off-EDT callers (every CN1 UnitTest's
+                // runTest()) block until the hook completes — tests would
+                // otherwise assert state changes before the EDT got to run
+                // the action. On the EDT, callSeriallyAndWait runs the body
+                // inline without re-entering the dispatch queue.
                 Display.getInstance().callSeriallyAndWait(new Runnable() {
                     @Override
                     public void run() {
@@ -272,26 +254,5 @@ public final class SimulatorHookLoader {
                 });
             }
         };
-    }
-
-    /**
-     * Subclass of Properties that records insertion order so the menu reflects
-     * the order keys appear in the file rather than hash order. We only rely
-     * on {@code load(Reader)}, which routes through {@link #put(Object, Object)}.
-     */
-    private static final class OrderedProperties extends Properties {
-        private final LinkedHashMap<String, String> ordered = new LinkedHashMap<String, String>();
-
-        @Override
-        public synchronized Object put(Object key, Object value) {
-            if (key instanceof String && value instanceof String) {
-                ordered.put((String) key, (String) value);
-            }
-            return super.put(key, value);
-        }
-
-        List<String> orderedKeys() {
-            return Collections.unmodifiableList(new ArrayList<String>(ordered.keySet()));
-        }
     }
 }
