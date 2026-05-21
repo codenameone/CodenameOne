@@ -816,7 +816,6 @@
     }
     __cn1PendingSaveBlobHandler = function() {
       var doc = (global.window || global).document || global.document;
-      var win = global.window || global;
       if (!doc) {
         return;
       }
