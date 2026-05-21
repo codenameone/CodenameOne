@@ -247,3 +247,271 @@ if(CheckCert.isCertCheckingSupported()) {
 ----
 
 Notice that once connection is established you don't need to verify again for the current application run.
+
+=== Cryptographic primitives
+
+[[crypto-api-section,Codename One Crypto API]]
+The `com.codename1.security` package gives you the cryptographic building blocks you need for typical mobile-app concerns -- hashing, message authentication, symmetric and asymmetric encryption, digital signatures, JSON Web Tokens, and time/counter-based one-time passwords. The supporting `com.codename1.components.OtpField` component covers the UI side of OTP entry.
+
+The hash and HMAC primitives are implemented in portable Java so they produce identical output on every platform without depending on any external library. Symmetric and asymmetric encryption, signing, and the secure RNG go through each platform's native crypto provider via Codename One's implementation layer:
+
+* The simulator (JavaSE) and Android route through the JRE's `java.security` and `javax.crypto`.
+* iOS routes through Apple's CommonCrypto and the Security framework (via `Ports/iOSPort/nativeSources/CN1Crypto.{h,m}` and the corresponding `IOSImplementation` overrides).
+
+Application code never sees these differences -- you call the same `com.codename1.security` classes regardless of the platform you are running on.
+
+NOTE: Cryptographic operations only throw `com.codename1.security.CryptoException`, an unchecked exception. You can let it bubble up or catch it; you do not have to declare it.
+
+==== Hashing
+
+`com.codename1.security.Hash` implements MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512. SHA-256 is the recommended default for new code; MD5 and SHA-1 are exposed only for compatibility with older protocols since both are broken for collision resistance.
+
+[source,java]
+----
+import com.codename1.security.Hash;
+
+// One-shot
+byte[] digest = Hash.sha256("hello".getBytes("UTF-8"));
+String hex    = Hash.toHex(digest);          // 64-character lowercase hex
+byte[] back   = Hash.fromHex(hex);           // round-trip helper
+
+// Streaming
+Hash h = Hash.create(Hash.SHA256);
+h.update(part1);
+h.update(part2);
+byte[] full = h.digest();                    // hash is reset after digest()
+----
+
+The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also accepted with or without dashes and in any case (`"sha256"` and `"SHA-256"` are equivalent).
+
+==== Message authentication (HMAC)
+
+`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, TOTP token generation, and so on.
+
+[source,java]
+----
+import com.codename1.security.Hmac;
+
+byte[] tag = Hmac.sha256(secret, message);
+
+// Streaming
+Hmac h = Hmac.create(Hash.SHA256, secret);
+h.update(part1);
+h.update(part2);
+byte[] tag2 = h.doFinal();
+----
+
+When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead of `Arrays.equals(a, b)` -- the latter short-circuits on the first mismatch and is vulnerable to timing attacks.
+
+==== Secure random numbers
+
+`com.codename1.security.SecureRandom` exposes the platform's cryptographically secure RNG (`SecRandomCopyBytes` on iOS, `/dev/urandom` on Linux/Android, etc.). Use it for keys, nonces, salts, password reset tokens, and any other security-sensitive value. Never use `java.util.Random` or `Math.random()` for these purposes.
+
+[source,java]
+----
+import com.codename1.security.SecureRandom;
+
+byte[] iv  = SecureRandom.bytes(12);      // 12-byte AES-GCM nonce
+int    pin = SecureRandom.intBelow(1_000_000);   // bias-free 6-digit code
+long   id  = SecureRandom.longBelow(1L << 53);
+----
+
+==== Symmetric encryption (AES)
+
+`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it is authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data.
+
+[source,java]
+----
+import com.codename1.security.Cipher;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.SecretKey;
+import com.codename1.security.SecureRandom;
+
+SecretKey key   = KeyGenerator.aes(256);
+byte[]    nonce = SecureRandom.bytes(12);
+byte[]    aad   = "v1".getBytes("UTF-8");
+
+byte[] ciphertext = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, aad, plaintext);
+byte[] decrypted  = Cipher.aesDecrypt(Cipher.AES_GCM, key, nonce, aad, ciphertext);
+----
+
+The `Cipher` class exposes the standard JCE-style transformation strings as constants: `Cipher.AES_GCM`, `Cipher.AES_CBC_PKCS5`, `Cipher.AES_CBC`, and `Cipher.AES_ECB_PKCS5`. For GCM, the 16-byte authentication tag is appended to the ciphertext (matching the JCE convention). ECB is exposed only for interop with legacy systems -- it leaks structure and should never be used for new designs.
+
+==== Asymmetric encryption and digital signatures (RSA, ECDSA)
+
+`com.codename1.security.Cipher` also covers RSA encryption, and `com.codename1.security.Signature` covers digital signatures (RSA and ECDSA). Keys are represented by `com.codename1.security.PublicKey` and `com.codename1.security.PrivateKey`, which wrap X.509 SubjectPublicKeyInfo and PKCS#8 DER blobs respectively -- the same encodings used by OpenSSL.
+
+[source,java]
+----
+import com.codename1.security.Cipher;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.KeyPair;
+import com.codename1.security.Signature;
+
+// Generate a fresh RSA-2048 key pair (run on a background thread; key
+// generation can take a noticeable amount of time)
+KeyPair kp = KeyGenerator.rsa(2048);
+
+// Encrypt a small payload (e.g. wrap an AES key)
+byte[] sealed = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, kp.getPublicKey(), payload);
+byte[] opened = Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, kp.getPrivateKey(), sealed);
+
+// Sign / verify
+byte[] sig = Signature.sign(Signature.SHA256_WITH_RSA, kp.getPrivateKey(), data);
+boolean ok = Signature.verify(Signature.SHA256_WITH_RSA, kp.getPublicKey(), data, sig);
+----
+
+To use a key that was generated outside the app, feed the DER bytes to the static factory methods:
+
+[source,java]
+----
+PublicKey  pub  = PublicKey.rsa(x509SpkiBytes);          // openssl rsa -pubout -outform DER
+PrivateKey priv = PrivateKey.rsa(pkcs8DerBytes);         // openssl pkcs8 -topk8 -nocrypt -outform DER
+----
+
+The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`, `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, and `SHA512_WITH_ECDSA`.
+
+==== JSON Web Tokens
+
+`com.codename1.security.Jwt` provides JWT (RFC 7519) signing and verification. The `HS` family (HMAC-SHA-2) is pure Java so it works on every platform; the `RS` family (RSA-PKCS#1 v1.5 with SHA-2) and the `ES` family (ECDSA with SHA-2) route through the platform's native crypto.
+
+[source,java]
+----
+import com.codename1.security.Jwt;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+Map<String, Object> claims = new LinkedHashMap<String, Object>();
+claims.put("sub", "user-123");
+claims.put("exp", System.currentTimeMillis() / 1000 + 3600);
+
+// Sign with a shared secret (HS256)
+String token = Jwt.signHs256(claims, "secret".getBytes("UTF-8"));
+
+// Parse + verify
+Jwt parsed = Jwt.parse(token);
+if (!parsed.verifyHs256("secret".getBytes("UTF-8"))) {
+    throw new SecurityException("bad signature");
+}
+String subject = (String) parsed.getClaim("sub");
+----
+
+For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), pass the key to the dynamic overloads:
+
+[source,java]
+----
+KeyPair kp   = KeyGenerator.rsa(2048);
+String  rs   = Jwt.sign(claims, kp.getPrivateKey(), Jwt.RS256);
+Jwt     read = Jwt.parse(rs);
+boolean ok   = read.verify(kp.getPublicKey());
+----
+
+WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have very deliberately decided that the transport is trusted.
+
+==== HOTP / TOTP one-time passwords
+
+`com.codename1.security.Otp` implements counter-based HOTP (RFC 4226) and time-based TOTP (RFC 6238). The output is identical to standard authenticator apps (Google Authenticator, Microsoft Authenticator, 1Password, Authy, etc.) -- you can use this class to generate codes inside your app, to validate codes sent by an authenticator on a sign-in flow, or for SMS-based two-factor flows.
+
+Shared secrets are commonly distributed as Base32 strings (the format embedded in QR codes by authenticator apps). `com.codename1.security.Base32` handles the encoding.
+
+[source,java]
+----
+import com.codename1.security.Base32;
+import com.codename1.security.Otp;
+
+byte[] secret = Base32.decode("JBSWY3DPEHPK3PXP");
+
+// Generate the current 6-digit TOTP code (30-second step, SHA-1)
+String code = Otp.totp(secret);
+
+// Verify the code the user typed in, allowing one step of clock skew on
+// either side (so the previous, current, and next codes are all accepted)
+boolean ok = Otp.verifyTotp(secret, userInput, 1);
+----
+
+For HOTP, supply the counter explicitly and increment it after every successful authentication:
+
+[source,java]
+----
+String code = Otp.hotp(secret, counter++, 6);
+----
+
+==== OTP input widget
+
+`com.codename1.components.OtpField` is a segmented input -- one box per character, auto-advancing as the user types and stepping back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens.
+
+[source,java]
+----
+import com.codename1.components.OtpField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+OtpField otp = new OtpField(6);                  // 6 digits, numeric
+otp.addCompleteListener(new ActionListener() {
+    public void actionPerformed(ActionEvent evt) {
+        if (Otp.verifyTotp(secret, otp.getText(), 1)) {
+            // accepted
+        } else {
+            otp.clear();
+        }
+    }
+});
+form.add(otp);
+----
+
+Style the boxes through the UIIDs `OtpField` (the container) and `OtpDigit` (each box). The component supports alphanumeric input via the two-argument constructor (`new OtpField(8, false)`), and pasting a full code into any one box distributes the characters across the remaining boxes automatically.
+
+==== Algorithm identifier reference
+
+The string constants exposed by these classes are listed below so you can pick them out at a glance.
+
+|===
+| Class | Constant | Algorithm string
+
+| `Hash`
+| `MD5`, `SHA1`, `SHA224`, `SHA256`, `SHA384`, `SHA512`
+| `MD5`, `SHA-1`, `SHA-224`, `SHA-256`, `SHA-384`, `SHA-512`
+
+| `Cipher`
+| `AES_GCM`
+| `AES/GCM/NoPadding`
+
+| `Cipher`
+| `AES_CBC_PKCS5`
+| `AES/CBC/PKCS5Padding`
+
+| `Cipher`
+| `AES_CBC`
+| `AES/CBC/NoPadding`
+
+| `Cipher`
+| `AES_ECB_PKCS5`
+| `AES/ECB/PKCS5Padding` (legacy)
+
+| `Cipher`
+| `RSA_OAEP_SHA256`
+| `RSA/ECB/OAEPWithSHA-256AndMGF1Padding`
+
+| `Cipher`
+| `RSA_PKCS1`
+| `RSA/ECB/PKCS1Padding` (legacy)
+
+| `Signature`
+| `SHA256_WITH_RSA`, `SHA384_WITH_RSA`, `SHA512_WITH_RSA`
+| `SHA256withRSA`, `SHA384withRSA`, `SHA512withRSA`
+
+| `Signature`
+| `SHA256_WITH_ECDSA`, `SHA384_WITH_ECDSA`, `SHA512_WITH_ECDSA`
+| `SHA256withECDSA`, `SHA384withECDSA`, `SHA512withECDSA`
+
+| `Jwt`
+| `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`
+| Same as the JWT `alg` header value
+|===
+
+==== Key sizes and recommended defaults
+
+* *AES*: 256 bits (`KeyGenerator.aes(256)`) for new code. 128 bits is also acceptable and faster; pick 192 only if you have a specific reason.
+* *RSA*: 2048 bits minimum (`KeyGenerator.rsa(2048)`). Use 3072 or 4096 if you need a longer security margin -- key generation gets slow above 2048 so run it on a background thread.
+* *HMAC*: a key at least as long as the hash output (32 bytes for HMAC-SHA-256). `KeyGenerator.hmac(256)` returns a key of the requested bit length.
+* *TOTP / HOTP*: 160 bits (20 bytes) is the de-facto standard for authenticator-app compatibility.

@@ -10886,3 +10886,83 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
     UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsText);
     POOL_END();
 }
+
+// ====================================================================
+// Crypto bridge -- implementations of the native methods on IOSNative
+// that back com.codename1.security.{Cipher,Signature,SecureRandom,
+// KeyGenerator}. The actual crypto runs in CN1Crypto.{h,m}; this file
+// is just the marshalling layer.
+
+#import "CN1Crypto.h"
+
+#ifndef NEW_CODENAME_ONE_VM
+#define CN1_PRIM_ARR_DATA(arr) ((void*)((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.array_)
+#define CN1_PRIM_ARR_LEN(arr)  (((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.length_)
+#else
+#define CN1_PRIM_ARR_DATA(arr) ((void*)((JAVA_ARRAY)(arr))->data)
+#define CN1_PRIM_ARR_LEN(arr)  (((JAVA_ARRAY)(arr))->length)
+#endif
+
+void com_codename1_impl_ios_IOSNative_secureRandomBytes___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    if (out == JAVA_NULL) return;
+    cn1_crypto_secure_random((uint8_t*) CN1_PRIM_ARR_DATA(out), (int) CN1_PRIM_ARR_LEN(out));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr, JAVA_INT padding) {
+    return cn1_crypto_aes_cbc(encrypt,
+        (uint8_t*) CN1_PRIM_ARR_DATA(keyArr), (int) CN1_PRIM_ARR_LEN(keyArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(ivArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr),  (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr),
+        padding);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    const uint8_t* aadPtr = (aadArr == JAVA_NULL) ? NULL : (uint8_t*) CN1_PRIM_ARR_DATA(aadArr);
+    int aadLen = (aadArr == JAVA_NULL) ? 0 : (int) CN1_PRIM_ARR_LEN(aadArr);
+    return cn1_crypto_aes_gcm(encrypt,
+        (uint8_t*) CN1_PRIM_ARR_DATA(keyArr), (int) CN1_PRIM_ARR_LEN(keyArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(ivArr),  (int) CN1_PRIM_ARR_LEN(ivArr),
+        aadPtr, aadLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr),  (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return cn1_crypto_rsa_encrypt(paddingKind,
+        (uint8_t*) CN1_PRIM_ARR_DATA(x509),  (int) CN1_PRIM_ARR_LEN(x509),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr), (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT pkcs8, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return cn1_crypto_rsa_decrypt(paddingKind,
+        (uint8_t*) CN1_PRIM_ARR_DATA(pkcs8), (int) CN1_PRIM_ARR_LEN(pkcs8),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr), (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT pkcs8, JAVA_OBJECT data, JAVA_OBJECT outArr) {
+    return cn1_crypto_sign(algorithm,
+        (uint8_t*) CN1_PRIM_ARR_DATA(pkcs8), (int) CN1_PRIM_ARR_LEN(pkcs8),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data),  (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT x509, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    return cn1_crypto_verify(algorithm,
+        (uint8_t*) CN1_PRIM_ARR_DATA(x509), (int) CN1_PRIM_ARR_LEN(x509),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data), (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(sig),  (int) CN1_PRIM_ARR_LEN(sig));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    int pubLen = 0, privLen = 0;
+    int rc = cn1_crypto_generate_rsa_keypair(bits,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPub),  (int) CN1_PRIM_ARR_LEN(outPub),  &pubLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPriv), (int) CN1_PRIM_ARR_LEN(outPriv), &privLen);
+    JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+    lens[0] = pubLen;
+    lens[1] = privLen;
+    return rc;
+}
