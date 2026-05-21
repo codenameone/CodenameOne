@@ -105,8 +105,16 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; 
     # No -q here: the codenameone-maven-plugin's css goal runs the designer
     # as a forked Java process and only surfaces its stderr through INFO-level
     # maven output, so suppressing it makes any failure undebuggable.
+    # ``-DoutputDirectory`` for dependency:copy-dependencies is resolved
+    # relative to EACH selected module's base dir, not the reactor root. With
+    # ``-pl common`` that's ``scripts/initializr/common`` -- so passing
+    # ``common/target/...`` here would land jars at
+    # ``scripts/initializr/common/common/target/parparvm-deps/`` which the
+    # downstream COMMON_DEPS_DIR=$COMMON_ROOT/target/parparvm-deps lookup
+    # then misses, silently no-op'ing the entire CN1lib (ZipSupport, etc.)
+    # extraction. Use a path that resolves under the module's own target/.
     run_with_display sh ./mvnw -B -U -pl common -am -DskipTests -Dautomated=true -Dcodename1.platform=javascript \
-      package dependency:copy-dependencies -DincludeScope=compile -DoutputDirectory=common/target/parparvm-deps
+      package dependency:copy-dependencies -DincludeScope=compile -DoutputDirectory=target/parparvm-deps
   )
 fi
 
