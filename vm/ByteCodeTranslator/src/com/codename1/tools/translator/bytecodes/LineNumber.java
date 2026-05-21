@@ -37,6 +37,10 @@ public class LineNumber extends Instruction {
         this.line = line;
     }
 
+    public int getLine() {
+        return line;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
         if(hasInstructions && (getMethod() == null || !getMethod().isDisableDebugInfo())) {

@@ -91,8 +91,83 @@ public class Parser extends ClassVisitor {
             if(bc.getClsName().equals(name)) {
                 return bc;
             }
-        }        
+        }
         return null;
+    }
+
+    /**
+     * Resolves a class by name and returns its post-{@link #writeOutput}
+     * classOffset, or -1 if no class with that name exists. Used by the
+     * on-device-debug side-table emitter to wire stable IDs into the
+     * generated frame_info structs.
+     */
+    public static int getClassOffset(String name) {
+        ByteCodeClass bc = getClassByName(name);
+        return bc == null ? -1 : bc.getClassOffset();
+    }
+
+    public static List<ByteCodeClass> getClasses() {
+        return classes;
+    }
+
+    /**
+     * Writes the on-device-debug symbol sidecar (cn1-symbols.txt) to the
+     * output directory. Format is line-based ASCII for trivial parsing
+     * by the desktop proxy:
+     *   version &lt;n&gt;
+     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt;
+     *   method  &lt;methodId&gt; &lt;classId&gt; &lt;methodName&gt; &lt;desc&gt;
+     *   line    &lt;methodId&gt; &lt;sourceLine&gt;
+     * The proxy uses this to map JDWP class signatures and source-line
+     * breakpoints back onto the (classId, methodId, line) tuples the
+     * device wire protocol speaks.
+     */
+    private static void writeSymbolSidecar(File outputDirectory) throws IOException {
+        File f = new File(outputDirectory, "cn1-symbols.txt");
+        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
+            w.write("version\t1\n");
+            for (ByteCodeClass bc : classes) {
+                String src = bc.getSourceFile();
+                if (src == null) {
+                    src = "";
+                }
+                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName() + "\t" + src + "\n");
+            }
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (BytecodeMethod m : bc.getMethods()) {
+                    if (m.isEliminated()) {
+                        continue;
+                    }
+                    String desc = m.getDesc();
+                    if (desc == null) {
+                        desc = "";
+                    }
+                    w.write("method\t" + m.getMethodOffset() + "\t" + classId + "\t" + m.getMethodName() + "\t" + desc + "\n");
+                    Set<Integer> lines = new TreeSet<>();
+                    for (com.codename1.tools.translator.bytecodes.Instruction ins : m.getInstructions()) {
+                        if (ins instanceof com.codename1.tools.translator.bytecodes.LineNumber) {
+                            lines.add(((com.codename1.tools.translator.bytecodes.LineNumber)ins).getLine());
+                        }
+                    }
+                    for (Integer line : lines) {
+                        w.write("line\t" + m.getMethodOffset() + "\t" + line + "\n");
+                    }
+                    // Local variables: emitted as "always-live" scope until a
+                    // follow-up resolves ASM labels to source lines properly.
+                    // jdb tolerates this — uninitialised slots just show 0.
+                    for (com.codename1.tools.translator.bytecodes.LocalVariable lv : m.getLocalVariables()) {
+                        w.write("var\t" + m.getMethodOffset()
+                                + "\t" + lv.getIndex()
+                                + "\t" + lv.getOrigName()
+                                + "\t" + lv.getDesc() + "\n");
+                    }
+                }
+            }
+        }
+        if (ByteCodeTranslator.verbose) {
+            System.out.println("Wrote on-device-debug symbol sidecar: " + f.getAbsolutePath());
+        }
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {
@@ -458,6 +533,10 @@ public class Parser extends ClassVisitor {
                     writeFile(bc, outputDirectory, cos);
                 }
                 if (cos != null) cos.realClose();
+
+                if (BytecodeMethod.isOnDeviceDebug()) {
+                    writeSymbolSidecar(outputDirectory);
+                }
             }
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);

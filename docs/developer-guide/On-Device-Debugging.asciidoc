@@ -1,0 +1,224 @@
+== On-Device Debugging (iOS)
+
+The Codename One simulator runs your app on the JVM, so the IDE's
+normal Java debugger works against it directly.  Some bugs only appear
+on a real device — ParparVM's threading model, iOS-specific native
+behaviour, performance characteristics on real hardware, memory
+pressure under iOS background limits, and timing around UIKit
+interactions are common examples.  On-device debugging lets you keep
+using a standard Java debugger (jdb, IntelliJ IDEA, VS Code, Eclipse,
+NetBeans, anything that speaks JDWP) against the running iOS app on
+either the iOS Simulator or a physical device.
+
+It works by adding a tiny listener thread to the ParparVM-generated
+iOS binary.  The app dials out to a desktop proxy over Wi-Fi/loopback;
+the proxy speaks JDWP on the other side, so to the IDE everything
+looks like attaching to a normal remote JVM.
+
+=== When to use it
+
+* You can reproduce a bug on the simulator's Xcode build but not in
+  the JavaSE simulator — for instance a native-call issue, a layout
+  glitch that only shows up on iOS modern theme, or a JIT-vs.-AOT
+  numerical discrepancy.
+* You want to single-step through real ParparVM-translated code and
+  read the values its variables actually hold at runtime.
+* You want to inspect object state on a tethered device while
+  reproducing a problem a customer reported, without having to add
+  log lines and rebuild.
+
+If your bug is reproducible in the simulator, stay in the simulator —
+its debugger is faster and has fewer limitations.
+
+=== Prerequisites
+
+* Codename One {cn1-release-version} or later.
+* macOS with Xcode installed.  The iOS app must be built locally
+  (Xcode Simulator or a tethered device), or via the cloud build
+  configured with the on-device-debug target.
+* A JDWP-capable debugger.  `jdb` ships with the JDK; IntelliJ
+  IDEA, VS Code (Debugger for Java), Eclipse and NetBeans all work.
+* For physical devices: the device and your laptop need to be on the
+  same Wi-Fi network.  For iOS Simulator: localhost is sufficient.
+
+=== Quick start
+
+==== 1. Enable the build hint
+
+Add to your project's `common/codenameone_settings.properties`:
+
+[source,properties]
+----
+codename1.arg.ios.onDeviceDebug=true
+codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
+codename1.arg.ios.onDeviceDebug.proxyPort=55333
+# Optional: block the app at startup until the proxy is attached.
+# codename1.arg.ios.onDeviceDebug.waitForAttach=true
+----
+
+For a physical device, set `proxyHost` to the laptop's LAN IP
+(`ifconfig | grep "inet "`) instead of `127.0.0.1`.
+
+==== 2. Build the iOS app
+
+Locally:
+
+[source,bash]
+----
+mvn package -DskipTests \
+    -Dcodename1.platform=ios \
+    -Dcodename1.buildTarget=ios-source
+----
+
+This generates an Xcode project under `ios/target/...-ios-source/`.
+Open `<MainClass>.xcodeproj` in Xcode and run on the iOS Simulator
+or a tethered device.
+
+Via the cloud build, use the `ios-on-device-debug` build target:
+
+[source,bash]
+----
+mvn package -DskipTests \
+    -Dcodename1.platform=ios \
+    -Dcodename1.buildTarget=ios-on-device-debug
+----
+
+==== 3. Start the proxy
+
+[source,bash]
+----
+mvn cn1:ios-on-device-debugging
+----
+
+The proxy prints two listening ports and waits for both the device
+and a debugger to connect:
+
+----
+On-device-debug proxy starting:
+  symbols : .../cn1-symbols.txt
+  device  : listening on tcp://0.0.0.0:55333
+  jdwp    : listening on tcp://0.0.0.0:8000
+
+Next steps:
+  1. Open the generated Xcode project in iOS Simulator or on device.
+  2. Once the app boots it will dial in and the proxy will log a HELLO.
+  3. Attach a debugger:  jdb -attach localhost:8000
+----
+
+==== 4. Attach a debugger
+
+From a second terminal, point your debugger at the proxy's JDWP port.
+
+For `jdb`:
+
+[source,bash]
+----
+jdb -attach localhost:8000
+----
+
+For IntelliJ IDEA: *Run → Edit Configurations…* → *+* → *Remote JVM
+Debug*.  Set the host to `localhost`, port to `8000`, leave the rest
+at the defaults, and click *Debug*.
+
+For VS Code (Debugger for Java extension): add a launch
+configuration of type `java` with `"request": "attach"`, `"hostName":
+"localhost"`, `"port": 8000`.
+
+When the app starts running on the device it will connect to the
+proxy and the IDE will see a fresh suspended VM.  Set breakpoints,
+step, inspect, just like a normal remote attach.
+
+=== What works today
+
+* Class loading: the IDE sees every class in your build.
+* Line breakpoints in user code and in the Codename One framework.
+* Step into / over / out.
+* Stack walking — full Java stack including the cn1 framework
+  frames above your code.
+* Inspecting primitive locals (int, long, float, double, boolean,
+  byte, char, short).
+* Inspecting `java.lang.String` values directly.
+* Inspecting object references — class name and identity, plus the
+  ability to drill in via the IDE's variables view.
+* Pause and resume from the IDE.
+
+=== Known limitations
+
+* *Method invocation from the debugger is not supported.*  The IDE's
+  "evaluate expression" feature can read existing values but cannot
+  invoke methods on objects (e.g. `myList.size()`).  Object identity,
+  field access, and primitive evaluation are supported.
+* *Watch expressions* that don't require method calls work; those
+  that do return an error.
+* *Hot-swap* is not supported.  Code changes require a rebuild and
+  reinstall of the app.
+* *Hot threads* — if your app is doing heavy work on a non-EDT
+  thread when a breakpoint hits, that other thread continues
+  running.  Only the thread that hit the breakpoint suspends by
+  default.  Use the IDE's "suspend VM" if you need a fully frozen
+  picture.
+* *Local variable names* are present only when the user's Java
+  sources were compiled with `-g`.  Codename One's archetypes do
+  compile with debug info by default; if a variable shows up as
+  `v1`, `v2`, ... it means that particular class was compiled
+  without debug info.
+
+=== Performance
+
+The on-device-debug instrumentation is gated by a compile-time flag
+that is *only set in debug builds*.  Release builds (`ios-release`)
+are completely unaffected — no listener thread, no per-line callback,
+no extra metadata in the binary.
+
+In debug builds, the per-line callback adds a predictable
+load+branch around the macro that ParparVM already emits to record
+source line numbers for stack traces.  When no debugger is attached
+the runtime cost is close to zero.  When a debugger *is* attached,
+expect numerical inner loops to run on the order of two to three
+times slower than a release build — this is normal and matches the
+overhead of `-g`-style debugging on other native VMs.
+
+=== Troubleshooting
+
+==== The proxy reports "device disconnected" before my breakpoint fires
+
+The app may be crashing before it reaches user code.  Run the app
+from Xcode and watch the console — installSignalHandlers will
+intercept native crashes and rethrow them as Java exceptions you can
+see.  If the connection drops mid-debug, check the proxy log for a
+device-side I/O error.
+
+==== "Connection refused" when the device tries to reach the proxy
+
+The device's `CN1ProxyHost` is wrong, or a firewall is blocking the
+port.  Verify:
+
+* The simulator can always reach `127.0.0.1`.
+* A physical device needs your laptop's *LAN IP* (not `localhost`),
+  and the laptop's firewall must allow incoming connections on the
+  configured `proxyPort` (default `55333`).
+* macOS may prompt the first time the proxy listens — accept the
+  Allow incoming connections dialog.
+
+==== jdb reports "Internal exception: Unexpected JDWP Error: 100"
+
+This typically means an unsupported JDWP feature was invoked — most
+commonly an attempt to call a method on an object from the debugger
+(see "Method invocation from the debugger is not supported" above).
+The debug session itself is fine; rerun the operation as a value
+read (e.g. expand the object in the variables view) instead of a
+method call.
+
+==== The app launches but the breakpoint never fires
+
+Confirm the build hint actually took effect.  Inspect the generated
+Xcode project's `cn1_globals.h` and look for `#define
+CN1_ON_DEVICE_DEBUG` *without* a leading `//`.  If the line is still
+commented, the build was a release/non-debug build, or
+`ios.onDeviceDebug` wasn't set in `codenameone_settings.properties`.
+
+==== I want the app to wait for me to attach before running
+
+Set `codename1.arg.ios.onDeviceDebug.waitForAttach=true`.  The app
+will block at startup until the proxy is connected and the IDE has
+issued a Resume.

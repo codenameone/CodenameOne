@@ -1,0 +1,751 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * On-device-debug runtime. Single-file implementation: wire-protocol
+ * encode/decode, breakpoint hash, per-thread suspend/resume, command
+ * handlers. The translator emits per-frame metadata that this file reads
+ * (callStackFrameInfo, callStackLocalsAddresses) — see cn1_globals.h and
+ * BytecodeMethod.appendLocalsAddressTable for the format.
+ *
+ * Wire protocol (binary, network byte order, length-prefixed):
+ *   [u32 payload-length] [u8 command/event-code] [payload-bytes...]
+ *
+ * Codes 0x01-0x7F are commands (proxy -> device);
+ * codes 0x80-0xFF are events (device -> proxy). See the #defines below.
+ */
+
+#import "cn1_debugger.h"
+
+#ifdef CN1_ON_DEVICE_DEBUG
+
+#import <Foundation/Foundation.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdatomic.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <errno.h>
+
+#define CN1_DBG_PROTOCOL_VERSION 1
+
+// Commands (proxy -> device)
+#define CMD_SET_BREAKPOINT   0x02
+#define CMD_CLEAR_BREAKPOINT 0x03
+#define CMD_RESUME           0x04
+#define CMD_SUSPEND          0x05
+#define CMD_GET_THREADS      0x06
+#define CMD_GET_STACK        0x07
+#define CMD_GET_LOCALS       0x08
+#define CMD_STEP             0x09
+#define CMD_DISPOSE          0x0A
+#define CMD_GET_STRING       0x0B
+#define CMD_GET_OBJECT_CLASS 0x0C
+
+// Events (device -> proxy)
+#define EVT_HELLO            0x80
+#define EVT_THREAD_LIST      0x81
+#define EVT_BP_HIT           0x82
+#define EVT_STEP_COMPLETE    0x83
+#define EVT_STACK            0x84
+#define EVT_LOCALS           0x85
+#define EVT_VM_DEATH         0x86
+#define EVT_STRING_VALUE     0x87
+#define EVT_REPLY_STATUS     0x88
+#define EVT_OBJECT_CLASS     0x89
+
+// java.lang.String's clazz struct is emitted by the translator; we reference
+// it by symbol so cn1_debugger.m doesn't depend on the generated
+// cn1_class_method_index.h. Used in handleGetLocals to tag String references
+// with JDWP type 's' so jdb can call StringReference.Value directly instead
+// of falling through to a (currently unsupported) toString() InvokeMethod.
+extern struct clazz class__java_lang_String;
+
+// Step kinds
+#define STEP_INTO 0
+#define STEP_OVER 1
+#define STEP_OUT  2
+
+// Override the weak default in cn1_globals.m. Flipped to 1 once a proxy is
+// connected and out of the HELLO handshake.
+volatile int cn1DebuggerActive = 0;
+
+static int g_proxyFd = -1;
+static pthread_mutex_t g_writeMutex = PTHREAD_MUTEX_INITIALIZER;
+static int g_waitForAttach = 0;
+static pthread_mutex_t g_attachMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  g_attachCond  = PTHREAD_COND_INITIALIZER;
+
+/* --------------------------------------------------------------------- */
+/* Breakpoint hash. Open-addressed, lock-free reads via atomic 64-bit    */
+/* slots. Key = (methodId << 32) | line; zero is the empty sentinel,     */
+/* which means line 0 of methodId 0 is reserved (no real source uses it).*/
+/* --------------------------------------------------------------------- */
+
+#define BP_TABLE_SIZE 1024
+#define BP_TABLE_MASK (BP_TABLE_SIZE - 1)
+static _Atomic uint64_t g_bps[BP_TABLE_SIZE];
+
+static inline uint32_t bp_hash(uint64_t key) {
+    // splitmix64-ish reduction
+    key ^= key >> 33;
+    key *= 0xff51afd7ed558ccdULL;
+    key ^= key >> 33;
+    return (uint32_t)key & BP_TABLE_MASK;
+}
+
+static int bp_contains(int methodId, int line) {
+    uint64_t key = ((uint64_t)(uint32_t)methodId << 32) | (uint32_t)line;
+    uint32_t h = bp_hash(key);
+    for (int i = 0; i < BP_TABLE_SIZE; i++) {
+        uint64_t v = atomic_load_explicit(&g_bps[(h + i) & BP_TABLE_MASK], memory_order_acquire);
+        if (v == 0) return 0;
+        if (v == key) return 1;
+    }
+    return 0;
+}
+
+static void bp_add(int methodId, int line) {
+    uint64_t key = ((uint64_t)(uint32_t)methodId << 32) | (uint32_t)line;
+    uint32_t h = bp_hash(key);
+    for (int i = 0; i < BP_TABLE_SIZE; i++) {
+        uint64_t expected = 0;
+        if (atomic_compare_exchange_strong_explicit(
+                &g_bps[(h + i) & BP_TABLE_MASK], &expected, key,
+                memory_order_acq_rel, memory_order_relaxed)) {
+            return;
+        }
+        if (expected == key) return; // already present
+    }
+    NSLog(@"cn1_debugger: breakpoint table full");
+}
+
+static void bp_clear(int methodId, int line) {
+    // Simple zero-out. Linear probing tolerates holes only because we stop
+    // on zero, which would terminate searches early — so on delete we shift
+    // subsequent matching slots up. With a small table and few breakpoints
+    // a full re-probe is fine.
+    uint64_t key = ((uint64_t)(uint32_t)methodId << 32) | (uint32_t)line;
+    uint32_t h = bp_hash(key);
+    int found = -1;
+    for (int i = 0; i < BP_TABLE_SIZE; i++) {
+        uint64_t v = atomic_load_explicit(&g_bps[(h + i) & BP_TABLE_MASK], memory_order_acquire);
+        if (v == 0) break;
+        if (v == key) {
+            found = (h + i) & BP_TABLE_MASK;
+            break;
+        }
+    }
+    if (found < 0) return;
+    atomic_store_explicit(&g_bps[found], 0, memory_order_release);
+    // Re-insert any following non-empty slots whose ideal slot is <= found
+    // so future lookups don't terminate prematurely.
+    int j = (found + 1) & BP_TABLE_MASK;
+    while (1) {
+        uint64_t v = atomic_load_explicit(&g_bps[j], memory_order_acquire);
+        if (v == 0) break;
+        atomic_store_explicit(&g_bps[j], 0, memory_order_release);
+        bp_add((int)(v >> 32), (int)(v & 0xFFFFFFFFULL));
+        j = (j + 1) & BP_TABLE_MASK;
+    }
+}
+
+/* --------------------------------------------------------------------- */
+/* Per-thread suspend state. Keyed by ThreadLocalData->threadId hashed   */
+/* down into a fixed-size table — ParparVM caps at 1024 simultaneous     */
+/* threads so we mirror that. Each slot owns a mutex + condvar that the  */
+/* hitting Java thread blocks on; the listener thread signals to resume. */
+/* --------------------------------------------------------------------- */
+
+struct sus_state {
+    pthread_mutex_t mu;
+    pthread_cond_t  cv;
+    int suspended;
+    int stepKind;       // -1 = none, otherwise STEP_INTO/OVER/OUT
+    int stepFromDepth;  // callStackOffset captured at suspend
+    struct ThreadLocalData* tsd; // current frame owner while suspended
+};
+
+#define SUS_TABLE_SIZE 1024
+static struct sus_state g_sus[SUS_TABLE_SIZE];
+static _Atomic int g_susInit = 0;
+
+static void ensureSusInit(void) {
+    int expected = 0;
+    if (atomic_compare_exchange_strong(&g_susInit, &expected, 1)) {
+        for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+            pthread_mutex_init(&g_sus[i].mu, NULL);
+            pthread_cond_init(&g_sus[i].cv, NULL);
+            g_sus[i].suspended = 0;
+            g_sus[i].stepKind = -1;
+            g_sus[i].tsd = NULL;
+        }
+    }
+}
+
+static struct sus_state* susForThread(int64_t threadId) {
+    ensureSusInit();
+    return &g_sus[((uint64_t)threadId) & (SUS_TABLE_SIZE - 1)];
+}
+
+/* --------------------------------------------------------------------- */
+/* Wire I/O. Send/recv all bytes or fail. The write side is serialised  */
+/* by g_writeMutex so an event from a Java thread can't interleave with */
+/* a reply from the command loop.                                       */
+/* --------------------------------------------------------------------- */
+
+static int sendAll(int fd, const void* buf, size_t n) {
+    const char* p = (const char*)buf;
+    while (n > 0) {
+        ssize_t w = send(fd, p, n, 0);
+        if (w <= 0) {
+            if (w < 0 && errno == EINTR) continue;
+            return -1;
+        }
+        p += w; n -= (size_t)w;
+    }
+    return 0;
+}
+
+static int readAll(int fd, void* buf, size_t n) {
+    char* p = (char*)buf;
+    while (n > 0) {
+        ssize_t r = recv(fd, p, n, 0);
+        if (r <= 0) {
+            if (r < 0 && errno == EINTR) continue;
+            return -1;
+        }
+        p += r; n -= (size_t)r;
+    }
+    return 0;
+}
+
+static void sendEvent(uint8_t cmd, const void* payload, uint32_t len) {
+    if (g_proxyFd < 0) return;
+    pthread_mutex_lock(&g_writeMutex);
+    uint32_t lenBE = htonl(len);
+    int ok = (sendAll(g_proxyFd, &lenBE, 4) == 0)
+          && (sendAll(g_proxyFd, &cmd, 1) == 0)
+          && (len == 0 || sendAll(g_proxyFd, payload, len) == 0);
+    pthread_mutex_unlock(&g_writeMutex);
+    if (!ok) {
+        NSLog(@"cn1_debugger: send failed, closing");
+        cn1DebuggerActive = 0;
+        // Don't close fd here; let the read loop notice and tear down.
+    }
+}
+
+/* --------------------------------------------------------------------- */
+/* Suspend / resume. suspendCurrent releases the GC bit so a long pause */
+/* doesn't block collection. resumeThread signals the condvar.          */
+/* --------------------------------------------------------------------- */
+
+static void suspendCurrent(struct ThreadLocalData* tsd) {
+    int64_t threadId = (int64_t)tsd->threadId;
+    struct sus_state* s = susForThread(threadId);
+    pthread_mutex_lock(&s->mu);
+    s->suspended = 1;
+    s->stepFromDepth = tsd->callStackOffset;
+    s->tsd = tsd;
+    // Mark thread inactive so the concurrent GC can mark/sweep freely.
+    tsd->threadActive = JAVA_FALSE;
+    while (s->suspended) {
+        pthread_cond_wait(&s->cv, &s->mu);
+    }
+    // GC may have parked us; wait for it to finish before resuming.
+    while (tsd->threadBlockedByGC) {
+        pthread_mutex_unlock(&s->mu);
+        usleep(1000);
+        pthread_mutex_lock(&s->mu);
+    }
+    tsd->threadActive = JAVA_TRUE;
+    s->tsd = NULL;
+    pthread_mutex_unlock(&s->mu);
+}
+
+/*
+ * resumeThreadById signals a suspended thread to continue but does NOT
+ * touch its stepKind — so a CMD_STEP that ran earlier (which sets the
+ * step kind) survives a subsequent CMD_RESUME from jdb. Caller passes
+ * preserveStep=1 to leave stepKind alone, or 0 to also reset to -1.
+ */
+static void resumeThreadById(int64_t threadId, int preserveStep) {
+    struct sus_state* s = susForThread(threadId);
+    pthread_mutex_lock(&s->mu);
+    if (!preserveStep) {
+        s->stepKind = -1;
+    }
+    s->suspended = 0;
+    pthread_cond_signal(&s->cv);
+    pthread_mutex_unlock(&s->mu);
+}
+
+static void resumeAll(int preserveStep) {
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        pthread_mutex_lock(&g_sus[i].mu);
+        if (g_sus[i].suspended) {
+            if (!preserveStep) {
+                g_sus[i].stepKind = -1;
+            }
+            g_sus[i].suspended = 0;
+            pthread_cond_signal(&g_sus[i].cv);
+        }
+        pthread_mutex_unlock(&g_sus[i].mu);
+    }
+}
+
+/* Sets the step state on a thread and wakes it if currently suspended. */
+static void setStepAndResume(int64_t threadId, int stepKind) {
+    struct sus_state* s = susForThread(threadId);
+    pthread_mutex_lock(&s->mu);
+    s->stepKind = stepKind;
+    if (s->suspended) {
+        s->suspended = 0;
+        pthread_cond_signal(&s->cv);
+    }
+    pthread_mutex_unlock(&s->mu);
+}
+
+/* --------------------------------------------------------------------- */
+/* Hot-path check called from __CN1_DEBUG_INFO. Strong definition that   */
+/* shadows the weak stub in cn1_globals.m. Reached only when             */
+/* cn1DebuggerActive is non-zero.                                        */
+/* --------------------------------------------------------------------- */
+
+/*
+ * Byte-explicit big-endian writers. Avoids the htonl-and-shift trap on
+ * little-endian hosts where the order of bytes inside a uint64_t depends
+ * on host endianness and the shift composition doesn't actually yield
+ * network byte order in memory.
+ */
+static inline void writeBE32(uint8_t* dst, uint32_t v) {
+    dst[0] = (uint8_t)(v >> 24); dst[1] = (uint8_t)(v >> 16);
+    dst[2] = (uint8_t)(v >>  8); dst[3] = (uint8_t)v;
+}
+static inline void writeBE64(uint8_t* dst, uint64_t v) {
+    dst[0] = (uint8_t)(v >> 56); dst[1] = (uint8_t)(v >> 48);
+    dst[2] = (uint8_t)(v >> 40); dst[3] = (uint8_t)(v >> 32);
+    dst[4] = (uint8_t)(v >> 24); dst[5] = (uint8_t)(v >> 16);
+    dst[6] = (uint8_t)(v >>  8); dst[7] = (uint8_t)v;
+}
+
+static void emitLocationEvent(uint8_t code, int64_t threadId, int methodId, int line) {
+    uint8_t buf[16];
+    writeBE64(buf,      (uint64_t)threadId);
+    writeBE32(buf + 8,  (uint32_t)methodId);
+    writeBE32(buf + 12, (uint32_t)line);
+    sendEvent(code, buf, 16);
+}
+
+void cn1_debugger_check(struct ThreadLocalData* tsd, int line) {
+    if (tsd->callStackOffset <= 0) return;
+    const struct cn1_frame_info* fi = tsd->callStackFrameInfo[tsd->callStackOffset - 1];
+    if (fi == NULL) return;
+    int methodId = fi->methodId;
+    int64_t threadId = (int64_t)tsd->threadId;
+
+    // Stepping has priority over breakpoints so a step that lands on a
+    // breakpoint reports once (as STEP_COMPLETE).
+    struct sus_state* s = susForThread(threadId);
+    int sk = s->stepKind;
+    if (sk >= 0) {
+        int depth = tsd->callStackOffset;
+        int shouldStop = 0;
+        switch (sk) {
+            case STEP_INTO: shouldStop = 1; break;
+            case STEP_OVER: shouldStop = (depth <= s->stepFromDepth); break;
+            case STEP_OUT:  shouldStop = (depth <  s->stepFromDepth); break;
+        }
+        if (shouldStop) {
+            // Clear step state under the per-thread mutex so a concurrent
+            // CMD_STEP can't race the clear.
+            pthread_mutex_lock(&s->mu);
+            s->stepKind = -1;
+            pthread_mutex_unlock(&s->mu);
+            emitLocationEvent(EVT_STEP_COMPLETE, threadId, methodId, line);
+            suspendCurrent(tsd);
+            return;
+        }
+    }
+    if (bp_contains(methodId, line)) {
+        emitLocationEvent(EVT_BP_HIT, threadId, methodId, line);
+        suspendCurrent(tsd);
+    }
+}
+
+/* --------------------------------------------------------------------- */
+/* Command-loop handlers. Stack / locals are read from the suspended    */
+/* thread's tsd which was recorded into the sus_state when it parked.   */
+/* --------------------------------------------------------------------- */
+
+static void handleGetStack(int64_t threadId) {
+    struct sus_state* s = susForThread(threadId);
+    pthread_mutex_lock(&s->mu);
+    struct ThreadLocalData* tsd = s->tsd;
+    if (tsd == NULL || tsd->callStackOffset <= 0) {
+        pthread_mutex_unlock(&s->mu);
+        uint8_t buf[12];
+        writeBE64(buf,     (uint64_t)threadId);
+        writeBE32(buf + 8, 0);
+        sendEvent(EVT_STACK, buf, 12);
+        return;
+    }
+    int depth = tsd->callStackOffset;
+    // Cap depth to keep payload sane.
+    if (depth > 256) depth = 256;
+    size_t sz = 8 + 4 + (size_t)depth * 8;
+    uint8_t* buf = (uint8_t*)malloc(sz);
+    writeBE64(buf,     (uint64_t)threadId);
+    writeBE32(buf + 8, (uint32_t)depth);
+    // Frames emitted innermost-first.
+    for (int i = 0; i < depth; i++) {
+        int frameIdx = (tsd->callStackOffset - 1 - i);
+        int methodId = 0;
+        const struct cn1_frame_info* fi = tsd->callStackFrameInfo[frameIdx];
+        if (fi) methodId = fi->methodId;
+        int line = tsd->callStackLine[frameIdx];
+        writeBE32(buf + 12 + i * 8,     (uint32_t)methodId);
+        writeBE32(buf + 12 + i * 8 + 4, (uint32_t)line);
+    }
+    pthread_mutex_unlock(&s->mu);
+    sendEvent(EVT_STACK, buf, (uint32_t)sz);
+    free(buf);
+}
+
+static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
+    struct sus_state* s = susForThread(threadId);
+    pthread_mutex_lock(&s->mu);
+    struct ThreadLocalData* tsd = s->tsd;
+    if (tsd == NULL || tsd->callStackOffset <= 0
+            || frameOffsetFromTop < 0
+            || frameOffsetFromTop >= tsd->callStackOffset) {
+        pthread_mutex_unlock(&s->mu);
+        uint32_t zero = 0;
+        sendEvent(EVT_LOCALS, &zero, 4);
+        return;
+    }
+    int frameIdx = tsd->callStackOffset - 1 - frameOffsetFromTop;
+    const struct cn1_frame_info* fi = tsd->callStackFrameInfo[frameIdx];
+    void** addrs = tsd->callStackLocalsAddresses[frameIdx];
+    if (fi == NULL || addrs == NULL) {
+        pthread_mutex_unlock(&s->mu);
+        uint32_t zero = 0;
+        sendEvent(EVT_LOCALS, &zero, 4);
+        return;
+    }
+    int count = fi->varTableCount;
+    size_t sz = 4 + (size_t)count * (4 + 1 + 8);
+    uint8_t* buf = (uint8_t*)malloc(sz);
+    writeBE32(buf, (uint32_t)count);
+    uint8_t* p = buf + 4;
+    for (int i = 0; i < count; i++) {
+        const struct cn1_var_entry* v = &fi->varTable[i];
+        writeBE32(p, (uint32_t)v->slot); p += 4;
+        uint8_t tag = (uint8_t)v->typeCode;
+        uint64_t value = 0;
+        if (v->slot >= 0 && v->slot < fi->numLocals && addrs[v->slot] != NULL) {
+            switch (v->typeCode) {
+                case 'I': case 'B': case 'S': case 'C': case 'Z':
+                    value = (uint64_t)(*(int32_t*)addrs[v->slot]);
+                    break;
+                case 'J':
+                    value = (uint64_t)(*(int64_t*)addrs[v->slot]);
+                    break;
+                case 'F': {
+                    float f = *(float*)addrs[v->slot];
+                    uint32_t u; memcpy(&u, &f, 4);
+                    value = u;
+                    break;
+                }
+                case 'D': {
+                    double d = *(double*)addrs[v->slot];
+                    uint64_t u; memcpy(&u, &d, 8);
+                    value = u;
+                    break;
+                }
+                case 'L': case '[': {
+                    JAVA_OBJECT obj = *(JAVA_OBJECT*)addrs[v->slot];
+                    value = (uint64_t)(uintptr_t)obj;
+                    // Tag java.lang.String references with JDWP type 's'
+                    // so the IDE can read their contents via
+                    // StringReference.Value instead of invoking toString().
+                    if (v->typeCode == 'L' && obj != JAVA_NULL
+                            && obj->__codenameOneParentClsReference == &class__java_lang_String) {
+                        tag = 's';
+                    }
+                    break;
+                }
+            }
+        }
+        *p++ = tag;
+        writeBE64(p, value); p += 8;
+    }
+    pthread_mutex_unlock(&s->mu);
+    sendEvent(EVT_LOCALS, buf, (uint32_t)sz);
+    free(buf);
+}
+
+/* --------------------------------------------------------------------- */
+/* Listener thread.                                                      */
+/* --------------------------------------------------------------------- */
+
+static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
+    switch (cmd) {
+        case CMD_SET_BREAKPOINT: {
+            if (len < 8) return 0;
+            uint32_t mid, line;
+            memcpy(&mid, payload, 4);
+            memcpy(&line, payload + 4, 4);
+            bp_add((int)ntohl(mid), (int)ntohl(line));
+            return 0;
+        }
+        case CMD_CLEAR_BREAKPOINT: {
+            if (len < 8) return 0;
+            uint32_t mid, line;
+            memcpy(&mid, payload, 4);
+            memcpy(&line, payload + 4, 4);
+            bp_clear((int)ntohl(mid), (int)ntohl(line));
+            return 0;
+        }
+        case CMD_RESUME: {
+            // Preserve any pending step kind so a SINGLE_STEP request
+            // followed by VM.Resume keeps the step active for the next line.
+            if (len < 8) {
+                resumeAll(/*preserveStep*/ 1);
+            } else {
+                uint32_t hi, lo;
+                memcpy(&hi, payload, 4);
+                memcpy(&lo, payload + 4, 4);
+                int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+                if (tid == 0) resumeAll(1); else resumeThreadById(tid, 1);
+            }
+            // The first RESUME after attach also releases cn1_debugger_start
+            // if it was waiting.
+            pthread_mutex_lock(&g_attachMutex);
+            g_waitForAttach = 0;
+            pthread_cond_broadcast(&g_attachCond);
+            pthread_mutex_unlock(&g_attachMutex);
+            return 0;
+        }
+        case CMD_STEP: {
+            if (len < 9) return 0;
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            uint8_t kind = payload[8];
+            setStepAndResume(tid, (int)kind);
+            return 0;
+        }
+        case CMD_GET_STACK: {
+            if (len < 8) return 0;
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            handleGetStack(tid);
+            return 0;
+        }
+        case CMD_GET_LOCALS: {
+            if (len < 12) return 0;
+            uint32_t hi, lo, frame;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            memcpy(&frame, payload + 8, 4);
+            int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            handleGetLocals(tid, (int)ntohl(frame));
+            return 0;
+        }
+        case CMD_DISPOSE: {
+            cn1DebuggerActive = 0;
+            resumeAll(/*preserveStep*/ 0);
+            return -1; // tells listener to tear down
+        }
+        case CMD_GET_OBJECT_CLASS: {
+            if (len < 8) {
+                sendEvent(EVT_OBJECT_CLASS, NULL, 0);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            int classId = -1;
+            JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
+            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
+                classId = obj->__codenameOneParentClsReference->classId;
+            }
+            uint8_t reply[4];
+            uint32_t cidBE = htonl((uint32_t)classId);
+            memcpy(reply, &cidBE, 4);
+            sendEvent(EVT_OBJECT_CLASS, reply, 4);
+            return 0;
+        }
+        case CMD_GET_STRING: {
+            if (len < 8) {
+                sendEvent(EVT_STRING_VALUE, NULL, 0);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
+            NSString* ns = nil;
+            @try {
+                if (obj != JAVA_NULL) {
+                    ns = toNSString(getThreadLocalData(), obj);
+                }
+            } @catch (NSException* e) {
+                ns = nil;
+            }
+            const char* utf8 = ns ? [ns UTF8String] : "";
+            size_t n = strlen(utf8);
+            sendEvent(EVT_STRING_VALUE, utf8, (uint32_t)n);
+            return 0;
+        }
+        case CMD_GET_THREADS:
+        case CMD_SUSPEND:
+            // Minimal viable: reply empty so the proxy doesn't hang.
+            sendEvent(EVT_REPLY_STATUS, NULL, 0);
+            return 0;
+        default:
+            NSLog(@"cn1_debugger: unknown command 0x%02x", cmd);
+            return 0;
+    }
+}
+
+static void* listenerThreadMain(void* arg) {
+    @autoreleasepool {
+        NSDictionary* info = [[NSBundle mainBundle] infoDictionary];
+        NSString* host = info[@"CN1ProxyHost"];
+        NSNumber* portN = info[@"CN1ProxyPort"];
+        int port = portN ? [portN intValue] : 55333;
+        if (!host) {
+            NSLog(@"cn1_debugger: CN1ProxyHost not configured");
+            return NULL;
+        }
+
+        // Retry a few times with backoff so launching slightly before the
+        // proxy is up still works.
+        int fd = -1;
+        for (int attempt = 0; attempt < 20; attempt++) {
+            fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (fd < 0) { usleep(500000); continue; }
+            struct sockaddr_in sa;
+            memset(&sa, 0, sizeof(sa));
+            sa.sin_family = AF_INET;
+            sa.sin_port = htons(port);
+            if (inet_pton(AF_INET, [host UTF8String], &sa.sin_addr) != 1) {
+                // Try resolving as a hostname.
+                struct addrinfo hints = {0}, *res = NULL;
+                hints.ai_family = AF_INET;
+                hints.ai_socktype = SOCK_STREAM;
+                if (getaddrinfo([host UTF8String], NULL, &hints, &res) == 0 && res) {
+                    sa.sin_addr = ((struct sockaddr_in*)res->ai_addr)->sin_addr;
+                    freeaddrinfo(res);
+                } else {
+                    close(fd);
+                    fd = -1;
+                    usleep(500000);
+                    continue;
+                }
+            }
+            if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) == 0) {
+                break;
+            }
+            close(fd);
+            fd = -1;
+            usleep(500000);
+        }
+        if (fd < 0) {
+            NSLog(@"cn1_debugger: could not connect to %@:%d, giving up", host, port);
+            pthread_mutex_lock(&g_attachMutex);
+            g_waitForAttach = 0;
+            pthread_cond_broadcast(&g_attachCond);
+            pthread_mutex_unlock(&g_attachMutex);
+            return NULL;
+        }
+        int nodelay = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+        g_proxyFd = fd;
+
+        // Send HELLO.
+        uint8_t hello[3];
+        hello[0] = 0;
+        hello[1] = 0;
+        hello[2] = CN1_DBG_PROTOCOL_VERSION;
+        sendEvent(EVT_HELLO, hello, 3);
+        cn1DebuggerActive = 1;
+        NSLog(@"cn1_debugger: connected to proxy %@:%d (proto v%d)", host, port, CN1_DBG_PROTOCOL_VERSION);
+
+        for (;;) {
+            uint32_t lenBE;
+            if (readAll(fd, &lenBE, 4) < 0) break;
+            uint32_t plen = ntohl(lenBE);
+            if (plen > (1 << 20)) { // sanity cap
+                NSLog(@"cn1_debugger: oversized payload %u, closing", plen);
+                break;
+            }
+            uint8_t cmd;
+            if (readAll(fd, &cmd, 1) < 0) break;
+            uint8_t* payload = NULL;
+            if (plen > 0) {
+                payload = (uint8_t*)malloc(plen);
+                if (readAll(fd, payload, plen) < 0) { free(payload); break; }
+            }
+            int rc = handleCommand(cmd, payload, plen);
+            free(payload);
+            if (rc < 0) break;
+        }
+
+        NSLog(@"cn1_debugger: proxy connection closed");
+        cn1DebuggerActive = 0;
+        resumeAll(-1);
+        close(fd);
+        g_proxyFd = -1;
+        pthread_mutex_lock(&g_attachMutex);
+        g_waitForAttach = 0;
+        pthread_cond_broadcast(&g_attachCond);
+        pthread_mutex_unlock(&g_attachMutex);
+    }
+    return NULL;
+}
+
+void cn1_debugger_start(void) {
+    NSDictionary* info = [[NSBundle mainBundle] infoDictionary];
+    NSString* host = info[@"CN1ProxyHost"];
+    if (!host) {
+        NSLog(@"cn1_debugger: CN1ProxyHost not set in Info.plist; on-device-debug disabled at runtime");
+        return;
+    }
+    NSNumber* wait = info[@"CN1ProxyWaitForAttach"];
+    g_waitForAttach = (wait && [wait boolValue]) ? 1 : 0;
+
+    pthread_t t;
+    pthread_create(&t, NULL, listenerThreadMain, NULL);
+    pthread_detach(t);
+
+    if (g_waitForAttach) {
+        NSLog(@"cn1_debugger: waiting for proxy to attach and send RESUME...");
+        pthread_mutex_lock(&g_attachMutex);
+        while (g_waitForAttach) {
+            pthread_cond_wait(&g_attachCond, &g_attachMutex);
+        }
+        pthread_mutex_unlock(&g_attachMutex);
+        NSLog(@"cn1_debugger: attach handshake complete, continuing boot");
+    }
+}
+
+#endif // CN1_ON_DEVICE_DEBUG

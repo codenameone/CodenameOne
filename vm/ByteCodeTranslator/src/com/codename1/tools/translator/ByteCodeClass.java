@@ -1932,7 +1932,11 @@ public class ByteCodeClass {
 
     public void setSourceFile(String sourceFile) {
         this.sourceFile = sourceFile;
-    } 
+    }
+
+    public String getSourceFile() {
+        return sourceFile;
+    }
 
     /**
      * @return the classOffset

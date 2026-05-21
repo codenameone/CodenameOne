@@ -229,6 +229,9 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
+        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+            replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
+        }
         File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsC.toPath()));
         File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
@@ -321,6 +324,9 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+        }
+        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+            replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
         File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsM.toPath()));

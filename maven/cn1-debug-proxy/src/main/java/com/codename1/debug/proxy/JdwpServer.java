@@ -1,0 +1,1096 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.debug.proxy;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Minimum-viable JDWP server. Speaks enough of the protocol that jdb can
+ * connect, set a line breakpoint, see it fire, walk the stack, and read
+ * primitive locals — which is the bar we're aiming for in this first cut.
+ *
+ * Many JDWP commands are answered with empty / "no capability" replies so
+ * the IDE doesn't hang; expanding the surface (object inspection, eval,
+ * field reads, ARM events) is a follow-up.
+ *
+ * IDs: typeID = classId from the sidecar, methodID = methodId from the
+ * sidecar, both padded to 8 bytes. threadID = the ParparVM threadId.
+ * frameID = (threadId &lt;&lt; 32) | frameIdxFromTop. The "bytecode index"
+ * inside a JDWP Location is just the source line — we don't carry real
+ * bytecode offsets in ParparVM, and jdb uses the index purely to look
+ * the same value back up via Method.LineTable.
+ */
+public final class JdwpServer implements DeviceConnection.DeviceListener {
+
+    private static final String HANDSHAKE = "JDWP-Handshake";
+
+    // JDWP command sets
+    private static final int CS_VIRTUAL_MACHINE     = 1;
+    private static final int CS_REFERENCE_TYPE      = 2;
+    private static final int CS_CLASS_TYPE          = 3;
+    private static final int CS_METHOD              = 6;
+    private static final int CS_OBJECT_REFERENCE    = 9;
+    private static final int CS_STRING_REFERENCE    = 10;
+    private static final int CS_THREAD_REFERENCE    = 11;
+    private static final int CS_THREAD_GROUP_REF    = 12;
+    private static final int CS_ARRAY_REFERENCE     = 13;
+    private static final int CS_CLASS_LOADER_REF    = 14;
+    private static final int CS_EVENT_REQUEST       = 15;
+    private static final int CS_STACK_FRAME         = 16;
+    private static final int CS_CLASS_OBJECT_REF    = 17;
+    private static final int CS_EVENT               = 64;
+
+    // Event kinds (subset)
+    private static final int EK_SINGLE_STEP   = 1;
+    private static final int EK_BREAKPOINT    = 2;
+    private static final int EK_THREAD_START  = 6;
+    private static final int EK_THREAD_DEATH  = 7;
+    private static final int EK_CLASS_PREPARE = 8;
+    private static final int EK_CLASS_UNLOAD  = 9;
+    private static final int EK_VM_START      = 90;
+    private static final int EK_VM_DEATH      = 99;
+
+    // refTypeTag
+    private static final int TYPE_TAG_CLASS = 1;
+
+    // SuspendPolicy
+    private static final int SP_NONE         = 0;
+    private static final int SP_EVENT_THREAD = 1;
+    private static final int SP_ALL          = 2;
+
+    private final int port;
+    private final SymbolTable symbols;
+    private volatile DeviceConnection device;
+
+    private Socket socket;
+    private DataInputStream in;
+    private DataOutputStream out;
+    private final Object writeLock = new Object();
+
+    private final AtomicInteger nextRequestId = new AtomicInteger(1);
+    private final Map<Integer, BpRequest> bpRequests = new ConcurrentHashMap<>();
+    // Pending step request keyed by threadId so the device's STEP_COMPLETE
+    // event can find the JDWP request ID that triggered it.
+    private final Map<Long, Integer> stepRequests = new ConcurrentHashMap<>();
+    private final List<Long> knownThreads = new ArrayList<>();
+    // Synthetic thread group ID. jdb wants a non-null group on every thread.
+    private static final long FAKE_GROUP_ID = 0xCAFEL;
+    private static final long FAKE_CLASSLOADER_ID = 0;
+    // Last suspending event's thread, used by ThreadReference.Frames when
+    // no explicit per-thread bookkeeping has been done yet.
+    private volatile long lastSuspendedThread = 0;
+
+    /*
+     * JDWP treats reference-type and method IDs of 0 as "null", but the
+     * translator's classId/methodId space is dense starting at 0. We shift
+     * both directions by +1 at the JDWP boundary so id 0 stays reserved.
+     */
+    private static long toJdwpRef(int sidecarId)  { return sidecarId + 1L; }
+    private static int  fromJdwpRef(long jdwpId)  { return (int)(jdwpId - 1L); }
+    // True once the device has handshook; the VM_START event will fire as
+    // soon as a JDWP client is attached (and was already attached when the
+    // device joined — order doesn't matter).
+    private volatile boolean deviceHelloReceived = false;
+
+    private static final class BpRequest {
+        final int requestId;
+        final long typeID;  // classId
+        final long methodID;
+        final long codeIndex; // source line
+        final int suspendPolicy;
+        BpRequest(int rid, long typeID, long methodID, long codeIndex, int sp) {
+            this.requestId = rid; this.typeID = typeID; this.methodID = methodID;
+            this.codeIndex = codeIndex; this.suspendPolicy = sp;
+        }
+    }
+
+    public JdwpServer(int port, SymbolTable symbols) {
+        this.port = port;
+        this.symbols = symbols;
+    }
+
+    public void setDevice(DeviceConnection device) {
+        this.device = device;
+    }
+
+    public void acceptAndServe() throws IOException {
+        try (ServerSocket server = new ServerSocket(port)) {
+            System.out.println("[jdwp] listening on port " + port + " for debugger (jdb) to attach");
+            socket = server.accept();
+        }
+        socket.setTcpNoDelay(true);
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+        System.out.println("[jdwp] debugger connected from " + socket.getRemoteSocketAddress());
+
+        if (!doHandshake()) {
+            System.err.println("[jdwp] handshake failed");
+            return;
+        }
+        System.out.println("[jdwp] handshake complete");
+        // If the device connected before us, fire VM_START now.
+        if (deviceHelloReceived) {
+            sendVmStart();
+        }
+
+        try {
+            packetLoop();
+        } finally {
+            try { socket.close(); } catch (IOException ignore) {}
+        }
+    }
+
+    private void sendVmStart() {
+        try {
+            Buf b = new Buf();
+            b.writeByte(SP_NONE);
+            b.writeInt(1);
+            b.writeByte(EK_VM_START);
+            b.writeInt(0);     // requestID 0 = auto-generated
+            b.writeLong(1);    // dummy thread id; jdb tolerates this
+            writeEventCommand(b.bytes());
+        } catch (IOException e) {
+            System.err.println("[jdwp] failed to send VM_START: " + e.getMessage());
+        }
+    }
+
+    private boolean doHandshake() throws IOException {
+        byte[] expected = HANDSHAKE.getBytes(StandardCharsets.US_ASCII);
+        byte[] buf = new byte[expected.length];
+        in.readFully(buf);
+        for (int i = 0; i < expected.length; i++) {
+            if (buf[i] != expected[i]) return false;
+        }
+        out.write(expected);
+        out.flush();
+        return true;
+    }
+
+    private void packetLoop() throws IOException {
+        while (true) {
+            int len;
+            try {
+                len = in.readInt();
+            } catch (IOException eof) {
+                System.out.println("[jdwp] debugger disconnected");
+                return;
+            }
+            if (len < 11) throw new IOException("Malformed JDWP packet length=" + len);
+            int id = in.readInt();
+            int flags = in.readUnsignedByte();
+            byte[] payload = new byte[len - 11];
+            if ((flags & 0x80) != 0) {
+                // Reply packet — we don't initiate commands TO jdb (yet), so ignore.
+                int err = in.readUnsignedShort();
+                in.readFully(payload);
+                continue;
+            }
+            int cmdSet = in.readUnsignedByte();
+            int cmd    = in.readUnsignedByte();
+            in.readFully(payload);
+            dispatchCommand(id, cmdSet, cmd, payload);
+        }
+    }
+
+    // -------- Packet writers ------------------------------------------------
+
+    private void writeReply(int id, int errorCode, byte[] data) throws IOException {
+        synchronized (writeLock) {
+            int len = 11 + (data == null ? 0 : data.length);
+            out.writeInt(len);
+            out.writeInt(id);
+            out.writeByte(0x80);
+            out.writeShort(errorCode);
+            if (data != null && data.length > 0) out.write(data);
+            out.flush();
+        }
+    }
+
+    private void writeEventCommand(byte[] data) throws IOException {
+        synchronized (writeLock) {
+            int len = 11 + data.length;
+            out.writeInt(len);
+            out.writeInt(nextRequestId.incrementAndGet());
+            out.writeByte(0x00);
+            out.writeByte(CS_EVENT);
+            out.writeByte(100); // Composite
+            out.write(data);
+            out.flush();
+        }
+    }
+
+    private static byte[] empty() { return new byte[0]; }
+
+    // -------- Dispatch ------------------------------------------------------
+
+    private static final boolean LOG_JDWP = Boolean.getBoolean("cn1.debug.logJdwp");
+
+    private void dispatchCommand(int id, int cmdSet, int cmd, byte[] p) throws IOException {
+        if (LOG_JDWP) System.out.println("[jdwp<-] cmdSet=" + cmdSet + " cmd=" + cmd + " len=" + p.length);
+        try {
+            switch (cmdSet) {
+                case CS_VIRTUAL_MACHINE:  handleVM(id, cmd, p); return;
+                case CS_REFERENCE_TYPE:   handleRefType(id, cmd, p); return;
+                case CS_METHOD:           handleMethod(id, cmd, p); return;
+                case CS_THREAD_REFERENCE: handleThread(id, cmd, p); return;
+                case CS_THREAD_GROUP_REF: handleThreadGroup(id, cmd, p); return;
+                case CS_STACK_FRAME:      handleStackFrame(id, cmd, p); return;
+                case CS_EVENT_REQUEST:    handleEventRequest(id, cmd, p); return;
+                case CS_OBJECT_REFERENCE: handleObject(id, cmd, p); return;
+                case CS_CLASS_TYPE:       handleClassType(id, cmd, p); return;
+                case CS_STRING_REFERENCE: handleString(id, cmd, p); return;
+                case CS_ARRAY_REFERENCE:
+                case CS_CLASS_LOADER_REF:
+                case CS_CLASS_OBJECT_REF:
+                    // Reply with NOT_IMPLEMENTED (100) so jdb falls back gracefully.
+                    writeReply(id, 100, empty());
+                    return;
+                default:
+                    writeReply(id, 100, empty());
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+            writeReply(id, 103, empty()); // INTERNAL
+        }
+    }
+
+    // -------- VirtualMachine ------------------------------------------------
+
+    private void handleVM(int id, int cmd, byte[] p) throws IOException {
+        switch (cmd) {
+            case 1: { // Version
+                Buf b = new Buf();
+                b.writeString("Codename One ParparVM on-device-debug proxy");
+                b.writeInt(1); b.writeInt(8); // JDWP 1.8
+                b.writeString("1.8");
+                b.writeString("ParparVM");
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // ClassesBySignature
+                String sig = readString(p, 0);
+                Buf b = new Buf();
+                SymbolTable.ClassInfo c = symbols.classByJvmSignature(sig);
+                if (c != null) {
+                    b.writeInt(1);
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(toJdwpRef(c.classId));
+                    b.writeInt(7); // VERIFIED|PREPARED|INITIALIZED
+                } else {
+                    b.writeInt(0);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 3: { // AllClasses
+                Buf b = new Buf();
+                b.writeInt(symbols.allClasses().size());
+                for (SymbolTable.ClassInfo c : symbols.allClasses()) {
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(toJdwpRef(c.classId));
+                    b.writeString(c.jvmSignature());
+                    b.writeInt(7);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 20: { // AllClassesWithGeneric — extra empty generic-sig per class
+                Buf b = new Buf();
+                b.writeInt(symbols.allClasses().size());
+                for (SymbolTable.ClassInfo c : symbols.allClasses()) {
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(toJdwpRef(c.classId));
+                    b.writeString(c.jvmSignature());
+                    b.writeString(""); // generic signature
+                    b.writeInt(7);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 4: { // AllThreads
+                Buf b = new Buf();
+                b.writeInt(knownThreads.size());
+                for (long tid : knownThreads) b.writeLong(tid);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 5: { // TopLevelThreadGroups
+                Buf b = new Buf();
+                b.writeInt(1);
+                b.writeLong(FAKE_GROUP_ID);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 6: { // Dispose
+                if (device != null) try { device.dispose(); } catch (IOException ignore) {}
+                writeReply(id, 0, empty());
+                return;
+            }
+            case 7: { // IDSizes
+                Buf b = new Buf();
+                b.writeInt(8); b.writeInt(8); b.writeInt(8); b.writeInt(8); b.writeInt(8);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 8: { // Suspend
+                writeReply(id, 0, empty());
+                return;
+            }
+            case 9: { // Resume
+                if (device != null) try { device.resumeAll(); } catch (IOException ignore) {}
+                writeReply(id, 0, empty());
+                return;
+            }
+            case 10: { // Exit
+                writeReply(id, 0, empty());
+                return;
+            }
+            case 12: case 17: { // Capabilities / CapabilitiesNew — return all false
+                Buf b = new Buf();
+                int n = (cmd == 12) ? 7 : 32;
+                for (int i = 0; i < n; i++) b.writeByte(0);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 13: { // ClassPaths
+                Buf b = new Buf();
+                b.writeString("/");      // base dir
+                b.writeInt(0); b.writeInt(0); // empty classpath/bootclasspath
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    // -------- ReferenceType -------------------------------------------------
+
+    private void handleRefType(int id, int cmd, byte[] p) throws IOException {
+        long typeID = readLong(p, 0);
+        SymbolTable.ClassInfo c = symbols.classById(fromJdwpRef(typeID));
+        switch (cmd) {
+            case 1: { // Signature
+                Buf b = new Buf();
+                b.writeString(c != null ? c.jvmSignature() : "Ljava/lang/Object;");
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // ClassLoader
+                Buf b = new Buf();
+                b.writeLong(FAKE_CLASSLOADER_ID);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 3: { // Modifiers
+                Buf b = new Buf(); b.writeInt(0x0001); writeReply(id, 0, b.bytes()); return;
+            }
+            case 4: { // Fields
+                Buf b = new Buf(); b.writeInt(0); writeReply(id, 0, b.bytes()); return;
+            }
+            case 14: { // FieldsWithGeneric — stubbed empty too
+                Buf b = new Buf(); b.writeInt(0); writeReply(id, 0, b.bytes()); return;
+            }
+            case 5: { // Methods
+                Buf b = new Buf();
+                if (c == null) { b.writeInt(0); writeReply(id, 0, b.bytes()); return; }
+                b.writeInt(c.methods.size());
+                for (SymbolTable.MethodInfo m : c.methods) {
+                    b.writeLong(toJdwpRef(m.methodId));
+                    b.writeString(m.name);
+                    b.writeString(m.descriptor);
+                    b.writeInt(0x0001); // PUBLIC; we don't track real modifiers
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 15: { // MethodsWithGeneric — same as Methods + per-method genericSig
+                Buf b = new Buf();
+                if (c == null) { b.writeInt(0); writeReply(id, 0, b.bytes()); return; }
+                b.writeInt(c.methods.size());
+                for (SymbolTable.MethodInfo m : c.methods) {
+                    b.writeLong(toJdwpRef(m.methodId));
+                    b.writeString(m.name);
+                    b.writeString(m.descriptor);
+                    b.writeString(""); // generic signature
+                    b.writeInt(0x0001);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 7: { // SourceFile
+                Buf b = new Buf();
+                b.writeString(c != null && c.sourceFile != null && !c.sourceFile.isEmpty()
+                        ? c.sourceFile : "Unknown.java");
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 9: { // Status
+                Buf b = new Buf(); b.writeInt(7); writeReply(id, 0, b.bytes()); return;
+            }
+            case 10: { // Interfaces
+                Buf b = new Buf(); b.writeInt(0); writeReply(id, 0, b.bytes()); return;
+            }
+            case 11: { // ClassObject
+                Buf b = new Buf(); b.writeLong(typeID); writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    // -------- Method --------------------------------------------------------
+
+    private void handleMethod(int id, int cmd, byte[] p) throws IOException {
+        long typeID = readLong(p, 0);
+        long methodID = readLong(p, 8);
+        SymbolTable.MethodInfo m = symbols.methodById(fromJdwpRef(methodID));
+        switch (cmd) {
+            case 1: { // LineTable
+                Buf b = new Buf();
+                if (m == null || m.lines.isEmpty()) {
+                    b.writeLong(0); b.writeLong(0); b.writeInt(0);
+                } else {
+                    long start = m.lines.first();
+                    long end = m.lines.last();
+                    b.writeLong(start); b.writeLong(end); b.writeInt(m.lines.size());
+                    for (int line : m.lines) {
+                        b.writeLong(line); b.writeInt(line);
+                    }
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // VariableTable
+                Buf b = new Buf();
+                if (m == null || m.locals.isEmpty()) {
+                    b.writeInt(0); b.writeInt(0);
+                } else {
+                    // argSlots without isStatic distinction — we don't track
+                    // modifiers in the sidecar yet, so assume instance (off
+                    // by one for static methods is harmless to jdb's display).
+                    b.writeInt(m.argSlots(false));
+                    b.writeInt(m.locals.size());
+                    for (SymbolTable.LocalVarInfo v : m.locals) {
+                        // codeIndex=0, length=large => "always live"
+                        b.writeLong(0L);
+                        b.writeString(v.name);
+                        b.writeString(v.descriptor);
+                        b.writeInt(Integer.MAX_VALUE);
+                        b.writeInt(v.slot);
+                    }
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 5: { // VariableTableWithGeneric — adds per-var generic sig
+                Buf b = new Buf();
+                if (m == null || m.locals.isEmpty()) {
+                    b.writeInt(0); b.writeInt(0);
+                } else {
+                    b.writeInt(m.argSlots(false));
+                    b.writeInt(m.locals.size());
+                    for (SymbolTable.LocalVarInfo v : m.locals) {
+                        b.writeLong(0L);
+                        b.writeString(v.name);
+                        b.writeString(v.descriptor);
+                        b.writeString(""); // generic signature
+                        b.writeInt(Integer.MAX_VALUE);
+                        b.writeInt(v.slot);
+                    }
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 3: { // Bytecodes
+                Buf b = new Buf(); b.writeInt(0);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 4: { // IsObsolete
+                Buf b = new Buf(); b.writeByte(0); writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    private void handleClassType(int id, int cmd, byte[] p) throws IOException {
+        switch (cmd) {
+            case 1: { // Superclass
+                Buf b = new Buf();
+                b.writeLong(0); // null = java.lang.Object's super
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    // -------- Thread / ThreadGroup -----------------------------------------
+
+    private void handleThread(int id, int cmd, byte[] p) throws IOException {
+        long tid = readLong(p, 0);
+        switch (cmd) {
+            case 1: { // Name
+                Buf b = new Buf(); b.writeString("Thread-" + tid); writeReply(id, 0, b.bytes()); return;
+            }
+            case 2: { // Suspend
+                writeReply(id, 0, empty()); return;
+            }
+            case 3: { // Resume
+                if (device != null) try { device.resume(tid); } catch (IOException ignore) {}
+                writeReply(id, 0, empty()); return;
+            }
+            case 4: { // Status
+                // 1 = SLEEPING, 4 = RUNNING; suspendStatus bit 1 = SUSPENDED
+                Buf b = new Buf();
+                b.writeInt(4); // RUNNING
+                b.writeInt(tid == lastSuspendedThread ? 1 : 0);
+                writeReply(id, 0, b.bytes()); return;
+            }
+            case 5: { // ThreadGroup
+                Buf b = new Buf(); b.writeLong(FAKE_GROUP_ID); writeReply(id, 0, b.bytes()); return;
+            }
+            case 6: { // Frames
+                int startFrame = readInt(p, 8);
+                int length = readInt(p, 12);
+                fetchStackForThread(tid);
+                Buf b = new Buf();
+                int[] mids = lastStackMids;
+                int[] lines = lastStackLines;
+                int total = mids == null ? 0 : mids.length;
+                int count = total - startFrame;
+                if (length >= 0 && length < count) count = length;
+                if (count < 0) count = 0;
+                b.writeInt(count);
+                for (int i = 0; i < count; i++) {
+                    int idx = startFrame + i;
+                    long frameId = ((tid & 0xFFFFFFFFL) << 32) | (idx & 0xFFFFFFFFL);
+                    b.writeLong(frameId);
+                    // Location: typeTag, classID, methodID, codeIndex (in JDWP space)
+                    SymbolTable.MethodInfo m = symbols.methodById(mids[idx]);
+                    int classId = m != null ? m.classId : 0;
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(toJdwpRef(classId));
+                    b.writeLong(toJdwpRef(mids[idx]));
+                    b.writeLong(lines[idx]);
+                }
+                writeReply(id, 0, b.bytes()); return;
+            }
+            case 7: { // FrameCount
+                fetchStackForThread(tid);
+                Buf b = new Buf(); b.writeInt(lastStackMids == null ? 0 : lastStackMids.length);
+                writeReply(id, 0, b.bytes()); return;
+            }
+            case 12: { // SuspendCount
+                Buf b = new Buf();
+                b.writeInt(tid == lastSuspendedThread ? 1 : 0);
+                writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    private void handleThreadGroup(int id, int cmd, byte[] p) throws IOException {
+        switch (cmd) {
+            case 1: { Buf b = new Buf(); b.writeString("main"); writeReply(id, 0, b.bytes()); return; }
+            case 2: { Buf b = new Buf(); b.writeLong(0); writeReply(id, 0, b.bytes()); return; }
+            case 3: {
+                Buf b = new Buf();
+                b.writeInt(knownThreads.size());
+                for (long t : knownThreads) b.writeLong(t);
+                b.writeInt(0);
+                writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    // -------- StackFrame ----------------------------------------------------
+
+    private void handleStackFrame(int id, int cmd, byte[] p) throws IOException {
+        long tid = readLong(p, 0);
+        long frameId = readLong(p, 8);
+        int frameIdx = (int)(frameId & 0xFFFFFFFFL);
+        switch (cmd) {
+            case 1: { // GetValues
+                int slotCount = readInt(p, 16);
+                // Read the requested slots into a list.
+                List<int[]> requested = new ArrayList<>(); // each: { slot, sigByte }
+                int off = 20;
+                for (int i = 0; i < slotCount; i++) {
+                    int slot = readInt(p, off); off += 4;
+                    int sig = p[off] & 0xff; off += 1;
+                    requested.add(new int[]{ slot, sig });
+                }
+                // Synchronously ask the device for locals at frameIdx.
+                int[] devSlots; byte[] devTypes; long[] devValues;
+                synchronized (localsLock) {
+                    pendingLocals = true;
+                    lastLocalsSlots = null; lastLocalsTypes = null; lastLocalsValues = null;
+                    try { device.getLocals(tid, frameIdx); } catch (IOException io) {
+                        writeReply(id, 103, empty()); return;
+                    }
+                    long deadline = System.currentTimeMillis() + 2000;
+                    while (pendingLocals && System.currentTimeMillis() < deadline) {
+                        try { localsLock.wait(deadline - System.currentTimeMillis()); } catch (InterruptedException ie) { break; }
+                    }
+                    devSlots = lastLocalsSlots; devTypes = lastLocalsTypes; devValues = lastLocalsValues;
+                }
+                Buf b = new Buf();
+                b.writeInt(slotCount);
+                for (int[] r : requested) {
+                    int slot = r[0];
+                    int idx = findSlot(devSlots, slot);
+                    if (idx < 0) {
+                        b.writeByte('L'); b.writeLong(0);
+                    } else {
+                        byte tc = devTypes[idx];
+                        long v = devValues[idx];
+                        b.writeByte(tc);
+                        switch ((char) tc) {
+                            case 'Z': b.writeByte((int)v & 1); break;
+                            case 'B': b.writeByte((int)v & 0xff); break;
+                            case 'S': case 'C': b.writeShort((int)v & 0xffff); break;
+                            case 'I': case 'F': b.writeInt((int)v); break;
+                            case 'J': case 'D': b.writeLong(v); break;
+                            case 'L': case '[': b.writeLong(v); break;
+                            default: b.writeLong(v);
+                        }
+                    }
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 3: { // ThisObject
+                Buf b = new Buf(); b.writeByte('L'); b.writeLong(0); writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    private int findSlot(int[] slots, int target) {
+        if (slots == null) return -1;
+        for (int i = 0; i < slots.length; i++) if (slots[i] == target) return i;
+        return -1;
+    }
+
+    // -------- EventRequest --------------------------------------------------
+
+    private void handleEventRequest(int id, int cmd, byte[] p) throws IOException {
+        switch (cmd) {
+            case 1: { // Set
+                int eventKind = p[0] & 0xff;
+                int suspendPolicy = p[1] & 0xff;
+                int modCount = readInt(p, 2);
+                int off = 6;
+                long typeID = 0, methodID = 0, codeIndex = 0;
+                long stepThread = 0;
+                int stepDepth = 0;
+                for (int i = 0; i < modCount; i++) {
+                    int modKind = p[off] & 0xff; off += 1;
+                    switch (modKind) {
+                        case 7: { // LocationOnly
+                            int typeTag = p[off] & 0xff; off += 1;
+                            typeID = readLong(p, off); off += 8;
+                            methodID = readLong(p, off); off += 8;
+                            codeIndex = readLong(p, off); off += 8;
+                            break;
+                        }
+                        case 1: { // Count
+                            off += 4; break;
+                        }
+                        case 2: { // ThreadOnly
+                            off += 8; break;
+                        }
+                        case 3: case 4: case 5: { // ClassOnly, ClassMatch, ClassExclude
+                            off = skipString(p, off + (modKind == 3 ? 8 : 0));
+                            break;
+                        }
+                        case 8: { // ExceptionOnly
+                            off += 8 + 1 + 1; break;
+                        }
+                        case 10: { // Step modifier (threadID, size, depth)
+                            stepThread = readLong(p, off); off += 8;
+                            // size: 0=MIN(instruction), 1=LINE — we only do LINE
+                            off += 4;
+                            stepDepth = readInt(p, off); off += 4;
+                            break;
+                        }
+                        case 11: { // InstanceOnly
+                            off += 8; break;
+                        }
+                        default:
+                            // Best-effort skip; many modifier kinds are variable-width
+                            // but jdb mostly uses the ones above.
+                            off = p.length; break;
+                    }
+                }
+                int rid = nextRequestId.incrementAndGet();
+                if (eventKind == EK_BREAKPOINT) {
+                    // typeID / methodID arrive in JDWP-space; convert back.
+                    int classIdInt = fromJdwpRef(typeID);
+                    int methodIdInt = fromJdwpRef(methodID);
+                    BpRequest br = new BpRequest(rid, classIdInt, methodIdInt, codeIndex, suspendPolicy);
+                    bpRequests.put(rid, br);
+                    // If the device isn't connected yet, the breakpoint will
+                    // be replayed when onHello fires. Either way bpRequests
+                    // is the source of truth so the event handler can match
+                    // device-emitted BP_HIT events back to a JDWP request id.
+                    if (device != null && deviceHelloReceived) try {
+                        device.setBreakpoint(methodIdInt, (int) codeIndex);
+                    } catch (IOException io) { /* ignore */ }
+                } else if (eventKind == EK_SINGLE_STEP && stepThread != 0) {
+                    // depth: 0=INTO, 1=OVER, 2=OUT — same numeric values as
+                    // the wire protocol's STEP_INTO/OVER/OUT, so no mapping.
+                    stepRequests.put(stepThread, rid);
+                    if (device != null && deviceHelloReceived) try {
+                        device.step(stepThread, stepDepth);
+                    } catch (IOException io) { /* ignore */ }
+                }
+                Buf b = new Buf(); b.writeInt(rid); writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // Clear
+                int eventKind = p[0] & 0xff;
+                int rid = readInt(p, 1);
+                BpRequest br = bpRequests.remove(rid);
+                if (br != null && device != null && eventKind == EK_BREAKPOINT) {
+                    try { device.clearBreakpoint((int) br.methodID, (int) br.codeIndex); } catch (IOException ignore) {}
+                }
+                if (eventKind == EK_SINGLE_STEP) {
+                    stepRequests.entrySet().removeIf(e -> e.getValue() == rid);
+                }
+                writeReply(id, 0, empty());
+                return;
+            }
+            case 3: { // ClearAllBreakpoints
+                for (BpRequest br : bpRequests.values()) {
+                    if (device != null) try {
+                        device.clearBreakpoint((int) br.methodID, (int) br.codeIndex);
+                    } catch (IOException ignore) {}
+                }
+                bpRequests.clear();
+                writeReply(id, 0, empty());
+                return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    private void handleObject(int id, int cmd, byte[] p) throws IOException {
+        long objectId = readLong(p, 0);
+        switch (cmd) {
+            case 1: { // ReferenceType — get class
+                int classId = blockingGetObjectClass(objectId);
+                Buf b = new Buf();
+                if (classId < 0) {
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(0);
+                } else {
+                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeLong(toJdwpRef(classId));
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // GetValues — instance field reads. Stub: empty.
+                int count = readInt(p, 8);
+                Buf b = new Buf();
+                b.writeInt(count);
+                for (int i = 0; i < count; i++) {
+                    b.writeByte('L');
+                    b.writeLong(0);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 9: { // IsCollected — we don't track GC; always false.
+                Buf b = new Buf(); b.writeByte(0); writeReply(id, 0, b.bytes()); return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    private void handleString(int id, int cmd, byte[] p) throws IOException {
+        long objectId = readLong(p, 0);
+        switch (cmd) {
+            case 1: { // Value
+                String s = blockingGetString(objectId);
+                Buf b = new Buf();
+                b.writeString(s == null ? "" : s);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
+    // -------- Synchronous request/reply against the device ----------------
+
+    private final Object objectClassLock = new Object();
+    private boolean pendingObjectClass = false;
+    private int lastObjectClass = -1;
+
+    private int blockingGetObjectClass(long objectId) {
+        if (device == null) return -1;
+        synchronized (objectClassLock) {
+            pendingObjectClass = true;
+            lastObjectClass = -1;
+            try { device.getObjectClass(objectId); } catch (IOException io) { return -1; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingObjectClass && System.currentTimeMillis() < deadline) {
+                try { objectClassLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return lastObjectClass;
+        }
+    }
+
+    private final Object stringLock = new Object();
+    private boolean pendingString = false;
+    private String lastString = null;
+
+    private String blockingGetString(long objectId) {
+        if (device == null) return null;
+        synchronized (stringLock) {
+            pendingString = true;
+            lastString = null;
+            try { device.getString(objectId); } catch (IOException io) { return null; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingString && System.currentTimeMillis() < deadline) {
+                try { stringLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return lastString;
+        }
+    }
+
+    // -------- DeviceListener (events from device) --------------------------
+
+    private final Object localsLock = new Object();
+    private boolean pendingLocals = false;
+    private int[] lastLocalsSlots;
+    private byte[] lastLocalsTypes;
+    private long[] lastLocalsValues;
+
+    private final Object stackLock = new Object();
+    private volatile long stackThreadId = -1;
+    private volatile boolean pendingStack = false;
+    private volatile int[] lastStackMids;
+    private volatile int[] lastStackLines;
+
+    private void fetchStackForThread(long tid) {
+        if (device == null) return;
+        synchronized (stackLock) {
+            // Already cached for this thread? Reuse without round-tripping.
+            if (stackThreadId == tid && lastStackMids != null && !pendingStack) {
+                return;
+            }
+            pendingStack = true;
+            stackThreadId = tid;
+            lastStackMids = null;
+            lastStackLines = null;
+            try { device.getStack(tid); } catch (IOException io) { pendingStack = false; return; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingStack && System.currentTimeMillis() < deadline) {
+                try { stackLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+        }
+    }
+
+    @Override public void onHello(int version) {
+        System.out.println("[jdwp] device handshake (proto v" + version + ")");
+        deviceHelloReceived = true;
+        if (out != null) {
+            sendVmStart();
+        }
+        // Replay any breakpoints that were registered before the device
+        // joined — common when jdb's startup script issues "stop at" before
+        // the iOS app finishes booting.
+        if (device != null) {
+            for (BpRequest br : bpRequests.values()) {
+                try { device.setBreakpoint((int) br.methodID, (int) br.codeIndex); }
+                catch (IOException ignore) {}
+            }
+        }
+    }
+
+    @Override public void onBreakpointHit(long threadId, int methodId, int line) {
+        System.out.println("[jdwp] BP_HIT tid=" + threadId + " methodId=" + methodId + " line=" + line);
+        if (!knownThreads.contains(threadId)) knownThreads.add(threadId);
+        lastSuspendedThread = threadId;
+        // Eagerly ask the device for stack so the IDE's subsequent Frames
+        // query returns something useful.
+        if (device != null) try { device.getStack(threadId); } catch (IOException ignore) {}
+        // Find matching JDWP request id; if none we still send a generic
+        // event so jdb sees the suspend.
+        int rid = 0;
+        for (BpRequest br : bpRequests.values()) {
+            if (br.methodID == methodId && br.codeIndex == line) { rid = br.requestId; break; }
+        }
+        try {
+            SymbolTable.MethodInfo m = symbols.methodById(methodId);
+            int classId = m != null ? m.classId : 0;
+            Buf b = new Buf();
+            b.writeByte(SP_ALL);
+            b.writeInt(1);
+            b.writeByte(EK_BREAKPOINT);
+            b.writeInt(rid);
+            b.writeLong(threadId);
+            b.writeByte(TYPE_TAG_CLASS);
+            b.writeLong(toJdwpRef(classId));
+            b.writeLong(toJdwpRef(methodId));
+            b.writeLong(line);
+            writeEventCommand(b.bytes());
+        } catch (IOException e) {
+            System.err.println("[jdwp] failed to send breakpoint event: " + e.getMessage());
+        }
+    }
+
+    @Override public void onStepComplete(long threadId, int methodId, int line) {
+        Integer rid = stepRequests.remove(threadId);
+        try {
+            SymbolTable.MethodInfo m = symbols.methodById(methodId);
+            int classId = m != null ? m.classId : 0;
+            Buf b = new Buf();
+            b.writeByte(SP_ALL);
+            b.writeInt(1);
+            b.writeByte(EK_SINGLE_STEP);
+            b.writeInt(rid == null ? 0 : rid);
+            b.writeLong(threadId);
+            b.writeByte(TYPE_TAG_CLASS);
+            b.writeLong(toJdwpRef(classId));
+            b.writeLong(toJdwpRef(methodId));
+            b.writeLong(line);
+            writeEventCommand(b.bytes());
+        } catch (IOException e) {
+            System.err.println("[jdwp] failed to send step event: " + e.getMessage());
+        }
+    }
+
+    @Override public void onStack(long threadId, int[] methodIds, int[] lines) {
+        synchronized (stackLock) {
+            lastStackMids = methodIds;
+            lastStackLines = lines;
+            stackThreadId = threadId;
+            pendingStack = false;
+            stackLock.notifyAll();
+        }
+    }
+
+    @Override public void onLocals(int[] slots, byte[] typeCodes, long[] values) {
+        synchronized (localsLock) {
+            lastLocalsSlots = slots;
+            lastLocalsTypes = typeCodes;
+            lastLocalsValues = values;
+            pendingLocals = false;
+            localsLock.notifyAll();
+        }
+    }
+
+    @Override public void onVmDeath() {
+        try {
+            Buf b = new Buf();
+            b.writeByte(SP_NONE);
+            b.writeInt(1);
+            b.writeByte(EK_VM_DEATH);
+            b.writeInt(0);
+            writeEventCommand(b.bytes());
+        } catch (IOException ignore) {}
+    }
+
+    @Override public void onStringValue(String value) {
+        synchronized (stringLock) {
+            lastString = value;
+            pendingString = false;
+            stringLock.notifyAll();
+        }
+    }
+    @Override public void onObjectClass(int classId) {
+        synchronized (objectClassLock) {
+            lastObjectClass = classId;
+            pendingObjectClass = false;
+            objectClassLock.notifyAll();
+        }
+    }
+    @Override public void onReplyStatus() {}
+    @Override public void onUnknownEvent(int code, byte[] payload) {
+        System.out.println("[jdwp] unknown device event code 0x" + Integer.toHexString(code));
+    }
+    @Override public void onDisconnected() {
+        System.out.println("[jdwp] device disconnected");
+        onVmDeath();
+    }
+
+    // -------- buffer helpers -----------------------------------------------
+
+    private static int readInt(byte[] b, int off) {
+        return ((b[off] & 0xff) << 24) | ((b[off+1] & 0xff) << 16)
+             | ((b[off+2] & 0xff) << 8) | (b[off+3] & 0xff);
+    }
+    private static long readLong(byte[] b, int off) {
+        return ((long)readInt(b, off) << 32) | (readInt(b, off + 4) & 0xffffffffL);
+    }
+    private static String readString(byte[] b, int off) {
+        int len = readInt(b, off);
+        return new String(b, off + 4, len, StandardCharsets.UTF_8);
+    }
+    private static int skipString(byte[] b, int off) {
+        int len = readInt(b, off);
+        return off + 4 + len;
+    }
+
+    /** Tiny growable byte buffer with JDWP-flavoured writers. */
+    private static final class Buf {
+        private byte[] arr = new byte[64];
+        private int n = 0;
+        private void ensure(int more) {
+            if (n + more > arr.length) {
+                int cap = arr.length;
+                while (cap < n + more) cap *= 2;
+                byte[] na = new byte[cap];
+                System.arraycopy(arr, 0, na, 0, n);
+                arr = na;
+            }
+        }
+        void writeByte(int v) { ensure(1); arr[n++] = (byte)v; }
+        void writeShort(int v) { ensure(2); arr[n++] = (byte)(v>>>8); arr[n++] = (byte)v; }
+        void writeInt(int v) { ensure(4); arr[n++]=(byte)(v>>>24); arr[n++]=(byte)(v>>>16); arr[n++]=(byte)(v>>>8); arr[n++]=(byte)v; }
+        void writeLong(long v) { writeInt((int)(v>>>32)); writeInt((int)v); }
+        void writeString(String s) {
+            byte[] u = s.getBytes(StandardCharsets.UTF_8);
+            writeInt(u.length);
+            ensure(u.length);
+            System.arraycopy(u, 0, arr, n, u.length);
+            n += u.length;
+        }
+        byte[] bytes() { byte[] o = new byte[n]; System.arraycopy(arr, 0, o, 0, n); return o; }
+    }
+}

@@ -20,6 +20,13 @@
 //#define CN1_INCLUDE_NPE_CHECKS
 #define CN1_INCLUDE_ARRAY_BOUND_CHECKS
 
+// Uncommented by the translator (driven by the cn1.onDeviceDebug system
+// property) when an on-device-debug build is requested. Enables per-frame
+// locals-address tables, the cn1DebuggerActive hot-path check inside
+// __CN1_DEBUG_INFO, and the proxy listener thread. Release builds leave
+// this off and pay no overhead.
+//#define CN1_ON_DEVICE_DEBUG
+
 #ifdef DEBUG_GC_ALLOCATIONS
 #define DEBUG_GC_VARIABLES int line; int className;
 #define DEBUG_GC_INIT 0, 0,
@@ -790,7 +797,20 @@ struct ThreadLocalData {
     int* callStackLine;
     int* callStackMethod;
     int callStackOffset;
-    
+
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Per-frame pointer to a stack-allocated array of void* addresses, one per
+    // JVM local slot in the current method. Populated by translator-emitted
+    // prologue code in debug builds; consulted by the debugger thread to read
+    // primitive locals (the auto C variables are volatile so their address is
+    // stable for the duration of the frame).
+    void*** callStackLocalsAddresses;
+    // Per-frame pointer to the static cn1_frame_info struct for the current
+    // method. Carries the variable side-table the debugger uses to map source
+    // lines to slot/type info.
+    const struct cn1_frame_info** callStackFrameInfo;
+#endif
+
     char* utf8Buffer;
     int utf8BufferSize;
     JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
@@ -799,7 +819,48 @@ struct ThreadLocalData {
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
 
+#ifdef CN1_ON_DEVICE_DEBUG
+// One row of the variable side-table: a single (line, slot, typeCode) tuple.
+// typeCode is the JVM type descriptor first char (I/J/F/D/Z/B/S/C/L/[) so the
+// debugger thread knows how to dereference the void* held in
+// callStackLocalsAddresses[offset][slot].
+struct cn1_var_entry {
+    int line;
+    int slot;
+    char typeCode;
+};
+
+// Per-method static metadata emitted once per translated method. Held alive
+// for the life of the program. The translator emits an instance as
+// "static const struct cn1_frame_info __cn1_finfo_<method> = { ... };" and
+// passes &__cn1_finfo_<method> into the frame at method entry.
+struct cn1_frame_info {
+    int classId;
+    int methodId;
+    int numLocals;
+    int varTableCount;
+    const struct cn1_var_entry* varTable;
+};
+
+// Set to non-zero by the debugger proxy listener once a proxy has connected
+// and is ready to receive events. Read on the hot path of __CN1_DEBUG_INFO,
+// so kept as a plain volatile int (predictable branch when zero).
+extern volatile int cn1DebuggerActive;
+
+// Cold-path callee invoked by __CN1_DEBUG_INFO when cn1DebuggerActive is set.
+// Defined in cn1_debugger.m (iOS port) / a no-op shim in release builds.
+extern void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line);
+
+#define __CN1_DEBUG_INFO(line) \
+    do { \
+        threadStateData->callStackLine[threadStateData->callStackOffset - 1] = (line); \
+        if (__builtin_expect(cn1DebuggerActive, 0)) { \
+            cn1_debugger_check(threadStateData, (line)); \
+        } \
+    } while (0)
+#else
 #define __CN1_DEBUG_INFO(line) threadStateData->callStackLine[threadStateData->callStackOffset - 1] = line;
+#endif
 
 // we need to throw stack overflow error but its unavailable here...
 /*#define ENTERING_CODENAME_ONE_METHOD(classIdNumber, methodIdNumber) { \

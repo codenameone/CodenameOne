@@ -117,11 +117,25 @@ public class BytecodeMethod implements SignatureSet {
 
     
     static boolean optimizerOn;
-    
+
+    /**
+     * When true, the translator emits extra metadata (per-frame locals-address
+     * tables, variable side-tables) and uses a debugger-aware form of
+     * __CN1_DEBUG_INFO. Toggled via the cn1.onDeviceDebug system property.
+     * Release builds leave this off and pay no overhead.
+     */
+    static boolean onDeviceDebug;
+
     static {
         String op = System.getProperty("optimizer");
         optimizerOn = op == null || op.equalsIgnoreCase("on");
         //optimizerOn = false;
+
+        onDeviceDebug = "true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"));
+    }
+
+    public static boolean isOnDeviceDebug() {
+        return onDeviceDebug;
     }
 
     public boolean isBarebone() {
@@ -884,6 +898,114 @@ public class BytecodeMethod implements SignatureSet {
         }
         return false;
     }
+
+    /**
+     * Emits a stack-allocated {@code void*} array containing the address of
+     * each JVM-local slot in the current frame, then stores the array pointer
+     * into the per-frame slot {@code callStackLocalsAddresses[offset-1]} that
+     * the debugger thread consults to read locals.
+     *
+     * Slot type is resolved from {@link #localVariables} first (the declared
+     * source-level locals) and falls back to method arguments for slots that
+     * have no debug info. Slots with no known type are emitted as NULL — the
+     * debugger will report them as unavailable.
+     *
+     * Only called from the non-barebone path; barebone methods carry no
+     * locals and bypass this entirely.
+     */
+    private void appendLocalsAddressTable(StringBuilder b) {
+        if (maxLocals <= 0) {
+            return;
+        }
+        char[] slotQual = new char[maxLocals];
+        java.util.Arrays.fill(slotQual, ' ');
+        for (LocalVariable lv : localVariables) {
+            int idx = lv.getIndex();
+            if (idx >= 0 && idx < maxLocals) {
+                slotQual[idx] = lv.getQualifier();
+            }
+        }
+        int slot = 0;
+        if (!staticMethod) {
+            if (slotQual[0] == ' ') {
+                slotQual[0] = 'o';
+            }
+            slot = 1;
+        }
+        for (int i = 0; i < arguments.size() && slot < maxLocals; i++) {
+            ByteCodeMethodArg arg = arguments.get(i);
+            if (slotQual[slot] == ' ') {
+                slotQual[slot] = arg.getQualifier();
+            }
+            slot++;
+            if (arg.isDoubleOrLong() && slot < maxLocals) {
+                slot++;
+            }
+        }
+
+        // Leading newline: callers may have left the cursor mid-line after
+        // the "this" assignment when there are no other arguments, and the
+        // preprocessor requires #ifdef to be the first non-whitespace token
+        // on its line.
+        b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
+        b.append("    void* __cn1_local_addrs[").append(maxLocals).append("] = { ");
+        for (int s = 0; s < maxLocals; s++) {
+            if (s > 0) {
+                b.append(", ");
+            }
+            char q = slotQual[s];
+            switch (q) {
+                case 'o':
+                    b.append("&locals[").append(s).append("].data.o");
+                    break;
+                case 'i':
+                case 'l':
+                case 'f':
+                case 'd':
+                    b.append("&").append(q).append("locals_").append(s).append("_");
+                    break;
+                default:
+                    b.append("0");
+                    break;
+            }
+        }
+        b.append(" };\n");
+        b.append("    threadStateData->callStackLocalsAddresses[threadStateData->callStackOffset - 1] = __cn1_local_addrs;\n");
+        b.append("    threadStateData->callStackFrameInfo[threadStateData->callStackOffset - 1] = &__cn1_finfo_").append(getMethodIdentifier()).append(";\n");
+        b.append("#endif\n");
+    }
+
+    /**
+     * Emits the static per-method {@code cn1_frame_info} (and its inline
+     * {@code cn1_var_entry[]} side-table). Held at file scope so the
+     * per-frame pointer set up in {@link #appendLocalsAddressTable} stays
+     * valid for the program's lifetime.
+     *
+     * The side-table currently lists every declared local with line=0
+     * meaning "always live"; refining live-range per source line is left
+     * for a follow-up so the proxy can hide locals before their declaration.
+     */
+    private void appendFrameInfoStruct(StringBuilder b) {
+        String id = getMethodIdentifier();
+        int classId = Parser.getClassOffset(clsName);
+        int methodId = methodOffset;
+        b.append("#ifdef CN1_ON_DEVICE_DEBUG\n");
+        if (localVariables.isEmpty()) {
+            b.append("static const struct cn1_frame_info __cn1_finfo_").append(id).append(" = {\n");
+            b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", 0, 0\n");
+            b.append("};\n");
+        } else {
+            b.append("static const struct cn1_var_entry __cn1_vars_").append(id).append("[] = {\n");
+            for (LocalVariable lv : localVariables) {
+                b.append("    { 0, ").append(lv.getIndex()).append(", '").append(lv.getTypeCode()).append("' },\n");
+            }
+            b.append("};\n");
+            b.append("static const struct cn1_frame_info __cn1_finfo_").append(id).append(" = {\n");
+            b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", ").append(localVariables.size()).append(", __cn1_vars_").append(id).append("\n");
+            b.append("};\n");
+        }
+        b.append("#endif\n");
+    }
     
     private void fixUpBarebone() {
         for (Instruction i : instructions) {
@@ -924,6 +1046,9 @@ public class BytecodeMethod implements SignatureSet {
     public void appendMethodC(StringBuilder b) {
         if(nativeMethod) {
             return;
+        }
+        if (onDeviceDebug && !eliminated) {
+            appendFrameInfoStruct(b);
         }
         appendCMethodPrefix(b, "");
         b.append(" {\n");
@@ -1096,6 +1221,9 @@ public class BytecodeMethod implements SignatureSet {
                 if(arg.isDoubleOrLong()) {
                     localsOffset++;
                 }
+            }
+            if (onDeviceDebug && !barebone) {
+                appendLocalsAddressTable(b);
             }
         } else {
             if(synchronizedMethod) {
@@ -1451,7 +1579,19 @@ public class BytecodeMethod implements SignatureSet {
     
     public void setSourceFile(String sourceFile) {
         this.sourceFile = sourceFile;
-    } 
+    }
+
+    public String getSourceFile() {
+        return sourceFile;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+
+    public Set<LocalVariable> getLocalVariables() {
+        return localVariables;
+    }
     
     public void addDebugInfo(int line) {
         if (disableDebugInfo) {

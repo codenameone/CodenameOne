@@ -322,9 +322,17 @@ static void installSignalHandlers() {
     
     // Override point for customization after application launch.
     
-    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the 
+    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the
     // app will throw an NPE.
     installSignalHandlers();
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Bring up the on-device-debug listener BEFORE the VM callback so the
+    // proxy can already be attached when user code starts running. The
+    // listener spawns its own thread and may block boot if Info.plist
+    // sets CN1ProxyWaitForAttach=YES.
+    extern void cn1_debugger_start(void);
+    cn1_debugger_start();
+#endif
     [self cn1EnsureViewController];
 #ifndef CN1_USE_UI_SCENE
     [self cn1InstallRootViewControllerIntoWindow:self.window];

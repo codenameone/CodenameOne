@@ -1676,6 +1676,11 @@ public class IPhoneBuilder extends Executor {
             // includeNullChecks enables null checks on everything else (methods, arrays, etc..)
             String includeNullChecks = Boolean.valueOf(request.getArg("ios.includeNullChecks", "true")) ? "true":"false";
             String bundleVersionNumber = request.getArg("ios.bundleVersion", buildVersion);
+            // On-device-debug toggle: tells the translator to emit per-frame
+            // locals-address tables, the cn1_frame_info side-tables, and to
+            // flip the CN1_ON_DEVICE_DEBUG #define in cn1_globals.h so the
+            // generated Xcode build links the listener thread.
+            String onDeviceDebug = Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
 
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
@@ -1690,7 +1695,7 @@ public class IPhoneBuilder extends Executor {
             debug("Building using addLibs="+addLibs);
             stopwatch.split("Prepare ParparVM");
             try {
-                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
+                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-Dcn1.onDeviceDebug=" + onDeviceDebug, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
                         "-jar", parparVMCompilerJar, "ios",
                         classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";" +
                                 buildinRes.getAbsolutePath(),
@@ -2758,6 +2763,27 @@ public class IPhoneBuilder extends Executor {
 
         // nothing to inject here? move along
         String inject = request.getArg("ios.plistInject", "<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>");
+
+        // On-device-debug: drop the proxy host/port into Info.plist so
+        // cn1_debugger.m can read them at app boot without needing the
+        // build to also patch source files.
+        if ("true".equalsIgnoreCase(request.getArg("ios.onDeviceDebug", "false"))) {
+            String proxyHost = request.getArg("ios.onDeviceDebug.proxyHost", "127.0.0.1");
+            String proxyPort = request.getArg("ios.onDeviceDebug.proxyPort", "55333");
+            String waitForAttach = "true".equalsIgnoreCase(
+                    request.getArg("ios.onDeviceDebug.waitForAttach", "false")) ? "true" : "false";
+            inject += "\n<key>CN1ProxyHost</key>\n<string>" + proxyHost + "</string>";
+            inject += "\n<key>CN1ProxyPort</key>\n<integer>" + proxyPort + "</integer>";
+            inject += "\n<key>CN1ProxyWaitForAttach</key><" + waitForAttach + "/>";
+            // ATS exemption for localhost / arbitrary loads so the device
+            // can dial out to the developer's laptop without a TLS chain.
+            if (!inject.contains("NSAppTransportSecurity")) {
+                inject += "\n<key>NSAppTransportSecurity</key>"
+                        + "<dict>"
+                        + "<key>NSAllowsArbitraryLoads</key><true/>"
+                        + "</dict>";
+            }
+        }
         
         String applicationQueriesSchemes = request.getArg("ios.applicationQueriesSchemes", null);
         if(applicationQueriesSchemes != null && applicationQueriesSchemes.length() > 0) {
