@@ -10190,4 +10190,113 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void announceForAccessibility(final Component cmp, final String text) {
         IOSNative.announceForAccessibility(text);
     }
+
+    // ================================================================
+    // Crypto bridge -- routes through CN1Crypto.{h,m} in nativeSources/
+    // (the corresponding native methods live on IOSNative). The defaults
+    // inherited from CodenameOneImplementation use java.security via
+    // reflection, which isn't on the ParparVM runtime classpath.
+
+    private static byte[] cryptoTrim(byte[] buf, int len) {
+        if (len < 0) {
+            throw new RuntimeException("crypto operation failed with code " + len);
+        }
+        if (len == buf.length) return buf;
+        byte[] out = new byte[len];
+        System.arraycopy(buf, 0, out, 0, len);
+        return out;
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        nativeInstance.secureRandomBytes(out);
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return doAes(transformation, key, iv, aad, plaintext, 1);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return doAes(transformation, key, iv, aad, ciphertext, 0);
+    }
+
+    private byte[] doAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int encrypt) {
+        String t = transformation == null ? "" : transformation.toUpperCase();
+        if (t.indexOf("GCM") >= 0) {
+            // Encrypt output = ciphertext + 16-byte tag; decrypt output is
+            // the same length as the ciphertext minus the tag.
+            int outLen = encrypt == 1 ? input.length + 16 : Math.max(0, input.length - 16);
+            byte[] outBuf = new byte[outLen];
+            int written = nativeInstance.aesGcm(encrypt, key, iv, aad, input, outBuf);
+            return cryptoTrim(outBuf, written);
+        }
+        boolean padded = t.indexOf("NOPADDING") < 0;
+        // CBC ciphertext is at most input + one extra block (16 bytes).
+        int outLen = input.length + 16;
+        byte[] outBuf = new byte[outLen];
+        int written = nativeInstance.aesCbc(encrypt, key, iv, input, outBuf, padded ? 1 : 0);
+        return cryptoTrim(outBuf, written);
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        int padding = rsaPaddingKind(transformation);
+        // Modern key sizes never exceed 2048 bytes of output.
+        byte[] outBuf = new byte[2048];
+        int written = nativeInstance.rsaEncrypt(padding, publicKeyX509, plaintext, outBuf);
+        return cryptoTrim(outBuf, written);
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        int padding = rsaPaddingKind(transformation);
+        byte[] outBuf = new byte[2048];
+        int written = nativeInstance.rsaDecrypt(padding, privateKeyPkcs8, ciphertext, outBuf);
+        return cryptoTrim(outBuf, written);
+    }
+
+    private static int rsaPaddingKind(String transformation) {
+        if (transformation == null) return 1;
+        return transformation.toUpperCase().indexOf("OAEP") >= 0 ? 2 : 1;
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        int alg = signatureAlgorithmKind(algorithm);
+        byte[] outBuf = new byte[2048];
+        int written = nativeInstance.sign(alg, privateKeyPkcs8, data, outBuf);
+        return cryptoTrim(outBuf, written);
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
+        int alg = signatureAlgorithmKind(algorithm);
+        int rc = nativeInstance.verify(alg, publicKeyX509, data, signature);
+        if (rc < 0) throw new RuntimeException("verify failed: code " + rc);
+        return rc == 1;
+    }
+
+    private static int signatureAlgorithmKind(String algorithm) {
+        if ("SHA256withRSA".equals(algorithm)) return 0;
+        if ("SHA384withRSA".equals(algorithm)) return 1;
+        if ("SHA512withRSA".equals(algorithm)) return 2;
+        if ("SHA256withECDSA".equals(algorithm)) return 3;
+        if ("SHA384withECDSA".equals(algorithm)) return 4;
+        if ("SHA512withECDSA".equals(algorithm)) return 5;
+        throw new RuntimeException("unsupported signature algorithm: " + algorithm);
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        // 4096-bit RSA produces ~600 bytes of DER for the public side and
+        // ~2300 for the private; round up generously.
+        byte[] pubBuf = new byte[bits + 1024];
+        byte[] privBuf = new byte[bits * 3];
+        int[] lens = new int[2];
+        int rc = nativeInstance.generateRsaKeyPair(bits, pubBuf, privBuf, lens);
+        if (rc < 0) throw new RuntimeException("RSA keypair generation failed: code " + rc);
+        return new byte[][]{ cryptoTrim(pubBuf, lens[0]), cryptoTrim(privBuf, lens[1]) };
+    }
 }

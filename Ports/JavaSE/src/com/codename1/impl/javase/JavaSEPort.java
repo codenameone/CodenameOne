@@ -15796,7 +15796,128 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void nativeBrowserWindowRemoveCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
         ((AbstractBrowserWindowSE)window).removeCloseListener(l);
-        
+
     }
     // END NATIVE BROWSER WINDOW METHODS---------------------------------------------------------
+
+    // ================================================================
+    // Crypto bridge -- routes the com.codename1.security API onto the
+    // JCE/JDK crypto provider available on JavaSE/Android. iOS does
+    // not reach this code path; it overrides the same methods on
+    // CodenameOneImplementation via IOSImplementation + CN1Crypto.{h,m}.
+
+    private static java.security.SecureRandom javaseSecureRandom;
+    private static final Object javaseSecureRandomSync = new Object();
+
+    private static java.security.SecureRandom javaseSecureRandom() {
+        synchronized (javaseSecureRandomSync) {
+            if (javaseSecureRandom == null) {
+                javaseSecureRandom = new java.security.SecureRandom();
+            }
+            return javaseSecureRandom;
+        }
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        if (out == null) return;
+        javaseSecureRandom().nextBytes(out);
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return javaseAes(transformation, key, iv, aad, plaintext, javax.crypto.Cipher.ENCRYPT_MODE);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return javaseAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
+    }
+
+    private static byte[] javaseAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int mode) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(key, "AES");
+            String tu = transformation == null ? "" : transformation.toUpperCase();
+            if (tu.indexOf("GCM") >= 0) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.GCMParameterSpec(128, iv));
+            } else if (iv != null) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.IvParameterSpec(iv));
+            } else {
+                cipher.init(mode, keySpec);
+            }
+            if (aad != null && aad.length > 0) {
+                cipher.updateAAD(aad);
+            }
+            return cipher.doFinal(input);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("AES " + (mode == javax.crypto.Cipher.ENCRYPT_MODE ? "encrypt" : "decrypt") + " failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PublicKey key = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+            return cipher.doFinal(plaintext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA encrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PrivateKey key = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key);
+            return cipher.doFinal(ciphertext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA decrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PrivateKey priv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initSign(priv);
+            sig.update(data);
+            return sig.sign();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("sign failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PublicKey pub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initVerify(pub);
+            sig.update(data);
+            return sig.verify(signature);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("verify failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        try {
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(bits);
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA keypair generation failed: " + e.getMessage());
+        }
+    }
 }
