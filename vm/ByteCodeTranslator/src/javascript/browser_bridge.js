@@ -782,10 +782,26 @@
     var payload = request || {};
     var blob = resolveHostRef(payload.blob);
     var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register fileName=' + fileName + ' blob=' + (blob ? 'ok' : 'missing')); } catch (_le) {}
+    }
     if (!blob) {
       __cn1PendingSaveBlobHandler = null;
       return null;
     }
+    // Fire the download immediately. The Generate flow is a clear user-
+    // intent path so most browsers allow the programmatic ``a.click()``
+    // even though the original ``mousedown`` was ~10s ago (cooperative
+    // scheduler had to walk the zip template). Backside-hook timing
+    // becomes irrelevant.
+    var handler = __cn1MakeBlobDownloader(blob, fileName);
+    try { handler(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    // Also stash for the existing backside-hook fire path in case the
+    // immediate click was blocked by user-gesture policy.
     __cn1PendingSaveBlobHandler = __cn1MakeBlobDownloader(blob, fileName);
     return null;
   });
@@ -822,6 +838,9 @@
   hostBridge.register('__cn1_fire_save_blob__', function() {
     var handler = __cn1PendingSaveBlobHandler;
     __cn1PendingSaveBlobHandler = null;
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:fire handler=' + (typeof handler === 'function' ? 'present' : 'absent')); } catch (_le) {}
+    }
     if (typeof handler === 'function') {
       try { handler(); } catch (e) {
         if (global.console && typeof global.console.warn === 'function') {
