@@ -59,7 +59,20 @@ public final class GenerateCN1AccessRegistry {
             // it by returning it from invokeN. Exclude the whole class from
             // the bean-shell registry - Simd is a low-level SIMD primitives
             // API that playground scripts are extremely unlikely to need.
-            "com.codename1.util.Simd"
+            "com.codename1.util.Simd",
+            // com.codename1.security.* is a newly-introduced API
+            // (Biometrics, SecureStorage and friends). Until the cloud build
+            // server / TeaVM backend that compiles the playground catches up
+            // with the new classes the bridge generation trips the TeaVM
+            // RMI daemon. Exclude the new types from the registry for one
+            // release; the API is still usable in real apps, just not in the
+            // playground sandbox.
+            "com.codename1.security.Biometrics",
+            "com.codename1.security.SecureStorage",
+            "com.codename1.security.AuthenticationOptions",
+            "com.codename1.security.BiometricType",
+            "com.codename1.security.BiometricError",
+            "com.codename1.security.BiometricException"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
