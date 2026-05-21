@@ -300,7 +300,12 @@ public class GeneratorModel {
 
     private void copyZipEntriesToMap(String zipResource, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
         boolean dropWindowsModule = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17;
-        try(ZipInputStream zis = new ZipInputStream(getResourceAsStream(zipResource))) {
+        java.io.InputStream raw = getResourceAsStream(zipResource);
+        System.out.println("CN1INIT:copyZip:open res=" + zipResource + " stream=" + (raw == null ? "null" : raw.getClass().getSimpleName()));
+        if (raw == null) {
+            throw new IOException("Resource not found: " + zipResource);
+        }
+        try(ZipInputStream zis = new ZipInputStream(raw)) {
             ZipEntry entry = zis.getNextEntry();
             while (entry != null) {
                 if (!entry.isDirectory()) {
@@ -319,6 +324,7 @@ public class GeneratorModel {
                 entry = zis.getNextEntry();
             }
         }
+        System.out.println("CN1INIT:copyZip:close res=" + zipResource);
     }
 
     private void copyEntryToMap(String sourceName, byte[] sourceData, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
