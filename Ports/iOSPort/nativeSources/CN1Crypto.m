@@ -18,23 +18,29 @@
  */
 
 #import "CN1Crypto.h"
+
+#ifdef CN1_INCLUDE_CRYPTO
+
 #import <Security/Security.h>
 #import <CommonCrypto/CommonCrypto.h>
 #import <CommonCrypto/CommonCryptor.h>
 #import <CommonCrypto/CommonRandom.h>
 
+#ifdef CN1_INCLUDE_CRYPTO_GCM
 /*
  * CommonCrypto exposes AES-GCM only through the SPI header
  * <CommonCrypto/CommonCryptorSPI.h>, which is not in the public iOS SDK. The
  * functions and the kCCModeGCM value below are stable across all current iOS
  * versions and are exported from libcommonCrypto.dylib at runtime -- we
  * declare them here as externs so we can call them without depending on the
- * private header.
+ * private header. These symbols are only referenced when the app explicitly
+ * opts into AES-GCM via the ios.crypto.gcm build hint.
  */
 enum { kCCModeGCM = 11 };
 extern CCCryptorStatus CCCryptorGCMAddIV(CCCryptorRef ref, const void* iv, size_t ivLen);
 extern CCCryptorStatus CCCryptorGCMAddAAD(CCCryptorRef ref, const void* aData, size_t aDataLen);
 extern CCCryptorStatus CCCryptorGCMFinal(CCCryptorRef ref, void* tag, size_t* tagLen);
+#endif
 
 /* --- secure random ----------------------------------------------------- */
 
@@ -79,6 +85,11 @@ int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
                        const uint8_t* aad, int aadLen,
                        const uint8_t* in, int inLen,
                        uint8_t* out, int outCap) {
+#ifndef CN1_INCLUDE_CRYPTO_GCM
+    (void) encrypt; (void) key; (void) keyLen; (void) iv; (void) ivLen;
+    (void) aad; (void) aadLen; (void) in; (void) inLen; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+#else
     if (keyLen != kCCKeySizeAES128 && keyLen != kCCKeySizeAES192 && keyLen != kCCKeySizeAES256) {
         return CN1_CRYPTO_E_BAD_KEY;
     }
@@ -159,6 +170,7 @@ int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
 
     CCCryptorRelease(cryptor);
     return (int) produced;
+#endif /* CN1_INCLUDE_CRYPTO_GCM */
 }
 
 /* --- RSA --------------------------------------------------------------- */
@@ -440,3 +452,57 @@ int cn1_crypto_generate_rsa_keypair(int bits,
     *privLen = p8TotalLen;
     return 0;
 }
+
+#else /* CN1_INCLUDE_CRYPTO */
+
+/*
+ * When the user's app never references com.codename1.security.* the build
+ * system leaves CN1_INCLUDE_CRYPTO undefined and we drop in stub versions of
+ * the exported functions. The stubs let the IOSNative C bridge link against
+ * something, but none of CommonCrypto's encryption symbols (and especially
+ * none of the AES-GCM SPI symbols) end up referenced by the binary -- which
+ * keeps Apple's static-symbol scanner happy.
+ */
+#include <string.h>
+
+int cn1_crypto_secure_random(uint8_t* out, int len) {
+    (void) out; (void) len;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_aes_cbc(int e, const uint8_t* k, int kl, const uint8_t* iv,
+                       const uint8_t* in, int inLen, uint8_t* out, int outCap, int pad) {
+    (void) e; (void) k; (void) kl; (void) iv; (void) in; (void) inLen; (void) out; (void) outCap; (void) pad;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_aes_gcm(int e, const uint8_t* k, int kl, const uint8_t* iv, int ivl,
+                       const uint8_t* aad, int aadl, const uint8_t* in, int inl,
+                       uint8_t* out, int outCap) {
+    (void) e; (void) k; (void) kl; (void) iv; (void) ivl; (void) aad; (void) aadl;
+    (void) in; (void) inl; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_rsa_encrypt(int p, const uint8_t* x, int xl, const uint8_t* in, int inl, uint8_t* out, int outCap) {
+    (void) p; (void) x; (void) xl; (void) in; (void) inl; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_rsa_decrypt(int p, const uint8_t* k, int kl, const uint8_t* in, int inl, uint8_t* out, int outCap) {
+    (void) p; (void) k; (void) kl; (void) in; (void) inl; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_sign(int a, const uint8_t* k, int kl, const uint8_t* d, int dl, uint8_t* out, int outCap) {
+    (void) a; (void) k; (void) kl; (void) d; (void) dl; (void) out; (void) outCap;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_verify(int a, const uint8_t* x, int xl, const uint8_t* d, int dl, const uint8_t* s, int sl) {
+    (void) a; (void) x; (void) xl; (void) d; (void) dl; (void) s; (void) sl;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+int cn1_crypto_generate_rsa_keypair(int bits, uint8_t* outPub, int pubCap, int* pubLen,
+                                    uint8_t* outPriv, int privCap, int* privLen) {
+    (void) bits; (void) outPub; (void) pubCap; (void) outPriv; (void) privCap;
+    if (pubLen) *pubLen = 0;
+    if (privLen) *privLen = 0;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+#endif /* CN1_INCLUDE_CRYPTO */

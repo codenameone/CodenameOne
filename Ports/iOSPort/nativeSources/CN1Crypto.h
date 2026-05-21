@@ -40,6 +40,17 @@
 
 #import <Foundation/Foundation.h>
 
+/*
+ * Build-system toggles. IPhoneBuilder (maven plugin + BuildDaemon) scans the
+ * user's compiled bytecode for references to com.codename1.security.* and
+ * flips the placeholders below to enable the matching code paths. Apps that
+ * don't use the crypto API end up with no extra crypto symbols in the
+ * binary -- in particular the AES-GCM SPI references stay completely out
+ * unless the app opts into GCM via the ios.crypto.gcm build hint.
+ */
+//#define CN1_INCLUDE_CRYPTO
+//#define CN1_INCLUDE_CRYPTO_GCM
+
 #define CN1_CRYPTO_E_GENERIC       -1
 #define CN1_CRYPTO_E_BAD_KEY       -2
 #define CN1_CRYPTO_E_BAD_INPUT     -3

@@ -10892,6 +10892,13 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
 // that back com.codename1.security.{Cipher,Signature,SecureRandom,
 // KeyGenerator}. The actual crypto runs in CN1Crypto.{h,m}; this file
 // is just the marshalling layer.
+//
+// CN1_INCLUDE_CRYPTO is enabled by IPhoneBuilder when the app references
+// com.codename1.security.* in its compiled bytecode. When the app doesn't
+// use the crypto API the implementations below collapse into no-ops, the
+// CommonCrypto / Security framework symbols are never referenced, and the
+// AES-GCM SPI symbols (gated separately by CN1_INCLUDE_CRYPTO_GCM) stay
+// completely out of the binary.
 
 #import "CN1Crypto.h"
 
@@ -10902,6 +10909,8 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
 #define CN1_PRIM_ARR_DATA(arr) ((void*)((JAVA_ARRAY)(arr))->data)
 #define CN1_PRIM_ARR_LEN(arr)  (((JAVA_ARRAY)(arr))->length)
 #endif
+
+#ifdef CN1_INCLUDE_CRYPTO
 
 void com_codename1_impl_ios_IOSNative_secureRandomBytes___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
     if (out == JAVA_NULL) return;
@@ -10966,3 +10975,59 @@ JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_b
     lens[1] = privLen;
     return rc;
 }
+
+#else /* CN1_INCLUDE_CRYPTO */
+
+/*
+ * When the crypto API isn't reachable from the user's code we still emit
+ * stub IOSNative bridge symbols so the generated C from IOSImplementation
+ * has something to link against, but they all just delegate to the
+ * CN1_CRYPTO_E_UNSUPPORTED stubs in CN1Crypto.m (no encryption symbols
+ * referenced).
+ */
+
+void com_codename1_impl_ios_IOSNative_secureRandomBytes___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    (void) instanceObject; (void) out;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr, JAVA_INT padding) {
+    (void) instanceObject; (void) encrypt; (void) keyArr; (void) ivArr; (void) inArr; (void) outArr; (void) padding;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) encrypt; (void) keyArr; (void) ivArr; (void) aadArr; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) paddingKind; (void) x509; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT pkcs8, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) paddingKind; (void) pkcs8; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT pkcs8, JAVA_OBJECT data, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) algorithm; (void) pkcs8; (void) data; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT x509, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    (void) instanceObject; (void) algorithm; (void) x509; (void) data; (void) sig;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    (void) instanceObject; (void) bits; (void) outPub; (void) outPriv;
+    if (lengths != JAVA_NULL) {
+        JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+        lens[0] = 0;
+        lens[1] = 0;
+    }
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+#endif /* CN1_INCLUDE_CRYPTO */
