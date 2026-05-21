@@ -11358,7 +11358,12 @@ static int cn1_nfcSendError(int requestId, NSError *err) {
 @end
 #endif // CN1_INCLUDE_NFC
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNfcSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+// ParparVM mangles non-void-returning native methods as
+// `..._methodName___R_<returnType>`. Older symbols in this file
+// (isMetalRendering__, isBiometricsSupported__) predate the
+// convention switch and are kept for binary compatibility; new natives
+// must use the suffix or the link step fails with "Undefined symbol".
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNfcSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_INCLUDE_NFC
     if (@available(iOS 11.0, *)) {
         return [NFCNDEFReaderSession readingAvailable] ? JAVA_TRUE : JAVA_FALSE;
@@ -11367,11 +11372,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNfcSupported__(CN1_THREAD_STATE_
     return JAVA_FALSE;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfc__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return com_codename1_impl_ios_IOSNative_isNfcSupported__(CN1_THREAD_STATE_PASS_ARG me);
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfc___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isNfcSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfcTags__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfcTags___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_INCLUDE_NFC
     if (@available(iOS 13.0, *)) {
         return [NFCTagReaderSession readingAvailable] ? JAVA_TRUE : JAVA_FALSE;
@@ -11380,7 +11385,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfcTags__(CN1_THREAD_STATE_
     return JAVA_FALSE;
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canHostEmulateNfc__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canHostEmulateNfc___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_INCLUDE_NFC
     if (@available(iOS 17.4, *)) {
         // NFCPresentmentIntent etc are still gated by entitlement + EU region.
