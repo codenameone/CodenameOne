@@ -213,6 +213,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StreamApiTest(),
             new StringApiTest(),
             new TimeApiTest(),
+            new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
             new VPNDetectionAPITest(),
@@ -295,7 +296,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "CallDetectionAPITest".equals(testName)
                 || "LocalNotificationOverrideTest".equals(testName)
                 || "Base64NativePerformanceTest".equals(testName)
-                || "AccessibilityTest".equals(testName);
+                || "AccessibilityTest".equals(testName)
+                // CryptoApiTest exercises AES/RSA/Signature/SecureRandom which
+                // route through CodenameOneImplementation overrides; the
+                // JavaScript port doesn't yet provide a crypto bridge.
+                || "CryptoApiTest".equals(testName);
     }
 
     private static boolean isJsSkippedThemeTest(String testName) {
