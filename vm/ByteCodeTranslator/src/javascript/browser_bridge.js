@@ -749,6 +749,45 @@
     return null;
   });
 
+  // Apply a CSS canvas2d ``filter: blur(<radius>px)`` to ``dst`` from
+  // ``src`` in a single host-side call. The worker invokes this once per
+  // ``gaussianBlurImage`` so the cooperative scheduler doesn't have to
+  // round-trip six separate ctx.save/setFilter/drawImage/setFilter/restore
+  // ops -- the earlier per-op Java-typed dispatch path was correct but
+  // slow enough to hang Sheet/Dialog backdrop renders against the screenshot
+  // test budget (see fa18f0301..153d971dc). Returns null; callers don't
+  // need the result, just the side effect on ``dst``.
+  hostBridge.register('__cn1_apply_canvas_blur__', function(request) {
+    var payload = request || {};
+    var dst = resolveHostRef(payload.dst);
+    var src = resolveHostRef(payload.src);
+    if (!dst || !src || typeof dst.getContext !== 'function') {
+      return null;
+    }
+    var w = (payload.w | 0);
+    var h = (payload.h | 0);
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    var radius = +payload.radius;
+    if (!(radius >= 0)) {
+      radius = 0;
+    }
+    var ctx = dst.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    ctx.save();
+    try {
+      ctx.filter = 'blur(' + radius + 'px)';
+      ctx.drawImage(src, 0, 0, w, h);
+    } finally {
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+    return null;
+  });
+
   hostBridge.register('__cn1_create_custom_event__', function(request) {
     var payload = request || {};
     var type = payload.type == null ? '' : String(payload.type);

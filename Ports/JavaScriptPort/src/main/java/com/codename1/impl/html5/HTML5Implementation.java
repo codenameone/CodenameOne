@@ -5709,19 +5709,80 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return true;
     }
 
-    // ``isGaussianBlurSupported`` intentionally stays ``false`` for now: the
-    // canvas2d ``filter: blur(<r>px)`` path *works* via the Java-typed JSO
-    // dispatcher (see commit fa18f0301) but each blur incurs ~6 worker→main
-    // round-trips for the ctx.save/setFilter/drawImage/setFilter/restore
-    // sequence. Repeated paint calls -- particularly the Sheet/Dialog
-    // backdrop blur path -- amplified that into a per-test budget exhaustion
-    // that hung SheetScreenshotTest at the 10s deadline and ran the suite
-    // out of its 1740s lifetime. Falling back to the default ``return
-    // image`` keeps blur a visual no-op (the pre-PR-4795 state) until a
-    // batched/synchronous host-call path lands. See [[jsport-jsbody-worker-proxy]].
     @Override
     public boolean isGaussianBlurSupported() {
-        return false;
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        if (image == null) {
+            return image;
+        }
+        NativeImage src = (NativeImage) image.getImage();
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 0 || h <= 0) {
+            return image;
+        }
+        NativeImage blurred = new NativeImage();
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(w, h,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
+                            }
+                        });
+        blurred.width = buffer.getWidth();
+        blurred.height = buffer.getHeight();
+        attachMutableImageSurface(blurred, buffer.getGraphics());
+        if (src.img != null && !src.loaded) {
+            src.load();
+        }
+        try {
+            if (src.img != null && src.loaded) {
+                applyBlurViaHost(buffer.getCanvas(), src.img, w, h, radius);
+            } else if (src.mutableGraphics != null) {
+                applyBlurViaHost(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
+            } else {
+                return image;
+            }
+        } catch (Throwable t) {
+            return image;
+        }
+        return Image.createImage(blurred);
+    }
+
+    // Single-shot host-bridge blur. The earlier Java-typed dispatch path
+    // (commit fa18f0301) ran six separate ctx.save/setFilter/drawImage/.../
+    // restore calls -- each a worker→main round-trip -- and that latency
+    // hung Sheet/Dialog backdrop paint cycles long enough to overrun the
+    // screenshot test budget. Doing the whole blur in one
+    // ``invokeHostNative('__cn1_apply_canvas_blur__', ...)`` call collapses
+    // it to a single round-trip; the matching handler in browser_bridge.js
+    // performs the canvas2d filter:blur op entirely on the main thread.
+    @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
+            "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n"
+            + "yield jvm.invokeHostNative('__cn1_apply_canvas_blur__', [{dst: dst, src: src, w: w|0, h: h|0, radius: +radius}]);\n"
+            + "return null;\n")
+    private static native void applyBlurViaHost(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
+
+    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
+        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
+    }
+
+    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
+        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
     }
 
     @Override
