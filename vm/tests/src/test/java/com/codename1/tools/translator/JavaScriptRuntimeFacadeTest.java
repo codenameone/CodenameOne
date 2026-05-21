@@ -222,7 +222,13 @@ class JavaScriptRuntimeFacadeTest {
                 "DrawShape should delegate stroke style mapping to the shared shape path adapter");
         assertTrue(clipShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
                 "ClipShape should delegate path traversal to the shared shape path adapter");
-        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb("),
+        // Delegation may go through either the per-pixel ``readRgbaToArgb``
+        // helper or the native ``readRgbaToArgbBulk`` intrinsic -- either one
+        // counts as "delegating to the image data adapter". The current
+        // HTML5Implementation calls the bulk variant for the host-side
+        // path (see commit c5080d78b for the rationale).
+        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb(")
+                        || html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgbBulk("),
                 "HTML5Implementation should delegate image-data readback packing to the image data adapter");
         assertTrue(html5Source.contains(".writeArgbBuffer("),
                 "HTML5Implementation should delegate image-data writes through ImageData.writeArgbBuffer "
@@ -1203,6 +1209,15 @@ class JavaScriptRuntimeFacadeTest {
         Files.write(geomPackageDir.resolve("Shape.java"), (
                 "package com.codename1.ui.geom;\n" +
                 "public interface Shape { PathIterator getPathIterator(); }\n").getBytes(StandardCharsets.UTF_8));
+        // JavaScriptImageDataAdapter now imports Uint8ClampedArray for the
+        // bulk-read native intrinsic added in c5080d78b. Stub the type so the
+        // standalone compile resolves it without pulling in the full
+        // typedarrays package.
+        Path typedArraysPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "html5", "js", "typedarrays"));
+        Files.createDirectories(typedArraysPackageDir);
+        Files.write(typedArraysPackageDir.resolve("Uint8ClampedArray.java"), (
+                "package com.codename1.html5.js.typedarrays;\n" +
+                "public interface Uint8ClampedArray {}\n").getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
         int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
@@ -1212,6 +1227,7 @@ class JavaScriptRuntimeFacadeTest {
                 uiPackageDir.resolve("Stroke.java").toString(),
                 geomPackageDir.resolve("PathIterator.java").toString(),
                 geomPackageDir.resolve("Shape.java").toString(),
+                typedArraysPackageDir.resolve("Uint8ClampedArray.java").toString(),
                 html5PackageDir.resolve("JavaScriptShapePathAdapter.java").toString(),
                 html5PackageDir.resolve("JavaScriptImageDataAdapter.java").toString(),
                 html5PackageDir.resolve("JavaScriptNativeImageAdapter.java").toString()
