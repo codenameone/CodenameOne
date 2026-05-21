@@ -4,7 +4,7 @@ Codename One ships first-class biometric authentication (Touch ID, Face ID, Andr
 
 A sibling `SecureStorage` API stores secret strings (auth tokens, refresh tokens, encryption keys) behind biometric authentication using the iOS keychain or the Android Keystore.
 
-=== Quick start: authenticate
+=== Quick start: Authenticate
 
 [source,java]
 ----
@@ -34,7 +34,7 @@ b.authenticate("Unlock your account").onResult((success, err) -> {
 
 Always gate the call on `canAuthenticate()` and never on `isSupported()` alone. `isSupported()` only checks for hardware, while `canAuthenticate()` also requires at least one enrolled credential and that the device isn't in a locked-out state.
 
-=== Quick start: secure storage
+=== Quick start: Secure storage
 
 [source,java]
 ----
