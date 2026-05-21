@@ -7078,6 +7078,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private AndroidBiometrics biometrics;
     private AndroidSecureStorage secureStorage;
+    private AndroidNfc nfc;
 
     @Override
     public com.codename1.security.Biometrics getBiometrics() {
@@ -7093,6 +7094,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             secureStorage = new AndroidSecureStorage();
         }
         return secureStorage;
+    }
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        if (nfc == null) {
+            nfc = new AndroidNfc(this);
+        }
+        return nfc;
     }
 
     /**

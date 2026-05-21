@@ -4307,6 +4307,14 @@ public final class Display extends CN1Constants {
         return impl.getSecureStorage();
     }
 
+    /// Returns the platform NFC entry point. Prefer
+    /// {@link com.codename1.nfc.Nfc#getInstance()} in application code ---
+    /// it handles the fallback to a no-op stub when the current port does
+    /// not implement NFC.
+    public com.codename1.nfc.Nfc getNfc() {
+        return impl.getNfc();
+    }
+
     /// This method tries to invoke the device native camera to capture images.
     /// The method returns immediately and the response will be sent asynchronously
     /// to the given ActionListener Object

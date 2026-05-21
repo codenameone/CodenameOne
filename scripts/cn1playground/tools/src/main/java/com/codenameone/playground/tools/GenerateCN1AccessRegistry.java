@@ -72,7 +72,31 @@ public final class GenerateCN1AccessRegistry {
             "com.codename1.security.AuthenticationOptions",
             "com.codename1.security.BiometricType",
             "com.codename1.security.BiometricError",
-            "com.codename1.security.BiometricException"
+            "com.codename1.security.BiometricException",
+            // com.codename1.nfc.* is a newly-introduced API (Nfc, NdefMessage,
+            // tag-technology classes, HostCardEmulationService). Same TeaVM
+            // backend cloud-build limitation as the security package above --
+            // exclude until the playground server is updated. Real apps still
+            // use the API, just not playground scripts.
+            "com.codename1.nfc.Nfc",
+            "com.codename1.nfc.NfcException",
+            "com.codename1.nfc.NfcError",
+            "com.codename1.nfc.NfcReadOptions",
+            "com.codename1.nfc.NfcListener",
+            "com.codename1.nfc.NdefMessage",
+            "com.codename1.nfc.NdefRecord",
+            "com.codename1.nfc.Tag",
+            "com.codename1.nfc.TagType",
+            "com.codename1.nfc.TagTechnology",
+            "com.codename1.nfc.IsoDep",
+            "com.codename1.nfc.MifareClassic",
+            "com.codename1.nfc.MifareUltralight",
+            "com.codename1.nfc.NfcA",
+            "com.codename1.nfc.NfcB",
+            "com.codename1.nfc.NfcF",
+            "com.codename1.nfc.NfcV",
+            "com.codename1.nfc.HostCardEmulationService",
+            "com.codename1.nfc.ApduResponse"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{

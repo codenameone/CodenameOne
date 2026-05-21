@@ -664,6 +664,63 @@ public final class IOSNative {
     /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
     native void secureStorageRemove(int requestId, String reason, String account);
 
+    // --- NFC (Core NFC) -----------------------------------------------------
+
+    /** True when NFCNDEFReaderSession is available (iOS 11+) and the device has NFC hardware. */
+    native boolean isNfcSupported();
+
+    /** True when Core NFC reader sessions can be started right now. */
+    native boolean canReadNfc();
+
+    /** True when Core NFC tag sessions (ISO-DEP / FeliCa / MIFARE) are available (iOS 13+). */
+    native boolean canReadNfcTags();
+
+    /** True when CardSession (HCE) is available; iOS 17.4+ EU-only with entitlement. */
+    native boolean canHostEmulateNfc();
+
+    /**
+     * Starts an NDEF-only NFCNDEFReaderSession. Result is delivered via
+     * IOSNfc.nativeNdefResult(int, byte[]) or
+     * IOSNfc.nativeNfcError(int, int, String).
+     */
+    native void startNdefRead(int requestId, String alertMessage, long timeoutMs);
+
+    /**
+     * Starts an NFCTagReaderSession that accepts ISO-DEP / FeliCa / MIFARE.
+     * `polling` is a bitmask: 1 = NFC-A, 2 = NFC-B, 4 = NFC-F, 8 = NFC-V (Core
+     * NFC does not actually expose B/V; the request is silently downgraded
+     * by the OS). `aidsArr`, when non-null, lists ISO 7816 AIDs to auto-SELECT.
+     * `felicaSystemCodes` is a list of 2-byte hex strings.
+     * Result via IOSNfc.nativeTagDiscovered(int, byte[], int) and
+     * IOSNfc.nativeNfcError(int, int, String).
+     */
+    native void startTagRead(int requestId, String alertMessage,
+            int polling, String[] felicaSystemCodes, byte[][] aidsArr,
+            long timeoutMs);
+
+    /** Cancels the active reader session. */
+    native void stopNfcRead(int requestId);
+
+    /** Sends an APDU on the currently-connected ISO 7816 tag.
+     * Result via IOSNfc.nativeTransceiveResult(int, byte[]) or
+     * IOSNfc.nativeNfcError(int, int, String). */
+    native void nfcTransceive(int requestId, long tagHandle, byte[] payload);
+
+    /** Reads the NDEF message on the currently-connected tag (after tag session). */
+    native void nfcReadNdefFromTag(int requestId, long tagHandle);
+
+    /** Writes an NDEF message to the currently-connected tag. */
+    native void nfcWriteNdefToTag(int requestId, long tagHandle, byte[] ndef);
+
+    /** Permanently locks the NDEF area on the currently-connected tag. */
+    native void nfcLockTag(int requestId, long tagHandle);
+
+    /** Registers / clears HCE AID list. Called by IOSNfc.registerHostCardEmulationService. */
+    native void registerHceAids(String[] aids);
+
+    /** Sends the HCE response for the APDU currently outstanding on CardSession. */
+    native void hceSendResponse(byte[] response);
+
     native long gausianBlurImage(long peer, float radius);
     
     /**
