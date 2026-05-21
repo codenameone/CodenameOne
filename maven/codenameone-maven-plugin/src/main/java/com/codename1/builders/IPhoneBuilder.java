@@ -85,6 +85,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesPurchaseAPI;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
+    private boolean usesBiometrics;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -648,12 +649,23 @@ public class IPhoneBuilder extends Executor {
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
                     }
-                    if (!usesCryptoAPI && cls.indexOf("com/codename1/security/") == 0) {
-                        // Any reference into the crypto package switches on
-                        // the native bridge in CN1Crypto.{h,m} and tells the
-                        // Info.plist that we use encryption (the standard
-                        // Apple-framework exemption applies -- see below).
-                        usesCryptoAPI = true;
+                    if (cls.indexOf("com/codename1/security/") == 0) {
+                        // com.codename1.security contains two distinct API
+                        // families that toggle different bits of the iOS
+                        // build. Biometrics + SecureStorage need the
+                        // LocalAuthentication.framework linkage; the crypto
+                        // primitives need the CN1Crypto.{h,m} #defines and
+                        // an Info.plist export-compliance entry.
+                        String shortName = cls.substring("com/codename1/security/".length());
+                        boolean isBiometric =
+                                shortName.startsWith("Biometric")
+                             || shortName.equals("SecureStorage")
+                             || shortName.equals("AuthenticationOptions");
+                        if (isBiometric) {
+                            usesBiometrics = true;
+                        } else {
+                            usesCryptoAPI = true;
+                        }
                     }
                 }
 
@@ -1593,6 +1605,18 @@ public class IPhoneBuilder extends Executor {
                 addLibs = addLibs.replace(',', ';').replace(':', ';');
                 if (addLibs.startsWith(";")) {
                     addLibs = addLibs.substring(1);
+                }
+            }
+
+            // LocalAuthentication is required only when the app actually uses
+            // com.codename1.security.Biometrics / SecureStorage. The scanner
+            // above sets usesBiometrics if any com/codename1/security/ class
+            // is referenced; apps that don't touch the API pay nothing.
+            if (usesBiometrics) {
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "LocalAuthentication.framework";
+                } else if (!addLibs.toLowerCase().contains("localauthentication")) {
+                    addLibs = addLibs + ";LocalAuthentication.framework";
                 }
             }
 

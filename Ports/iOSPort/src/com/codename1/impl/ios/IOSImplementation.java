@@ -3331,6 +3331,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
     
+    private IOSBiometrics biometrics;
+    private IOSSecureStorage secureStorage;
+
+    @Override
+    public com.codename1.security.Biometrics getBiometrics() {
+        if (biometrics == null) {
+            biometrics = new IOSBiometrics(nativeInstance);
+        }
+        return biometrics;
+    }
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new IOSSecureStorage(nativeInstance);
+        }
+        return secureStorage;
+    }
+
     public LocationManager getLocationManager() {
         if (!nativeInstance.checkLocationUsage()) {
             throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");

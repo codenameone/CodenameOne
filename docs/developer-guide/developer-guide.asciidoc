@@ -82,6 +82,8 @@ include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
 include::security.asciidoc[]
 
+include::Biometric-Authentication.asciidoc[]
+
 include::signing.asciidoc[]
 
 include::Working-With-iOS.asciidoc[]

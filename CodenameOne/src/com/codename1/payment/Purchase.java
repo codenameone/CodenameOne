@@ -52,6 +52,7 @@ public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
+    private static final String PROCESSED_PURCHASE_KEY = "ProcessedPurchases.dat";
     private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
@@ -458,7 +459,15 @@ public abstract class Purchase {
         }
     }
 
-    /// Adds a receipt to be pushed to the server.
+    /// Adds a receipt to be pushed to the server.  Receipts whose
+    /// `transactionId` has already been successfully submitted to the
+    /// `ReceiptStore` (recorded in the persistent processed set) or is
+    /// already sitting in the pending queue are silently dropped.  This
+    /// closes the abstraction so the user's `ReceiptStore.submitReceipt`
+    /// is invoked at most once per `transactionId` across the lifetime of
+    /// the install, regardless of platform-level redelivery quirks
+    /// (e.g. iOS StoreKit redelivering an unfinished transaction across
+    /// app sessions, or sandbox subscription renewals).
     ///
     /// #### Parameters
     ///
@@ -466,31 +475,83 @@ public abstract class Purchase {
     private void addPendingPurchase(Receipt receipt) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
-            List<Receipt> pendingPurchases = getPendingPurchases();
-            pendingPurchases.add(receipt);
-            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            String txId = receipt.getTransactionId();
+            if (txId != null) {
+                if (getProcessedTransactionIds().contains(txId)) {
+                    return;
+                }
+                List<Receipt> pendingPurchases = getPendingPurchases();
+                for (Receipt r : pendingPurchases) {
+                    if (txId.equals(r.getTransactionId())) {
+                        return;
+                    }
+                }
+                pendingPurchases.add(receipt);
+                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            } else {
+                // Receipts without a transactionId can't be tracked in the
+                // processed set; fall back to enqueueing and let the
+                // synchronize path drain them.  receiptsMatch handles
+                // removal correctly when transactionId is null on both
+                // sides.
+                List<Receipt> pendingPurchases = getPendingPurchases();
+                pendingPurchases.add(receipt);
+                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            }
         }
     }
 
-    /// Removes a receipt from pending purchases.
+    /// Returns the persistent list of transactionIds that have already
+    /// been successfully submitted to the `ReceiptStore`.  The caller
+    /// must hold `PENDING_PURCHASE_LOCK`.
+    @SuppressWarnings("unchecked")
+    private List<String> getProcessedTransactionIds() {
+        Storage s = Storage.getInstance();
+        if (s.exists(PROCESSED_PURCHASE_KEY)) {
+            return (List<String>) s.readObject(PROCESSED_PURCHASE_KEY);
+        }
+        return new ArrayList<String>();
+    }
+
+    /// Records that the receipt with the given transactionId has been
+    /// successfully submitted to the `ReceiptStore`, so future
+    /// `addPendingPurchase` calls with the same transactionId skip the
+    /// enqueue.
+    private void recordProcessedTransactionId(String txId) {
+        if (txId == null) {
+            return;
+        }
+        synchronized (PENDING_PURCHASE_LOCK) {
+            List<String> processed = getProcessedTransactionIds();
+            if (!processed.contains(txId)) {
+                processed.add(txId);
+                Storage.getInstance().writeObject(PROCESSED_PURCHASE_KEY, processed);
+            }
+        }
+    }
+
+    /// Removes a receipt from pending purchases.  Receipts with a non-null
+    /// `transactionId` are matched on `transactionId`; receipts whose
+    /// `transactionId` is null fall back to matching on `sku`, `storeCode`,
+    /// `purchaseDate` and `orderData` so that the receipt is still removed
+    /// from the queue and `synchronizeReceipts` doesn't re-submit it forever.
     ///
     /// #### Parameters
     ///
-    /// - `transactionId`: the transaction id
+    /// - `target`: the receipt to remove
     ///
     /// #### Returns
     ///
-    /// the removed receipt
-    private Receipt removePendingPurchase(String transactionId) {
+    /// the removed receipt, or null if no matching receipt was found
+    private Receipt removePendingPurchase(Receipt target) {
         synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             Receipt found = null;
             for (Receipt r : pendingPurchases) {
-                if (r.getTransactionId() != null && r.getTransactionId().equals(transactionId)) {
+                if (receiptsMatch(r, target)) {
                     found = r;
                     break;
-
                 }
             }
             if (found != null) {
@@ -501,6 +562,25 @@ public abstract class Purchase {
                 return null;
             }
         }
+    }
+
+    private static boolean receiptsMatch(Receipt a, Receipt b) {
+        String aTx = a.getTransactionId();
+        String bTx = b.getTransactionId();
+        if (aTx != null && bTx != null) {
+            return aTx.equals(bTx);
+        }
+        if (aTx != null || bTx != null) {
+            return false;
+        }
+        return nullSafeEquals(a.getSku(), b.getSku())
+                && nullSafeEquals(a.getStoreCode(), b.getStoreCode())
+                && nullSafeEquals(a.getPurchaseDate(), b.getPurchaseDate())
+                && nullSafeEquals(a.getOrderData(), b.getOrderData());
+    }
+
+    private static boolean nullSafeEquals(Object a, Object b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     public final void synchronizeReceipts() {
@@ -552,19 +632,30 @@ public abstract class Purchase {
             if (!pending.isEmpty() && receiptStore != null) {
 
                 final Receipt receipt = pending.get(0);
-                receiptStore.submitReceipt(pending.get(0), new SuccessCallback<Boolean>() {
+                receiptStore.submitReceipt(receipt, new SuccessCallback<Boolean>() {
 
                     @Override
                     public void onSucess(Boolean submitSucceeded) {
+                        // Reset syncInProgress before doing any work that can
+                        // throw so that a failure here doesn't permanently
+                        // wedge synchronizeReceipts in the "in progress"
+                        // state for the rest of the app's lifetime.
+                        syncInProgress = false;
                         if (submitSucceeded) {
-                            removePendingPurchase(receipt.getTransactionId());
-                            syncInProgress = false;
-
-                            // If the submit succeeded we need to refetch
-                            // so we set this to zero here.
-                            synchronizeReceipts(0, callback);
+                            // Record the transactionId before removing the
+                            // receipt from pending so a parallel
+                            // postReceipt re-enqueue (e.g. iOS redelivery)
+                            // is dropped by addPendingPurchase rather than
+                            // sneaking back into the queue.
+                            recordProcessedTransactionId(receipt.getTransactionId());
+                            removePendingPurchase(receipt);
+                            // Continue draining the queue.  The original
+                            // callback is already registered in
+                            // synchronizeReceiptsCallbacks; passing null here
+                            // avoids registering it again and firing it once
+                            // per drained receipt.
+                            synchronizeReceipts(0, null);
                         } else {
-                            syncInProgress = false;
                             fireSynchronizeReceiptsCallbacks(false);
                         }
                     }
