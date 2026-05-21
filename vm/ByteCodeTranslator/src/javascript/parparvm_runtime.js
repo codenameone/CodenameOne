@@ -1615,6 +1615,24 @@ const jvm = {
         }
         return entry;
       }
+      // Raw JS errors (``throw new Error(...)`` from runtime helpers
+      // such as ``resolveVirtual`` when a worker-side host-ref proxy
+      // is missing) carry neither ``__class`` nor ``__classDef``, so
+      // the strict comparisons above always miss and the throw
+      // escapes every Java ``catch (Throwable t)``. That defeats
+      // defensive call-site wrappers like ``createImage``'s catch
+      // for the writeArgbBuffer/createImageData race. Java semantics
+      // say ``catch (Throwable)`` is the broadest possible catch, so
+      // treat raw JS errors as if they had been thrown as
+      // ``java.lang.RuntimeException`` -- matches any handler typed
+      // Throwable, Exception, RuntimeException, or Error.
+      if (errorClass == null
+              && (type === "java_lang_Throwable"
+                  || type === "java_lang_Exception"
+                  || type === "java_lang_RuntimeException"
+                  || type === "java_lang_Error")) {
+        return entry;
+      }
     }
     return null;
   },
