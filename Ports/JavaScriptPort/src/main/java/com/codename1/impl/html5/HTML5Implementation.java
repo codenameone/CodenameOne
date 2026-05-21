@@ -5304,23 +5304,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
-        
+        System.out.println("CN1INIT:exec:enter url=" + url);
         if (url.startsWith("javascript:")) {
             String cmd = url.substring(url.indexOf(":")+1);
             eval_(cmd);
             return;
         }
-        
+
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        if (!url.startsWith("http:") && 
-                !url.startsWith("http:") && 
-                !url.startsWith("mailto:") && 
+        if (!url.startsWith("http:") &&
+                !url.startsWith("http:") &&
+                !url.startsWith("mailto:") &&
                 !url.startsWith("data:")) {
-            if (exists(url)) {
+            boolean exists = exists(url);
+            System.out.println("CN1INIT:exec:exists=" + exists);
+            if (exists) {
                 try {
                     Blob blob = openFileAsBlob(url);
+                    System.out.println("CN1INIT:exec:openBlob ok blob=" + (blob == null ? "null" : "present"));
                     char sep = getFileSystemSeparator();
                     fileName = url;
                     if (fileName.indexOf(sep) >=0) {
@@ -5329,13 +5332,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     //String dataUrl = blobToDataURL(blob);
                     //registerSaveBlobHandlerDataUrl(fileName, dataUrl);
                     registerSaveBlobHandler(fileName, blob);
+                    System.out.println("CN1INIT:exec:registerCalled fileName=" + fileName);
                     useBlobHandler = true;
 
-                } catch (IOException ex) {
-
+                } catch (Throwable ex) {
+                    System.out.println("CN1INIT:exec:openBlob err=" + ex);
                 }
             }
         }
+        System.out.println("CN1INIT:exec:useBlobHandler=" + useBlobHandler + " backsideAvail=" + isBacksideHookAvailable());
         
         final boolean fuseBlobHandler = useBlobHandler;
         
