@@ -1850,6 +1850,20 @@
       // PARPAR:DIAG:* lines in the production browser console.
       if (diagEnabled && global.console && typeof global.console.log === 'function') {
         global.console.log(String(data.message));
+      } else if (global.console && typeof global.console.log === 'function') {
+        // Allowlist a small set of high-value diagnostic prefixes so they
+        // surface on the main-thread console even without ?parparDiag=1.
+        // System.out.println from user / framework code uses these tags
+        // exactly because the diag-gated echo above swallows everything;
+        // app-level breadcrumbs and the raw-JS-error catch warning need
+        // to be visible in production deployments to be useful.
+        var rawMsg = String(data.message);
+        if (rawMsg.indexOf('CN1INIT:') === 0
+                || rawMsg.indexOf('PARPAR:CAUGHT_RAW_JS_ERROR') === 0
+                || rawMsg.indexOf('PARPAR:ERROR') === 0
+                || rawMsg.indexOf('CN1SS:ERR:') === 0) {
+          global.console.log(rawMsg);
+        }
       }
       if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
         diag('SCREENSHOT_START', 'source', 'vm_log');

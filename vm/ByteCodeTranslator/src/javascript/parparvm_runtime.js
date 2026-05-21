@@ -1636,14 +1636,16 @@ const jvm = {
         // turns deep render bugs into seemingly-spontaneous visual
         // artifacts (frame tearing, flicker) with no console signal.
         // Rate-limit per message so a paint-cycle-per-frame error
-        // doesn't flood the console.
-        if (typeof console !== "undefined" && typeof console.warn === "function") {
-          var msg = error && error.message ? String(error.message) : String(error);
-          if (!this._rawCatchLogged) this._rawCatchLogged = {};
-          if (!this._rawCatchLogged[msg]) {
-            this._rawCatchLogged[msg] = 1;
-            try { console.warn("PARPAR:CAUGHT_RAW_JS_ERROR:" + msg); } catch (_le) {}
-          }
+        // doesn't flood the console. ``printToConsole`` routes through
+        // the worker→main log forwarding pipeline -- with the matching
+        // PARPAR:CAUGHT_RAW_JS_ERROR allowlist entry in browser_bridge.js
+        // the line surfaces on the main-thread DevTools console without
+        // ``?parparDiag=1``.
+        var msg = error && error.message ? String(error.message) : String(error);
+        if (!this._rawCatchLogged) this._rawCatchLogged = {};
+        if (!this._rawCatchLogged[msg]) {
+          this._rawCatchLogged[msg] = 1;
+          try { printToConsole("PARPAR:CAUGHT_RAW_JS_ERROR:" + msg); } catch (_le) {}
         }
         return entry;
       }
