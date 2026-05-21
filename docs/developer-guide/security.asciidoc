@@ -286,7 +286,7 @@ The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also acce
 
 ==== Message authentication (HMAC)
 
-`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, TOTP token generation, and so on.
+`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, or TOTP token generation.
 
 [source,java]
 ----
@@ -318,7 +318,7 @@ long   id  = SecureRandom.longBelow(1L << 53);
 
 ==== Symmetric encryption (AES)
 
-`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it is authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data.
+`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it's authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data.
 
 [source,java]
 ----
@@ -406,7 +406,7 @@ Jwt     read = Jwt.parse(rs);
 boolean ok   = read.verify(kp.getPublicKey());
 ----
 
-WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have very deliberately decided that the transport is trusted.
+WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one of the `verify*` methods afterwards. Tokens with an `alg` header of `none` are rejected by `verify` unless you explicitly call `setVerifyAllowNoneAlgorithm(true)` on the parsed JWT. Accepting unsigned tokens is a critical security bug in almost every deployment, so leave it off unless you have decided that the transport is trusted.
 
 ==== HOTP / TOTP one-time passwords
 
@@ -438,7 +438,7 @@ String code = Otp.hotp(secret, counter++, 6);
 
 ==== OTP input widget
 
-`com.codename1.components.OtpField` is a segmented input -- one box per character, auto-advancing as the user types and stepping back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens.
+`com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens.
 
 [source,java]
 ----

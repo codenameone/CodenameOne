@@ -10151,26 +10151,24 @@ public abstract class CodenameOneImplementation {
     }
 
     // ================================================================
-    // Crypto bridge -- see com.codename1.security package
+    // Crypto bridge -- see com.codename1.security package.
     //
-    // Each port is expected to override these methods with calls into the
-    // platform's native crypto provider (java.security / javax.crypto on JVM
-    // ports, CommonCrypto/Security on iOS, etc.). The default implementation
-    // tries java.security via reflection so that it works on any port that
-    // runs on top of a full JRE (JavaSE simulator and Android both qualify)
-    // without each port having to override individually.
-    //
-    // For iOS via ParparVM, java.security is not on the runtime classpath, so
-    // the reflection will throw ClassNotFoundException and these methods will
-    // throw RuntimeException -- the iOS port overrides them with native calls.
-    //
-    // Method signatures use only primitive types, String, and byte[] so the
-    // contract is portable across the various impls.
+    // The default implementations below all throw -- each platform port
+    // (JavaSEPort, AndroidImplementation, IOSImplementation) overrides them
+    // with the real native-backed implementation. The core stays free of
+    // java.security / javax.crypto references because the core compiles
+    // against the CLDC11 stub where those classes (and full Class reflection)
+    // are not available.
+
+    private static RuntimeException cryptoUnsupported(String op) {
+        return new RuntimeException("Crypto operation " + op + " is not supported on this platform. "
+                + "If you are running in a fresh CodenameOneImplementation subclass, override the matching method.");
+    }
 
     /// Fills `out` with cryptographically secure random bytes. Override in the
     /// port to route to the platform's native CSPRNG.
     public void secureRandomBytes(byte[] out) {
-        cryptoReflectSecureRandom(out);
+        throw cryptoUnsupported("secureRandomBytes");
     }
 
     /// Encrypts with AES. Modes / paddings supported: AES/CBC/PKCS5Padding,
@@ -10179,215 +10177,49 @@ public abstract class CodenameOneImplementation {
     /// AES/ECB/PKCS5Padding (legacy interop only). `iv` may be null for ECB.
     /// `aad` is associated data for GCM (may be null).
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
-        return cryptoReflectAes(transformation, key, iv, aad, plaintext, true);
+        throw cryptoUnsupported("aesEncrypt");
     }
 
     /// Decrypts with AES. Same parameters as `aesEncrypt`.
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
-        return cryptoReflectAes(transformation, key, iv, aad, ciphertext, false);
+        throw cryptoUnsupported("aesDecrypt");
     }
 
     /// Encrypts with RSA using an X.509 (SubjectPublicKeyInfo) DER-encoded
     /// public key. `transformation` is typically
     /// "RSA/ECB/OAEPWithSHA-256AndMGF1Padding" or "RSA/ECB/PKCS1Padding".
     public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
-        return cryptoReflectRsa(transformation, publicKeyX509, plaintext, true, true);
+        throw cryptoUnsupported("rsaEncrypt");
     }
 
     /// Decrypts with RSA using a PKCS#8 DER-encoded private key.
     public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
-        return cryptoReflectRsa(transformation, privateKeyPkcs8, ciphertext, false, false);
+        throw cryptoUnsupported("rsaDecrypt");
     }
 
     /// Computes a signature. `algorithm` is e.g. "SHA256withRSA",
     /// "SHA256withECDSA". `keyAlgorithm` is "RSA" or "EC".
     public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
-        return cryptoReflectSign(algorithm, keyAlgorithm, privateKeyPkcs8, data);
+        throw cryptoUnsupported("cryptoSign");
     }
 
     /// Verifies a signature with an X.509 public key.
     public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
-        return cryptoReflectVerify(algorithm, keyAlgorithm, publicKeyX509, data, signature);
+        throw cryptoUnsupported("cryptoVerify");
     }
 
     /// Generates a fresh RSA key pair of the given size in bits. Returns
     /// `{publicKeyX509, privateKeyPkcs8}`.
     public byte[][] generateRsaKeyPair(int bits) {
-        return cryptoReflectGenerateRsaKeyPair(bits);
+        throw cryptoUnsupported("generateRsaKeyPair");
     }
 
-    /// Generates `bytes` of fresh symmetric key material (just secure random
-    /// bytes; AES does not require any structure).
+    /// Generates `bytes` of fresh symmetric key material. The default just
+    /// delegates to [#secureRandomBytes(byte[])] (no structure is required
+    /// for AES keys).
     public byte[] generateSymmetricKey(int bytes) {
         byte[] out = new byte[bytes];
         secureRandomBytes(out);
         return out;
-    }
-
-    // ---- default reflection-based implementations (work on JavaSE + Android)
-    private static Object cryptoSecureRandomInstance;
-    private static final Object cryptoReflectionSync = new Object();
-
-    private void cryptoReflectSecureRandom(byte[] out) {
-        try {
-            Object sr;
-            synchronized (cryptoReflectionSync) {
-                sr = cryptoSecureRandomInstance;
-                if (sr == null) {
-                    Class srCls = Class.forName("java.security.SecureRandom");
-                    sr = srCls.newInstance();
-                    cryptoSecureRandomInstance = sr;
-                }
-            }
-            sr.getClass().getMethod("nextBytes", new Class[]{byte[].class}).invoke(sr, new Object[]{out});
-        } catch (Throwable t) {
-            throw new RuntimeException("secure random not available: " + t.getMessage());
-        }
-    }
-
-    private byte[] cryptoReflectAes(String transformation, byte[] key, byte[] iv, byte[] aad,
-                                    byte[] input, boolean encrypt) {
-        try {
-            Class cipherCls = Class.forName("javax.crypto.Cipher");
-            Class keySpecCls = Class.forName("javax.crypto.spec.SecretKeySpec");
-            Object cipher = cipherCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{transformation});
-            Object keySpec = keySpecCls.getConstructor(new Class[]{byte[].class, String.class})
-                    .newInstance(new Object[]{key, "AES"});
-            int mode = encrypt ? 1 : 2; // Cipher.ENCRYPT_MODE / DECRYPT_MODE
-            Object paramSpec = null;
-            String tu = transformation.toUpperCase();
-            if (tu.indexOf("GCM") >= 0) {
-                Class gcmCls = Class.forName("javax.crypto.spec.GCMParameterSpec");
-                paramSpec = gcmCls.getConstructor(new Class[]{int.class, byte[].class})
-                        .newInstance(new Object[]{Integer.valueOf(128), iv});
-            } else if (iv != null) {
-                Class ivCls = Class.forName("javax.crypto.spec.IvParameterSpec");
-                paramSpec = ivCls.getConstructor(new Class[]{byte[].class})
-                        .newInstance(new Object[]{iv});
-            }
-            Class keyCls = Class.forName("java.security.Key");
-            Class algSpecCls = Class.forName("java.security.spec.AlgorithmParameterSpec");
-            if (paramSpec == null) {
-                cipherCls.getMethod("init", new Class[]{int.class, keyCls})
-                        .invoke(cipher, new Object[]{Integer.valueOf(mode), keySpec});
-            } else {
-                cipherCls.getMethod("init", new Class[]{int.class, keyCls, algSpecCls})
-                        .invoke(cipher, new Object[]{Integer.valueOf(mode), keySpec, paramSpec});
-            }
-            if (aad != null && aad.length > 0) {
-                cipherCls.getMethod("updateAAD", new Class[]{byte[].class})
-                        .invoke(cipher, new Object[]{aad});
-            }
-            return (byte[]) cipherCls.getMethod("doFinal", new Class[]{byte[].class})
-                    .invoke(cipher, new Object[]{input});
-        } catch (Throwable t) {
-            Throwable c = t.getCause() != null ? t.getCause() : t;
-            throw new RuntimeException("AES " + (encrypt ? "encrypt" : "decrypt") + " failed: " + c.getMessage());
-        }
-    }
-
-    private byte[] cryptoReflectRsa(String transformation, byte[] keyBytes, byte[] input,
-                                    boolean encrypt, boolean pub) {
-        try {
-            Class cipherCls = Class.forName("javax.crypto.Cipher");
-            Class kfCls = Class.forName("java.security.KeyFactory");
-            Object cipher = cipherCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{transformation});
-            Object kf = kfCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{"RSA"});
-            Object key;
-            if (pub) {
-                Class specCls = Class.forName("java.security.spec.X509EncodedKeySpec");
-                Object spec = specCls.getConstructor(new Class[]{byte[].class}).newInstance(new Object[]{keyBytes});
-                key = kfCls.getMethod("generatePublic", new Class[]{Class.forName("java.security.spec.KeySpec")})
-                        .invoke(kf, new Object[]{spec});
-            } else {
-                Class specCls = Class.forName("java.security.spec.PKCS8EncodedKeySpec");
-                Object spec = specCls.getConstructor(new Class[]{byte[].class}).newInstance(new Object[]{keyBytes});
-                key = kfCls.getMethod("generatePrivate", new Class[]{Class.forName("java.security.spec.KeySpec")})
-                        .invoke(kf, new Object[]{spec});
-            }
-            int mode = encrypt ? 1 : 2;
-            Class keyCls = Class.forName("java.security.Key");
-            cipherCls.getMethod("init", new Class[]{int.class, keyCls})
-                    .invoke(cipher, new Object[]{Integer.valueOf(mode), key});
-            return (byte[]) cipherCls.getMethod("doFinal", new Class[]{byte[].class})
-                    .invoke(cipher, new Object[]{input});
-        } catch (Throwable t) {
-            Throwable c = t.getCause() != null ? t.getCause() : t;
-            throw new RuntimeException("RSA " + (encrypt ? "encrypt" : "decrypt") + " failed: " + c.getMessage());
-        }
-    }
-
-    private byte[] cryptoReflectSign(String algorithm, String keyAlgorithm,
-                                     byte[] privateKeyPkcs8, byte[] data) {
-        try {
-            Class sigCls = Class.forName("java.security.Signature");
-            Class kfCls = Class.forName("java.security.KeyFactory");
-            Object kf = kfCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{keyAlgorithm});
-            Class specCls = Class.forName("java.security.spec.PKCS8EncodedKeySpec");
-            Object spec = specCls.getConstructor(new Class[]{byte[].class}).newInstance(new Object[]{privateKeyPkcs8});
-            Object priv = kfCls.getMethod("generatePrivate", new Class[]{Class.forName("java.security.spec.KeySpec")})
-                    .invoke(kf, new Object[]{spec});
-            Object sig = sigCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{algorithm});
-            sigCls.getMethod("initSign", new Class[]{Class.forName("java.security.PrivateKey")})
-                    .invoke(sig, new Object[]{priv});
-            sigCls.getMethod("update", new Class[]{byte[].class})
-                    .invoke(sig, new Object[]{data});
-            return (byte[]) sigCls.getMethod("sign", new Class[0]).invoke(sig, new Object[0]);
-        } catch (Throwable t) {
-            Throwable c = t.getCause() != null ? t.getCause() : t;
-            throw new RuntimeException("sign failed: " + c.getMessage());
-        }
-    }
-
-    private boolean cryptoReflectVerify(String algorithm, String keyAlgorithm,
-                                        byte[] publicKeyX509, byte[] data, byte[] signature) {
-        try {
-            Class sigCls = Class.forName("java.security.Signature");
-            Class kfCls = Class.forName("java.security.KeyFactory");
-            Object kf = kfCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{keyAlgorithm});
-            Class specCls = Class.forName("java.security.spec.X509EncodedKeySpec");
-            Object spec = specCls.getConstructor(new Class[]{byte[].class}).newInstance(new Object[]{publicKeyX509});
-            Object pub = kfCls.getMethod("generatePublic", new Class[]{Class.forName("java.security.spec.KeySpec")})
-                    .invoke(kf, new Object[]{spec});
-            Object sig = sigCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{algorithm});
-            sigCls.getMethod("initVerify", new Class[]{Class.forName("java.security.PublicKey")})
-                    .invoke(sig, new Object[]{pub});
-            sigCls.getMethod("update", new Class[]{byte[].class})
-                    .invoke(sig, new Object[]{data});
-            Object r = sigCls.getMethod("verify", new Class[]{byte[].class})
-                    .invoke(sig, new Object[]{signature});
-            return ((Boolean) r).booleanValue();
-        } catch (Throwable t) {
-            Throwable c = t.getCause() != null ? t.getCause() : t;
-            throw new RuntimeException("verify failed: " + c.getMessage());
-        }
-    }
-
-    private byte[][] cryptoReflectGenerateRsaKeyPair(int bits) {
-        try {
-            Class kpgCls = Class.forName("java.security.KeyPairGenerator");
-            Object kpg = kpgCls.getMethod("getInstance", new Class[]{String.class})
-                    .invoke(null, new Object[]{"RSA"});
-            kpgCls.getMethod("initialize", new Class[]{int.class})
-                    .invoke(kpg, new Object[]{Integer.valueOf(bits)});
-            Object kp = kpgCls.getMethod("generateKeyPair", new Class[0]).invoke(kpg, new Object[0]);
-            Class kpCls = Class.forName("java.security.KeyPair");
-            Object pub = kpCls.getMethod("getPublic", new Class[0]).invoke(kp, new Object[0]);
-            Object priv = kpCls.getMethod("getPrivate", new Class[0]).invoke(kp, new Object[0]);
-            Class keyCls = Class.forName("java.security.Key");
-            byte[] pubEnc = (byte[]) keyCls.getMethod("getEncoded", new Class[0]).invoke(pub, new Object[0]);
-            byte[] privEnc = (byte[]) keyCls.getMethod("getEncoded", new Class[0]).invoke(priv, new Object[0]);
-            return new byte[][]{pubEnc, privEnc};
-        } catch (Throwable t) {
-            Throwable c = t.getCause() != null ? t.getCause() : t;
-            throw new RuntimeException("RSA keypair generation failed: " + c.getMessage());
-        }
     }
 }
