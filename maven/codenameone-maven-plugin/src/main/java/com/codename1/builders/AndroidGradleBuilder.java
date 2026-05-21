@@ -2268,11 +2268,11 @@ public class AndroidGradleBuilder extends Executor {
             }
             apduXml.append("    </aid-group>\n");
             apduXml.append("</host-apdu-service>\n");
-            File xmlDir = new File(projectDir, "src/main/res/xml");
-            xmlDir.mkdirs();
+            File hceXmlDir = new File(projectDir, "src/main/res/xml");
+            hceXmlDir.mkdirs();
             try {
                 OutputStream apduStream = new FileOutputStream(
-                        new File(xmlDir, "apduservice.xml"));
+                        new File(hceXmlDir, "apduservice.xml"));
                 apduStream.write(apduXml.toString().getBytes(StandardCharsets.UTF_8));
                 apduStream.close();
             } catch (IOException ex) {
