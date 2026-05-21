@@ -184,15 +184,18 @@ class AndroidNfc extends com.codename1.nfc.Nfc {
     }
 
     private void armReader() {
-        Activity activity = AndroidImplementation.getActivity();
-        NfcAdapter a = adapter();
+        final Activity activity = AndroidImplementation.getActivity();
+        final NfcAdapter a = adapter();
         if (activity == null || a == null) {
             return;
         }
-        int flags = computeReaderFlags(pendingOptions);
-        Bundle extras = new Bundle();
+        final int flags = computeReaderFlags(pendingOptions);
+        final Bundle extras = new Bundle();
         // 250 ms presence-check delay is the platform default.
         extras.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
+        // Ports/Android compiles with -source 1.6, so locals captured by
+        // anonymous inner classes have to be explicitly declared final
+        // (Java 8's effectively-final semantics don't apply here).
         activity.runOnUiThread(new Runnable() {
             public void run() {
                 a.enableReaderMode(activity, new NfcAdapter.ReaderCallback() {
