@@ -1631,6 +1631,20 @@ const jvm = {
                   || type === "java_lang_Exception"
                   || type === "java_lang_RuntimeException"
                   || type === "java_lang_Error")) {
+        // Always-on log (not diag-gated) so users can see WHAT was
+        // caught -- a silent swallow of recurring runtime errors
+        // turns deep render bugs into seemingly-spontaneous visual
+        // artifacts (frame tearing, flicker) with no console signal.
+        // Rate-limit per message so a paint-cycle-per-frame error
+        // doesn't flood the console.
+        if (typeof console !== "undefined" && typeof console.warn === "function") {
+          var msg = error && error.message ? String(error.message) : String(error);
+          if (!this._rawCatchLogged) this._rawCatchLogged = {};
+          if (!this._rawCatchLogged[msg]) {
+            this._rawCatchLogged[msg] = 1;
+            try { console.warn("PARPAR:CAUGHT_RAW_JS_ERROR:" + msg); } catch (_le) {}
+          }
+        }
         return entry;
       }
     }
