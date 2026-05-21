@@ -239,6 +239,16 @@ import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
+        // See comment in the TEAVM_AVAILABLE branch above -- forces the
+        // translator to keep net.sf.zipme.ZipInputStream so the
+        // Initializr Generate flow's writeProjectZip can actually walk
+        // the template zips.
+        if (args.length == -1) {
+            try {
+                new net.sf.zipme.ZipInputStream(null);
+            } catch (Throwable ignored) {
+            }
+        }
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         ParparVMBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
