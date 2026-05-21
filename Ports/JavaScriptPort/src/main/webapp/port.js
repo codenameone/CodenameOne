@@ -3259,7 +3259,19 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // drifts run-to-run. Park both alongside the chart tail so the
   // suite reliably reaches comparison.
   "com_codenameone_examples_hellocodenameone_tests_ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness"
+  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
+  // CssGradients lands at suite index ~92 -- well past the canvas-
+  // accumulation threshold that exhausts the JS port's
+  // Document.createElement host-receiver cache. The failure manifests
+  // as the same ``cn1_s_createElement ... receiverClass=null`` cascade
+  // documented in the chartDocumentStaleness comment above, and on
+  // half of CI runs it halts the entire screenshot suite before the
+  // FINAL marker fires (taking ~18 trailing tests with it). The test
+  // has a JS golden so was earlier flipped on, but the underlying
+  // staleness has to be fixed at the bridge layer before it can run
+  // reliably -- park here in the meantime so the rest of the suite
+  // is deterministic.
+  "com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "chartDocumentStaleness"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3303,7 +3315,8 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "SheetSlideUpAnimationScreenshotTest": "chartDocumentStaleness",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   "ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
-  "LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness"
+  "LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
+  "CssGradientsScreenshotTest": "chartDocumentStaleness"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
