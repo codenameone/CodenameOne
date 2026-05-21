@@ -11811,9 +11811,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
+    private boolean biometricsBuildHintsInstalled;
 
     @Override
     public Biometrics getBiometrics() {
+        installBiometricsBuildHintsIfNeeded();
         if (biometrics == null) {
             biometrics = new JavaSEBiometrics();
         }
@@ -11822,10 +11824,42 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public SecureStorage getSecureStorage() {
+        installBiometricsBuildHintsIfNeeded();
         if (secureStorage == null) {
             secureStorage = new JavaSESecureStorage((JavaSEBiometrics) getBiometrics());
         }
         return secureStorage;
+    }
+
+    /**
+     * The first time the app reaches the biometric APIs in the simulator,
+     * add the iOS Face ID usage description to {@code codenameone_settings.properties}
+     * if the developer hasn't supplied one. Apple rejects builds that present
+     * the Face ID prompt without {@code NSFaceIDUsageDescription} set, so this
+     * keeps simulator-developed projects buildable on iOS without the user
+     * having to remember the build hint. They should overwrite the placeholder
+     * text before shipping.
+     */
+    private void installBiometricsBuildHintsIfNeeded() {
+        if (biometricsBuildHintsInstalled) {
+            return;
+        }
+        biometricsBuildHintsInstalled = true;
+        Map<String, String> existing = getProjectBuildHints();
+        if (existing == null) {
+            return;
+        }
+        if (!existing.containsKey("ios.NSFaceIDUsageDescription")) {
+            try {
+                setProjectBuildHint(
+                        "ios.NSFaceIDUsageDescription",
+                        "Authenticate to securely access your account");
+            } catch (RuntimeException ignore) {
+                // codenameone_settings.properties became unwritable between
+                // the read above and the write here; not fatal -- the device
+                // builder will warn if the hint is missing.
+            }
+        }
     }
 
     public LocationManager getLocationManager() {

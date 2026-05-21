@@ -28,7 +28,6 @@ import com.codename1.security.BiometricException;
 import com.codename1.security.BiometricType;
 import com.codename1.security.Biometrics;
 import com.codename1.ui.CN;
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
 import javax.swing.JButton;
@@ -43,7 +42,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Simulator backing for {@link Biometrics}. State is mutated by the
@@ -75,51 +73,23 @@ public final class JavaSEBiometrics extends Biometrics {
 
     private volatile AsyncResource<Boolean> pending;
     private volatile JDialog pendingDialog;
-    private boolean buildHintsInstalled;
 
     JavaSEBiometrics() {
     }
 
-    /// Mirrors the historical FingerprintScanner cn1lib pattern: the first
-    /// time the application touches Biometrics in the simulator, declare
-    /// the iOS Face ID usage description build hint on the project. The
-    /// device builders also auto-inject what's needed (LocalAuthentication
-    /// framework, USE_BIOMETRIC permission), but `NSFaceIDUsageDescription`
-    /// must contain app-specific localised text that Apple rejects
-    /// placeholder defaults for, so we only add it if the developer hasn't
-    /// already supplied one.
-    private void installBuildHintsIfNeeded() {
-        if (buildHintsInstalled) {
-            return;
-        }
-        buildHintsInstalled = true;
-        Map<String, String> existing = Display.getInstance().getProjectBuildHints();
-        if (existing == null) {
-            return;
-        }
-        if (!existing.containsKey("ios.NSFaceIDUsageDescription")) {
-            Display.getInstance().setProjectBuildHint(
-                    "ios.NSFaceIDUsageDescription",
-                    "Authenticate to securely access your account");
-        }
-    }
-
     @Override
     public boolean isSupported() {
-        installBuildHintsIfNeeded();
         return simAvailable;
     }
 
     @Override
     public boolean canAuthenticate() {
-        installBuildHintsIfNeeded();
         return simAvailable
                 && (simFaceEnrolled || simTouchEnrolled || simIrisEnrolled);
     }
 
     @Override
     public List<BiometricType> getAvailableBiometrics() {
-        installBuildHintsIfNeeded();
         List<BiometricType> out = new ArrayList<BiometricType>();
         if (!simAvailable) {
             return out;
@@ -138,7 +108,6 @@ public final class JavaSEBiometrics extends Biometrics {
 
     @Override
     public AsyncResource<Boolean> authenticate(AuthenticationOptions opts) {
-        installBuildHintsIfNeeded();
         final AsyncResource<Boolean> result = new AsyncResource<Boolean>();
         if (!simAvailable) {
             result.error(new BiometricException(BiometricError.NOT_AVAILABLE,
