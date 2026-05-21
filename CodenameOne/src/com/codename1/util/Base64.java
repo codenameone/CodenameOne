@@ -349,6 +349,77 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, outputLength);
     }
 
+    /// URL-safe Base64 encoding per RFC 4648 §5: `+` becomes `-`, `/` becomes
+    /// `_`, and the trailing `=` padding is dropped. This is the encoding
+    /// used by JWTs and most modern web token formats. Reuses the same
+    /// SIMD-optimized encode path as [#encodeNoNewline(byte[])] under the
+    /// hood, so it is just as fast.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the array to encode
+    ///
+    /// #### Returns
+    ///
+    /// the URL-safe Base64 string with no padding
+    public static String encodeUrlSafe(byte[] in) {
+        int inputLength = in.length;
+        if (inputLength == 0) {
+            return "";
+        }
+        int outputLength = ((inputLength + 2) / 3) * 4;
+        byte[] out = allocByteMaybeSimd(outputLength);
+        encodeNoNewline(in, out);
+        // Map standard alphabet to URL-safe alphabet and trim trailing '='
+        int unpadded = outputLength;
+        while (unpadded > 0 && out[unpadded - 1] == '=') {
+            unpadded--;
+        }
+        for (int i = 0; i < unpadded; i++) {
+            byte c = out[i];
+            if (c == '+') {
+                out[i] = '-';
+            } else if (c == '/') {
+                out[i] = '_';
+            }
+        }
+        return com.codename1.util.StringUtil.newString(out, 0, unpadded);
+    }
+
+    /// Decodes a URL-safe Base64 string (RFC 4648 §5). Padding is optional --
+    /// the canonical URL-safe form drops it, but this method also accepts
+    /// strings that still carry trailing `=`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: URL-safe Base64 string
+    ///
+    /// #### Returns
+    ///
+    /// the decoded bytes
+    public static byte[] decodeUrlSafe(String s) {
+        if (s == null || s.length() == 0) {
+            return new byte[0];
+        }
+        int len = s.length();
+        int pad = (4 - (len & 3)) & 3;
+        byte[] buf = new byte[len + pad];
+        for (int i = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (c == '-') {
+                buf[i] = '+';
+            } else if (c == '_') {
+                buf[i] = '/';
+            } else {
+                buf[i] = (byte) c;
+            }
+        }
+        for (int i = 0; i < pad; i++) {
+            buf[len + i] = '=';
+        }
+        return decode(buf, buf.length);
+    }
+
     /// Encodes input into a caller-provided output buffer without line breaks.
     ///
     /// #### Parameters

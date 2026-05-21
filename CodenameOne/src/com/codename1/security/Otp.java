@@ -127,6 +127,123 @@ public final class Otp {
                 System.currentTimeMillis(), 30, 6, Hash.SHA1);
     }
 
+    /// Builds the canonical `otpauth://totp/...` URI that authenticator apps
+    /// (Google Authenticator, Microsoft Authenticator, 1Password, Authy, ...)
+    /// consume when the user scans a QR code on your enrolment screen. The
+    /// format is documented at
+    /// <https://github.com/google/google-authenticator/wiki/Key-Uri-Format>.
+    ///
+    /// Render the returned string as a QR code (server-side render, or a
+    /// QR-generation cn1lib) and show it to the user; they scan it, the
+    /// authenticator stores `secret` against the `issuer:accountName` label,
+    /// and from then on it produces six-digit codes that match
+    /// [#totp(byte[])] on your side using the same `secret`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `issuer`: the human-readable service name shown in the authenticator
+    ///   ("Acme Bank"). Must not contain a `:`.
+    ///
+    /// - `accountName`: the user's identifier within your service
+    ///   ("alice@example.com"). Must not contain a `:`.
+    ///
+    /// - `secret`: shared secret (the bytes you also pass to
+    ///   [#totp(byte[])]) -- encoded as Base32 in the URI per the spec.
+    ///
+    /// - `digits`: number of digits in each code (typically 6).
+    ///
+    /// - `stepSeconds`: time-step size, typically 30.
+    ///
+    /// - `hashAlgorithm`: hash, typically [Hash#SHA1] for authenticator
+    ///   compatibility. SHA-256 and SHA-512 are accepted but not all
+    ///   authenticator apps support them.
+    public static String otpauthUri(String issuer, String accountName, byte[] secret,
+                                    int digits, int stepSeconds, String hashAlgorithm) {
+        if (issuer == null || issuer.indexOf(':') >= 0) {
+            throw new CryptoException("issuer must be non-null and must not contain ':'");
+        }
+        if (accountName == null || accountName.indexOf(':') >= 0) {
+            throw new CryptoException("accountName must be non-null and must not contain ':'");
+        }
+        String alg = uriAlgorithm(hashAlgorithm);
+        StringBuilder b = new StringBuilder(128);
+        b.append("otpauth://totp/");
+        appendUriComponent(b, issuer);
+        b.append(':');
+        appendUriComponent(b, accountName);
+        b.append("?secret=");
+        b.append(Base32.encode(secret).replace("=", ""));
+        b.append("&issuer=");
+        appendUriComponent(b, issuer);
+        b.append("&algorithm=");
+        b.append(alg);
+        b.append("&digits=");
+        b.append(digits);
+        b.append("&period=");
+        b.append(stepSeconds);
+        return b.toString();
+    }
+
+    /// Convenience overload using the typical 6 digits / 30 seconds / SHA-1
+    /// settings most authenticator apps expect.
+    public static String otpauthUri(String issuer, String accountName, byte[] secret) {
+        return otpauthUri(issuer, accountName, secret, 6, 30, Hash.SHA1);
+    }
+
+    private static String uriAlgorithm(String hashAlgorithm) {
+        String n = hashAlgorithm == null ? "" : MessageDigestImpl.normalise(hashAlgorithm);
+        if ("SHA1".equals(n)) {
+            return "SHA1";
+        }
+        if ("SHA256".equals(n)) {
+            return "SHA256";
+        }
+        if ("SHA512".equals(n)) {
+            return "SHA512";
+        }
+        throw new CryptoException("unsupported OTP URI algorithm: " + hashAlgorithm);
+    }
+
+    /// Minimal RFC 3986 percent-encoder for URI path / query segments. The
+    /// Google Authenticator KeyUri format only ever contains issuer + account
+    /// name written by the host app, so we only need to escape the small set
+    /// of unsafe characters that show up there in practice.
+    private static void appendUriComponent(StringBuilder out, String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean unreserved = (c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '-' || c == '_' || c == '.' || c == '~';
+            if (unreserved) {
+                out.append(c);
+            } else if (c < 0x80) {
+                appendPercent(out, c);
+            } else {
+                // UTF-8 encode multi-byte chars
+                if (c < 0x800) {
+                    appendPercent(out, 0xc0 | (c >>> 6));
+                    appendPercent(out, 0x80 | (c & 0x3f));
+                } else {
+                    appendPercent(out, 0xe0 | (c >>> 12));
+                    appendPercent(out, 0x80 | ((c >>> 6) & 0x3f));
+                    appendPercent(out, 0x80 | (c & 0x3f));
+                }
+            }
+        }
+    }
+
+    private static void appendPercent(StringBuilder out, int b) {
+        out.append('%');
+        out.append(HEX[(b >>> 4) & 0x0f]);
+        out.append(HEX[b & 0x0f]);
+    }
+
+    private static final char[] HEX = {
+            '0', '1', '2', '3', '4', '5', '6', '7',
+            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    };
+
     /// Verifies a TOTP code with full parameter control.
     public static boolean verifyTotp(byte[] secret, String code, int tolerance,
                                      long currentTimeMillis, int stepSeconds,

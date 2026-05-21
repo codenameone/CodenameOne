@@ -436,6 +436,78 @@ For HOTP, supply the counter explicitly and increment it after every successful 
 String code = Otp.hotp(secret, counter++, 6);
 ----
 
+==== Walkthrough: Adding two-factor authentication to a sign-in flow
+
+The typical TOTP-based two-factor authentication flow has two distinct phases. The first is _enrolment_, where the server provisions a shared secret to the user's authenticator app; the second is _verification_, which happens on every subsequent sign-in.
+
+[NOTE]
+====
+The TOTP secret should be generated and stored on your *server*, not on the Codename One client. The client only ever sees the secret long enough to display the enrolment QR code, then forgets it. Verification on every subsequent sign-in is also a server-side concern (the client just sends the code the user types in). The code samples below put the cryptography on the client only to keep the example self-contained -- in production, the server does the actual generation and verification.
+====
+
+*Phase 1 -- Enrolment.* When the user opts into 2FA, generate a 20-byte random secret and show it to their authenticator app as a QR code that encodes a standard `otpauth://totp/...` URI:
+
+[source,java]
+----
+import com.codename1.security.Otp;
+import com.codename1.security.SecureRandom;
+
+// 1. Generate (or fetch from your server) a 20-byte secret -- 160 bits is the
+//    de-facto standard for authenticator compatibility.
+byte[] secret = SecureRandom.bytes(20);
+
+// 2. Build the otpauth URI. The authenticator app stores the secret against
+//    the "Acme Bank: alice@example.com" label and tags it with the issuer
+//    so it can show "Acme Bank" next to the rotating code.
+String uri = Otp.otpauthUri("Acme Bank", "alice@example.com", secret);
+
+// 3. Render `uri` as a QR code and show it on screen for the user to scan.
+//    See "Rendering the QR code" below.
+----
+
+[NOTE]
+====
+The maximum-compatibility settings -- 6 digits, 30 second step, SHA-1 -- are the defaults of `Otp.otpauthUri(issuer, accountName, secret)`. Pass digits / step / algorithm explicitly via the full overload only if you have a specific reason; some authenticator apps don't recognize anything except the defaults.
+====
+
+*Rendering the QR code.* Codename One core doesn't currently ship a QR-code generator. Pick whichever option fits your deployment:
+
+* *Server-side render* (simplest). Send `uri` to your backend over HTTPS and have it return a PNG. The Google Charts API endpoint `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=<URL-encoded-uri>` and the open-source `https://api.qrserver.com/v1/create-qr-code/?data=<URL-encoded-uri>` both work; the latter doesn't require Google API setup. Render the resulting PNG with `URLImage` or `EncodedImage.create(bytes)`.
+
+* *Use a QR cn1lib.* Community cn1libs such as `QRMaker` provide native generation. Add as a normal cn1lib dependency.
+
+* *Display the secret as a typed value.* If you can't render a QR code, show the user the Base32-encoded secret (the value after `secret=` in `uri`) and ask them to type it manually into their authenticator's "set up by hand" flow. Less convenient but works on every platform.
+
+*Phase 2 -- Verification.* On every sign-in after enrolment, ask the user for the current six-digit code and verify it against the stored secret. Use [com.codename1.components.OtpField] for the input:
+
+[source,java]
+----
+import com.codename1.components.OtpField;
+import com.codename1.security.Otp;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+OtpField field = new OtpField(6);
+field.addCompleteListener(new ActionListener() {
+    public void actionPerformed(ActionEvent evt) {
+        String userInput = field.getText();
+        // tolerance=1 allows the previous, current, and next 30-second
+        // windows to compensate for clock skew between the device and the
+        // server. tolerance=0 is strict but unforgiving; tolerance=2 or 3
+        // is more permissive but increases the brute-force attack surface.
+        if (Otp.verifyTotp(secret, userInput, 1)) {
+            grantAccess();
+        } else {
+            field.clear();
+            Dialog.show("Invalid code", "Try again", "OK", null);
+        }
+    }
+});
+form.add(field);
+----
+
+*Server-side verification.* When your backend does the verification, the corresponding Java looks the same -- `Otp.verifyTotp(storedSecret, codeFromClient, 1)`. Make sure you rate-limit verification attempts (e.g. lock the account after 5 wrong codes within a minute) and log failures, since the 6-digit search space is small enough to be brute-forced without that.
+
 ==== OTP input widget
 
 `com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens.

@@ -16,7 +16,11 @@
 /// - [Jwt] -- JSON Web Token signing and verification (HS, RS and ES families).
 /// - [Otp] -- RFC 4226/6238 HOTP and TOTP one-time passwords, compatible with
 ///   standard authenticator apps.
-/// - [Base32] / [Base64Url] -- encodings commonly paired with crypto code.
+/// - [Base32] -- 32-character encoding commonly used for OTP shared secrets.
+///   URL-safe Base64 (used by JWTs) lives on
+///   [com.codename1.util.Base64#encodeUrlSafe(byte[])] /
+///   [com.codename1.util.Base64#decodeUrlSafe(String)] so it can share the
+///   existing SIMD-optimized encoder.
 ///
 /// For a segmented OTP input widget see
 /// [com.codename1.components.OtpField].

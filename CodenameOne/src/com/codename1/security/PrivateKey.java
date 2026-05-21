@@ -27,22 +27,10 @@ package com.codename1.security;
 ///
 /// For interop with PEM files (`-----BEGIN PRIVATE KEY-----`) feed the
 /// PKCS#8 DER bytes to [#fromPkcs8].
-public final class PrivateKey {
-    private final String algorithm;
-    private final byte[] encoded;
-    private final String format;
+public final class PrivateKey extends Key {
 
     PrivateKey(String algorithm, byte[] encoded, String format) {
-        if (algorithm == null) {
-            throw new CryptoException("algorithm must not be null");
-        }
-        if (encoded == null) {
-            throw new CryptoException("encoded must not be null");
-        }
-        this.algorithm = algorithm;
-        this.encoded = new byte[encoded.length];
-        System.arraycopy(encoded, 0, this.encoded, 0, encoded.length);
-        this.format = format == null ? "PKCS#8" : format;
+        super(algorithm, encoded, format == null ? "PKCS#8" : format);
     }
 
     /// Wraps a PKCS#8 DER blob. This is the format produced by `openssl
@@ -54,23 +42,5 @@ public final class PrivateKey {
     /// Convenience: build an RSA [PrivateKey] from a [#fromPkcs8] PKCS#8 blob.
     public static PrivateKey rsa(byte[] pkcs8Der) {
         return fromPkcs8(PublicKey.RSA, pkcs8Der);
-    }
-
-    /// Returns a fresh copy of the encoded key bytes. Treat as sensitive
-    /// material -- do not log or store unencrypted.
-    public byte[] getEncoded() {
-        byte[] copy = new byte[encoded.length];
-        System.arraycopy(encoded, 0, copy, 0, encoded.length);
-        return copy;
-    }
-
-    /// Returns the algorithm this key is for (e.g. "RSA").
-    public String getAlgorithm() {
-        return algorithm;
-    }
-
-    /// Returns the encoding format ("PKCS#8").
-    public String getFormat() {
-        return format;
     }
 }

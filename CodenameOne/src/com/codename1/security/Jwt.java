@@ -130,7 +130,7 @@ public final class Jwt {
         }
         String signingInput = signingInput(algorithm, claims);
         byte[] sig = computeHmac(algorithm, secret, signingInput);
-        return signingInput + "." + Base64Url.encode(sig);
+        return signingInput + "." + com.codename1.util.Base64.encodeUrlSafe(sig);
     }
 
     /// Signs `claims` with the given RSA or ECDSA algorithm.
@@ -164,7 +164,7 @@ public final class Jwt {
         if (algorithm.startsWith("ES")) {
             sig = derToJoseEcdsa(sig, ecdsaCoordinateLength(algorithm));
         }
-        return signingInput + "." + Base64Url.encode(sig);
+        return signingInput + "." + com.codename1.util.Base64.encodeUrlSafe(sig);
     }
 
     /// Builds an unsigned token (header `{"alg":"none"}`). Accepting these on
@@ -193,9 +193,9 @@ public final class Jwt {
         String headerB64 = token.substring(0, firstDot);
         String payloadB64 = token.substring(firstDot + 1, secondDot);
         String sigB64 = token.substring(secondDot + 1);
-        Map<String, Object> header = readJson(Base64Url.decode(headerB64));
-        Map<String, Object> claims = readJson(Base64Url.decode(payloadB64));
-        byte[] sig = sigB64.length() == 0 ? new byte[0] : Base64Url.decode(sigB64);
+        Map<String, Object> header = readJson(com.codename1.util.Base64.decodeUrlSafe(headerB64));
+        Map<String, Object> claims = readJson(com.codename1.util.Base64.decodeUrlSafe(payloadB64));
+        byte[] sig = sigB64.length() == 0 ? new byte[0] : com.codename1.util.Base64.decodeUrlSafe(sigB64);
         return new Jwt(header, claims, sig, headerB64 + "." + payloadB64);
     }
 
@@ -299,8 +299,8 @@ public final class Jwt {
         String headerJson = JSONParser.mapToJson(hdr);
         String claimsJson = JSONParser.mapToJson(claims);
         try {
-            return Base64Url.encode(headerJson.getBytes("UTF-8")) + "."
-                 + Base64Url.encode(claimsJson.getBytes("UTF-8"));
+            return com.codename1.util.Base64.encodeUrlSafe(headerJson.getBytes("UTF-8")) + "."
+                 + com.codename1.util.Base64.encodeUrlSafe(claimsJson.getBytes("UTF-8"));
         } catch (UnsupportedEncodingException e) {
             throw new CryptoException("UTF-8 not supported", e);
         }

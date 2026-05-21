@@ -29,9 +29,7 @@ package com.codename1.security;
 /// for. They do not enforce length or strength -- that is the caller's
 /// responsibility, although [KeyGenerator] will produce keys of standard
 /// lengths.
-public final class SecretKey {
-    private final byte[] key;
-    private final String algorithm;
+public final class SecretKey extends Key {
 
     /// Wraps existing key material.
     ///
@@ -41,31 +39,11 @@ public final class SecretKey {
     ///
     /// - `keyBytes`: raw key material -- defensively copied
     public SecretKey(String algorithm, byte[] keyBytes) {
-        if (algorithm == null) {
-            throw new CryptoException("algorithm must not be null");
-        }
-        if (keyBytes == null) {
-            throw new CryptoException("keyBytes must not be null");
-        }
-        this.algorithm = algorithm;
-        this.key = new byte[keyBytes.length];
-        System.arraycopy(keyBytes, 0, this.key, 0, keyBytes.length);
-    }
-
-    /// Returns a fresh copy of the raw key material.
-    public byte[] getEncoded() {
-        byte[] copy = new byte[key.length];
-        System.arraycopy(key, 0, copy, 0, key.length);
-        return copy;
-    }
-
-    /// Returns the algorithm this key is intended for.
-    public String getAlgorithm() {
-        return algorithm;
+        super(algorithm, keyBytes, "RAW");
     }
 
     /// Returns the length of the key in bits.
     public int getBitLength() {
-        return key.length * 8;
+        return getEncoded().length * 8;
     }
 }

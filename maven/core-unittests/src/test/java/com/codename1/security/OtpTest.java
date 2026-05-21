@@ -70,4 +70,31 @@ class OtpTest {
         assertArrayEquals(new byte[]{(byte)0x48, (byte)0x65, (byte)0x6c, (byte)0x6c, (byte)0x6f, (byte)0x21, (byte)0xde, (byte)0xad, (byte)0xbe, (byte)0xef},
                 Base32.decode("JBSWY3DPEHPK3PXP"));
     }
+
+    @Test
+    void otpauthUriMatchesGoogleAuthenticatorFormat() {
+        byte[] secret = "12345678901234567890".getBytes();
+        String uri = Otp.otpauthUri("Acme Bank", "alice@example.com", secret);
+        // expected structure: otpauth://totp/<issuer>:<account>?secret=...&issuer=...&algorithm=SHA1&digits=6&period=30
+        assertTrue(uri.startsWith("otpauth://totp/Acme%20Bank:alice%40example.com?"), uri);
+        assertTrue(uri.contains("&issuer=Acme%20Bank"));
+        assertTrue(uri.contains("&algorithm=SHA1"));
+        assertTrue(uri.contains("&digits=6"));
+        assertTrue(uri.contains("&period=30"));
+        // secret is the Base32 of `secret` with padding stripped
+        String b32 = Base32.encode(secret).replace("=", "");
+        assertTrue(uri.contains("secret=" + b32));
+    }
+
+    @Test
+    void otpauthUriRejectsColonsInIssuerOrAccount() {
+        try {
+            Otp.otpauthUri("Acme:Bank", "alice", new byte[20]);
+            fail("expected CryptoException");
+        } catch (CryptoException expected) { /* ok */ }
+        try {
+            Otp.otpauthUri("Acme", "alice:doe", new byte[20]);
+            fail("expected CryptoException");
+        } catch (CryptoException expected) { /* ok */ }
+    }
 }

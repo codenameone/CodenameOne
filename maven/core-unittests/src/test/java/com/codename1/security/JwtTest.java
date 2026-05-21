@@ -92,6 +92,7 @@ class JwtTest extends UITestBase {
     void base64UrlRoundTrip() throws Exception {
         byte[] data = new byte[256];
         for (int i = 0; i < 256; i++) data[i] = (byte) i;
-        assertArrayEquals(data, Base64Url.decode(Base64Url.encode(data)));
+        assertArrayEquals(data,
+                com.codename1.util.Base64.decodeUrlSafe(com.codename1.util.Base64.encodeUrlSafe(data)));
     }
 }
