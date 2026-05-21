@@ -10,6 +10,7 @@ import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidato
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.ClipUnderRotation;
+import com.codenameone.examples.hellocodenameone.tests.graphics.ImageClipUnderRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradientStops;
@@ -136,6 +137,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StrokeTest(),
             new Clip(),
             new ClipUnderRotation(),
+            new ImageClipUnderRotation(),
             new TileImage(),
             new Rotate(),
             new TransformTranslation(),
@@ -375,6 +377,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "AffineScale".equals(testName)
                 || "Clip".equals(testName)
                 || "ClipUnderRotation".equals(testName)
+                || "ImageClipUnderRotation".equals(testName)
                 || "DrawArc".equals(testName)
                 || "DrawGradient".equals(testName)
                 || "DrawGradientStops".equals(testName)
