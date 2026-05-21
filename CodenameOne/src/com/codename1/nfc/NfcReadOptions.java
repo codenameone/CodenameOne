@@ -167,8 +167,7 @@ public final class NfcReadOptions {
             return this;
         }
         List<byte[]> copies = new ArrayList<byte[]>(aids.length);
-        for (int i = 0; i < aids.length; i++) {
-            byte[] src = aids[i];
+        for (byte[] src : aids) {
             if (src == null) {
                 continue;
             }

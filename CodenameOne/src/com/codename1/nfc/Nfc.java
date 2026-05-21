@@ -173,6 +173,7 @@ public class Nfc {
     private static void chainReadNdef(AsyncResource<Tag> source,
             final AsyncResource<NdefMessage> chained) {
         source.ready(new SuccessCallback<Tag>() {
+            @Override
             public void onSucess(Tag tag) {
                 if (tag == null) {
                     chained.error(new NfcException(NfcError.TAG_LOST,
@@ -180,16 +181,19 @@ public class Nfc {
                     return;
                 }
                 tag.readNdef().ready(new SuccessCallback<NdefMessage>() {
+                    @Override
                     public void onSucess(NdefMessage msg) {
                         chained.complete(msg);
                     }
                 }).except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         chained.error(err);
                     }
                 });
             }
         }).except(new SuccessCallback<Throwable>() {
+            @Override
             public void onSucess(Throwable err) {
                 chained.error(err);
             }
@@ -213,6 +217,7 @@ public class Nfc {
             final NdefMessage message,
             final AsyncResource<Boolean> chained) {
         source.ready(new SuccessCallback<Tag>() {
+            @Override
             public void onSucess(Tag tag) {
                 if (tag == null) {
                     chained.error(new NfcException(NfcError.TAG_LOST,
@@ -220,16 +225,19 @@ public class Nfc {
                     return;
                 }
                 tag.writeNdef(message).ready(new SuccessCallback<Boolean>() {
+                    @Override
                     public void onSucess(Boolean result) {
                         chained.complete(result);
                     }
                 }).except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         chained.error(err);
                     }
                 });
             }
         }).except(new SuccessCallback<Throwable>() {
+            @Override
             public void onSucess(Throwable err) {
                 chained.error(err);
             }
