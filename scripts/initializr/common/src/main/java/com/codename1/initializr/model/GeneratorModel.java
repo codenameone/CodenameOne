@@ -173,20 +173,28 @@ public class GeneratorModel {
 
     public static void cleanupGeneratedZips() {
         try {
+            System.out.println("CN1INIT:cleanup:getHome");
             String home = getAppHomePath();
+            System.out.println("CN1INIT:cleanup:listFiles home=" + home);
             String[] files = listFiles(home);
+            System.out.println("CN1INIT:cleanup:listed count=" + (files == null ? "null" : files.length));
             if (files == null) {
                 return;
             }
             for (String file : files) {
                 if (file != null && file.endsWith(".zip")) {
                     try {
+                        System.out.println("CN1INIT:cleanup:delete " + file);
                         delete(home + file);
+                        System.out.println("CN1INIT:cleanup:deleted " + file);
                     } catch (Throwable ignored) {
+                        System.out.println("CN1INIT:cleanup:deleteFail " + file + " err=" + ignored);
                     }
                 }
             }
+            System.out.println("CN1INIT:cleanup:done");
         } catch (Throwable ignored) {
+            System.out.println("CN1INIT:cleanup:fatal err=" + ignored);
         }
     }
 
