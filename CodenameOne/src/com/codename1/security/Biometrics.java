@@ -72,8 +72,6 @@ import java.util.List;
 ///   [#authenticate(String)] completes with [BiometricError#NOT_AVAILABLE].
 ///   Application code does not need platform `if` statements -- always
 ///   gate biometrics on [#canAuthenticate()] before invoking the prompt.
-///
-/// This class is the Codename One parallel of Flutter's `local_auth` API.
 public class Biometrics {
 
     /// Subclasses are constructed by the port. Application code obtains the
