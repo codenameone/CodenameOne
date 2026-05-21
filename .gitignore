@@ -106,4 +106,7 @@ package.json
 
 # Local screenshot/perf bench output
 /artifacts/
+/scripts/artifacts/
+# Local diagnostic playwright scripts (sidemenu-test, initializr-test, etc.)
+/scripts/*-test.mjs
 
