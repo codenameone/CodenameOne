@@ -363,138 +363,109 @@ public class LocalForage {
     
     
     
+    // Poll-based wait helper. Avoids synchronized(done) + done.wait() which
+    // on the JS-port cooperative scheduler strands the waiter (the monitor
+    // isn't released when wait() parks, so the async callback can't enter
+    // synchronized(done) to deliver the result). The worker is single-threaded
+    // so cross-thread visibility from the callback to the waiter is implicit.
+    private static void awaitLocalForageDone(boolean[] done) throws IOException {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (!done[0]) {
+            if (System.currentTimeMillis() >= deadline) {
+                throw new IOException("LocalForage callback timed out after 10s");
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                throw new IOException("Interrupted", e);
+            }
+        }
+    }
+
     private static JSObject setValue(LocalForageImpl impl, String key, JSObject value) throws IOException {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.setItem(key, value, new SetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        HTML5Implementation._logObj(err);
-                        error[0] = new QuotaExceededException("Failed to set value");
-                    } else {
-                        result[0] = val;
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    HTML5Implementation._logObj(err);
+                    error[0] = new QuotaExceededException("Failed to set value");
+                } else {
+                    result[0] = val;
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
         return (JSObject) result[0];
     }
-    
+
     private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.getItem(key, new GetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException(JS.unwrapString(err));
-                    } else {
-                        result[0] = val;
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException(JS.unwrapString(err));
+                } else {
+                    result[0] = val;
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
         return (JSObject) result[0];
     }
-    
+
     private static void removeItem(LocalForageImpl impl, String key) throws IOException {
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.removeItem(key, new SuccessCallback(){
             @Override
             public void callback(JSObject err) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to delete value");
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to delete value");
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
     }
-    
+
     private static void clear(LocalForageImpl impl) throws IOException {
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.clear(new SuccessCallback(){
             @Override
             public void callback(JSObject err) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to clear forage");
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to clear forage");
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
@@ -505,47 +476,25 @@ public class LocalForage {
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
 
-        System.out.println("CN1INIT:LF.keys:request");
         impl.keys(new KeysCallback(){
             @Override
             public void callback(JSObject err, JSArray<JSString> k) {
-                System.out.println("CN1INIT:LF.keys:callback err=" + (err == null ? "null" : "present"));
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to get keys");
-                    } else {
-                        result[0] = JS.unwrapStringArray(k);
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to get keys");
+                } else {
+                    result[0] = JS.unwrapStringArray(k);
                 }
-                System.out.println("CN1INIT:LF.keys:callback:done");
+                done[0] = true;
             }
         });
-        System.out.println("CN1INIT:LF.keys:awaiting");
 
-        // Timed wait instead of unbounded wait. wait/notifyAll on the JS-port
-        // cooperative scheduler has been observed to drop notifications under
-        // tight timing -- the unbounded variant hung the Initializr Generate
-        // button at cleanupGeneratedZips. A short timeout lets the EDT loop
-        // re-check the done flag periodically; the callback eventually
-        // delivers and the loop exits.
-        long deadline = System.currentTimeMillis() + 10_000L;
-        synchronized(done) {
-            while (!done[0]) {
-                if (System.currentTimeMillis() >= deadline) {
-                    System.out.println("CN1INIT:LF.keys:timeout (10s) -- returning empty");
-                    return new String[0];
-                }
-                try {
-                    done.wait(50);
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
+        try {
+            awaitLocalForageDone(done);
+        } catch (IOException timeoutEx) {
+            // Cleanup callers treat null/empty as "no files to delete"; better
+            // than a hard failure when the bridge response is delayed.
+            return new String[0];
         }
-        System.out.println("CN1INIT:LF.keys:gotResult len=" + (result[0] == null ? "null" : ((String[]) result[0]).length));
-
         if (error[0] != null) {
             throw error[0];
         }
@@ -556,32 +505,20 @@ public class LocalForage {
         final int[] result = new int[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.length(new LengthCallback(){
             @Override
             public void callback(JSObject err, JSObject len) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to get length");
-                    } else {
-                        result[0] = JS.unwrapInt(len);
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to get length");
+                } else {
+                    result[0] = JS.unwrapInt(len);
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
