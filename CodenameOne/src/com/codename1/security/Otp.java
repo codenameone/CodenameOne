@@ -78,7 +78,7 @@ public final class Otp {
                  | ((mac[offset + 2] & 0xff) << 8)
                  | (mac[offset + 3] & 0xff);
         int mod = 1;
-        for (int i = 0; i < digits; i++) mod *= 10;
+        for (int i = 0; i < digits; i++) { mod *= 10; }
         code %= mod;
         return pad(Integer.toString(code), digits);
     }
@@ -129,7 +129,9 @@ public final class Otp {
     public static boolean verifyTotp(byte[] secret, String code, int tolerance,
                                      long currentTimeMillis, int stepSeconds,
                                      int digits, String hashAlgorithm) {
-        if (code == null) return false;
+        if (code == null) {
+            return false;
+        }
         long counter = (currentTimeMillis / 1000L) / stepSeconds;
         for (int s = -tolerance; s <= tolerance; s++) {
             String candidate = hotp(secret, counter + s, digits, hashAlgorithm);
@@ -141,7 +143,9 @@ public final class Otp {
     }
 
     private static boolean constantTimeEqualsString(String a, String b) {
-        if (a == null || b == null || a.length() != b.length()) return false;
+        if (a == null || b == null || a.length() != b.length()) {
+            return false;
+        }
         int diff = 0;
         for (int i = 0; i < a.length(); i++) {
             diff |= (a.charAt(i) ^ b.charAt(i));
@@ -150,9 +154,11 @@ public final class Otp {
     }
 
     private static String pad(String s, int digits) {
-        if (s.length() >= digits) return s;
+        if (s.length() >= digits) {
+            return s;
+        }
         StringBuilder b = new StringBuilder(digits);
-        for (int i = s.length(); i < digits; i++) b.append('0');
+        for (int i = s.length(); i < digits; i++) { b.append('0'); }
         b.append(s);
         return b.toString();
     }

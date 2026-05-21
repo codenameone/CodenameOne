@@ -52,7 +52,9 @@ public final class SecureRandom {
 
     /// Fills `out` with secure random bytes.
     public static void fill(byte[] out) {
-        if (out == null) throw new CryptoException("out must not be null");
+        if (out == null) {
+            throw new CryptoException("out must not be null");
+        }
         try {
             Util.secureRandomBytes(out);
         } catch (RuntimeException re) {
@@ -63,7 +65,9 @@ public final class SecureRandom {
     /// Returns a uniformly distributed random int in `[0, bound)`. `bound`
     /// must be positive.
     public static int intBelow(int bound) {
-        if (bound <= 0) throw new CryptoException("bound must be positive");
+        if (bound <= 0) {
+            throw new CryptoException("bound must be positive");
+        }
         // Rejection sampling to avoid modulo bias.
         byte[] buf = new byte[4];
         while (true) {
@@ -80,7 +84,9 @@ public final class SecureRandom {
     /// Returns a uniformly distributed random long in `[0, bound)`. `bound`
     /// must be positive.
     public static long longBelow(long bound) {
-        if (bound <= 0) throw new CryptoException("bound must be positive");
+        if (bound <= 0) {
+            throw new CryptoException("bound must be positive");
+        }
         byte[] buf = new byte[8];
         while (true) {
             fill(buf);

@@ -40,12 +40,12 @@ abstract class MessageDigestImpl {
             throw new CryptoException("algorithm must not be null");
         }
         String a = normalise(algorithm);
-        if (a.equals("MD5")) return new Md5();
-        if (a.equals("SHA1")) return new Sha1();
-        if (a.equals("SHA224")) return new Sha2_32(true);
-        if (a.equals("SHA256")) return new Sha2_32(false);
-        if (a.equals("SHA384")) return new Sha2_64(true);
-        if (a.equals("SHA512")) return new Sha2_64(false);
+        if ("MD5".equals(a)) { return new Md5(); }
+        if ("SHA1".equals(a)) { return new Sha1(); }
+        if ("SHA224".equals(a)) { return new Sha256Family(true); }
+        if ("SHA256".equals(a)) { return new Sha256Family(false); }
+        if ("SHA384".equals(a)) { return new Sha512Family(true); }
+        if ("SHA512".equals(a)) { return new Sha512Family(false); }
         throw new CryptoException("unsupported hash algorithm: " + algorithm);
     }
 
@@ -53,8 +53,8 @@ abstract class MessageDigestImpl {
         StringBuilder b = new StringBuilder(algorithm.length());
         for (int i = 0; i < algorithm.length(); i++) {
             char c = algorithm.charAt(i);
-            if (c == '-' || c == '_' || c == ' ') continue;
-            if (c >= 'a' && c <= 'z') c = (char) (c - 'a' + 'A');
+            if (c == '-' || c == '_' || c == ' ') { continue; }
+            if (c >= 'a' && c <= 'z') { c = (char) (c - 'a' + 'A'); }
             b.append(c);
         }
         return b.toString();
@@ -70,11 +70,12 @@ abstract class MessageDigestImpl {
         abstract void processBlock(byte[] block, int offset);
         abstract void writeStateBigEndian(byte[] out);
 
+        @Override
         void update(byte[] data, int offset, int length) {
             byteCount += length;
             if (bufferLen > 0) {
                 int copy = 64 - bufferLen;
-                if (copy > length) copy = length;
+                if (copy > length) { copy = length; }
                 System.arraycopy(data, offset, buffer, bufferLen, copy);
                 bufferLen += copy;
                 offset += copy;
@@ -95,6 +96,7 @@ abstract class MessageDigestImpl {
             }
         }
 
+        @Override
         void update(byte b) {
             byteCount++;
             buffer[bufferLen++] = b;
@@ -108,11 +110,11 @@ abstract class MessageDigestImpl {
             long bits = byteCount * 8L;
             buffer[bufferLen++] = (byte) 0x80;
             if (bufferLen > 56) {
-                while (bufferLen < 64) buffer[bufferLen++] = 0;
+                while (bufferLen < 64) { buffer[bufferLen++] = 0; }
                 processBlock(buffer, 0);
                 bufferLen = 0;
             }
-            while (bufferLen < 56) buffer[bufferLen++] = 0;
+            while (bufferLen < 56) { buffer[bufferLen++] = 0; }
             if (bigEndianLength) {
                 buffer[56] = (byte) (bits >>> 56);
                 buffer[57] = (byte) (bits >>> 48);
@@ -143,10 +145,14 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // MD5 -- RFC 1321 (little-endian length, little-endian word loads)
     static final class Md5 extends Block64 {
-        int a, b, c, d;
+        int a;
+        int b;
+        int c;
+        int d;
 
         Md5() { reset(); }
 
+        @Override
         public void reset() {
             a = 0x67452301;
             b = 0xefcdab89;
@@ -156,10 +162,13 @@ abstract class MessageDigestImpl {
             byteCount = 0;
         }
 
+        @Override
         public int digestLength() { return 16; }
 
+        @Override
         public byte[] digest() { return finishCommon(false); }
 
+        @Override
         void writeStateBigEndian(byte[] out) {
             // MD5 actually writes its state little-endian; we reuse the name
             // for the shared finish path.
@@ -185,6 +194,7 @@ abstract class MessageDigestImpl {
 
         private static int rol(int v, int s) { return (v << s) | (v >>> (32 - s)); }
 
+        @Override
         void processBlock(byte[] block, int o) {
             int x0  = readLE(block, o);
             int x1  = readLE(block, o + 4);
@@ -203,7 +213,10 @@ abstract class MessageDigestImpl {
             int x14 = readLE(block, o + 56);
             int x15 = readLE(block, o + 60);
 
-            int aa = a, bb = b, cc = c, dd = d;
+            int aa = a;
+            int bb = b;
+            int cc = c;
+            int dd = d;
 
             // round 1
             aa = bb + rol(aa + ((bb & cc) | (~bb & dd)) + x0  + 0xd76aa478, 7);
@@ -287,11 +300,16 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // SHA-1 -- RFC 3174
     static final class Sha1 extends Block64 {
-        int h0, h1, h2, h3, h4;
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
         final int[] w = new int[80];
 
         Sha1() { reset(); }
 
+        @Override
         public void reset() {
             h0 = 0x67452301;
             h1 = 0xEFCDAB89;
@@ -302,10 +320,13 @@ abstract class MessageDigestImpl {
             byteCount = 0;
         }
 
+        @Override
         public int digestLength() { return 20; }
 
+        @Override
         public byte[] digest() { return finishCommon(true); }
 
+        @Override
         void writeStateBigEndian(byte[] out) {
             writeBE(out, 0, h0);
             writeBE(out, 4, h1);
@@ -314,6 +335,7 @@ abstract class MessageDigestImpl {
             writeBE(out, 16, h4);
         }
 
+        @Override
         void processBlock(byte[] block, int o) {
             for (int i = 0; i < 16; i++) {
                 w[i] = (block[o + i * 4] & 0xff) << 24
@@ -325,9 +347,14 @@ abstract class MessageDigestImpl {
                 int t = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16];
                 w[i] = (t << 1) | (t >>> 31);
             }
-            int a = h0, b = h1, c = h2, d = h3, e = h4;
+            int a = h0;
+            int b = h1;
+            int c = h2;
+            int d = h3;
+            int e = h4;
             for (int i = 0; i < 80; i++) {
-                int f, k;
+                int f;
+                int k;
                 if (i < 20) {
                     f = (b & c) | (~b & d);
                     k = 0x5A827999;
@@ -358,7 +385,7 @@ abstract class MessageDigestImpl {
 
     // ===============================================================
     // SHA-224 / SHA-256 -- FIPS 180-4 (32-bit word version)
-    static final class Sha2_32 extends Block64 {
+    static final class Sha256Family extends Block64 {
         private static final int[] K = {
             0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
             0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -379,14 +406,22 @@ abstract class MessageDigestImpl {
         };
 
         private final boolean truncated; // sha-224 if true
-        private int h0, h1, h2, h3, h4, h5, h6, h7;
+        private int h0;
+        private int h1;
+        private int h2;
+        private int h3;
+        private int h4;
+        private int h5;
+        private int h6;
+        private int h7;
         private final int[] w = new int[64];
 
-        Sha2_32(boolean truncated) {
+        Sha256Family(boolean truncated) {
             this.truncated = truncated;
             reset();
         }
 
+        @Override
         public void reset() {
             if (truncated) {
                 h0 = 0xc1059ed8; h1 = 0x367cd507; h2 = 0x3070dd17; h3 = 0xf70e5939;
@@ -399,10 +434,13 @@ abstract class MessageDigestImpl {
             byteCount = 0;
         }
 
+        @Override
         public int digestLength() { return truncated ? 28 : 32; }
 
+        @Override
         public byte[] digest() { return finishCommon(true); }
 
+        @Override
         void writeStateBigEndian(byte[] out) {
             writeBE(out, 0, h0);
             writeBE(out, 4, h1);
@@ -416,6 +454,7 @@ abstract class MessageDigestImpl {
             }
         }
 
+        @Override
         void processBlock(byte[] block, int o) {
             for (int i = 0; i < 16; i++) {
                 w[i] = (block[o + i * 4] & 0xff) << 24
@@ -430,7 +469,14 @@ abstract class MessageDigestImpl {
                 int s1 = ((v2 >>> 17) | (v2 << 15)) ^ ((v2 >>> 19) | (v2 << 13)) ^ (v2 >>> 10);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            int a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+            int a = h0;
+            int b = h1;
+            int c = h2;
+            int d = h3;
+            int e = h4;
+            int f = h5;
+            int g = h6;
+            int h = h7;
             for (int i = 0; i < 64; i++) {
                 int s1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
                 int ch = (e & f) ^ (~e & g);
@@ -451,7 +497,7 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // SHA-384 / SHA-512 -- FIPS 180-4 (64-bit word version, 128-byte blocks,
     // 128-bit length field). Uses a 128-byte block engine.
-    static final class Sha2_64 extends MessageDigestImpl {
+    static final class Sha512Family extends MessageDigestImpl {
         private static final long[] K = {
             0x428a2f98d728ae22L, 0x7137449123ef65cdL, 0xb5c0fbcfec4d3b2fL, 0xe9b5dba58189dbbcL,
             0x3956c25bf348b538L, 0x59f111f1b605d019L, 0x923f82a4af194f9bL, 0xab1c5ed5da6d8118L,
@@ -476,17 +522,25 @@ abstract class MessageDigestImpl {
         };
 
         private final boolean truncated; // sha-384 if true
-        private long h0, h1, h2, h3, h4, h5, h6, h7;
+        private long h0;
+        private long h1;
+        private long h2;
+        private long h3;
+        private long h4;
+        private long h5;
+        private long h6;
+        private long h7;
         private final byte[] buffer = new byte[128];
         private int bufferLen;
         private long byteCount; // we cap message length at 2^63-1 bytes which is plenty
         private final long[] w = new long[80];
 
-        Sha2_64(boolean truncated) {
+        Sha512Family(boolean truncated) {
             this.truncated = truncated;
             reset();
         }
 
+        @Override
         public void reset() {
             if (truncated) {
                 h0 = 0xcbbb9d5dc1059ed8L; h1 = 0x629a292a367cd507L; h2 = 0x9159015a3070dd17L;
@@ -501,13 +555,15 @@ abstract class MessageDigestImpl {
             byteCount = 0;
         }
 
+        @Override
         public int digestLength() { return truncated ? 48 : 64; }
 
+        @Override
         void update(byte[] data, int offset, int length) {
             byteCount += length;
             if (bufferLen > 0) {
                 int copy = 128 - bufferLen;
-                if (copy > length) copy = length;
+                if (copy > length) { copy = length; }
                 System.arraycopy(data, offset, buffer, bufferLen, copy);
                 bufferLen += copy;
                 offset += copy;
@@ -528,6 +584,7 @@ abstract class MessageDigestImpl {
             }
         }
 
+        @Override
         void update(byte b) {
             byteCount++;
             buffer[bufferLen++] = b;
@@ -537,18 +594,19 @@ abstract class MessageDigestImpl {
             }
         }
 
+        @Override
         public byte[] digest() {
             long bits = byteCount * 8L;
             buffer[bufferLen++] = (byte) 0x80;
             if (bufferLen > 112) {
-                while (bufferLen < 128) buffer[bufferLen++] = 0;
+                while (bufferLen < 128) { buffer[bufferLen++] = 0; }
                 processBlock(buffer, 0);
                 bufferLen = 0;
             }
-            while (bufferLen < 112) buffer[bufferLen++] = 0;
+            while (bufferLen < 112) { buffer[bufferLen++] = 0; }
             // high 64 bits of the 128-bit length field are always 0 here since
             // a Java byte array cannot hold more than 2^31-1 bytes.
-            for (int i = 112; i < 120; i++) buffer[i] = 0;
+            for (int i = 112; i < 120; i++) { buffer[i] = 0; }
             buffer[120] = (byte) (bits >>> 56);
             buffer[121] = (byte) (bits >>> 48);
             buffer[122] = (byte) (bits >>> 40);
@@ -566,9 +624,8 @@ abstract class MessageDigestImpl {
             writeBE64(out, 24, h3);
             writeBE64(out, 32, h4);
             writeBE64(out, 40, h5);
-            if (truncated) {
-                // sha-384 omits h6, h7
-            } else {
+            // sha-384 omits h6, h7
+            if (!truncated) {
                 writeBE64(out, 48, h6);
                 writeBE64(out, 56, h7);
             }
@@ -599,7 +656,14 @@ abstract class MessageDigestImpl {
                        ^ (v2 >>> 6);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            long a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+            long a = h0;
+            long b = h1;
+            long c = h2;
+            long d = h3;
+            long e = h4;
+            long f = h5;
+            long g = h6;
+            long h = h7;
             for (int i = 0; i < 80; i++) {
                 long s1 = ((e >>> 14) | (e << 50))
                        ^ ((e >>> 18) | (e << 46))

@@ -33,8 +33,12 @@ public final class PrivateKey {
     private final String format;
 
     PrivateKey(String algorithm, byte[] encoded, String format) {
-        if (algorithm == null) throw new CryptoException("algorithm must not be null");
-        if (encoded == null) throw new CryptoException("encoded must not be null");
+        if (algorithm == null) {
+            throw new CryptoException("algorithm must not be null");
+        }
+        if (encoded == null) {
+            throw new CryptoException("encoded must not be null");
+        }
         this.algorithm = algorithm;
         this.encoded = new byte[encoded.length];
         System.arraycopy(encoded, 0, this.encoded, 0, encoded.length);

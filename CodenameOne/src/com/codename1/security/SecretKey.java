@@ -41,8 +41,12 @@ public final class SecretKey {
     ///
     /// - `keyBytes`: raw key material -- defensively copied
     public SecretKey(String algorithm, byte[] keyBytes) {
-        if (algorithm == null) throw new CryptoException("algorithm must not be null");
-        if (keyBytes == null) throw new CryptoException("keyBytes must not be null");
+        if (algorithm == null) {
+            throw new CryptoException("algorithm must not be null");
+        }
+        if (keyBytes == null) {
+            throw new CryptoException("keyBytes must not be null");
+        }
         this.algorithm = algorithm;
         this.key = new byte[keyBytes.length];
         System.arraycopy(keyBytes, 0, this.key, 0, keyBytes.length);

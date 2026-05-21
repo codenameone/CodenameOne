@@ -104,8 +104,11 @@ public class OtpField extends Container {
                 tf.setConstraint(TextField.NUMERIC);
             }
             tf.addDataChangedListener(new DataChangedListener() {
+                @Override
                 public void dataChanged(int type, int idx) {
-                    if (updating) return;
+                    if (updating) {
+                        return;
+                    }
                     handleChange(index, tf);
                 }
             });
@@ -116,7 +119,9 @@ public class OtpField extends Container {
 
     private void handleChange(int index, TextField source) {
         String text = source.getText();
-        if (text == null) text = "";
+        if (text == null) {
+            text = "";
+        }
         // If multiple chars were pasted, distribute across boxes.
         if (text.length() > 1) {
             distributePaste(index, text);
@@ -143,7 +148,9 @@ public class OtpField extends Container {
             int p = startIndex;
             for (int i = 0; i < text.length() && p < length; i++) {
                 char c = text.charAt(i);
-                if (numericOnly && (c < '0' || c > '9')) continue;
+                if (numericOnly && (c < '0' || c > '9')) {
+                    continue;
+                }
                 boxes[p].setText(String.valueOf(c));
                 p++;
             }
@@ -164,9 +171,11 @@ public class OtpField extends Container {
         String code = getText();
         if (code.length() == length) {
             ActionEvent evt = new ActionEvent(this);
-            for (int i = 0; i < completeListeners.size(); i++) {
-                completeListeners.get(i).actionPerformed(evt);
-                if (evt.isConsumed()) break;
+            for (ActionListener listener : completeListeners) {
+                listener.actionPerformed(evt);
+                if (evt.isConsumed()) {
+                    break;
+                }
             }
         }
     }
@@ -177,7 +186,9 @@ public class OtpField extends Container {
         StringBuilder b = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
             String t = boxes[i].getText();
-            if (t != null) b.append(t);
+            if (t != null) {
+                b.append(t);
+            }
         }
         return b.toString();
     }
@@ -208,7 +219,9 @@ public class OtpField extends Container {
     /// Adds a listener fired when the field becomes completely filled. Useful
     /// to trigger automatic verification.
     public void addCompleteListener(ActionListener l) {
-        if (l != null) completeListeners.add(l);
+        if (l != null) {
+            completeListeners.add(l);
+        }
     }
 
     /// Removes a previously-registered listener.

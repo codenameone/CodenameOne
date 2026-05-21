@@ -90,10 +90,10 @@ public final class Hmac {
 
     private static int blockSizeFor(String algorithm) {
         String a = MessageDigestImpl.normalise(algorithm);
-        if (a.equals("MD5") || a.equals("SHA1") || a.equals("SHA224") || a.equals("SHA256")) {
+        if ("MD5".equals(a) || "SHA1".equals(a) || "SHA224".equals(a) || "SHA256".equals(a)) {
             return 64;
         }
-        if (a.equals("SHA384") || a.equals("SHA512")) {
+        if ("SHA384".equals(a) || "SHA512".equals(a)) {
             return 128;
         }
         throw new CryptoException("unsupported HMAC algorithm: " + algorithm);

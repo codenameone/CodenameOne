@@ -36,9 +36,12 @@ public final class Base64Url {
         StringBuilder b = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '=') continue;
-            if (c == '+') c = '-';
-            else if (c == '/') c = '_';
+            if (c == '=') { continue; }
+            if (c == '+') {
+                c = '-';
+            } else if (c == '/') {
+                c = '_';
+            }
             b.append(c);
         }
         return b.toString();
@@ -46,16 +49,19 @@ public final class Base64Url {
 
     /// Decodes a URL-safe Base64 string. Padding is optional.
     public static byte[] decode(String s) {
-        if (s == null) return new byte[0];
+        if (s == null) { return new byte[0]; }
         StringBuilder b = new StringBuilder(s.length() + 4);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '-') c = '+';
-            else if (c == '_') c = '/';
+            if (c == '-') {
+                c = '+';
+            } else if (c == '_') {
+                c = '/';
+            }
             b.append(c);
         }
         int pad = (4 - (b.length() & 3)) & 3;
-        for (int i = 0; i < pad; i++) b.append('=');
+        for (int i = 0; i < pad; i++) { b.append('='); }
         try {
             return com.codename1.util.Base64.decode(b.toString().getBytes("UTF-8"));
         } catch (java.io.UnsupportedEncodingException e) {

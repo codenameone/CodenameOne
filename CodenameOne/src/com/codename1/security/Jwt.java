@@ -122,8 +122,12 @@ public final class Jwt {
     /// Signs `claims` with the given HMAC algorithm. Use this when you want
     /// to pass the algorithm dynamically.
     public static String sign(Map<String, Object> claims, byte[] secret, String algorithm) {
-        if (claims == null) throw new CryptoException("claims must not be null");
-        if (algorithm == null) throw new CryptoException("algorithm must not be null");
+        if (claims == null) {
+            throw new CryptoException("claims must not be null");
+        }
+        if (algorithm == null) {
+            throw new CryptoException("algorithm must not be null");
+        }
         String signingInput = signingInput(algorithm, claims);
         byte[] sig = computeHmac(algorithm, secret, signingInput);
         return signingInput + "." + Base64Url.encode(sig);
@@ -140,8 +144,12 @@ public final class Jwt {
     /// - `algorithm`: one of [#RS256], [#RS384], [#RS512], [#ES256], [#ES384],
     ///   [#ES512]
     public static String sign(Map<String, Object> claims, PrivateKey privateKey, String algorithm) {
-        if (claims == null) throw new CryptoException("claims must not be null");
-        if (privateKey == null) throw new CryptoException("privateKey must not be null");
+        if (claims == null) {
+            throw new CryptoException("claims must not be null");
+        }
+        if (privateKey == null) {
+            throw new CryptoException("privateKey must not be null");
+        }
         String sigAlg = signatureAlgorithmFor(algorithm);
         String signingInput = signingInput(algorithm, claims);
         byte[] data;
@@ -171,11 +179,17 @@ public final class Jwt {
     /// Parses an encoded JWT into a [Jwt] object. The signature is NOT
     /// verified -- you must call one of the `verify*` methods afterwards.
     public static Jwt parse(String token) {
-        if (token == null) throw new CryptoException("token must not be null");
+        if (token == null) {
+            throw new CryptoException("token must not be null");
+        }
         int firstDot = token.indexOf('.');
-        if (firstDot < 0) throw new CryptoException("malformed JWT: no '.'");
+        if (firstDot < 0) {
+            throw new CryptoException("malformed JWT: no '.'");
+        }
         int secondDot = token.indexOf('.', firstDot + 1);
-        if (secondDot < 0) throw new CryptoException("malformed JWT: only one '.'");
+        if (secondDot < 0) {
+            throw new CryptoException("malformed JWT: only one '.'");
+        }
         String headerB64 = token.substring(0, firstDot);
         String payloadB64 = token.substring(firstDot + 1, secondDot);
         String sigB64 = token.substring(secondDot + 1);
@@ -208,7 +222,9 @@ public final class Jwt {
     public boolean verifyHs512(byte[] secret) { return verifyHmac(HS512, secret); }
 
     private boolean verifyHmac(String expectedAlg, byte[] secret) {
-        if (!expectedAlg.equals(getAlgorithm())) return false;
+        if (!expectedAlg.equals(getAlgorithm())) {
+            return false;
+        }
         byte[] expected = computeHmac(expectedAlg, secret, signingInput);
         return Hmac.constantTimeEquals(expected, signature);
     }
@@ -286,10 +302,15 @@ public final class Jwt {
 
     private static byte[] computeHmac(String algorithm, byte[] secret, String signingInput) {
         String hashAlg;
-        if (HS256.equals(algorithm)) hashAlg = Hash.SHA256;
-        else if (HS384.equals(algorithm)) hashAlg = Hash.SHA384;
-        else if (HS512.equals(algorithm)) hashAlg = Hash.SHA512;
-        else throw new CryptoException("unsupported HMAC algorithm: " + algorithm);
+        if (HS256.equals(algorithm)) {
+            hashAlg = Hash.SHA256;
+        } else if (HS384.equals(algorithm)) {
+            hashAlg = Hash.SHA384;
+        } else if (HS512.equals(algorithm)) {
+            hashAlg = Hash.SHA512;
+        } else {
+            throw new CryptoException("unsupported HMAC algorithm: " + algorithm);
+        }
         try {
             return Hmac.create(hashAlg, secret).doFinal(signingInput.getBytes("UTF-8"));
         } catch (UnsupportedEncodingException e) {
@@ -298,19 +319,19 @@ public final class Jwt {
     }
 
     private static String signatureAlgorithmFor(String jwtAlg) {
-        if (RS256.equals(jwtAlg)) return Signature.SHA256_WITH_RSA;
-        if (RS384.equals(jwtAlg)) return Signature.SHA384_WITH_RSA;
-        if (RS512.equals(jwtAlg)) return Signature.SHA512_WITH_RSA;
-        if (ES256.equals(jwtAlg)) return Signature.SHA256_WITH_ECDSA;
-        if (ES384.equals(jwtAlg)) return Signature.SHA384_WITH_ECDSA;
-        if (ES512.equals(jwtAlg)) return Signature.SHA512_WITH_ECDSA;
+        if (RS256.equals(jwtAlg)) { return Signature.SHA256_WITH_RSA; }
+        if (RS384.equals(jwtAlg)) { return Signature.SHA384_WITH_RSA; }
+        if (RS512.equals(jwtAlg)) { return Signature.SHA512_WITH_RSA; }
+        if (ES256.equals(jwtAlg)) { return Signature.SHA256_WITH_ECDSA; }
+        if (ES384.equals(jwtAlg)) { return Signature.SHA384_WITH_ECDSA; }
+        if (ES512.equals(jwtAlg)) { return Signature.SHA512_WITH_ECDSA; }
         throw new CryptoException("unsupported JWT algorithm: " + jwtAlg);
     }
 
     private static int ecdsaCoordinateLength(String jwtAlg) {
-        if (ES256.equals(jwtAlg)) return 32;   // P-256
-        if (ES384.equals(jwtAlg)) return 48;   // P-384
-        if (ES512.equals(jwtAlg)) return 66;   // P-521
+        if (ES256.equals(jwtAlg)) { return 32; }   // P-256
+        if (ES384.equals(jwtAlg)) { return 48; }   // P-384
+        if (ES512.equals(jwtAlg)) { return 66; }   // P-521
         throw new CryptoException("not an ECDSA algorithm: " + jwtAlg);
     }
 
@@ -338,11 +359,15 @@ public final class Jwt {
             int n = der[1] & 0x7f;
             p = 2 + n;
         }
-        if ((der[p] & 0xff) != 0x02) throw new CryptoException("bad ECDSA DER signature");
+        if ((der[p] & 0xff) != 0x02) {
+            throw new CryptoException("bad ECDSA DER signature");
+        }
         int rLen = der[p + 1] & 0xff;
         int rOff = p + 2;
         int sStart = rOff + rLen;
-        if ((der[sStart] & 0xff) != 0x02) throw new CryptoException("bad ECDSA DER signature");
+        if ((der[sStart] & 0xff) != 0x02) {
+            throw new CryptoException("bad ECDSA DER signature");
+        }
         int sLen = der[sStart + 1] & 0xff;
         int sOff = sStart + 2;
         byte[] out = new byte[coordLen * 2];
@@ -354,12 +379,17 @@ public final class Jwt {
     private static void copyAndPad(byte[] src, int srcOff, int srcLen,
                                    byte[] dst, int dstOff, int dstLen) {
         // Strip leading zero pad if any
-        while (srcLen > 0 && src[srcOff] == 0) { srcOff++; srcLen--; }
+        while (srcLen > 0 && src[srcOff] == 0) {
+            srcOff++;
+            srcLen--;
+        }
         if (srcLen > dstLen) {
             throw new CryptoException("ECDSA coordinate too large");
         }
         int pad = dstLen - srcLen;
-        for (int i = 0; i < pad; i++) dst[dstOff + i] = 0;
+        for (int i = 0; i < pad; i++) {
+            dst[dstOff + i] = 0;
+        }
         System.arraycopy(src, srcOff, dst, dstOff + pad, srcLen);
     }
 
@@ -398,12 +428,16 @@ public final class Jwt {
     private static byte[] trimAndAddSignByte(byte[] src, int off, int len) {
         int start = off;
         int end = off + len;
-        while (start < end - 1 && src[start] == 0) start++;
+        while (start < end - 1 && src[start] == 0) {
+            start++;
+        }
         boolean needPad = (src[start] & 0x80) != 0;
         int outLen = (end - start) + (needPad ? 1 : 0);
         byte[] out = new byte[outLen];
         int p = 0;
-        if (needPad) out[p++] = 0;
+        if (needPad) {
+            out[p++] = 0;
+        }
         System.arraycopy(src, start, out, p, end - start);
         return out;
     }

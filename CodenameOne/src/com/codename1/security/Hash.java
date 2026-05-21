@@ -180,8 +180,8 @@ public final class Hash {
             return null;
         }
         StringBuilder b = new StringBuilder(data.length * 2);
-        for (int i = 0; i < data.length; i++) {
-            int v = data[i] & 0xff;
+        for (byte d : data) {
+            int v = d & 0xff;
             b.append(HEX[v >>> 4]);
             b.append(HEX[v & 0x0f]);
         }
@@ -209,9 +209,9 @@ public final class Hash {
     }
 
     private static int nibble(char c) {
-        if (c >= '0' && c <= '9') return c - '0';
-        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        if (c >= '0' && c <= '9') { return c - '0'; }
+        if (c >= 'a' && c <= 'f') { return c - 'a' + 10; }
+        if (c >= 'A' && c <= 'F') { return c - 'A' + 10; }
         throw new CryptoException("invalid hex digit");
     }
 

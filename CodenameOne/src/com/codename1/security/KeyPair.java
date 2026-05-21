@@ -30,8 +30,12 @@ public final class KeyPair {
 
     /// Bundles an already-paired public/private key.
     public KeyPair(PublicKey publicKey, PrivateKey privateKey) {
-        if (publicKey == null) throw new CryptoException("publicKey must not be null");
-        if (privateKey == null) throw new CryptoException("privateKey must not be null");
+        if (publicKey == null) {
+            throw new CryptoException("publicKey must not be null");
+        }
+        if (privateKey == null) {
+            throw new CryptoException("privateKey must not be null");
+        }
         this.publicKey = publicKey;
         this.privateKey = privateKey;
     }

@@ -39,24 +39,24 @@ public final class Base32 {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
     private static final int[] DECODE = new int[128];
     static {
-        for (int i = 0; i < DECODE.length; i++) DECODE[i] = -1;
-        for (int i = 0; i < ALPHABET.length; i++) DECODE[ALPHABET[i]] = i;
+        for (int i = 0; i < DECODE.length; i++) { DECODE[i] = -1; }
+        for (int i = 0; i < ALPHABET.length; i++) { DECODE[ALPHABET[i]] = i; }
         // common lowercase variant
         for (int i = 0; i < ALPHABET.length; i++) {
             char lc = (char) (ALPHABET[i] | 0x20);
-            if (lc != ALPHABET[i]) DECODE[lc] = i;
+            if (lc != ALPHABET[i]) { DECODE[lc] = i; }
         }
     }
 
     /// Encodes the bytes as a Base32 string (uppercase, with `=` padding).
     public static String encode(byte[] data) {
-        if (data == null || data.length == 0) return "";
+        if (data == null || data.length == 0) { return ""; }
         int output = ((data.length + 4) / 5) * 8;
         StringBuilder b = new StringBuilder(output);
         int bits = 0;
         int value = 0;
-        for (int i = 0; i < data.length; i++) {
-            value = (value << 8) | (data[i] & 0xff);
+        for (byte aData : data) {
+            value = (value << 8) | (aData & 0xff);
             bits += 8;
             while (bits >= 5) {
                 b.append(ALPHABET[(value >>> (bits - 5)) & 0x1f]);
@@ -66,19 +66,19 @@ public final class Base32 {
         if (bits > 0) {
             b.append(ALPHABET[(value << (5 - bits)) & 0x1f]);
         }
-        while (b.length() < output) b.append('=');
+        while (b.length() < output) { b.append('='); }
         return b.toString();
     }
 
     /// Decodes a Base32 string. Padding and whitespace are tolerated; mixed
     /// case is accepted.
     public static byte[] decode(String s) {
-        if (s == null) return new byte[0];
+        if (s == null) { return new byte[0]; }
         // strip padding and whitespace
         StringBuilder cleaned = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '=' || c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '-') continue;
+            if (c == '=' || c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '-') { continue; }
             cleaned.append(c);
         }
         int len = cleaned.length();
