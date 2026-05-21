@@ -162,10 +162,18 @@ public class Nfc {
     /// followed by [Tag#readNdef()]. Resolves with the parsed NDEF
     /// message, or fails with an [NfcException].
     public AsyncResource<NdefMessage> readNdef(NfcReadOptions options) {
-        final AsyncResource<NdefMessage> chained =
-                new AsyncResource<NdefMessage>();
-        readTag(options).ready(new SuccessCallback<Tag>() {
-            public void onSucess(final Tag tag) {
+        AsyncResource<NdefMessage> chained = new AsyncResource<NdefMessage>();
+        chainReadNdef(readTag(options), chained);
+        return chained;
+    }
+
+    // The anonymous callbacks live inside a static method so they don't
+    // capture a synthetic outer-Nfc reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void chainReadNdef(AsyncResource<Tag> source,
+            final AsyncResource<NdefMessage> chained) {
+        source.ready(new SuccessCallback<Tag>() {
+            public void onSucess(Tag tag) {
                 if (tag == null) {
                     chained.error(new NfcException(NfcError.TAG_LOST,
                             "tag-read produced no tag"));
@@ -186,7 +194,6 @@ public class Nfc {
                 chained.error(err);
             }
         });
-        return chained;
     }
 
     /// Convenience writer -- opens a tag-read session, writes the given
@@ -194,10 +201,18 @@ public class Nfc {
     /// [NfcError#READ_ONLY] for locked tags and with
     /// [NfcError#CAPACITY_EXCEEDED] when the message is too large.
     public AsyncResource<Boolean> writeNdef(NfcReadOptions options,
-            final NdefMessage message) {
-        final AsyncResource<Boolean> chained =
-                new AsyncResource<Boolean>();
-        readTag(options).ready(new SuccessCallback<Tag>() {
+            NdefMessage message) {
+        AsyncResource<Boolean> chained = new AsyncResource<Boolean>();
+        chainWriteNdef(readTag(options), message, chained);
+        return chained;
+    }
+
+    // Static so the anonymous callbacks don't carry a synthetic outer-Nfc
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void chainWriteNdef(AsyncResource<Tag> source,
+            final NdefMessage message,
+            final AsyncResource<Boolean> chained) {
+        source.ready(new SuccessCallback<Tag>() {
             public void onSucess(Tag tag) {
                 if (tag == null) {
                     chained.error(new NfcException(NfcError.TAG_LOST,
@@ -219,7 +234,6 @@ public class Nfc {
                 chained.error(err);
             }
         });
-        return chained;
     }
 
     /// Cancels any in-flight [#readTag(NfcReadOptions)] /

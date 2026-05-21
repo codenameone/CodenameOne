@@ -156,22 +156,30 @@ public final class IOSNfc extends Nfc {
         listeners.remove(listener);
     }
 
+    // hceService is static (the OS routes APDUs to a single registered
+    // service, regardless of which IOSNfc instance owns it) so the
+    // synchronization uses the IOSNfc class lock rather than `this` --
+    // SpotBugs SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA.
     @Override
-    public synchronized void registerHostCardEmulationService(
+    public void registerHostCardEmulationService(
             HostCardEmulationService service) {
-        hceService = service;
-        if (service == null) {
-            nativeInstance.registerHceAids(new String[0]);
-        } else {
-            String[] aids = service.getAids();
-            nativeInstance.registerHceAids(aids != null ? aids : new String[0]);
+        synchronized (IOSNfc.class) {
+            hceService = service;
+            if (service == null) {
+                nativeInstance.registerHceAids(new String[0]);
+            } else {
+                String[] aids = service.getAids();
+                nativeInstance.registerHceAids(aids != null ? aids : new String[0]);
+            }
         }
     }
 
     @Override
-    public synchronized void unregisterHostCardEmulationService() {
-        hceService = null;
-        nativeInstance.registerHceAids(new String[0]);
+    public void unregisterHostCardEmulationService() {
+        synchronized (IOSNfc.class) {
+            hceService = null;
+            nativeInstance.registerHceAids(new String[0]);
+        }
     }
 
     private static int pollingMask(NfcReadOptions opts) {
@@ -451,64 +459,69 @@ public final class IOSNfc extends Nfc {
                 r.complete(eagerNdef);
                 return r;
             }
-            return tagOp(new TagOpInvoker<NdefMessage>() {
-                public void run(int rid, long h, IOSNative ni) {
-                    ni.nfcReadNdefFromTag(rid, h);
-                }
-            });
+            AsyncResource<NdefMessage> r = new AsyncResource<NdefMessage>();
+            IOSNative ni = bindTagOp(handle, r);
+            if (ni != null) {
+                ni.nfcReadNdefFromTag(takeId(r), handle);
+            }
+            return r;
         }
 
         @Override
-        public AsyncResource<Boolean> writeNdef(final NdefMessage message) {
+        public AsyncResource<Boolean> writeNdef(NdefMessage message) {
             if (message == null) {
                 AsyncResource<Boolean> r = new AsyncResource<Boolean>();
                 r.error(new NfcException(NfcError.INVALID_NDEF,
                         "null message"));
                 return r;
             }
-            return tagOp(new TagOpInvoker<Boolean>() {
-                public void run(int rid, long h, IOSNative ni) {
-                    ni.nfcWriteNdefToTag(rid, h, message.toByteArray());
-                }
-            });
+            AsyncResource<Boolean> r = new AsyncResource<Boolean>();
+            IOSNative ni = bindTagOp(handle, r);
+            if (ni != null) {
+                ni.nfcWriteNdefToTag(takeId(r), handle,
+                        message.toByteArray());
+            }
+            return r;
         }
 
         @Override
         public AsyncResource<Boolean> makeReadOnly() {
-            return tagOp(new TagOpInvoker<Boolean>() {
-                public void run(int rid, long h, IOSNative ni) {
-                    ni.nfcLockTag(rid, h);
-                }
-            });
+            AsyncResource<Boolean> r = new AsyncResource<Boolean>();
+            IOSNative ni = bindTagOp(handle, r);
+            if (ni != null) {
+                ni.nfcLockTag(takeId(r), handle);
+            }
+            return r;
         }
 
         @Override
         public com.codename1.nfc.IsoDep getIsoDep() {
             return iso;
         }
+    }
 
-        private <T> AsyncResource<T> tagOp(TagOpInvoker<T> inv) {
-            AsyncResource<T> r = new AsyncResource<T>();
-            if (handle == 0L) {
-                r.error(new NfcException(NfcError.TAG_LOST,
-                        "tag handle no longer valid"));
-                return r;
-            }
-            IOSNfc nfc = (IOSNfc) Display.getInstance().getNfc();
-            if (nfc == null) {
-                r.error(new NfcException(NfcError.NOT_AVAILABLE,
-                        "NFC not available"));
-                return r;
-            }
-            int rid = takeId(r);
-            inv.run(rid, handle, nfc.nativeInstance);
-            return r;
+    /**
+     * Validates the tag handle, locates the active IOSNfc and returns its
+     * native bridge, or rejects the AsyncResource with a typed NfcError and
+     * returns {@code null}. Lives as a static helper so the IOSTag op
+     * methods don't need any inner-class indirection (SpotBugs
+     * SIC_INNER_SHOULD_BE_STATIC_ANON).
+     */
+    static IOSNative bindTagOp(long handle, AsyncResource<?> r) {
+        if (handle == 0L) {
+            r.error(new NfcException(NfcError.TAG_LOST,
+                    "tag handle no longer valid"));
+            return null;
         }
+        IOSNfc nfc = (IOSNfc) Display.getInstance().getNfc();
+        if (nfc == null) {
+            r.error(new NfcException(NfcError.NOT_AVAILABLE,
+                    "NFC not available"));
+            return null;
+        }
+        return nfc.nativeInstance;
     }
 
-    interface TagOpInvoker<T> {
-        void run(int rid, long handle, IOSNative ni);
-    }
 
     /** iOS IsoDep view that posts transceive requests to Core NFC's
      * NFCISO7816Tag through {@link IOSNative#nfcTransceive(int, long, byte[])}. */

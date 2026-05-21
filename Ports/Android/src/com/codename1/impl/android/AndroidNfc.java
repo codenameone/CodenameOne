@@ -295,9 +295,9 @@ class AndroidNfc extends com.codename1.nfc.Nfc {
                 types.add(tt);
             }
         }
-        final AndroidTag wrapped = new AndroidTag(rawTag, types);
-        final AsyncResource<com.codename1.nfc.Tag> r;
-        final Set<NfcListener> listenerSnapshot;
+        AndroidTag wrapped = new AndroidTag(rawTag, types);
+        AsyncResource<com.codename1.nfc.Tag> r;
+        Set<NfcListener> listenerSnapshot;
         synchronized (this) {
             r = pendingRead;
             pendingRead = null;
@@ -307,6 +307,15 @@ class AndroidNfc extends com.codename1.nfc.Nfc {
                 disarmReader();
             }
         }
+        scheduleTagDelivery(r, wrapped, listenerSnapshot);
+    }
+
+    // Static so the Runnable does not capture a synthetic outer-AndroidNfc
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void scheduleTagDelivery(
+            final AsyncResource<com.codename1.nfc.Tag> r,
+            final AndroidTag wrapped,
+            final Set<NfcListener> listenerSnapshot) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 if (r != null) {
