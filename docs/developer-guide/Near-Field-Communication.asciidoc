@@ -86,13 +86,13 @@ nfc.readTag(new NfcReadOptions()
    });
 ----
 
-Each accessor returns `null` when the tag does not advertise the corresponding technology, so always null-check before calling.
+Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
 
 [options="header"]
 |===
 | Accessor | Android | iOS | Notes
 | `getIsoDep()` | yes | yes | ISO 7816 -- EMV, ePassport, smart cards
-| `getMifareClassic()` | yes | -- | Apple does not expose MIFARE Classic on iOS
+| `getMifareClassic()` | yes | -- | Apple doesn't expose MIFARE Classic on iOS
 | `getMifareUltralight()` | yes | yes | NTAG21x, Ultralight C
 | `getNfcA()` | yes | yes (limited) | Raw ISO 14443-3A
 | `getNfcB()` | yes | -- | Raw ISO 14443-3B (Android-only)

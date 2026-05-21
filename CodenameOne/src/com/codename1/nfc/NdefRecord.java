@@ -273,7 +273,10 @@ public final class NdefRecord {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            return s.getBytes();
+            // UTF-8 is required by JLS to be present on every JVM, so this
+            // branch is unreachable. Throw rather than fall back to the
+            // platform default encoding (SpotBugs DM_DEFAULT_ENCODING).
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -281,7 +284,8 @@ public final class NdefRecord {
         try {
             return s.getBytes("US-ASCII");
         } catch (java.io.UnsupportedEncodingException e) {
-            return s.getBytes();
+            // US-ASCII is required by JLS to be present on every JVM.
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
@@ -289,7 +293,8 @@ public final class NdefRecord {
         try {
             return new String(data, offset, length, "UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            return new String(data, offset, length);
+            // UTF-8 is required by JLS to be present on every JVM.
+            throw new RuntimeException(e.toString(), e);
         }
     }
 
