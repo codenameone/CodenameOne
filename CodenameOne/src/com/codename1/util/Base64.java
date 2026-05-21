@@ -349,7 +349,7 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, outputLength);
     }
 
-    /// URL-safe Base64 encoding per RFC 4648 §5: `+` becomes `-`, `/` becomes
+    /// URL-safe Base64 encoding per RFC 4648 sec5: `+` becomes `-`, `/` becomes
     /// `_`, and the trailing `=` padding is dropped. This is the encoding
     /// used by JWTs and most modern web token formats. Reuses the same
     /// SIMD-optimized encode path as [#encodeNoNewline(byte[])] under the
@@ -386,7 +386,7 @@ public abstract class Base64 {
         return com.codename1.util.StringUtil.newString(out, 0, unpadded);
     }
 
-    /// Decodes a URL-safe Base64 string (RFC 4648 §5). Padding is optional --
+    /// Decodes a URL-safe Base64 string (RFC 4648 sec5). Padding is optional --
     /// the canonical URL-safe form drops it, but this method also accepts
     /// strings that still carry trailing `=`.
     ///
