@@ -114,7 +114,9 @@ public class GeneratorModel {
     public void generate() {
         String filePath = generateZip();
         if (filePath != null) {
+            System.out.println("CN1INIT:openZip:start path=" + filePath);
             openGeneratedZip(filePath);
+            System.out.println("CN1INIT:openZip:done");
         }
     }
 
@@ -128,17 +130,21 @@ public class GeneratorModel {
         // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
         // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
         // generation accumulates a multi-MB record until the browser quota is exhausted.
+        System.out.println("CN1INIT:generateZip:cleanup");
         cleanupGeneratedZips();
         String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
+        System.out.println("CN1INIT:generateZip:write path=" + filePath);
         try {
             writeProjectZipToStorage(filePath);
         } catch (IOException firstErr) {
+            System.out.println("CN1INIT:generateZip:retry err=" + firstErr);
             // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
             // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
                 writeProjectZipToStorage(filePath);
             } catch (IOException retryErr) {
+                System.out.println("CN1INIT:generateZip:retryFail err=" + retryErr);
                 Log.e(retryErr);
                 ToastBar.showErrorMessage(
                         "Browser storage is full. Open your browser settings, clear site "
@@ -146,6 +152,7 @@ public class GeneratorModel {
                 return null;
             }
         }
+        System.out.println("CN1INIT:generateZip:writeDone");
         return filePath;
     }
 
