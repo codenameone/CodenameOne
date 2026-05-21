@@ -5263,39 +5263,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static void windowOpen(String url, String target);
 
    
-    @JSBody(params={"fileName", "blob"}, script="window.cn1SaveBlobHandler = function() {if (window.navigator && window.navigator.msSaveOrOpenBlob) {\n" +
-        "    window.navigator.msSaveOrOpenBlob(blob, fileName);\n" +
-        "}\n" +
-        "else {\n" +
-        "    var downloadLink = document.createElement('a');"
-            + "downloadLink.href =  URL.createObjectURL(blob);\n"
-            + "downloadLink.download = fileName;"
-            + "document.body.appendChild(downloadLink);" +
-        "    downloadLink.click();"
-            + "document.body.removeChild(downloadLink);\n"
-            + "window.cn1SaveBlobHandler = null;" +
-        "}};")
+    // The original implementations of register/fire SaveBlobHandler ran their
+    // scripts inside the worker, where ``document`` doesn't exist -- the
+    // generated download <a> element / .click() trick threw the moment the
+    // backside hook fired, with no Blob ever reaching the user. Route through
+    // host-bridge handlers (__cn1_register_save_blob__ + __cn1_fire_save_blob__)
+    // in browser_bridge.js so registration and the click-driven download both
+    // happen on the main thread.
+    @JSBody(params={"fileName", "blob"}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_register_save_blob__', [{fileName: fileName, blob: blob}]);\n" +
+        "return null;")
     private static native void registerSaveBlobHandler(String fileName, Blob blob);
-    
-    @JSBody(params={"fileName", "dataUrl"}, script="window.cn1SaveBlobHandler = function() {if (window.navigator && window.navigator.msSaveOrOpenBlob) {\n" +
-        "    var blob = window.Base64ToBlob(dataUrl);"
-            + "window.navigator.msSaveOrOpenBlob(blob, fileName);\n" +
-        "}\n" +
-        "else {\n" +
-        "    var downloadLink = document.createElement('a');"
-            + "downloadLink.href =  dataUrl;\n"
-            + "downloadLink.download = fileName;"
-            + "document.body.appendChild(downloadLink);" +
-        "    downloadLink.click();"
-            + "document.body.removeChild(downloadLink);\n"
-            + "window.cn1SaveBlobHandler = null;" +
-        "}};")
+
+    @JSBody(params={"fileName", "dataUrl"}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_register_save_blob_dataurl__', [{fileName: fileName, dataUrl: dataUrl}]);\n" +
+        "return null;")
     private static native void registerSaveBlobHandlerDataUrl(String fileName, String dataUrl);
-    
-    @JSBody(params={}, script="window.cn1SaveBlobHandler = null;")
+
+    @JSBody(params={}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_deregister_save_blob__', []);\n" +
+        "return null;")
     private static native void deregisterSaveBlobHandler();
-    
-    @JSBody(params={}, script="if (window.cn1SaveBlobHandler) window.cn1SaveBlobHandler();")
+
+    @JSBody(params={}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_fire_save_blob__', []);\n" +
+        "return null;")
     private static native void fireSaveBlobHandler();
     
     

@@ -749,6 +749,89 @@
     return null;
   });
 
+  // Save-blob handler (used by HTML5Implementation.execute for downloads).
+  // The worker can't touch ``document`` so all the link-creation +
+  // .click() driving the actual file save has to live on the main thread.
+  // We stash the pending handler here and the cn1NativeBacksideHooks
+  // user-gesture poll fires ``__cn1_fire_save_blob__`` which invokes it
+  // -- preserving the "download must be inside a user-gesture event"
+  // browser contract.
+  var __cn1PendingSaveBlobHandler = null;
+
+  function __cn1MakeBlobDownloader(blob, fileName) {
+    return function() {
+      var doc = (global.window || global).document || global.document;
+      var win = global.window || global;
+      if (!doc) {
+        return;
+      }
+      if (win.navigator && win.navigator.msSaveOrOpenBlob) {
+        win.navigator.msSaveOrOpenBlob(blob, fileName);
+        return;
+      }
+      var a = doc.createElement('a');
+      a.href = (win.URL || URL).createObjectURL(blob);
+      a.download = fileName;
+      doc.body.appendChild(a);
+      a.click();
+      doc.body.removeChild(a);
+    };
+  }
+
+  hostBridge.register('__cn1_register_save_blob__', function(request) {
+    var payload = request || {};
+    var blob = resolveHostRef(payload.blob);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (!blob) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    __cn1PendingSaveBlobHandler = __cn1MakeBlobDownloader(blob, fileName);
+    return null;
+  });
+
+  hostBridge.register('__cn1_register_save_blob_dataurl__', function(request) {
+    var payload = request || {};
+    var dataUrl = String(payload.dataUrl == null ? '' : payload.dataUrl);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (!dataUrl) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    __cn1PendingSaveBlobHandler = function() {
+      var doc = (global.window || global).document || global.document;
+      var win = global.window || global;
+      if (!doc) {
+        return;
+      }
+      var a = doc.createElement('a');
+      a.href = dataUrl;
+      a.download = fileName;
+      doc.body.appendChild(a);
+      a.click();
+      doc.body.removeChild(a);
+    };
+    return null;
+  });
+
+  hostBridge.register('__cn1_deregister_save_blob__', function() {
+    __cn1PendingSaveBlobHandler = null;
+    return null;
+  });
+
+  hostBridge.register('__cn1_fire_save_blob__', function() {
+    var handler = __cn1PendingSaveBlobHandler;
+    __cn1PendingSaveBlobHandler = null;
+    if (typeof handler === 'function') {
+      try { handler(); } catch (e) {
+        if (global.console && typeof global.console.warn === 'function') {
+          try { global.console.warn('PARPAR:save-blob-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+        }
+      }
+    }
+    return null;
+  });
+
   // Apply a CSS canvas2d ``filter: blur(<radius>px)`` to ``dst`` from
   // ``src`` in a single host-side call. The worker invokes this once per
   // ``gaussianBlurImage`` so the cooperative scheduler doesn't have to
