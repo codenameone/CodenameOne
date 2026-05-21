@@ -106,10 +106,6 @@ public class Parser extends ClassVisitor {
         return bc == null ? -1 : bc.getClassOffset();
     }
 
-    public static List<ByteCodeClass> getClasses() {
-        return classes;
-    }
-
     /**
      * Writes the on-device-debug symbol sidecar (cn1-symbols.txt) to the
      * output directory. Format is line-based ASCII for trivial parsing

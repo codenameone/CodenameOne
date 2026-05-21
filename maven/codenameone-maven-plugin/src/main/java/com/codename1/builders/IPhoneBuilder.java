@@ -1679,8 +1679,12 @@ public class IPhoneBuilder extends Executor {
             // On-device-debug toggle: tells the translator to emit per-frame
             // locals-address tables, the cn1_frame_info side-tables, and to
             // flip the CN1_ON_DEVICE_DEBUG #define in cn1_globals.h so the
-            // generated Xcode build links the listener thread.
-            String onDeviceDebug = Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
+            // generated Xcode build links the listener thread. Force-off on
+            // release builds so a stray hint in codenameone_settings.properties
+            // can't leak the debug listener into an App Store binary.
+            boolean isReleaseBuild = !request.getArg("ios.buildType", "debug").equals("debug");
+            String onDeviceDebug = !isReleaseBuild
+                    && Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
 
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
@@ -2766,8 +2770,10 @@ public class IPhoneBuilder extends Executor {
 
         // On-device-debug: drop the proxy host/port into Info.plist so
         // cn1_debugger.m can read them at app boot without needing the
-        // build to also patch source files.
-        if ("true".equalsIgnoreCase(request.getArg("ios.onDeviceDebug", "false"))) {
+        // build to also patch source files. Skipped on release builds for
+        // the same reason as the translator gate above.
+        if ("true".equalsIgnoreCase(request.getArg("ios.onDeviceDebug", "false"))
+                && "debug".equals(request.getArg("ios.buildType", "debug"))) {
             String proxyHost = request.getArg("ios.onDeviceDebug.proxyHost", "127.0.0.1");
             String proxyPort = request.getArg("ios.onDeviceDebug.proxyPort", "55333");
             String waitForAttach = "true".equalsIgnoreCase(
