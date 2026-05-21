@@ -959,14 +959,19 @@ def main() -> None:
             return False
 
 
-        violations = [
-            f for f in spotbugs.findings
-            if f.rule in forbidden_rules and not _is_exempt(f)
-        ]
-        if violations:
+        # Apply the same forbidden_rules to every SpotBugs report (android,
+        # ios, codenameone-maven-plugin, ...) -- not just core-unittests --
+        # so a quality regression in a port is caught in CI just as quickly
+        # as one in core.
+        all_violations: List[Tuple[str, Finding]] = []
+        for label, report in spotbugs_reports.items():
+            for f in report.findings:
+                if f.rule in forbidden_rules and not _is_exempt(f):
+                    all_violations.append((label, f))
+        if all_violations:
             print("\n❌ Build failed due to forbidden SpotBugs violations:")
-            for v in violations:
-                print(f"  - {v.rule}: {v.location} - {v.message}")
+            for label, v in all_violations:
+                print(f"  - {v.rule}: {label} {v.location} - {v.message}")
             exit(1)
 
     pmd = parse_pmd()

@@ -42,8 +42,12 @@
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
+#import <LocalAuthentication/LocalAuthentication.h>
+#import <Security/Security.h>
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_impl_ios_IOSBiometrics.h"
+#include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
@@ -10884,5 +10888,271 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
     POOL_BEGIN();
     NSString *nsText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsText);
+    POOL_END();
+}
+
+// ============================================================================
+// Biometrics + SecureStorage natives (LocalAuthentication + Security framework)
+// ============================================================================
+//
+// The static LAContext is held across calls so it can be invalidated mid-prompt
+// by stopBiometricAuthentication(). Memory management is manual because the
+// iOS port builds with CLANG_ENABLE_OBJC_ARC=NO (see ARC memory in plan).
+
+static LAContext *cn1_biometricsContext = nil;
+static NSString *cn1_keychainAccessGroup = nil;
+
+static LAContext *cn1_ensureContext(void) {
+    if (cn1_biometricsContext == nil) {
+        cn1_biometricsContext = [[LAContext alloc] init];
+    }
+    return cn1_biometricsContext;
+}
+
+static void cn1_resetContext(void) {
+    if (cn1_biometricsContext != nil) {
+        [cn1_biometricsContext release];
+        cn1_biometricsContext = nil;
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (NSClassFromString(@"LAContext") == NULL) {
+        return JAVA_FALSE;
+    }
+    NSError *error = nil;
+    LAContext *ctx = cn1_ensureContext();
+    BOOL ok = [ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error];
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (NSClassFromString(@"LAContext") == NULL) {
+        return 0;
+    }
+    NSError *error = nil;
+    LAContext *ctx = cn1_ensureContext();
+    if (![ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
+        return 0;
+    }
+    JAVA_INT mask = 0;
+    if (@available(iOS 11.0, *)) {
+        if (ctx.biometryType == LABiometryTypeTouchID) {
+            mask |= 1;
+        } else if (ctx.biometryType == LABiometryTypeFaceID) {
+            mask |= 2;
+        }
+    } else {
+        // Pre-iOS 11: only Touch ID exists.
+        mask |= 1;
+    }
+    return mask;
+}
+
+void com_codename1_impl_ios_IOSNative_authenticateBiometric___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    // Each authenticate call gets a fresh context so a prior stopAuthentication
+    // can't bleed cancellation into the next request.
+    cn1_resetContext();
+    LAContext *ctx = cn1_ensureContext();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [ctx evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+            localizedReason:nsReason
+                      reply:^(BOOL success, NSError *err) {
+            if (success) {
+                com_codename1_impl_ios_IOSBiometrics_nativeAuthSuccess___int(getThreadLocalData(), requestId);
+            } else {
+                int code = (int)err.code;
+                NSString *msg = err.localizedDescription ? err.localizedDescription : @"";
+                JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), msg);
+                com_codename1_impl_ios_IOSBiometrics_nativeAuthError___int_int_java_lang_String(getThreadLocalData(), requestId, code, jmsg);
+            }
+        }];
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_stopBiometricAuthentication__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1_biometricsContext != nil) {
+        if (@available(iOS 9.0, *)) {
+            [cn1_biometricsContext invalidate];
+        }
+        cn1_resetContext();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
+    if (cn1_keychainAccessGroup != nil) {
+        [cn1_keychainAccessGroup release];
+        cn1_keychainAccessGroup = nil;
+    }
+    if (accessGroup != JAVA_NULL) {
+        NSString *ag = toNSString(CN1_THREAD_STATE_PASS_ARG accessGroup);
+        if (ag != nil && [ag length] > 0) {
+            cn1_keychainAccessGroup = [ag retain];
+        }
+    }
+}
+
+static NSString *cn1_getAppName(CN1_THREAD_STATE_SINGLE_ARG) {
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance___R_com_codename1_ui_Display(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    JAVA_OBJECT key = fromNSString(CN1_THREAD_STATE_PASS_ARG @"AppName");
+    JAVA_OBJECT def = fromNSString(CN1_THREAD_STATE_PASS_ARG @"CodenameOneApp");
+    JAVA_OBJECT res = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, key, def);
+    return toNSString(CN1_THREAD_STATE_PASS_ARG res);
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsReason retain];
+    [nsAccount retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSMutableDictionary *q = [NSMutableDictionary dictionary];
+        [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [q setObject:@YES forKey:(__bridge id)kSecReturnData];
+        [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [q setObject:appName forKey:(__bridge id)kSecAttrService];
+        [q setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+        if (accessGroup != nil) {
+            [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        CFTypeRef dataRef = NULL;
+        OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+        if (status == errSecSuccess) {
+            NSData *d = (__bridge NSData *)dataRef;
+            NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
+            JAVA_OBJECT jv = fromNSString(getThreadLocalData(), value);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageStringResult___int_java_lang_String(getThreadLocalData(), requestId, jv);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsReason release];
+        [nsAccount release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
+    POOL_END();
+}
+
+static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString *nsAccount, NSString *nsValue, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    [q setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    NSMutableDictionary *ch = [NSMutableDictionary dictionary];
+    [ch setObject:[nsValue dataUsingEncoding:NSUTF8StringEncoding] forKey:(__bridge id)kSecValueData];
+    OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)ch);
+    if (status == errSecSuccess) {
+        com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+    } else {
+        JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+        com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account, JAVA_OBJECT value) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsReason retain];
+    [nsAccount retain];
+    [nsValue retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        SecAccessControlRef sacRef = SecAccessControlCreateWithFlags(kCFAllocatorDefault,
+                kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+                kSecAccessControlTouchIDCurrentSet,
+                nil);
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        [d setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [d setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [d setObject:appName forKey:(__bridge id)kSecAttrService];
+        [d setObject:[nsValue dataUsingEncoding:NSUTF8StringEncoding] forKey:(__bridge id)kSecValueData];
+        [d setObject:(__bridge id)sacRef forKey:(__bridge id)kSecAttrAccessControl];
+        [d setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+        if (accessGroup != nil) {
+            [d setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        OSStatus status = SecItemAdd((__bridge CFDictionaryRef)d, nil);
+        if (sacRef != NULL) {
+            CFRelease(sacRef);
+        }
+        if (status == errSecDuplicateItem) {
+            cn1_secureStorageUpdate((int)requestId, nsReason, nsAccount, nsValue, appName, accessGroup);
+        } else if (status == errSecSuccess) {
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsReason release];
+        [nsAccount release];
+        [nsValue release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsAccount retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        [d setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [d setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [d setObject:appName forKey:(__bridge id)kSecAttrService];
+        if (accessGroup != nil) {
+            [d setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        OSStatus status = SecItemDelete((__bridge CFDictionaryRef)d);
+        if (status == errSecSuccess || status == errSecItemNotFound) {
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsAccount release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
     POOL_END();
 }

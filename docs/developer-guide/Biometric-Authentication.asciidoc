@@ -1,0 +1,172 @@
+== Biometric Authentication
+
+Codename One ships first-class biometric authentication (Touch ID, Face ID, Android `BiometricPrompt`) under the `com.codename1.security` package. A single entry point exposes the platform prompt, a typed enum reports the modalities currently enrolled, and a typed error enum lets callers react to failures without string matching.
+
+A sibling `SecureStorage` API stores secret strings (auth tokens, refresh tokens, encryption keys) behind biometric authentication using the iOS keychain or the Android Keystore.
+
+=== Quick start: Authenticate
+
+[source,java]
+----
+import com.codename1.security.Biometrics;
+import com.codename1.security.BiometricError;
+import com.codename1.security.BiometricException;
+
+Biometrics b = Biometrics.getInstance();
+if (!b.canAuthenticate()) {
+    // Fall back to password
+    return;
+}
+b.authenticate("Unlock your account").onResult((success, err) -> {
+    if (err != null) {
+        BiometricError code = ((BiometricException) err).getError();
+        switch (code) {
+            case USER_CANCELED: /* user dismissed the prompt */ break;
+            case LOCKED_OUT:    /* too many bad attempts */ break;
+            case NOT_ENROLLED:  /* prompt the user to enrol in Settings */ break;
+            default:            /* generic failure */ break;
+        }
+    } else {
+        // Authenticated. Continue with the gated action.
+    }
+});
+----
+
+Always gate the call on `canAuthenticate()` and never on `isSupported()` alone. `isSupported()` only checks for hardware, while `canAuthenticate()` also requires at least one enrolled credential and that the device isn't in a locked-out state.
+
+=== Quick start: Secure storage
+
+[source,java]
+----
+import com.codename1.security.SecureStorage;
+
+// Write (Android prompts; iOS does not unless ios.Fingerprint.addPassword.prompt=true)
+SecureStorage.getInstance().set("Save your token", "user@example.com", token);
+
+// Read (prompts on both platforms)
+SecureStorage.getInstance().get("Unlock your token", "user@example.com")
+    .onResult((value, err) -> {
+        if (err == null) {
+            // Use value
+        }
+    });
+----
+
+Entries are bound to the current set of enrolled biometrics. If the user enrols a new fingerprint or face after writing, the next `get` fails with `BiometricError.KEY_REVOKED` and the application must re-prompt for the original value and write it again.
+
+=== Platform behaviour
+
+[options="header"]
+|===
+| Platform         | Implementation                                                              | Notes
+| iOS              | `LocalAuthentication.framework` (`LAContext`) + `Security.framework` keychain | Add the `ios.NSFaceIDUsageDescription` build hint when targeting Face ID hardware.
+| Android API 29+  | `BiometricPrompt`                                                            | Face / iris / fingerprint per `PackageManager` features.
+| Android API 23-28| `FingerprintManager`                                                         | Fingerprint only.
+| JavaSE simulator | `Simulate -> Biometric Simulation` submenu                                   | Toggle hardware availability, per-modality enrolment, and the next-call outcome.
+| All other ports  | Non-supporting fallback                                                      | `canAuthenticate()` returns `false`; `authenticate()` completes with `BiometricError.NOT_AVAILABLE`.
+|===
+
+Application code never needs a platform `if`. The API itself returns the right thing on each port. On platforms without biometric hardware, the fallback reports `NOT_AVAILABLE` immediately.
+
+=== Build hints
+
+The Codename One Maven plugin and the build daemon both **automatically inject** the platform configuration when the app's bytecode references `com.codename1.security`:
+
+- **iOS:** `LocalAuthentication.framework` is linked into the generated Xcode project.
+- **Android:** `<uses-permission android:name="android.permission.USE_BIOMETRIC" />` (and `USE_FINGERPRINT` with `maxSdkVersion=28` for the legacy path) is injected into `AndroidManifest.xml`.
+
+Apps that never touch the API pay nothing: no extra framework, no extra permission.
+
+One thing the plugin won't inject: the iOS Face ID usage description. Apple rejects placeholder text, so you must supply the build hint yourself:
+
+[source,properties]
+----
+ios.NSFaceIDUsageDescription=Authenticate to securely access your account
+----
+
+The JavaSE simulator automatically sets this hint to a default the first time biometrics is invoked, so projects developed in the simulator have a working default; you should overwrite the text before shipping.
+
+To share keychain entries with iOS App Extensions, set both the build hint and the runtime access group:
+
+[source,properties]
+----
+ios.keychainAccessGroup=TEAMID123.group.com.example.app
+----
+
+[source,java]
+----
+SecureStorage.getInstance().setKeychainAccessGroup("TEAMID123.group.com.example.app");
+----
+
+The Team ID prefix is required; omitting it produces `errSecMissingEntitlement`.
+
+=== Configuring the prompt
+
+Use `AuthenticationOptions` to control prompt copy and security policy:
+
+[source,java]
+----
+import com.codename1.security.AuthenticationOptions;
+
+Biometrics.getInstance().authenticate(new AuthenticationOptions()
+    .setReason("Authorize transfer")                // iOS localizedReason; Android title fallback
+    .setTitle("Confirm payment")                    // Android only
+    .setSubtitle("Stripe charge $25.00")            // Android only
+    .setNegativeButtonText("Cancel")                // Android only
+    .setBiometricOnly(true)                         // reject PIN / passcode fallback
+    .setSensitiveTransaction(true)                  // request class-3 ("strong") biometric (Android 30+)
+);
+----
+
+Unrecognised options are ignored, so callers can set the union without platform-checking.
+
+=== Typed error handling
+
+`BiometricException.getError()` returns a `BiometricError`:
+
+[options="header"]
+|===
+| Code                       | Meaning
+| `NOT_AVAILABLE`            | No biometric hardware or the platform doesn't support it
+| `NOT_ENROLLED`             | Hardware present but the user hasn't enrolled
+| `LOCKED_OUT`               | Too many failed attempts; temporary
+| `PERMANENTLY_LOCKED_OUT`   | User must unlock with passcode before biometrics can be used again
+| `PASSCODE_NOT_SET`         | Device has no PIN / pattern configured (can't use biometrics)
+| `USER_CANCELED`            | User dismissed the prompt
+| `SYSTEM_CANCELED`          | OS dismissed the prompt (app backgrounded, system pre-empted)
+| `AUTHENTICATION_FAILED`    | Prompt completed but the user wasn't recognised
+| `KEY_REVOKED`              | `SecureStorage` entry can no longer be decrypted (re-enrolment occurred)
+| `UNKNOWN`                  | Anything not covered above
+|===
+
+=== Cancelling an in-flight prompt
+
+Call `Biometrics.getInstance().stopAuthentication()` to dismiss an active prompt; the pending `AsyncResource` then completes with `BiometricError.USER_CANCELED`. The method returns `true` if a prompt was cancelled, `false` if nothing was pending.
+
+=== Listing enrolled biometrics
+
+`getAvailableBiometrics()` returns a `List<BiometricType>` to drive UI affordances (icon, prompt copy):
+
+- `FINGERPRINT`: iOS Touch ID; Android fingerprint sensor.
+- `FACE`: iOS Face ID; Android face recognition (API 29+).
+- `IRIS`: a handful of Samsung devices; never on iOS.
+- `STRONG`: Android class-3 authenticator tier (false-acceptance < 1/100,000); only Android API 30+.
+- `WEAK`: Android class-2 authenticator tier; only Android API 30+. Can't unlock Keystore-bound keys, so weak-only devices can't use `SecureStorage`.
+
+Never use this list to decide whether to call `authenticate()`; always use `canAuthenticate()` for that decision.
+
+=== Simulator workflow
+
+The JavaSE simulator's `Simulate -> Biometric Simulation` submenu lets you exercise every code path without a device:
+
+- **Hardware Available**: toggles `isSupported()` and `canAuthenticate()`.
+- **Face ID Enrolled / Touch ID Enrolled / Iris Enrolled**: populate `getAvailableBiometrics()`.
+- **Next authenticate() Outcome**: radio button that picks the outcome of the next prompt: `SUCCEED`, `FAIL`, `CANCEL`, `LOCKED_OUT`, `PERMANENTLY_LOCKED_OUT`, `NOT_ENROLLED`, `PASSCODE_NOT_SET`. The selection is sticky; change it any time.
+
+When `authenticate()` is invoked, a small modal Swing dialog mirrors the platform prompt so the developer can see the trigger fire and click through. State persists across simulator restarts via `java.util.prefs`.
+
+`SecureStorage` round-trips against `java.util.prefs` in the simulator, so you can test the full `set` -> `get` -> `KEY_REVOKED` flow end-to-end.
+
+=== Security notes
+
+The Android backing for `authenticate()` doesn't simply forward the OS success callback; it binds the prompt to a single-use AES probe cipher in the Android Keystore (with `setUserAuthenticationRequired(true)` and, on API 24+, `setInvalidatedByBiometricEnrollment(true)`). On success the cipher performs a real `doFinal` operation. A hooked or spoofed success callback fails because the Keystore refuses the operation. This guards against the bypass class documented by CodeQL's `java/android/insecure-local-authentication` rule.

@@ -7076,6 +7076,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         t.printStackTrace(p);
     }
 
+    private AndroidBiometrics biometrics;
+    private AndroidSecureStorage secureStorage;
+
+    @Override
+    public com.codename1.security.Biometrics getBiometrics() {
+        if (biometrics == null) {
+            biometrics = new AndroidBiometrics();
+        }
+        return biometrics;
+    }
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new AndroidSecureStorage();
+        }
+        return secureStorage;
+    }
+
     /**
      * This method returns the platform Location Control
      *

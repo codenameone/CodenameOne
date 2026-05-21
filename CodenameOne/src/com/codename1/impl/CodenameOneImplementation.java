@@ -51,6 +51,8 @@ import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.security.Biometrics;
+import com.codename1.security.SecureStorage;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
@@ -6547,6 +6549,24 @@ public abstract class CodenameOneImplementation {
     ///
     /// LocationManager Object
     public LocationManager getLocationManager() {
+        return null;
+    }
+
+    /// Returns the port-specific biometric authentication entry point. Default
+    /// implementation returns {@code null}; ports that support biometrics
+    /// override this to return a cached singleton. Application code should
+    /// use {@link com.codename1.security.Biometrics#getInstance()} instead
+    /// of calling this directly --- it transparently substitutes a no-op
+    /// fallback when the port returns {@code null}.
+    public Biometrics getBiometrics() {
+        return null;
+    }
+
+    /// Returns the port-specific biometric-gated secure storage. Default
+    /// implementation returns {@code null}; ports that back the keychain
+    /// override this. Application code should call
+    /// {@link com.codename1.security.SecureStorage#getInstance()} instead.
+    public SecureStorage getSecureStorage() {
         return null;
     }
 
