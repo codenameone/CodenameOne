@@ -208,22 +208,6 @@ import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
-        // Force ZipInputStream into the translator's reachability graph. The
-        // class IS referenced via ``new ZipInputStream(...)`` inside
-        // GeneratorModel.copyZipEntriesToMap's try-with-resources, but the
-        // translator's static analyzer doesn't follow that call site -- the
-        // class body never made it into translated_app.js and Generate
-        // threw "Unknown class net_sf_zipme_ZipInputStream" at runtime,
-        // silently aborting the zip write. A class-literal field reference
-        // ($APP_MAIN_SIMPLE 1.0-SNAPSHOT translator) wasn't enough, so emit
-        // an actual constructor call gated behind an unreachable branch the
-        // translator can't prove dead.
-        if (args.length == -1) {
-            try {
-                new net.sf.zipme.ZipInputStream(null);
-            } catch (Throwable ignored) {
-            }
-        }
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         JavaScriptPortBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
@@ -239,16 +223,6 @@ import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
-        // See comment in the TEAVM_AVAILABLE branch above -- forces the
-        // translator to keep net.sf.zipme.ZipInputStream so the
-        // Initializr Generate flow's writeProjectZip can actually walk
-        // the template zips.
-        if (args.length == -1) {
-            try {
-                new net.sf.zipme.ZipInputStream(null);
-            } catch (Throwable ignored) {
-            }
-        }
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         ParparVMBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
