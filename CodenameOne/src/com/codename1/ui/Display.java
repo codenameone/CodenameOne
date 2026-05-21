@@ -2066,6 +2066,10 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        if (x.length == 0) {
+            // Native ports have been observed to deliver zero-length pointer arrays
+            return;
+        }
         longPointerCharged = false;
         if (x.length == 1) {
             addPointerDragEventWithTimestamp(x[0], y[0]);
