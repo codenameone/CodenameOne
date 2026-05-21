@@ -324,16 +324,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
-        public void blurLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int width, int height, float radius) {
-            applyBlurToCanvas(canvas, image, width, height, radius);
-        }
-
-        @Override
-        public void blurMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int width, int height, float radius) {
-            applyBlurToCanvas(canvas, sourceCanvas, width, height, radius);
-        }
-
-        @Override
         public Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException {
             return BlobUtil.canvasToBlob(canvas, mimeType, quality);
         }
@@ -5719,74 +5709,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return true;
     }
 
+    // ``isGaussianBlurSupported`` intentionally stays ``false`` for now: the
+    // canvas2d ``filter: blur(<r>px)`` path *works* via the Java-typed JSO
+    // dispatcher (see commit fa18f0301) but each blur incurs ~6 worker→main
+    // round-trips for the ctx.save/setFilter/drawImage/setFilter/restore
+    // sequence. Repeated paint calls -- particularly the Sheet/Dialog
+    // backdrop blur path -- amplified that into a per-test budget exhaustion
+    // that hung SheetScreenshotTest at the 10s deadline and ran the suite
+    // out of its 1740s lifetime. Falling back to the default ``return
+    // image`` keeps blur a visual no-op (the pre-PR-4795 state) until a
+    // batched/synchronous host-call path lands. See [[jsport-jsbody-worker-proxy]].
     @Override
     public boolean isGaussianBlurSupported() {
-        return true;
-    }
-
-    @Override
-    public Image gaussianBlurImage(Image image, float radius) {
-        if (image == null) {
-            return image;
-        }
-        NativeImage src = (NativeImage) image.getImage();
-        int w = src.getWidth();
-        int h = src.getHeight();
-        if (w <= 0 || h <= 0) {
-            return image;
-        }
-        NativeImage blurred = new NativeImage();
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(w, h,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
-                            }
-                        });
-        blurred.width = buffer.getWidth();
-        blurred.height = buffer.getHeight();
-        attachMutableImageSurface(blurred, buffer.getGraphics());
-        if (src.img != null && !src.loaded) {
-            src.load();
-        }
-        // Wrap in try/catch so a blur failure cannot escape the async paint
-        // pipeline -- an uncaught exception there kills the screenshot test
-        // runner and halts the rest of the suite. Returning the source image
-        // makes blur a visual no-op when something goes wrong, which is the
-        // pre-PR-4795 behaviour anyway (default impl never blurred).
-        try {
-            if (src.img != null && src.loaded) {
-                renderingBackend.blurLoadedImageToCanvas(buffer.getCanvas(), src.img, w, h, radius);
-            } else if (src.mutableGraphics != null) {
-                renderingBackend.blurMutableSurfaceToCanvas(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
-            } else {
-                return image;
-            }
-        } catch (Throwable t) {
-            logBlurFailureOnce(t);
-            return image;
-        }
-        return Image.createImage(blurred);
-    }
-
-    private static volatile boolean blurFailureLogged;
-
-    private static void logBlurFailureOnce(Throwable t) {
-        if (blurFailureLogged) {
-            return;
-        }
-        blurFailureLogged = true;
-        System.out.println("CN1SS:DIAG:gaussianBlur:failed=" + t);
+        return false;
     }
 
     @Override
@@ -5909,40 +5844,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         ctx.restore();
     }
-
-    // Apply CSS canvas2d ``filter: blur(<r>px)`` to the destination context,
-    // drawImage the source onto it (which bakes the blur into the destination
-    // pixels), then clear the filter so the canvas is reusable. The CSS blur
-    // radius is the Gaussian stddev in pixels — matches what iOS CIGaussianBlur
-    // and JavaSE JHLabs GaussianFilter expect for the ``radius`` arg the
-    // existing tests use. Supported in Chromium, Firefox, and Safari since
-    // 2018; no graceful fallback needed (we already report support via
-    // isGaussianBlurSupported, and the JS port has no pre-2018 target).
-    //
-    // The implementation goes through the Java-typed canvas2d interface (not
-    // an @JSBody) so cn1's JSO dispatcher transparently routes worker-side
-    // calls to the real main-thread canvas. An earlier @JSBody variant
-    // (commits 29cd3f2c7..ebb25e247) saw ``dst`` arrive as a worker-thread
-    // ``__cn1HostRef`` proxy with no ``getContext`` of its own, so the
-    // direct script invocation threw before reaching the real canvas.
-    private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
-        CanvasRenderingContext2D ctx = renderingBackend.getContext(dst);
-        ctx.save();
-        ctx.setFilter("blur(" + radius + "px)");
-        ctx.drawImage(src, 0, 0, w, h);
-        ctx.setFilter("none");
-        ctx.restore();
-    }
-
-    private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
-        CanvasRenderingContext2D ctx = renderingBackend.getContext(dst);
-        ctx.save();
-        ctx.setFilter("blur(" + radius + "px)");
-        ctx.drawImage(src, 0, 0, w, h);
-        ctx.setFilter("none");
-        ctx.restore();
-    }
-
 
 
     @Override
