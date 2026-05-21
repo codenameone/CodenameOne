@@ -193,5 +193,5 @@ still commented out, the build was a release/non-debug build, or
 ==== Make the app wait before running so the IDE can attach first
 
 Set `ios.onDeviceDebug.waitForAttach=true`. The app will block
-at startup until the proxy is connected and the IDE has issued
-the resume command.
+at startup until the proxy is connected and the IDE tells the
+VM to continue.

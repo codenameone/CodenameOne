@@ -452,7 +452,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.
 
 |ios.onDeviceDebug.waitForAttach
-|Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE issues a Resume. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
+|Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
 
 |desktop.width
 |Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.
