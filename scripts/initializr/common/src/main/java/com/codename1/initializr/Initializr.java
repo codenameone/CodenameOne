@@ -180,7 +180,50 @@ public class Initializr extends Lifecycle {
                     includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
                     liveCustomCss
             );
-            GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
+            // Zip generation walks 1000+ template entries through LocalForage on the
+            // JS port and can take a few seconds; running it on the EDT froze the UI
+            // until the download Sheet finally appeared, and a second tap during the
+            // freeze queued a duplicate generation. Disable the button up front, hop
+            // off the EDT for the heavy work, and dispatch back for the Sheet show
+            // (Sheet.show does layout/style mutation that assumes EDT).
+            final GeneratorModel model = GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options);
+            final String originalLabel = generateButton.getText();
+            generateButton.setEnabled(false);
+            generateButton.setText("Generating…");
+            form.revalidate();
+            final ToastBar.Status status = ToastBar.getInstance().createStatus();
+            status.setMessage("Generating project…");
+            status.setShowProgressIndicator(true);
+            status.setExpires(0);
+            status.show();
+            Display.getInstance().startThread(new Runnable() {
+                public void run() {
+                    String filePath = null;
+                    String errorMessage = null;
+                    try {
+                        filePath = model.generateZip();
+                    } catch (Throwable t) {
+                        errorMessage = String.valueOf(t);
+                    }
+                    final String resultPath = filePath;
+                    final String resultError = errorMessage;
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            status.clear();
+                            generateButton.setEnabled(true);
+                            generateButton.setText(originalLabel);
+                            form.revalidate();
+                            if (resultError != null) {
+                                ToastBar.showErrorMessage("Generation failed: " + resultError);
+                                return;
+                            }
+                            if (resultPath != null) {
+                                model.openGeneratedZip(resultPath);
+                            }
+                        }
+                    });
+                }
+            }, "initializr-generate").start();
         });
 
         Container body = createResponsiveBody(leftColumn, rightColumn);

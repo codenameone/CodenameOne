@@ -112,6 +112,19 @@ public class GeneratorModel {
     }
 
     public void generate() {
+        String filePath = generateZip();
+        if (filePath != null) {
+            openGeneratedZip(filePath);
+        }
+    }
+
+    /// Builds the project zip into storage and returns its path. Safe to
+    /// call from a background thread -- all I/O is synchronous-friendly
+    /// (the JS port uses LocalForage/IndexedDB which serialises requests
+    /// internally). Returns null when the zip could not be written even
+    /// after a quota-recovery retry, in which case a user-facing
+    /// ToastBar message has already been shown.
+    public String generateZip() {
         // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
         // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
         // generation accumulates a multi-MB record until the browser quota is exhausted.
@@ -130,9 +143,18 @@ public class GeneratorModel {
                 ToastBar.showErrorMessage(
                         "Browser storage is full. Open your browser settings, clear site "
                                 + "data for this page, then try again.");
-                return;
+                return null;
             }
         }
+        return filePath;
+    }
+
+    /// Hands the generated zip to the platform via Display.execute, which
+    /// on the JS port shows a download Sheet. Must be called on the EDT --
+    /// Sheet.show() does layout/style work that assumes single-threaded
+    /// access. Pair with {@link #generateZip()} when running generation
+    /// off the EDT (e.g. via Display.startThread + callSerially).
+    public void openGeneratedZip(String filePath) {
         execute(filePath);
     }
 
