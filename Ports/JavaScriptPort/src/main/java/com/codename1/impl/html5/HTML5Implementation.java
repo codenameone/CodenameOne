@@ -5918,39 +5918,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // existing tests use. Supported in Chromium, Firefox, and Safari since
     // 2018; no graceful fallback needed (we already report support via
     // isGaussianBlurSupported, and the JS port has no pre-2018 target).
-    // The translator already auto-unwraps Object-typed @JSBody params via
-    // ``jvm.unwrapJsValue(__cn1Arg<N>)`` (see appendJsBodyMethod in
-    // JavascriptMethodGenerator). Despite that, on the first attempt ``dst``
-    // here was not a canvas (getContext missing) -- diagnose by logging the
-    // actual shape of the value before throwing, so the next CI surfaces what
-    // type the buffer canvas is arriving as.
-    @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
-            "if (typeof dst.getContext !== 'function') {\n"
-            + "  var dk = '';\n"
-            + "  try { dk = Object.keys(dst || {}).slice(0, 12).join('|'); } catch (e) {}\n"
-            + "  console.log('CN1SS:DIAG:applyBlur:dst type=' + typeof dst\n"
-            + "    + ' ctor=' + (dst && dst.constructor && dst.constructor.name)\n"
-            + "    + ' tag=' + (dst && dst.tagName)\n"
-            + "    + ' keys=' + dk);\n"
-            + "  return;\n"
-            + "}\n"
-            + "var ctx = dst.getContext('2d');\n"
-            + "ctx.save();\n"
-            + "ctx.filter = 'blur(' + radius + 'px)';\n"
-            + "ctx.drawImage(src, 0, 0, w, h);\n"
-            + "ctx.filter = 'none';\n"
-            + "ctx.restore();")
-    private static native void applyBlurToCanvas(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
-
+    //
+    // The implementation goes through the Java-typed canvas2d interface (not
+    // an @JSBody) so cn1's JSO dispatcher transparently routes worker-side
+    // calls to the real main-thread canvas. An earlier @JSBody variant
+    // (commits 29cd3f2c7..ebb25e247) saw ``dst`` arrive as a worker-thread
+    // ``__cn1HostRef`` proxy with no ``getContext`` of its own, so the
+    // direct script invocation threw before reaching the real canvas.
     private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
-        applyBlurToCanvas(dst, (JSObject)src, w, h, radius);
+        CanvasRenderingContext2D ctx = renderingBackend.getContext(dst);
+        ctx.save();
+        ctx.setFilter("blur(" + radius + "px)");
+        ctx.drawImage(src, 0, 0, w, h);
+        ctx.setFilter("none");
+        ctx.restore();
     }
 
     private void applyBlurToCanvas(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
-        applyBlurToCanvas(dst, (JSObject)src, w, h, radius);
+        CanvasRenderingContext2D ctx = renderingBackend.getContext(dst);
+        ctx.save();
+        ctx.setFilter("blur(" + radius + "px)");
+        ctx.drawImage(src, 0, 0, w, h);
+        ctx.setFilter("none");
+        ctx.restore();
     }
-    
-    
+
+
 
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
