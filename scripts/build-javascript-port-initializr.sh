@@ -207,6 +207,16 @@ import com.codename1.initializr.WebsiteThemeNativeImpl;
 import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
+    // Force ZipInputStream into the translator's reachability graph. It IS
+    // referenced via ``new ZipInputStream(...)`` inside
+    // GeneratorModel.copyZipEntriesToMap's try-with-resources, but the JS
+    // port translator's static analyzer doesn't follow that call site, so
+    // the class body never makes it into translated_app.js and Generate
+    // throws "Unknown class net_sf_zipme_ZipInputStream" at runtime --
+    // which causes the zip write to silently fail and the download to
+    // never trigger.
+    @SuppressWarnings("unused")
+    private static final Class<?> __forceIncludeZipInputStream = net.sf.zipme.ZipInputStream.class;
     public static void main(String[] args) {
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         JavaScriptPortBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
