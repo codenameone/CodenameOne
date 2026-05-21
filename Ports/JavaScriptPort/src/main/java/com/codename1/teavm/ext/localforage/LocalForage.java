@@ -504,10 +504,12 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
+        System.out.println("CN1INIT:LF.keys:request");
         impl.keys(new KeysCallback(){
             @Override
             public void callback(JSObject err, JSArray<JSString> k) {
+                System.out.println("CN1INIT:LF.keys:callback err=" + (err == null ? "null" : "present"));
                 synchronized(done) {
                     if (err != null && !JS.isUndefined(err)) {
                         error[0] = new IOException("Failed to get keys");
@@ -517,19 +519,33 @@ public class LocalForage {
                     done[0] = true;
                     done.notifyAll();
                 }
+                System.out.println("CN1INIT:LF.keys:callback:done");
             }
         });
-        
+        System.out.println("CN1INIT:LF.keys:awaiting");
+
+        // Timed wait instead of unbounded wait. wait/notifyAll on the JS-port
+        // cooperative scheduler has been observed to drop notifications under
+        // tight timing -- the unbounded variant hung the Initializr Generate
+        // button at cleanupGeneratedZips. A short timeout lets the EDT loop
+        // re-check the done flag periodically; the callback eventually
+        // delivers and the loop exits.
+        long deadline = System.currentTimeMillis() + 10_000L;
         synchronized(done) {
             while (!done[0]) {
+                if (System.currentTimeMillis() >= deadline) {
+                    System.out.println("CN1INIT:LF.keys:timeout (10s) -- returning empty");
+                    return new String[0];
+                }
                 try {
-                    done.wait();
+                    done.wait(50);
                 } catch (InterruptedException e) {
                     throw new IOException("Interrupted", e);
                 }
             }
         }
-        
+        System.out.println("CN1INIT:LF.keys:gotResult len=" + (result[0] == null ? "null" : ((String[]) result[0]).length));
+
         if (error[0] != null) {
             throw error[0];
         }
