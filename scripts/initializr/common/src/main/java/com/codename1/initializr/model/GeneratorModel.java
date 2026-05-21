@@ -89,32 +89,6 @@ public class GeneratorModel {
             + "When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the\n"
             + "reference table at the bottom.\n";
 
-    // Force-include ZipInputStream into the JS-port translator's reachability
-    // graph. The class IS referenced via the ``new ZipInputStream(...)`` inside
-    // ``copyZipEntriesToMap``'s try-with-resources, but the JS-port translator
-    // doesn't follow that call site -- the class body was culled from
-    // translated_app.js and Generate threw "Unknown class net_sf_zipme_ZipInputStream"
-    // at runtime, silently aborting the zip write. An explicit field reference
-    // here keeps the constructor in the reachability graph.
-    @SuppressWarnings("unused")
-    private static final Class<?> __forceIncludeZipInputStream =
-            initForceIncludeZipInputStream();
-
-    private static Class<?> initForceIncludeZipInputStream() {
-        // Use a runtime-allocated Object[] holder so the translator's optimizer
-        // can't statically prove the constructor unreachable and discard it.
-        Object[] holder = new Object[1];
-        try {
-            holder[0] = new ZipInputStream(null);
-        } catch (Throwable ignored) {
-            // Constructor with null source throws NPE inside ZipInputStream;
-            // we only ever execute this once at class-load to anchor the
-            // constructor in the call graph, the resulting instance is
-            // discarded.
-        }
-        return ZipInputStream.class;
-    }
-
     private final IDE ide;
     private final Template template;
     private final String appName;
@@ -162,14 +136,14 @@ public class GeneratorModel {
         System.out.println("CN1INIT:generateZip:write path=" + filePath);
         try {
             writeProjectZipToStorage(filePath);
-        } catch (IOException firstErr) {
+        } catch (Throwable firstErr) {
             System.out.println("CN1INIT:generateZip:retry err=" + firstErr);
             // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
             // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
                 writeProjectZipToStorage(filePath);
-            } catch (IOException retryErr) {
+            } catch (Throwable retryErr) {
                 System.out.println("CN1INIT:generateZip:retryFail err=" + retryErr);
                 Log.e(retryErr);
                 ToastBar.showErrorMessage(
@@ -227,20 +201,31 @@ public class GeneratorModel {
     void writeProjectZip(OutputStream outputStream) throws IOException {
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
+        System.out.println("CN1INIT:writeZip:ideZip=" + ide.ZIP);
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
+        System.out.println("CN1INIT:writeZip:commonZip");
         copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON);
+        System.out.println("CN1INIT:writeZip:gitignore");
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
+        System.out.println("CN1INIT:writeZip:readme");
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
         if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
+            System.out.println("CN1INIT:writeZip:agentSkills");
             addAgentSkillEntries(mergedEntries);
         }
+        System.out.println("CN1INIT:writeZip:pom");
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
         if (template.CN1LIB_ZIP != null) {
+            System.out.println("CN1INIT:writeZip:cn1lib=" + template.CN1LIB_ZIP);
             copyZipEntriesToMap(template.CN1LIB_ZIP, mergedEntries, ZipEntryType.TEMPLATE_CN1LIB);
         }
+        System.out.println("CN1INIT:writeZip:css=" + template.CSS);
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
+        System.out.println("CN1INIT:writeZip:source=" + template.SOURCE_ZIP);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
+        System.out.println("CN1INIT:writeZip:l10n");
         addLocalizationEntries(mergedEntries);
+        System.out.println("CN1INIT:writeZip:emitZip entries=" + mergedEntries.size());
 
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
@@ -250,6 +235,7 @@ public class GeneratorModel {
                 zos.closeEntry();
             }
         }
+        System.out.println("CN1INIT:writeZip:emitZipDone");
     }
 
 
