@@ -3734,7 +3734,7 @@ public final class Display extends CN1Constants {
         return impl.canExecute(url);
     }
 
-    /// Executes the given URL on the native platform
+    /// Executes the given URL on the native platform.
     ///
     /// ```java
     /// Boolean can = Display.getInstance().canExecute("imdb:///find?q=godfather");
@@ -3744,6 +3744,27 @@ public final class Display extends CN1Constants {
     ///   Display.getInstance().execute("http://www.imdb.com");
     /// }
     /// ```
+    ///
+    /// On the JavaSE simulator this method also serves as the cross-platform
+    /// entry point for the simulator hook system. The simulator scans cn1libs
+    /// (and the running app) for `META-INF/codenameone/simulator-hooks.properties`
+    /// files, and a URL of the form `namespace:itemN` that matches a registered
+    /// hook is intercepted and dispatched on the CN1 EDT instead of being
+    /// handed to the native URL opener. On Android, iOS, JavaScript and other
+    /// production targets no hooks are ever registered, so a hook-style URL
+    /// falls through to the normal native execute and (almost always) becomes
+    /// a no-op. CN1 UnitTests running cross-platform should guard with
+    /// [#canExecute(String)] before invoking a hook URL:
+    ///
+    /// ```java
+    /// if (Boolean.TRUE.equals(Display.getInstance().canExecute("bluetooth:item1"))) {
+    ///     Display.getInstance().execute("bluetooth:item1"); // toggle the simulated adapter
+    /// }
+    /// ```
+    ///
+    /// See the developer guide's "Creating CN1Libs" chapter for the
+    /// `simulator-hooks.properties` format and the positional `itemN` / `labelN`
+    /// conventions.
     ///
     /// #### Parameters
     ///

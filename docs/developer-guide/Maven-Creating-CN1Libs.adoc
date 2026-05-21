@@ -453,6 +453,130 @@ com.example.HelloWorld.helloWorld();
 
 And build the project. The project should build OK, and if you run it, you should see that the `helloWorld()` method works as designed.
 
+=== Adding menus to the simulator
+
+A cn1lib can contribute menu items to the Codename One simulator's menu bar. This is the same affordance the framework itself uses for the Skins / Native Theme / Simulate menus — opened up so library authors can expose backend-specific actions (for example, "Add a simulated peripheral," "Inject a push notification," or "Switch backend") without users having to write any Swing code or instrument their app.
+
+Every menu item is also reachable from CN1 UnitTests (or any app code) through `CN.execute("namespace:itemN")` — the JavaSE port's URL execute is overloaded to recognize a registered hook url and dispatch it on the EDT instead of opening it as a browser URL. On Android, iOS, JavaScript and other production targets no hooks are registered, so a hook-style URL falls through to the normal native execute and (almost always) becomes a no-op; tests should pair `CN.execute` with `CN.canExecute` for that reason. Hooks can also be declared with no menu label, which makes them callable from tests but invisible in the menu — useful for state-priming actions a human wouldn't click.
+
+==== The contract
+
+Each cn1lib ships a properties file at a well-known classpath location. The simulator scans every jar on its classpath for this resource and merges the results, so multiple cn1libs coexist cleanly.
+
+[source,properties]
+----
+# META-INF/codenameone/simulator-hooks.properties
+name=Bluetooth
+namespace=bluetooth   # optional; defaults to slugified `name`
+
+# Each itemN is the action; the matching labelN is the menu text.
+# Items are positional — the loader reads item1, item2, item3, ... and
+# stops at the first missing index. Don't skip numbers.
+item1=com.example.bt.simulator.Hooks#toggleAdapter
+label1=Toggle adapter on/off
+
+item2=com.example.bt.simulator.Hooks#addDemoPeripheral
+label2=Add demo peripheral
+
+# Label omitted → API-only hook. Callable from tests, invisible in menu.
+item3=com.example.bt.simulator.Hooks#primeReadFailure
+----
+
+Required keys:
+
+`name`:: Menu title shown in the simulator's menu bar. One menu per properties file.
+`itemN`:: A `fully.qualified.ClassName#staticMethodName` reference for the Nth menu item. The method must be `public static void` and take no arguments. Items are numbered from 1 upward; the loader stops at the first missing `itemN`, so don't leave gaps.
+
+Optional keys:
+
+`namespace`:: Identifier used for the `CN.execute` lookup (for example, `bluetooth` for a URL like `bluetooth:item1`). Defaults to lowercased, ASCII-slugified `name` (`Push Notifications!` → `push-notifications`). Set this explicitly when you want a different identifier from the display name.
+`labelN`:: Display text for the matching `itemN`. Omit entirely to make the hook API-only — registered with `CN.execute` but hidden from the menu.
+
+No groups, no submenus, no priority — flat by design. If you need ordering relative to another cn1lib, you can't have it: discovery order wins, and that's intentional so the contract stays small and the future simulator UX can re-render this metadata however it likes.
+
+==== The action method
+
+The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally.
+
+[source,java]
+----
+package com.example.bt.simulator;
+
+import com.codename1.components.ToastBar;
+import com.codename1.ui.Display;
+
+public final class Hooks {
+    public static void toggleAdapter() {
+        boolean next = !BluetoothSimulator.isEnabled();
+        BluetoothSimulator.setEnabled(next);
+        if (Display.isInitialized()) {
+            ToastBar.showInfoMessage("Bluetooth adapter " + (next ? "ON" : "OFF"));
+        }
+    }
+}
+----
+
+The `Display.isInitialized()` guard is a useful pattern when the same static methods are also called from JUnit tests that don't run inside a live CN1 simulator — the state mutation runs in both contexts, only the UI feedback is skipped.
+
+==== Worked example using cn1-bluetooth
+
+The `cn1-bluetooth` cn1lib ships a JavaSE port with two backends: a scriptable in-memory simulator and a real-hardware backend that talks to a native helper (CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). Both are useful in different stages of development, and the menu lets the user choose between them and exercise the simulator without writing any test scaffolding.
+
+Its `simulator-hooks.properties` looks like this:
+
+[source,properties]
+----
+name=Bluetooth
+namespace=bluetooth
+
+item1=com.codename1.bluetoothle.BluetoothSimulatorHooks#toggleAdapter
+label1=Toggle adapter on/off
+
+item2=com.codename1.bluetoothle.BluetoothSimulatorHooks#addDemoPeripheral
+label2=Add demo peripheral
+
+item3=com.codename1.bluetoothle.BluetoothSimulatorHooks#switchToNativeBle
+label3=Switch backend → native BLE (real hardware)
+
+# API-only: used by the test suite but never displayed in the menu
+item4=com.codename1.bluetoothle.BluetoothSimulatorHooks#primeReadFailure
+----
+
+When the user runs an app that depends on `cn1-bluetooth`, the simulator's menu bar gets a *Bluetooth* menu with the three labeled items. Clicking *Add demo peripheral* drops a peripheral into the in-memory simulator that the running app can then scan for, connect to, and exchange data with — without any real hardware. `item4` is callable from tests via `CN.execute("bluetooth:item4")` but never shows up in the menu.
+
+==== Calling hooks from CN1 unit tests
+
+CN1 unit tests (`AbstractTest` subclasses run via `mvn cn1:test`) compile under the same restrictions as the rest of the app — no reflection, no JavaSE-only imports. Drive a hook the same way you'd execute any URL — `CN.execute` recognizes registered hook urls and dispatches them on the EDT:
+
+[source,java]
+----
+import com.codename1.testing.AbstractTest;
+import com.codename1.ui.CN;
+
+public class BluetoothDemoTest extends AbstractTest {
+    @Override
+    public boolean runTest() throws Exception {
+        // Skip cleanly off-simulator: a real device has no hook registered
+        // and CN.canExecute will not return TRUE.
+        if (!Boolean.TRUE.equals(CN.canExecute("bluetooth:item2"))) {
+            return true;
+        }
+        // Seed the simulator — same effect as clicking "Add demo peripheral".
+        CN.execute("bluetooth:item2");
+        // ...now drive the public Bluetooth API as usual.
+        return true;
+    }
+}
+----
+
+A common pattern: ship label-bearing hooks for actions a developer might want to fire manually (toggle adapter, inject notification), and ship label-less hooks for test-only state setup (`primeReadFailure`, `seedFixture`) that would just clutter the menu.
+
+==== What's intentionally not exposed
+
+* *Swing types.* `JMenu`, `JMenuItem`, `KeyStroke` and friends don't appear in the contract. The simulator UX may change shape (toolbar, command palette, sidebar) and cn1libs shouldn't have to follow.
+* *Submenus, separators, priority.* The metadata is a flat list with no hierarchy. If you want grouping, ship multiple `simulator-hooks.properties` files in separate jars — each becomes its own menu.
+* *Long-running work on the EDT.* Hook methods run on the CN1 EDT; if you need to do I/O, fire-and-forget a `new Thread(...)` from the method or use `CN.invokeAndBlock` so you don't block the UI.
+
 === Distributing your library
 
 The recommended way to distribute your library is on Maven central. That way users will be able to install your library by copying and pasting a familiar `<dependency>` snippet into their pom.xml file.

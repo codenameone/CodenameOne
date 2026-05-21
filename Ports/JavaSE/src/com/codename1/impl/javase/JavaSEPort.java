@@ -3784,6 +3784,41 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * Discovers cn1lib-contributed simulator menu items via
+     * {@link SimulatorHookLoader} and groups them by menu name. The UX shell
+     * (this method, today) translates the neutral {@link SimulatorHook} list
+     * into Swing widgets; the contract that cn1libs depend on is the
+     * properties file + static method, not these JMenu/JMenuItem types.
+     */
+    private List<JMenu> buildExtensionMenus() {
+        List<SimulatorHook> hooks = SimulatorHookLoader.load();
+        LinkedHashMap<String, JMenu> byName = new LinkedHashMap<String, JMenu>();
+        for (final SimulatorHook hook : hooks) {
+            // API-only hooks (no label) are still registered with the
+            // executor so CN.executeHook can drive them, but they don't
+            // appear in the menu.
+            if (!hook.hasMenuLabel()) {
+                continue;
+            }
+            JMenu menu = byName.get(hook.getMenuName());
+            if (menu == null) {
+                menu = new JMenu(hook.getMenuName());
+                registerMenuWithBlit(menu);
+                byName.put(hook.getMenuName(), menu);
+            }
+            JMenuItem item = new JMenuItem(hook.getLabel());
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    hook.getInvoke().run();
+                }
+            });
+            menu.add(item);
+        }
+        return new ArrayList<JMenu>(byName.values());
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -5025,6 +5060,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(toolsMenu);
             bar.add(skinMenu);
             bar.add(createNativeThemeMenu(frm));
+            for (JMenu extensionMenu : buildExtensionMenus()) {
+                bar.add(extensionMenu);
+            }
             bar.add(helpMenu);
         }
 
@@ -10283,13 +10321,22 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void execute(String url) {
+        // Simulator-only intercept: a URL that matches a registered
+        // SimulatorHookExecutor entry is dispatched as a named hook
+        // (e.g. "bluetooth:item1") instead of being handed to the
+        // OS URL opener. SimulatorHookExecutor.execute returns false
+        // when no such hook is registered, so non-hook URLs fall
+        // through to the normal native behavior.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.execute(url.trim())) {
+            return;
+        }
         try {
             url = url.trim();
             if(url.startsWith("file:")) {
                 if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to open the file")){
                     return;
                 }
-                
+
                 url = new File(unfile(url)).toURI().toURL().toExternalForm();
             }
             final String fUrl = url;
@@ -10298,7 +10345,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     launchBrowserThatWorks(fUrl);
                 }
             });
-            
+
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -14817,6 +14864,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        // If this is a registered simulator hook URL, report it as
+        // executable up-front so a cross-platform CN1 UnitTest can use
+        // CN.canExecute(...) to gate hook calls behind a "we're in the
+        // simulator" check without exception-handling.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.isRegistered(url.trim())) {
+            return Boolean.TRUE;
+        }
         if(!url.startsWith("http")) {
             int pos = url.indexOf(":");
             if(pos > -1) {
