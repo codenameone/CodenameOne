@@ -1181,28 +1181,12 @@ bindNative([
   const tag = tagName == null ? "" : jvm.toNativeString(tagName);
   const canvasClass = "com_codename1_html5_js_dom_HTMLCanvasElement";
   if (doc && doc.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
-    // The chart-suite tail (ChartDoughnut and onward) tripped a
-    // "Missing host receiver for JSO bridge" throw from this call
-    // after ~60 prior tests had accumulated host-refs and the
-    // Document wrapper resolution started missing in the host
-    // cache. The throw escaped through the chart paint cycle and
-    // halted the screenshot suite, which is why port.js parks the
-    // affected charts on the chartDocumentStaleness force-timeout
-    // list. Catch and return null instead so paint cycles can
-    // degrade gracefully -- a missing element is better than a
-    // crash, and downstream null-checks (every caller already
-    // handles null from createElement) keep the suite alive.
-    let hostResult = null;
-    try {
-      hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
-        receiver: doc,
-        kind: "method",
-        member: "createElement",
-        args: [tag]
-      }]);
-    } catch (e) {
-      return null;
-    }
+    const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
+      receiver: doc,
+      kind: "method",
+      member: "createElement",
+      args: [tag]
+    }]);
     if (hostResult == null) {
       return null;
     }
@@ -1214,15 +1198,7 @@ bindNative([
   if (!doc || typeof doc.createElement !== "function") {
     return null;
   }
-  let element;
-  try {
-    element = doc.createElement(tag);
-  } catch (e) {
-    return null;
-  }
-  if (element == null) {
-    return null;
-  }
+  const element = doc.createElement(tag);
   const expectedClass = String(tag).toLowerCase() === "canvas"
     ? canvasClass
     : jvm.inferJsObjectClass(element, "com_codename1_html5_js_dom_HTMLElement");
