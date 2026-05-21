@@ -237,7 +237,7 @@ public class JavaSENfc extends Nfc {
         }
         lastHceCommand = copyOf(command);
         if (svc == null) {
-            byte[] resp = ApduResponse.SW_FILE_NOT_FOUND;
+            byte[] resp = ApduResponse.swFileNotFound();
             lastHceResponse = copyOf(resp);
             return resp;
         }
@@ -245,10 +245,10 @@ public class JavaSENfc extends Nfc {
         try {
             resp = svc.processCommand(command);
             if (resp == null) {
-                resp = ApduResponse.SW_UNKNOWN_ERROR;
+                resp = ApduResponse.swUnknownError();
             }
         } catch (Throwable t) {
-            resp = ApduResponse.SW_UNKNOWN_ERROR;
+            resp = ApduResponse.swUnknownError();
         }
         lastHceResponse = copyOf(resp);
         return resp;
@@ -352,7 +352,7 @@ public class JavaSENfc extends Nfc {
         public AsyncResource<byte[]> transceive(byte[] apdu) {
             AsyncResource<byte[]> r = new AsyncResource<byte[]>();
             byte[] body = apdu != null ? apdu : new byte[0];
-            r.complete(ApduResponse.withStatus(body, ApduResponse.SW_SUCCESS));
+            r.complete(ApduResponse.withStatus(body, ApduResponse.swSuccess()));
             return r;
         }
     }

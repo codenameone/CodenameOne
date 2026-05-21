@@ -51,13 +51,13 @@ public class CodenameOneHostApduService extends HostApduService {
     public byte[] processCommandApdu(byte[] apdu, Bundle extras) {
         HostCardEmulationService d = delegate;
         if (d == null) {
-            return ApduResponse.SW_FILE_NOT_FOUND;
+            return ApduResponse.swFileNotFound();
         }
         try {
             byte[] resp = d.processCommand(apdu);
-            return resp != null ? resp : ApduResponse.SW_UNKNOWN_ERROR;
+            return resp != null ? resp : ApduResponse.swUnknownError();
         } catch (Throwable t) {
-            return ApduResponse.SW_UNKNOWN_ERROR;
+            return ApduResponse.swUnknownError();
         }
     }
 

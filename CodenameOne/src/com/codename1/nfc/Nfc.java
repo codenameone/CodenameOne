@@ -78,7 +78,7 @@ import com.codename1.util.SuccessCallback;
 ///     public String[] getAids() { return new String[] { "F0010203040506" }; }
 ///     public byte[] processCommand(byte[] apdu) {
 ///         return ApduResponse.withStatus(new byte[] { 'O', 'K' },
-///                 ApduResponse.SW_SUCCESS);
+///                 ApduResponse.swSuccess());
 ///     }
 /// }
 /// Nfc.getInstance().registerHostCardEmulationService(new MyService());

@@ -375,13 +375,13 @@ public final class IOSNfc extends Nfc {
                 try {
                     resp = svc.processCommand(apdu);
                 } catch (Throwable t) {
-                    resp = com.codename1.nfc.ApduResponse.SW_UNKNOWN_ERROR;
+                    resp = com.codename1.nfc.ApduResponse.swUnknownError();
                 }
                 IOSNfc nfc = (IOSNfc) Display.getInstance().getNfc();
                 if (nfc != null) {
                     nfc.nativeInstance.hceSendResponse(resp != null
                             ? resp
-                            : com.codename1.nfc.ApduResponse.SW_UNKNOWN_ERROR);
+                            : com.codename1.nfc.ApduResponse.swUnknownError());
                 }
             }
         });

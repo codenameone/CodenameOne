@@ -27,32 +27,52 @@ package com.codename1.nfc;
 /// [HostCardEmulationService] (card mode).
 public final class ApduResponse {
 
+    private ApduResponse() {
+    }
+
+    // Status-word constants are exposed as accessor methods (returning a
+    // fresh array each call) rather than public static byte[] fields,
+    // because mutable static arrays would let one HCE service corrupt the
+    // shared value for every other caller (SpotBugs MS_PKGPROTECT). Each
+    // method allocates a 2-byte array on the heap; the cost is negligible
+    // for HCE APDU response paths.
+
     /// SW = `90 00` -- command succeeded.
-    public static final byte[] SW_SUCCESS = new byte[] {
-            (byte) 0x90, (byte) 0x00 };
+    public static byte[] swSuccess() {
+        return new byte[] { (byte) 0x90, (byte) 0x00 };
+    }
+
     /// SW = `6A 82` -- file or AID not found. Returned from an HCE
     /// service's `SELECT` when the requested AID is not the one it
     /// registered.
-    public static final byte[] SW_FILE_NOT_FOUND = new byte[] {
-            (byte) 0x6A, (byte) 0x82 };
+    public static byte[] swFileNotFound() {
+        return new byte[] { (byte) 0x6A, (byte) 0x82 };
+    }
+
     /// SW = `6D 00` -- INS not supported. Returned from an HCE service for
     /// any APDU whose instruction byte is not handled.
-    public static final byte[] SW_INS_NOT_SUPPORTED = new byte[] {
-            (byte) 0x6D, (byte) 0x00 };
-    /// SW = `6E 00` -- CLA not supported.
-    public static final byte[] SW_CLA_NOT_SUPPORTED = new byte[] {
-            (byte) 0x6E, (byte) 0x00 };
-    /// SW = `67 00` -- wrong length / Lc.
-    public static final byte[] SW_WRONG_LENGTH = new byte[] {
-            (byte) 0x67, (byte) 0x00 };
-    /// SW = `69 82` -- security condition not satisfied.
-    public static final byte[] SW_SECURITY_NOT_SATISFIED = new byte[] {
-            (byte) 0x69, (byte) 0x82 };
-    /// SW = `6F 00` -- unknown / generic failure.
-    public static final byte[] SW_UNKNOWN_ERROR = new byte[] {
-            (byte) 0x6F, (byte) 0x00 };
+    public static byte[] swInsNotSupported() {
+        return new byte[] { (byte) 0x6D, (byte) 0x00 };
+    }
 
-    private ApduResponse() {
+    /// SW = `6E 00` -- CLA not supported.
+    public static byte[] swClaNotSupported() {
+        return new byte[] { (byte) 0x6E, (byte) 0x00 };
+    }
+
+    /// SW = `67 00` -- wrong length / Lc.
+    public static byte[] swWrongLength() {
+        return new byte[] { (byte) 0x67, (byte) 0x00 };
+    }
+
+    /// SW = `69 82` -- security condition not satisfied.
+    public static byte[] swSecurityNotSatisfied() {
+        return new byte[] { (byte) 0x69, (byte) 0x82 };
+    }
+
+    /// SW = `6F 00` -- unknown / generic failure.
+    public static byte[] swUnknownError() {
+        return new byte[] { (byte) 0x6F, (byte) 0x00 };
     }
 
     /// `true` when the trailing two bytes of `apdu` are `90 00`.

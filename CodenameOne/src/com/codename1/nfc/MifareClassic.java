@@ -36,23 +36,35 @@ import com.codename1.util.AsyncResource;
 /// untransitioned demo / blank cards.
 public class MifareClassic extends TagTechnology {
 
-    /// Default MIFARE Classic key A used by NXP shipping cards.
-    public static final byte[] KEY_DEFAULT = new byte[] {
-            (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-            (byte) 0xFF, (byte) 0xFF, (byte) 0xFF
-    };
+    // Well-known MIFARE Classic keys are returned via accessors so callers
+    // can't mutate a shared instance (SpotBugs MS_PKGPROTECT).
 
-    /// MIFARE Application Directory (MAD) key A from NXP AN10787.
-    public static final byte[] KEY_MIFARE_APPLICATION_DIRECTORY = new byte[] {
-            (byte) 0xA0, (byte) 0xA1, (byte) 0xA2,
-            (byte) 0xA3, (byte) 0xA4, (byte) 0xA5
-    };
+    /// Default MIFARE Classic key A used by NXP shipping cards
+    /// (`FF FF FF FF FF FF`). Returns a fresh defensive copy.
+    public static byte[] keyDefault() {
+        return new byte[] {
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF
+        };
+    }
 
-    /// NFC Forum key A for NDEF-formatted MIFARE Classic blocks.
-    public static final byte[] KEY_NFC_FORUM = new byte[] {
-            (byte) 0xD3, (byte) 0xF7, (byte) 0xD3,
-            (byte) 0xF7, (byte) 0xD3, (byte) 0xF7
-    };
+    /// MIFARE Application Directory (MAD) key A from NXP AN10787
+    /// (`A0 A1 A2 A3 A4 A5`). Returns a fresh defensive copy.
+    public static byte[] keyMifareApplicationDirectory() {
+        return new byte[] {
+                (byte) 0xA0, (byte) 0xA1, (byte) 0xA2,
+                (byte) 0xA3, (byte) 0xA4, (byte) 0xA5
+        };
+    }
+
+    /// NFC Forum key A for NDEF-formatted MIFARE Classic blocks
+    /// (`D3 F7 D3 F7 D3 F7`). Returns a fresh defensive copy.
+    public static byte[] keyNfcForum() {
+        return new byte[] {
+                (byte) 0xD3, (byte) 0xF7, (byte) 0xD3,
+                (byte) 0xF7, (byte) 0xD3, (byte) 0xF7
+        };
+    }
 
     /// Total sectors on the tag (16 on Classic 1K, 40 on Classic 4K).
     public int getSectorCount() {

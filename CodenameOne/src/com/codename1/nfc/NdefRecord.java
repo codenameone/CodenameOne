@@ -41,7 +41,7 @@ public final class NdefRecord {
     /// TNF (Type Name Format) -- record contains no payload.
     public static final byte TNF_EMPTY = 0x00;
     /// TNF -- type is one of the NFC Forum well-known types (e.g. `T`, `U`,
-    /// `Sp`). See [#RTD_TEXT], [#RTD_URI].
+    /// `Sp`). See [#rtdText()], [#rtdUri()].
     public static final byte TNF_WELL_KNOWN = 0x01;
     /// TNF -- type is a MIME media type (RFC 2046).
     public static final byte TNF_MIME_MEDIA = 0x02;
@@ -55,16 +55,36 @@ public final class NdefRecord {
     /// TNF -- continuation of a chunked record (rare).
     public static final byte TNF_UNCHANGED = 0x06;
 
-    /// Record Type Definition (RTD) for well-known text records.
-    public static final byte[] RTD_TEXT = new byte[] { 'T' };
+    // RTD bytes are kept as private fields so external callers can't
+    // mutate the shared instance (SpotBugs MS_PKGPROTECT); the public
+    // accessor methods below each return a fresh defensive copy.
+    private static final byte[] RTD_TEXT = new byte[] { 'T' };
+    private static final byte[] RTD_URI = new byte[] { 'U' };
+    private static final byte[] RTD_SMART_POSTER = new byte[] { 'S', 'p' };
+    private static final byte[] RTD_ANDROID_APP = new byte[] { 'a', 'n', 'd',
+            'r', 'o', 'i', 'd', '.', 'c', 'o', 'm', ':', 'p', 'k', 'g' };
+
+    /// Record Type Definition (RTD) for well-known text records. Returns
+    /// a defensive copy so callers cannot mutate the shared constant.
+    public static byte[] rtdText() {
+        return clone(RTD_TEXT);
+    }
+
     /// RTD for well-known URI records.
-    public static final byte[] RTD_URI = new byte[] { 'U' };
+    public static byte[] rtdUri() {
+        return clone(RTD_URI);
+    }
+
     /// RTD for SmartPoster (URI + title).
-    public static final byte[] RTD_SMART_POSTER = new byte[] { 'S', 'p' };
+    public static byte[] rtdSmartPoster() {
+        return clone(RTD_SMART_POSTER);
+    }
+
     /// RTD for Android Application Record (external type
     /// `android.com:pkg`).
-    public static final byte[] RTD_ANDROID_APP = new byte[] { 'a', 'n', 'd',
-            'r', 'o', 'i', 'd', '.', 'c', 'o', 'm', ':', 'p', 'k', 'g' };
+    public static byte[] rtdAndroidApp() {
+        return clone(RTD_ANDROID_APP);
+    }
 
     private final byte tnf;
     private final byte[] type;

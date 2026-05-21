@@ -128,9 +128,9 @@ class MyService extends HostCardEmulationService {
             // SELECT -- terminal has just routed an APDU to our AID
             return ApduResponse.withStatus(
                     new byte[] { 'O', 'K' },
-                    ApduResponse.SW_SUCCESS);
+                    ApduResponse.swSuccess());
         }
-        return ApduResponse.SW_INS_NOT_SUPPORTED;
+        return ApduResponse.swInsNotSupported();
     }
 }
 
