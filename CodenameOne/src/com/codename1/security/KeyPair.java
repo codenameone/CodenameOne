@@ -41,8 +41,12 @@ public final class KeyPair {
     }
 
     /// Returns the public part of this pair.
-    public PublicKey getPublicKey() { return publicKey; }
+    public PublicKey getPublicKey() {
+        return publicKey;
+    }
 
     /// Returns the private part of this pair.
-    public PrivateKey getPrivateKey() { return privateKey; }
+    public PrivateKey getPrivateKey() {
+        return privateKey;
+    }
 }

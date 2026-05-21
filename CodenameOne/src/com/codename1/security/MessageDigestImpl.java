@@ -40,12 +40,24 @@ abstract class MessageDigestImpl {
             throw new CryptoException("algorithm must not be null");
         }
         String a = normalise(algorithm);
-        if ("MD5".equals(a)) { return new Md5(); }
-        if ("SHA1".equals(a)) { return new Sha1(); }
-        if ("SHA224".equals(a)) { return new Sha256Family(true); }
-        if ("SHA256".equals(a)) { return new Sha256Family(false); }
-        if ("SHA384".equals(a)) { return new Sha512Family(true); }
-        if ("SHA512".equals(a)) { return new Sha512Family(false); }
+        if ("MD5".equals(a)) {
+            return new Md5();
+        }
+        if ("SHA1".equals(a)) {
+            return new Sha1();
+        }
+        if ("SHA224".equals(a)) {
+            return new Sha256Family(true);
+        }
+        if ("SHA256".equals(a)) {
+            return new Sha256Family(false);
+        }
+        if ("SHA384".equals(a)) {
+            return new Sha512Family(true);
+        }
+        if ("SHA512".equals(a)) {
+            return new Sha512Family(false);
+        }
         throw new CryptoException("unsupported hash algorithm: " + algorithm);
     }
 
@@ -53,8 +65,12 @@ abstract class MessageDigestImpl {
         StringBuilder b = new StringBuilder(algorithm.length());
         for (int i = 0; i < algorithm.length(); i++) {
             char c = algorithm.charAt(i);
-            if (c == '-' || c == '_' || c == ' ') { continue; }
-            if (c >= 'a' && c <= 'z') { c = (char) (c - 'a' + 'A'); }
+            if (c == '-' || c == '_' || c == ' ') {
+                continue;
+            }
+            if (c >= 'a' && c <= 'z') {
+                c = (char) (c - 'a' + 'A');
+            }
             b.append(c);
         }
         return b.toString();
@@ -75,7 +91,9 @@ abstract class MessageDigestImpl {
             byteCount += length;
             if (bufferLen > 0) {
                 int copy = 64 - bufferLen;
-                if (copy > length) { copy = length; }
+                if (copy > length) {
+                    copy = length;
+                }
                 System.arraycopy(data, offset, buffer, bufferLen, copy);
                 bufferLen += copy;
                 offset += copy;
@@ -110,11 +128,15 @@ abstract class MessageDigestImpl {
             long bits = byteCount * 8L;
             buffer[bufferLen++] = (byte) 0x80;
             if (bufferLen > 56) {
-                while (bufferLen < 64) { buffer[bufferLen++] = 0; }
+                while (bufferLen < 64) {
+                    buffer[bufferLen++] = 0;
+                }
                 processBlock(buffer, 0);
                 bufferLen = 0;
             }
-            while (bufferLen < 56) { buffer[bufferLen++] = 0; }
+            while (bufferLen < 56) {
+                buffer[bufferLen++] = 0;
+            }
             if (bigEndianLength) {
                 buffer[56] = (byte) (bits >>> 56);
                 buffer[57] = (byte) (bits >>> 48);
@@ -150,7 +172,9 @@ abstract class MessageDigestImpl {
         int c;
         int d;
 
-        Md5() { reset(); }
+        Md5() {
+            reset();
+        }
 
         @Override
         public void reset() {
@@ -163,10 +187,14 @@ abstract class MessageDigestImpl {
         }
 
         @Override
-        public int digestLength() { return 16; }
+        public int digestLength() {
+            return 16;
+        }
 
         @Override
-        public byte[] digest() { return finishCommon(false); }
+        public byte[] digest() {
+            return finishCommon(false);
+        }
 
         @Override
         void writeStateBigEndian(byte[] out) {
@@ -192,7 +220,9 @@ abstract class MessageDigestImpl {
                   | (src[o + 3] & 0xff) << 24;
         }
 
-        private static int rol(int v, int s) { return (v << s) | (v >>> (32 - s)); }
+        private static int rol(int v, int s) {
+            return (v << s) | (v >>> (32 - s));
+        }
 
         @Override
         void processBlock(byte[] block, int o) {
@@ -307,7 +337,9 @@ abstract class MessageDigestImpl {
         int h4;
         final int[] w = new int[80];
 
-        Sha1() { reset(); }
+        Sha1() {
+            reset();
+        }
 
         @Override
         public void reset() {
@@ -321,10 +353,14 @@ abstract class MessageDigestImpl {
         }
 
         @Override
-        public int digestLength() { return 20; }
+        public int digestLength() {
+            return 20;
+        }
 
         @Override
-        public byte[] digest() { return finishCommon(true); }
+        public byte[] digest() {
+            return finishCommon(true);
+        }
 
         @Override
         void writeStateBigEndian(byte[] out) {
@@ -435,10 +471,14 @@ abstract class MessageDigestImpl {
         }
 
         @Override
-        public int digestLength() { return truncated ? 28 : 32; }
+        public int digestLength() {
+            return truncated ? 28 : 32;
+        }
 
         @Override
-        public byte[] digest() { return finishCommon(true); }
+        public byte[] digest() {
+            return finishCommon(true);
+        }
 
         @Override
         void writeStateBigEndian(byte[] out) {
@@ -556,14 +596,18 @@ abstract class MessageDigestImpl {
         }
 
         @Override
-        public int digestLength() { return truncated ? 48 : 64; }
+        public int digestLength() {
+            return truncated ? 48 : 64;
+        }
 
         @Override
         void update(byte[] data, int offset, int length) {
             byteCount += length;
             if (bufferLen > 0) {
                 int copy = 128 - bufferLen;
-                if (copy > length) { copy = length; }
+                if (copy > length) {
+                    copy = length;
+                }
                 System.arraycopy(data, offset, buffer, bufferLen, copy);
                 bufferLen += copy;
                 offset += copy;
@@ -599,14 +643,20 @@ abstract class MessageDigestImpl {
             long bits = byteCount * 8L;
             buffer[bufferLen++] = (byte) 0x80;
             if (bufferLen > 112) {
-                while (bufferLen < 128) { buffer[bufferLen++] = 0; }
+                while (bufferLen < 128) {
+                    buffer[bufferLen++] = 0;
+                }
                 processBlock(buffer, 0);
                 bufferLen = 0;
             }
-            while (bufferLen < 112) { buffer[bufferLen++] = 0; }
+            while (bufferLen < 112) {
+                buffer[bufferLen++] = 0;
+            }
             // high 64 bits of the 128-bit length field are always 0 here since
             // a Java byte array cannot hold more than 2^31-1 bytes.
-            for (int i = 112; i < 120; i++) { buffer[i] = 0; }
+            for (int i = 112; i < 120; i++) {
+                buffer[i] = 0;
+            }
             buffer[120] = (byte) (bits >>> 56);
             buffer[121] = (byte) (bits >>> 48);
             buffer[122] = (byte) (bits >>> 40);
@@ -648,12 +698,12 @@ abstract class MessageDigestImpl {
             for (int i = 16; i < 80; i++) {
                 long v15 = w[i - 15];
                 long s0 = ((v15 >>> 1) | (v15 << 63))
-                       ^ ((v15 >>> 8) | (v15 << 56))
-                       ^ (v15 >>> 7);
+                        ^ ((v15 >>> 8) | (v15 << 56))
+                        ^ (v15 >>> 7);
                 long v2 = w[i - 2];
                 long s1 = ((v2 >>> 19) | (v2 << 45))
-                       ^ ((v2 >>> 61) | (v2 << 3))
-                       ^ (v2 >>> 6);
+                        ^ ((v2 >>> 61) | (v2 << 3))
+                        ^ (v2 >>> 6);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
             long a = h0;
@@ -666,13 +716,13 @@ abstract class MessageDigestImpl {
             long h = h7;
             for (int i = 0; i < 80; i++) {
                 long s1 = ((e >>> 14) | (e << 50))
-                       ^ ((e >>> 18) | (e << 46))
-                       ^ ((e >>> 41) | (e << 23));
+                        ^ ((e >>> 18) | (e << 46))
+                        ^ ((e >>> 41) | (e << 23));
                 long ch = (e & f) ^ (~e & g);
                 long t1 = h + s1 + ch + K[i] + w[i];
                 long s0 = ((a >>> 28) | (a << 36))
-                       ^ ((a >>> 34) | (a << 30))
-                       ^ ((a >>> 39) | (a << 25));
+                        ^ ((a >>> 34) | (a << 30))
+                        ^ ((a >>> 39) | (a << 25));
                 long mj = (a & b) ^ (a & c) ^ (b & c);
                 long t2 = s0 + mj;
                 h = g; g = f; f = e;

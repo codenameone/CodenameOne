@@ -78,7 +78,9 @@ public final class Otp {
                  | ((mac[offset + 2] & 0xff) << 8)
                  | (mac[offset + 3] & 0xff);
         int mod = 1;
-        for (int i = 0; i < digits; i++) { mod *= 10; }
+        for (int i = 0; i < digits; i++) {
+            mod *= 10;
+        }
         code %= mod;
         return pad(Integer.toString(code), digits);
     }
@@ -158,7 +160,9 @@ public final class Otp {
             return s;
         }
         StringBuilder b = new StringBuilder(digits);
-        for (int i = s.length(); i < digits; i++) { b.append('0'); }
+        for (int i = s.length(); i < digits; i++) {
+            b.append('0');
+        }
         b.append(s);
         return b.toString();
     }

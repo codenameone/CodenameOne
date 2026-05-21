@@ -149,22 +149,34 @@ public final class Hmac {
     // one-shot entry points
 
     /// One-shot HMAC-MD5. Legacy interop only -- prefer HMAC-SHA-256.
-    public static byte[] md5(byte[] key, byte[] data) { return create(Hash.MD5, key).doFinal(data); }
+    public static byte[] md5(byte[] key, byte[] data) {
+        return create(Hash.MD5, key).doFinal(data);
+    }
 
     /// One-shot HMAC-SHA-1. Legacy interop only -- prefer HMAC-SHA-256.
-    public static byte[] sha1(byte[] key, byte[] data) { return create(Hash.SHA1, key).doFinal(data); }
+    public static byte[] sha1(byte[] key, byte[] data) {
+        return create(Hash.SHA1, key).doFinal(data);
+    }
 
     /// One-shot HMAC-SHA-224.
-    public static byte[] sha224(byte[] key, byte[] data) { return create(Hash.SHA224, key).doFinal(data); }
+    public static byte[] sha224(byte[] key, byte[] data) {
+        return create(Hash.SHA224, key).doFinal(data);
+    }
 
     /// One-shot HMAC-SHA-256 (recommended default).
-    public static byte[] sha256(byte[] key, byte[] data) { return create(Hash.SHA256, key).doFinal(data); }
+    public static byte[] sha256(byte[] key, byte[] data) {
+        return create(Hash.SHA256, key).doFinal(data);
+    }
 
     /// One-shot HMAC-SHA-384.
-    public static byte[] sha384(byte[] key, byte[] data) { return create(Hash.SHA384, key).doFinal(data); }
+    public static byte[] sha384(byte[] key, byte[] data) {
+        return create(Hash.SHA384, key).doFinal(data);
+    }
 
     /// One-shot HMAC-SHA-512.
-    public static byte[] sha512(byte[] key, byte[] data) { return create(Hash.SHA512, key).doFinal(data); }
+    public static byte[] sha512(byte[] key, byte[] data) {
+        return create(Hash.SHA512, key).doFinal(data);
+    }
 
     // ----------------------------------------------------------------
 

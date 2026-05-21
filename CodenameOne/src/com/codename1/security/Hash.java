@@ -154,22 +154,34 @@ public final class Hash {
     // one-shot convenience entry points
 
     /// One-shot MD5 hash.
-    public static byte[] md5(byte[] data) { return create(MD5).digest(data); }
+    public static byte[] md5(byte[] data) {
+        return create(MD5).digest(data);
+    }
 
     /// One-shot SHA-1 hash.
-    public static byte[] sha1(byte[] data) { return create(SHA1).digest(data); }
+    public static byte[] sha1(byte[] data) {
+        return create(SHA1).digest(data);
+    }
 
     /// One-shot SHA-224 hash.
-    public static byte[] sha224(byte[] data) { return create(SHA224).digest(data); }
+    public static byte[] sha224(byte[] data) {
+        return create(SHA224).digest(data);
+    }
 
     /// One-shot SHA-256 hash (recommended general-purpose hash).
-    public static byte[] sha256(byte[] data) { return create(SHA256).digest(data); }
+    public static byte[] sha256(byte[] data) {
+        return create(SHA256).digest(data);
+    }
 
     /// One-shot SHA-384 hash.
-    public static byte[] sha384(byte[] data) { return create(SHA384).digest(data); }
+    public static byte[] sha384(byte[] data) {
+        return create(SHA384).digest(data);
+    }
 
     /// One-shot SHA-512 hash.
-    public static byte[] sha512(byte[] data) { return create(SHA512).digest(data); }
+    public static byte[] sha512(byte[] data) {
+        return create(SHA512).digest(data);
+    }
 
     // ----------------------------------------------------------------
     // hex helpers -- handy for displaying digests and writing test vectors
@@ -209,13 +221,19 @@ public final class Hash {
     }
 
     private static int nibble(char c) {
-        if (c >= '0' && c <= '9') { return c - '0'; }
-        if (c >= 'a' && c <= 'f') { return c - 'a' + 10; }
-        if (c >= 'A' && c <= 'F') { return c - 'A' + 10; }
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
         throw new CryptoException("invalid hex digit");
     }
 
     private static final char[] HEX = {
-            '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
     };
 }

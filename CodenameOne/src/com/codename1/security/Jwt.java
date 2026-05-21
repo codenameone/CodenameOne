@@ -213,13 +213,19 @@ public final class Jwt {
 
     /// Verifies with a shared HMAC secret. The token's `alg` header is read
     /// and must be one of the HS family.
-    public boolean verifyHs256(byte[] secret) { return verifyHmac(HS256, secret); }
+    public boolean verifyHs256(byte[] secret) {
+        return verifyHmac(HS256, secret);
+    }
 
     /// HMAC verification with HS384.
-    public boolean verifyHs384(byte[] secret) { return verifyHmac(HS384, secret); }
+    public boolean verifyHs384(byte[] secret) {
+        return verifyHmac(HS384, secret);
+    }
 
     /// HMAC verification with HS512.
-    public boolean verifyHs512(byte[] secret) { return verifyHmac(HS512, secret); }
+    public boolean verifyHs512(byte[] secret) {
+        return verifyHmac(HS512, secret);
+    }
 
     private boolean verifyHmac(String expectedAlg, byte[] secret) {
         if (!expectedAlg.equals(getAlgorithm())) {
@@ -319,19 +325,37 @@ public final class Jwt {
     }
 
     private static String signatureAlgorithmFor(String jwtAlg) {
-        if (RS256.equals(jwtAlg)) { return Signature.SHA256_WITH_RSA; }
-        if (RS384.equals(jwtAlg)) { return Signature.SHA384_WITH_RSA; }
-        if (RS512.equals(jwtAlg)) { return Signature.SHA512_WITH_RSA; }
-        if (ES256.equals(jwtAlg)) { return Signature.SHA256_WITH_ECDSA; }
-        if (ES384.equals(jwtAlg)) { return Signature.SHA384_WITH_ECDSA; }
-        if (ES512.equals(jwtAlg)) { return Signature.SHA512_WITH_ECDSA; }
+        if (RS256.equals(jwtAlg)) {
+            return Signature.SHA256_WITH_RSA;
+        }
+        if (RS384.equals(jwtAlg)) {
+            return Signature.SHA384_WITH_RSA;
+        }
+        if (RS512.equals(jwtAlg)) {
+            return Signature.SHA512_WITH_RSA;
+        }
+        if (ES256.equals(jwtAlg)) {
+            return Signature.SHA256_WITH_ECDSA;
+        }
+        if (ES384.equals(jwtAlg)) {
+            return Signature.SHA384_WITH_ECDSA;
+        }
+        if (ES512.equals(jwtAlg)) {
+            return Signature.SHA512_WITH_ECDSA;
+        }
         throw new CryptoException("unsupported JWT algorithm: " + jwtAlg);
     }
 
     private static int ecdsaCoordinateLength(String jwtAlg) {
-        if (ES256.equals(jwtAlg)) { return 32; }   // P-256
-        if (ES384.equals(jwtAlg)) { return 48; }   // P-384
-        if (ES512.equals(jwtAlg)) { return 66; }   // P-521
+        if (ES256.equals(jwtAlg)) {
+            return 32;   // P-256
+        }
+        if (ES384.equals(jwtAlg)) {
+            return 48;   // P-384
+        }
+        if (ES512.equals(jwtAlg)) {
+            return 66;   // P-521
+        }
         throw new CryptoException("not an ECDSA algorithm: " + jwtAlg);
     }
 

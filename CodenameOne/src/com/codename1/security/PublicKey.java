@@ -70,8 +70,12 @@ public final class PublicKey {
     }
 
     /// Returns the algorithm this key is for (e.g. "RSA").
-    public String getAlgorithm() { return algorithm; }
+    public String getAlgorithm() {
+        return algorithm;
+    }
 
     /// Returns the encoding format ("X.509" for SPKI).
-    public String getFormat() { return format; }
+    public String getFormat() {
+        return format;
+    }
 }

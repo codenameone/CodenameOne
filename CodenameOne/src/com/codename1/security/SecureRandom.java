@@ -72,8 +72,10 @@ public final class SecureRandom {
         byte[] buf = new byte[4];
         while (true) {
             fill(buf);
-            int v = ((buf[0] & 0x7f) << 24) | ((buf[1] & 0xff) << 16)
-                  | ((buf[2] & 0xff) << 8) | (buf[3] & 0xff);
+            int v = ((buf[0] & 0x7f) << 24)
+                    | ((buf[1] & 0xff) << 16)
+                    | ((buf[2] & 0xff) << 8)
+                    | (buf[3] & 0xff);
             int m = v % bound;
             if (v - m + (bound - 1) >= 0) {
                 return m;
@@ -90,14 +92,14 @@ public final class SecureRandom {
         byte[] buf = new byte[8];
         while (true) {
             fill(buf);
-            long v = ((long)(buf[0] & 0x7f) << 56)
-                   | ((long)(buf[1] & 0xff) << 48)
-                   | ((long)(buf[2] & 0xff) << 40)
-                   | ((long)(buf[3] & 0xff) << 32)
-                   | ((long)(buf[4] & 0xff) << 24)
-                   | ((long)(buf[5] & 0xff) << 16)
-                   | ((long)(buf[6] & 0xff) << 8)
-                   |  (long)(buf[7] & 0xff);
+            long v = ((long) (buf[0] & 0x7f) << 56)
+                    | ((long) (buf[1] & 0xff) << 48)
+                    | ((long) (buf[2] & 0xff) << 40)
+                    | ((long) (buf[3] & 0xff) << 32)
+                    | ((long) (buf[4] & 0xff) << 24)
+                    | ((long) (buf[5] & 0xff) << 16)
+                    | ((long) (buf[6] & 0xff) << 8)
+                    | (long) (buf[7] & 0xff);
             long m = v % bound;
             if (v - m + (bound - 1) >= 0) {
                 return m;

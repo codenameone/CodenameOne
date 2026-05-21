@@ -65,8 +65,12 @@ public final class PrivateKey {
     }
 
     /// Returns the algorithm this key is for (e.g. "RSA").
-    public String getAlgorithm() { return algorithm; }
+    public String getAlgorithm() {
+        return algorithm;
+    }
 
     /// Returns the encoding format ("PKCS#8").
-    public String getFormat() { return format; }
+    public String getFormat() {
+        return format;
+    }
 }
