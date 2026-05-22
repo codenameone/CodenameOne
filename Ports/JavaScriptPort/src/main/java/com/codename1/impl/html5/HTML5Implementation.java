@@ -8062,6 +8062,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         req.setResponseType("arraybuffer");
         req.send();
 
+        // Static hosts that fall back to index.html for unknown paths
+        // (Cloudflare Pages SPA mode is the common one) hand back the
+        // HTML page with status 4xx but a non-empty body. The previous
+        // path treated that body as if it were the requested asset and
+        // wrapped the ``<!DOCTYPE html>...`` bytes in an
+        // ArrayBufferInputStream -- ZipInputStream then threw
+        // ``Wrong Local header signature: 6f64213c`` (the little-endian
+        // encoding of ``<!do``) and copyZipEntriesToMap silently
+        // copied zero entries. Reject 4xx/5xx up front so the
+        // ``getResourceAsStream`` fallback to the bundle root path
+        // gets a chance to try the next candidate URL.
+        int status = req.getStatus();
+        if (status >= 400) {
+            return null;
+        }
+
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null) {
             System.out.println(req.getAllResponseHeaders());
