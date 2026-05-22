@@ -411,10 +411,21 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
+        final String keyForLog = key;
 
         impl.getItem(key, new GetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
+                String errStr = (err == null) ? "null" : (JS.isUndefined(err) ? "undef" : "obj");
+                String valStr;
+                if (val == null) {
+                    valStr = "null";
+                } else if (JS.isUndefined(val)) {
+                    valStr = "undef";
+                } else {
+                    valStr = "obj";
+                }
+                System.out.println("CN1INIT:lforage:getCb key=" + keyForLog + " err=" + errStr + " val=" + valStr);
                 if (err != null && !JS.isUndefined(err)) {
                     error[0] = new IOException(JS.unwrapString(err));
                 } else {
