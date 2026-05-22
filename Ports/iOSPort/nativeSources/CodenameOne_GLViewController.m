@@ -2785,6 +2785,13 @@ bool lockDrawing;
         UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc]
                                            initWithTarget:self
                                                    action:@selector(cn1HandleHover:)];
+        // UIGestureRecognizer defaults cancelsTouchesInView to YES, which on
+        // simulator builds where the host-mac mouse cursor is always hovering
+        // over the window can cancel taps before they reach touchesBegan:.
+        // Hover is independent of touch; don't let it preempt.
+        hover.cancelsTouchesInView = NO;
+        hover.delaysTouchesBegan = NO;
+        hover.delaysTouchesEnded = NO;
         [self.view addGestureRecognizer:hover];
 #ifndef CN1_USE_ARC
         [hover release];
