@@ -214,12 +214,15 @@ import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.initializr.WebsiteThemeNativeImpl;
 import com.codename1.initializr.DownloadNative;
 import com.codename1.initializr.DownloadNativeImpl;
+import com.codename1.initializr.InflateNative;
+import com.codename1.initializr.InflateNativeImpl;
 import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         NativeLookup.register(DownloadNative.class, DownloadNativeImpl.class);
+        NativeLookup.register(InflateNative.class, InflateNativeImpl.class);
         JavaScriptPortBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
 }
@@ -232,12 +235,15 @@ import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.initializr.WebsiteThemeNativeImpl;
 import com.codename1.initializr.DownloadNative;
 import com.codename1.initializr.DownloadNativeImpl;
+import com.codename1.initializr.InflateNative;
+import com.codename1.initializr.InflateNativeImpl;
 import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
         NativeLookup.register(DownloadNative.class, DownloadNativeImpl.class);
+        NativeLookup.register(InflateNative.class, InflateNativeImpl.class);
         ParparVMBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
 }
@@ -303,11 +309,37 @@ public final class DownloadNativeImpl implements DownloadNative {
 }
 EOF
 
+bj_log "Generating Initializr InflateNative impl stub"
+cat > "$NATIVE_IMPL_DIR/InflateNativeImpl.java" <<'EOF'
+package com.codename1.initializr;
+
+/**
+ * Hardcoded JS-port stub for InflateNative. inflateRaw bridges through
+ * invokeHostNative to a main-thread handler that uses the browser's
+ * DecompressionStream ("deflate-raw") to decompress a zip entry's
+ * compressed bytes. Used to sidestep the broken net.sf.zipme Inflater
+ * (state-leaks between successive entries).
+ */
+public final class InflateNativeImpl implements InflateNative {
+    public byte[] inflateRaw(byte[] compressed) {
+        return nativeInflateRaw(compressed);
+    }
+
+    public boolean isSupported() {
+        return nativeIsSupported();
+    }
+
+    private static native byte[] nativeInflateRaw(byte[] compressed);
+    private static native boolean nativeIsSupported();
+}
+EOF
+
 bj_log "Building source list for JavaScriptPort"
 find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
 echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
 echo "$NATIVE_IMPL_DIR/WebsiteThemeNativeImpl.java" >> "$SOURCE_LIST"
 echo "$NATIVE_IMPL_DIR/DownloadNativeImpl.java" >> "$SOURCE_LIST"
+echo "$NATIVE_IMPL_DIR/InflateNativeImpl.java" >> "$SOURCE_LIST"
 
 CLASSPATH_ENTRIES=("$STAGE_CLASSES")
 TEAVM_JARS=()
@@ -507,6 +539,19 @@ cat > "$DIST_DIR/initializr_native_bindings.js" <<'EOF'
     "cn1_com_codename1_initializr_DownloadNativeImpl_nativeIsSupported_R_boolean",
     "cn1_com_codename1_initializr_DownloadNativeImpl_nativeIsSupported___R_boolean"
   ], "initializr.DownloadNative.isSupported");
+  // InflateNative.inflateRaw(byte[]) -> byte[]. Forwards the compressed
+  // bytes through invokeHostNative; the main-thread handler runs
+  // DecompressionStream "deflate-raw" and returns the inflated bytes.
+  bindNative([
+    "cn1_com_codename1_initializr_InflateNativeImpl_nativeInflateRaw_byte_1ARRAY_R_byte_1ARRAY",
+    "cn1_com_codename1_initializr_InflateNativeImpl_nativeInflateRaw__B_R_B"
+  ], function*(compressed) {
+    return yield jvm.invokeHostNative("initializr.InflateNative.inflateRaw", [compressed]);
+  });
+  bindBoolean([
+    "cn1_com_codename1_initializr_InflateNativeImpl_nativeIsSupported_R_boolean",
+    "cn1_com_codename1_initializr_InflateNativeImpl_nativeIsSupported___R_boolean"
+  ], "initializr.InflateNative.isSupported");
 })();
 EOF
 
@@ -607,6 +652,8 @@ cat > "$DIST_DIR/initializr_native_handlers.js" <<'EOF'
   bridgeMethod0("initializr.WebsiteThemeNative.notifyUiReady", "com_codename1_initializr_WebsiteThemeNative", "notifyUiReady_", null);
   bridgeMethodN("initializr.DownloadNative.downloadBytes", "com_codename1_initializr_DownloadNative", "downloadBytes_", false);
   bridgeMethod0("initializr.DownloadNative.isSupported", "com_codename1_initializr_DownloadNative", "isSupported_", false);
+  bridgeMethodN("initializr.InflateNative.inflateRaw", "com_codename1_initializr_InflateNative", "inflateRaw_", null);
+  bridgeMethod0("initializr.InflateNative.isSupported", "com_codename1_initializr_InflateNative", "isSupported_", false);
 })(typeof window !== "undefined" ? window : self);
 EOF
 
@@ -620,6 +667,7 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "initializr_native_handlers.js" "$
       if ($0 ~ /<script src="browser_bridge.js"><\/script>/ && !done) {
         print "<script src=\"native/com_codename1_initializr_WebsiteThemeNative.js\"></script>";
         print "<script src=\"native/com_codename1_initializr_DownloadNative.js\"></script>";
+        print "<script src=\"native/com_codename1_initializr_InflateNative.js\"></script>";
         print $0;
         print "<script src=\"initializr_native_handlers.js\"></script>";
         done = 1;

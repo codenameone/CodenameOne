@@ -2,6 +2,7 @@ package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
 import com.codename1.initializr.DownloadNative;
+import com.codename1.initializr.InflateNative;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.system.NativeLookup;
@@ -400,6 +401,88 @@ public class GeneratorModel {
         return (long) (crc ^ 0xFFFFFFFF) & 0xFFFFFFFFL;
     }
 
+    /// Manual zip parser used on the JS port where zipme's ZipInputStream
+    /// Inflater corrupts state between entries. Walks the central directory
+    /// inferred from the local file headers, reads each entry's compressed
+    /// bytes from the raw resource buffer, and routes deflate decompression
+    /// through ``InflateNative`` (browser DecompressionStream). STORED
+    /// entries (method == 0) are copied as-is.
+    private void copyZipEntriesViaNativeInflate(String zipResource, Map<String, byte[]> mergedEntries,
+                                                ZipEntryType zipType, boolean dropWindowsModule,
+                                                InflateNative inflater) throws IOException {
+        java.io.InputStream raw = getResourceAsStream(zipResource);
+        if (raw == null) {
+            throw new IOException("Resource not found: " + zipResource);
+        }
+        byte[] zipBytes;
+        try {
+            zipBytes = readToBytesNoClose(raw);
+        } finally {
+            try { raw.close(); } catch (Throwable ignored) {}
+        }
+        System.out.println("CN1INIT:nativeUnzip:open res=" + zipResource + " bytes=" + zipBytes.length);
+        int entries = 0;
+        int pos = 0;
+        while (pos + 30 <= zipBytes.length) {
+            int sig = readUInt32LE(zipBytes, pos);
+            if (sig != 0x04034b50) {
+                // Reached central directory (signature 0x02014b50) or EOCD.
+                break;
+            }
+            int method = readUInt16LE(zipBytes, pos + 8);
+            int cSize = readUInt32LE(zipBytes, pos + 18);
+            int nameLen = readUInt16LE(zipBytes, pos + 26);
+            int extraLen = readUInt16LE(zipBytes, pos + 28);
+            int nameStart = pos + 30;
+            int dataStart = nameStart + nameLen + extraLen;
+            if (dataStart + cSize > zipBytes.length) {
+                throw new IOException("Truncated zip entry in " + zipResource);
+            }
+            String name;
+            try {
+                name = new String(zipBytes, nameStart, nameLen, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException ex) {
+                name = new String(zipBytes, nameStart, nameLen);
+            }
+            boolean isDir = name.endsWith("/");
+            if (!isDir) {
+                if (dropWindowsModule && (name.startsWith("win/") || name.startsWith("win\\"))) {
+                    pos = dataStart + cSize;
+                    continue;
+                }
+                byte[] data;
+                if (method == 0) {
+                    data = new byte[cSize];
+                    System.arraycopy(zipBytes, dataStart, data, 0, cSize);
+                } else if (method == 8) {
+                    byte[] compressed = new byte[cSize];
+                    System.arraycopy(zipBytes, dataStart, compressed, 0, cSize);
+                    data = inflater.inflateRaw(compressed);
+                    if (data == null) {
+                        throw new IOException("inflate failed for " + name + " in " + zipResource);
+                    }
+                } else {
+                    throw new IOException("Unsupported zip compression method " + method + " for " + name + " in " + zipResource);
+                }
+                copyEntryToMap(name, data, mergedEntries, zipType);
+                entries++;
+            }
+            pos = dataStart + cSize;
+        }
+        System.out.println("CN1INIT:nativeUnzip:close res=" + zipResource + " entries=" + entries);
+    }
+
+    private static int readUInt16LE(byte[] data, int off) {
+        return (data[off] & 0xFF) | ((data[off + 1] & 0xFF) << 8);
+    }
+
+    private static int readUInt32LE(byte[] data, int off) {
+        return (data[off] & 0xFF)
+                | ((data[off + 1] & 0xFF) << 8)
+                | ((data[off + 2] & 0xFF) << 16)
+                | ((data[off + 3] & 0xFF) << 24);
+    }
+
 
     private void addAgentSkillEntries(Map<String, byte[]> mergedEntries) throws IOException {
         // Ship the Codename One authoring skill inside every generated project under a
@@ -462,6 +545,16 @@ public class GeneratorModel {
 
     private void copyZipEntriesToMap(String zipResource, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
         boolean dropWindowsModule = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17;
+        // Prefer InflateNative when available (JS port). The bundled zipme
+        // Inflater on that port leaks state between successive ZipInputStream
+        // entries, so we parse the zip framing manually and route deflate
+        // decompression through DecompressionStream. On platforms without the
+        // native helper (JavaSE / Android tests) fall through to zipme.
+        InflateNative inflater = NativeLookup.create(InflateNative.class);
+        if (inflater != null && inflater.isSupported()) {
+            copyZipEntriesViaNativeInflate(zipResource, mergedEntries, zipType, dropWindowsModule, inflater);
+            return;
+        }
         java.io.InputStream raw = getResourceAsStream(zipResource);
         System.out.println("CN1INIT:copyZip:open res=" + zipResource + " stream=" + (raw == null ? "null" : raw.getClass().getSimpleName()));
         if (raw == null) {
