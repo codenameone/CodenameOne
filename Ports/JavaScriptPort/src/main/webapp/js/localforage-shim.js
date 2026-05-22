@@ -90,77 +90,73 @@
       }
     }
   }
+  // Each method synchronously performs the localStorage operation, fires
+  // the callback inline, and returns the result. The previous shape
+  // ``return (function () { ... });`` returned the function REFERENCE
+  // without invoking it -- the storage operation never ran, the callback
+  // never fired, and the Java-side polling helper saw the value
+  // ``getItem`` returned (null) instead of the value the callback would
+  // have delivered. (The Java-side ``setItem-ok`` log still printed
+  // because the helper checks ``error[0]`` rather than whether the
+  // callback fired. The empty-result case looked indistinguishable from
+  // a non-existent key.)
   window.localforage = {
     INDEXEDDB: "indexeddb",
     WEBSQL: "websql",
     LOCALSTORAGE: "localstorage",
     config: function(_opts) { return true; },
     setItem: function(key, value, callback) {
-      return (function() {
-        var stored = setItemImpl(key, value);
-        callBack(callback, null, stored);
-        return stored;
-      });
+      var stored = setItemImpl(key, value);
+      callBack(callback, null, stored);
+      return stored;
     },
     getItem: function(key, callback) {
-      return (function() {
-        var value = getItemImpl(key);
-        callBack(callback, null, value);
-        return value;
-      });
+      var value = getItemImpl(key);
+      callBack(callback, null, value);
+      return value;
     },
     removeItem: function(key, callback) {
-      return (function() {
-        window.localStorage.removeItem(namespacedKey(key));
-        callBack(callback, null);
-      });
+      window.localStorage.removeItem(namespacedKey(key));
+      callBack(callback, null);
     },
     clear: function(callback) {
-      return (function() {
-        var doomed = [];
-        eachKey(function(k) { doomed.push(k); });
-        for (var i = 0; i < doomed.length; i++) {
-          window.localStorage.removeItem(namespacedKey(doomed[i]));
-        }
-        callBack(callback, null);
-      });
+      var doomed = [];
+      eachKey(function(k) { doomed.push(k); });
+      for (var i = 0; i < doomed.length; i++) {
+        window.localStorage.removeItem(namespacedKey(doomed[i]));
+      }
+      callBack(callback, null);
     },
     length: function(callback) {
-      return (function() {
-        var n = 0;
-        eachKey(function() { n++; });
-        callBack(callback, null, n);
-        return n;
-      });
+      var n = 0;
+      eachKey(function() { n++; });
+      callBack(callback, null, n);
+      return n;
     },
     keys: function(callback) {
-      return (function() {
-        var out = [];
-        eachKey(function(k) { out.push(k); });
-        callBack(callback, null, out);
-        return out;
-      });
+      var out = [];
+      eachKey(function(k) { out.push(k); });
+      callBack(callback, null, out);
+      return out;
     },
     iterate: function(iteratorCallback, successCallback) {
-      return (function() {
-        var stopped = false;
-        var idx = 1;
-        eachKey(function(k) {
-          if (stopped) { return false; }
-          var value = getItemImpl(k);
-          var result;
-          try { result = iteratorCallback(value, k, idx++); }
-          catch (_e) { result = undefined; }
-          if (result !== undefined) {
-            stopped = true;
-            callBack(successCallback, null, result);
-            return false;
-          }
-        });
-        if (!stopped) {
-          callBack(successCallback, null);
+      var stopped = false;
+      var idx = 1;
+      eachKey(function(k) {
+        if (stopped) { return false; }
+        var value = getItemImpl(k);
+        var result;
+        try { result = iteratorCallback(value, k, idx++); }
+        catch (_e) { result = undefined; }
+        if (result !== undefined) {
+          stopped = true;
+          callBack(successCallback, null, result);
+          return false;
         }
       });
+      if (!stopped) {
+        callBack(successCallback, null);
+      }
     }
   };
 })();
