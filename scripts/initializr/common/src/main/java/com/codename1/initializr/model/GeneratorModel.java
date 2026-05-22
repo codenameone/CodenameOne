@@ -252,20 +252,38 @@ public class GeneratorModel {
         addLocalizationEntries(mergedEntries);
         System.out.println("CN1INIT:writeZip:emitZip entries=" + mergedEntries.size());
 
-        try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+        ZipOutputStream zos = null;
+        try {
+            System.out.println("CN1INIT:writeZip:newZos");
+            zos = new ZipOutputStream(outputStream);
+            System.out.println("CN1INIT:writeZip:zosCtor-ok");
             int emitIdx = 0;
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
-                ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
+                String key = fileEntry.getKey();
                 byte[] data = fileEntry.getValue();
+                System.out.println("CN1INIT:writeZip:emitStart idx=" + emitIdx + " key=" + key + " size=" + (data == null ? -1 : data.length));
                 try {
+                    ZipEntry zipEntry = new ZipEntry(key);
                     zos.putNextEntry(zipEntry);
                     zos.write(data);
                     zos.closeEntry();
+                    System.out.println("CN1INIT:writeZip:emitOk idx=" + emitIdx);
                 } catch (Throwable t) {
-                    System.out.println("CN1INIT:writeZip:emitErr idx=" + emitIdx + " key=" + fileEntry.getKey() + " size=" + (data == null ? -1 : data.length) + " err=" + t);
-                    throw t instanceof IOException ? (IOException) t : new IOException("emit failed: " + t);
+                    System.out.println("CN1INIT:writeZip:emitErr idx=" + emitIdx + " key=" + key + " cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
+                    if (t instanceof IOException) throw (IOException) t;
+                    throw new IOException("emit failed: " + t);
                 }
                 emitIdx++;
+            }
+        } finally {
+            if (zos != null) {
+                try {
+                    System.out.println("CN1INIT:writeZip:closingZos");
+                    zos.close();
+                    System.out.println("CN1INIT:writeZip:closeZos-ok");
+                } catch (Throwable t) {
+                    System.out.println("CN1INIT:writeZip:closeZos-err cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
+                }
             }
         }
         System.out.println("CN1INIT:writeZip:emitZipDone");
