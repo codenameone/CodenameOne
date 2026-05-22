@@ -120,10 +120,6 @@ files.each do |path|
   end
 end
 
-if options[:output]
-  File.write(options[:output], JSON.pretty_generate(errors))
-end
-
 # Baseline support. Each baseline entry is a (file, word, excerpt) triple.
 # We deliberately omit the line number because any edit above an unrelated
 # paragraph would otherwise reclassify a pre-existing finding as "new".
@@ -151,6 +147,19 @@ if options[:baseline] && File.exist?(options[:baseline])
 end
 
 new_errors = errors.reject { |e| baseline_keys.include?(baseline_key(e)) }
+
+# Write a structured report so the CI summarizer can distinguish total
+# findings from new findings.
+if options[:output]
+  payload = {
+    total: errors.length,
+    new: new_errors.length,
+    baseline: baseline_keys.length,
+    new_findings: new_errors,
+    all_findings: errors
+  }
+  File.write(options[:output], JSON.pretty_generate(payload))
+end
 
 if new_errors.any?
   warn "Paragraph capitalization check failed: #{new_errors.length} new paragraph(s) start with a lowercase word."

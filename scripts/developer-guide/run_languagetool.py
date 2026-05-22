@@ -56,6 +56,37 @@ def extract_text(html_path):
     return parser.text()
 
 
+CHUNK_BYTES = 40_000
+
+
+def chunk_text(text, max_bytes=CHUNK_BYTES):
+    """Split text on paragraph boundaries into chunks under max_bytes each.
+
+    The local LanguageTool server crashes ('Connection reset by peer') when
+    fed multi-megabyte inputs in a single request, so we batch by paragraph.
+    Yields (offset, chunk_text) pairs so callers can translate per-chunk
+    offsets back to a global offset.
+    """
+    paragraphs = text.split("\n\n")
+    buf = []
+    buf_len = 0
+    offset = 0
+    chunk_start = 0
+    for para in paragraphs:
+        segment = para + "\n\n"
+        if buf and buf_len + len(segment) > max_bytes:
+            yield chunk_start, "".join(buf)
+            chunk_start = offset
+            buf = [segment]
+            buf_len = len(segment)
+        else:
+            buf.append(segment)
+            buf_len += len(segment)
+        offset += len(segment)
+    if buf:
+        yield chunk_start, "".join(buf)
+
+
 def run_languagetool(text, language="en-US"):
     try:
         import language_tool_python
@@ -67,24 +98,38 @@ def run_languagetool(text, language="en-US"):
         return None
 
     tool = language_tool_python.LanguageTool(language)
+    all_matches = []
     try:
-        matches = tool.check(text)
+        for global_offset, chunk in chunk_text(text):
+            try:
+                matches = tool.check(chunk)
+            except Exception as exc:  # noqa: BLE001 — advisory check must not crash CI
+                print(
+                    f"LanguageTool failed on chunk at offset {global_offset} ({len(chunk)} bytes): {exc}",
+                    file=sys.stderr,
+                )
+                continue
+            for m in matches:
+                # Wrap match so callers see global offsets, not chunk-local.
+                m._global_offset = global_offset + m.offset
+                all_matches.append(m)
     finally:
         tool.close()
-    return matches
+    return all_matches
 
 
 def matches_to_json(matches, text):
     out = []
     for m in matches:
         # Translate offset to a line number in the plain-text input.
-        line = text.count("\n", 0, m.offset) + 1
+        offset = getattr(m, "_global_offset", m.offset)
+        line = text.count("\n", 0, offset) + 1
         out.append({
             "rule": m.rule_id,
             "category": m.category,
             "message": m.message,
             "line": line,
-            "offset": m.offset,
+            "offset": offset,
             "length": m.error_length,
             "context": m.context,
             "replacements": list(m.replacements[:5]),
@@ -100,20 +145,30 @@ def main():
     args = parser.parse_args()
 
     text = extract_text(args.html)
-    matches = run_languagetool(text, language=args.language)
+
+    try:
+        matches = run_languagetool(text, language=args.language)
+    except Exception as exc:  # noqa: BLE001 — advisory check must not crash CI
+        print(f"LanguageTool failed to start: {exc}", file=sys.stderr)
+        matches = None
+        run_status = "error"
+        run_reason = str(exc)
+    else:
+        run_status = "ok" if matches is not None else "skipped"
+        run_reason = None if matches is not None else "language_tool_python not installed"
 
     if matches is None:
-        report = {"status": "skipped", "reason": "language_tool_python not installed", "matches": []}
+        report = {"status": run_status, "reason": run_reason, "matches": [], "total": 0}
         issue_count = 0
     else:
         report = {"status": "ok", "matches": matches_to_json(matches, text), "total": len(matches)}
         issue_count = len(matches)
 
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2)
 
-    print(f"LanguageTool report written to {args.output} ({issue_count} match(es)).")
+    print(f"LanguageTool report written to {args.output} ({issue_count} match(es), status={report['status']}).")
     # Advisory check: never fails the build.
     return 0
 

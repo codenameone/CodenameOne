@@ -363,6 +363,23 @@ jobs:
             --details-key details \
             --preview-limit 10
 
+      - name: Summarize paragraph capitalization findings
+        id: summarize_paragraph_cap
+        if: always()
+        run: |
+          python3 scripts/developer-guide/summarize_reports.py paragraph-capitalization \
+            --report "${PARAGRAPH_CAP_REPORT}" \
+            --status "${PARAGRAPH_CAP_STATUS:-0}" \
+            --output "${GITHUB_OUTPUT}"
+
+      - name: Summarize LanguageTool findings
+        id: summarize_languagetool
+        if: always()
+        run: |
+          python3 scripts/developer-guide/summarize_reports.py languagetool \
+            --report "${LANGUAGETOOL_REPORT}" \
+            --output "${GITHUB_OUTPUT}"
+
       - name: Upload HTML artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -461,6 +478,8 @@ jobs:
           VALE_SUMMARY: ${{ steps.summarize_vale.outputs.summary }}
           UNUSED_SUMMARY: ${{ steps.summarize_unused_images.outputs.summary }}
           UNUSED_DETAILS: ${{ steps.summarize_unused_images.outputs.details }}
+          PARAGRAPH_CAP_SUMMARY: ${{ steps.summarize_paragraph_cap.outputs.summary }}
+          LANGUAGETOOL_SUMMARY: ${{ steps.summarize_languagetool.outputs.summary }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -516,6 +535,12 @@ jobs:
             if (artifactLinks.has('developer-guide-unused-images')) {
               links.push(`- [Unused image report](${artifactLinks.get('developer-guide-unused-images')})`);
             }
+            if (artifactLinks.has('developer-guide-paragraph-capitalization')) {
+              links.push(`- [Paragraph capitalization report](${artifactLinks.get('developer-guide-paragraph-capitalization')})`);
+            }
+            if (artifactLinks.has('developer-guide-languagetool')) {
+              links.push(`- [LanguageTool report (advisory)](${artifactLinks.get('developer-guide-languagetool')})`);
+            }
 
             if (!links.length) {
               console.log('No artifacts found to report.');
@@ -526,15 +551,25 @@ jobs:
             const asciiSummary = process.env.ASCII_SUMMARY?.trim();
             const valeSummary = process.env.VALE_SUMMARY?.trim();
             const unusedSummary = process.env.UNUSED_SUMMARY?.trim();
+            const paragraphCapSummary = process.env.PARAGRAPH_CAP_SUMMARY?.trim();
+            const languagetoolSummary = process.env.LANGUAGETOOL_SUMMARY?.trim();
             const asciiLink = artifactLinks.get('developer-guide-asciidoc-lint');
             const valeLink = artifactLinks.get('developer-guide-vale-report');
             const unusedLink = artifactLinks.get('developer-guide-unused-images');
+            const paragraphCapLink = artifactLinks.get('developer-guide-paragraph-capitalization');
+            const languagetoolLink = artifactLinks.get('developer-guide-languagetool');
 
             if (asciiSummary) {
               qualityLines.push(`- AsciiDoc linter: ${asciiSummary}${asciiLink ? ` ([report](${asciiLink}))` : ''}`);
             }
             if (valeSummary) {
               qualityLines.push(`- Vale: ${valeSummary}${valeLink ? ` ([report](${valeLink}))` : ''}`);
+            }
+            if (paragraphCapSummary) {
+              qualityLines.push(`- Paragraph capitalization: ${paragraphCapSummary}${paragraphCapLink ? ` ([report](${paragraphCapLink}))` : ''}`);
+            }
+            if (languagetoolSummary) {
+              qualityLines.push(`- LanguageTool (advisory): ${languagetoolSummary}${languagetoolLink ? ` ([report](${languagetoolLink}))` : ''}`);
             }
             if (unusedSummary) {
               qualityLines.push(`- Image references: ${unusedSummary}${unusedLink ? ` ([report](${unusedLink}))` : ''}`);
