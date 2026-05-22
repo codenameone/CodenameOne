@@ -1,31 +1,28 @@
 // JS-port native impl of com.codename1.initializr.DownloadNative.
 //
-// Runs inside the worker. We can't touch ``document.createElement('a')``
-// here (Workers don't have ``document``), so the Blob construction
-// happens in the worker but the actual download trigger is routed
-// through the existing main-thread host handler
-// ``__cn1_register_save_blob__`` in browser_bridge.js. That handler
-// auto-fires the click on receive, so we only need to register --
-// the download starts before this generator resumes.
+// Native-interface JS impls in the JS port run on the MAIN thread (not the
+// worker) -- the registry populated by ``cn1_get_native_interfaces()`` lives
+// in window, and ``initializr_native_handlers.js`` looks up the impl from
+// there and invokes the chosen method with the host args + a callback that
+// resolves the worker-side Promise. So we have ``document`` here and can
+// trigger a download directly; no need to route through ``jvm.invokeHostNative``
+// (which is worker-only).
 //
-// Why this exists: the standard Display.execute(file://) flow on the
-// JS port reads the bytes back from LocalForage/IndexedDB via
-// openFileAsBlob, but the bundled localforage's setItem callback
-// (and the immediate getItem after it) returns null for Uint8Array
-// inputs -- diagnosed against the PR #4795 preview Initializr Generate
-// flow. Going Blob-direct sidesteps that entire layer.
+// Why this exists: the standard Display.execute(file://) flow on the JS port
+// reads bytes back from LocalForage/IndexedDB via openFileAsBlob, but the
+// bundled localforage's setItem callback returns null for Uint8Array inputs
+// and the read-back exists() check sees nothing -- exec() decides the file
+// "doesn't exist" and the user is left with no download. Going Blob+<a>.click()
+// direct sidesteps the entire storage layer.
 (function(exports) {
   var o = {};
 
-  o.downloadBytes_ = function*(fileName, bytes, callback) {
+  o.downloadBytes_ = function(fileName, bytes, callback) {
     try {
-      // The worker-side ``bytes`` param is whatever the translator hands
-      // a Java ``byte[]`` parameter on the JS port. Empirically that's a
-      // plain JS Array of signed-byte numbers (-128..127); some bridge
-      // paths hand back a Uint8Array view directly. Cover both: detect
-      // typed-array via ``BYTES_PER_ELEMENT`` (defined on every typed
-      // array constructor instance) and copy into a fresh Uint8Array
-      // otherwise so the Blob constructor sees the canonical shape.
+      // ``bytes`` is whatever shape the host bridge hands a Java byte[] to
+      // the main-thread native impl. The bridge transfers byte[] via
+      // structured clone, so on this side we get a plain JS Array of signed
+      // numbers (-128..127) -- not a Uint8Array. Coerce.
       var arr;
       if (bytes && bytes.BYTES_PER_ELEMENT !== undefined && bytes.buffer) {
         arr = bytes;
@@ -41,11 +38,28 @@
       }
       var name = (fileName == null || fileName === '') ? 'download' : String(fileName);
       var blob = new Blob([arr], { type: 'application/octet-stream' });
-      try { console.log('CN1INIT:download:native register fileName=' + name + ' len=' + arr.length); } catch (_le) {}
-      // The register handler in browser_bridge.js auto-fires the
-      // download on receipt -- by the time this yield resolves the
-      // browser has already presented (or queued) the file.
-      yield jvm.invokeHostNative('__cn1_register_save_blob__', [{ fileName: name, blob: blob }]);
+      try { console.log('CN1INIT:download:native-fire fileName=' + name + ' len=' + arr.length); } catch (_le) {}
+      var doc = (typeof document !== 'undefined') ? document : (window && window.document);
+      if (!doc || !doc.body) {
+        try { console.log('CN1INIT:download:native-err no-document'); } catch (_le) {}
+        callback.complete(false);
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      var a = doc.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.style.display = 'none';
+      doc.body.appendChild(a);
+      try {
+        a.click();
+      } finally {
+        doc.body.removeChild(a);
+      }
+      // Revoke after a short delay so the click handler has time to read the URL.
+      setTimeout(function() {
+        try { URL.revokeObjectURL(url); } catch (_re) {}
+      }, 5000);
       callback.complete(true);
     } catch (e) {
       try { console.log('CN1INIT:download:native-err ' + (e && e.message ? e.message : String(e))); } catch (_le) {}
