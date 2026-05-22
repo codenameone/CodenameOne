@@ -2934,11 +2934,40 @@ jvm.defineClass = function(def) {
     global._S[nm] = def.staticFields;
   }
 };
+// Wrap a raw JS Error (no ``__class``) in a fresh ``java.lang.RuntimeException``
+// so the Java catch handler that's about to receive it can call ``.getMessage()``,
+// ``.getClass()``, ``.toString()`` etc. without immediately crashing with
+// ``Missing virtual method`` (raw Errors carry no ``__classDef`` and have no
+// place for virtual dispatch to land). Preserves the original error on the
+// wrapper as ``__cn1WrappedRawJsError`` so diagnostics can recover it.
+//
+// Companion to the findExceptionHandler shim that makes raw JS Errors *match*
+// Java catches typed as Throwable/Exception/RuntimeException/Error: matching
+// alone isn't enough -- once dispatched, the catch body has to be able to
+// actually USE the caught reference. The original observation came from
+// GeneratorModel.writeProjectZipToStorage: a raw ``Array expected: null`` from
+// zipme's Deflater path matched the catch(Throwable) (good), but the very
+// first ``t.getClass()`` inside the catch threw ``Missing virtual method $djI
+// on undefined`` (because raw JS Error has no classDef), which surfaced as a
+// secondary error and lost the original message.
+function wrapRawJsErrorAsRuntimeException(err) {
+  if (!err || err.__class !== undefined) return err;
+  if (!jvm.classes || !jvm.classes["java_lang_RuntimeException"]) return err;
+  try {
+    const wrapper = jvm.newObject("java_lang_RuntimeException");
+    const msg = err && err.message ? String(err.message) : String(err);
+    wrapper[CN1_THROWABLE_MESSAGE] = createJavaString(msg);
+    wrapper.__cn1WrappedRawJsError = err;
+    return wrapper;
+  } catch (_wrapErr) {
+    return err;
+  }
+}
 global._E = function(table, pc, err, stack) {
   const h = jvm.findExceptionHandler(table, pc, err);
   if (!h) throw err;
   stack.length = 0;
-  stack.p(err);
+  stack.p(wrapRawJsErrorAsRuntimeException(err));
   return h.h !== undefined ? h.h : h.handler;
 };
 // Two-char ``.p()`` / ``.q()`` aliases for the stack-push / -pop
