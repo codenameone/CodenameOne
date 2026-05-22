@@ -212,11 +212,14 @@ import com.codename1.impl.html5.JavaScriptPortBootstrap;
 import com.codename1.system.NativeLookup;
 import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.initializr.WebsiteThemeNativeImpl;
+import com.codename1.initializr.DownloadNative;
+import com.codename1.initializr.DownloadNativeImpl;
 import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
+        NativeLookup.register(DownloadNative.class, DownloadNativeImpl.class);
         JavaScriptPortBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
 }
@@ -227,11 +230,14 @@ import com.codename1.impl.html5.ParparVMBootstrap;
 import com.codename1.system.NativeLookup;
 import com.codename1.initializr.WebsiteThemeNative;
 import com.codename1.initializr.WebsiteThemeNativeImpl;
+import com.codename1.initializr.DownloadNative;
+import com.codename1.initializr.DownloadNativeImpl;
 import $APP_MAIN_CLASS;
 
 public final class $TRANSLATOR_APP_NAME {
     public static void main(String[] args) {
         NativeLookup.register(WebsiteThemeNative.class, WebsiteThemeNativeImpl.class);
+        NativeLookup.register(DownloadNative.class, DownloadNativeImpl.class);
         ParparVMBootstrap.bootstrap(new $APP_MAIN_SIMPLE());
     }
 }
