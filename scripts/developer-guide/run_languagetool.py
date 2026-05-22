@@ -407,12 +407,6 @@ DISABLED_RULES = (
 )
 
 
-# Accept-list patterns are loaded once. Each pattern must consume the full
-# flagged span and is bracketed by word boundaries so a literal "ios"
-# matches "ios" but not the "ios" inside "kiosk".
-_ACCEPT_PATTERN = None
-
-
 def load_accept_patterns(path):
     """Read the accept-list file and return a compiled regex (or None)."""
     if not path or not os.path.exists(path):

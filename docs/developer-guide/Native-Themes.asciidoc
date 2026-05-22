@@ -244,6 +244,7 @@ look.
 
 To layer a brand color on top, override `RaisedButton` and
 accent-driven UIIDs the same way as Android above. The color names
+// vale-skip: write-good.So: "So" connects this consequence to the preceding sentence about Apple's UIColor names; replacing it would lose the bridging clause that motivates the next sentence.
 match Apple's `UIColor.systemBlue` etc. So you can mirror the SF
 Symbols semantics if you want.
 

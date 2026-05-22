@@ -941,7 +941,7 @@ image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwi
 
 That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
-For example: let's enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group. You can do this by changing the last line of the code above as such:
+For example, to enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group, change the last line of the code above as such:
 
 [source,java]
 ----
@@ -1471,7 +1471,7 @@ TIP: Since the `MultiList` uses the `GenericListCellRenderer` internally you can
 
 ===== Going further with the ListModel
 
-Let's assume that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
+Suppose that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
 
 You will fake it a bit but notice that 1M components won't be created even if you somehow scroll all the way down...
 
@@ -1627,7 +1627,7 @@ class MyRenderer extends Label implements ListCellRenderer {
 }
 ----
 
-Now let's have a look at a more advanced Renderer:
+Now look at a more advanced Renderer:
 
 [source,java]
 ----

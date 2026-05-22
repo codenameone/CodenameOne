@@ -2394,6 +2394,7 @@ include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp
 
 For some other methods, the public API needs to break apart the parameters into a form that the native interface can accept. For example: the `init()` method, shown above, takes a `MobihelpConfig` object as a parameter, but it passed the properties of the `config` object individually into the native interface.
 
+// vale-skip: Microsoft.Foreign: "i.e.," is the precise abbreviation here; "that is" would read awkwardly inside the parenthetical clause. LanguageTool requires the comma after "i.e.".
 Another example, is the `showSupport(ArrayList<String> tags)` method. The corresponding native interface method that's wraps is `showSupport(String tags, `String` separator)` - i.e., it needs to merge all tags into a single delimited string, and pass then to the native interface along with the delimiter used. The implementation is:
 
 [source,java]
@@ -3214,6 +3215,7 @@ You can also use the usual method of #Codename One Settings# -> #Basic# -> #Upda
 
 ==== How does it work
 
+// vale-skip: Microsoft.Contractions: "of it is simple" parses as the prepositional phrase "of it" plus the predicate "is simple"; collapsing it to "of it's" would read as a possessive ("of its simple") and lose the meaning.
 You can see the full code https://github.com/codenameone/UpdateCodenameOne[here] the gist of it is simple. You create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
 
 An update happens by running this tool with a path to a Codename One project for example:

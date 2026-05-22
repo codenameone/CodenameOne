@@ -413,7 +413,9 @@ Grid also has an autoFit attribute that can be used to automatically calculate t
 available space and preferred width. This is useful for working with UI's where the device orientation
 might change.
 
+// vale-skip: Microsoft.Auto: "auto-fit" is a literal CSS Grid keyword and matches the API option name; the unhyphenated form would refer to a different concept.
 A terse syntax for working with a grid also exists in two versions, one that uses the "auto-fit" option and
+// vale-skip: Microsoft.Auto: "auto-fit" is a literal CSS Grid keyword and matches the API option name; the unhyphenated form would refer to a different concept.
 another that accepts the number of columns. Here's a sample of the terse syntax coupled with auto-fit followed by screenshots
 of the same code in two orientations:
 

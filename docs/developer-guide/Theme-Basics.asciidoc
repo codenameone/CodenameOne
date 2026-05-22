@@ -118,7 +118,7 @@ The order for UIID settings for background is as follows:
 
 ==== The background behavior and Image
 
-Let's start in the first page of the style entry, you will customize the background behavior for the `Title` UIID and show/explain some behaviors.
+Start in the first page of the style entry, you will customize the background behavior for the `Title` UIID and show/explain some behaviors.
 
 The pictures below show the different types of background image behaviors.
 

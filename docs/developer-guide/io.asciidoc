@@ -903,8 +903,8 @@ You've had a great sample of working with `XMLParser` in the <<tree-section,Tree
 The https://www.codenameone.com/javadoc/com/codename1/processing/Result.html[Result] class provides a subset of
 https://www.w3schools.com/xml/xpath_intro.asp[XPath], but it isn't limited to XML documents, it can also work with JSON documents, and even with raw `Map` objects.
 
-Let's start by demonstrating how to process a response from the
-https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geocoder API]. Let's start with this XML snippet:
+Start by demonstrating how to process a response from the
+https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geocoder API]. Start with this XML snippet:
 
 [source,xml]
 ----
