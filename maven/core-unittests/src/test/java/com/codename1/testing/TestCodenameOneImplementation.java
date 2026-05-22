@@ -30,6 +30,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.TextSelection;
+import com.codename1.ui.Transform;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
@@ -1293,10 +1294,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void resetAffine(Object nativeGraphics) {
+        if (nativeGraphics instanceof TestGraphics) {
+            ((TestGraphics) nativeGraphics).transform.setIdentity();
+        }
     }
 
     @Override
     public void scale(Object nativeGraphics, float x, float y) {
+        if (nativeGraphics instanceof TestGraphics) {
+            TestTransform t = ((TestGraphics) nativeGraphics).transform;
+            TestTransform s = new TestTransform();
+            s.setScale(x, y, 1f);
+            t.concatenate(s);
+        }
+    }
+
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object nativeGraphics, float x, float y) {
+        if (nativeGraphics instanceof TestGraphics) {
+            TestTransform t = ((TestGraphics) nativeGraphics).transform;
+            TestTransform translation = new TestTransform();
+            translation.setTranslation(x, y, 0f);
+            t.concatenate(translation);
+        }
     }
 
 
@@ -1369,6 +1394,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         TestTransform transform = new TestTransform();
         transform.setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
         return transform;
+    }
+
+    @Override
+    public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
+        ((TestTransform) nativeTransform).setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
     }
 
     @Override
@@ -2174,8 +2204,135 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void drawImage(Object graphics, Object img, int x, int y) {
     }
 
+    /**
+     * Rasterizes the RGB array into the destination {@link TestImage} backing the
+     * supplied graphics, applying the current affine transform stored on the
+     * {@link TestGraphics}. Used by tests that exercise scaled image draws --
+     * the production no-op was insufficient because pixel-level assertions need
+     * actual output. The mapping is inverse, nearest-neighbour, so an integer
+     * scale yields exact source pixel replication.
+     */
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
+        if (!(graphics instanceof TestGraphics) || w <= 0 || h <= 0) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (g.image == null) {
+            return;
+        }
+
+        float[] corner = new float[2];
+        float[] mapped = new float[2];
+        float minDestX = Float.POSITIVE_INFINITY, minDestY = Float.POSITIVE_INFINITY;
+        float maxDestX = Float.NEGATIVE_INFINITY, maxDestY = Float.NEGATIVE_INFINITY;
+        for (int c = 0; c < 4; c++) {
+            corner[0] = (c & 1) == 0 ? x : x + w;
+            corner[1] = (c & 2) == 0 ? y : y + h;
+            g.transform.transformPoint(corner, mapped);
+            if (mapped[0] < minDestX) minDestX = mapped[0];
+            if (mapped[1] < minDestY) minDestY = mapped[1];
+            if (mapped[0] > maxDestX) maxDestX = mapped[0];
+            if (mapped[1] > maxDestY) maxDestY = mapped[1];
+        }
+
+        int clipRight = g.clipX + Math.max(0, g.clipWidth);
+        int clipBottom = g.clipY + Math.max(0, g.clipHeight);
+        int destStartX = Math.max((int) Math.floor(minDestX), g.clipX);
+        int destStartY = Math.max((int) Math.floor(minDestY), g.clipY);
+        int destEndX = Math.min((int) Math.ceil(maxDestX), clipRight);
+        int destEndY = Math.min((int) Math.ceil(maxDestY), clipBottom);
+        if (destStartX >= destEndX || destStartY >= destEndY) {
+            return;
+        }
+
+        TestTransform inv = g.transform.createInverse();
+        int imgW = g.image.width;
+        int imgH = g.image.height;
+        float[] destSample = new float[2];
+        float[] srcSample = new float[2];
+        for (int dy = destStartY; dy < destEndY; dy++) {
+            if (dy < 0 || dy >= imgH) {
+                continue;
+            }
+            int rowOffset = dy * imgW;
+            for (int dx = destStartX; dx < destEndX; dx++) {
+                if (dx < 0 || dx >= imgW) {
+                    continue;
+                }
+                destSample[0] = dx + 0.5f;
+                destSample[1] = dy + 0.5f;
+                inv.transformPoint(destSample, srcSample);
+                int sx = (int) Math.floor(srcSample[0]) - x;
+                int sy = (int) Math.floor(srcSample[1]) - y;
+                if (sx < 0 || sx >= w || sy < 0 || sy >= h) {
+                    continue;
+                }
+                int srcIdx = offset + sy * w + sx;
+                if (srcIdx < 0 || srcIdx >= rgbData.length) {
+                    continue;
+                }
+                int srcArgb = rgbData[srcIdx];
+                int dstIdx = rowOffset + dx;
+                if (!processAlpha || (srcArgb & 0xff000000) == 0xff000000) {
+                    g.image.argb[dstIdx] = srcArgb;
+                } else {
+                    int srcAlpha = (srcArgb >>> 24) & 0xff;
+                    if (srcAlpha == 0) {
+                        continue;
+                    }
+                    int srcR = (srcArgb >>> 16) & 0xff;
+                    int srcG = (srcArgb >>> 8) & 0xff;
+                    int srcB = srcArgb & 0xff;
+                    int dstArgb = g.image.argb[dstIdx];
+                    int dstR = (dstArgb >>> 16) & 0xff;
+                    int dstG = (dstArgb >>> 8) & 0xff;
+                    int dstB = dstArgb & 0xff;
+                    int outR = (srcR * srcAlpha + dstR * (255 - srcAlpha)) / 255;
+                    int outG = (srcG * srcAlpha + dstG * (255 - srcAlpha)) / 255;
+                    int outB = (srcB * srcAlpha + dstB * (255 - srcAlpha)) / 255;
+                    g.image.argb[dstIdx] = 0xff000000 | (outR << 16) | (outG << 8) | outB;
+                }
+            }
+        }
+    }
+
+    @Override
+    public void setTransform(Object graphics, Transform transform) {
+        if (!(graphics instanceof TestGraphics)) {
+            super.setTransform(graphics, transform);
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (transform == null || transform.isIdentity()) {
+            g.transform.setIdentity();
+            return;
+        }
+        Object nativeT = transform.getNativeTransform();
+        if (nativeT instanceof TestTransform) {
+            g.transform.copyFrom((TestTransform) nativeT);
+        } else {
+            g.transform.setIdentity();
+        }
+    }
+
+    @Override
+    public Transform getTransform(Object graphics) {
+        if (!(graphics instanceof TestGraphics)) {
+            return super.getTransform(graphics);
+        }
+        TestTransform t = ((TestGraphics) graphics).transform;
+        return Transform.makeAffine(t.m00, t.m10, t.m01, t.m11, t.m02, t.m12);
+    }
+
+    @Override
+    public void getTransform(Object graphics, Transform t) {
+        if (!(graphics instanceof TestGraphics)) {
+            super.getTransform(graphics, t);
+            return;
+        }
+        TestTransform src = ((TestGraphics) graphics).transform;
+        t.setAffine(src.m00, src.m10, src.m01, src.m11, src.m02, src.m12);
     }
 
     @Override
@@ -3256,6 +3413,123 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    // ================================================================
+    // Crypto bridge -- mirrors the JavaSEPort overrides so unit tests
+    // exercising com.codename1.security.* work in the lightweight
+    // CodenameOneImplementation subclass used by core-unittests.
+
+    private static java.security.SecureRandom testSecureRandom;
+
+    private static synchronized java.security.SecureRandom testSecureRandom() {
+        if (testSecureRandom == null) {
+            testSecureRandom = new java.security.SecureRandom();
+        }
+        return testSecureRandom;
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        if (out == null) return;
+        testSecureRandom().nextBytes(out);
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return testAes(transformation, key, iv, aad, plaintext, javax.crypto.Cipher.ENCRYPT_MODE);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return testAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
+    }
+
+    private static byte[] testAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int mode) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(key, "AES");
+            String tu = transformation == null ? "" : transformation.toUpperCase();
+            if (tu.indexOf("GCM") >= 0) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.GCMParameterSpec(128, iv));
+            } else if (iv != null) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.IvParameterSpec(iv));
+            } else {
+                cipher.init(mode, keySpec);
+            }
+            if (aad != null && aad.length > 0) {
+                cipher.updateAAD(aad);
+            }
+            return cipher.doFinal(input);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("AES " + (mode == javax.crypto.Cipher.ENCRYPT_MODE ? "encrypt" : "decrypt") + " failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PublicKey key = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+            return cipher.doFinal(plaintext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA encrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PrivateKey key = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key);
+            return cipher.doFinal(ciphertext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA decrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PrivateKey priv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initSign(priv);
+            sig.update(data);
+            return sig.sign();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("sign failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PublicKey pub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initVerify(pub);
+            sig.update(data);
+            return sig.verify(signature);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("verify failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        try {
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(bits);
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA keypair generation failed: " + e.getMessage());
+        }
+    }
+
     public static final class TestDatabase extends Database {
         private final String name;
         private boolean inTransaction;
@@ -3785,6 +4059,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int clipHeight;
         int translateX;
         int translateY;
+        final TestTransform transform = new TestTransform();
         TestFont font;
         TestImage image;
 

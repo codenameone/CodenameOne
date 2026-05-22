@@ -1015,7 +1015,7 @@ The result is as follows:
 .Rotating the rectangle
 image::img/rotation1.png[Rotating the rectangle,scaledwidth=20%]
 
-This may not be an intuitive outcome since you drew 10 rectangle components, be you see a portion of one
+This may not be an intuitive outcome since you drew 10 rectangle components, but you see a portion of one
 rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
 Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In
 your case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their

@@ -1,6 +1,6 @@
 == Animations
 
-many ways to animate and liven the data within a Codename One application, layout animations are probably chief among them. But first you need to understand some basics such as layout reflows.
+There are many ways to animate and liven the data within a Codename One application, layout animations are probably chief among them. But first you need to understand some basics such as layout reflows.
 
 [[layout-reflows]]
 === Layout reflow

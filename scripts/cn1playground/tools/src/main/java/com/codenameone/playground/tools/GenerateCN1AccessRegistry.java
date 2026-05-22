@@ -59,7 +59,39 @@ public final class GenerateCN1AccessRegistry {
             // it by returning it from invokeN. Exclude the whole class from
             // the bean-shell registry - Simd is a low-level SIMD primitives
             // API that playground scripts are extremely unlikely to need.
-            "com.codename1.util.Simd"
+            "com.codename1.util.Simd",
+            // com.codename1.security.* is a newly-introduced API
+            // (Biometrics, SecureStorage and friends). Until the cloud build
+            // server / TeaVM backend that compiles the playground catches up
+            // with the new classes the bridge generation trips the TeaVM
+            // RMI daemon. Exclude the new types from the registry for one
+            // release; the API is still usable in real apps, just not in the
+            // playground sandbox.
+            "com.codename1.security.Biometrics",
+            "com.codename1.security.SecureStorage",
+            "com.codename1.security.AuthenticationOptions",
+            "com.codename1.security.BiometricType",
+            "com.codename1.security.BiometricError",
+            "com.codename1.security.BiometricException",
+            // Crypto primitives (Hash, Hmac, Cipher, ...) ride the same
+            // one-release exclusion: the playground's TeaVM bridge needs to
+            // catch up with the new package before these can be reflected
+            // from beanshell.
+            "com.codename1.security.Hash",
+            "com.codename1.security.Hmac",
+            "com.codename1.security.Cipher",
+            "com.codename1.security.Signature",
+            "com.codename1.security.SecureRandom",
+            "com.codename1.security.KeyGenerator",
+            "com.codename1.security.KeyPair",
+            "com.codename1.security.SecretKey",
+            "com.codename1.security.PublicKey",
+            "com.codename1.security.PrivateKey",
+            "com.codename1.security.Jwt",
+            "com.codename1.security.Otp",
+            "com.codename1.security.Base32",
+            "com.codename1.security.Base64Url",
+            "com.codename1.security.CryptoException"
     ));
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{

@@ -42,8 +42,12 @@
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
+#import <LocalAuthentication/LocalAuthentication.h>
+#import <Security/Security.h>
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_impl_ios_IOSBiometrics.h"
+#include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
@@ -10885,4 +10889,453 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
     NSString *nsText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsText);
     POOL_END();
+}
+
+// ====================================================================
+// Crypto bridge -- implementations of the native methods on IOSNative
+// that back com.codename1.security.{Cipher,Signature,SecureRandom,
+// KeyGenerator}. The actual crypto runs in CN1Crypto.{h,m}; this file
+// is just the marshalling layer.
+//
+// CN1_INCLUDE_CRYPTO is enabled by IPhoneBuilder when the app references
+// com.codename1.security.* in its compiled bytecode. When the app doesn't
+// use the crypto API the implementations below collapse into no-ops, the
+// CommonCrypto / Security framework symbols are never referenced, and the
+// AES-GCM SPI symbols (gated separately by CN1_INCLUDE_CRYPTO_GCM) stay
+// completely out of the binary.
+
+#import "CN1Crypto.h"
+
+#ifndef NEW_CODENAME_ONE_VM
+#define CN1_PRIM_ARR_DATA(arr) ((void*)((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.array_)
+#define CN1_PRIM_ARR_LEN(arr)  (((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.length_)
+#else
+#define CN1_PRIM_ARR_DATA(arr) ((void*)((JAVA_ARRAY)(arr))->data)
+#define CN1_PRIM_ARR_LEN(arr)  (((JAVA_ARRAY)(arr))->length)
+#endif
+
+#ifdef CN1_INCLUDE_CRYPTO
+
+void com_codename1_impl_ios_IOSNative_secureRandomBytes___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    if (out == JAVA_NULL) return;
+    cn1_crypto_secure_random((uint8_t*) CN1_PRIM_ARR_DATA(out), (int) CN1_PRIM_ARR_LEN(out));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr, JAVA_INT padding) {
+    return cn1_crypto_aes_cbc(encrypt,
+        (uint8_t*) CN1_PRIM_ARR_DATA(keyArr), (int) CN1_PRIM_ARR_LEN(keyArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(ivArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr),  (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr),
+        padding);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    const uint8_t* aadPtr = (aadArr == JAVA_NULL) ? NULL : (uint8_t*) CN1_PRIM_ARR_DATA(aadArr);
+    int aadLen = (aadArr == JAVA_NULL) ? 0 : (int) CN1_PRIM_ARR_LEN(aadArr);
+    return cn1_crypto_aes_gcm(encrypt,
+        (uint8_t*) CN1_PRIM_ARR_DATA(keyArr), (int) CN1_PRIM_ARR_LEN(keyArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(ivArr),  (int) CN1_PRIM_ARR_LEN(ivArr),
+        aadPtr, aadLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr),  (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr), (int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return cn1_crypto_rsa_encrypt(paddingKind,
+        (uint8_t*) CN1_PRIM_ARR_DATA(x509),  (int) CN1_PRIM_ARR_LEN(x509),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr), (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT pkcs8, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return cn1_crypto_rsa_decrypt(paddingKind,
+        (uint8_t*) CN1_PRIM_ARR_DATA(pkcs8), (int) CN1_PRIM_ARR_LEN(pkcs8),
+        (uint8_t*) CN1_PRIM_ARR_DATA(inArr), (int) CN1_PRIM_ARR_LEN(inArr),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT pkcs8, JAVA_OBJECT data, JAVA_OBJECT outArr) {
+    return cn1_crypto_sign(algorithm,
+        (uint8_t*) CN1_PRIM_ARR_DATA(pkcs8), (int) CN1_PRIM_ARR_LEN(pkcs8),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data),  (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(outArr),(int) CN1_PRIM_ARR_LEN(outArr));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT x509, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    return cn1_crypto_verify(algorithm,
+        (uint8_t*) CN1_PRIM_ARR_DATA(x509), (int) CN1_PRIM_ARR_LEN(x509),
+        (uint8_t*) CN1_PRIM_ARR_DATA(data), (int) CN1_PRIM_ARR_LEN(data),
+        (uint8_t*) CN1_PRIM_ARR_DATA(sig),  (int) CN1_PRIM_ARR_LEN(sig));
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    int pubLen = 0, privLen = 0;
+    int rc = cn1_crypto_generate_rsa_keypair(bits,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPub),  (int) CN1_PRIM_ARR_LEN(outPub),  &pubLen,
+        (uint8_t*) CN1_PRIM_ARR_DATA(outPriv), (int) CN1_PRIM_ARR_LEN(outPriv), &privLen);
+    JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+    lens[0] = pubLen;
+    lens[1] = privLen;
+    return rc;
+}
+
+#else /* CN1_INCLUDE_CRYPTO */
+
+/*
+ * When the crypto API isn't reachable from the user's code we still emit
+ * stub IOSNative bridge symbols so the generated C from IOSImplementation
+ * has something to link against, but they all just delegate to the
+ * CN1_CRYPTO_E_UNSUPPORTED stubs in CN1Crypto.m (no encryption symbols
+ * referenced).
+ */
+
+void com_codename1_impl_ios_IOSNative_secureRandomBytes___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+    (void) instanceObject; (void) out;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr, JAVA_INT padding) {
+    (void) instanceObject; (void) encrypt; (void) keyArr; (void) ivArr; (void) inArr; (void) outArr; (void) padding;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) encrypt; (void) keyArr; (void) ivArr; (void) aadArr; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) paddingKind; (void) x509; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT pkcs8, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) paddingKind; (void) pkcs8; (void) inArr; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT pkcs8, JAVA_OBJECT data, JAVA_OBJECT outArr) {
+    (void) instanceObject; (void) algorithm; (void) pkcs8; (void) data; (void) outArr;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT x509, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    (void) instanceObject; (void) algorithm; (void) x509; (void) data; (void) sig;
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    (void) instanceObject; (void) bits; (void) outPub; (void) outPriv;
+    if (lengths != JAVA_NULL) {
+        JAVA_ARRAY_INT* lens = (JAVA_ARRAY_INT*) CN1_PRIM_ARR_DATA(lengths);
+        lens[0] = 0;
+        lens[1] = 0;
+    }
+    return CN1_CRYPTO_E_UNSUPPORTED;
+}
+
+#endif /* CN1_INCLUDE_CRYPTO */
+
+// ============================================================================
+// Biometrics + SecureStorage natives (LocalAuthentication + Security framework)
+// ============================================================================
+//
+// The static LAContext is held across calls so it can be invalidated mid-prompt
+// by stopBiometricAuthentication(). Memory management is manual because the
+// iOS port builds with CLANG_ENABLE_OBJC_ARC=NO (see ARC memory in plan).
+
+static LAContext *cn1_biometricsContext = nil;
+static NSString *cn1_keychainAccessGroup = nil;
+
+static LAContext *cn1_ensureContext(void) {
+    if (cn1_biometricsContext == nil) {
+        cn1_biometricsContext = [[LAContext alloc] init];
+    }
+    return cn1_biometricsContext;
+}
+
+static void cn1_resetContext(void) {
+    if (cn1_biometricsContext != nil) {
+        [cn1_biometricsContext release];
+        cn1_biometricsContext = nil;
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (NSClassFromString(@"LAContext") == NULL) {
+        return JAVA_FALSE;
+    }
+    NSError *error = nil;
+    LAContext *ctx = cn1_ensureContext();
+    BOOL ok = [ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error];
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (NSClassFromString(@"LAContext") == NULL) {
+        return 0;
+    }
+    NSError *error = nil;
+    LAContext *ctx = cn1_ensureContext();
+    if (![ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
+        return 0;
+    }
+    JAVA_INT mask = 0;
+    if (@available(iOS 11.0, *)) {
+        if (ctx.biometryType == LABiometryTypeTouchID) {
+            mask |= 1;
+        } else if (ctx.biometryType == LABiometryTypeFaceID) {
+            mask |= 2;
+        }
+    } else {
+        // Pre-iOS 11: only Touch ID exists.
+        mask |= 1;
+    }
+    return mask;
+}
+
+void com_codename1_impl_ios_IOSNative_authenticateBiometric___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    // Each authenticate call gets a fresh context so a prior stopAuthentication
+    // can't bleed cancellation into the next request.
+    cn1_resetContext();
+    LAContext *ctx = cn1_ensureContext();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [ctx evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+            localizedReason:nsReason
+                      reply:^(BOOL success, NSError *err) {
+            if (success) {
+                com_codename1_impl_ios_IOSBiometrics_nativeAuthSuccess___int(getThreadLocalData(), requestId);
+            } else {
+                int code = (int)err.code;
+                NSString *msg = err.localizedDescription ? err.localizedDescription : @"";
+                JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), msg);
+                com_codename1_impl_ios_IOSBiometrics_nativeAuthError___int_int_java_lang_String(getThreadLocalData(), requestId, code, jmsg);
+            }
+        }];
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_stopBiometricAuthentication__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1_biometricsContext != nil) {
+        if (@available(iOS 9.0, *)) {
+            [cn1_biometricsContext invalidate];
+        }
+        cn1_resetContext();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
+    if (cn1_keychainAccessGroup != nil) {
+        [cn1_keychainAccessGroup release];
+        cn1_keychainAccessGroup = nil;
+    }
+    if (accessGroup != JAVA_NULL) {
+        NSString *ag = toNSString(CN1_THREAD_STATE_PASS_ARG accessGroup);
+        if (ag != nil && [ag length] > 0) {
+            cn1_keychainAccessGroup = [ag retain];
+        }
+    }
+}
+
+static NSString *cn1_getAppName(CN1_THREAD_STATE_SINGLE_ARG) {
+    JAVA_OBJECT d = com_codename1_ui_Display_getInstance___R_com_codename1_ui_Display(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    JAVA_OBJECT key = fromNSString(CN1_THREAD_STATE_PASS_ARG @"AppName");
+    JAVA_OBJECT def = fromNSString(CN1_THREAD_STATE_PASS_ARG @"CodenameOneApp");
+    JAVA_OBJECT res = com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, key, def);
+    return toNSString(CN1_THREAD_STATE_PASS_ARG res);
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsReason retain];
+    [nsAccount retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSMutableDictionary *q = [NSMutableDictionary dictionary];
+        [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [q setObject:@YES forKey:(__bridge id)kSecReturnData];
+        [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [q setObject:appName forKey:(__bridge id)kSecAttrService];
+        [q setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+        if (accessGroup != nil) {
+            [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        CFTypeRef dataRef = NULL;
+        OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+        if (status == errSecSuccess) {
+            NSData *d = (__bridge NSData *)dataRef;
+            NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
+            JAVA_OBJECT jv = fromNSString(getThreadLocalData(), value);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageStringResult___int_java_lang_String(getThreadLocalData(), requestId, jv);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsReason release];
+        [nsAccount release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
+    POOL_END();
+}
+
+static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString *nsAccount, NSString *nsValue, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    [q setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    NSMutableDictionary *ch = [NSMutableDictionary dictionary];
+    [ch setObject:[nsValue dataUsingEncoding:NSUTF8StringEncoding] forKey:(__bridge id)kSecValueData];
+    OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)ch);
+    if (status == errSecSuccess) {
+        com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+    } else {
+        JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+        com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account, JAVA_OBJECT value) {
+    POOL_BEGIN();
+    NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsReason retain];
+    [nsAccount retain];
+    [nsValue retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        SecAccessControlRef sacRef = SecAccessControlCreateWithFlags(kCFAllocatorDefault,
+                kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+                kSecAccessControlTouchIDCurrentSet,
+                nil);
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        [d setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [d setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [d setObject:appName forKey:(__bridge id)kSecAttrService];
+        [d setObject:[nsValue dataUsingEncoding:NSUTF8StringEncoding] forKey:(__bridge id)kSecValueData];
+        [d setObject:(__bridge id)sacRef forKey:(__bridge id)kSecAttrAccessControl];
+        [d setObject:nsReason forKey:(__bridge id)kSecUseOperationPrompt];
+        if (accessGroup != nil) {
+            [d setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        OSStatus status = SecItemAdd((__bridge CFDictionaryRef)d, nil);
+        if (sacRef != NULL) {
+            CFRelease(sacRef);
+        }
+        if (status == errSecDuplicateItem) {
+            cn1_secureStorageUpdate((int)requestId, nsReason, nsAccount, nsValue, appName, accessGroup);
+        } else if (status == errSecSuccess) {
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsReason release];
+        [nsAccount release];
+        [nsValue release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *accessGroup = cn1_keychainAccessGroup;
+    [nsAccount retain];
+    [appName retain];
+    if (accessGroup != nil) {
+        [accessGroup retain];
+    }
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        [d setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+        [d setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+        [d setObject:appName forKey:(__bridge id)kSecAttrService];
+        if (accessGroup != nil) {
+            [d setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+        }
+        OSStatus status = SecItemDelete((__bridge CFDictionaryRef)d);
+        if (status == errSecSuccess || status == errSecItemNotFound) {
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageBooleanResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+        } else {
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
+        }
+        [nsAccount release];
+        [appName release];
+        if (accessGroup != nil) {
+            [accessGroup release];
+        }
+    });
+    POOL_END();
+}
+
+// ====================================================================
+// Crypto bridge _R_int wrappers
+//
+// ParparVM emits two C entry points for every non-void native method: the
+// unmangled implementation (com_..._methodName___paramTypes) plus a
+// _R_<returnType>-suffixed wrapper that the bytecode dispatcher actually
+// calls. We forward each wrapper to the matching implementation -- which is
+// either the CN1_INCLUDE_CRYPTO-on real version or the always-fail stub
+// from the #else branch above, depending on the build configuration.
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr, JAVA_INT padding) {
+    return com_codename1_impl_ios_IOSNative_aesCbc___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(CN1_THREAD_STATE_PASS_ARG instanceObject, encrypt, keyArr, ivArr, inArr, outArr, padding);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT encrypt, JAVA_OBJECT keyArr, JAVA_OBJECT ivArr, JAVA_OBJECT aadArr, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return com_codename1_impl_ios_IOSNative_aesGcm___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, encrypt, keyArr, ivArr, aadArr, inArr, outArr);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT x509, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return com_codename1_impl_ios_IOSNative_rsaEncrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, paddingKind, x509, inArr, outArr);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT paddingKind, JAVA_OBJECT pkcs8, JAVA_OBJECT inArr, JAVA_OBJECT outArr) {
+    return com_codename1_impl_ios_IOSNative_rsaDecrypt___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, paddingKind, pkcs8, inArr, outArr);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT pkcs8, JAVA_OBJECT data, JAVA_OBJECT outArr) {
+    return com_codename1_impl_ios_IOSNative_sign___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, algorithm, pkcs8, data, outArr);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT algorithm, JAVA_OBJECT x509, JAVA_OBJECT data, JAVA_OBJECT sig) {
+    return com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, algorithm, x509, data, sig);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
+    return com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, bits, outPub, outPriv, lengths);
 }

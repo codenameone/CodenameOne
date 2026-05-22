@@ -83,6 +83,9 @@ public class IPhoneBuilder extends Executor {
     private String buildVersion;
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
+    private boolean usesCryptoAPI;
+    private boolean usesCryptoGcm;
+    private boolean usesBiometrics;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -646,6 +649,24 @@ public class IPhoneBuilder extends Executor {
                     if (!usesPurchaseAPI && cls.indexOf("com/codename1/payment") == 0) {
                         usesPurchaseAPI = true;
                     }
+                    if (cls.indexOf("com/codename1/security/") == 0) {
+                        // com.codename1.security contains two distinct API
+                        // families that toggle different bits of the iOS
+                        // build. Biometrics + SecureStorage need the
+                        // LocalAuthentication.framework linkage; the crypto
+                        // primitives need the CN1Crypto.{h,m} #defines and
+                        // an Info.plist export-compliance entry.
+                        String shortName = cls.substring("com/codename1/security/".length());
+                        boolean isBiometric =
+                                shortName.startsWith("Biometric")
+                             || shortName.equals("SecureStorage")
+                             || shortName.equals("AuthenticationOptions");
+                        if (isBiometric) {
+                            usesBiometrics = true;
+                        } else {
+                            usesCryptoAPI = true;
+                        }
+                    }
                 }
 
                 @Override
@@ -707,6 +728,28 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "iOS7Theme.res").delete();
         } 
 
+
+        // Flip the crypto build toggles in CN1Crypto.h based on what the
+        // user's bytecode references. Apps that don't touch
+        // com.codename1.security.* get stub-only versions of the iOS
+        // crypto bridge -- no CommonCrypto / Security framework symbols
+        // referenced -- which keeps Apple's static-symbol scanner happy.
+        usesCryptoGcm = usesCryptoAPI && "true".equals(request.getArg("ios.crypto.gcm", "false"));
+        try {
+            File cn1Crypto = new File(buildinRes, "CN1Crypto.h");
+            if (cn1Crypto.exists()) {
+                if (usesCryptoAPI) {
+                    replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO", "#define CN1_INCLUDE_CRYPTO");
+                }
+                if (usesCryptoGcm) {
+                    replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO_GCM", "#define CN1_INCLUDE_CRYPTO_GCM");
+                }
+            }
+        } catch (Exception ex) {
+            throw new BuildException("Failed to configure CN1Crypto.h", ex);
+        }
+        debug("Crypto API "+(usesCryptoAPI?"enabled":"disabled")
+              +", AES-GCM "+(usesCryptoGcm?"enabled":"disabled"));
 
         if (useMetal) {
             try {
@@ -1562,6 +1605,18 @@ public class IPhoneBuilder extends Executor {
                 addLibs = addLibs.replace(',', ';').replace(':', ';');
                 if (addLibs.startsWith(";")) {
                     addLibs = addLibs.substring(1);
+                }
+            }
+
+            // LocalAuthentication is required only when the app actually uses
+            // com.codename1.security.Biometrics / SecureStorage. The scanner
+            // above sets usesBiometrics if any com/codename1/security/ class
+            // is referenced; apps that don't touch the API pay nothing.
+            if (usesBiometrics) {
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "LocalAuthentication.framework";
+                } else if (!addLibs.toLowerCase().contains("localauthentication")) {
+                    addLibs = addLibs + ";LocalAuthentication.framework";
                 }
             }
 
@@ -2742,6 +2797,24 @@ public class IPhoneBuilder extends Executor {
 
         // nothing to inject here? move along
         String inject = request.getArg("ios.plistInject", "<key>CFBundleShortVersionString</key> 	<string>" + buildVersion +"</string>");
+
+        // Export compliance: when the app uses com.codename1.security.* we
+        // route all crypto through Apple's Security framework / CommonCrypto
+        // (and, with the ios.crypto.gcm opt-in, AES-GCM via stable SPI
+        // symbols). All of these qualify for the "uses standard cryptography"
+        // exemption under EAR 740.17, so we set ITSAppUsesNonExemptEncryption
+        // to false. Callers can override by setting the
+        // ios.appUsesNonExemptEncryption build hint -- pass it as "true" if
+        // your app links proprietary crypto in addition to ours, or as ""
+        // (empty) to omit the key entirely and answer in App Store Connect.
+        String exemptOverride = request.getArg("ios.appUsesNonExemptEncryption", null);
+        if (exemptOverride != null) {
+            if (exemptOverride.length() > 0 && !inject.contains("ITSAppUsesNonExemptEncryption")) {
+                inject += "\n<key>ITSAppUsesNonExemptEncryption</key><"+exemptOverride+"/>";
+            }
+        } else if (usesCryptoAPI && !inject.contains("ITSAppUsesNonExemptEncryption")) {
+            inject += "\n<key>ITSAppUsesNonExemptEncryption</key><false/>";
+        }
         
         String applicationQueriesSchemes = request.getArg("ios.applicationQueriesSchemes", null);
         if(applicationQueriesSchemes != null && applicationQueriesSchemes.length() > 0) {

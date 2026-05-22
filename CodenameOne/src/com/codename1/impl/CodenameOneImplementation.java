@@ -51,6 +51,8 @@ import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.security.Biometrics;
+import com.codename1.security.SecureStorage;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
@@ -6578,6 +6580,24 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific biometric authentication entry point. Default
+    /// implementation returns {@code null}; ports that support biometrics
+    /// override this to return a cached singleton. Application code should
+    /// use {@link com.codename1.security.Biometrics#getInstance()} instead
+    /// of calling this directly --- it transparently substitutes a no-op
+    /// fallback when the port returns {@code null}.
+    public Biometrics getBiometrics() {
+        return null;
+    }
+
+    /// Returns the port-specific biometric-gated secure storage. Default
+    /// implementation returns {@code null}; ports that back the keychain
+    /// override this. Application code should call
+    /// {@link com.codename1.security.SecureStorage#getInstance()} instead.
+    public SecureStorage getSecureStorage() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters
@@ -10156,5 +10176,78 @@ public abstract class CodenameOneImplementation {
                 callback.registeredForPush("" + pushId);
             }
         }
+    }
+
+    // ================================================================
+    // Crypto bridge -- see com.codename1.security package.
+    //
+    // The default implementations below all throw -- each platform port
+    // (JavaSEPort, AndroidImplementation, IOSImplementation) overrides them
+    // with the real native-backed implementation. The core stays free of
+    // java.security / javax.crypto references because the core compiles
+    // against the CLDC11 stub where those classes (and full Class reflection)
+    // are not available.
+
+    private static RuntimeException cryptoUnsupported(String op) {
+        return new RuntimeException("Crypto operation " + op + " is not supported on this platform. "
+                + "If you are running in a fresh CodenameOneImplementation subclass, override the matching method.");
+    }
+
+    /// Fills `out` with cryptographically secure random bytes. Override in the
+    /// port to route to the platform's native CSPRNG.
+    public void secureRandomBytes(byte[] out) {
+        throw cryptoUnsupported("secureRandomBytes");
+    }
+
+    /// Encrypts with AES. Modes / paddings supported: AES/CBC/PKCS5Padding,
+    /// AES/CBC/NoPadding, AES/GCM/NoPadding (recommended -- authenticated;
+    /// the auth tag is appended to the ciphertext per the JCE convention) and
+    /// AES/ECB/PKCS5Padding (legacy interop only). `iv` may be null for ECB.
+    /// `aad` is associated data for GCM (may be null).
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        throw cryptoUnsupported("aesEncrypt");
+    }
+
+    /// Decrypts with AES. Same parameters as `aesEncrypt`.
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        throw cryptoUnsupported("aesDecrypt");
+    }
+
+    /// Encrypts with RSA using an X.509 (SubjectPublicKeyInfo) DER-encoded
+    /// public key. `transformation` is typically
+    /// "RSA/ECB/OAEPWithSHA-256AndMGF1Padding" or "RSA/ECB/PKCS1Padding".
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        throw cryptoUnsupported("rsaEncrypt");
+    }
+
+    /// Decrypts with RSA using a PKCS#8 DER-encoded private key.
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        throw cryptoUnsupported("rsaDecrypt");
+    }
+
+    /// Computes a signature. `algorithm` is e.g. "SHA256withRSA",
+    /// "SHA256withECDSA". `keyAlgorithm` is "RSA" or "EC".
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        throw cryptoUnsupported("cryptoSign");
+    }
+
+    /// Verifies a signature with an X.509 public key.
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
+        throw cryptoUnsupported("cryptoVerify");
+    }
+
+    /// Generates a fresh RSA key pair of the given size in bits. Returns
+    /// `{publicKeyX509, privateKeyPkcs8}`.
+    public byte[][] generateRsaKeyPair(int bits) {
+        throw cryptoUnsupported("generateRsaKeyPair");
+    }
+
+    /// Generates `bytes` of fresh symmetric key material. The default just
+    /// delegates to [#secureRandomBytes(byte[])] (no structure is required
+    /// for AES keys).
+    public byte[] generateSymmetricKey(int bytes) {
+        byte[] out = new byte[bytes];
+        secureRandomBytes(out);
+        return out;
     }
 }

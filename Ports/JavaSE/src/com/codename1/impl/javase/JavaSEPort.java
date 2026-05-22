@@ -96,6 +96,8 @@ import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
+import com.codename1.security.Biometrics;
+import com.codename1.security.SecureStorage;
 import com.codename1.media.AbstractMedia;
 import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
@@ -3784,6 +3786,41 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * Discovers cn1lib-contributed simulator menu items via
+     * {@link SimulatorHookLoader} and groups them by menu name. The UX shell
+     * (this method, today) translates the neutral {@link SimulatorHook} list
+     * into Swing widgets; the contract that cn1libs depend on is the
+     * properties file + static method, not these JMenu/JMenuItem types.
+     */
+    private List<JMenu> buildExtensionMenus() {
+        List<SimulatorHook> hooks = SimulatorHookLoader.load();
+        LinkedHashMap<String, JMenu> byName = new LinkedHashMap<String, JMenu>();
+        for (final SimulatorHook hook : hooks) {
+            // API-only hooks (no label) are still registered with the
+            // executor so CN.executeHook can drive them, but they don't
+            // appear in the menu.
+            if (!hook.hasMenuLabel()) {
+                continue;
+            }
+            JMenu menu = byName.get(hook.getMenuName());
+            if (menu == null) {
+                menu = new JMenu(hook.getMenuName());
+                registerMenuWithBlit(menu);
+                byName.put(hook.getMenuName(), menu);
+            }
+            JMenuItem item = new JMenuItem(hook.getLabel());
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    hook.getInvoke().run();
+                }
+            });
+            menu.add(item);
+        }
+        return new ArrayList<JMenu>(byName.values());
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -4556,6 +4593,87 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(pushSim);
 
+        JMenu biometricMenu = new JMenu("Biometric Simulation");
+
+        final JCheckBoxMenuItem bioAvailable = new JCheckBoxMenuItem("Hardware Available",
+                pref.getBoolean("BiometricSim.available", false));
+        JavaSEBiometrics.simAvailable = bioAvailable.isSelected();
+        bioAvailable.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simAvailable = bioAvailable.isSelected();
+                pref.putBoolean("BiometricSim.available", bioAvailable.isSelected());
+            }
+        });
+        biometricMenu.add(bioAvailable);
+
+        biometricMenu.addSeparator();
+
+        final JCheckBoxMenuItem bioFace = new JCheckBoxMenuItem("Face ID Enrolled",
+                pref.getBoolean("BiometricSim.face", false));
+        JavaSEBiometrics.simFaceEnrolled = bioFace.isSelected();
+        bioFace.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simFaceEnrolled = bioFace.isSelected();
+                pref.putBoolean("BiometricSim.face", bioFace.isSelected());
+            }
+        });
+        biometricMenu.add(bioFace);
+
+        final JCheckBoxMenuItem bioTouch = new JCheckBoxMenuItem("Touch ID Enrolled",
+                pref.getBoolean("BiometricSim.touch", false));
+        JavaSEBiometrics.simTouchEnrolled = bioTouch.isSelected();
+        bioTouch.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simTouchEnrolled = bioTouch.isSelected();
+                pref.putBoolean("BiometricSim.touch", bioTouch.isSelected());
+            }
+        });
+        biometricMenu.add(bioTouch);
+
+        final JCheckBoxMenuItem bioIris = new JCheckBoxMenuItem("Iris Enrolled",
+                pref.getBoolean("BiometricSim.iris", false));
+        JavaSEBiometrics.simIrisEnrolled = bioIris.isSelected();
+        bioIris.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEBiometrics.simIrisEnrolled = bioIris.isSelected();
+                pref.putBoolean("BiometricSim.iris", bioIris.isSelected());
+            }
+        });
+        biometricMenu.add(bioIris);
+
+        biometricMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Next authenticate() Outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        String savedOutcome = pref.get("BiometricSim.outcome", JavaSEBiometrics.SimOutcome.SUCCEED.name());
+        try {
+            JavaSEBiometrics.nextOutcome = JavaSEBiometrics.SimOutcome.valueOf(savedOutcome);
+        } catch (IllegalArgumentException ex) {
+            JavaSEBiometrics.nextOutcome = JavaSEBiometrics.SimOutcome.SUCCEED;
+        }
+        JavaSEBiometrics.SimOutcome[] outcomes = JavaSEBiometrics.SimOutcome.values();
+        for (int i = 0; i < outcomes.length; i++) {
+            final JavaSEBiometrics.SimOutcome outcome = outcomes[i];
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(outcome.name(),
+                    outcome == JavaSEBiometrics.nextOutcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEBiometrics.nextOutcome = outcome;
+                    pref.put("BiometricSim.outcome", outcome.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        biometricMenu.add(outcomeMenu);
+
+        simulateMenu.add(biometricMenu);
+
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
         // top of Toolbar created by Toolbar.initTitleBarStatus). The native
@@ -5025,6 +5143,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             bar.add(toolsMenu);
             bar.add(skinMenu);
             bar.add(createNativeThemeMenu(frm));
+            for (JMenu extensionMenu : buildExtensionMenus()) {
+                bar.add(extensionMenu);
+            }
             bar.add(helpMenu);
         }
 
@@ -10283,13 +10404,22 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void execute(String url) {
+        // Simulator-only intercept: a URL that matches a registered
+        // SimulatorHookExecutor entry is dispatched as a named hook
+        // (e.g. "bluetooth:item1") instead of being handed to the
+        // OS URL opener. SimulatorHookExecutor.execute returns false
+        // when no such hook is registered, so non-hook URLs fall
+        // through to the normal native behavior.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.execute(url.trim())) {
+            return;
+        }
         try {
             url = url.trim();
             if(url.startsWith("file:")) {
                 if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to open the file")){
                     return;
                 }
-                
+
                 url = new File(unfile(url)).toURI().toURL().toExternalForm();
             }
             final String fUrl = url;
@@ -10298,7 +10428,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     launchBrowserThatWorks(fUrl);
                 }
             });
-            
+
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -11724,6 +11854,59 @@ public class JavaSEPort extends CodenameOneImplementation {
             return new String[] {"desktop", "tablet"};
         }
         return platformOverrides;
+    }
+
+    private JavaSEBiometrics biometrics;
+    private JavaSESecureStorage secureStorage;
+    private boolean biometricsBuildHintsInstalled;
+
+    @Override
+    public Biometrics getBiometrics() {
+        installBiometricsBuildHintsIfNeeded();
+        if (biometrics == null) {
+            biometrics = new JavaSEBiometrics();
+        }
+        return biometrics;
+    }
+
+    @Override
+    public SecureStorage getSecureStorage() {
+        installBiometricsBuildHintsIfNeeded();
+        if (secureStorage == null) {
+            secureStorage = new JavaSESecureStorage((JavaSEBiometrics) getBiometrics());
+        }
+        return secureStorage;
+    }
+
+    /**
+     * The first time the app reaches the biometric APIs in the simulator,
+     * add the iOS Face ID usage description to {@code codenameone_settings.properties}
+     * if the developer hasn't supplied one. Apple rejects builds that present
+     * the Face ID prompt without {@code NSFaceIDUsageDescription} set, so this
+     * keeps simulator-developed projects buildable on iOS without the user
+     * having to remember the build hint. They should overwrite the placeholder
+     * text before shipping.
+     */
+    private void installBiometricsBuildHintsIfNeeded() {
+        if (biometricsBuildHintsInstalled) {
+            return;
+        }
+        biometricsBuildHintsInstalled = true;
+        Map<String, String> existing = getProjectBuildHints();
+        if (existing == null) {
+            return;
+        }
+        if (!existing.containsKey("ios.NSFaceIDUsageDescription")) {
+            try {
+                setProjectBuildHint(
+                        "ios.NSFaceIDUsageDescription",
+                        "Authenticate to securely access your account");
+            } catch (RuntimeException ignore) {
+                // codenameone_settings.properties became unwritable between
+                // the read above and the write here; not fatal -- the device
+                // builder will warn if the hint is missing.
+            }
+        }
     }
 
     public LocationManager getLocationManager() {
@@ -14817,6 +15000,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        // If this is a registered simulator hook URL, report it as
+        // executable up-front so a cross-platform CN1 UnitTest can use
+        // CN.canExecute(...) to gate hook calls behind a "we're in the
+        // simulator" check without exception-handling.
+        if (url != null && com.codename1.system.SimulatorHookExecutor.isRegistered(url.trim())) {
+            return Boolean.TRUE;
+        }
         if(!url.startsWith("http")) {
             int pos = url.indexOf(":");
             if(pos > -1) {
@@ -15606,7 +15796,128 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void nativeBrowserWindowRemoveCloseListener(Object window, com.codename1.ui.events.ActionListener l) {
         ((AbstractBrowserWindowSE)window).removeCloseListener(l);
-        
+
     }
     // END NATIVE BROWSER WINDOW METHODS---------------------------------------------------------
+
+    // ================================================================
+    // Crypto bridge -- routes the com.codename1.security API onto the
+    // JCE/JDK crypto provider available on JavaSE/Android. iOS does
+    // not reach this code path; it overrides the same methods on
+    // CodenameOneImplementation via IOSImplementation + CN1Crypto.{h,m}.
+
+    private static java.security.SecureRandom javaseSecureRandom;
+    private static final Object javaseSecureRandomSync = new Object();
+
+    private static java.security.SecureRandom javaseSecureRandom() {
+        synchronized (javaseSecureRandomSync) {
+            if (javaseSecureRandom == null) {
+                javaseSecureRandom = new java.security.SecureRandom();
+            }
+            return javaseSecureRandom;
+        }
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        if (out == null) return;
+        javaseSecureRandom().nextBytes(out);
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return javaseAes(transformation, key, iv, aad, plaintext, javax.crypto.Cipher.ENCRYPT_MODE);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return javaseAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
+    }
+
+    private static byte[] javaseAes(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] input, int mode) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(key, "AES");
+            String tu = transformation == null ? "" : transformation.toUpperCase();
+            if (tu.indexOf("GCM") >= 0) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.GCMParameterSpec(128, iv));
+            } else if (iv != null) {
+                cipher.init(mode, keySpec, new javax.crypto.spec.IvParameterSpec(iv));
+            } else {
+                cipher.init(mode, keySpec);
+            }
+            if (aad != null && aad.length > 0) {
+                cipher.updateAAD(aad);
+            }
+            return cipher.doFinal(input);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("AES " + (mode == javax.crypto.Cipher.ENCRYPT_MODE ? "encrypt" : "decrypt") + " failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PublicKey key = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+            return cipher.doFinal(plaintext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA encrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        try {
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+            java.security.PrivateKey key = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key);
+            return cipher.doFinal(ciphertext);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA decrypt failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PrivateKey priv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initSign(priv);
+            sig.update(data);
+            return sig.sign();
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("sign failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509, byte[] data, byte[] signature) {
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance(keyAlgorithm);
+            java.security.PublicKey pub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
+            java.security.Signature sig = java.security.Signature.getInstance(algorithm);
+            sig.initVerify(pub);
+            sig.update(data);
+            return sig.verify(signature);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("verify failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        try {
+            java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(bits);
+            java.security.KeyPair kp = kpg.generateKeyPair();
+            return new byte[][]{ kp.getPublic().getEncoded(), kp.getPrivate().getEncoded() };
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException("RSA keypair generation failed: " + e.getMessage());
+        }
+    }
 }

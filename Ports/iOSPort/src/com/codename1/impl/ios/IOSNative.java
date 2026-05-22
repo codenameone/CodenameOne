@@ -628,6 +628,42 @@ public final class IOSNative {
 
     native void cancelLocalNotification(String id);
 
+    // --- Biometrics (LocalAuthentication.framework) -------------------------
+
+    /** True when LAContext.canEvaluatePolicy(deviceOwnerAuthenticationWithBiometrics) succeeds. */
+    native boolean isBiometricsSupported();
+
+    /** Same as {@link #isBiometricsSupported()} but also requires at least one biometric to be enrolled. */
+    native boolean canAuthenticateBiometric();
+
+    /** Bitmask: bit 0 = FINGERPRINT (Touch ID), bit 1 = FACE (Face ID). */
+    native int getAvailableBiometricTypes();
+
+    /**
+     * Triggers an asynchronous biometric prompt. Native code calls back into
+     * {@code IOSBiometrics.nativeAuthSuccess(int)} or
+     * {@code IOSBiometrics.nativeAuthError(int, int, String)} with the same
+     * requestId.
+     */
+    native void authenticateBiometric(int requestId, String reason);
+
+    /** Invalidates the LAContext so the in-flight prompt resolves with LAErrorAppCancel. */
+    native void stopBiometricAuthentication();
+
+    // --- Secure storage (Security.framework keychain) -----------------------
+
+    /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */
+    native void setSecureStorageAccessGroup(String accessGroup);
+
+    /** Async keychain read; result via IOSSecureStorage.nativeStorageStringResult / nativeStorageError. */
+    native void secureStorageGet(int requestId, String reason, String account);
+
+    /** Async keychain write; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
+    native void secureStorageSet(int requestId, String reason, String account, String value);
+
+    /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
+    native void secureStorageRemove(int requestId, String reason, String account);
+
     native long gausianBlurImage(long peer, float radius);
     
     /**
@@ -758,5 +794,33 @@ public final class IOSNative {
     native boolean isRTLString(String javaString);
 
     public static native void announceForAccessibility(String text);
-    
+
+    // ============================================================
+    // Crypto bridge -- backed by CN1Crypto.{h,m} in nativeSources/.
+    //
+    // Each method returns the number of bytes written to its output buffer,
+    // or a negative CN1_CRYPTO_E_* error code on failure. The Java side in
+    // IOSImplementation trims to that length and translates failures into
+    // CryptoException.
+
+    native void secureRandomBytes(byte[] out);
+
+    native int aesCbc(int encrypt, byte[] key, byte[] iv,
+                      byte[] in, byte[] out, int padding);
+
+    native int aesGcm(int encrypt, byte[] key, byte[] iv,
+                      byte[] aad, byte[] in, byte[] out);
+
+    native int rsaEncrypt(int paddingKind, byte[] x509, byte[] in, byte[] out);
+
+    native int rsaDecrypt(int paddingKind, byte[] pkcs8, byte[] in, byte[] out);
+
+    native int sign(int algorithm, byte[] pkcs8, byte[] data, byte[] out);
+
+    native int verify(int algorithm, byte[] x509, byte[] data, byte[] sig);
+
+    /// `lengths[0]` is set to public-key DER length, `lengths[1]` to
+    /// private-key DER length. Returns 0 on success, negative on error.
+    native int generateRsaKeyPair(int bits, byte[] outPub, byte[] outPriv, int[] lengths);
+
 }

@@ -213,6 +213,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StreamApiTest(),
             new StringApiTest(),
             new TimeApiTest(),
+            new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
             new VPNDetectionAPITest(),
@@ -312,7 +313,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // before any later test runs. (Underlying picker behaviour is
                 // tracked separately; this skip just stops the harness from
                 // burning the whole budget on the wedge.)
-                || "PickerCancelRestoreTest".equals(testName);
+                || "PickerCancelRestoreTest".equals(testName)
+                // CryptoApiTest exercises AES/RSA/Signature/SecureRandom which
+                // route through CodenameOneImplementation overrides; the
+                // JavaScript port doesn't yet provide a crypto bridge.
+                || "CryptoApiTest".equals(testName);
     }
 
     private static boolean isJsSkippedThemeTest(String testName) {
