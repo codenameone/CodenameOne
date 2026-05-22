@@ -1700,6 +1700,134 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /**
+     * Emits the debugger-driven invoke thunk for this method. The thunk
+     * has a uniform C signature so the registry can store all thunks in
+     * one function-pointer table; it unpacks args from a {@code cn1_invoke_arg}
+     * union array into the typed parameters the underlying translated
+     * function expects, wraps the call in a catch-all try block so an
+     * uncaught throw turns into {@code result.type='X'} rather than a
+     * longjmp past the debugger's cond-wait, and packs the return value
+     * back into the result union.
+     */
+    public void appendOnDeviceDebugInvokeThunk(String declaringClsName, StringBuilder b) {
+        String symbol = declaringClsName + "_";
+        if ("<init>".equals(methodName)) {
+            // skipped at caller, but defensive
+            return;
+        } else if ("<clinit>".equals(methodName)) {
+            return;
+        }
+        symbol += getCMethodName();
+        // Append the descriptor suffix the translator uses
+        // (args + _R<return> for non-void).
+        StringBuilder argSuffix = new StringBuilder();
+        for (ByteCodeMethodArg arg : arguments) {
+            arg.appendCMethodExt(argSuffix);
+        }
+        if (!returnType.isVoid()) {
+            argSuffix.append("_R");
+            returnType.appendCMethodExt(argSuffix);
+        }
+        String fullSymbol = symbol + "__" + argSuffix.toString();
+        // Choose virtual_<sym> only when the translator actually emits
+        // one. Static, private, or methods marked virtualOverriden (the
+        // class is final, so the dispatch was constant-folded) have no
+        // virtual_ alias in their header, and the thunk has to call the
+        // plain symbol or the C file won't compile.
+        boolean useVirtualPrefix = !staticMethod && !privateMethod && !virtualOverriden;
+        String callSymbol = useVirtualPrefix ? ("virtual_" + fullSymbol) : fullSymbol;
+        int mid = methodOffset;
+
+        b.append("static void __cn1_dbg_invoke_").append(mid)
+          .append("(struct ThreadLocalData* threadStateData, JAVA_OBJECT thisObj, const cn1_invoke_arg* args, cn1_invoke_result* result) {\n");
+        b.append("    (void)args; (void)thisObj;\n");
+        b.append("    int __savedCallStack = threadStateData->callStackOffset;\n");
+        b.append("    int __savedLocalsBegin = threadStateData->threadObjectStackOffset;\n");
+        b.append("    int __savedTryBlock = threadStateData->tryBlockOffset;\n");
+        b.append("    jmp_buf __tryJmp;\n");
+        b.append("    if (setjmp(__tryJmp) == 0) {\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0;\n");
+        b.append("        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __tryJmp, sizeof(jmp_buf));\n");
+        b.append("        threadStateData->tryBlockOffset++;\n");
+        // Emit the actual call
+        b.append("        ");
+        if (returnType.isVoid()) {
+            b.append(callSymbol).append("(threadStateData");
+        } else {
+            // Capture return into a typed temp, then pack.
+            char rq = returnType.getQualifier();
+            if (rq == 'o') b.append("JAVA_OBJECT __r = ");
+            else if (rq == 'l') b.append("JAVA_LONG __r = ");
+            else if (rq == 'd') b.append("JAVA_DOUBLE __r = ");
+            else if (rq == 'f') b.append("JAVA_FLOAT __r = ");
+            else b.append("JAVA_INT __r = ");
+            b.append(callSymbol).append("(threadStateData");
+        }
+        if (!staticMethod) {
+            b.append(", thisObj");
+        }
+        for (int i = 0; i < arguments.size(); i++) {
+            ByteCodeMethodArg arg = arguments.get(i);
+            char q = arg.getQualifier();
+            b.append(", args[").append(i).append("].");
+            switch (q) {
+                case 'o': b.append("o"); break;
+                case 'l': b.append("j"); break;
+                case 'd': b.append("d"); break;
+                case 'f': b.append("f"); break;
+                default:  b.append("i"); break;
+            }
+        }
+        b.append(");\n");
+        // Pop our try block (no exception path) and store the result.
+        b.append("        threadStateData->tryBlockOffset--;\n");
+        if (returnType.isVoid()) {
+            b.append("        result->type = 'V';\n");
+        } else {
+            char rq = returnType.getQualifier();
+            String rtc;
+            String slot;
+            if (rq == 'o') { rtc = "L"; slot = "o"; }
+            else if (rq == 'l') { rtc = "J"; slot = "j"; }
+            else if (rq == 'd') { rtc = "D"; slot = "d"; }
+            else if (rq == 'f') { rtc = "F"; slot = "f"; }
+            else {
+                // Sub-int types still pack through the int slot;
+                // we communicate the real type via the type-char.
+                String d = returnType.getQualifier() == 'i' ? returnTypeChar() : "I";
+                rtc = d;
+                slot = "i";
+            }
+            b.append("        result->type = '").append(rtc).append("';\n");
+            b.append("        result->value.").append(slot).append(" = __r;\n");
+        }
+        b.append("    } else {\n");
+        b.append("        result->type = 'X';\n");
+        b.append("        result->value.o = threadStateData->exception;\n");
+        b.append("        threadStateData->exception = JAVA_NULL;\n");
+        b.append("        threadStateData->callStackOffset = __savedCallStack;\n");
+        b.append("        threadStateData->threadObjectStackOffset = __savedLocalsBegin;\n");
+        b.append("        threadStateData->tryBlockOffset = __savedTryBlock;\n");
+        b.append("    }\n");
+        b.append("}\n");
+    }
+
+    /**
+     * Returns the JDWP type-char for the method's return type. Only used
+     * by {@link #appendOnDeviceDebugInvokeThunk} for sub-int primitive
+     * returns where the C variable is JAVA_INT but the wire-level type
+     * is more specific (e.g. boolean / byte / short / char).
+     */
+    private String returnTypeChar() {
+        if (returnType.getPrimitiveType() == Boolean.TYPE) return "Z";
+        if (returnType.getPrimitiveType() == Byte.TYPE)    return "B";
+        if (returnType.getPrimitiveType() == Short.TYPE)   return "S";
+        if (returnType.getPrimitiveType() == Character.TYPE) return "C";
+        return "I";
+    }
+
+    /**
      * @param methodOffset the methodOffset to set
      */
     public void setMethodOffset(int methodOffset) {

@@ -191,7 +191,15 @@ public class Parser extends ClassVisitor {
                 if (src == null) {
                     src = "";
                 }
-                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName() + "\t" + src + "\n");
+                // Extended class row: id, name, sourceFile, superId.
+                // Older proxies (4-column form) ignore the trailing
+                // column since the parser tolerates extras.
+                int superId = -1;
+                if (bc.getBaseClassObject() != null) {
+                    superId = bc.getBaseClassObject().getClassOffset();
+                }
+                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
+                        + "\t" + src + "\t" + superId + "\n");
             }
             // Emit instance-field metadata so the proxy can answer JDWP
             // ClassType.Fields / FieldsWithGeneric without a device round-trip,
@@ -224,7 +232,14 @@ public class Parser extends ClassVisitor {
                     if (desc == null) {
                         desc = "";
                     }
-                    w.write("method\t" + m.getMethodOffset() + "\t" + classId + "\t" + m.getMethodName() + "\t" + desc + "\n");
+                    // Extended method row: classId, name, desc, isStatic.
+                    // Older proxies that only know 4 columns ignore the 5th
+                    // because the parser slices with `split("\t", -1)` and
+                    // size-checks before reading.
+                    w.write("method\t" + m.getMethodOffset() + "\t" + classId
+                            + "\t" + m.getMethodName()
+                            + "\t" + desc
+                            + "\t" + (m.isStatic() ? "1" : "0") + "\n");
                     Set<Integer> lines = new TreeSet<>();
                     for (com.codename1.tools.translator.bytecodes.Instruction ins : m.getInstructions()) {
                         if (ins instanceof com.codename1.tools.translator.bytecodes.LineNumber) {
@@ -680,6 +695,16 @@ public class Parser extends ClassVisitor {
                             System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
                         }
                     }
+                    continue;
+                }
+                // Preserve virtual-root methods of java.lang.Object when
+                // on-device-debug is on. jdb's `print` formats objects by
+                // calling Object.toString, and a debugger user can ask to
+                // invoke equals/hashCode/etc. without a static call site
+                // to keep their body alive on its own.
+                if (BytecodeMethod.isOnDeviceDebug()
+                        && "java_lang_Object".equals(bc.getClsName())
+                        && !mtd.isStatic()) {
                     continue;
                 }
 

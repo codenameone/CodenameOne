@@ -53,6 +53,7 @@
 #define CMD_GET_STRING       0x0B
 #define CMD_GET_OBJECT_CLASS 0x0C
 #define CMD_GET_OBJECT_FIELDS 0x0D
+#define CMD_INVOKE_METHOD    0x0E
 
 // Events (device -> proxy)
 #define EVT_HELLO            0x80
@@ -68,6 +69,7 @@
 #define EVT_OBJECT_FIELDS    0x8A
 #define EVT_STDOUT_LINE      0x8B
 #define EVT_STDERR_LINE      0x8C
+#define EVT_INVOKE_RESULT    0x8D
 
 // java.lang.String's clazz struct is emitted by the translator; we reference
 // it by symbol so cn1_debugger.m doesn't depend on the generated
@@ -306,6 +308,39 @@ static const cn1_field_entry* field_lookup_by_class_and_id(int classId, int fiel
     return NULL;
 }
 
+/* --------------------------------------------------------------------- */
+/* Invoke-thunk registry. Indexed by methodId; translator-emitted        */
+/* constructors fill the table at process load. Lookup is O(1).          */
+/* --------------------------------------------------------------------- */
+
+#define CN1_INVOKE_REG_INITIAL_CAP 4096
+static cn1_invoke_thunk_t* g_invokeThunks = NULL;
+static int g_invokeThunkCap = 0;
+static pthread_mutex_t g_invokeRegMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void cn1_debugger_register_invoke_thunk(int methodId, cn1_invoke_thunk_t thunk) {
+    if (methodId < 0) return;
+    pthread_mutex_lock(&g_invokeRegMutex);
+    if (methodId >= g_invokeThunkCap) {
+        int newCap = g_invokeThunkCap == 0 ? CN1_INVOKE_REG_INITIAL_CAP : g_invokeThunkCap * 2;
+        while (methodId >= newCap) newCap *= 2;
+        cn1_invoke_thunk_t* n = (cn1_invoke_thunk_t*)realloc(g_invokeThunks,
+                newCap * sizeof(cn1_invoke_thunk_t));
+        if (!n) { pthread_mutex_unlock(&g_invokeRegMutex); return; }
+        memset(n + g_invokeThunkCap, 0,
+               (newCap - g_invokeThunkCap) * sizeof(cn1_invoke_thunk_t));
+        g_invokeThunks = n;
+        g_invokeThunkCap = newCap;
+    }
+    g_invokeThunks[methodId] = thunk;
+    pthread_mutex_unlock(&g_invokeRegMutex);
+}
+
+static cn1_invoke_thunk_t invoke_thunk_for(int methodId) {
+    if (methodId < 0 || methodId >= g_invokeThunkCap) return NULL;
+    return g_invokeThunks[methodId];
+}
+
 /**
  * Read a field value into 8 host-endian bytes plus a JVM type-char.
  * Object refs become the JAVA_OBJECT pointer reinterpreted as uint64 so
@@ -388,6 +423,15 @@ struct sus_state {
     int stepKind;       // -1 = none, otherwise STEP_INTO/OVER/OUT
     int stepFromDepth;  // callStackOffset captured at suspend
     struct ThreadLocalData* tsd; // current frame owner while suspended
+    // Debugger-driven method invocation. The listener thread sets these
+    // and signals s->cv; the suspended thread runs the thunk and signals
+    // back. invokeReady is the predicate for the listener's wait — 0 =
+    // running, 1 = finished, the result is in invokeResult.
+    cn1_invoke_thunk_t invokeThunk;
+    JAVA_OBJECT invokeThis;
+    cn1_invoke_arg invokeArgs[16];
+    cn1_invoke_result invokeResult;
+    int invokeReady;
 };
 
 #define SUS_TABLE_SIZE 1024
@@ -475,6 +519,31 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
     tsd->threadActive = JAVA_FALSE;
     while (s->suspended) {
         pthread_cond_wait(&s->cv, &s->mu);
+        // The listener thread may have queued a debugger-invoked method
+        // call for us to run. Servicing it on this thread keeps the call
+        // inside a valid Java context (right tsd, right call stack) and
+        // gives ParparVM's throwException somewhere to longjmp back to —
+        // we set up a catch-all try block inside the thunk itself.
+        if (s->invokeThunk && !s->invokeReady) {
+            cn1_invoke_thunk_t thunk = s->invokeThunk;
+            JAVA_OBJECT thisObj = s->invokeThis;
+            cn1_invoke_arg argsCopy[16];
+            memcpy(argsCopy, s->invokeArgs, sizeof(argsCopy));
+            // Re-activate the thread while running the thunk so any
+            // allocations / GC interaction it triggers proceed normally;
+            // we'll re-park before going back to wait.
+            tsd->threadActive = JAVA_TRUE;
+            pthread_mutex_unlock(&s->mu);
+            cn1_invoke_result r;
+            r.type = 'V';
+            r.value.o = JAVA_NULL;
+            thunk(tsd, thisObj, argsCopy, &r);
+            pthread_mutex_lock(&s->mu);
+            tsd->threadActive = JAVA_FALSE;
+            s->invokeResult = r;
+            s->invokeReady = 1;
+            pthread_cond_broadcast(&s->cv);
+        }
     }
     // GC may have parked us; wait for it to finish before resuming.
     while (tsd->threadBlockedByGC) {
@@ -879,6 +948,113 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             }
             sendEvent(EVT_OBJECT_FIELDS, buf, sz);
             free(buf);
+            return 0;
+        }
+        case CMD_INVOKE_METHOD: {
+            // Payload: threadId(8) methodId(4) thisObj(8) argCount(4) args[argCount]*9
+            // Each arg: type-char(1) + value(8). Value layout matches
+            // cn1_invoke_arg union per type.
+            // Reply: EVT_INVOKE_RESULT with type-char(1) + value(8).
+            if (len < 24) {
+                uint8_t empty[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, empty, 9);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4); memcpy(&lo, payload + 4, 4);
+            int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            uint32_t midBE;
+            memcpy(&midBE, payload + 8, 4);
+            int mid = (int)ntohl(midBE);
+            uint32_t thisHi, thisLo;
+            memcpy(&thisHi, payload + 12, 4); memcpy(&thisLo, payload + 16, 4);
+            uint64_t thisRaw = ((uint64_t)ntohl(thisHi) << 32) | (uint32_t)ntohl(thisLo);
+            JAVA_OBJECT thisObj = (JAVA_OBJECT)(uintptr_t)thisRaw;
+            uint32_t cntBE;
+            memcpy(&cntBE, payload + 20, 4);
+            int argCount = (int)ntohl(cntBE);
+            if (argCount < 0 || argCount > 16
+                    || (uint32_t)(24 + argCount * 9) > len) {
+                uint8_t err[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, err, 9);
+                return 0;
+            }
+            cn1_invoke_arg argv[16];
+            memset(argv, 0, sizeof(argv));
+            for (int i = 0; i < argCount; i++) {
+                uint8_t t = payload[24 + i * 9];
+                uint32_t valHi, valLo;
+                memcpy(&valHi, payload + 24 + i * 9 + 1, 4);
+                memcpy(&valLo, payload + 24 + i * 9 + 5, 4);
+                uint64_t v = ((uint64_t)ntohl(valHi) << 32) | (uint32_t)ntohl(valLo);
+                switch ((char)t) {
+                    case 'Z': case 'B': case 'S': case 'C': case 'I':
+                        argv[i].i = (JAVA_INT)(uint32_t)v; break;
+                    case 'J':
+                        argv[i].j = (JAVA_LONG)v; break;
+                    case 'F': {
+                        uint32_t bits = (uint32_t)v;
+                        memcpy(&argv[i].f, &bits, 4); break;
+                    }
+                    case 'D':
+                        memcpy(&argv[i].d, &v, 8); break;
+                    case 'L': case '[': default:
+                        argv[i].o = (JAVA_OBJECT)(uintptr_t)v; break;
+                }
+            }
+            cn1_invoke_thunk_t thunk = invoke_thunk_for(mid);
+            if (thunk == NULL) {
+                uint8_t notfound[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, notfound, 9);
+                return 0;
+            }
+            // Queue the invoke on the target thread and wait for the
+            // result. If the thread isn't currently suspended we can't
+            // dispatch (JDWP requires it).
+            struct sus_state* s = susForThread(tid);
+            pthread_mutex_lock(&s->mu);
+            if (s->tsd == NULL) {
+                pthread_mutex_unlock(&s->mu);
+                uint8_t notsuspended[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, notsuspended, 9);
+                return 0;
+            }
+            s->invokeThunk = thunk;
+            s->invokeThis = thisObj;
+            memcpy(s->invokeArgs, argv, sizeof(argv));
+            s->invokeReady = 0;
+            pthread_cond_broadcast(&s->cv);
+            // Block listener thread until result lands.
+            while (!s->invokeReady) {
+                pthread_cond_wait(&s->cv, &s->mu);
+            }
+            cn1_invoke_result r = s->invokeResult;
+            s->invokeThunk = NULL;
+            s->invokeReady = 0;
+            pthread_mutex_unlock(&s->mu);
+
+            uint8_t reply[9];
+            reply[0] = (uint8_t)r.type;
+            uint64_t bits = 0;
+            switch (r.type) {
+                case 'Z': case 'B': case 'S': case 'C': case 'I':
+                    bits = (uint64_t)(uint32_t)r.value.i; break;
+                case 'J':
+                    bits = (uint64_t)r.value.j; break;
+                case 'F': {
+                    uint32_t fb;
+                    memcpy(&fb, &r.value.f, 4);
+                    bits = (uint64_t)fb; break;
+                }
+                case 'D':
+                    memcpy(&bits, &r.value.d, 8); break;
+                case 'L': case '[': case 'X':
+                    bits = (uint64_t)(uintptr_t)r.value.o; break;
+                case 'V': default:
+                    bits = 0; break;
+            }
+            writeBE64(reply + 1, bits);
+            sendEvent(EVT_INVOKE_RESULT, reply, 9);
             return 0;
         }
         case CMD_GET_THREADS:

@@ -42,6 +42,7 @@ public final class DeviceConnection implements AutoCloseable {
         void onStringValue(String value);
         void onObjectClass(int classId);
         void onObjectFields(byte[] typeCodes, long[] values);
+        void onInvokeResult(byte type, long value);
         void onReplyStatus();
         void onStdoutLine(String line);
         void onStderrLine(String line);
@@ -173,6 +174,14 @@ public final class DeviceConnection implements AutoCloseable {
                 listener.onObjectFields(types, values);
                 return;
             }
+            case WireProtocol.EVT_INVOKE_RESULT: {
+                // Payload: type(1) + value(8). Value packing depends on type:
+                //   I/F/Z/B/S/C use the int slot, J/D the long slot,
+                //   L/[ /X carry an object reference, V leaves value=0.
+                if (p.length < 9) { listener.onUnknownEvent(code, p); return; }
+                listener.onInvokeResult(p[0], readLong(p, 1));
+                return;
+            }
             case WireProtocol.EVT_STDOUT_LINE:
             case WireProtocol.EVT_STDERR_LINE: {
                 // Payload: 4-byte big-endian length, then UTF-8 line bytes.
@@ -264,6 +273,29 @@ public final class DeviceConnection implements AutoCloseable {
         byte[] p = new byte[8];
         writeLong(p, 0, objPtr);
         sendCommand(WireProtocol.CMD_GET_STRING, p);
+    }
+
+    /**
+     * Dispatches a debugger-driven method invocation to the device. The
+     * suspended thread (identified by {@code threadId}) runs the call;
+     * {@code thisObj} is ignored for static methods (use 0). Each arg
+     * carries a JVM type-char and an 8-byte value — the device's thunk
+     * unpacks it into the typed C parameter the underlying function
+     * expects.
+     */
+    public void invokeMethod(long threadId, int methodId, long thisObj,
+                             byte[] argTypes, long[] argValues) throws IOException {
+        int n = argTypes.length;
+        byte[] p = new byte[8 + 4 + 8 + 4 + n * 9];
+        writeLong(p, 0, threadId);
+        writeInt(p, 8, methodId);
+        writeLong(p, 12, thisObj);
+        writeInt(p, 20, n);
+        for (int i = 0; i < n; i++) {
+            p[24 + i * 9] = argTypes[i];
+            writeLong(p, 24 + i * 9 + 1, argValues[i]);
+        }
+        sendCommand(WireProtocol.CMD_INVOKE_METHOD, p);
     }
 
     public void getObjectFields(long objPtr, int[] fieldIds) throws IOException {

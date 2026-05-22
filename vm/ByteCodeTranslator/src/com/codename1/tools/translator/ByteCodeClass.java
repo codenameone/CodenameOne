@@ -1265,9 +1265,75 @@ public class ByteCodeClass {
         // the data or registration cost.
         if (BytecodeMethod.isOnDeviceDebug()) {
             appendOnDeviceDebugFieldTable(b);
+            appendOnDeviceDebugInvokeThunks(b);
         }
 
         return b.toString();
+    }
+
+    /**
+     * Emits a per-method shim that lets the debugger runtime call any
+     * translated method generically. Each thunk unpacks an argument array
+     * into the typed C parameters that the underlying function expects,
+     * wraps the call in a catch-all try block so an uncaught Throwable
+     * round-trips back as a value instead of unwinding past
+     * suspendCurrent, and packs the return value into a uniform
+     * {@code cn1_invoke_result}. A __attribute__((constructor)) at the
+     * bottom registers each thunk with the global registry keyed by
+     * methodOffset.
+     */
+    private void appendOnDeviceDebugInvokeThunks(StringBuilder b) {
+        // Skip thunk generation for classes whose impl is hand-written
+        // native code that's been allowed to fall out of sync with the
+        // translator's calling convention. Without thunks the linker
+        // dead-strips the C wrapper (since user code typically doesn't
+        // call those wrappers); with thunks the wrapper is forced live
+        // and the link fails on missing native impls.
+        //
+        // The skip list is intentionally narrow — only the packages
+        // where this is known to bite. java.lang / java.util etc. are
+        // fine and worth keeping (jdb leans on Object.toString for
+        // "print" output, and we want lists/strings to round-trip too).
+        if (clsName.startsWith("java_io_") || clsName.startsWith("java_net_")
+                || clsName.startsWith("java_nio_")
+                || clsName.startsWith("com_codename1_impl_")) {
+            return;
+        }
+        // We emit a constructor PER class that registers all of that
+        // class's invoke thunks in one go. The thunks themselves are
+        // file-static so they don't leak symbols.
+        List<BytecodeMethod> eligible = new ArrayList<>();
+        for (BytecodeMethod m : methods) {
+            if (m.isEliminated()) continue;
+            if (m.isConstructor()) continue;
+            String name = m.getMethodName();
+            if ("__CLINIT__".equals(name) || "<clinit>".equals(name)) continue;
+            // Abstract methods have no body to call. Native methods are
+            // fine — their impls live in nativeMethods.m / iOS port
+            // hand-written code, with the same C name our thunk calls.
+            // We rely on the class-prefix filter above to skip whole
+            // packages whose native sidecar isn't linked in this build
+            // (java.io / java.net / java.nio / com.codename1.impl).
+            if (m.isAbstract()) continue;
+            eligible.add(m);
+        }
+        if (eligible.isEmpty()) return;
+
+        b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
+        b.append("#include <setjmp.h>\n");
+        b.append("#include <string.h>\n");
+        for (BytecodeMethod m : eligible) {
+            m.appendOnDeviceDebugInvokeThunk(clsName, b);
+        }
+        b.append("__attribute__((constructor)) static void __cn1_dbg_register_invoke_thunks_")
+                .append(clsName).append("(void) {\n");
+        for (BytecodeMethod m : eligible) {
+            b.append("    cn1_debugger_register_invoke_thunk(")
+              .append(m.getMethodOffset())
+              .append(", &__cn1_dbg_invoke_").append(m.getMethodOffset()).append(");\n");
+        }
+        b.append("}\n");
+        b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
     }
 
     private void appendOnDeviceDebugFieldTable(StringBuilder b) {

@@ -175,12 +175,18 @@ in the IDE editor when stepping into framework code.
 
 === Known limitations
 
-* *Method invocation from the debugger isn't supported.* The IDE's
-  "evaluate expression" feature can read existing values but can't
-  invoke methods on objects (for example, `myList.size()`). Object
-  identity, field access, and primitive evaluation work.
-* *Watch expressions* that don't require method calls work; those
-  that do return an error.
+* *Method invocation is partial.* The debugger can call instance and
+  static methods on Codename One framework classes and on user code:
+  jdb's `print myForm.getTitle()` and IntelliJ's "Evaluate Expression"
+  pop-up work for the chains you actually want
+  (`Display.getInstance().getCurrent().getTitle()` is the canonical
+  test). What doesn't work: methods on `java.io.*`, `java.net.*`,
+  `java.nio.*`, and `com.codename1.impl.*` — those classes are linked
+  against hand-written native code that has fallen out of sync with
+  the generic invoke-thunk calling convention, so the translator
+  skips them. Watching expressions follow the same rule.
+* *Constructor invocation* isn't supported. The debugger can call
+  existing instance methods but not `new Foo(...)`.
 * *Hot-swap* isn't supported. Code changes require a rebuild and
   reinstall of the app.
 * *Hot threads* — if your app is doing heavy work on a non-EDT
@@ -241,12 +247,11 @@ firewall is blocking the port. Verify:
 
 ==== jdb reports "Internal exception: Unexpected JDWP Error: 100"
 
-This typically means an unsupported JDWP feature was invoked —
-most commonly an attempt to call a method on an object from the
-debugger (see "Method invocation from the debugger isn't
-supported" above). The debug session itself is fine; rerun the
-operation as a value read (for example, expand the object in the
-variables view) instead of a method call.
+This means an unsupported JDWP command was invoked. The session
+itself survives; the most common cause is the IDE asking for
+something we explicitly stub (see "Known limitations" above). If
+you hit a less obvious case, the proxy logs the unknown command
+code — file an issue with that code attached.
 
 ==== The app launches but the breakpoint never fires
 

@@ -104,6 +104,19 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      */
     private static long toJdwpRef(int sidecarId)  { return sidecarId + 1L; }
     private static int  fromJdwpRef(long jdwpId)  { return (int)(jdwpId - 1L); }
+
+    /**
+     * JDWP method modifier bits. We track only static in the sidecar
+     * today; public is assumed. Adding STATIC for static methods is
+     * load-bearing — jdb's expression parser only resolves
+     * {@code Class.method()} syntax against methods reported with the
+     * STATIC modifier bit.
+     */
+    private static int jdwpMethodModifiers(SymbolTable.MethodInfo m) {
+        int flags = 0x0001; // PUBLIC
+        if (m.isStatic) flags |= 0x0008;
+        return flags;
+    }
     // True once the device has handshook; the VM_START event will fire as
     // soon as a JDWP client is attached (and was already attached when the
     // device joined — order doesn't matter).
@@ -489,7 +502,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeLong(toJdwpRef(m.methodId));
                     b.writeString(m.name);
                     b.writeString(m.descriptor);
-                    b.writeInt(0x0001); // PUBLIC; we don't track real modifiers
+                    b.writeInt(jdwpMethodModifiers(m));
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -503,7 +516,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeString(m.name);
                     b.writeString(m.descriptor);
                     b.writeString(""); // generic signature
-                    b.writeInt(0x0001);
+                    b.writeInt(jdwpMethodModifiers(m));
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -608,14 +621,92 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private void handleClassType(int id, int cmd, byte[] p) throws IOException {
         switch (cmd) {
             case 1: { // Superclass
+                long typeID = readLong(p, 0);
+                SymbolTable.ClassInfo c = symbols.classById(fromJdwpRef(typeID));
                 Buf b = new Buf();
-                b.writeLong(0); // null = java.lang.Object's super
+                if (c != null && c.superId >= 0) {
+                    b.writeLong(toJdwpRef(c.superId));
+                } else {
+                    b.writeLong(0); // null = java.lang.Object's super
+                }
                 writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 3: { // InvokeMethod (static)
+                // refType(8) thread(8) method(8) argCount(4) args[].
+                // Each arg: tag(1) + value(tag-sized). options(4).
+                /* refType */ long classRef = readLong(p, 0);
+                long threadRef = readLong(p, 8);
+                long methodRef = readLong(p, 16);
+                int argCount = readInt(p, 24);
+                int devMid = fromJdwpRef(methodRef);
+                int off = 28;
+                byte[] argTypes = new byte[argCount];
+                long[] argValues = new long[argCount];
+                for (int i = 0; i < argCount; i++) {
+                    byte tag = p[off]; off += 1;
+                    argTypes[i] = tag;
+                    long v;
+                    switch ((char) tag) {
+                        case 'Z': case 'B': v = p[off] & 0xff; off += 1; break;
+                        case 'S': case 'C': v = readShort(p, off) & 0xffff; off += 2; break;
+                        case 'I': case 'F': v = readInt(p, off) & 0xffffffffL; off += 4; break;
+                        case 'J': case 'D': v = readLong(p, off); off += 8; break;
+                        default: // object refs etc.
+                            v = readLong(p, off); off += 8; break;
+                    }
+                    argValues[i] = v;
+                }
+                int methodId = fromJdwpRef(methodRef);
+                long threadId = threadRef;
+                boolean ok = blockingInvoke(threadId, methodId, /*thisObj=static*/0L, argTypes, argValues);
+                writeInvokeReply(id, ok);
                 return;
             }
             default:
                 writeReply(id, 100, empty());
         }
+    }
+
+    /**
+     * Packs the result of a CMD_INVOKE_METHOD round-trip into a JDWP
+     * InvokeMethod reply (returnValue + exception object).
+     */
+    private void writeInvokeReply(int id, boolean ok) throws IOException {
+        Buf b = new Buf();
+        if (!ok) {
+            // returnValue = void, exception = null
+            b.writeByte('V');
+            b.writeByte('L');
+            b.writeLong(0);
+            writeReply(id, 0, b.bytes());
+            return;
+        }
+        byte t = lastInvokeType;
+        long v = lastInvokeValue;
+        boolean threw = t == 'X';
+        if (threw) {
+            // Return value is void in this case; exception object goes in
+            // the second slot.
+            b.writeByte('V');
+            b.writeByte('L');
+            b.writeLong(v);
+        } else {
+            b.writeByte(t == 0 ? 'V' : t);
+            switch ((char) t) {
+                case 'Z': b.writeByte((int) v & 1); break;
+                case 'B': b.writeByte((int) v & 0xff); break;
+                case 'S': case 'C': b.writeShort((int) v & 0xffff); break;
+                case 'I': case 'F': b.writeInt((int) v); break;
+                case 'J': case 'D': b.writeLong(v); break;
+                case 'L': case '[': b.writeLong(v); break;
+                case 'V': default: /* no value bytes for void */ break;
+            }
+            // No exception.
+            b.writeByte('L');
+            b.writeLong(0);
+        }
+        writeReply(id, 0, b.bytes());
     }
 
     // -------- Thread / ThreadGroup -----------------------------------------
@@ -996,6 +1087,36 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 writeReply(id, 0, b.bytes());
                 return;
             }
+            case 6: { // InvokeMethod (instance)
+                // objId(8) thread(8) refType(8) method(8) argCount(4) args[] options(4)
+                long thisObj = objectId;
+                long threadRef = readLong(p, 8);
+                /* refType */ readLong(p, 16);
+                long methodRef = readLong(p, 24);
+                int argCount = readInt(p, 32);
+                int devMid = fromJdwpRef(methodRef);
+                int off = 36;
+                byte[] argTypes = new byte[argCount];
+                long[] argValues = new long[argCount];
+                for (int i = 0; i < argCount; i++) {
+                    byte tag = p[off]; off += 1;
+                    argTypes[i] = tag;
+                    long v;
+                    switch ((char) tag) {
+                        case 'Z': case 'B': v = p[off] & 0xff; off += 1; break;
+                        case 'S': case 'C': v = readShort(p, off) & 0xffff; off += 2; break;
+                        case 'I': case 'F': v = readInt(p, off) & 0xffffffffL; off += 4; break;
+                        case 'J': case 'D': v = readLong(p, off); off += 8; break;
+                        default: v = readLong(p, off); off += 8; break;
+                    }
+                    argValues[i] = v;
+                }
+                int methodId = fromJdwpRef(methodRef);
+                long threadId = threadRef;
+                boolean ok = blockingInvoke(threadId, methodId, thisObj, argTypes, argValues);
+                writeInvokeReply(id, ok);
+                return;
+            }
             case 9: { // IsCollected — we don't track GC; always false.
                 Buf b = new Buf(); b.writeByte(0); writeReply(id, 0, b.bytes()); return;
             }
@@ -1037,6 +1158,37 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 catch (InterruptedException ie) { break; }
             }
             return lastObjectClass;
+        }
+    }
+
+    private final Object invokeLock = new Object();
+    private boolean pendingInvoke = false;
+    private byte lastInvokeType = 'V';
+    private long lastInvokeValue = 0;
+
+    /**
+     * Sends an InvokeMethod request to the device and blocks until the
+     * suspended thread runs the thunk and returns a result. Returns false
+     * on timeout — the proxy can't tell the IDE much in that case beyond
+     * an INTERNAL error.
+     */
+    private boolean blockingInvoke(long threadId, int methodId, long thisObj,
+                                   byte[] argTypes, long[] argValues) {
+        if (device == null) return false;
+        synchronized (invokeLock) {
+            pendingInvoke = true;
+            lastInvokeType = 'V';
+            lastInvokeValue = 0;
+            try { device.invokeMethod(threadId, methodId, thisObj, argTypes, argValues); }
+            catch (IOException io) { pendingInvoke = false; return false; }
+            // Bigger budget than the field-read path because the call can
+            // actually run user code that does anything.
+            long deadline = System.currentTimeMillis() + 10000;
+            while (pendingInvoke && System.currentTimeMillis() < deadline) {
+                try { invokeLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return !pendingInvoke;
         }
     }
 
@@ -1245,6 +1397,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             objectFieldsLock.notifyAll();
         }
     }
+    @Override public void onInvokeResult(byte type, long value) {
+        synchronized (invokeLock) {
+            lastInvokeType = type;
+            lastInvokeValue = value;
+            pendingInvoke = false;
+            invokeLock.notifyAll();
+        }
+    }
     @Override public void onReplyStatus() {}
     @Override public void onStdoutLine(String line) {
         // Surface device prints in whatever console the proxy is running in
@@ -1269,6 +1429,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private static int readInt(byte[] b, int off) {
         return ((b[off] & 0xff) << 24) | ((b[off+1] & 0xff) << 16)
              | ((b[off+2] & 0xff) << 8) | (b[off+3] & 0xff);
+    }
+    private static short readShort(byte[] b, int off) {
+        return (short)(((b[off] & 0xff) << 8) | (b[off+1] & 0xff));
     }
     private static long readLong(byte[] b, int off) {
         return ((long)readInt(b, off) << 32) | (readInt(b, off + 4) & 0xffffffffL);

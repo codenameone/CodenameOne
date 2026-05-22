@@ -57,6 +57,57 @@ extern void cn1_debugger_register_fields(int classId,
                                          const cn1_field_entry* table,
                                          int count);
 
+/* --- Method invocation -------------------------------------------------- */
+
+/**
+ * Argument or scratch slot for a debugger-driven method invocation. All
+ * args travel as a flat array of these; the thunk reads the right field
+ * for each declared parameter. Floats/doubles round-trip through the bit
+ * width of their integer counterparts since debug clients pass them as
+ * raw 32/64-bit values.
+ */
+typedef union cn1_invoke_arg {
+    JAVA_INT     i;
+    JAVA_LONG    j;
+    JAVA_FLOAT   f;
+    JAVA_DOUBLE  d;
+    JAVA_OBJECT  o;
+} cn1_invoke_arg;
+
+/**
+ * Result of a debugger-driven method invocation. {@code type} is a JVM
+ * type-char ('V', 'I', 'J', 'F', 'D', 'L', 'Z', 'B', 'S', 'C') or 'X'
+ * if the call threw — in which case {@code value.o} carries the
+ * Throwable.
+ */
+typedef struct cn1_invoke_result {
+    char type;
+    cn1_invoke_arg value;
+} cn1_invoke_result;
+
+/**
+ * Translator-emitted per-method shim. The thunk unpacks {@code args}
+ * into the typed C parameters the underlying translated function
+ * expects, dispatches through {@code virtual_<sym>(...)} (instance) or
+ * the static symbol (static), and packs the return into {@code result}.
+ * Exceptions are caught and surfaced as result.type='X'.
+ *
+ * Runs on the suspended Java thread so it has a valid
+ * {@code threadStateData} context.
+ */
+typedef void (*cn1_invoke_thunk_t)(struct ThreadLocalData* threadStateData,
+                                   JAVA_OBJECT thisObj,
+                                   const cn1_invoke_arg* args,
+                                   cn1_invoke_result* result);
+
+/**
+ * Translator-emitted constructor registers each method's thunk at
+ * process load. methodId matches the same value the sidecar carries,
+ * so the proxy can look up by name → methodId and forward to the
+ * device with no further mapping.
+ */
+extern void cn1_debugger_register_invoke_thunk(int methodId, cn1_invoke_thunk_t thunk);
+
 #ifdef __BLOCKS__
 /**
  * Defers the VM callback until the proxy reports the IDE has attached, so

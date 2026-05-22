@@ -61,6 +61,9 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
             System.out.println("        #" + i + " type='" + (char) typeCodes[i] + "' value=" + formatValue(typeCodes[i], values[i]));
         }
     }
+    @Override public void onInvokeResult(byte type, long value) {
+        System.out.println("[event] INVOKE_RESULT type='" + (char) type + "' value=" + formatValue(type, value));
+    }
     @Override public void onReplyStatus() { System.out.println("[event] REPLY_STATUS"); }
     @Override public void onStdoutLine(String line) { System.out.println("[device] " + line); }
     @Override public void onStderrLine(String line) { System.err.println("[device] " + line); }

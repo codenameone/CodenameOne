@@ -35,6 +35,8 @@ public final class SymbolTable {
         public final int classId;
         public final String name;        // e.g. "java_lang_String" (translator convention)
         public final String sourceFile;
+        /** Superclass classId, or -1 if java.lang.Object / unknown. */
+        public int superId = -1;
         public final List<MethodInfo> methods = new ArrayList<>();
         /**
          * Instance fields physically stored in this class's struct (i.e. including
@@ -89,14 +91,16 @@ public final class SymbolTable {
         public final int classId;
         public final String name;
         public final String descriptor;
+        public final boolean isStatic;
         public final TreeSet<Integer> lines = new TreeSet<>();
         public final List<LocalVarInfo> locals = new ArrayList<>();
 
-        MethodInfo(int methodId, int classId, String name, String descriptor) {
+        MethodInfo(int methodId, int classId, String name, String descriptor, boolean isStatic) {
             this.methodId = methodId;
             this.classId = classId;
             this.name = name;
             this.descriptor = descriptor;
+            this.isStatic = isStatic;
         }
 
         /**
@@ -149,6 +153,10 @@ public final class SymbolTable {
                         if (parts.length < 4) continue;
                         int id = Integer.parseInt(parts[1]);
                         ClassInfo c = new ClassInfo(id, parts[2], parts[3]);
+                        if (parts.length >= 5) {
+                            try { c.superId = Integer.parseInt(parts[4]); }
+                            catch (NumberFormatException ignore) {}
+                        }
                         t.classesById.put(id, c);
                         t.classesByJvmSig.put(c.jvmSignature(), c);
                         if (!parts[3].isEmpty()) {
@@ -160,7 +168,8 @@ public final class SymbolTable {
                         if (parts.length < 5) continue;
                         int mid = Integer.parseInt(parts[1]);
                         int cid = Integer.parseInt(parts[2]);
-                        MethodInfo m = new MethodInfo(mid, cid, parts[3], parts[4]);
+                        boolean isStatic = parts.length >= 6 && "1".equals(parts[5]);
+                        MethodInfo m = new MethodInfo(mid, cid, parts[3], parts[4], isStatic);
                         t.methodsById.put(mid, m);
                         ClassInfo c = t.classesById.get(cid);
                         if (c != null) c.methods.add(m);
