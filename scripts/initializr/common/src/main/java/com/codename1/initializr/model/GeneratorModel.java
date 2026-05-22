@@ -319,8 +319,14 @@ public class GeneratorModel {
             try {
                 entry = zis.getNextEntry();
             } catch (Throwable t) {
-                System.out.println("CN1INIT:copyZip:getNextEntry-err res=" + zipResource + " err=" + t);
-                throw t instanceof IOException ? (IOException) t : new IOException("getNextEntry: " + t);
+                String cls;
+                String msg;
+                try { cls = t.getClass().getName(); } catch (Throwable ignored) { cls = "<no-class>"; }
+                try { msg = t.getMessage(); } catch (Throwable ignored) { msg = "<no-msg>"; }
+                System.out.println("CN1INIT:copyZip:getNextEntry-err res=" + zipResource + " cls=" + cls + " msg=" + msg);
+                IOException wrap = new IOException("getNextEntry " + cls + ": " + msg);
+                System.out.println("CN1INIT:copyZip:throwing wrap=" + wrap);
+                throw wrap;
             }
             while (entry != null) {
                 if (!entry.isDirectory()) {
