@@ -916,36 +916,46 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 for (int i = 0; i < modCount && !badModifier; i++) {
                     if (off >= p.length) { badModifier = true; break; }
                     int modKind = p[off] & 0xff; off += 1;
-                    // ClassOnly (3) is a refTypeID (8 bytes), not a string —
-                    // ClassMatch (4) and ClassExclude (5) are strings. Splitting
-                    // the case body keeps the dispatch tidy.
+                    // JDWP modifier-kind numbering per the spec:
+                    //   1 Count, 2 Conditional (deprecated),
+                    //   3 ThreadOnly, 4 ClassOnly, 5 ClassMatch,
+                    //   6 ClassExclude, 7 LocationOnly, 8 ExceptionOnly,
+                    //   9 FieldOnly, 10 Step, 11 InstanceOnly,
+                    //   12 SourceNameMatch.
+                    // IntelliJ leans heavily on 6 (ClassExclude) — it
+                    // auto-attaches java.*, javax.*, sun.*, etc. to every
+                    // step request, so a parser that drops modKind=6
+                    // aborts every IntelliJ step.
                     switch (modKind) {
-                        case 7: { // LocationOnly
-                            // Location: typeTag(1) + classID(8) + methodID(8) + codeIndex(8) = 25
+                        case 1: { // Count
+                            if (off + 4 > p.length) { badModifier = true; break; }
+                            off += 4; break;
+                        }
+                        case 2: { // ConditionalExpression (deprecated) — exprID
+                            if (off + 4 > p.length) { badModifier = true; break; }
+                            off += 4; break;
+                        }
+                        case 3: { // ThreadOnly (objectID)
+                            if (off + 8 > p.length) { badModifier = true; break; }
+                            off += 8; break;
+                        }
+                        case 4: { // ClassOnly (refTypeID)
+                            if (off + 8 > p.length) { badModifier = true; break; }
+                            off += 8; break;
+                        }
+                        case 5: case 6: { // ClassMatch, ClassExclude (string)
+                            if (off + 4 > p.length) { badModifier = true; break; }
+                            int slen = readInt(p, off);
+                            if (slen < 0 || off + 4 + slen > p.length) { badModifier = true; break; }
+                            off += 4 + slen;
+                            break;
+                        }
+                        case 7: { // LocationOnly: typeTag(1) + classID(8) + methodID(8) + codeIndex(8) = 25
                             if (off + 25 > p.length) { badModifier = true; break; }
                             /* typeTag */ off += 1;
                             typeID = readLong(p, off); off += 8;
                             methodID = readLong(p, off); off += 8;
                             codeIndex = readLong(p, off); off += 8;
-                            break;
-                        }
-                        case 1: { // Count
-                            if (off + 4 > p.length) { badModifier = true; break; }
-                            off += 4; break;
-                        }
-                        case 2: { // ThreadOnly
-                            if (off + 8 > p.length) { badModifier = true; break; }
-                            off += 8; break;
-                        }
-                        case 3: { // ClassOnly (refTypeID)
-                            if (off + 8 > p.length) { badModifier = true; break; }
-                            off += 8; break;
-                        }
-                        case 4: case 5: { // ClassMatch, ClassExclude (string)
-                            if (off + 4 > p.length) { badModifier = true; break; }
-                            int slen = readInt(p, off);
-                            if (slen < 0 || off + 4 + slen > p.length) { badModifier = true; break; }
-                            off += 4 + slen;
                             break;
                         }
                         case 8: { // ExceptionOnly: refTypeID + caught(byte) + uncaught(byte)
@@ -956,14 +966,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                             if (off + 16 > p.length) { badModifier = true; break; }
                             off += 16; break;
                         }
-                        case 10: { // Step modifier: threadID(8) + size(4) + depth(4) = 16
+                        case 10: { // Step: threadID(8) + size(4) + depth(4) = 16
                             if (off + 16 > p.length) { badModifier = true; break; }
                             stepThread = readLong(p, off); off += 8;
                             /* size */ off += 4;
                             stepDepth = readInt(p, off); off += 4;
                             break;
                         }
-                        case 11: { // InstanceOnly
+                        case 11: { // InstanceOnly (objectID)
                             if (off + 8 > p.length) { badModifier = true; break; }
                             off += 8; break;
                         }
@@ -975,10 +985,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                             break;
                         }
                         default:
-                            // Unknown modifier type. We don't know its width
-                            // so we have to bail rather than guessing — guessing
-                            // walks the read pointer past the buffer and
-                            // crashes the dispatcher.
+                            // Unknown modifier — bail rather than guess its
+                            // width and walk the read pointer past the buffer.
                             System.out.println("[jdwp] EventRequest.Set: unknown modKind=" + modKind
                                     + " — ignoring remaining " + (modCount - i - 1) + " modifiers");
                             badModifier = true;
