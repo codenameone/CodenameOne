@@ -29,7 +29,7 @@ The easiest way to create a new project is to use the https://www.codenameone.co
 
 image::img/codenameone-initializr-screenshot.png[]
 
-This tool will allow you to choose from a growing selection of project templates, and download a starter project that you can open in your preferred IDE (IntelliJ IDEA, NetBeans, etc..), or build directly on the command-line using Maven.
+This tool will allow you to choose from a growing selection of project templates, and download a starter project that you can open in your preferred IDE (IntelliJ IDEA, NetBeans, etc.), or build directly on the command-line using Maven.
 
 The starter projects are based on the <<cn1app-archetype>>.
 
@@ -52,7 +52,7 @@ See https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.h
 [#cn1app-archetype-example]
 ===== Bare-bones Java project
 
-If you prefer to generate your projects directly on the command-line, you can use the <<cn1app-archetype>> to generate the project directly on the command-line.
+If you prefer to generate your projects directly on the command-line, you can use the <<cn1app-archetype>> to generate the project directly on the command-line:
 
 [source,bash]
 ----
@@ -92,9 +92,9 @@ You can learn more about using the archetype in <<cn1app-archetype, the appendix
 
 ===== Project templates
 
-The https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html[bare-bones Kotlin App project template] is an alternative starter project that uses Kotlin as the primary language instead of Java. it's built on the <<cn1app-archetype,cn1app-archetype>> at its core, but it includes some more configuration settings and sources to change the template. You can use such templates as starter projects by using the `generate-app-project` goal of the Codename One Maven plugin.
+The https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html[bare-bones Kotlin App project template] is an alternative starter project that uses Kotlin as the primary language instead of Java. It's built on the <<cn1app-archetype,cn1app-archetype>> at its core, but it includes some more configuration settings and sources to change the template. You can use such templates as starter projects by using the `generate-app-project` goal of the Codename One Maven plugin.
 
-Here is an example which generates a project based on the bare-bones kotlin template:
+Here is an example which generates a project based on the bare-bones Kotlin template:
 
 [source,bash,subs="+attributes"]
 ----
@@ -110,7 +110,7 @@ mvn com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:genera
   -DsourceProject=/path/to/kotlin-example-app
 ----
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 Like the `archetype:generate` goal, this will create the project in a directory named after your specified artifact ID. For example, If your command included `-DartifactId=myapp`, then the project would be in a newly created directory named "myapp."
 
@@ -118,9 +118,9 @@ Some notes here:
 
 . The `com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project` argument is the fully qualified goal name for the `generate-app-project`. This is necessary since you aren't running this goal in the context of any existing project. You should adjust the version number (`{cn1-plugin-release-version}`) to reflect the https://search.maven.org/search?q=a:codenameone-maven-plugin[latest available Codename One version on Maven Central].
 . The `archetypeGroupId`, `archetypeArtifactId`, and `archetypeVersion` parameters are the same as when using the `archetype:generate` goal, and they will (almost) always refer to the <<cn1app-archetype>>.
-. The `groupId`, `artifactId`, and `version` work the same as for the `archetype:generate` goal. that's, that they specify the coordinates for your newly created project.
+. The `groupId`, `artifactId`, and `version` work the same as for the `archetype:generate` goal. That's, that they specify the coordinates for your newly created project.
 . The `mainName` specifies the Main class name for your app. This is the class name, and shouldn't include the full package. For example, `MyApp`, not "com.example.MyApp"
-. The `sourceProject` property is the path to the "template" project. In this case, you will assume that you've cloned the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones kotlin project template repository] at /path/to/kotlin-example-app.
+. The `sourceProject` property is the path to the "template" project. In this case, you will assume that you've cloned the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones Kotlin project template repository] at /path/to/kotlin-example-app.
 
 [TIP]
 ====
@@ -132,7 +132,7 @@ See <<creating-project-templates>> for instructions on building your own project
 [#migrate-existing-project]
 === Migrating an existing project
 
-If you've an existing Codename One application project that uses the old Ant project structure, you can use the `generate-app-project` goal to migrate the project over to maven. This goal doesn't make any changes to the Ant project. It creates a new Maven project and copies over all the project sources and libraries, reorganized to fit the new project structure.
+If you have an existing Codename One application project that uses the old Ant project structure, you can use the `generate-app-project` goal to migrate the project over to maven. This goal doesn't make any changes to the Ant project. It creates a new Maven project and copies over all the project sources and libraries, reorganized to fit the new project structure.
 
 A minimal invocation of this goal would look like:
 
@@ -149,7 +149,7 @@ mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-app-project \
   -Dcn1Version=$CN1VERSION
 ----
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 This will generate the new project in the current directory inside a folder named after the `artifactId` parameter.
 
@@ -183,7 +183,7 @@ If all goes well it should open in the Codename One simulator.
 
 ==== Eclipse IDE
 
-Open Eclipse, and select "File" > "Import.."
+Open Eclipse, and select "File" > "Import..."
 
 image::img/eclipse-file-menu-import.png[]
 
@@ -228,7 +228,7 @@ If all goes well it should open in the Codename One simulator.
 
 Consider a concrete example, now. Download the KitchenSink Ant project from https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip[here] and extract it.
 
-The following is a bash script that uses curl to download this project as a zip file, and then converts it to a fully functional Maven project.
+The following is a bash script that uses curl to download this project as a zip file, and then converts it to a fully functional Maven project:
 
 [source,bash,subs="+attributes"]
 ----
@@ -247,7 +247,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
   -DsourceProject=KitchenSink-1.0-cn7.0.11
 ----
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 This will generate the maven project in a directory named "kitchensink" in the current working directory because of the `-DartifactId=kitchensink` directory.
 
@@ -259,20 +259,20 @@ TIP: For the easiest and recommended approach to adding dependencies to your pro
 
 One of the reasons to use Maven as the build tool is because it makes the management of project dependencies *almost* trivial. If the library you want to add is on Maven central, then you can copy and paste its `<dependency>` snippet into your pom.xml file and you're good to go. Maven does the rest.
 
-NOTE: See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html[Introducton to the Dependency Mechanism] on the Maven website for a gentle, but comprehensive introduction to Maven dependencies.
+NOTE: See https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html[Introduction to the Dependency Mechanism] on the Maven website for a gentle, but comprehensive introduction to Maven dependencies.
 
-With Codename One projects, there are a few caveats (see <<compliance-check>>), and a few added nicities that make it easier to find and install add-on libraries in your project (see <<managing-addons-in-control-center>>).
+With Codename One projects, there are a few caveats (see <<compliance-check>>), and a few added niceties that make it easier to find and install add-on libraries in your project (see <<managing-addons-in-control-center>>).
 
 ==== Which `pom.xml` to add the `<dependency>` snippet to
 
-Suppose you've a Maven `<dependency>` snippet that you've copied from Maven central, and it's burning a hole in your clipboard while you're trying to figure out where to paste it into your project.
+Suppose you have a Maven `<dependency>` snippet that you've copied from Maven central, and it's burning a hole in your clipboard while you're trying to figure out where to paste it into your project.
 Codename One application projects, being multi-module projects, have more than one `pom.xml` file; One per module.
 
 **Question:** Which pom.xml file should you paste the snippet into?
 
 **Answer:** common/pom.xml (almost always).
 
-The "common" module is where all your Codename One application resides. It houses your Java and Kotlin files, your CSS files, your GUI builder files, your Codename One configuration files (that is, `codenameone_settings.properties`). Pretty much everything. The things you'd place in the other modules (for example, `Java SE`, `ios`, etc...) are your platform-specific native interface implementations; And in many applications you won't need any of that.
+The "common" module is where all your Codename One application resides. It houses your Java and Kotlin files, your CSS files, your GUI builder files, your Codename One configuration files (that is, `codenameone_settings.properties`). Pretty much everything. The things you'd place in the other modules (for example, `Java SE`, `ios`, etc.) are your platform-specific native interface implementations; And in many applications you won't need any of that.
 
 When adding dependencies into your app, you'll therefore almost always place them inside the pom.xml file for the "common" module.
 
@@ -281,7 +281,7 @@ TIP: You can add dependencies without needing to change XML configuration files 
 .When to use the "other" pom.xml Files
 [sidebar]
 ****
-The instructions say that you *almost* always add dependencies in the common/pom.xml file. what are the other modules' pom.xml files for, and when do you need to change them, or add dependencies to them?
+The instructions say that you *almost* always add dependencies in the common/pom.xml file. What are the other modules' pom.xml files for, and when do you need to change them, or add dependencies to them?
 
 Here's an overview:
 
@@ -299,7 +299,7 @@ These modules don't use Maven for their dependencies (Android may deserve a smal
 ****
 
 [#maven-dependency-example]
-==== Example: Adding Google maps dependency via Maven central
+==== Example: Adding Google Maps dependency via Maven central
 
 Add the GoogleMaps library to your app as a maven dependency.
 
@@ -368,7 +368,7 @@ Type in "Maps" into the search box, and it should narrow the options down to thr
 
 image:img/control-center-extensions-search-maps.png[Control Center Extensions filtered on maps]
 
-The one in the middle `Codename One Google Native`, is the Google maps lib that you want.
+The one in the middle `Codename One Google Native`, is the Google Maps lib that you want.
 
 Press the "Download" button.
 
@@ -386,7 +386,7 @@ You shouldn't need to worry about this, as it happens seamlessly. If you're curi
 
 ==== Installing legacy cn1libs
 
-The recommended approach for installing add-ons to your project is to use the <<managing-addons-in-control-center, control center>>, or by <<maven-dependency-example, adding the maven dependency to your common/pom.xml file>>. But, in some situations you may not be able to use those methods. For example, If you've a legacy cnlib file that you need to use in your app, and it isn't available on Maven central or the control center.
+The recommended approach for installing add-ons to your project is to use the <<managing-addons-in-control-center, control center>>, or by <<maven-dependency-example, adding the maven dependency to your common/pom.xml file>>. But, in some situations you may not be able to use those methods. For example, If you have a legacy cnlib file that you need to use in your app, and it isn't available on Maven central or the control center.
 
 In cases like this you can use the `install-cn1lib` Maven goal to install it as follows:
 

@@ -299,7 +299,7 @@ jobs:
           set -euo pipefail
           pip install --user language-tool-python==2.9.4
 
-      - name: Run LanguageTool grammar check (advisory)
+      - name: Run LanguageTool grammar check
         run: |
           set -euo pipefail
           REPORT_DIR="build/developer-guide/reports"
@@ -314,7 +314,8 @@ jobs:
           LT_COUNT="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("total",0))' "$REPORT_FILE" 2>/dev/null || echo 0)"
           echo "LANGUAGETOOL_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
           echo "LANGUAGETOOL_COUNT=$LT_COUNT" >> "$GITHUB_ENV"
-          echo "LanguageTool flagged ${LT_COUNT} match(es). This is advisory and does not fail the build." >&2
+          echo "LANGUAGETOOL_STATUS=$STATUS" >> "$GITHUB_ENV"
+          echo "LanguageTool flagged ${LT_COUNT} match(es). The final quality-gate step will fail the build if any matches remain." >&2
 
       - name: Check for unused developer guide images
         run: |
@@ -463,11 +464,16 @@ jobs:
             echo "Rewrite the flagged paragraph so its first prose word starts with a capital letter." >&2
             FAIL=1
           fi
+          if [ "${LANGUAGETOOL_STATUS:-0}" != "0" ] || [ "${LANGUAGETOOL_COUNT:-0}" != "0" ]; then
+            echo "LanguageTool reported ${LANGUAGETOOL_COUNT:-?} match(es) (exit status ${LANGUAGETOOL_STATUS:-?}). See the developer-guide-languagetool artifact." >&2
+            echo "Either fix the prose, add the term to docs/developer-guide/languagetool-accept.txt, or document a new exception by disabling the rule in scripts/developer-guide/run_languagetool.py." >&2
+            FAIL=1
+          fi
           if [ "$FAIL" -ne 0 ]; then
-            echo "Developer guide quality gates failed. Warnings from vale and asciidoctor are treated as build-breaking errors." >&2
+            echo "Developer guide quality gates failed. Warnings from vale, asciidoctor, and LanguageTool are treated as build-breaking errors." >&2
             exit 1
           fi
-          echo "Developer guide quality gates passed (vale issues=${VALE_ISSUE_COUNT:-0}, asciidoctor status=${ASCII_DOC_LINT_STATUS:-0}, unused-image status=${UNUSED_IMAGES_STATUS:-0})."
+          echo "Developer guide quality gates passed (vale issues=${VALE_ISSUE_COUNT:-0}, asciidoctor status=${ASCII_DOC_LINT_STATUS:-0}, unused-image status=${UNUSED_IMAGES_STATUS:-0}, languagetool count=${LANGUAGETOOL_COUNT:-0})."
 
       - name: Comment with artifact download links
         if: ${{ always() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
@@ -538,7 +544,7 @@ jobs:
               links.push(`- [Paragraph capitalization report](${artifactLinks.get('developer-guide-paragraph-capitalization')})`);
             }
             if (artifactLinks.has('developer-guide-languagetool')) {
-              links.push(`- [LanguageTool report (advisory)](${artifactLinks.get('developer-guide-languagetool')})`);
+              links.push(`- [LanguageTool report](${artifactLinks.get('developer-guide-languagetool')})`);
             }
 
             if (!links.length) {
@@ -568,7 +574,7 @@ jobs:
               qualityLines.push(`- Paragraph capitalization: ${paragraphCapSummary}${paragraphCapLink ? ` ([report](${paragraphCapLink}))` : ''}`);
             }
             if (languagetoolSummary) {
-              qualityLines.push(`- LanguageTool (advisory): ${languagetoolSummary}${languagetoolLink ? ` ([report](${languagetoolLink}))` : ''}`);
+              qualityLines.push(`- LanguageTool: ${languagetoolSummary}${languagetoolLink ? ` ([report](${languagetoolLink}))` : ''}`);
             }
             if (unusedSummary) {
               qualityLines.push(`- Image references: ${unusedSummary}${unusedLink ? ` ([report](${unusedLink}))` : ''}`);

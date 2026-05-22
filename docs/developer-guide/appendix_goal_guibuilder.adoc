@@ -10,7 +10,7 @@ The `guibuilder` goal opens the Codename One GUI builder to edit a specified GUI
 mvn cn1:guibuilder -DclassName=com.example.MyForm
 ----
 
-This will open the gui builder to edit the form whose class is `com.example.MyForm`.
+This will open the GUI builder to edit the form whose class is `com.example.MyForm`.
 
 ==== Parameters
 

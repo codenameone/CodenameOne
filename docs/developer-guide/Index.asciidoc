@@ -62,7 +62,7 @@ Since Android is already based on Java, Codename One is already native to Androi
 
 On iOS, Codename One built and open-sourced ParparVM, which is a conservative VM. ParparVM features a concurrent, non-blocking GC and is written entirely in Java/C. ParparVM is a transpiler that generates C source code matching the given Java bytecode. This means that an Xcode project is generated and compiled on the build servers. It's as if you hand-coded a native app and is thus future-proof against changes that Apple introduces. For example, Apple migrated to 64-bit and later introduced bitcode support to iOS. ParparVM needed no modifications to meet those changes.
 
-NOTE: Codename One translates the bytecode to C, which is faster than Swift/Objective-C. The port code that invokes iOS API's is hand coded in Objective-C
+NOTE: Codename One translates the bytecode to C, which is faster than Swift/Objective-C. The port code that invokes iOS APIs is hand coded in Objective-C
 
 Codename One earlier offered a UWP (Universal Windows Platform) target based on iKVM. That target was discontinued in release 7.0.229 and is preserved as historical context in older documentation and blog posts.
 
@@ -76,9 +76,9 @@ What makes Codename One stand out is the approach it takes to UI: "`lightweight 
 
 Lightweight architecture is the "`not so secrete sauce`" to Codename One's portability. Essentially it means all the components/widgets in Codename One are written in Java. Thus their behavior is consistent across all platforms and they're fully customizable from the developer code as they don't rely on OS internal semantics. This allows developers to preview the application accurately in the simulators and GUI builders.
 
-One of the big accomplishments in Codename One is its unique ability to embed "`heavyweight`" widgets into place among the "`lightweights.`" This is crucial for apps such as Uber where the cars and widgets on top are implemented as Codename One components yet below them you've the native map component.
+One of the big accomplishments in Codename One is its unique ability to embed "`heavyweight`" widgets into place among the "`lightweights.`" This is crucial for apps such as Uber where the cars and widgets on top are implemented as Codename One components yet below them, you have the native map component.
 
-Codename One achieves fast performance by drawing using the native gaming API's of most platforms for example: OpenGL ES on iOS. The core technologies behind Codename One are all open source including most of the stuff developed by Codename One itself, for example: ParparVM but also the full library, platform ports, designer tool, device skins etc.
+Codename One achieves fast performance by drawing using the native gaming APIs of most platforms for example: OpenGL ES on iOS. The core technologies behind Codename One are all open source including most of the stuff developed by Codename One itself, for example: ParparVM but also the full library, platform ports, designer tool, device skins etc.
 
 .Lightweight Architecture Origin
 ****
@@ -128,7 +128,7 @@ NOTE: The Desktop port is available to pro grade subscribers of Codename One
 .LWUIT App Screenshot circa 2007
 image::img/lwuit-screenshot.png[LWUIT App Screenshot,scaledwidth=15%]
 
-Codename One was started by Chen Fishbein and Shai Almog who authored the Open Source LWUIT project at Sun Microsystems (circa 2007). The LWUIT project aimed to solve the fragmentation within J2ME/Blackberry devices by creating a higher standard of user interface than the common baseline at the time. LWUIT received critical acclaim and traction within many industries but was limited by the declining feature phone market. It was forked by many companies including Nokia. It was used as the base standard for DTV in Brazil. Another fork has brought a LWUIT into high end cars from Toyota and other companies. This fork later adapted Codename One as well.
+Codename One was started by Chen Fishbein and Shai Almog who authored the Open Source LWUIT project at Sun Microsystems (circa 2007). The LWUIT project aimed to solve the fragmentation within J2ME/Blackberry devices by creating a higher standard of user interface than the common baseline at the time. LWUIT received critical acclaim and traction within many industries but was limited by the declining feature phone market. It was forked by many companies including Nokia. It was used as the base standard for DTV in Brazil. Another fork has brought a LWUIT into high-end cars from Toyota and other companies. This fork later adapted Codename One as well.
 
 In 2012 Shai and Chen formed Codename One as they left Oracle. The project has taken many of the basic concepts developed within the LWUIT project and adapted them to the smartphone world which is still experiencing similar issues to the device fragmentation of the old J2ME phones.
 
@@ -158,7 +158,7 @@ The exact same image will look different on each device, sometimes to a comical 
 
 This also highlights the need for working with measurements other than pixels. Codename One supports millimeters (or dips) as a unit of measurement. This is highly convenient and is a better representation of size when dealing with mobile devices.
 
-However, there is a bigger conceptual issue involved. You need to build a UI that adapts to the wide differences in form factors. You might have fewer pixels on an iPad, but because of its physical size, you would expect the app to cram more information into that space so the app won't feel like a blown-up phone application. many strategies to address that, but one of the first steps is in the layout managers. (((Layouts, Layout)))
+However, there is a bigger conceptual issue involved. You need to build a UI that adapts to the wide differences in form factors. You might have fewer pixels on an iPad, but because of its physical size, you would expect the app to cram more information into that space so the app won't feel like a blown-up phone application. Many strategies to address that, but one of the first steps is in the layout managers. (((Layouts, Layout)))
 
 Chapter 2 discusses the layout managers in depth, but the core concept is that they decide where a UI element is placed based on generic logic. That way, the user interface can adapt automatically to the huge variance in display size and density.
 
@@ -195,11 +195,11 @@ If an app is big, it might not update over a cellular network connection. Google
 
 ===== Power drain
 
-Desktop developers think about power usage within their apps. In mobile development, this is a crucial concept. Modern device OS's have tools that highlight misbehaving applications, and this can lead to bad reviews.
+Desktop developers think about power usage within their apps. In mobile development, this is a crucial concept. Modern device OSes have tools that highlight misbehaving applications, and this can lead to bad reviews.
 
 Code that loops forever while waiting for input will block the CPU from sleeping and drain the battery.
 
-Worse. Mobile OS's kill applications that drain the battery. If the app is draining the battery and is minimized, (for example, during an incoming call) the app could be killed. This will impact app performance and usability.
+Worse. Mobile OSes kill applications that drain the battery. If the app is draining the battery and is minimized, (for example, during an incoming call) the app could be killed. This will impact app performance and usability.
 
 ==== Sandbox and permissions
 
@@ -266,9 +266,9 @@ Apple, Google and Microsoft identify applications based on their package names. 
 
 This can cause difficulties when submitting to Apple, Google, or Microsoft. Submitting to one of them is no guarantee of success when submitting to another.
 
-To come up with the right package name use a reverse domain notation. if your website is `goodstuff.co.uk` your package name should start with `uk.co.goodstuff`. Follow these guidelines for package names:
+To come up with the right package name use a reverse domain notation. If your website is `goodstuff.co.uk` your package name should start with `uk.co.goodstuff`. Follow these guidelines for package names:
 
-* *Lower Case* - some OS's are case sensitive and handling a mistake in case is painful. The Java convention is lower case; stick to that
+* *Lower Case* - some OSes are case-sensitive and handling a mistake in case is painful. The Java convention is lower case; stick to that
 
 * *Avoid Dash and Underscore* - You can't use a dash character (`-`) for a package name in Java. Underscore (`_`) doesn't work for iOS. If you want more than one word just use a deeper package e.g.: `com.mydomain.deeper.meaningful.name`
 
@@ -285,20 +285,20 @@ With the `Skins` menu you can download device skins to see how your app will loo
 
 TIP: Some skins are bigger than the screen size, uncheck the `Scrollable` flag in the `Simulator` menu to handle them more effectively
 
-Use your IDE's Debug button with the Run in Simulator task to launch the simulator under the debugger.
+Use your IDEs Debug button with the Run in Simulator task to launch the simulator under the debugger.
 
 .Simulator vs. Emulator
 ****
 Codename One ships with a simulator similarly to the iOS toolchain which also has a simulator. Android ships with an emulator. Emulators go further. They create a virtual machine that's compatible with the device CPU and then boot the full mobile OS within that environment. This provides a proper runtime environment but is **slow**.
 
-Simulators rely on the fact that OS's are similar and so they leave the low-level details in place and just map the API behavior. Since Codename One relies on Java it can start simulating on top of the virtual machine on the desktop. That provides several advantages including fast development cycles and full support for all the development tools/debuggers you can use on the desktop.
+Simulators rely on the fact that OSes are similar and so they leave the low-level details in place and just map the API behavior. Since Codename One relies on Java it can start simulating on top of the virtual machine on the desktop. That provides several advantages including fast development cycles and full support for all the development tools/debuggers you can use on the desktop.
 
 Emulators make sense for developers who want to build OS level services for example, screensavers or low-level services. Standard applications are better served by simulators.
 ****
 
 ==== The source code of the hello world app
 
-After clicking finish in the new project wizard you've a `HelloWorld` project with a few default settings. The following sections break the class down to small pieces and explain each piece starting with the enclosing class:
+After clicking finish in the new project wizard you have a `HelloWorld` project with a few default settings. The following sections break the class down to small pieces and explain each piece starting with the enclosing class:
 
 [source,java,title='HelloWorld Class']
 ----
@@ -316,7 +316,7 @@ public class HelloWorld { // <1>
 
 <3> Every app has a theme, it determines how everything within the application looks for example: colors, fonts etc.
 
-Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth.
+Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 
 [source,java,title='HelloWorld init(Object)']
 ----
@@ -338,7 +338,7 @@ public void init(Object context) { // <1>
 }
 ----
 
-<1> `init` is the first of the four lifecycle methods. it's responsible for initialization of variables and values
+<1> `init` is the first of the four lifecycle methods. It's responsible for initialization of variables and values
 
 <2> By default Codename One has one thread that performs all the networking, you set the default to two which provides better performance
 
@@ -352,9 +352,9 @@ public void init(Object context) { // <1>
 
 <7> `consume()` swallows the event so it doesn't trigger other alerts, it means "`you got this`"
 
-<8> Not all errors include an exception, if you've an exception you can log it with this code
+<8> Not all errors include an exception, if you have an exception you can log it with this code
 
-<9> This will email the log from the device to you if you've a pro subscription
+<9> This will email the log from the device to you if you have a pro subscription
 
 <10> This shows an error dialog to the user, in production you might want to remove that code
 
@@ -419,7 +419,7 @@ Codename One has four standard callback methods in the lifecycle API:
 IMPORTANT: `destroy()` is optional there is no guarantee that it will be invoked. It should be used only as a last resort
 ****
 
-Now that you've a general sense of the lifecycle lets look at the last two lifecycle methods:
+Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 
 [source,java,title='HelloWorld stop() and destroy()']
 ----
@@ -450,7 +450,7 @@ That's it. You should now have a general sense of the code. It's time to run on 
 .Codename One Control Center
 image::img/control-center-main.png[Codename One Settings/Control Center,scaledwidth=50%]
 
-You can use the Control Center to configure almost anything. Specifically, the application title, application version, application icon etc. are all found in the Codename One Settings maven target.
+You can use the Control Center to configure almost anything. Specifically, the application title, application version, application icon etc. Are all found in the Codename One Settings maven target.
 
 There are many options within this UI that control almost every aspect of the application from signing to basic settings.
 
@@ -463,7 +463,7 @@ image::img/control-center-builds-empty.png[Builds in Empty State,scaledwidth=50%
 
 All the modern mobile platforms require signed applications but they all take radically different approaches when implementing it.
 
-Signing is a process that marks your final application for the device with a special value. This value (signature) is a value that you can generate based on the content of the application and your certificate. Effectively it guarantees the app came from you. This blocks a 3rd party from signing their apps and posing as you to the App Store or to the user. it's a crucial security layer.
+Signing is a process that marks your final application for the device with a special value. This value (signature) is a value that you can generate based on the content of the application and your certificate. Effectively it guarantees the app came from you. This blocks a 3rd party from signing their apps and posing as you to the App Store or to the user. It's a crucial security layer.
 
 A certificate is the tool you use for signing. Think of it as a mathematical rubber stamp that generates a different value each time. Unlike a rubber stamp a signature can't be forged!
 
@@ -472,7 +472,7 @@ A certificate is the tool you use for signing. Think of it as a mathematical rub
 .Backup your Android certificate and save its password!
 WARNING: If you lose your Android certificate you won't be able to update your app
 
-Android uses a self signed certificate approach. You can generate a certificate by describing who you're and picking a password!
+Android uses a self-signed certificate approach. You can generate a certificate by describing who you're and picking a password!
 
 Anyone can do that. For example, once a certificate is published it can't be replaced...
 
@@ -480,7 +480,7 @@ If this wasn't the case someone else could push an "`upgrade`" to your app. Once
 
 With that in mind generating an Android certificate is trivial.
 
-NOTE: The following chart illustrates a process that's identical on all IDE's
+NOTE: The following chart illustrates a process that's identical on all IDEs
 
 .Process of Certificate Generation for Android
 image::img/android-certificate-generator.png[]
@@ -492,7 +492,7 @@ TIP: Make sure to back that up and the password as losing these can have dire co
 ****
 In theory yes. In practice it's a pain... Keeping multiple certificates and managing them is a pain so you often just use one.
 
-The drawback of this approach occurs when you're building an app for someone else or want to sell the app. Giving away your certificate is akin to giving away your house keys. it makes sense to have separate certificates for each app.
+The drawback of this approach occurs when you're building an app for someone else or want to sell the app. Giving away your certificate is akin to giving away your house keys. It makes sense to have separate certificates for each app.
 ****
 
 ====== Signing and provisioning iOS
@@ -532,17 +532,17 @@ image::img/ios-certificate-wizard-3.png[Using the iOS Certificate Wizard Steps 5
 
 [TIP]
 ====
-If you've more than one project you should use the same iOS P12 certificate files in all the projects and regenerate the provisioning. In this situation the certificate wizard asks you if you want to revoke the existing certificate which you shouldn't revoke in such a case. You can update the provisioning profile in Apple's iOS developer website.
+If you have more than one project you should use the same iOS P12 certificate files in all the projects and regenerate the provisioning. In this situation the certificate wizard asks you if you want to revoke the existing certificate which you shouldn't revoke in such a case. You can update the provisioning profile in Apple's iOS developer website.
 ====
 
-One important aspect of provisioning on iOS is the device list in the provisioning step. Apple allows you to install the app on 100 devices during development. This blocks developers from skipping the App Store altogether. it's important you list the correct UDID for the device in the list otherwise install will fail.
+One important aspect of provisioning on iOS is the device list in the provisioning step. Apple allows you to install the app on 100 devices during development. This blocks developers from skipping the App Store altogether. It's important you list the correct UDID for the device in the list otherwise install will fail.
 
 WARNING: Many apps and tools offer the UDID of the device, but they aren't necessarily reliable and might give a fake number!
 
 .Get the UDID of a Device
 image::img/get-device-udid.png[Get the UDID of a Device]
 
-TIP: You can right click the UDID and select #copy# to copy it
+TIP: You can right-click the UDID and select #copy# to copy it
 
 The simplest and most reliable process for getting a UDID is through iTunes. Other approaches have worked in the past but this approach is guaranteed.
 
@@ -552,7 +552,7 @@ NOTE: Ad hoc provisioning allows 1000 beta testers for your application but it's
 
 Before you continue with the build you should sign up at https://www.codenameone.com/build-server.html where you can soon follow the progress of your builds. You need a Codename One account to build for the device.
 
-Now that you've certificates the process of device builds is a right click away for both OS's. You can right click the project and select #Codename One# -> #Send iOS Debug Build# or #Codename One# -> #Send Android Build#.
+Now that you have certificates, the process of device builds is a right click away for both OSes. You can right-click the project and select #Codename One# -> #Send iOS Debug Build# or #Codename One# -> #Send Android Build#.
 
 .Right click menu options for sending device builds
 image::img/getting-started-right-click-menu.png[Right click menu options for sending device builds,scaledwidth=50%]
@@ -568,7 +568,7 @@ TIP: On iOS make sure you use Safari when installing, as 3rd party browsers migh
 
 Once you go through those steps you should have the #HelloWorld# app running on your device. This process is non-trivial when starting so if you run into difficulties don't despair and seek help at the discussion forum (https://www.codenameone.com/discussion-forum.html) or stack overflow (https://stackoverflow/tags/codenameone/). Once you go through signing and installation, it becomes easier.
 
-TIP: You can also install the application either by emailing the install link to your account (using the #e-mail Link#
+TIP: You can also install the application either by emailing the installation link to your account (using the #e-mail Link#
 button)
 
 You can also download the binaries to upload them to the appstores.
@@ -578,11 +578,11 @@ You can also download the binaries to upload them to the appstores.
 
 Codename One started before Kotlin became public. Kotlin has since shown itself as an interesting option for developers within the Android community. With that in mind, Codename One added support for Kotlin.
 
-To use Kotlin with Codename One you can create a kotlin directory next to the java directory under the `common/src/main` directory. Kotlin code that resides there can work as usual and interact with the Java code.
+To use Kotlin with Codename One you can create a `kotlin` directory next to the `java` directory under the `common/src/main` directory. Kotlin code that resides there can work as usual and interact with the Java code.
 
 Please notice the following:
 
-- don't use the project conversion tools or accept the warning that the project isn't a Kotlin project. You do your own build process
+- Don't use the project conversion tools or accept the warning that the project isn't a Kotlin project. You do your own build process
 
 - Warnings and errors aren't listed and builds that claim to have errors might pass
 
@@ -664,7 +664,7 @@ class MyApplication {
 }
 ----
 
-That's pretty familiar. The problem is that there are two bugs in the automatic conversion... that's the code for Kotlin behaves differently from standard Java.
+That's pretty familiar. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
 
 The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration as such:
 
@@ -677,7 +677,7 @@ This is essential as the build server will fail with weird errors related to ins
 
 NOTE: This applies to the main class of the project, other classes in Codename One can remain `final`
 
-The second problem is that arguments are non-null by default. The `init` method might have a null argument. this fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
+The second problem is that arguments are non-null by default. The `init` method might have a null argument. This fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
 
 The full working sample is:
 

@@ -11,7 +11,7 @@ Every button, label, or other element on the screen in a Codename One applicatio
 image::img/codenameone-class-diagram.png[The Core Component Class Hierarchy]
 
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is a special `Component`. it's the root component shown to the user. `Container` is a `Component` type that can hold other components. That lets you create elaborate hierarchies by nesting `Container` instances.
+The https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is a special `Component`. It's the root component shown to the user. `Container` is a `Component` type that can hold other components. That lets you create elaborate hierarchies by nesting `Container` instances.
 
 [[component-uml]]
 .Component UML
@@ -119,9 +119,9 @@ This works great for regular layouts but might not for constraint based layouts.
 cnt.add(NORTH, new Label("Just Added"));
 ----
 
-This line assumes you've an `import static com.codename1.ui.CN.*;` in the top of the file. In `BorderLayout` (which is a constraint based layout) placing an item in the `NORTH` places it in the top of the `Container`.
+This line assumes you have an `import static com.codename1.ui.CN.*;` in the top of the file. In `BorderLayout` (which is a constraint based layout) placing an item in the `NORTH` places it in the top of the `Container`.
 
-TIP: The `CN` class is a class that contains many static helper methods and functions. it's specifically designed for static import in this way to help keep your code terse
+TIP: The `CN` class is a class that contains many static helper methods and functions. It's specifically designed for static import in this way to help keep your code terse
 
 .Static Global Context
 ****
@@ -132,7 +132,7 @@ The `CN` class is a thin wrapper around features in `Display`, `NetworkManager`,
 import static com.codename1.ui.CN.*;
 ----
 
-TIP: that's optional, if you don't like static imports you can just write `CN.` for every element
+TIP: That's optional, if you don't like static imports you can just write `CN.` for every element
 
 From that point on you can write code that looks like this:
 
@@ -172,7 +172,7 @@ log(myException);
 
 Instead of `Display.getInstance().getCurrent()` you now have `getCurrentForm()` since `getCurrent()` is too generic. For most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work."
 
-The motivation for this is three fold:
+The motivation for this is threefold:
 
 - Terse code
 - Small performance gain
@@ -224,7 +224,7 @@ To sum this up, you can use layout managers and nesting to create elaborate UI's
 .Flow Layout
 image::img/flow-layout.png[Flow Layout,scaledwidth=20%]
 
-link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components "flow" horizontally and break a line when reaching the edge of the container. it's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in wrong preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container]. This can create a reflow issue, as a result recommend using flow layout for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime.
+link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components "flow" horizontally and break a line when reaching the edge of the container. It's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in wrong preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container]. This can create a reflow issue, as a result recommend using flow layout for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime:
 
 [source,java]
 ----
@@ -265,7 +265,7 @@ image::img/flow-layout-center-middle.png[Flow layout aligned to the center horiz
 
 Components within the flow layout get their natural preferred size by default and aren't stretched in any axis.
 
-TIP: The natural sizing behavior is often used to prevent other layout managers from stretching components. For example: if you've a border layout element in the south and you want it to keep its natural size instead of adding the element to the south directly you can wrap it using `parent.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(dontGrowThisComponent))`.
+TIP: The natural sizing behavior is often used to prevent other layout managers from stretching components. For example: if you have a border layout element in the south and you want it to keep its natural size instead of adding the element to the south directly you can wrap it using `parent.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(dontGrowThisComponent))`.
 
 ===== Box Layout
 
@@ -289,7 +289,7 @@ Which results in <<box-layout-y,this>>
 .BoxLayout Y
 image::img/box-layout-y.png[BoxLayout Y,scaledwidth=20%]
 
-Box layout also supports a shorter terse notation which you use here to <<box-layout-x,show the X axis box>>.
+Box layout also supports a shorter terse notation which you use here to <<box-layout-x,show the X axis box>>:
 
 [source,java]
 ----
@@ -323,7 +323,7 @@ TIP: When applicable recommend `BoxLayout` over `FlowLayout` as it acts more con
 image::img/border-layout.png[Border Layout,scaledwidth=20%]
 
 link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[Border layout] is unique. `BorderLayout` is a constraint-based layout that can place up to five components in one of the five positions: `NORTH`, `SOUTH`,
-`EAST`, `WEST` or `CENTER`.
+`EAST`, `WEST` or `CENTER`:
 
 [source,java]
 ----
@@ -389,7 +389,7 @@ be left in place.
 
 // vale-skip: Microsoft.ComplexWords/TooWordy — 'an additional row' reads correctly; 'an more row' is ungrammatical.
 In this example you can see that a 2×2 grid is used to add 5 elements, this results in an additional row that's implicitly
-added turning the grid to a 3×2 grid implicitly and leaving one blank cell.
+added turning the grid to a 3×2 grid implicitly and leaving one blank cell:
 
 [source,java]
 ----
@@ -413,8 +413,10 @@ Grid also has an autoFit attribute that can be used to automatically calculate t
 available space and preferred width. This is useful for working with UI's where the device orientation
 might change.
 
-A terse syntax for working with a grid also exists in two versions, one that uses the "auto fit" option and
-another that accepts the number of columns. Here's a sample of the terse syntax coupled with auto fit followed by screenshots
+// vale-skip: Microsoft.Auto: "auto-fit" is a literal CSS Grid keyword and matches the API option name; the unhyphenated form would refer to a different concept.
+A terse syntax for working with a grid also exists in two versions, one that uses the "auto-fit" option and
+// vale-skip: Microsoft.Auto: "auto-fit" is a literal CSS Grid keyword and matches the API option name; the unhyphenated form would refer to a different concept.
+another that accepts the number of columns. Here's a sample of the terse syntax coupled with auto-fit followed by screenshots
 of the same code in two orientations:
 
 [source,java]
@@ -435,7 +437,7 @@ image::img/grid-layout-autofit-landscape.png[Grid Layout autofit landscape,scale
 [[table-layout-section]]
 ==== Table Layout
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html[TableLayout] is a elaborate **constraint based** layout manager that can arrange elements in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight etc.
+The https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html[TableLayout] is an elaborate **constraint based** layout manager that can arrange elements in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight etc.
 
 .Note the Different Package for `TableLayout`
 NOTE: The `TableLayout` is in the `com.codename1.ui.table` package and not in the layouts package. +
@@ -461,7 +463,7 @@ image::img/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that th
 
 `TableLayout` supports the ability to grow the last column which can be enabled using the `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a `TableLayout` but since the `TableLayout` is a constraint based layout you won't be able to use its full power with this syntax.
 
-The default usage of the `encloseIn` method below uses the `setGrowHorizontally` flag.
+The default usage of the `encloseIn` method below uses the `setGrowHorizontally` flag:
 
 [source,java]
 ----
@@ -610,8 +612,8 @@ hi.add(LayeredLayout.encloseIn(settingsLabel,
 
 You're doing three distinct things here:
 
-. you're adding a layered layout to the form
-. you're creating a layered layout and placing two components within. This would be the equivalent of creating a `LayeredLayout` `Container` and invoking `add` twice
+. You're adding a layered layout to the form
+. You're creating a layered layout and placing two components within. This would be the equivalent of creating a `LayeredLayout` `Container` and invoking `add` twice
 . You use `FlowLayout` to position the `X` close button in the right position
 
 NOTE: When used without constraints, the layered layout sizes all components to the exact same size one on top of the other. It requires that you use another container within; to position the components correctly
@@ -684,7 +686,7 @@ The special "auto" inset indicates that it's a flexible inset. If all insets are
 
 NOTE: The "inset bounding box" is the containing box from which a component's insets are measured. If the component's insets aren't linked to any other components, then its inset bounding box will be the inner bounds (that's: taking padding into account) of the component's parent container.
 
-If one inset is fixed (that's: defined in px, mm, or %), and the opposite inset is "auto," then the "auto" inset will allow the component to be its preferred size. if you want to position a component to be centered vertically, and 5mm from the left edge, you could do:
+If one inset is fixed (that's: defined in px, mm, or %), and the opposite inset is "auto," then the "auto" inset will allow the component to be its preferred size. If you want to position a component to be centered vertically, and 5mm from the left edge, you could do:
 
 [source,java]
 ----
@@ -756,7 +758,7 @@ The two active lines here are the last two:
 <1> Sets the left inset on `btn` to 0.
 <2> Links `btn`'s left inset to `tf` so that it's measured from the text field. The third parameter (`1.0`) is the reference position. This will either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field). In this case you set a reference position of `1.0` because you want the button to be aligned to the text field's right edge.
 
-NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured. A reference position of 0 means that the inset is measured from the leading edge of the reference component. A value of 1.0 means that the inset is measured from the trailing edge of the reference component. A value of 0.5 means that the inset is measured from the center of the reference component. Etc... Any floating point value can be used, though the most common values are 0 and 1.
+NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured. A reference position of 0 means that the inset is measured from the leading edge of the reference component. A value of 1.0 means that the inset is measured from the trailing edge of the reference component. A value of 0.5 means that the inset is measured from the center of the reference component. Etc. Any floating point value can be used, though the most common values are 0 and 1.
 
 The definition above may make reference components and reference position seem more complex than they are. Some examples:
 
@@ -796,7 +798,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/layouts/GridBagLayout.html[
 
 Your recommendation is to <<table-layout-section,use Table>> which is as powerful but has better Codename One integration.
 
-To show `GridBagLayout` you ported http://docs.oracle.com/Java SE/tutorial/uiswing/layout/gridbag.html[the sample from the Java tutorial] to Codename One.
+To show `GridBagLayout` you ported http://docs.oracle.com/Java SE/tutorial/uiswing/layout/gridbag.html[the sample from the Java tutorial] to Codename One:
 
 [source,java]
 ----
@@ -856,9 +858,9 @@ image::img/gridbag-layout.png[GridbagLayout sample from the Java tutorial runnin
 
 https://www.codenameone.com/javadoc/com/codename1/ui/layouts/GroupLayout.html[GroupLayout] is a layout that would be familiar to the users of https://netbeans.org/features/java/swing.html[the NetBeans GUI builder (Matisse)]. Its a layout manager that's hard to use for manual coding but is powerful for some elaborate use cases. Although `MiGLayout` and `LayeredLayout` might be superior options.
 
-It was originally added during the LWUIT days as part of an internal try to port Matisse to LWUIT. it's still useful to this day as developers copy and paste Matisse code into Codename One and produce elaborate layouts with drag.
+It was originally added during the LWUIT days as part of an internal try to port Matisse to LWUIT. It's still useful to this day as developers copy and paste Matisse code into Codename One and produce elaborate layouts with drag.
 
-Since the layout is based on an older version of `GroupLayout` some things need to be adapted in the code or you should use the special "compatibility" library for Matisse to get better interaction. You also recommend tweaking Matisse to use import statements instead of full package names, that way if you use `Label` changing the awt import to a Codename One import will make it use work for Codenmae One's `Label`.
+Since the layout is based on an older version of `GroupLayout` some things need to be adapted in the code or you should use the special "compatibility" library for Matisse to get better interaction. You also recommend tweaking Matisse to use import statements instead of full package names, that way if you use `Label` changing the awt import to a Codename One import will make it use work for Codename One's `Label`.
 
 Unlike any other layout manager `GroupLayout` adds the components into the container instead of the standard API. This works for GUI builder code but as you can see from this sample it doesn't make the code readable:
 
@@ -941,7 +943,7 @@ If you're porting newer Matisse code there are simple changes you can do:
 
 ==== Mig Layout
 
-https://www.codenameone.com/javadoc/com/codename1/ui/layouts/mig/MigLayout.html[MigLayout] is a popular cross platform layout manager that was ported to Codename One from Swing.
+https://www.codenameone.com/javadoc/com/codename1/ui/layouts/mig/MigLayout.html[MigLayout] is a popular cross-platform layout manager that was ported to Codename One from Swing.
 
 WARNING: MiG is still considered experimental so proceed with caution! +
 The API was deprecated to serve as a warning of its experimental status.
@@ -967,9 +969,9 @@ image::img/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=2
 
 It should be reasonably easy to port MiG code but you should notice the following:
 
-- MiG handles a lot of the spacing/padding/margin issues that are missing in Swing/AWT. With Codename One styles you've the padding and margin which are probably a better way to do a lot of the things that MiG does
+- MiG handles a lot of the spacing/padding/margin issues that are missing in Swing/AWT. With Codename One styles you have the padding and margin which are probably a better way to do a lot of the things that MiG does
 - The `add` method in Codename One can be changed as shown in the sample above.
-- The constraint argument for Coedname One `add` calls appears before the `Component` instance.
+- The constraint argument for Codename One `add` calls appears before the `Component` instance.
 
 
 === Themes and styles
@@ -991,7 +993,7 @@ nameText.setUIID("Label");
 
 This is a text field component (user input field) but it will look like a `Label`.
 
-Effectively you told the text field that it should use the UIID of `Label` when it's drawing itself. it's common to do tricks like that in Codename One. For example: `button.setUIID("Label")` would make a button appear like a label and allow you to track clicks on a `Label`.
+Effectively you told the text field that it should use the UIID of `Label` when it's drawing itself. It's common to do tricks like that in Codename One. For example: `button.setUIID("Label")` would make a button appear like a label and allow you to track clicks on a `Label`.
 
 The UIID's translate the theme elements into a set of `Style` objects. These `Style` objects get their initial values from the theme but can be further manipulated after the fact. To make the text field's foreground color red you could use this code:
 
@@ -1055,7 +1057,7 @@ The GUI builder allows you to arrange components visually within a UI using drag
 
 ==== Hello world
 
-The GUI builder is invoked through the Codename One Maven plugin and works the same way regardless of which IDE you use to edit the surrounding Java code. two goals to know about:
+The GUI builder is invoked through the Codename One Maven plugin and works the same way regardless of which IDE you use to edit the surrounding Java code. Two goals to know about:
 
 - `cn1:create-gui-form` generates a new GUI form (the `.gui` XML file plus the matching Java source).
 - `cn1:guibuilder` opens the GUI builder so you can edit an existing form.
@@ -1088,7 +1090,7 @@ The full goal reference, including every parameter, lives in <<create-gui-form>>
 Notice that the UI of the GUIBuilder might change in various ways but the basic concepts should remain the
 same.
 
-The GUI builder is controlled through it's main toolbar, notice that your changes will be applied when you click
+The GUI builder is controlled through its main toolbar, notice that your changes will be applied when you click
 the #Save# button on the right:
 
 .The features of the left toolbar
@@ -1101,7 +1103,7 @@ The main UI includes four important parts:
 
 - #Main Form# -- This is where you place the components of the UI you're building
 
-- #Component Tree# -- This is a logical representation of the component hierarchy within the #Main Form#. it's often easier to pick a component from the tree rather than the form itself
+- #Component Tree# -- This is a logical representation of the component hierarchy within the #Main Form#. It's often easier to pick a component from the tree rather than the form itself
 
 - #Property Inspector# -- When you select an element in the tree or form you can see its details here. You can then edit the various details of the component in this area
 
@@ -1159,7 +1161,7 @@ public void onButton_1ActionEvent(com.codename1.ui.events.ActionEvent ev) {
 }
 ----
 
-TIP: Some IDE's generate the project source code after you explicitly build the project so if your code needs to access variables etc. try building first
+TIP: Some IDEs generate the project source code after you explicitly build the project so if your code needs to access variables etc. try building first
 
 Within the code you can access all the GUI components you defined with the `gui_` prefix for example: `Button_1` from the
 UI is represented as:
@@ -1269,11 +1271,11 @@ public class MyForm extends com.codename1.ui.Form {
 }
 ----
 
-WARNING: don't touch the code within the don't EDIT comments...
+WARNING: Don't touch the code within the don't EDIT comments...
 
-The GUI builder uses the "magic comments" approach where code is generated into those areas to match the XML defined in the GUI builder. Various IDE's generate that code at different times. Some will generate it when you run the app while others will generate it as you save the GUI in the builder.
+The GUI builder uses the "magic comments" approach where code is generated into those areas to match the XML defined in the GUI builder. Various IDEs generate that code at different times. Some will generate it when you run the app while others will generate it as you save the GUI in the builder.
 
-You can write code within the class both by using the event mechanism, by writing code in the constructors or thru overriding functionality in the base class.
+You can write code within the class both by using the event mechanism, by writing code in the constructors or through overriding functionality in the base class.
 
 [[auto-layout-mode]]
 ==== Auto layout mode
@@ -1299,7 +1301,7 @@ image::img/guibuilder-2-inset-control.png[Inset control,scaledwidth=5%]
 Each control has three sections:
 
 // vale-skip: Microsoft.Percentages: "percent" is one of the named unit options in the GUI builder dropdown, used here as a unit name on equal footing with "millimetres" and "pixels", not as a quantity.
-1. **The inset value drop-down menu**. This shows the current value of the inset (for example: 0mm, 25%, auto, etc...). If you click on this, it will open a menu that will allow you to change the units. If the inset is in millimetres, it will have options for pixels, and percent. If the inset is in percent, it will have options for pixels and millimetres. Etc.. It also includes a text field to enter a an inset value explicitly.
+1. **The inset value drop-down menu**. This shows the current value of the inset (for example: 0mm, 25%, auto, etc.). If you click on this, it will open a menu that will allow you to change the units. If the inset is in millimetres, it will have options for pixels, and percent. If the inset is in percent, it will have options for pixels and millimetres. Etc. It also includes a text field to enter an inset value explicitly.
 +
 image::img/guibuilder-2-insets-dropdown-menu.png[Inset drop-down menu,scaledwidth=6%]
 2. **The "Link" Button** image:img/guibuilder-2-link-button-unselected.png[Link button,scaledwidth=6%] - If the inset is linked to a reference component, then this button will be highlighted "blue," and hovering over it will highlight the reference component in the UI so that you can see which component it's linked to. Clicking on this button will open a dialog that will allow you to "break" this link. You can drag this button over any component in the form to "link."
@@ -1345,7 +1347,7 @@ This control pad also includes game-pad-like controls (up, down, left, right), t
 
 Sometimes, you may need to add sub-containers to your form to aid in grouping your components together. You can drag a container onto your form using the "Container" palette item (under "Core Components"). The default layout the subcontainer will be LayeredLayout so that you're able to position components within the sub-container with precision, like on the root container.
 
-You can also change the layout of subcontainers to another classical layout manager (for example: grid layout, box layout, etc..) and drag components directly into it. This is useful if parts of your form lend themselves to a different layout. As an example, drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
+You can also change the layout of subcontainers to another classical layout manager (for example: grid layout, box layout, etc.) and drag components directly into it. This is useful if parts of your form lend themselves to a different layout. As an example, drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
 
 Drag the button (that was earlier on the form) over that container, and you should see a drop-zone become highlighted.
 
