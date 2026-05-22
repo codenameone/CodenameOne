@@ -100,6 +100,29 @@ When the app starts running on the device, it'll connect to the
 proxy and the IDE will see a fresh suspended VM. Set breakpoints,
 step, inspect, just like a normal remote attach.
 
+==== Surfacing device output in the IDE console
+
+The proxy prints every `[device]` line to its own stdout. An IDE
+remote-attach configuration sees the JDWP socket but not the
+proxy's console, so device prints don't appear in the *Debug*
+window by default.
+
+Two workarounds:
+
+* *Tail the proxy log in a terminal.* If the proxy was started
+  via `mvn cn1:ios-on-device-debugging` you can run
+  `tail -f target/cn1-debug-proxy.log` in another terminal.
+* *Launch the proxy as an additional IDE Run config.* In IntelliJ
+  IDEA: *Run* → *Edit Configurations…* → *+* → *Application*. Set
+  the main class to `com.codename1.debug.proxy.ProxyMain`, fill in
+  *Program arguments* with `--symbols=path/to/cn1-symbols.txt`
+  `--device-port=55333 --jdwp-port=8000`, and put
+  `com.codenameone:cn1-debug-proxy:8.0-SNAPSHOT` on the classpath
+  (Modules → Dependencies → +). The proxy's stdout now lands in
+  IntelliJ's *Run* window, which is the easiest way to follow
+  `[device]` lines alongside the JDWP attach session — group both
+  configs into a *Compound* run config so they start together.
+
 === What works today
 
 * Class loading: the IDE sees every class in your build.
