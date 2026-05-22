@@ -49,31 +49,58 @@ if [ -z "$BUNDLE_ID" ]; then
 fi
 iv_log "Bundle id: $BUNDLE_ID"
 
-DEVICE_NAME="${CN1IV_DEVICE_NAME:-iPhone 17 Pro}"
+DEVICE_NAME="${CN1IV_DEVICE_NAME:-}"
 DEVICE_RUNTIME="${CN1IV_DEVICE_RUNTIME:-}"
 
-iv_log "Locating simulator: $DEVICE_NAME"
-SIM_UDID=""
-while IFS=$'\t' read -r udid name state runtime; do
-  if [ "$name" = "$DEVICE_NAME" ] && { [ -z "$DEVICE_RUNTIME" ] || [ "$runtime" = "$DEVICE_RUNTIME" ]; }; then
-    SIM_UDID="$udid"
-    break
-  fi
-done < <(xcrun simctl list devices available -j \
-  | python3 -c '
+# Build a sorted (name, runtime, udid) list of available simulators. Newer
+# iOS runtimes sort last so we pick them by default.
+read_devices() {
+  xcrun simctl list devices available -j \
+    | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
+rows = []
 for runtime, devs in data.get("devices", {}).items():
+    if "iOS-" not in runtime:
+        continue
     for d in devs:
         if d.get("isAvailable"):
-            print(f"{d[\"udid\"]}\t{d[\"name\"]}\t{d[\"state\"]}\t{runtime}")
-')
+            rows.append((runtime, d["name"], d["udid"]))
+rows.sort()
+for r in rows:
+    print("\t".join(r))
+'
+}
+
+SIM_UDID=""
+if [ -n "$DEVICE_NAME" ]; then
+  iv_log "Locating simulator by name: $DEVICE_NAME"
+  while IFS=$'\t' read -r runtime name udid; do
+    if [ "$name" = "$DEVICE_NAME" ] && { [ -z "$DEVICE_RUNTIME" ] || [ "$runtime" = "$DEVICE_RUNTIME" ]; }; then
+      SIM_UDID="$udid"
+      break
+    fi
+  done < <(read_devices)
+fi
 
 if [ -z "$SIM_UDID" ]; then
-  iv_log "No simulator matched name=$DEVICE_NAME runtime=$DEVICE_RUNTIME" >&2
+  # Fall back to the newest available iPhone (any model). XCode 16.4 only has
+  # iPhone 16; XCode 26 has iPhone 17. We'd rather adapt than fail-fast on a
+  # CI runner that doesn't have the exact device name we'd prefer.
+  iv_log "No exact device match -- picking the newest available iPhone"
+  while IFS=$'\t' read -r runtime name udid; do
+    case "$name" in
+      iPhone*) SIM_UDID="$udid"; DEVICE_NAME="$name"; DEVICE_RUNTIME="$runtime" ;;
+    esac
+  done < <(read_devices)
+fi
+
+if [ -z "$SIM_UDID" ]; then
+  iv_log "No iOS simulator available on this host" >&2
   xcrun simctl list devices available >&2 || true
   exit 3
 fi
+iv_log "Selected simulator: $DEVICE_NAME ($DEVICE_RUNTIME)"
 iv_log "Using simulator $SIM_UDID"
 
 # Boot the simulator if needed. `bootstatus -b` blocks until SpringBoard is up.
