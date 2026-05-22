@@ -15,7 +15,7 @@ mvn cn1:install-cn1lib -Dfile=/path/to/MyLegacyLib.cn1lib
 
 This will generate a Maven pom project for this lib inside the "cn1libs" directory, and it will add a dependency inside the common/pom.xml file.
 
-NOTE: The generated project isn't a <<cn1lib-archetype, cn1lib-archetype>> project, and it isn't meant to change. it's merely a Maven wrapper around the cn1lib file that provides compatibility with Maven's dependency mechanism.
+NOTE: The generated project isn't a <<cn1lib-archetype, cn1lib-archetype>> project, and it isn't meant to change. It's merely a Maven wrapper around the cn1lib file that provides compatibility with Maven's dependency mechanism.
 
 ==== Removing the Cn1lib later
 

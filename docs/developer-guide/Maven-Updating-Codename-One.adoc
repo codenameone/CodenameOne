@@ -1,10 +1,12 @@
 [#updating]
 == Updating Codename One
-Codename One releases new versions weekly on Maven central. it's recommended that you stay up to date with the latest version as much as possible to ensure compatibility with the Codename One build server, which is always running the latest version.
+Codename One releases new versions weekly on Maven central. It's recommended that you stay up to date with the latest version as much as possible to ensure compatibility with the Codename One build server, which is always running the latest version.
 
 You can use the <<update-goal, update goal>> to update both the Codename One libraries, and the Codename One dependencies in your project.
 
-For example, [source,bash]
+For example:
+
+[source,bash]
 ----
 mvn cn:update
 ----
@@ -33,7 +35,7 @@ Then press the image:img/intellij-run-icon.png[Run] button.
 [discrete]
 === NetBeans
 
-Or you can right click on the project in the project inspector, and select "Run Maven" > "Update Codename One" as shown here:
+Or you can right-click on the project in the project inspector, and select "Run Maven" > "Update Codename One" as shown here:
 
 image::img/netbeans-update-codenameone.png[]
 

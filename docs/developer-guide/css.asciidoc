@@ -55,7 +55,7 @@ Button.pressed {
 
 ==== Inheriting properties using `cn1-derive`
 
-The following example defines a custom Button style named "MyButton" that inherits all the styles of Button but changes the background color to blue.
+The following example defines a custom Button style named "MyButton" that inherits all the styles of Button but changes the background color to blue:
 
 [source,css]
 ----
@@ -69,7 +69,7 @@ MyButton {
 
 ==== `#device`
 
-The `#Device` selector allows you to define which device resolutions this CSS file should target. Mutli-images generated from this style-sheet will be include variants for device resolutions in the range `(min-resolution, max-resolution)` as defined in this section. By default all resolutions are generated.
+The `#Device` selector allows you to define which device resolutions this CSS file should target. Mutli-images generated from this style-sheet will be included variants for device resolutions in the range `(min-resolution, max-resolution)` as defined in this section. By default all resolutions are generated:
 
 [source,css]
 ----
@@ -84,7 +84,9 @@ The `#Device` selector allows you to define which device resolutions this CSS fi
 
 The `#Constants` selector allows you to specify theme constants.
 
-For example, [source,css]
+For example:
+
+[source,css]
 ----
 #Constants {
     PopupDialogArrowBool: false;
@@ -200,7 +202,9 @@ Used to specify that this UIID should derive from an existing UIID.
 
 === CSS variables
 
-As of CodenameOne 7.0, you can use variables in your CSS file via the `var()` CSS function. For example, [source,css]
+As of CodenameOne 7.0, you can use variables in your CSS file via the `var()` CSS function. For example:
+
+[source,css]
 ----
 var(--header-color, blue);
 ----
@@ -354,7 +358,7 @@ RoundRectLabel {
 
 `cn1-pill-border` and `cn1-round-border` don't support the standard CSS `box-shadow` property. This is because the `box-shadow` property parameters don't map onto the shadow parameters for the Codename One `RoundBorder` class. To get shadows on the `cn1-pill-border`, you should use one or more of the following CSS properties:
 
-* `cn1-box-shadow-spread`: Accepts values in any scalar unit (for example, px, mm, cm, etc...). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowSpread-int-boolean-[shadowSpread] property.
+* `cn1-box-shadow-spread`: Accepts values in any scalar unit (for example, px, mm, cm, etc.). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowSpread-int-boolean-[shadowSpread] property.
 * `cn1-box-shadow-h`: Accepts values in real values or integers (not a scalar unit). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowX-float-[shadowX] property.
 * `cn1-box-shadow-v`: Accepts values in real values or integers (not a scalar unit). This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowY-float-[shadowY] property.
 * `cn1-box-shadow-blur`: Scalar value. Maps to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowBlur-float-[shadowBlur] property.
@@ -363,7 +367,7 @@ RoundRectLabel {
 
 Using the regular CSS `box-shadow` in conjunction with `border-radius` will cause a 9-piece border to be generated rather than mapping to the `RoundRectBorder`. If, but, you use the `cn1-box-*` properties for the shadow instead, it will use the RoundRectBorder—assuming that no other styles are specified that trigger an image border to be generated.
 
-Codename One also exposes per-corner elliptical radius controls that map to the `RoundBorder`'s X/Y radii. You can set them directly with `cn1-border-top-left-radius-x` / `cn1-border-top-left-radius-y` (and the equivalent `top-right`, `bottom-left`, and `bottom-right` pairs) to fine tune horizontal and vertical curvature independently. The CSS parser automatically populates these properties when you use standard `border-radius` syntax, including the longhand declarations and the `border-radius: <x-radii> / <y-radii>` shorthand.
+Codename One also exposes per-corner elliptical radius controls that map to the `RoundBorder`'s X/Y radii. You can set them directly with `cn1-border-top-left-radius-x` / `cn1-border-top-left-radius-y` (and the equivalent `top-right`, `bottom-left`, and `bottom-right` pairs) to fine tune horizontal and vertical curvature independently. The CSS parser automatically populates these properties when you use standard `border-radius` syntax, including the longhand declarations and the `border-radius: <x-radii> / <y-radii>` shorthand:
 
 [source,css]
 ----
@@ -398,7 +402,7 @@ image::img/css-gradients-overview.png[CSS gradient examples,300]
 
 **`linear-gradient`**
 
-Any angle in degrees, radians, or `turn`, or the canonical `to <side>` / `to <side1> <side2>` directions. Two or more stops, each with optional position percentage; positions left blank between fixed anchors are autodistributed.
+Any angle in degrees, radians, or `turn`, or the canonical `to <side>` / `to <side1> <side2>` directions. Two or more stops, each with optional position percentage; positions left blank between fixed anchors are autodistributed:
 
 [source,css]
 ----
@@ -421,7 +425,7 @@ MyComponent { background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue); }
 
 **`radial-gradient`**
 
-Full CSS radial syntax: `circle` or `ellipse`, any of the four extent keywords (`closest-side` / `closest-corner` / `farthest-side` / `farthest-corner`, defaulting to `farthest-corner`), explicit radii as percentages, an optional `at <position>` clause with side keywords or percentages, and two or more multi-stop colors.
+Full CSS radial syntax: `circle` or `ellipse`, any of the four extent keywords (`closest-side` / `closest-corner` / `farthest-side` / `farthest-corner`, defaulting to `farthest-corner`), explicit radii as percentages, an optional `at <position>` clause with side keywords or percentages, and two or more multi-stop colors:
 
 [source,css]
 ----
@@ -432,7 +436,7 @@ MyContainer { background: radial-gradient(circle farthest-corner at right, #ffe,
 
 **`conic-gradient`**
 
-Sweep / pie-style gradient. Optional `from <angle>` (CSS convention: 0° points up, sweep is clockwise) and `at <position>` prefix, followed by the stop list.
+Sweep / pie-style gradient. Optional `from <angle>` (CSS convention: 0° points up, sweep is clockwise) and `at <position>` prefix, followed by the stop list:
 
 [source,css]
 ----
@@ -442,7 +446,7 @@ MyContainer { background: conic-gradient(from 45deg at 50% 50%, #f06 0%, #fc0 25
 
 **`repeating-linear-gradient` / `repeating-radial-gradient`**
 
-Identical syntax to their non-repeating counterparts. The stop pattern tiles outward to fill the bounding box, ideal for stripes and rings.
+Identical syntax to their non-repeating counterparts. The stop pattern tiles outward to fill the bounding box, ideal for stripes and rings:
 
 [source,css]
 ----
@@ -455,7 +459,7 @@ MyTarget   { background: repeating-radial-gradient(circle at center, #fff, #fff 
 CSS `filter` and `backdrop-filter` accept a chain of functions. Two storage forms land on the corresponding `Style`:
 
 * `blur(<length>)` → `filterBlurRadius` / `backdropFilterBlurRadius` (a single pixel value).
-* `brightness`, `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`, `sepia` → `filterColorMatrix` / `backdropFilterColorMatrix` (a 4×5 color matrix; a multi-function chain composes into a single matrix in CSS order).
+* `brightness`, `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`, `sepia` → `filterColorMatrix` / `backdropFilterColorMatrix` (a 4×5 color matrix; a multi-function chain composes into a single matrix in CSS order):
 
 [source,css]
 ----
@@ -540,7 +544,9 @@ NOTE: `cn1-source-dpi` values are meant to fall into threshold ranges. Values le
 
 ==== Multi-Images vs regular images
 
-By default all images are imported as multi-images (unless you define the `defaultSourceDPIInt` theme constant). If you want to import an image as a "regular" image, you can set `cn1-source-dpi` to `0`. For example, [source,css]
+By default all images are imported as multi-images (unless you define the `defaultSourceDPIInt` theme constant). If you want to import an image as a "regular" image, you can set `cn1-source-dpi` to `0`. For example:
+
+[source,css]
 ----
 SomeStyle {
     background-image: url(images/my-image.png);
@@ -550,7 +556,9 @@ SomeStyle {
 
 [NOTE]
 ====
-You can change the default source DPI for the whole stylesheet by adding `defaultSourceDPIInt: 0` to the theme constants. For example, [source,css]
+You can change the default source DPI for the whole stylesheet by adding `defaultSourceDPIInt: 0` to the theme constants. For example:
+
+[source,css]
 ----
 #Constants {
   defaultSourceDPIInt: 0;
@@ -594,7 +602,7 @@ css/
              +--- verylow.png
              +--- low.png
              +--- medium.png
-              ... etc...
+              ... etc.
 ----
 
 NOTE: Multi-image inputs are supported for local URLs. You can't use remote (for example, `http://`) urls with multi-image inputs
@@ -670,7 +678,9 @@ Label bookmark = new Label(theme.getImage("Bookmark-icon.png"));
 
 ==== Loading images from URLs
 
-You can also load images from remote URLs. For example, [source,css]
+You can also load images from remote URLs. For example:
+
+[source,css]
 ----
 Images {
     background-image: url(http://solutions.weblite.ca/logo.png);
@@ -683,7 +693,9 @@ image::img/css-nine-piece-border.png[]
 
 9-Piece image borders can be created using the `image-border` and `image-border-slice` properties.
 
-For example, [source,css]
+For example:
+
+[source,css]
 ----
 NinePiece {
 	border-image:url('dashbg_landscape.png');
@@ -693,7 +705,9 @@ NinePiece {
 
 In the above example you omitted the `border-image-slice` property, so it defaults to "40%," which means that the image is sliced 40% from the top, 40% from the bottom, 40% from the left, and 40% from the right.
 
-If you want more specific "slice" points, you can add the `border-image-slice` property. For example, [source,css]
+If you want more specific "slice" points, you can add the `border-image-slice` property. For example:
+
+[source,css]
 ----
 NinePiece {
 	border-image:url('dashbg_landscape.png');
@@ -771,7 +785,9 @@ This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[fon
 
 ==== `font-family`
 
-By default, https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html[CN1's native fonts] are used. The appropriate native font is selected for the provided font-weight and font-style properties. You can also explicitly specify the native font you wish to use in the `font-family` property. For example, [source,css]
+By default, https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html[CN1's native fonts] are used. The appropriate native font is selected for the provided font-weight and font-style properties. You can also explicitly specify the native font you wish to use in the `font-family` property. For example:
+
+[source,css]
 ----
 SideCommand {
     font-family:  "native:MainThin";
@@ -793,7 +809,9 @@ If you omit the `font-family` directive altogether, it will use `native:MainRegu
 
 ===== Using TTF fonts
 
-If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule. For example, [source,css]
+If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule. For example:
+
+[source,css]
 ----
 @font-face {
     font-family: "Montserrat";
@@ -801,14 +819,18 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 }
 ----
 
-Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example, [source,css]
+Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
+
+[source,css]
 ----
 MyLabel {
     font-family: "Montserrat";
 }
 ----
 
-The `@font-face` directive's `src` property will accept both local and remote URLs. For example, [source,css]
+The `@font-face` directive's `src` property will accept both local and remote URLs. For example:
+
+[source,css]
 ----
 @font-face {
     font-family: "MyFont";
@@ -820,9 +842,9 @@ In this case, it will download the `myfont.ttf` file to the same directory as th
 
 Fonts are automatically copied to the project's "src" directory when the CSS file is compiled so that they will be distributed with the app and available at runtime.
 
-**Github URLs**
+**GitHub URLs**
 
-Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts. For example, the following directive includes the "FontAwesome" font directly from Github
+Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts. For example, the following directive includes the "FontAwesome" font directly from GitHub
 
 [source,css]
 ----
@@ -832,7 +854,7 @@ Fonts hosted on GitHub are accessible using a special `github:` protocol to make
 }
 ----
 
-NOTE: Apparently FontAwesome has removed its public repositories from Github so this URL no longer works.
+NOTE: Apparently FontAwesome has removed its public repositories from GitHub so this URL no longer works.
 
 ==== `font-size`
 
@@ -846,12 +868,12 @@ You can use system fonts, true type fonts, and native fonts in your CSS styleshe
 
 .Normalizing Default Font Size
 ****
-When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. you've now added theme constants to explicitly set the default font size in "screen-independent-pixels."
+When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. You've now added theme constants to explicitly set the default font size in "screen-independent-pixels."
 
 Note
 In this case, 1 screen-independent-pixel is defined as 1/160th of an inch on a device, and 1/96th of an inch on desktop. These values correspond to Android’s definition on device, and Windows' definition on the desktop.
 
-If you add the following to your stylesheet, it will set the default font size to 18 screen-independent pixels (or 18/160th of an inch), which corresponds to the Android native default "medium" font size.
+If you add the following to your stylesheet, it will set the default font size to 18 screen-independent pixels (or 18/160th of an inch), which corresponds to the Android native default "medium" font size:
 
 [source,css]
 ----
@@ -862,7 +884,7 @@ If you add the following to your stylesheet, it will set the default font size t
 
 TIP: A value of 18 here gives best results across devices.
 
-On the desktop, you may find that 18 is too big. You can define a default font size for tablet and desktop using `defaultDesktopFontSizeInt` and `defaultTabletFontSizeInt` respectively. A `defaultDesktopFontSizeInt` value gives results that match the Mac OS default font size.
+On the desktop, you may find that 18 is too big. You can define a default font size for tablet and desktop using `defaultDesktopFontSizeInt` and `defaultTabletFontSizeInt` respectively. A `defaultDesktopFontSizeInt` value gives results that match the macOS default font size:
 
 [source,css]
 ----
@@ -881,7 +903,7 @@ The conversion from "screen-independent pixels" or `mm` to physical pixels uses 
 * *Android:* uses `density × 160` from `DisplayMetrics`, where `density` is the bucketed scale factor reported by Android (typically `1.0`, `1.5`, `2.0`, `3.0`, `3.5`, `4.0`). Because the buckets are coarse, a phone whose physical density falls between two buckets will report the lower one, so mm-based measurements may render slightly smaller than their nominal physical size.
 * *iOS:* uses an explicit per-device PPI lookup keyed on the screen's pixel dimensions (for example, `460ppi` for iPhone 12 / 13 / 14 / 15 / 16, `458ppi` for the Plus and Pro Max models, `326ppi` for older 2× devices). This is exact for catalogued devices. Any iPhone whose resolution isn't in the table falls through to a default fallback (now `460ppi`, since Apple has held that density steady for every non-Plus iPhone since the iPhone 12).
 
-Net result: the same `defaultFontSizeInt: 18` may render at slightly different absolute physical sizes on an iPhone vs. an Android device of similar physical size—typically the iOS rendering is the larger of the two when both are at the platform's default text size. If you need cross-platform pixel-perfect sizing, use platform overrides (`@iOS-platform-font-size`, etc., via media queries) rather than relying on the conversion math alone.
+Net result: the same `defaultFontSizeInt: 18` may render at slightly different absolute physical sizes on an iPhone vs. An Android device of similar physical size—typically the iOS rendering is the larger of the two when both are at the platform's default text size. If you need cross-platform pixel-perfect sizing, use platform overrides (`@iOS-platform-font-size`, etc., via media queries) rather than relying on the conversion math alone.
 
 NOTE: When a new iPhone model ships with a resolution that isn't yet in the iOS PPI table, mm-based measurements will use the fallback `460ppi`, which is correct to within 1-2% for every modern iPhone. If you discover a model that should use a different value (for example a future Plus/Max device that returns to `458ppi`), file an issue so the table can be updated.
 ****
@@ -1146,7 +1168,8 @@ Button {
 }
 ----
 
-.Example: Different font colors on Android and iOS. On Android, labels will appear green. On iOS, they will appear red. On all other platforms, they will appear black.
+.Example: Different font colors on Android and iOS. On Android, labels will appear green. On iOS, they will appear red. On all other platforms, they will appear black:
+
 [source,css]
 ----
 Label {
@@ -1204,11 +1227,11 @@ Label {
 }
 ----
 
-NOTE: When deploying your app using the Javascript port, it will use a platform name derived from the "UserAgent" string in the browser, rather than the result of `Display.getPlatformName()`, which is used for other ports. When running on Android, then, the platform will be "and." When running on iOS, the platform will be "ios." Etc...
+NOTE: When deploying your app using the JavaScript port, it will use a platform name derived from the "UserAgent" string in the browser, rather than the result of `Display.getPlatformName()`, which is used for other ports. When running on Android, then, the platform will be "and." When running on iOS, the platform will be "ios." Etc.
 
 ==== Compound media queries
 
-You can combine multiple media queries together, separated by a comma. Queries of the same type are "OR"ed together. Queries of different types are "AND"ed together. For example if you've a media query that specifies two different device densities (for example, `density-low` and `density-high`) the query will match *both* devices with low density and high density. But, if the query specifies a device density and a platform (for example, `density-low` and `platform-and`), then it will match a device if it matches the platform *and* the density.
+You can combine multiple media queries together, separated by a comma. Queries of the same type are "OR"ed together. Queries of different types are "AND"ed together. For example if you have a media query that specifies two different device densities (for example, `density-low` and `density-high`) the query will match *both* devices with low density and high density. But, if the query specifies a device density and a platform (for example, `density-low` and `platform-and`), then it will match a device if it matches the platform *and* the density.
 
 .Example: Targeting styles to Android devices with high density
 [source,css]
@@ -1226,7 +1249,8 @@ You can combine multiple media queries together, separated by a comma. Queries o
 }
 ----
 
-.Example: Targeting Mac Desktop.
+.Example: Targeting Mac Desktop:
+
 [source,css]
 ----
 @media device-desktop, platform-mac {
@@ -1236,17 +1260,17 @@ You can combine multiple media queries together, separated by a comma. Queries o
 
 ==== Order or precedence
 
-The order of precendence when applying styles differs slightly from the way styles would be applied in standard CSS. The order of precendence is as follows:
+The order of precedence when applying styles differs slightly from the way styles would be applied in standard CSS. The order of precedence is as follows:
 
-1. Styles defined inside `@media` blocks will always take precendence over styles defined outside of `@media` blocks.
-2. `@media` blocks with more query matches will take precendence over blocks with fewer query matches. For example, A media block matching density, platform, and device will take precendence over a block that only matches the density and platform.
+1. Styles defined inside `@media` blocks will always take precedence over styles defined outside of `@media` blocks.
+2. `@media` blocks with more query matches will take precedence over blocks with fewer query matches. For example, A media block matching density, platform, and device will take precedence over a block that only matches the density and platform.
 3. If the same style is defined in two media blocks which contain the same number of query matches, then the order precedence is `platform`, `device`, `density` in decreasing order. That is, the block that matches on platform will take precedence over the block that matches on density.
 4. If the same style is defined in two media blocks with identical query matches, then the order of precedence is undefined.
 
 
 ==== Font scaling constants
 
-Sometimes you may find that fonts are coming out too large or too small across the board on certain types of devices. You can use standard media queries to customize font sizes, but you can also use `font-scaling` constants to *scale* font sizes for the entires stylesheet based on platform, device, and/or density. Sometimes you may find this approach easier.
+Sometimes you may find that fonts are coming out too large or too small across the board on certain types of devices. You can use standard media queries to customize font sizes, but you can also use `font-scaling` constants to *scale* font sizes for the entire stylesheet based on platform, device, and/or density. Sometimes you may find this approach easier.
 
 For example, consider the following simple stylesheet that defines a font size of 2mm on labels:
 
@@ -1257,7 +1281,7 @@ Label {
 }
 ----
 
-During testing, perhaps you find that, on desktop, the fonts are a little bit too small. In this case, you can apply a font-scale constant that only applies to the desktop.
+During testing, perhaps you find that, on desktop, the fonts are a little bit too small. In this case, you can apply a font-scale constant that only applies to the desktop:
 
 [source,css]
 ----

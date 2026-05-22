@@ -8,11 +8,12 @@ This is to assist in migrating Ant projects to Maven projects. This won't make a
 
 IMPORTANT: This goal isn't run in an existing maven project directory, so you need to include the absolute Maven coordinates for the goal.
 
-Suppose you've a Ant Codename One library project at `/path/to/MyLegacyAntLibraryProject` and you want to convert it to a Maven project.
+Suppose you have an Ant Codename One library project at `/path/to/MyLegacyAntLibraryProject` and you want to convert it to a Maven project.
 
 You can run the `generate-cn1lib-project` goal as follows:
 
-.Maven command to migrate an Ant project to Maven.
+.Maven command to migrate an Ant project to Maven:
+
 [source,bash]
 ----
 mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-cn1lib-project \
@@ -27,14 +28,16 @@ NOTE: Make sure you substitute the https://search.maven.org/search?q=a:codenameo
 
 Some notes about this command as shown above:
 
-. This command is formatted for Unix/Mac on multiple lines, using the `\` character to escape the new-lines. On windows the command will need to be all one line, and you should omit those `\` escape characters.
+. This command is formatted for Unix/Mac on multiple lines, using the `\` character to escape the new-lines. On Windows the command will need to be all one line, and you should omit those `\` escape characters.
 . The `-U` flag tells Maven to update its catalogs to ensure that it can find the `$CN1VERSION` that you specify.
 
 If all goes well, you should find a new maven project generated in the "your-maven-lib" directory (named after the `artifactId` that you specified).
 
 To test that the project was generated successfully, try opening the resulting project in your IDE or run its "install" goal on the command-line.
 
-For example, [source,bash]
+For example:
+
+[source,bash]
 ----
 cd my-maven-lib
 mvn install

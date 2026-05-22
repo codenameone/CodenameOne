@@ -155,7 +155,7 @@ rebrand to apply at *runtime* (for in-app accent toggles, branded
 flavours, A/B tests) without recompiling the theme, see
 `Runtime accent palette override` further down - a single
 `addThemeProps({"@accent-color": ...})` call retunes every
-accent-bearing UIID at once.
+accent-bearing UIID at once:
 
 [source,css]
 ----
@@ -244,7 +244,7 @@ look.
 
 To layer a brand color on top, override `RaisedButton` and
 accent-driven UIIDs the same way as Android above. The color names
-match Apple's `UIColor.systemBlue` etc. so you can mirror the SF
+match Apple's `UIColor.systemBlue` etc. So you can mirror the SF
 Symbols semantics if you want.
 
 === Accent palette override
