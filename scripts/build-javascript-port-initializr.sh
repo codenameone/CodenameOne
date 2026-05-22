@@ -273,10 +273,35 @@ public final class WebsiteThemeNativeImpl implements WebsiteThemeNative {
 }
 EOF
 
+bj_log "Generating Initializr DownloadNative impl stub"
+cat > "$NATIVE_IMPL_DIR/DownloadNativeImpl.java" <<'EOF'
+package com.codename1.initializr;
+
+/**
+ * Hardcoded JS-port stub for DownloadNative. The bytes-+-filename downloadBytes
+ * native bridges through invokeHostNative to a main-thread handler that wraps
+ * the bytes in a Blob and triggers an immediate download (via the existing
+ * __cn1_register_save_blob__ helper in browser_bridge.js).
+ */
+public final class DownloadNativeImpl implements DownloadNative {
+    public boolean downloadBytes(String fileName, byte[] bytes) {
+        return nativeDownloadBytes(fileName, bytes);
+    }
+
+    public boolean isSupported() {
+        return nativeIsSupported();
+    }
+
+    private static native boolean nativeDownloadBytes(String fileName, byte[] bytes);
+    private static native boolean nativeIsSupported();
+}
+EOF
+
 bj_log "Building source list for JavaScriptPort"
 find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
 echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
 echo "$NATIVE_IMPL_DIR/WebsiteThemeNativeImpl.java" >> "$SOURCE_LIST"
+echo "$NATIVE_IMPL_DIR/DownloadNativeImpl.java" >> "$SOURCE_LIST"
 
 CLASSPATH_ENTRIES=("$STAGE_CLASSES")
 TEAVM_JARS=()
@@ -462,6 +487,20 @@ cat > "$DIST_DIR/initializr_native_bindings.js" <<'EOF'
     "cn1_com_codename1_initializr_WebsiteThemeNativeImpl_nativeNotifyUiReady",
     "cn1_com_codename1_initializr_WebsiteThemeNativeImpl_nativeNotifyUiReady__"
   ], "initializr.WebsiteThemeNative.notifyUiReady");
+  // DownloadNative.downloadBytes(String, byte[]) -> boolean. Forwards both
+  // args through invokeHostNative; the main-thread handler wraps them in a
+  // Blob + register-save-blob call.
+  bindNative([
+    "cn1_com_codename1_initializr_DownloadNativeImpl_nativeDownloadBytes_java_lang_String_byte_1ARRAY_R_boolean",
+    "cn1_com_codename1_initializr_DownloadNativeImpl_nativeDownloadBytes_java_lang_String__B_R_boolean"
+  ], function*(fileName, bytes) {
+    var result = yield jvm.invokeHostNative("initializr.DownloadNative.downloadBytes", [fileName, bytes]);
+    return !!result;
+  });
+  bindBoolean([
+    "cn1_com_codename1_initializr_DownloadNativeImpl_nativeIsSupported_R_boolean",
+    "cn1_com_codename1_initializr_DownloadNativeImpl_nativeIsSupported___R_boolean"
+  ], "initializr.DownloadNative.isSupported");
 })();
 EOF
 
@@ -508,16 +547,17 @@ cat > "$DIST_DIR/initializr_native_handlers.js" <<'EOF'
     }
     return bridge;
   }
-  function getImpl() {
+  function getImpl(name) {
     if (typeof cn1_get_native_interfaces !== "function") {
       return null;
     }
     var registry = cn1_get_native_interfaces();
-    return registry ? registry["com_codename1_initializr_WebsiteThemeNative"] : null;
+    return registry ? registry[name] : null;
   }
-  function bridgeMethod(symbol, methodName, defaultValue) {
+  // Zero-arg bridge: ``impl[method](callback)``.
+  function bridgeMethod0(symbol, implName, methodName, defaultValue) {
     ensureBridge().register(symbol, function() {
-      var impl = getImpl();
+      var impl = getImpl(implName);
       if (!impl || typeof impl[methodName] !== "function") {
         return defaultValue;
       }
@@ -533,9 +573,34 @@ cat > "$DIST_DIR/initializr_native_handlers.js" <<'EOF'
       });
     });
   }
-  bridgeMethod("initializr.WebsiteThemeNative.isDarkMode", "isDarkMode_", false);
-  bridgeMethod("initializr.WebsiteThemeNative.isSupported", "isSupported_", false);
-  bridgeMethod("initializr.WebsiteThemeNative.notifyUiReady", "notifyUiReady_", null);
+  // Variadic bridge: forwards every arg the host call received plus the
+  // callback object as the final positional arg. Used by methods like
+  // ``downloadBytes_(fileName, bytes, callback)``.
+  function bridgeMethodN(symbol, implName, methodName, defaultValue) {
+    ensureBridge().register(symbol, function() {
+      var impl = getImpl(implName);
+      if (!impl || typeof impl[methodName] !== "function") {
+        return defaultValue;
+      }
+      var hostArgs = Array.prototype.slice.call(arguments);
+      return new Promise(function(resolve, reject) {
+        hostArgs.push({
+          complete: function(value) { resolve(value); },
+          error: function(err) { reject(err || new Error("native callback error")); }
+        });
+        try {
+          impl[methodName].apply(impl, hostArgs);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+  bridgeMethod0("initializr.WebsiteThemeNative.isDarkMode", "com_codename1_initializr_WebsiteThemeNative", "isDarkMode_", false);
+  bridgeMethod0("initializr.WebsiteThemeNative.isSupported", "com_codename1_initializr_WebsiteThemeNative", "isSupported_", false);
+  bridgeMethod0("initializr.WebsiteThemeNative.notifyUiReady", "com_codename1_initializr_WebsiteThemeNative", "notifyUiReady_", null);
+  bridgeMethodN("initializr.DownloadNative.downloadBytes", "com_codename1_initializr_DownloadNative", "downloadBytes_", false);
+  bridgeMethod0("initializr.DownloadNative.isSupported", "com_codename1_initializr_DownloadNative", "isSupported_", false);
 })(typeof window !== "undefined" ? window : self);
 EOF
 
@@ -548,6 +613,7 @@ if [ -f "$DIST_DIR/index.html" ] && ! grep -q "initializr_native_handlers.js" "$
     {
       if ($0 ~ /<script src="browser_bridge.js"><\/script>/ && !done) {
         print "<script src=\"native/com_codename1_initializr_WebsiteThemeNative.js\"></script>";
+        print "<script src=\"native/com_codename1_initializr_DownloadNative.js\"></script>";
         print $0;
         print "<script src=\"initializr_native_handlers.js\"></script>";
         done = 1;
