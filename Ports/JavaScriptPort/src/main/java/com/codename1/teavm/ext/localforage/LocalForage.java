@@ -386,10 +386,16 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
+        final String keyForLog = key;
+        final JSObject valForLog = value;
 
         impl.setItem(key, value, new SetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
+                String errStr = (err == null) ? "null" : (JS.isUndefined(err) ? "undef" : "obj");
+                String valStr = (val == null) ? "null" : (JS.isUndefined(val) ? "undef" : "obj");
+                String inStr  = (valForLog == null) ? "null" : (JS.isUndefined(valForLog) ? "undef" : "obj");
+                System.out.println("CN1INIT:lforage:setCb key=" + keyForLog + " err=" + errStr + " inVal=" + inStr + " cbVal=" + valStr);
                 if (err != null && !JS.isUndefined(err)) {
                     HTML5Implementation._logObj(err);
                     error[0] = new QuotaExceededException("Failed to set value");
