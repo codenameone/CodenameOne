@@ -88,6 +88,8 @@ pom.xml.tag
 !.brokk/project.properties
 dependency-reduced-pom.xml
 
+/artifacts/
+
 # Hugo website generated artifacts
 /docs/website/.hugo_build.lock
 /docs/website/hugo_stats.json

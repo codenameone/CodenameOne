@@ -131,30 +131,65 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     }
 
     public void acceptAndServe() throws IOException {
+        // Loop on accept so the developer can detach and reattach the IDE
+        // multiple times without restarting the proxy. The device side keeps
+        // running between attaches and the proxy preserves its breakpoint /
+        // event-request state.
         try (ServerSocket server = new ServerSocket(port)) {
             System.out.println("[jdwp] listening on port " + port + " for debugger (jdb) to attach");
-            socket = server.accept();
-        }
-        socket.setTcpNoDelay(true);
-        in = new DataInputStream(socket.getInputStream());
-        out = new DataOutputStream(socket.getOutputStream());
-        System.out.println("[jdwp] debugger connected from " + socket.getRemoteSocketAddress());
+            while (true) {
+                socket = server.accept();
+                socket.setTcpNoDelay(true);
+                in = new DataInputStream(socket.getInputStream());
+                out = new DataOutputStream(socket.getOutputStream());
+                System.out.println("[jdwp] debugger connected from " + socket.getRemoteSocketAddress());
 
-        if (!doHandshake()) {
-            System.err.println("[jdwp] handshake failed");
-            return;
-        }
-        System.out.println("[jdwp] handshake complete");
-        // If the device connected before us, fire VM_START now.
-        if (deviceHelloReceived) {
-            sendVmStart();
-        }
+                if (!doHandshake()) {
+                    System.err.println("[jdwp] handshake failed");
+                    closeJdwpSession();
+                    continue;
+                }
+                System.out.println("[jdwp] handshake complete");
+                // If the device connected before this IDE attach, fire VM_START now.
+                if (deviceHelloReceived) {
+                    sendVmStart();
+                }
+                // Auto-release the device-side waitForAttach gate after a
+                // short delay. The delay gives the IDE time to register
+                // breakpoints via EventRequest.Set so the device doesn't race
+                // past them when it resumes. Most JDWP debuggers (IntelliJ,
+                // VS Code) don't auto-send VM.Resume on attach, so without
+                // this nudge the app would sit on the waiting overlay forever.
+                Thread autoResume = new Thread(() -> {
+                    try { Thread.sleep(500); } catch (InterruptedException ignore) {}
+                    try { if (device != null) device.resumeAll(); }
+                    catch (IOException ignore) {}
+                }, "cn1-debug-auto-resume");
+                autoResume.setDaemon(true);
+                autoResume.start();
 
-        try {
-            packetLoop();
-        } finally {
-            try { socket.close(); } catch (IOException ignore) {}
+                try {
+                    packetLoop();
+                } catch (IOException eof) {
+                    // Debugger disconnected mid-session; fall through to reset.
+                } finally {
+                    closeJdwpSession();
+                }
+                System.out.println("[jdwp] debugger session ended; listening for the next attach");
+            }
         }
+    }
+
+    private void closeJdwpSession() {
+        try { if (socket != null) socket.close(); } catch (IOException ignore) {}
+        socket = null;
+        in = null;
+        out = null;
+        // Clear any pending step requests so a stale one from the previous
+        // attach can't fire against the new debugger.
+        stepRequests.clear();
+        // Breakpoints stay in bpRequests so the device keeps them set; the
+        // next attaching IDE will see them via EventRequest semantics.
     }
 
     private void sendVmStart() {

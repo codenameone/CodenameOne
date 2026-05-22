@@ -83,9 +83,26 @@ volatile int cn1DebuggerActive = 0;
 
 static int g_proxyFd = -1;
 static pthread_mutex_t g_writeMutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Wait-for-attach state. cn1_debugger_run_when_ready stashes the VM-callback
+// block here; the listener thread invokes it on the main queue once the
+// proxy has acked the IDE attach (the first CMD_RESUME). Releasing the wait
+// on the main thread keeps UIKit free to draw the overlay during the wait.
 static int g_waitForAttach = 0;
+static int g_attachReady = 0;           // set when the IDE has signalled ready
+static dispatch_block_t g_onReadyBlock = nil;
 static pthread_mutex_t g_attachMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  g_attachCond  = PTHREAD_COND_INITIALIZER;
+
+// "Waiting for debugger" overlay view. Owned by cn1_debugger; shown from
+// cn1_debugger_start when waitForAttach is set, dismissed once the IDE has
+// attached. Installed as a subview of the app's keyWindow root view rather
+// than as a separate UIWindow because iOS 13+ scene-based apps (which
+// Codename One is by default) refuse to display non-scene UIWindows.
+static UIView* g_waitOverlay = nil;
+
+// Forward declaration; callers in the command dispatch sit above the
+// definition further down the file.
+static void cn1_debugger_fire_ready_block_if_pending(void);
 
 /* --------------------------------------------------------------------- */
 /* Breakpoint hash. Open-addressed, lock-free reads via atomic 64-bit    */
@@ -530,12 +547,10 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 int64_t tid = ((int64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
                 if (tid == 0) resumeAll(1); else resumeThreadById(tid, 1);
             }
-            // The first RESUME after attach also releases cn1_debugger_start
-            // if it was waiting.
-            pthread_mutex_lock(&g_attachMutex);
-            g_waitForAttach = 0;
-            pthread_cond_broadcast(&g_attachCond);
-            pthread_mutex_unlock(&g_attachMutex);
+            // The first RESUME after attach also fires the VM-callback the
+            // AppDelegate registered via cn1_debugger_run_when_ready, so the
+            // splash / waiting overlay gives way to the user app.
+            cn1_debugger_fire_ready_block_if_pending();
             return 0;
         }
         case CMD_STEP: {
@@ -671,10 +686,9 @@ static void* listenerThreadMain(void* arg) {
         }
         if (fd < 0) {
             NSLog(@"cn1_debugger: could not connect to %@:%d, giving up", host, port);
-            pthread_mutex_lock(&g_attachMutex);
-            g_waitForAttach = 0;
-            pthread_cond_broadcast(&g_attachCond);
-            pthread_mutex_unlock(&g_attachMutex);
+            // Release the AppDelegate's deferred VM callback so the app
+            // boots even if the proxy never comes up.
+            cn1_debugger_fire_ready_block_if_pending();
             return NULL;
         }
         int nodelay = 1;
@@ -712,15 +726,156 @@ static void* listenerThreadMain(void* arg) {
 
         NSLog(@"cn1_debugger: proxy connection closed");
         cn1DebuggerActive = 0;
-        resumeAll(-1);
+        resumeAll(/*preserveStep*/ 0);
         close(fd);
         g_proxyFd = -1;
-        pthread_mutex_lock(&g_attachMutex);
-        g_waitForAttach = 0;
-        pthread_cond_broadcast(&g_attachCond);
-        pthread_mutex_unlock(&g_attachMutex);
+        // If the AppDelegate is still waiting for an IDE attach, release it
+        // so the app can boot even after a failed/cancelled debug session.
+        cn1_debugger_fire_ready_block_if_pending();
     }
     return NULL;
+}
+
+/* --------------------------------------------------------------------- */
+/* Wait-for-attach plumbing. Non-blocking: the AppDelegate installs the */
+/* "Waiting" overlay during didFinishLaunching, registers its VM-start  */
+/* completion block via cn1_debugger_run_when_ready, and returns        */
+/* promptly so UIKit can draw the overlay. The listener thread invokes  */
+/* the completion on the main queue once the proxy reports the IDE has  */
+/* attached (via CMD_RESUME).                                           */
+/* --------------------------------------------------------------------- */
+
+static UIView* cn1_debugger_active_host_view(void) {
+    UIWindow* w = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIScene* s in UIApplication.sharedApplication.connectedScenes) {
+            if ([s isKindOfClass:[UIWindowScene class]]) {
+                for (UIWindow* candidate in ((UIWindowScene*)s).windows) {
+                    if (candidate.isKeyWindow) { w = candidate; break; }
+                }
+                if (!w) {
+                    UIWindow* anyVisible = ((UIWindowScene*)s).windows.firstObject;
+                    if (anyVisible) { w = anyVisible; break; }
+                }
+            }
+            if (w) break;
+        }
+    }
+    if (!w) w = UIApplication.sharedApplication.keyWindow;
+    if (!w) w = UIApplication.sharedApplication.windows.firstObject;
+    return w ? w.rootViewController.view : nil;
+}
+
+static void cn1_debugger_install_wait_overlay_now(void); // forward
+static int g_overlayInstallAttempts = 0;
+
+static void cn1_debugger_try_install_wait_overlay(void) {
+    UIView* host = cn1_debugger_active_host_view();
+    if (host == nil) {
+        // didFinishLaunching may not have set up the rootViewController yet;
+        // retry on the next main-queue tick a few times.
+        if (g_overlayInstallAttempts++ < 50) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
+                           dispatch_get_main_queue(), ^{
+                cn1_debugger_try_install_wait_overlay();
+            });
+        }
+        return;
+    }
+    cn1_debugger_install_wait_overlay_now();
+}
+
+static void cn1_debugger_install_wait_overlay_now(void) {
+    if (g_waitOverlay != nil) return;
+    UIView* host = cn1_debugger_active_host_view();
+    if (host == nil) return;
+
+    UIView* overlay = [[UIView alloc] initWithFrame:host.bounds];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlay.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.85];
+
+    UIActivityIndicatorView* spin;
+    if (@available(iOS 13.0, *)) {
+        spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+    } else {
+        spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+    }
+    spin.color = [UIColor whiteColor];
+    [spin startAnimating];
+    spin.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:spin];
+
+    UILabel* lbl = [[UILabel alloc] init];
+    lbl.text = @"Waiting for debugger to attach…";
+    lbl.textColor = [UIColor whiteColor];
+    lbl.textAlignment = NSTextAlignmentCenter;
+    lbl.numberOfLines = 0;
+    lbl.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
+    lbl.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:lbl];
+
+    UILabel* sub = [[UILabel alloc] init];
+    NSDictionary* info = [[NSBundle mainBundle] infoDictionary];
+    NSString* host_s = info[@"CN1ProxyHost"] ?: @"?";
+    NSNumber* portN = info[@"CN1ProxyPort"];
+    sub.text = [NSString stringWithFormat:@"Proxy: %@:%@", host_s, portN ?: @"?"];
+    sub.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    sub.textAlignment = NSTextAlignmentCenter;
+    sub.font = [UIFont systemFontOfSize:13];
+    sub.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:sub];
+
+    [host addSubview:overlay];
+    overlay.translatesAutoresizingMaskIntoConstraints = NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [overlay.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [overlay.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [overlay.topAnchor constraintEqualToAnchor:host.topAnchor],
+        [overlay.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+        [spin.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [spin.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor constant:-32],
+        [lbl.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [lbl.topAnchor constraintEqualToAnchor:spin.bottomAnchor constant:16],
+        [lbl.widthAnchor constraintLessThanOrEqualToAnchor:overlay.widthAnchor multiplier:0.85],
+        [sub.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [sub.topAnchor constraintEqualToAnchor:lbl.bottomAnchor constant:8]
+    ]];
+
+    g_waitOverlay = overlay;
+}
+
+static void cn1_debugger_install_wait_overlay(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1_debugger_try_install_wait_overlay();
+    });
+}
+
+static void cn1_debugger_dismiss_wait_overlay(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (g_waitOverlay == nil) return;
+        [g_waitOverlay removeFromSuperview];
+        g_waitOverlay = nil;
+    });
+}
+
+/*
+ * Invoked when the proxy confirms the IDE is ready. Fires the pending
+ * VM-callback block on the main queue and dismisses the overlay. Safe to
+ * call multiple times; only the first call has effect.
+ */
+static void cn1_debugger_fire_ready_block_if_pending(void) {
+    dispatch_block_t block = nil;
+    pthread_mutex_lock(&g_attachMutex);
+    if (!g_attachReady) {
+        g_attachReady = 1;
+        block = g_onReadyBlock;
+        g_onReadyBlock = nil;
+    }
+    pthread_mutex_unlock(&g_attachMutex);
+    cn1_debugger_dismiss_wait_overlay();
+    if (block) {
+        dispatch_async(dispatch_get_main_queue(), block);
+    }
 }
 
 void cn1_debugger_start(void) {
@@ -738,13 +893,28 @@ void cn1_debugger_start(void) {
     pthread_detach(t);
 
     if (g_waitForAttach) {
-        NSLog(@"cn1_debugger: waiting for proxy to attach and send RESUME...");
-        pthread_mutex_lock(&g_attachMutex);
-        while (g_waitForAttach) {
-            pthread_cond_wait(&g_attachCond, &g_attachMutex);
-        }
-        pthread_mutex_unlock(&g_attachMutex);
-        NSLog(@"cn1_debugger: attach handshake complete, continuing boot");
+        NSLog(@"cn1_debugger: waitForAttach=YES; installing overlay (non-blocking)");
+        cn1_debugger_install_wait_overlay();
+    }
+}
+
+void cn1_debugger_run_when_ready(void (^onReady)(void)) {
+    if (onReady == nil) return;
+    if (!g_waitForAttach) {
+        onReady();
+        return;
+    }
+    int alreadyReady = 0;
+    pthread_mutex_lock(&g_attachMutex);
+    if (g_attachReady) {
+        alreadyReady = 1;
+    } else {
+        g_onReadyBlock = [onReady copy];
+    }
+    pthread_mutex_unlock(&g_attachMutex);
+    if (alreadyReady) {
+        // Proxy attached before the AppDelegate registered the callback.
+        dispatch_async(dispatch_get_main_queue(), onReady);
     }
 }
 

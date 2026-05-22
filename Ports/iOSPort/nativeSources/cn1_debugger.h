@@ -16,18 +16,33 @@
 #ifdef CN1_ON_DEVICE_DEBUG
 
 /**
- * Boots the on-device-debug listener thread. Reads the desktop proxy host
- * and port from Info.plist keys CN1ProxyHost and CN1ProxyPort, opens an
- * outbound TCP connection, sends a HELLO event, and services commands
- * (set/clear breakpoint, resume, step, get stack, get locals) in a loop.
+ * Boots the on-device-debug listener thread (non-blocking). Reads the
+ * desktop proxy host and port from Info.plist keys CN1ProxyHost /
+ * CN1ProxyPort, spawns a background thread that opens an outbound TCP
+ * connection, sends a HELLO event, and services commands (set/clear
+ * breakpoint, resume, step, get stack, get locals) in a loop.
  *
- * Called from CodenameOne_GLAppDelegate.m's application:didFinishLaunching
- * after signal handlers are in place but before the Java VM callback. If
- * Info.plist has CN1ProxyWaitForAttach=YES the function blocks until the
- * proxy connects and sends RESUME; otherwise it returns immediately and the
- * listener thread retries the connection in the background.
+ * Returns immediately. If Info.plist has CN1ProxyWaitForAttach=YES, the
+ * function also installs a "Waiting for debugger" overlay UIWindow so the
+ * user sees something other than the splash while the wait is in progress;
+ * the overlay is dismissed automatically when {@link
+ * cn1_debugger_run_when_ready} fires its block.
  */
 extern void cn1_debugger_start(void);
+
+#ifdef __BLOCKS__
+/**
+ * Defers the VM callback until the proxy reports the IDE has attached, so
+ * the AppDelegate can keep `didFinishLaunchingWithOptions` returning
+ * promptly and let UIKit draw the waiting overlay.
+ *
+ * If CN1ProxyWaitForAttach=NO (or the on-device-debug listener isn't
+ * configured), the block is invoked synchronously on the calling thread.
+ * Otherwise the block is stored and the proxy listener invokes it on the
+ * main queue once it receives the first RESUME from the desktop proxy.
+ */
+extern void cn1_debugger_run_when_ready(void (^onReady)(void));
+#endif
 
 #endif // CN1_ON_DEVICE_DEBUG
 #endif // CN1_DEBUGGER_H

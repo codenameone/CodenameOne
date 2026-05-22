@@ -326,10 +326,10 @@ static void installSignalHandlers() {
     // app will throw an NPE.
     installSignalHandlers();
 #ifdef CN1_ON_DEVICE_DEBUG
-    // Bring up the on-device-debug listener BEFORE the VM callback so the
-    // proxy can already be attached when user code starts running. The
-    // listener spawns its own thread and may block boot if Info.plist
-    // sets CN1ProxyWaitForAttach=YES.
+    // Spawn the on-device-debug listener thread. Non-blocking: if
+    // CN1ProxyWaitForAttach=YES the function also installs a translucent
+    // overlay UIWindow so the user sees a "Waiting for debugger..." message
+    // instead of the launch splash while the wait is in progress.
     extern void cn1_debugger_start(void);
     cn1_debugger_start();
 #endif
@@ -349,12 +349,26 @@ static void installSignalHandlers() {
             }
         }
     }
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Defer the VM callback until the on-device-debug proxy reports an IDE
+    // has attached (if CN1ProxyWaitForAttach=YES). Otherwise this fires
+    // synchronously and behaves identically to the non-debug build.
+    extern void cn1_debugger_run_when_ready(void (^onReady)(void));
+    id locationValueDeferred = [launchOptions objectForKey:UIApplicationLaunchOptionsLocationKey];
+    cn1_debugger_run_when_ready(^{
+        com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        if (locationValueDeferred) {
+            com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        }
+    });
+#else
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    
+
     id locationValue = [launchOptions objectForKey:UIApplicationLaunchOptionsLocationKey];
     if (locationValue) {
         com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+#endif
     
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
