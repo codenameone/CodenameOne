@@ -1,8 +1,10 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
+import com.codename1.initializr.DownloadNative;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.system.NativeLookup;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
@@ -111,6 +113,42 @@ public class GeneratorModel {
     }
 
     public void generate() {
+        // Build the zip into memory first. On platforms with a working
+        // native download path (the JS port) we hand the bytes straight
+        // to the browser without going through the file system at all --
+        // openFileOutputStream/exists()/openFileAsBlob on the JS port
+        // round-trip through localforage/IndexedDB which silently drops
+        // Uint8Array writes (the setItem callback returns null for the
+        // stored value and the read-back exists() check sees nothing).
+        // Falling back to the disk path on other platforms means
+        // Display.execute() can still open the file with the OS handler.
+        byte[] inMemoryZip = null;
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            writeProjectZip(baos);
+            inMemoryZip = baos.toByteArray();
+            System.out.println("CN1INIT:generate:inMemory size=" + inMemoryZip.length);
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:generate:inMemoryErr " + t);
+        }
+        if (inMemoryZip != null) {
+            DownloadNative dn = NativeLookup.create(DownloadNative.class);
+            if (dn != null && dn.isSupported()) {
+                String name = appName.toLowerCase() + ".zip";
+                System.out.println("CN1INIT:download:native-try name=" + name + " size=" + inMemoryZip.length);
+                boolean ok = false;
+                try {
+                    ok = dn.downloadBytes(name, inMemoryZip);
+                } catch (Throwable t) {
+                    System.out.println("CN1INIT:download:native-throw " + t);
+                }
+                System.out.println("CN1INIT:download:native-result=" + ok);
+                if (ok) {
+                    return;
+                }
+            }
+        }
+        // Fallback for platforms without DownloadNative: write to disk and open.
         String filePath = generateZip();
         if (filePath != null) {
             System.out.println("CN1INIT:openZip:start path=" + filePath);

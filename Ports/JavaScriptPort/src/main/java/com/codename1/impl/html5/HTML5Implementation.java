@@ -5293,8 +5293,60 @@ public class HTML5Implementation extends CodenameOneImplementation {
         "yield jvm.invokeHostNative('__cn1_fire_save_blob__', []);\n" +
         "return null;")
     private static native void fireSaveBlobHandler();
-    
-    
+
+    /**
+     * JS-port-only fast path for "download these bytes as a file". Skips the
+     * LocalForage/IndexedDB round-trip used by Display.execute(file:// URL)
+     * -- which on this port is broken: the bundled localforage's setItem
+     * callback returns null even when the input Uint8Array is non-null, the
+     * subsequent getItem also returns null, and exists() never sees the just-
+     * written file. The Initializr Generate flow was stuck forever on this.
+     *
+     * This method packages the bytes into a Blob in memory, registers it with
+     * the main-thread save-blob host handler, and fires the download
+     * immediately via the backside hook (the user's click is still on the
+     * call stack, so the browser's "downloads need a user gesture" check
+     * passes). Returns true on success, false if the backside hook isn't
+     * available (e.g. on Safari-without-gesture-relay or in unit tests).
+     */
+    public boolean downloadBytesAsFile(final String fileName, byte[] bytes) {
+        if (bytes == null || fileName == null) {
+            return false;
+        }
+        Blob blob;
+        try {
+            blob = BlobUtil.createBlob(bytes, "application/octet-stream");
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:download:createBlob-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+            return false;
+        }
+        try {
+            registerSaveBlobHandler(fileName, blob);
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:download:register-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+            return false;
+        }
+        if (isBacksideHookAvailable()) {
+            addBacksideHook(new JSRunnable() {
+                public void run() {
+                    fireSaveBlobHandler();
+                }
+            });
+            return true;
+        }
+        // No backside hook: best-effort fire right away. May be blocked by
+        // browser gesture policy on some configurations, but better than
+        // silently doing nothing.
+        try {
+            fireSaveBlobHandler();
+            return true;
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:download:fire-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+            return false;
+        }
+    }
+
+
     public boolean paintNativePeersBehind() {
         return true;
     }
