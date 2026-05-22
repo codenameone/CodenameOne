@@ -6,7 +6,6 @@ import com.codename1.io.Util;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
-import net.sf.zipme.ZipOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -251,25 +250,116 @@ public class GeneratorModel {
         System.out.println("CN1INIT:writeZip:l10n");
         addLocalizationEntries(mergedEntries);
         System.out.println("CN1INIT:writeZip:emitZip entries=" + mergedEntries.size());
-
-        System.out.println("CN1INIT:writeZip:newZos");
-        ZipOutputStream zos = new ZipOutputStream(outputStream);
-        System.out.println("CN1INIT:writeZip:zosCtor-ok");
-        int emitIdx = 0;
-        for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
-            String key = fileEntry.getKey();
-            byte[] data = fileEntry.getValue();
-            System.out.println("CN1INIT:writeZip:emitStart idx=" + emitIdx + " key=" + key + " size=" + (data == null ? -1 : data.length));
-            ZipEntry zipEntry = new ZipEntry(key);
-            zos.putNextEntry(zipEntry);
-            zos.write(data);
-            zos.closeEntry();
-            System.out.println("CN1INIT:writeZip:emitOk idx=" + emitIdx);
-            emitIdx++;
-        }
-        System.out.println("CN1INIT:writeZip:closingZos");
-        zos.close();
+        writeStoredZip(outputStream, mergedEntries);
         System.out.println("CN1INIT:writeZip:emitZipDone");
+    }
+
+    // STORED-mode (uncompressed) zip writer. Bypasses net.sf.zipme.ZipOutputStream
+    // whose constructor throws ``Array expected: null`` under the JS-port
+    // translator (likely a static-init order issue in the Deflater path that
+    // pre-populates a null Huffman table or window buffer array). STORED mode
+    // doesn't touch any of the Deflater state -- it just writes a Local File
+    // Header + raw bytes per entry, then a Central Directory at the end --
+    // so the broken classes never load.
+    //
+    // The downside is a larger output (zip files are uncompressed), but the
+    // Initializr template is text + small zips totalling a few hundred KB,
+    // which is fine for a one-shot download.
+    private static void writeStoredZip(OutputStream out, Map<String, byte[]> entries) throws IOException {
+        long offset = 0;
+        // Buffer central-directory records to write after all local headers.
+        ByteArrayOutputStream centralDir = new ByteArrayOutputStream();
+        int entryCount = 0;
+        for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
+            byte[] name = fileEntry.getKey().getBytes("UTF-8");
+            byte[] data = fileEntry.getValue();
+            long crc = crc32(data);
+            int len = data.length;
+            // Local file header
+            write32(out, 0x04034b50L); // signature
+            write16(out, 20);          // version needed to extract (2.0)
+            write16(out, 0);           // general purpose flags
+            write16(out, 0);           // compression method = STORED
+            write16(out, 0);           // last mod time
+            write16(out, 0x0021);      // last mod date = 1980-01-01
+            write32(out, crc);
+            write32(out, len);         // compressed size = uncompressed
+            write32(out, len);
+            write16(out, name.length);
+            write16(out, 0);           // extra-field length
+            out.write(name);
+            out.write(data);
+            // Central directory file header (buffered, emitted after all locals)
+            write32(centralDir, 0x02014b50L); // signature
+            write16(centralDir, 20);          // version made by
+            write16(centralDir, 20);          // version needed
+            write16(centralDir, 0);           // flags
+            write16(centralDir, 0);           // method
+            write16(centralDir, 0);           // mtime
+            write16(centralDir, 0x0021);      // mdate
+            write32(centralDir, crc);
+            write32(centralDir, len);
+            write32(centralDir, len);
+            write16(centralDir, name.length);
+            write16(centralDir, 0);           // extra len
+            write16(centralDir, 0);           // comment len
+            write16(centralDir, 0);           // disk number
+            write16(centralDir, 0);           // internal attrs
+            write32(centralDir, 0);           // external attrs
+            write32(centralDir, offset);      // local header offset
+            centralDir.write(name);
+            offset += 30L + name.length + len;
+            entryCount++;
+        }
+        long centralDirOffset = offset;
+        byte[] cd = centralDir.toByteArray();
+        out.write(cd);
+        // End of Central Directory Record
+        write32(out, 0x06054b50L); // signature
+        write16(out, 0);           // disk number
+        write16(out, 0);           // disk with central dir
+        write16(out, entryCount);  // num records on this disk
+        write16(out, entryCount);  // total records
+        write32(out, cd.length);   // central dir size
+        write32(out, centralDirOffset);
+        write16(out, 0);           // comment length
+    }
+
+    private static void write16(OutputStream out, int v) throws IOException {
+        out.write(v & 0xFF);
+        out.write((v >>> 8) & 0xFF);
+    }
+
+    private static void write32(OutputStream out, long v) throws IOException {
+        out.write((int) (v & 0xFFL));
+        out.write((int) ((v >>> 8) & 0xFFL));
+        out.write((int) ((v >>> 16) & 0xFFL));
+        out.write((int) ((v >>> 24) & 0xFFL));
+    }
+
+    // Inline CRC32 (RFC 1952). Avoids depending on net.sf.zipme.CRC32 -- if
+    // the same translator/runtime bug that breaks ZipOutputStream's Deflater
+    // also breaks CRC32's static lookup-table initializer, we'd be stuck.
+    private static final int[] CRC32_TABLE = makeCrc32Table();
+
+    private static int[] makeCrc32Table() {
+        int[] t = new int[256];
+        for (int i = 0; i < 256; i++) {
+            int c = i;
+            for (int j = 0; j < 8; j++) {
+                c = ((c & 1) != 0) ? 0xEDB88320 ^ (c >>> 1) : (c >>> 1);
+            }
+            t[i] = c;
+        }
+        return t;
+    }
+
+    private static long crc32(byte[] data) {
+        int crc = 0xFFFFFFFF;
+        for (int i = 0; i < data.length; i++) {
+            crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ data[i]) & 0xFF];
+        }
+        return (long) (crc ^ 0xFFFFFFFF) & 0xFFFFFFFFL;
     }
 
 
