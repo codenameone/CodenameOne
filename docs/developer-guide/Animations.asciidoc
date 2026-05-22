@@ -19,7 +19,7 @@ For example, imagine adding 100 components to a form. If the form was laid out a
 
 NOTE: Smart layout reflow logic can alleviate some pains of the automatic layout reflows but since the process is implicit it's almost impossible to optimize complex usages across browsers/devices. A major JavaScript performance tip is to use absolute positioning which is akin to not using layouts at all!
 
-that's why, when you add components to a form that's already showing, you should invoke `revalidate()` or animate the layout appropriately. This also enables the layout animation behavior explained below.
+That's why, when you add components to a form that's already showing, you should invoke `revalidate()` or animate the layout appropriately. This also enables the layout animation behavior explained below.
 
 [[layout-animations]]
 === Layout animations
@@ -137,7 +137,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 ===== Animation fade and hierarchy
 
-several more variations on the standard animate methods. Several methods accept a numeric `fade` argument. This is useful to fade out an element in an "unlayout" operation or fade in a regular animation.
+There are several more variations on the standard animate methods. Several methods accept a numeric `fade` argument. This is useful to fade out an element in an "unlayout" operation or fade in a regular animation.
 
 The value for the fade argument is a number between 0 and 255 where 0 represents full transparency and 255 represents full opacity.
 
@@ -171,7 +171,7 @@ The simple *yet problematic* fix would be:
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerWait,indent=0]
 ----
 
-why that might still fail?
+Why might that still fail?
 
 Events come in constantly during the run of the EDT footnote:[Event Dispatch Thread], so an event might come in that might trigger an animation in your code. Even if you're on the EDT keep in mind that you don't actually block it and an event might come in.
 
@@ -241,7 +241,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/plaf/LookAndFeel.html[LookA
 ****
 When defining a transition you define the entering transition and the exiting transition. For most cases only one of those is necessary and you default to the exiting (out transition) as a convention.
 
-for most cases the method `setFormTransitonIn` should go unused. That API exists for some elaborate custom transitions that might need to have a special effect both when transitioning in and out of a specific form. But, most of these effects are easier to achieve with layout animations (for example, components dropping into place etc.).
+For most cases the method `setFormTransitonIn` should go unused. That API exists for some elaborate custom transitions that might need to have a special effect both when transitioning in and out of a specific form. But, most of these effects are easier to achieve with layout animations (for example, components dropping into place etc.).
 
 For `Dialog` the transition in shows its appearance and the transition out shows its disposal. in that case both transitions make a lot of sense.
 ****

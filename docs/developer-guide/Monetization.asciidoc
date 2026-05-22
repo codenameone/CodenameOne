@@ -19,11 +19,11 @@ A special ad unit ID exists for test ads. If you specify `ca-app-pub-39402560999
 
 === In-app purchase
 
-in-app purchase is a helpful way to make app development profitable. Codename One supports in-app purchases of consumable and non-consumable products on Android and iOS. It also supports subscriptions. Even though the concept is simple, in-app purchase involves many moving parts, for subscriptions.
+In-app purchase is a helpful way to make app development profitable. Codename One supports in-app purchases of consumable and non-consumable products on Android and iOS. It also supports subscriptions. Even though the concept is simple, in-app purchase involves many moving parts, for subscriptions.
 
 ==== The SKU
 
-in-app purchase support centers around the set of SKUs you want to sell. Each product, whether it's a one-month subscription, an upgrade to the "Pro" version, or "10 disco credits," has a SKU (stock-keeping unit). Ideally, you can use the same SKU across every store that sells your app.
+In-app purchase support centers around the set of SKUs you want to sell. Each product, whether it's a one-month subscription, an upgrade to the "Pro" version, or "10 disco credits," has a SKU (stock-keeping unit). Ideally, you can use the same SKU across every store that sells your app.
 
 ==== Types of products
 

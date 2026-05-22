@@ -7,7 +7,7 @@ working with the higher level events is far more potable since it might map to d
 
 === High-level events
 
-high-level events are broadcast using an `addListener`/`setListener` - publish/subscribe system. Most of them are channeled via the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which further simplifies that and makes sending events far easier.
+High-level events are broadcast using an `addListener`/`setListener` - publish/subscribe system. Most of them are channeled via the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which further simplifies that and makes sending events far easier.
 
 TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` makes sure of that.
 
@@ -15,7 +15,7 @@ TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` ma
 
 Since all events fire on the EDT some complexities occur. E.g.:
 
-you have two listeners monitoring the same event (or related events for example, pointer event and button click event both of which will fire when the button is touched).
+You have two listeners monitoring the same event (or related events for example, pointer event and button click event both of which will fire when the button is touched).
 
 When the event occurs you can run into a scenario like this:
 
@@ -136,7 +136,7 @@ ConnectionRequest r = new ConnectionRequest() {
 };
 ----
 
-or you can do something similar using this code:
+Or you can do something similar using this code:
 
 [source,java]
 ----
@@ -269,13 +269,13 @@ private void fireEvent(ActionEvent ev) {
 
 === Low-level events
 
-low-level events map to "system" events directly. Touch events are considered low-level since they might expose platform specific nuances to your code.
+Low-level events map to "system" events directly. Touch events are considered low-level since they might expose platform specific nuances to your code.
 
 For example, one platform might send many events during drag while another might send a few. The high-level event handling hides those complexities but some of them trickle down into the low-level event handling.
 
 TIP: Codename One tries to hide some complexities from the low-level events as well. But, due to the nature of the event types it's a more challenging task.
 
-low-level events can be bound in one of 3 ways:
+Low-level events can be bound in one of 3 ways:
 
 * Use one of the add listener methods in https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] for example, `addPointerPressedListener`.
 
@@ -309,7 +309,7 @@ Each of those has advantages and disadvantages, specifically:
 
 ==== Low-level event types
 
-two basic types of low-level events: Key and Pointer.
+There are two basic types of low-level events: Key and Pointer.
 
 IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangeListener` as mentioned above.
 

@@ -143,7 +143,7 @@ Essentially the glass pane is a painter that allows you to draw an overlay on to
 Overriding the paint method of a form isn't a substitute for `glasspane` as it would appear to work initially, when you enter a `Form`. For example, when modifying an element within the form that element gets repainted not the entire
 `Form`!
 
-if you've a form with a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] and text drawn on top using the Form's paint method it would get erased whenever the button gets focus.
+If you've a form with a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] and text drawn on top using the Form's paint method it would get erased whenever the button gets focus.
 
 The glass pane is called whenever a component gets painted,
 it paints within the clipping region of the component hence it won't break the rest of the components on the `Form` which weren't modified.
@@ -413,7 +413,7 @@ you need a fallback path.
 
 You can check if a particular https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] context supports rotation and scaling using the `isAffineSupported()` method.
 
-for example:
+For example:
 
 [source,java]
 ----
@@ -436,7 +436,7 @@ in Codename One's graphics:
 2. Using `Graphics.translate()` to translate your drawing position by an offset.
 3. Using `Graphics.rotate()` to rotate your drawing position.
 
-three separate things that need to be drawn in a clock:
+There are three separate things that need to be drawn in a clock:
 
 1. **The tick marks**. For example: most clocks will have a tick mark for each second, larger tick marks for each hour, and
 sometimes even larger tick marks for each quarter hour.
@@ -805,7 +805,7 @@ public void stop(){
 }
 ----
 
-the code to instantiate the clock, and start the animation would be something like:
+The code to instantiate the clock, and start the animation would be something like:
 
 [source,java]
 ----
@@ -1067,7 +1067,7 @@ You could also use the `Graphics.setTransform()` class to apply rotations and ot
 
 ==== Global alpha & Anti-Aliasing
 
-far you've relied on the per-pixel alpha stored in images and gradients. `Graphics`
+Up to this point you've relied on the per-pixel alpha stored in images and gradients. `Graphics`
 also lets you apply a global alpha multiplier to every draw call by using
 `setAlpha(int)` or `concatenateAlpha(int)` after checking `isAlphaSupported()`.
 Both methods accept values from `0` (fully transparent) to `255` (fully opaque)
@@ -1149,7 +1149,7 @@ NOTE: This isn't the case for all images but it's common and you prefer calculat
 
 ==== The RGB image's
 
-two types of RGB constructed images that are different from one another but since they're both technically "RGB image's" you're bundling them under the same subsection.
+There are two types of RGB constructed images that are different from one another but since they're both technically "RGB image's" you're bundling them under the same subsection.
 
 ===== Internal
 
@@ -1202,7 +1202,7 @@ Multi images don't physically exist as a concept within the Codename One API so 
 
 The built-in support for multi images is in the resource file loading logic where a MultiImage is decoded and the version that matches the current DPI is physically loaded. From that point on user code can treat it like any other `EnclodedImage`.
 
-9-image borders use multi images by default to keep their appearance more refined on the different DPI’s.
+The 9-image borders use multi images by default to keep their appearance more refined on the different DPI’s.
 
 ==== FontImage & Material design icons
 
@@ -1230,7 +1230,7 @@ NOTE: The samples use the built-in material design icon font. This is for conven
 
 A more common and arguably "correct" way to construct such an icon would be thru the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] object. The `Style` object can provide the color, size and background information needed by `FontImage`.
 
-two versions of this method, the first one expects the `Style` object to have the correct icon font set to its font attribute. The second accepts a `Font` object as an argument. The latter is useful for a case where you want to reuse the same `Style` object that you defined for a general UI element for example: you can set an icon for a `Button` like this and it will take up the style of the `Button`:
+There are two versions of this method: the first one expects the `Style` object to have the correct icon font set to its font attribute. The second accepts a `Font` object as an argument. The latter is useful for a case where you want to reuse the same `Style` object that you defined for a general UI element for example: you can set an icon for a `Button` like this and it will take up the style of the `Button`:
 
 [source,java]
 ----
@@ -1251,9 +1251,9 @@ WARNING: Notice that for this specific version of the method the size of the fon
 
 ===== Material design icons
 
-many icon fonts in the web, the field is rather volatile and constantly changing. For example, you wanted to have built-in icons that would allow you to create better looking demos and built-in components.
+There are many icon fonts on the web, but the field is rather volatile and constantly changing. For example, you wanted to have built-in icons that would allow you to create better looking demos and built-in components.
 
-that's why you picked the material design icon font for inclusion in the Codename One distribution. It features a stable core set of icons, that aren't IP encumbered.
+That's why you picked the material design icon font for inclusion in the Codename One distribution. It features a stable core set of icons, that aren't IP encumbered.
 
 You can use the built-in font directly as demonstrated above but there are far better ways to create a material design icon. To find the icon you want you can check out the https://design.google.com/icons/[material design icon gallery]. For example: you used the save icon in the samples above.
 

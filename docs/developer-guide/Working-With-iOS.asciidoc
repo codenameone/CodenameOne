@@ -311,6 +311,6 @@ Supported need formats are `from:`, `exact:`, `branch:`, `revision:`, and `range
 
 If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to your native/ios directory.
 
-for example: native/ios/SomeThirdPartySDK.framework.zip
+For example: native/ios/SomeThirdPartySDK.framework.zip
 
-no build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.
+No build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.

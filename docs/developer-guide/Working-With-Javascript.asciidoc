@@ -190,7 +190,7 @@ If you don't want to install the.war file, but would rather copy the proxy servl
 
 ==== Step 2: Configuring your application to use the proxy
 
-three ways to configure your application to use your proxy.
+There are three ways to configure your application to use your proxy.
 
 1. Using the *javascript.proxy.url* build hint.
 +

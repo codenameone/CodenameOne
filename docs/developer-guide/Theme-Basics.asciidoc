@@ -55,7 +55,7 @@ When you select the theme you will see the theme default view.
 .Theme default view
 image::img/theme-default-view.png[Theme default view]
 
-many interesting things to notice here the preview section allows you to instantly see the changes you make to the theme data.
+There are many interesting things to notice here: the preview section allows you to instantly see the changes you make to the theme data.
 
 .Theme preview section
 image::img/theme-preview-section.png[Theme preview section,scaledwidth=50%]
@@ -189,7 +189,7 @@ The color settings are much simpler than the background behavior. As explained <
 .Add theme entry color settings
 image::img/theme-entry-color.png[Add theme entry color settings]
 
-three color settings:
+There are three color settings:
 
 - Foreground color is the RRGGBB color that sets the style foreground color used to draw the text of the component. You can use the color picker button on the side to pick a color
 
@@ -243,7 +243,7 @@ A 9-piece image border is a common convention in UI theming that divides a borde
 
 TIP: Android uses a common variation on the 9-piece border: 9-patch. The main difference between the 9-piece border and 9-patch is that 9-piece borders tile the sides/center whereas 9-patch scales them
 
-9-piece image borders work better than background images for many use cases where the background needs to "grow/shrink" extensively and might need to change aspect ratio.
+The 9-piece image borders work better than background images for many use cases where the background needs to "grow/shrink" extensively and might need to change aspect ratio.
 
 They don't work well in cases where the image is asymmetric on both axis. For example: a radial gradient image. 9-piece images in general don't work well with complex gradients.
 
@@ -364,7 +364,7 @@ The `RoundRectBorder` was developed based on the `RoundBorder` and has similar f
 
 TIP: don't confuse the Rounded Rectangle border with the deprecated `Rounded` border...
 
-it's a pretty simple border type akin to the `RoundBorder`.
+It's a pretty simple border type akin to the `RoundBorder`.
 
 .Rounded Rectangle Border
 image::img/rounded-rectangle-border.png[Rounded Rectangle Border,scaledwidth=50%]

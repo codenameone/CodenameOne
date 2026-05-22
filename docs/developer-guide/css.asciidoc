@@ -84,7 +84,7 @@ The `#Device` selector allows you to define which device resolutions this CSS fi
 
 The `#Constants` selector allows you to specify theme constants.
 
-for example, [source,css]
+For example, [source,css]
 ----
 #Constants {
     PopupDialogArrowBool: false;
@@ -155,7 +155,7 @@ In the above example, the constants referring to an image name as a string requi
 * `../res/<cssfilename>/<imageName>`
 * `../../res/<cssfilename>/<imageName>`
 
-*or* that it has been defined as a background image in some selector in this CSS file.
+It must also have been defined as a background image in some selector in this CSS file.
 
 ==== `Default`
 
@@ -627,7 +627,7 @@ It will then create a multi-image from these images and include them in the reso
 
 ==== Import multiple images in single selector
 
-it's quite useful to be able to embed images inside the resource file that's generated from the CSS stylesheet so that you can access the images using the `Resources.getImage()` method in your app and set it as an icon on a button or label. In this case, it's easier to create a dummy style that you don't intend to use and include multiple images in the background-image property like so:
+It's quite useful to be able to embed images inside the resource file that's generated from the CSS stylesheet so that you can access the images using the `Resources.getImage()` method in your app and set it as an icon on a button or label. In this case, it's easier to create a dummy style that you don't intend to use and include multiple images in the background-image property like so:
 
 [source,css]
 ----
@@ -836,7 +836,7 @@ NOTE: Apparently FontAwesome has removed its public repositories from Github so 
 
 ==== `font-size`
 
-it's best practice to size your fonts using millimetres (`rem`) (or another "real-world" measurement unit such as inches (`in`), centimetres (`cm`), millimetres (`mm`). This will allow the font to be sized appropriate for all display densities. If you specify size in pixels (`px`), it will treat it the same as if you sized it in points (`pt`), where 1pt == 1/72 inches (one seventy-second of an inch).
+It's best practice to size your fonts using millimetres (`rem`) (or another "real-world" measurement unit such as inches (`in`), centimetres (`cm`), millimetres (`mm`). This will allow the font to be sized appropriate for all display densities. If you specify size in pixels (`px`), it will treat it the same as if you sized it in points (`pt`), where 1pt == 1/72 inches (one seventy-second of an inch).
 
 If you size your font in percentage units (for example, `150%`) it will set the font size relative to the medium font size of the platform. This is different than the standard behaviour of a web browser, which would size it relative to the parent element's font size.
 

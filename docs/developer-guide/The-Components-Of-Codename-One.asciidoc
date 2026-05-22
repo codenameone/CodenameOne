@@ -236,7 +236,7 @@ NOTE: `hi` is the name of the parent `Form` in the sample above.
 
 ==== Styling dialogs
 
-it's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle--[getDialogStyle()] or
+It's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle--[getDialogStyle()] or
 https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#setDialogUIID-java.lang.String-[setDialogUIID] methods rather than styling the dialog object directly.
 
 The reason for this is that the `Dialog` is a `Form` that takes up the whole screen. The `Form` that's visible behind the `Dialog` is rendered as a screenshot. customizing the actual `UIID` of the `Dialog` won't produce the desired results.
@@ -694,7 +694,7 @@ The code is pretty self-explanatory and more convenient than typical setters/get
 
 The validator class supports text component and it should "work." But the cool thing is that it uses the material design convention for error handling!
 
-if you add to the sample above a `Validator`:
+If you add to the sample above a `Validator`:
 
 [source,java]
 ----
@@ -765,7 +765,7 @@ The one tiny thing you should notice with the `PickerComponent` is that you don'
 
 These varying looks are implemented through a combination of layouts, theme constants and UIID's. The most important UIID's are: `TextComponent`, `FloatingHint` & `TextHint`.
 
-many theme constants related that can manipulate some pieces of this functionality:
+There are many related theme constants that can manipulate some pieces of this functionality:
 
 - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect. When defined this will change the color of the border and label to the given color to match the material design styling. This implements the red border underline in cases of error and the label text color change
 - `textComponentErrorLineBorderBool` toggles the material-style underline that appears on validation errors. Set it to `false` if you prefer to supply a different border when errors are shown
@@ -868,7 +868,7 @@ f.show();
 
 The ripple effect in material design highlights the location of the finger and grows as a circle to occupy the full area of the component as the user presses the button.
 
-you've the ability to perform a ripple effect by darkening the touched area and growing that in a quick animation.
+You can perform a ripple effect by darkening the touched area and growing that in a quick animation.
 
 Ripple effect can be applied to any component but you have it turned on for buttons on Android which also applies to things like title commands, side menu elements etc. This might not apply at this moment to lead components like multi-buttons but that might change in the future.
 
@@ -939,7 +939,7 @@ hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
 .Toggle button converted sample
 image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
 
-that's half the story though, to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
+That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
 For example: lets enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group. You can do this by changing the last line of the code above as such:
 
@@ -1398,7 +1398,7 @@ Most of these use cases work best for lists that grow to a larger size, or repre
 ==== Important - lists and Layout managers
 When working with lists, you want the list to handle the scrolling (otherwise it will perform badly). This means you should place the list in a non-scrollable container (no parent can be scrollable), notice that the content pane is scrollable by default, so you should disable that.
 
-it's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. for example:
+It's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. For example:
 
 [source,java]
 ----
@@ -1409,7 +1409,7 @@ form.add(BorderLayout.CENTER, myList);
 
 ==== MultiList & DefaultListModel
 
-after this long start lets show the first sample of creating a list using the https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList].
+After this long start, here is the first sample of creating a list using the https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList].
 
 The `MultiList` is a preconfigured list that contains a ready made renderer with defaults that make sense for the most common use cases. It still retains most of the power available to the `List` component but reduces the complexity of one of the hardest things to grasp for most developers: rendering.
 
@@ -1605,7 +1605,7 @@ In this renderer you set the `Label.setFocus(true)` if it's selected, calling to
 
 Then you invoke `Label.getAllStyles().setBgTransparency(100)` to give the selection semi transparency, and `0` for full transparency if not selected.
 
-that's still not efficient because you create a new `Label` each time the method is invoked.
+That's still not efficient because you create a new `Label` each time the method is invoked.
 
 To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does.
 
@@ -2005,7 +2005,7 @@ image::img/components-table-with-spanning.png[Table with spanning and fixed widt
 
 To customize the table cell behavior you can derive the `Table` to create a "renderer like" widget, but unlike the list this component is "kept" and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
 
-lets fix the example above to include far more capabilities:
+The example above can be extended to include far more capabilities:
 [source,java]
 ----
 Table table = new Table(model) {
