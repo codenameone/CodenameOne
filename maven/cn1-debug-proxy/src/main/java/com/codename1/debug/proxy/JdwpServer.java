@@ -414,6 +414,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             }
             case 9: { // Resume
                 System.out.println("[jdwp] VM.Resume");
+                invalidateStack();
+                invalidateLocals();
                 if (device != null) try { device.resumeAll(); } catch (IOException ignore) {}
                 writeReply(id, 0, empty());
                 return;
@@ -729,6 +731,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             }
             case 3: { // Resume
                 System.out.println("[jdwp] Thread.Resume tid=" + tid);
+                invalidateStack();
+                invalidateLocals();
                 if (device != null) try { device.resume(tid); } catch (IOException ignore) {}
                 writeReply(id, 0, empty()); return;
             }
@@ -1309,6 +1313,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         System.out.println("[jdwp] BP_HIT tid=" + threadId + " methodId=" + methodId + " line=" + line);
         if (!knownThreads.contains(threadId)) knownThreads.add(threadId);
         lastSuspendedThread = threadId;
+        // The thread just paused at a new location — drop any stale cache
+        // from a previous suspension and re-fetch.
+        invalidateStack();
+        invalidateLocals();
         // Eagerly ask the device for stack so the IDE's subsequent Frames
         // query returns something useful.
         if (device != null) try { device.getStack(threadId); } catch (IOException ignore) {}
@@ -1339,6 +1347,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     @Override public void onStepComplete(long threadId, int methodId, int line) {
         Integer rid = stepRequests.remove(threadId);
+        // Drop any cached stack from before the step landed. Without this
+        // the IDE's Frames request after STEP_COMPLETE hits the cache and
+        // re-uses the BP_HIT stack — Frames panel sticks on the previous
+        // line, double-click jumps to the previous line, evaluation runs
+        // against a dead frame.
+        invalidateStack();
+        invalidateLocals();
         System.out.println("[jdwp] STEP_COMPLETE tid=" + threadId + " methodId=" + methodId + " line=" + line + " rid=" + rid);
         try {
             SymbolTable.MethodInfo m = symbols.methodById(methodId);
@@ -1366,6 +1381,29 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             stackThreadId = threadId;
             pendingStack = false;
             stackLock.notifyAll();
+        }
+    }
+
+    /**
+     * Drop the cached stack so the next fetchStackForThread round-trips
+     * to the device. Called whenever the thread state changes under us:
+     * a new suspend (BP_HIT / STEP_COMPLETE) or a resume (VM.Resume,
+     * Thread.Resume).
+     */
+    private void invalidateStack() {
+        synchronized (stackLock) {
+            lastStackMids = null;
+            lastStackLines = null;
+            stackThreadId = -1;
+        }
+    }
+
+    /** Drop the cached locals — same lifecycle as invalidateStack. */
+    private void invalidateLocals() {
+        synchronized (localsLock) {
+            lastLocalsSlots = null;
+            lastLocalsTypes = null;
+            lastLocalsValues = null;
         }
     }
 
