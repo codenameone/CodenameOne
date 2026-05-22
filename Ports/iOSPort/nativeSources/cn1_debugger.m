@@ -52,6 +52,7 @@
 #define CMD_DISPOSE          0x0A
 #define CMD_GET_STRING       0x0B
 #define CMD_GET_OBJECT_CLASS 0x0C
+#define CMD_GET_OBJECT_FIELDS 0x0D
 
 // Events (device -> proxy)
 #define EVT_HELLO            0x80
@@ -64,6 +65,9 @@
 #define EVT_STRING_VALUE     0x87
 #define EVT_REPLY_STATUS     0x88
 #define EVT_OBJECT_CLASS     0x89
+#define EVT_OBJECT_FIELDS    0x8A
+#define EVT_STDOUT_LINE      0x8B
+#define EVT_STDERR_LINE      0x8C
 
 // java.lang.String's clazz struct is emitted by the translator; we reference
 // it by symbol so cn1_debugger.m doesn't depend on the generated
@@ -103,6 +107,101 @@ static UIView* g_waitOverlay = nil;
 // Forward declaration; callers in the command dispatch sit above the
 // definition further down the file.
 static void cn1_debugger_fire_ready_block_if_pending(void);
+
+/* --------------------------------------------------------------------- */
+/* stdout / stderr forwarding. dup2()'s the original FDs to a pipe, then */
+/* a reader thread chunks the pipe by '\n' and emits each completed line */
+/* as an EVT_STDOUT_LINE / EVT_STDERR_LINE so the proxy can surface them */
+/* in the IDE debug console. Partial lines buffer until a newline lands. */
+/* --------------------------------------------------------------------- */
+static int g_origStdoutFd = -1;
+static int g_origStderrFd = -1;
+
+// Forward declaration so the capture thread can emit events; the body sits
+// further down with the rest of the wire-protocol helpers.
+static void sendEvent(uint8_t cmd, const void* payload, uint32_t len);
+
+struct stream_capture {
+    int readFd;            // read end of the pipe; we own it
+    int origFd;            // copy of the original FD so we can also forward to it
+    uint8_t evtCode;       // EVT_STDOUT_LINE / EVT_STDERR_LINE
+};
+
+static void forwardLineToOriginal(int origFd, const uint8_t* line, size_t len) {
+    if (origFd < 0) return;
+    // Best-effort write; missing bytes here only cost us a console line.
+    ssize_t w = write(origFd, line, len);
+    (void)w;
+    uint8_t nl = '\n';
+    w = write(origFd, &nl, 1);
+    (void)w;
+}
+
+static void* streamCaptureThread(void* arg) {
+    struct stream_capture* cap = (struct stream_capture*)arg;
+    uint8_t buf[1024];
+    uint8_t line[2048];
+    size_t lineLen = 0;
+    for (;;) {
+        ssize_t n = read(cap->readFd, buf, sizeof(buf));
+        if (n <= 0) {
+            if (n < 0 && (errno == EINTR || errno == EAGAIN)) continue;
+            break;
+        }
+        for (ssize_t i = 0; i < n; i++) {
+            uint8_t c = buf[i];
+            if (c == '\n' || lineLen == sizeof(line)) {
+                // Mirror to the host console (Xcode/simulator log) so local
+                // debugging without an attached proxy still sees prints.
+                forwardLineToOriginal(cap->origFd, line, lineLen);
+                if (g_proxyFd >= 0) {
+                    uint8_t* payload = (uint8_t*)malloc(4 + lineLen);
+                    if (payload) {
+                        uint32_t lenBE = htonl((uint32_t)lineLen);
+                        memcpy(payload, &lenBE, 4);
+                        if (lineLen > 0) memcpy(payload + 4, line, lineLen);
+                        sendEvent(cap->evtCode, payload, 4 + (uint32_t)lineLen);
+                        free(payload);
+                    }
+                }
+                lineLen = 0;
+                if (c == '\n') continue;
+            }
+            line[lineLen++] = c;
+        }
+    }
+    return NULL;
+}
+
+static void startStreamCapture(int* origFdSlot, FILE* stream, int fdNo, uint8_t evtCode) {
+    int pfd[2];
+    if (pipe(pfd) != 0) return;
+    int savedOrig = dup(fdNo);
+    if (savedOrig < 0) {
+        close(pfd[0]); close(pfd[1]);
+        return;
+    }
+    *origFdSlot = savedOrig;
+    // Re-route the target FD so anything writing to it (printf, NSLog into
+    // os_log_t fallback, fprintf(stderr, ...)) goes into our pipe.
+    if (dup2(pfd[1], fdNo) < 0) {
+        close(savedOrig); close(pfd[0]); close(pfd[1]);
+        *origFdSlot = -1;
+        return;
+    }
+    close(pfd[1]);
+    // Line-buffer so we don't sit on a partial line.
+    setvbuf(stream, NULL, _IOLBF, 0);
+
+    struct stream_capture* cap = (struct stream_capture*)malloc(sizeof(*cap));
+    if (!cap) { close(pfd[0]); return; }
+    cap->readFd = pfd[0];
+    cap->origFd = savedOrig;
+    cap->evtCode = evtCode;
+    pthread_t t;
+    pthread_create(&t, NULL, streamCaptureThread, cap);
+    pthread_detach(t);
+}
 
 /* --------------------------------------------------------------------- */
 /* Breakpoint hash. Open-addressed, lock-free reads via atomic 64-bit    */
@@ -146,6 +245,103 @@ static void bp_add(int methodId, int line) {
         if (expected == key) return; // already present
     }
     NSLog(@"cn1_debugger: breakpoint table full");
+}
+
+/* --------------------------------------------------------------------- */
+/* Field-offset registry. Each translator-emitted class .m calls         */
+/* cn1_debugger_register_fields from a __attribute__((constructor)), so  */
+/* by the time the listener thread is alive every class has registered   */
+/* its instance fields. The table is sparse (indexed by classId so       */
+/* gaps are common) but classIds are dense enough that a plain array     */
+/* outperforms a hash table here for the read pattern (one lookup per    */
+/* CMD_GET_OBJECT_FIELDS request).                                       */
+/* --------------------------------------------------------------------- */
+
+struct cn1_field_class_entry {
+    const cn1_field_entry* table;
+    int count;
+};
+
+#define CN1_FIELD_REG_INITIAL_CAP 2048
+static struct cn1_field_class_entry* g_fieldsByClass = NULL;
+static int g_fieldsByClassCap = 0;
+static pthread_mutex_t g_fieldsRegMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void cn1_debugger_register_fields(int classId, const cn1_field_entry* table, int count) {
+    if (classId < 0) return;
+    pthread_mutex_lock(&g_fieldsRegMutex);
+    if (classId >= g_fieldsByClassCap) {
+        int newCap = g_fieldsByClassCap == 0 ? CN1_FIELD_REG_INITIAL_CAP : g_fieldsByClassCap * 2;
+        while (classId >= newCap) newCap *= 2;
+        struct cn1_field_class_entry* n =
+            (struct cn1_field_class_entry*)realloc(g_fieldsByClass,
+                newCap * sizeof(struct cn1_field_class_entry));
+        if (!n) { pthread_mutex_unlock(&g_fieldsRegMutex); return; }
+        memset(n + g_fieldsByClassCap, 0,
+               (newCap - g_fieldsByClassCap) * sizeof(struct cn1_field_class_entry));
+        g_fieldsByClass = n;
+        g_fieldsByClassCap = newCap;
+    }
+    g_fieldsByClass[classId].table = table;
+    g_fieldsByClass[classId].count = count;
+    pthread_mutex_unlock(&g_fieldsRegMutex);
+}
+
+/**
+ * Looks up the (table, count) for a classId. Walks the parent chain via
+ * the class's vtable since field tables only cover own + inherited
+ * declared on THIS class; CMD_GET_OBJECT_FIELDS resolves by classId of
+ * the actual runtime class (which already includes inherited fields in
+ * its layout-order list — see ByteCodeClass.getAllInstanceFieldsInLayoutOrder).
+ */
+static const cn1_field_entry* field_lookup_by_class_and_id(int classId, int fieldId, int* outCount) {
+    if (classId < 0 || classId >= g_fieldsByClassCap) return NULL;
+    const cn1_field_entry* table = g_fieldsByClass[classId].table;
+    int count = g_fieldsByClass[classId].count;
+    if (outCount) *outCount = count;
+    if (!table) return NULL;
+    for (int i = 0; i < count; i++) {
+        if (table[i].fieldId == fieldId) return &table[i];
+    }
+    return NULL;
+}
+
+/**
+ * Read a field value into 8 host-endian bytes plus a JVM type-char.
+ * Object refs become the JAVA_OBJECT pointer reinterpreted as uint64 so
+ * the proxy can pass them straight to JDWP as objectIDs.
+ */
+static int field_read_into(JAVA_OBJECT obj, const cn1_field_entry* fe,
+                           char* outType, uint64_t* outValue) {
+    if (!obj || !fe) return 0;
+    char* base = (char*)obj + fe->offset;
+    *outType = fe->type;
+    switch (fe->type) {
+        case 'Z': *outValue = (uint64_t)(*(JAVA_BOOLEAN*)base & 1); return 1;
+        case 'B': *outValue = (uint64_t)(uint8_t)(*(JAVA_BYTE*)base); return 1;
+        case 'S': *outValue = (uint64_t)(uint16_t)(*(JAVA_SHORT*)base); return 1;
+        case 'C': *outValue = (uint64_t)(uint16_t)(*(JAVA_CHAR*)base); return 1;
+        case 'I': *outValue = (uint64_t)(uint32_t)(*(JAVA_INT*)base); return 1;
+        case 'F': {
+            JAVA_FLOAT f = *(JAVA_FLOAT*)base;
+            uint32_t bits;
+            memcpy(&bits, &f, 4);
+            *outValue = (uint64_t)bits; return 1;
+        }
+        case 'J': *outValue = (uint64_t)(*(JAVA_LONG*)base); return 1;
+        case 'D': {
+            JAVA_DOUBLE d = *(JAVA_DOUBLE*)base;
+            uint64_t bits;
+            memcpy(&bits, &d, 8);
+            *outValue = bits; return 1;
+        }
+        case 'L': default: {
+            JAVA_OBJECT v = *(JAVA_OBJECT*)base;
+            *outValue = (uint64_t)(uintptr_t)v;
+            *outType = 'L';
+            return 1;
+        }
+    }
 }
 
 static void bp_clear(int methodId, int line) {
@@ -630,6 +826,61 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             sendEvent(EVT_STRING_VALUE, utf8, (uint32_t)n);
             return 0;
         }
+        case CMD_GET_OBJECT_FIELDS: {
+            // Payload: objId(8) fieldCount(4) fieldIds[fieldCount](4 each)
+            if (len < 12) {
+                // Reply empty so the proxy doesn't hang on its synchronous wait.
+                uint8_t empty[4] = {0,0,0,0};
+                sendEvent(EVT_OBJECT_FIELDS, empty, 4);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4);
+            memcpy(&lo, payload + 4, 4);
+            uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            uint32_t countBE;
+            memcpy(&countBE, payload + 8, 4);
+            int count = (int)ntohl(countBE);
+            if (count < 0 || (uint32_t)(12 + count * 4) > len) {
+                uint8_t empty[4] = {0,0,0,0};
+                sendEvent(EVT_OBJECT_FIELDS, empty, 4);
+                return 0;
+            }
+            JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
+            int classId = -1;
+            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
+                classId = obj->__codenameOneParentClsReference->classId;
+            }
+            // Reply payload: count(4) then per-field { type(1), value(8) }.
+            uint32_t sz = 4 + (uint32_t)count * 9;
+            uint8_t* buf = (uint8_t*)malloc(sz);
+            if (!buf) {
+                uint8_t empty[4] = {0,0,0,0};
+                sendEvent(EVT_OBJECT_FIELDS, empty, 4);
+                return 0;
+            }
+            uint32_t countOutBE = htonl((uint32_t)count);
+            memcpy(buf, &countOutBE, 4);
+            uint8_t* p = buf + 4;
+            for (int i = 0; i < count; i++) {
+                uint32_t fidBE;
+                memcpy(&fidBE, payload + 12 + i * 4, 4);
+                int fid = (int)ntohl(fidBE);
+                char tc = 'L';
+                uint64_t val = 0;
+                const cn1_field_entry* fe = field_lookup_by_class_and_id(classId, fid, NULL);
+                if (fe && obj != JAVA_NULL) {
+                    field_read_into(obj, fe, &tc, &val);
+                } else {
+                    tc = 'L'; val = 0;
+                }
+                *p++ = (uint8_t)tc;
+                writeBE64(p, val); p += 8;
+            }
+            sendEvent(EVT_OBJECT_FIELDS, buf, sz);
+            free(buf);
+            return 0;
+        }
         case CMD_GET_THREADS:
         case CMD_SUSPEND:
             // Minimal viable: reply empty so the proxy doesn't hang.
@@ -887,6 +1138,12 @@ void cn1_debugger_start(void) {
     }
     NSNumber* wait = info[@"CN1ProxyWaitForAttach"];
     g_waitForAttach = (wait && [wait boolValue]) ? 1 : 0;
+
+    // Capture stdout/stderr before any user code runs so prints during runApp
+    // make it to the IDE. The reader threads also mirror lines back to the
+    // saved original FDs so xcrun simctl log / Xcode still shows the output.
+    startStreamCapture(&g_origStdoutFd, stdout, STDOUT_FILENO, EVT_STDOUT_LINE);
+    startStreamCapture(&g_origStderrFd, stderr, STDERR_FILENO, EVT_STDERR_LINE);
 
     pthread_t t;
     pthread_create(&t, NULL, listenerThreadMain, NULL);

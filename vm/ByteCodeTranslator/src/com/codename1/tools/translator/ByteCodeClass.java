@@ -1257,10 +1257,55 @@ public class ByteCodeClass {
         b.append(");\n");
 
         b.append("__").append(clsName).append("_LOADED__=1;\n");
-        
+
         b.append("}\n\n");
-        
+
+        // On-device-debug: emit the instance-field offset table for this
+        // class. Wrapped in CN1_ON_DEVICE_DEBUG so release builds don't pay
+        // the data or registration cost.
+        if (BytecodeMethod.isOnDeviceDebug()) {
+            appendOnDeviceDebugFieldTable(b);
+        }
+
         return b.toString();
+    }
+
+    private void appendOnDeviceDebugFieldTable(StringBuilder b) {
+        // Inherit-through layout-order list: parents first, this class last.
+        // Matches addFields() so offsetof() lines up with the actual struct.
+        List<ByteCodeField> instance = getAllInstanceFieldsInLayoutOrder();
+        // Drop any field whose declaring class isn't itself in the
+        // translation unit. We can't take offsetof of a field whose struct
+        // we don't have, but this should never happen — translator pulls in
+        // parents transitively.
+        b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
+        b.append("#import \"cn1_debugger.h\"\n");
+        b.append("static const cn1_field_entry __cn1_dbg_fields_").append(clsName).append("[] = {\n");
+        for (ByteCodeField bf : instance) {
+            String declCls = bf.getClsName().replace('/', '_').replace('$', '_');
+            int fid = Parser.getOrAssignFieldId(declCls, bf.getFieldName());
+            char tc = onDeviceDebugTypeCharFor(bf);
+            b.append("    { ").append(fid)
+              .append(", (int)offsetof(struct obj__").append(clsName)
+              .append(", ").append(declCls).append("_").append(bf.getFieldName())
+              .append("), '").append(tc).append("', \"")
+              .append(bf.getFieldName()).append("\" },\n");
+        }
+        b.append("};\n");
+        b.append("__attribute__((constructor)) static void __cn1_dbg_register_").append(clsName).append("(void) {\n");
+        b.append("    cn1_debugger_register_fields(cn1_class_id_").append(clsName).append(",\n");
+        b.append("            __cn1_dbg_fields_").append(clsName).append(",\n");
+        b.append("            (int)(sizeof(__cn1_dbg_fields_").append(clsName).append(") / sizeof(cn1_field_entry)));\n");
+        b.append("}\n");
+        b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
+    }
+
+    private static char onDeviceDebugTypeCharFor(ByteCodeField bf) {
+        // Object and arrays — both stored as JAVA_OBJECT in the C struct.
+        if (bf.isObjectType()) return 'L';
+        String d = bf.getRuntimeDescriptor();
+        if (d != null && d.length() == 1) return d.charAt(0);
+        return 'L';
     }
 
     private boolean doesImplement(ByteCodeClass interfaceObj) {
@@ -1979,6 +2024,30 @@ public class ByteCodeClass {
 
     public List<ByteCodeField> getFields() {
         return fields;
+    }
+
+    /**
+     * Walks the inheritance chain and collects every instance field this class
+     * physically stores in its C struct (in declaration order, parents first
+     * to match {@link #addFields}). Used by the on-device-debug sidecar so the
+     * proxy can ask the device for inherited fields by their declaring-class
+     * fieldId without a JDWP-level type walk.
+     */
+    public List<ByteCodeField> getAllInstanceFieldsInLayoutOrder() {
+        List<ByteCodeField> out = new ArrayList<>();
+        collectInstanceFieldsInLayoutOrder(out);
+        return out;
+    }
+
+    private void collectInstanceFieldsInLayoutOrder(List<ByteCodeField> out) {
+        if (baseClassObject != null) {
+            baseClassObject.collectInstanceFieldsInLayoutOrder(out);
+        }
+        for (ByteCodeField bf : fields) {
+            if (!bf.isStaticField()) {
+                out.add(bf);
+            }
+        }
     }
 
     /**

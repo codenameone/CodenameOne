@@ -103,7 +103,8 @@ step, inspect, just like a normal remote attach.
 === What works today
 
 * Class loading: the IDE sees every class in your build.
-* Line breakpoints in user code and in the Codename One framework.
+* Line breakpoints in user code *and* in the Codename One framework
+  classes (`com.codename1.ui.*`, `com.codename1.io.*`, etc.).
 * Step into / over / out.
 * Stack walking — full Java stack including the Codename One
   framework frames above your code.
@@ -111,8 +112,43 @@ step, inspect, just like a normal remote attach.
   byte, char, short).
 * Inspecting `java.lang.String` values directly.
 * Inspecting object references — class name and identity, plus
-  the ability to drill in via the IDE's variables view.
+  field-by-field drilldown via the IDE's variables view. The proxy
+  walks the ParparVM struct layout to read instance fields directly
+  at known offsets, so `dump this` / "Variables" shows the same
+  fields you'd see in a simulator debug session.
+* Native device output — `System.out.println`, `Log.p`, and
+  `printf` / `NSLog` from native code are surfaced in the proxy's
+  console (and the IDE's debug console when the proxy is launched
+  as an IDE run configuration) prefixed with `[device]`.
 * Pause and resume from the IDE.
+
+=== Pointing the IDE at the Codename One sources
+
+The proxy answers `Method.LineTable` and `ReferenceType.SourceFile`
+for framework classes, but the IDE still needs to find the actual
+`.java` files to render the source pane while stepping. Three options:
+
+* *Working from a clone of this repository.* Add
+  `CodenameOne/src` as a source root in your IDE's debug
+  configuration. In IntelliJ: *Run → Edit Configurations… → Remote
+  JVM Debug → Configuration → Source roots → +*.
+* *jdb command line.* Pass the framework source dir on the
+  `-sourcepath`:
++
+[source,bash]
+----
+jdb -attach localhost:8000 \
+    -sourcepath src/main/java:/path/to/CodenameOne/CodenameOne/src
+----
+* *Using the Maven artifacts.* Make sure the IDE has the
+  `codenameone-core-X.Y.Z-sources.jar` attached to the
+  `com.codenameone:codenameone-core` dependency. IntelliJ does this
+  automatically once you run *Maven → Reimport* with "Sources" enabled
+  in the Maven settings.
+
+Without a source path, breakpoints in framework classes still trigger
+and locals / fields still read — you'll just see "Sources not found"
+in the IDE editor when stepping into framework code.
 
 === Known limitations
 
@@ -134,6 +170,13 @@ step, inspect, just like a normal remote attach.
   compile with debug info by default; if a variable shows up as
   `v1`, `v2`, ... that's because that particular class was
   compiled without debug info.
+* *Static field reads* fall back to "not supported". Instance field
+  reads are fully wired; static-field support requires an additional
+  per-class static table that hasn't been emitted yet.
+* *NSLog on a real device* (as opposed to the simulator) may not
+  reach the `[device]` console. NSLog on iOS routes to `os_log`
+  which doesn't always mirror to `stderr`. `printf` / `fprintf` /
+  `Log.p` are unaffected and show up correctly.
 
 === Performance
 

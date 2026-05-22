@@ -30,6 +30,33 @@
  */
 extern void cn1_debugger_start(void);
 
+/**
+ * Per-class instance-field descriptor emitted by the translator (one
+ * static array per generated class), then registered with the debugger
+ * runtime by a __attribute__((constructor)) shim that the translator also
+ * emits. The runtime uses these to answer CMD_GET_OBJECT_FIELDS without
+ * any reflection / RTTI from ParparVM.
+ *
+ * offset is from the start of the object struct (i.e. offsetof). type is
+ * a JVM type-char ('I','J','F','D','Z','B','S','C','L' — 'L' covers
+ * arrays too since arrays are JAVA_OBJECT in the struct).
+ */
+typedef struct cn1_field_entry {
+    int fieldId;
+    int offset;
+    char type;
+    const char* name;
+} cn1_field_entry;
+
+/**
+ * Translator-generated constructors call this once at process load to
+ * publish the class's field table to the debugger runtime. classId is
+ * the cn1_class_id_XXX constant.
+ */
+extern void cn1_debugger_register_fields(int classId,
+                                         const cn1_field_entry* table,
+                                         int count);
+
 #ifdef __BLOCKS__
 /**
  * Defers the VM callback until the proxy reports the IDE has attached, so

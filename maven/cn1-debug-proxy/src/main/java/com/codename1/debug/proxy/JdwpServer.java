@@ -438,10 +438,43 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 Buf b = new Buf(); b.writeInt(0x0001); writeReply(id, 0, b.bytes()); return;
             }
             case 4: { // Fields
-                Buf b = new Buf(); b.writeInt(0); writeReply(id, 0, b.bytes()); return;
+                Buf b = new Buf();
+                if (c == null) { b.writeInt(0); writeReply(id, 0, b.bytes()); return; }
+                // Only fields declared on this class, not inherited — JDWP
+                // semantics. We filter from c.instanceFields (which may
+                // include inherited entries due to the translator listing
+                // them under the storing class for value-read efficiency).
+                java.util.List<SymbolTable.FieldInfo> declared = new java.util.ArrayList<>();
+                for (SymbolTable.FieldInfo fi : c.instanceFields) {
+                    if (fi.classId == c.classId) declared.add(fi);
+                }
+                b.writeInt(declared.size());
+                for (SymbolTable.FieldInfo fi : declared) {
+                    b.writeLong(toJdwpRef(fi.fieldId));
+                    b.writeString(fi.name);
+                    b.writeString(fi.descriptor);
+                    b.writeInt(fi.accessFlags);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
             }
-            case 14: { // FieldsWithGeneric — stubbed empty too
-                Buf b = new Buf(); b.writeInt(0); writeReply(id, 0, b.bytes()); return;
+            case 14: { // FieldsWithGeneric
+                Buf b = new Buf();
+                if (c == null) { b.writeInt(0); writeReply(id, 0, b.bytes()); return; }
+                java.util.List<SymbolTable.FieldInfo> declared = new java.util.ArrayList<>();
+                for (SymbolTable.FieldInfo fi : c.instanceFields) {
+                    if (fi.classId == c.classId) declared.add(fi);
+                }
+                b.writeInt(declared.size());
+                for (SymbolTable.FieldInfo fi : declared) {
+                    b.writeLong(toJdwpRef(fi.fieldId));
+                    b.writeString(fi.name);
+                    b.writeString(fi.descriptor);
+                    b.writeString(""); // generic signature
+                    b.writeInt(fi.accessFlags);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
             }
             case 5: { // Methods
                 Buf b = new Buf();
@@ -719,7 +752,38 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             case 3: { // ThisObject
-                Buf b = new Buf(); b.writeByte('L'); b.writeLong(0); writeReply(id, 0, b.bytes()); return;
+                // JDWP "ThisObject" returns the receiver of the frame's
+                // method, or null for statics. We don't track static-ness
+                // explicitly, so we ask the device for slot 0 of this frame:
+                // for instance methods the JVM places `this` there on entry,
+                // for statics it stays 0/null which is the correct JDWP reply.
+                int[] devSlots; byte[] devTypes; long[] devValues;
+                synchronized (localsLock) {
+                    pendingLocals = true;
+                    lastLocalsSlots = null; lastLocalsTypes = null; lastLocalsValues = null;
+                    try { device.getLocals(tid, frameIdx); }
+                    catch (IOException io) {
+                        Buf b = new Buf(); b.writeByte('L'); b.writeLong(0); writeReply(id, 0, b.bytes()); return;
+                    }
+                    long deadline = System.currentTimeMillis() + 2000;
+                    while (pendingLocals && System.currentTimeMillis() < deadline) {
+                        try { localsLock.wait(deadline - System.currentTimeMillis()); }
+                        catch (InterruptedException ie) { break; }
+                    }
+                    devSlots = lastLocalsSlots; devTypes = lastLocalsTypes; devValues = lastLocalsValues;
+                }
+                Buf b = new Buf();
+                b.writeByte('L');
+                long ref = 0;
+                if (devSlots != null && devTypes != null && devValues != null) {
+                    int i = findSlot(devSlots, 0);
+                    if (i >= 0 && ((char) devTypes[i] == 'L' || (char) devTypes[i] == '[')) {
+                        ref = devValues[i];
+                    }
+                }
+                b.writeLong(ref);
+                writeReply(id, 0, b.bytes());
+                return;
             }
             default:
                 writeReply(id, 100, empty());
@@ -852,13 +916,39 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 writeReply(id, 0, b.bytes());
                 return;
             }
-            case 2: { // GetValues — instance field reads. Stub: empty.
+            case 2: { // GetValues — instance field reads
                 int count = readInt(p, 8);
+                int[] fieldIds = new int[count];
+                for (int i = 0; i < count; i++) {
+                    long jdwpFid = readLong(p, 12 + i * 8);
+                    fieldIds[i] = fromJdwpRef(jdwpFid);
+                }
                 Buf b = new Buf();
                 b.writeInt(count);
+                if (count == 0) { writeReply(id, 0, b.bytes()); return; }
+                boolean ok = blockingGetObjectFields(objectId, fieldIds);
+                byte[] types = lastObjectFieldsTypes;
+                long[] values = lastObjectFieldsValues;
+                if (!ok || types == null || values == null || types.length != count) {
+                    // Fall back to writing nulls for each requested field so jdb
+                    // still gets a well-formed reply.
+                    for (int i = 0; i < count; i++) { b.writeByte('L'); b.writeLong(0); }
+                    writeReply(id, 0, b.bytes());
+                    return;
+                }
                 for (int i = 0; i < count; i++) {
-                    b.writeByte('L');
-                    b.writeLong(0);
+                    byte tc = types[i];
+                    long v = values[i];
+                    b.writeByte(tc);
+                    switch ((char) tc) {
+                        case 'Z': b.writeByte((int) v & 1); break;
+                        case 'B': b.writeByte((int) v & 0xff); break;
+                        case 'S': case 'C': b.writeShort((int) v & 0xffff); break;
+                        case 'I': case 'F': b.writeInt((int) v); break;
+                        case 'J': case 'D': b.writeLong(v); break;
+                        case 'L': case '[': b.writeLong(v); break;
+                        default: b.writeLong(v);
+                    }
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -904,6 +994,34 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 catch (InterruptedException ie) { break; }
             }
             return lastObjectClass;
+        }
+    }
+
+    private final Object objectFieldsLock = new Object();
+    private boolean pendingObjectFields = false;
+    private byte[] lastObjectFieldsTypes = null;
+    private long[] lastObjectFieldsValues = null;
+
+    /**
+     * Blocking call to the device's CMD_GET_OBJECT_FIELDS. Returns a parallel
+     * pair of arrays (type-code, raw value) or null on timeout. The proxy
+     * orders the request fields the way the IDE asked, so the response
+     * preserves the same ordering — no field-id round-trip needed here.
+     */
+    private boolean blockingGetObjectFields(long objectId, int[] fieldIds) {
+        if (device == null) return false;
+        synchronized (objectFieldsLock) {
+            pendingObjectFields = true;
+            lastObjectFieldsTypes = null;
+            lastObjectFieldsValues = null;
+            try { device.getObjectFields(objectId, fieldIds); }
+            catch (IOException io) { return false; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingObjectFields && System.currentTimeMillis() < deadline) {
+                try { objectFieldsLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return lastObjectFieldsTypes != null;
         }
     }
 
@@ -1075,7 +1193,25 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             objectClassLock.notifyAll();
         }
     }
+    @Override public void onObjectFields(byte[] typeCodes, long[] values) {
+        synchronized (objectFieldsLock) {
+            lastObjectFieldsTypes = typeCodes;
+            lastObjectFieldsValues = values;
+            pendingObjectFields = false;
+            objectFieldsLock.notifyAll();
+        }
+    }
     @Override public void onReplyStatus() {}
+    @Override public void onStdoutLine(String line) {
+        // Surface device prints in whatever console the proxy is running in
+        // (a terminal during local dev, or the IDE's "Run" console when the
+        // proxy is launched as an IDE run configuration). The prefix keeps
+        // proxy-internal noise distinguishable from app output.
+        System.out.println("[device] " + line);
+    }
+    @Override public void onStderrLine(String line) {
+        System.err.println("[device] " + line);
+    }
     @Override public void onUnknownEvent(int code, byte[] payload) {
         System.out.println("[jdwp] unknown device event code 0x" + Integer.toHexString(code));
     }

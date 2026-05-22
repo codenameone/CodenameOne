@@ -58,7 +58,8 @@ public final class ProxyMain {
 
         SymbolTable symbols = SymbolTable.load(Paths.get(symbolsPath));
         System.out.println("Loaded " + symbols.allClasses().size() + " classes, "
-                + symbols.allMethods().size() + " methods from " + symbolsPath);
+                + symbols.allMethods().size() + " methods, "
+                + symbols.fieldCount() + " fields from " + symbolsPath);
 
         final DeviceConnection.DeviceListener listener;
         final JdwpServer jdwpServer;

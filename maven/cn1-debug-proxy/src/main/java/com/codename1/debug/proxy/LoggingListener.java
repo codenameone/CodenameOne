@@ -55,7 +55,15 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
     @Override public void onVmDeath() { System.out.println("[event] VM_DEATH"); }
     @Override public void onStringValue(String value) { System.out.println("[event] STRING_VALUE=" + value); }
     @Override public void onObjectClass(int classId) { System.out.println("[event] OBJECT_CLASS=" + classId); }
+    @Override public void onObjectFields(byte[] typeCodes, long[] values) {
+        System.out.println("[event] OBJECT_FIELDS count=" + typeCodes.length);
+        for (int i = 0; i < typeCodes.length; i++) {
+            System.out.println("        #" + i + " type='" + (char) typeCodes[i] + "' value=" + formatValue(typeCodes[i], values[i]));
+        }
+    }
     @Override public void onReplyStatus() { System.out.println("[event] REPLY_STATUS"); }
+    @Override public void onStdoutLine(String line) { System.out.println("[device] " + line); }
+    @Override public void onStderrLine(String line) { System.err.println("[device] " + line); }
     @Override public void onUnknownEvent(int code, byte[] payload) {
         System.out.println("[event] UNKNOWN code=0x" + Integer.toHexString(code) + " payload=" + Arrays.toString(payload));
     }

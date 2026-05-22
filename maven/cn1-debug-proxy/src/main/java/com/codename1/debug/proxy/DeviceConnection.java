@@ -41,7 +41,10 @@ public final class DeviceConnection implements AutoCloseable {
         void onVmDeath();
         void onStringValue(String value);
         void onObjectClass(int classId);
+        void onObjectFields(byte[] typeCodes, long[] values);
         void onReplyStatus();
+        void onStdoutLine(String line);
+        void onStderrLine(String line);
         void onUnknownEvent(int code, byte[] payload);
         void onDisconnected();
     }
@@ -157,6 +160,33 @@ public final class DeviceConnection implements AutoCloseable {
                 listener.onObjectClass(cid);
                 return;
             }
+            case WireProtocol.EVT_OBJECT_FIELDS: {
+                if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
+                int n = readInt(p, 0);
+                byte[] types = new byte[n];
+                long[] values = new long[n];
+                int off = 4;
+                for (int i = 0; i < n; i++) {
+                    types[i] = p[off]; off += 1;
+                    values[i] = readLong(p, off); off += 8;
+                }
+                listener.onObjectFields(types, values);
+                return;
+            }
+            case WireProtocol.EVT_STDOUT_LINE:
+            case WireProtocol.EVT_STDERR_LINE: {
+                // Payload: 4-byte big-endian length, then UTF-8 line bytes.
+                if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
+                int len = readInt(p, 0);
+                if (len < 0 || 4 + len > p.length) { listener.onUnknownEvent(code, p); return; }
+                String s = new String(p, 4, len, java.nio.charset.StandardCharsets.UTF_8);
+                if (code == WireProtocol.EVT_STDOUT_LINE) {
+                    listener.onStdoutLine(s);
+                } else {
+                    listener.onStderrLine(s);
+                }
+                return;
+            }
             case WireProtocol.EVT_REPLY_STATUS:
                 listener.onReplyStatus();
                 return;
@@ -234,6 +264,16 @@ public final class DeviceConnection implements AutoCloseable {
         byte[] p = new byte[8];
         writeLong(p, 0, objPtr);
         sendCommand(WireProtocol.CMD_GET_STRING, p);
+    }
+
+    public void getObjectFields(long objPtr, int[] fieldIds) throws IOException {
+        byte[] p = new byte[8 + 4 + fieldIds.length * 4];
+        writeLong(p, 0, objPtr);
+        writeInt(p, 8, fieldIds.length);
+        for (int i = 0; i < fieldIds.length; i++) {
+            writeInt(p, 12 + i * 4, fieldIds[i]);
+        }
+        sendCommand(WireProtocol.CMD_GET_OBJECT_FIELDS, p);
     }
 
     @Override

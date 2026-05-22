@@ -107,6 +107,70 @@ public class Parser extends ClassVisitor {
     }
 
     /**
+     * On-device-debug field-id allocator. Maps a (declaring-class, field-name)
+     * pair to a stable int the device and proxy both use to address an
+     * instance field. Field ids start at 1 — 0 is reserved as a "no-field"
+     * sentinel so JDWP code can use 0 to mean "skip".
+     *
+     * IDs are persistent only within a single translator invocation; the
+     * sidecar carries them so the proxy doesn't need to recompute the same
+     * mapping.
+     */
+    private static final java.util.LinkedHashMap<String, Integer> fieldIdByKey = new java.util.LinkedHashMap<>();
+    private static int nextFieldId = 1;
+
+    public static int getOrAssignFieldId(String declClassMangled, String fieldName) {
+        String key = declClassMangled + "." + fieldName;
+        Integer id = fieldIdByKey.get(key);
+        if (id != null) return id;
+        id = nextFieldId++;
+        fieldIdByKey.put(key, id);
+        return id;
+    }
+
+    /**
+     * Returns the JVM-style descriptor for a ByteCodeField — "I" for int,
+     * "Lcom/example/Foo;" for object, "[I" for int[], etc. The translator
+     * normally exposes underscore-mangled type names; this helper converts
+     * to JVM form for JDWP wire compatibility.
+     */
+    public static String jvmDescriptorOf(ByteCodeField bf) {
+        StringBuilder sb = new StringBuilder();
+        String rd = bf.getRuntimeDescriptor();
+        // getRuntimeDescriptor returns either a JVM single-char (I/J/...)
+        // or an underscore-mangled object type, possibly followed by "[]"
+        // repeats for array dimensions.
+        int arrayDims = 0;
+        while (rd != null && rd.endsWith("[]")) {
+            arrayDims++;
+            rd = rd.substring(0, rd.length() - 2);
+        }
+        for (int i = 0; i < arrayDims; i++) sb.append('[');
+        if (rd != null && rd.length() == 1 && "ZBSCIJFD".indexOf(rd.charAt(0)) >= 0) {
+            sb.append(rd);
+        } else if (rd != null && !rd.isEmpty()) {
+            sb.append('L').append(rd.replace('_', '/')).append(';');
+        } else {
+            sb.append("Ljava/lang/Object;");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns a JDWP-style modifier bitmask (PUBLIC=1, PRIVATE=2, STATIC=8,
+     * FINAL=16, VOLATILE=64, TRANSIENT=128). We don't track protected/transient
+     * — fields are reported as public unless flagged private.
+     */
+    public static int jdwpAccessFlagsOf(ByteCodeField bf) {
+        int f = 0;
+        if (bf.isPrivate()) f |= 0x0002; else f |= 0x0001;
+        if (bf.isStaticField()) f |= 0x0008;
+        if (bf.isFinal()) f |= 0x0010;
+        if (bf.isVolatile()) f |= 0x0040;
+        return f;
+    }
+
+    /**
      * Writes the on-device-debug symbol sidecar (cn1-symbols.txt) to the
      * output directory. Format is line-based ASCII for trivial parsing
      * by the desktop proxy:
@@ -128,6 +192,27 @@ public class Parser extends ClassVisitor {
                     src = "";
                 }
                 w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName() + "\t" + src + "\n");
+            }
+            // Emit instance-field metadata so the proxy can answer JDWP
+            // ClassType.Fields / FieldsWithGeneric without a device round-trip,
+            // and so ObjectReference.GetValues knows what (type, declaring class)
+            // each fieldId resolves to. We list inherited fields under each
+            // class that physically stores them — JDWP expects a class's
+            // Fields response to include only its own declarations, but
+            // listing inherited fields too keeps single-table lookup cheap on
+            // the proxy side; the proxy filters to "declared here" itself.
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (ByteCodeField bf : bc.getFields()) {
+                    if (bf.isStaticField()) continue;
+                    int fid = getOrAssignFieldId(bc.getClsName(), bf.getFieldName());
+                    String desc = jvmDescriptorOf(bf);
+                    int access = jdwpAccessFlagsOf(bf);
+                    w.write("field\t" + classId + "\t" + fid
+                            + "\t" + bf.getFieldName()
+                            + "\t" + desc
+                            + "\t" + access + "\n");
+                }
             }
             for (ByteCodeClass bc : classes) {
                 int classId = bc.getClassOffset();

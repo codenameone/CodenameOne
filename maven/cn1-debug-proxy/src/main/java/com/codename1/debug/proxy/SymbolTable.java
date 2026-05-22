@@ -36,6 +36,13 @@ public final class SymbolTable {
         public final String name;        // e.g. "java_lang_String" (translator convention)
         public final String sourceFile;
         public final List<MethodInfo> methods = new ArrayList<>();
+        /**
+         * Instance fields physically stored in this class's struct (i.e. including
+         * those inherited from parents). The translator emits all of them under
+         * the storing class so the proxy can satisfy ObjectReference.GetValues
+         * without walking a JDWP ReferenceType hierarchy.
+         */
+        public final List<FieldInfo> instanceFields = new ArrayList<>();
 
         ClassInfo(int classId, String name, String sourceFile) {
             this.classId = classId;
@@ -46,6 +53,22 @@ public final class SymbolTable {
         /** JVM-style signature: "Ljava/lang/String;" derived from the underscore-separated name. */
         public String jvmSignature() {
             return "L" + name.replace('_', '/') + ";";
+        }
+    }
+
+    public static final class FieldInfo {
+        public final int fieldId;
+        public final int classId;        // declaring class, not necessarily the holding class
+        public final String name;
+        public final String descriptor;  // JVM-style: "I", "Ljava/lang/String;", "[I", ...
+        public final int accessFlags;    // JDWP modifier bits
+
+        FieldInfo(int fieldId, int classId, String name, String descriptor, int accessFlags) {
+            this.fieldId = fieldId;
+            this.classId = classId;
+            this.name = name;
+            this.descriptor = descriptor;
+            this.accessFlags = accessFlags;
         }
     }
 
@@ -107,6 +130,7 @@ public final class SymbolTable {
 
     private final Map<Integer, ClassInfo> classesById = new HashMap<>();
     private final Map<Integer, MethodInfo> methodsById = new HashMap<>();
+    private final Map<Integer, FieldInfo> fieldsById = new HashMap<>();
     private final Map<String, ClassInfo> classesByJvmSig = new HashMap<>();
     private final Map<String, ClassInfo> classesBySourceFile = new HashMap<>();
 
@@ -158,6 +182,17 @@ public final class SymbolTable {
                         if (m != null) m.locals.add(new LocalVarInfo(slot, parts[3], parts[4]));
                         break;
                     }
+                    case "field": {
+                        if (parts.length < 6) continue;
+                        int classId = Integer.parseInt(parts[1]);
+                        int fid = Integer.parseInt(parts[2]);
+                        int access = Integer.parseInt(parts[5]);
+                        FieldInfo fi = new FieldInfo(fid, classId, parts[3], parts[4], access);
+                        t.fieldsById.put(fid, fi);
+                        ClassInfo c = t.classesById.get(classId);
+                        if (c != null) c.instanceFields.add(fi);
+                        break;
+                    }
                     default:
                         // unknown directives are ignored to allow forward-compat
                 }
@@ -168,6 +203,8 @@ public final class SymbolTable {
 
     public ClassInfo classById(int id) { return classesById.get(id); }
     public MethodInfo methodById(int id) { return methodsById.get(id); }
+    public FieldInfo fieldById(int id) { return fieldsById.get(id); }
+    public int fieldCount() { return fieldsById.size(); }
     public ClassInfo classByJvmSignature(String sig) { return classesByJvmSig.get(sig); }
     public ClassInfo classBySourceFile(String name) { return classesBySourceFile.get(name); }
     public java.util.Collection<ClassInfo> allClasses() { return classesById.values(); }

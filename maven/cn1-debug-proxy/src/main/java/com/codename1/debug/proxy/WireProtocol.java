@@ -34,6 +34,7 @@ public final class WireProtocol {
     public static final int CMD_DISPOSE          = 0x0A;
     public static final int CMD_GET_STRING       = 0x0B;
     public static final int CMD_GET_OBJECT_CLASS = 0x0C;
+    public static final int CMD_GET_OBJECT_FIELDS = 0x0D;
 
     public static final int EVT_HELLO            = 0x80;
     public static final int EVT_THREAD_LIST      = 0x81;
@@ -45,6 +46,9 @@ public final class WireProtocol {
     public static final int EVT_STRING_VALUE     = 0x87;
     public static final int EVT_REPLY_STATUS     = 0x88;
     public static final int EVT_OBJECT_CLASS     = 0x89;
+    public static final int EVT_OBJECT_FIELDS    = 0x8A;
+    public static final int EVT_STDOUT_LINE      = 0x8B;
+    public static final int EVT_STDERR_LINE      = 0x8C;
 
     public static final int STEP_INTO = 0;
     public static final int STEP_OVER = 1;
