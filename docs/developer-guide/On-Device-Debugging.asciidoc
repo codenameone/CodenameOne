@@ -139,6 +139,20 @@ Two workarounds:
   walks the ParparVM struct layout to read instance fields directly
   at known offsets, so `dump this` / "Variables" shows the same
   fields you'd see in a simulator debug session.
+* Array inspection — `Object[]`, `int[]`, `byte[]`, etc. report
+  their length and per-index values to the IDE so expanding e.g.
+  `ArrayList.elementData` shows the actual element references
+  rather than an opaque reference. Primitive element types
+  round-trip with their JVM type tag.
+* Method invocation — the IDE's "Evaluate Expression" /
+  `print` command can call instance and static methods on objects
+  in scope. The classic chain
+  `Display.getInstance().getCurrent().getTitle()` evaluates to the
+  current form's title string, so `myForm.getComponentCount()` and
+  similar accessor calls work too. The call runs on the suspended
+  Java thread inside a catch-all try block, so uncaught throws
+  round-trip back as an exception reference rather than tearing
+  down the debugger.
 * Native device output — `System.out.println`, `Log.p`, and
   `printf` / `NSLog` from native code are surfaced in the proxy's
   console (and the IDE's debug console when the proxy is launched
@@ -199,9 +213,9 @@ in the IDE editor when stepping into framework code.
   compile with debug info by default; if a variable shows up as
   `v1`, `v2`, ... that's because that particular class was
   compiled without debug info.
-* *Static field reads* fall back to "not supported". Instance field
-  reads are fully wired; static-field support requires an additional
-  per-class static table that hasn't been emitted yet.
+* *Static field reads* are unsupported. Instance field reads are
+  fully wired; static-field support requires an additional per-class
+  static table that hasn't been emitted yet.
 * *NSLog on a real device* (as opposed to the simulator) may not
   reach the `[device]` console. NSLog on iOS routes to `os_log`
   which doesn't always mirror to `stderr`. `printf` / `fprintf` /
@@ -249,9 +263,9 @@ firewall is blocking the port. Verify:
 
 This means an unsupported JDWP command was invoked. The session
 itself survives; the most common cause is the IDE asking for
-something we explicitly stub (see "Known limitations" above). If
-you hit a less obvious case, the proxy logs the unknown command
-code — file an issue with that code attached.
+something the proxy explicitly stubs (see "Known limitations"
+above). If you hit a less obvious case, the proxy logs the unknown
+command code — file an issue with that code attached.
 
 ==== The app launches but the breakpoint never fires
 
