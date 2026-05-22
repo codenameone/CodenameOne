@@ -270,6 +270,53 @@ jobs:
             echo "Vale exited with status $STATUS and reported $ISSUE_COUNT issue(s). The final quality-gate step will fail the build." >&2
           fi
 
+      - name: Run paragraph capitalization check
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/developer-guide/reports"
+          REPORT_FILE="${REPORT_DIR}/paragraph-capitalization-report.json"
+          mkdir -p "$REPORT_DIR"
+          set +e
+          ruby scripts/developer-guide/check_paragraph_capitalization.rb \
+            --baseline docs/developer-guide/paragraph-capitalization-baseline.json \
+            --output "$REPORT_FILE" \
+            docs/developer-guide/developer-guide.asciidoc
+          STATUS=$?
+          set -e
+          echo "PARAGRAPH_CAP_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "PARAGRAPH_CAP_STATUS=$STATUS" >> "$GITHUB_ENV"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Paragraph capitalization check failed. The final quality-gate step will fail the build." >&2
+          fi
+
+      - name: Set up Java 17 for LanguageTool
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install language-tool-python
+        run: |
+          set -euo pipefail
+          pip install --user language-tool-python==2.9.4
+
+      - name: Run LanguageTool grammar check (advisory)
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/developer-guide/reports"
+          REPORT_FILE="${REPORT_DIR}/languagetool-report.json"
+          mkdir -p "$REPORT_DIR"
+          set +e
+          python3 scripts/developer-guide/run_languagetool.py \
+            --html build/developer-guide/html/developer-guide.html \
+            --output "$REPORT_FILE"
+          STATUS=$?
+          set -e
+          LT_COUNT="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("total",0))' "$REPORT_FILE" 2>/dev/null || echo 0)"
+          echo "LANGUAGETOOL_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "LANGUAGETOOL_COUNT=$LT_COUNT" >> "$GITHUB_ENV"
+          echo "LanguageTool flagged ${LT_COUNT} match(es). This is advisory and does not fail the build." >&2
+
       - name: Check for unused developer guide images
         run: |
           set -euo pipefail
@@ -360,6 +407,22 @@ jobs:
             ${{ env.UNUSED_IMAGES_TEXT }}
           if-no-files-found: warn
 
+      - name: Upload paragraph capitalization report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-paragraph-capitalization
+          path: ${{ env.PARAGRAPH_CAP_REPORT }}
+          if-no-files-found: warn
+
+      - name: Upload LanguageTool report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-languagetool
+          path: ${{ env.LANGUAGETOOL_REPORT }}
+          if-no-files-found: warn
+
       - name: Fail build on developer guide quality issues
         if: always()
         run: |
@@ -377,6 +440,11 @@ jobs:
           if [ "${UNUSED_IMAGES_STATUS:-0}" != "0" ]; then
             echo "Unused image check reported orphan files (exit status ${UNUSED_IMAGES_STATUS}). See the developer-guide-unused-images artifact." >&2
             echo "Either delete the orphan image or add an image:: reference for it from a developer-guide asciidoc file." >&2
+            FAIL=1
+          fi
+          if [ "${PARAGRAPH_CAP_STATUS:-0}" != "0" ]; then
+            echo "Paragraph capitalization check reported new findings (exit status ${PARAGRAPH_CAP_STATUS}). See the developer-guide-paragraph-capitalization artifact." >&2
+            echo "Rewrite the flagged paragraph so its first prose word starts with a capital letter, or — if the lowercase start is intentional — regenerate the baseline with --update-baseline." >&2
             FAIL=1
           fi
           if [ "$FAIL" -ne 0 ]; then

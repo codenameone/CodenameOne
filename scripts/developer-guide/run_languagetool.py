@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Run LanguageTool against the rendered developer guide.
+
+This produces an advisory report only — LanguageTool's signal/noise ratio is
+not high enough to gate the build on, but its findings are useful for spot-
+checks and as a soft signal in PR review. The companion paragraph
+capitalization check (check_paragraph_capitalization.rb) is the hard gate.
+
+Input: the asciidoctor-rendered HTML for the full developer guide.
+Output: JSON report compatible with the existing summarize_reports.py
+pipeline, written to the path given by --output.
+"""
+
+import argparse
+import json
+import os
+import sys
+from html.parser import HTMLParser
+
+
+SKIP_TAGS = {"script", "style", "code", "pre", "kbd", "samp", "var", "tt"}
+
+
+class TextExtractor(HTMLParser):
+    """Pull the prose content out of asciidoctor's HTML output."""
+
+    def __init__(self):
+        super().__init__()
+        self._chunks = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in SKIP_TAGS:
+            self._skip_depth += 1
+        elif tag in ("p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "div"):
+            self._chunks.append("\n\n")
+
+    def handle_endtag(self, tag):
+        if tag in SKIP_TAGS and self._skip_depth > 0:
+            self._skip_depth -= 1
+        elif tag in ("p", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
+            self._chunks.append("\n")
+
+    def handle_data(self, data):
+        if self._skip_depth == 0:
+            self._chunks.append(data)
+
+    def text(self):
+        return "".join(self._chunks)
+
+
+def extract_text(html_path):
+    parser = TextExtractor()
+    with open(html_path, "r", encoding="utf-8") as fh:
+        parser.feed(fh.read())
+    return parser.text()
+
+
+def run_languagetool(text, language="en-US"):
+    try:
+        import language_tool_python
+    except ImportError:
+        print(
+            "language_tool_python is not installed; skipping LanguageTool check.",
+            file=sys.stderr,
+        )
+        return None
+
+    tool = language_tool_python.LanguageTool(language)
+    try:
+        matches = tool.check(text)
+    finally:
+        tool.close()
+    return matches
+
+
+def matches_to_json(matches, text):
+    out = []
+    for m in matches:
+        # Translate offset to a line number in the plain-text input.
+        line = text.count("\n", 0, m.offset) + 1
+        out.append({
+            "rule": m.rule_id,
+            "category": m.category,
+            "message": m.message,
+            "line": line,
+            "offset": m.offset,
+            "length": m.error_length,
+            "context": m.context,
+            "replacements": list(m.replacements[:5]),
+        })
+    return out
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--html", required=True, help="Rendered HTML input")
+    parser.add_argument("--output", required=True, help="JSON output path")
+    parser.add_argument("--language", default="en-US")
+    args = parser.parse_args()
+
+    text = extract_text(args.html)
+    matches = run_languagetool(text, language=args.language)
+
+    if matches is None:
+        report = {"status": "skipped", "reason": "language_tool_python not installed", "matches": []}
+        issue_count = 0
+    else:
+        report = {"status": "ok", "matches": matches_to_json(matches, text), "total": len(matches)}
+        issue_count = len(matches)
+
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    with open(args.output, "w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2)
+
+    print(f"LanguageTool report written to {args.output} ({issue_count} match(es)).")
+    # Advisory check: never fails the build.
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
