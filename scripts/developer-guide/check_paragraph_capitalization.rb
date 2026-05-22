@@ -21,17 +21,11 @@ ALLOWED_FIRST_TOKENS = %w[
   eBay
 ].freeze
 
-options = { output: nil, baseline: nil, update_baseline: false }
+options = { output: nil }
 OptionParser.new do |opts|
   opts.banner = 'Usage: check_paragraph_capitalization.rb [options] PATH [PATH ...]'
   opts.on('--output FILE', 'Write JSON report of all findings to FILE') do |f|
     options[:output] = f
-  end
-  opts.on('--baseline FILE', 'Ignore findings already listed in FILE; only new findings fail the build') do |f|
-    options[:baseline] = f
-  end
-  opts.on('--update-baseline', 'Rewrite the baseline file to match current findings and exit 0') do
-    options[:update_baseline] = true
   end
 end.parse!
 
@@ -81,8 +75,12 @@ files.each do |path|
     # Skip paragraphs that begin with a code identifier, keyboard shortcut,
     # link, or inline image. These are typically "`Name` — description"
     # pseudo-list entries where the leading element is an API symbol whose
-    # case is determined by the language, not by prose conventions.
-    next if rendered =~ /\A<(code|kbd|samp|var|a\b|img\b|span class="image)/
+    # case is determined by the language, not by prose conventions. We also
+    # accept formatting wrappers (strong/em/b/i/mark/u/sub/sup) around the
+    # identifier because asciidoctor sometimes preserves them — for example
+    # `**\`a\` / \`b\`**` renders as `<strong><code>a</code> / <code>b</code></strong>`
+    # while `**\`a\`**` collapses to `<code>a</code>`.
+    next if rendered =~ %r{\A(?:<(?:strong|em|b|i|mark|u|sub|sup)>\s*)*<(code|kbd|samp|var|a\b|img\b|span class="image)}
 
     plain = strip_html(rendered).strip
     next if plain.empty?
@@ -120,64 +118,21 @@ files.each do |path|
   end
 end
 
-# Baseline support. Each baseline entry is a (file, word, excerpt) triple.
-# We deliberately omit the line number because any edit above an unrelated
-# paragraph would otherwise reclassify a pre-existing finding as "new".
-def baseline_key(entry)
-  [entry[:file] || entry['file'], entry[:word] || entry['word'], entry[:excerpt] || entry['excerpt']]
-end
-
-if options[:update_baseline]
-  abort '--update-baseline requires --baseline FILE' unless options[:baseline]
-  payload = {
-    'generated_by' => 'scripts/developer-guide/check_paragraph_capitalization.rb',
-    'note' => 'Pre-existing paragraph-capitalization findings. Regenerate with --update-baseline after fixing entries in the prose. New findings (not in this list) will fail CI.',
-    'entries' => errors
-  }
-  File.write(options[:baseline], JSON.pretty_generate(payload) + "\n")
-  puts "Baseline updated: #{options[:baseline]} (#{errors.length} entries)."
-  exit 0
-end
-
-baseline_keys = []
-if options[:baseline] && File.exist?(options[:baseline])
-  data = JSON.parse(File.read(options[:baseline]))
-  entries = data.is_a?(Hash) ? (data['entries'] || []) : data
-  baseline_keys = entries.map { |e| baseline_key(e) }
-end
-
-new_errors = errors.reject { |e| baseline_keys.include?(baseline_key(e)) }
-
-# Write a structured report so the CI summarizer can distinguish total
-# findings from new findings.
 if options[:output]
-  payload = {
-    total: errors.length,
-    new: new_errors.length,
-    baseline: baseline_keys.length,
-    new_findings: new_errors,
-    all_findings: errors
-  }
+  payload = { total: errors.length, findings: errors }
   File.write(options[:output], JSON.pretty_generate(payload))
 end
 
-if new_errors.any?
-  warn "Paragraph capitalization check failed: #{new_errors.length} new paragraph(s) start with a lowercase word."
-  warn "(#{errors.length - new_errors.length} pre-existing finding(s) from the baseline are ignored.)" if errors.length != new_errors.length
-  new_errors.each do |e|
+if errors.any?
+  warn "Paragraph capitalization check failed: #{errors.length} paragraph(s) start with a lowercase word."
+  errors.each do |e|
     warn "  #{e[:file]}:#{e[:line]}: '#{e[:word]}' — #{e[:excerpt]}"
   end
   warn ''
-  warn 'To fix: rewrite the flagged paragraph so its first prose word begins with a capital letter.'
+  warn 'Each flagged paragraph must be rewritten so its first prose word begins with a capital letter.'
   warn 'Example: "many ways to animate..." → "There are many ways to animate..."'
-  warn 'If the finding is a legitimate exception, add a baseline entry by running:'
-  warn "  ruby scripts/developer-guide/check_paragraph_capitalization.rb --baseline #{options[:baseline] || 'BASELINE.json'} --update-baseline docs/developer-guide/developer-guide.asciidoc"
   exit 1
 end
 
-if errors.any?
-  puts "Paragraph capitalization check passed: #{errors.length} pre-existing finding(s) acknowledged by the baseline, 0 new finding(s)."
-else
-  puts "Paragraph capitalization check passed: #{files.length} file(s), 0 issue(s)."
-end
+puts "Paragraph capitalization check passed: #{files.length} file(s), 0 issue(s)."
 exit 0

@@ -578,7 +578,7 @@ Notice that denying this second request won't trigger another Codename One promp
 
 ===== Code changes
 
-no explicit code changes needed for this functionality to "work." The respective API's will work like they always worked and will prompt the user seamlessly for permissions.
+No explicit code changes needed for this functionality to "work." The respective API's will work like they always worked and will prompt the user seamlessly for permissions.
 
 TIP: Some behaviors that never occurred on Android but were legal in the past might start occurring with the switch to the new API. For example: the location manager might be null and your app must always be ready to deal with such a situation
 
@@ -1171,7 +1171,7 @@ Permissions in Codename One are seamless. Codename One traverses the bytecode an
 
 For example, when accessing native functionality this won’t work since native code might require specialized permissions and you don’t/can’t run any serious analysis on it (it can be about anything).
 
-if you require more permissions in your Android native code you need to define them in the build arguments using
+If you require more permissions in your Android native code you need to define them in the build arguments using
 `android.permission.<PERMISSION_NAME>=true` for each permission you want to include. A full list of permissions are listed in Android's https://developer.android.com/reference/android/Manifest.permission.html[Manifest.permission documentation].
 
 For example:
@@ -1322,7 +1322,7 @@ The native sample in stack overflow bound the listener in the activity but here 
 include::../demos/common/src/main/java/com/codename1/sms/intercept/NativeSMSInterceptor.java[tag=nativeSmsInterceptor,indent=0]
 ----
 
-that's easy!
+That's easy!
 
 Notice that `isSupported()` returns false for all other OS's so you won't need to ask whether this is "Android" you can use `isSupported()`.
 
@@ -1354,7 +1354,7 @@ include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nat
 ----
 
 
-if you want to call it from Android or all the Java based platforms you can write this in the "native" code:
+If you want to call it from Android or all the Java based platforms you can write this in the "native" code:
 
 [source,java]
 ----
@@ -1462,7 +1462,7 @@ For example, the Google Maps project includes the static callback method:
 include::../demos/common/src/main/java/com/codename1/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
 ----
 
-defined in the `com.codename1.googlemaps.MapContainer` class.
+It is defined in the `com.codename1.googlemaps.MapContainer` class.
 
 This method is called from Javascript inside a native interface using the following code:
 
@@ -1533,7 +1533,7 @@ Jars don't include support for writing native code; you could use JNI in jars bu
 
 Jars don't support "proper" code completion, a common developer trick is to stick source code into the jar but that prevents usage with proprietary code. Cn1libs provide full IDE code completion (with JavaDoc hints) without exposing the sources.
 
-two use cases for wanting JAR's and they both have different solutions:
+There are two use cases for wanting JAR's and they both have different solutions:
 
 . Modularity
 . Working with an existing JARs
@@ -1597,7 +1597,7 @@ The best way to discover the right syntax for such build hints is to set them th
 
 The obvious question is why do you need two files?
 
-two types of build hints: required and appended.
+There are two types of build hints: required and appended.
 
 Required build hints can be something like `ios.objC=true`
 which you want to always work. For example: if a cn1lib defines `ios.objC=true` and another cn1lib defines `ios.objC=false`
@@ -1619,7 +1619,7 @@ for the developer to investigate issues in this process.
 `codenameone_settings.properties` file. If you need to change a flag later on you might need to alert users to make changes to their properties essentially negating the value of this feature... +
 be careful when adding properties here.
 
-it's your responsibility as a library developer to decide which build hint goes into which file! +
+It's your responsibility as a library developer to decide which build hint goes into which file! +
 Codename One can't automate this process as the whole process of build hints is by definition an ad hoc process.
 
 The rule of thumb is that a build hint with a numeric or boolean value is always a required property. If an entry has a string that you can append with another string then its probably an appended entry.
@@ -2084,7 +2084,7 @@ iOS is practically identical to Android with some small caveats, iOS's equivalen
 
 You can inject more data into the plist by using the `ios.plistInject` build hint.
 
-the equivalent in the iOS side would be
+The equivalent on the iOS side would be:
 
 [source,xml]
 ----
@@ -2239,7 +2239,7 @@ image::img/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,sc
 
 ==== Step 4: Implement the public API and native interface
 
-you've already looked at the final product of the public API in the previous step. Back up and walk through the process step-by-step.
+You've already looked at the final product of the public API in the previous step. Back up and walk through the process step-by-step.
 
 The goal is to model your API around the Android API. The central class that includes all the functionality of the SDK is the http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html[com.freshdesk.mobihelp.Mobihelp class], so you begin there.
 
@@ -2275,7 +2275,7 @@ In any case, you don't have to come up with the specifics right now, as you're s
 
 ===== Callbacks
 
-it's often the case that native code needs to call back into Codename One code when an event occurs. This may be connected directly to an API method call (for example: as the result of an asynchronous method invocation), or due to something initiated by the operating system or the native SDK on its own (for example: a push notification, a location event, etc..).
+It's often the case that native code needs to call back into Codename One code when an event occurs. This may be connected directly to an API method call (for example: as the result of an asynchronous method invocation), or due to something initiated by the operating system or the native SDK on its own (for example: a push notification, a location event, etc..).
 
 Native code will have access to both the Codename One API and any native APIs in your app, but on some platforms, accessing the Codename One API may be a little tricky. For example: on iOS you'll be calling from Objective-C back into Java which requires knowledge of Codename One's java-to-goal C conversion process. In general, the easiest way to ease callbacks is to provide abstractions that involve static Java methods (in Codename One space) that accept and return primitive types.
 
@@ -2292,9 +2292,9 @@ The interface definition for `UnreadUpdatesCallback` is:
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
 ----
 
-that's: If you were to implement this method (planned for a later section), you need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
+In other words: if you were to implement this method (planned for a later section), you need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
 
-you've two issues that will need to be solved here:
+You've two issues that will need to be solved here:
 
 1. How to pass the `callback` object through the native interface.
 2. How to *call* the `callback.onResult()` method from native code at the right time.
@@ -2323,7 +2323,7 @@ Note, but, that FreshDesk (and most other service provides that have native SDKs
 
 Your public API therefore needs to enable you to provide many credentials in the same app, and your API needs to know to use the correct credentials depending on the device that the app is running on.
 
-many solutions to this problem exist, but the chosen approach provides two different `init()` methods:
+Many solutions to this problem exist, but the chosen approach provides two different `init()` methods:
 
 [source,java]
 ----
@@ -2364,7 +2364,7 @@ Notice also, that the native interface includes a set of methods with names pref
 
 ===== Connecting the public API to the native interface
 
-you've a public API, and you've a native interface. The idea is that the public API should be a thin wrapper around the native interface to smooth out rough edges that are likely to exist due to the strict set of rules involved in native interfaces. You will, so, use delegation inside the `Mobihelp` class to provide it a reference to an instance of `MobihelpNative`:
+You've a public API, and you've a native interface. The idea is that the public API should be a thin wrapper around the native interface to smooth out rough edges that are likely to exist due to the strict set of rules involved in native interfaces. You will, so, use delegation inside the `Mobihelp` class to provide it a reference to an instance of `MobihelpNative`:
 
 [source,java]
 ----
@@ -2490,7 +2490,7 @@ appcompat-v7-19.1.0.aar.md5	appcompat-v7-19.1.0.pom.md5
 appcompat-v7-19.1.0.aar.sha1	appcompat-v7-19.1.0.pom.sha1
 ----
 
-two files of interest here:
+There are two files of interest here:
 
 . appcompat-v7-19.1.0.aar - This is the actual library that you need to include in your project to meet the Mobisdk dependency.
 . appcompat-v7-19.1.0.pom - This is the Maven XML file for the library. It will show you any dependencies that the appcompat library has. You will also need to include these dependencies:
@@ -2506,7 +2506,7 @@ two files of interest here:
   </dependencies>
 ----
 +
-that's: You need to include the `support-v4` library version 19.1.0 in your project. This is also part of the Android Support library. If you back up a couple of directories to: `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support`, you will see it listed there:
+In other words: you need to include the `support-v4` library version 19.1.0 in your project. This is also part of the Android Support library. If you back up a couple of directories to: `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support`, you will see it listed there:
 +
 ----
 appcompat-v7			palette-v7
@@ -2530,7 +2530,7 @@ support-v4-19.1.0-sources.jar.sha1	support-v4-19.1.0.pom.sha1
 +
 Looks like this library is pure Java classes, so you need to include the `support-v4-19.1.0.jar` file into your project. Checking the `.pom` file you see that there are no more dependencies you need to add.
 
-to summarize your findings, you need to include the following files in your `native/android` directory:
+To summarize your findings, you need to include the following files in your `native/android` directory:
 
 . appcompat-v7-19.1.0.aar
 . support-v4-19.1.0.jar
@@ -2769,7 +2769,7 @@ You can add these dependencies to your project using the `ios.add_libs` build hi
 .iOS's "add libs" build hint
 image::img/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
 
-that's: you list the framework names separated by semicolons. Notice that your list in the above image doesn't include all the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by building the project with "include sources" checked, then looked at the frameworks that were included).
+In short: you list the framework names separated by semicolons. Notice that your list in the above image doesn't include all the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by building the project with "include sources" checked, then looked at the frameworks that were included).
 
 === Part 3 : Packaging as a cn1lib
 
@@ -3031,7 +3031,7 @@ Constant pool:
 
 ----
 
-that's a big mess of stuff, but it's pretty easy to pick through it when you know what you're looking for. The layout of this output is pretty straight forward. The beginning shows that this is a class definition:
+That's a big mess of stuff, but it's pretty easy to pick through it when you know what you're looking for. The layout of this output is pretty straight forward. The beginning shows that this is a class definition:
 
 [source,java]
 ----
@@ -3102,7 +3102,7 @@ The instruction that *might* be problematic is "invokedynamic." All other instru
 
 **Summary of Byte-code Assessment**
 
-to summarize, the byte-code assessment phase, you're basically looking to make sure that the compiler doesn't tend to add dependencies to parts of the JDK that Codename One doesn't support. And you want to make sure that it doesn't use invokedynamic.
+To summarize, the byte-code assessment phase, you're basically looking to make sure that the compiler doesn't tend to add dependencies to parts of the JDK that Codename One doesn't support. And you want to make sure that it doesn't use invokedynamic.
 
 If you find that the compiler does use invokedynamic or add references to classes that Codename One doesn't support, don't give up yet. You might be able to create your own "porting" runtime library that will provide these dependencies at runtime.
 
@@ -3120,7 +3120,7 @@ This procedure exploits the fact that a cn1lib file is a zip file with a specifi
 
 To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Maven cn1lib project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named `kotlin-runtime-sources.jar`, so you used this as the "stubs." It contains full sources, which isn't necessary, but it also doesn't hurt.
 
-now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, create a new empty directory and copy them inside. Rename the jars "main.zip" and "stubs.zip" respectively. Then zip up the directory and rename the zip file `kotlin-runtime.cn1lib`.
+Now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, create a new empty directory and copy them inside. Rename the jars "main.zip" and "stubs.zip" respectively. Then zip up the directory and rename the zip file `kotlin-runtime.cn1lib`.
 
 IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypasses the API verification step that occurs when building a library project. it's possible, even likely, that the jar files that you convert depend on classes that aren't in the Codename One library, so your library will fail at runtime in unexpected ways. The reason you could do this with kotlin's runtime (with some confidence) is because the bytecodes were already analyzed to ensure that they didn't include anything problematic.
 

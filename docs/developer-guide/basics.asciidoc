@@ -96,7 +96,7 @@ Scrolling doesn't work well for all layout types because the positioning algorit
 ****
 Only one element can be scrollable within the hierarchy. Otherwise, if you drag your finger over the `Form`, Codename One can't know which element you want to scroll. By default, the form's content pane scrolls on the Y axis unless you disable it explicitly. Setting the layout to `BorderLayout` disables scrolling implicitly.
 
-it's fine to use non-scrollable layouts such as `BorderLayout` inside a scrollable container. In the TodoApp, for example, `TodoItem` uses `BorderLayout` inside a scrollable `BoxLayout` `Form`.
+It's fine to use non-scrollable layouts such as `BorderLayout` inside a scrollable container. In the TodoApp, for example, `TodoItem` uses `BorderLayout` inside a scrollable `BoxLayout` `Form`.
 ****
 
 Layouts can be divided into two distinct groups:
@@ -608,7 +608,7 @@ hi.add(LayeredLayout.encloseIn(settingsLabel,
         FlowLayout.encloseRight(close)));
 ----
 
-you're doing three distinct things here:
+You're doing three distinct things here:
 
 . you're adding a layered layout to the form
 . you're creating a layered layout and placing two components within. This would be the equivalent of creating a `LayeredLayout` `Container` and invoking `add` twice
@@ -1123,7 +1123,7 @@ When you select the component you placed you can edit the properties of that com
 .Properties allow you to customize everything about a component
 image::img/new-gui-builder-property-sheet.png[Properties allow you to customize everything about a component,scaledwidth=50%]
 
-five property sheets per component:
+There are five property sheets per component:
 
 - #Basic Settings# -- These include the basic configuration for a component for example: name, icon, text etc.
 

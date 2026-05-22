@@ -81,7 +81,7 @@ Codename One provides a secure REST API for sending push notifications. As an HT
 
 ==== Receiving a push notification
 
-two different scenarios to be aware of when it comes to receiving push notifications. If your app is running in the foreground when the message arrives, then it will be passed directly to your `push()` callback. If your app is either in the background, or not running, then the notification will be displayed in your device's notifications. If the user then taps the notification, it will open your app, and the `push()` callback will be run with the contents of the message.
+There are two different scenarios to be aware of when it comes to receiving push notifications. If your app is running in the foreground when the message arrives, then it will be passed directly to your `push()` callback. If your app is either in the background, or not running, then the notification will be displayed in your device's notifications. If the user then taps the notification, it will open your app, and the `push()` callback will be run with the contents of the message.
 
 Some push message types include hidden content that won't be displayed in your device's notifications. These hidden messages (or portions of messages) are passed directly to the `push()` callback of your app for processing.
 
@@ -473,7 +473,7 @@ public void push(String message) {
 
 === Deploying Push-Enabled apps to device
 
-you've implemented the Push callback in your app, and tested it in the push simulator and it works. If you try to deploy your app to a device, you may be disappointed to discover that your app doesn't seem to be receiving push notifications when installed on the device. This is because each platform has its own bureaucracy and hoops that you've to jump through before they will deliver notifications to your app. Read on to find out how to meet their requirements.
+You've implemented the Push callback in your app, and tested it in the push simulator and it works. If you try to deploy your app to a device, you may be disappointed to discover that your app doesn't seem to be receiving push notifications when installed on the device. This is because each platform has its own bureaucracy and hoops that you've to jump through before they will deliver notifications to your app. Read on to find out how to meet their requirements.
 
 [[push-bureaucracy-android-section]]
 ==== The push bureaucracy - Android
@@ -789,7 +789,7 @@ A normal response, will be an array with results:
 -----
 
 
-many things to notice in the responses above:
+There are many things to notice in the responses above:
 
 - If the response contains `status=updateId` it means that the GCM server wants you to update the device id to a new device id. You should do that in the database and avoid sending pushes to the old key
 - iOS doesn't acknowledge device receipt but it does send a `status=inactive` result which you should use to remove the device from the list of devices

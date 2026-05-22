@@ -388,7 +388,7 @@ public void start() {
 .Title and Label in the UI
 image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
 
-some complex ideas appear within this short snippet that this chapter addresses later when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
+Some complex ideas appear within this short snippet that this chapter addresses later when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
 
 .Application Lifecycle
 ****
@@ -443,7 +443,7 @@ public void destroy() { // <4>
 
 <4> `destroy()` is a special case. Under normal circumstances you shouldn't write code in `destroy()`. `stop()` should work for most cases
 
-that's it. You should now have a general sense of the code. it's time to run on the device.
+That's it. You should now have a general sense of the code. It's time to run on the device.
 
 ==== Building and deploying on devices
 
@@ -452,7 +452,7 @@ image::img/control-center-main.png[Codename One Settings/Control Center,scaledwi
 
 You can use the Control Center to configure almost anything. Specifically, the application title, application version, application icon etc. are all found in the Codename One Settings maven target.
 
-many options within this UI that control almost every aspect of the application from signing to basic settings.
+There are many options within this UI that control almost every aspect of the application from signing to basic settings.
 
 Your device builds using the Codename One Cloud can also be found right here as well as subscription information.
 
@@ -664,7 +664,7 @@ class MyApplication {
 }
 ----
 
-that's pretty familiar. The problem is that there are two bugs in the automatic conversion... that's the code for Kotlin behaves differently from standard Java.
+That's pretty familiar. The problem is that there are two bugs in the automatic conversion... that's the code for Kotlin behaves differently from standard Java.
 
 The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration as such:
 
@@ -679,7 +679,7 @@ NOTE: This applies to the main class of the project, other classes in Codename O
 
 The second problem is that arguments are non-null by default. The `init` method might have a null argument. this fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
 
-the full working sample is:
+The full working sample is:
 
 [source,kotlin]
 ----

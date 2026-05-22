@@ -161,7 +161,7 @@ WARNING: You should use the certificate wizard, if you don't have a Mac. This se
 
 iOS signing has two distinct modes: App Store signing which is valid for distribution via App Store Connect (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
 
-you've two major files to keep track of:
+You've two major files to keep track of:
 
 1. *Certificate* - your signature
 2. *Provisioning Profile* - details about the application and who is allowed to execute it

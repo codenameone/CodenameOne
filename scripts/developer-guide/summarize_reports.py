@@ -169,8 +169,6 @@ def summarize_paragraph_capitalization(
     report: Path, status: str, summary_key: str, output: Path | None
 ) -> None:
     total = 0
-    new_count = 0
-    baseline = 0
     if report.is_file():
         try:
             data = json.loads(report.read_text(encoding="utf-8"))
@@ -178,18 +176,9 @@ def summarize_paragraph_capitalization(
             data = {}
         if isinstance(data, dict):
             total = int(data.get("total", 0) or 0)
-            new_count = int(data.get("new", 0) or 0)
-            baseline = int(data.get("baseline", 0) or 0)
 
-    if new_count or _has_nonzero_status(status):
-        suffix = ""
-        if baseline:
-            suffix = f" ({baseline} pre-existing finding(s) from the baseline ignored)"
-        summary = (
-            f"{new_count or '?'} new paragraph(s) starting with a lowercase word{suffix}"
-        )
-    elif total:
-        summary = f"{total} pre-existing finding(s) acknowledged by the baseline, 0 new"
+    if total or _has_nonzero_status(status):
+        summary = f"{total} paragraph(s) starting with a lowercase word"
     else:
         summary = "No paragraph capitalization issues"
 

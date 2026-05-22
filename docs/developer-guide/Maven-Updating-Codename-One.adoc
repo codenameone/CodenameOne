@@ -4,7 +4,7 @@ Codename One releases new versions weekly on Maven central. it's recommended tha
 
 You can use the <<update-goal, update goal>> to update both the Codename One libraries, and the Codename One dependencies in your project.
 
-for example, [source,bash]
+For example, [source,bash]
 ----
 mvn cn:update
 ----

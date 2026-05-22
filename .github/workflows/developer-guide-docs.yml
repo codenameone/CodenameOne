@@ -278,7 +278,6 @@ jobs:
           mkdir -p "$REPORT_DIR"
           set +e
           ruby scripts/developer-guide/check_paragraph_capitalization.rb \
-            --baseline docs/developer-guide/paragraph-capitalization-baseline.json \
             --output "$REPORT_FILE" \
             docs/developer-guide/developer-guide.asciidoc
           STATUS=$?
@@ -460,8 +459,8 @@ jobs:
             FAIL=1
           fi
           if [ "${PARAGRAPH_CAP_STATUS:-0}" != "0" ]; then
-            echo "Paragraph capitalization check reported new findings (exit status ${PARAGRAPH_CAP_STATUS}). See the developer-guide-paragraph-capitalization artifact." >&2
-            echo "Rewrite the flagged paragraph so its first prose word starts with a capital letter, or — if the lowercase start is intentional — regenerate the baseline with --update-baseline." >&2
+            echo "Paragraph capitalization check reported findings (exit status ${PARAGRAPH_CAP_STATUS}). See the developer-guide-paragraph-capitalization artifact." >&2
+            echo "Rewrite the flagged paragraph so its first prose word starts with a capital letter." >&2
             FAIL=1
           fi
           if [ "$FAIL" -ne 0 ]; then

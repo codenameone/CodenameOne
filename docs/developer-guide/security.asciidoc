@@ -31,7 +31,7 @@ Notice that this is a temporary roadblock as any savvy hacker would compile the 
 
 NOTE: This isn't encoding or encryption — it's a simple obfuscation of the data.
 
-two simple methods in the `Util` class:
+There are two simple methods in the `Util` class:
 
 [source,java]
 ----
@@ -220,9 +220,9 @@ That won't work either. All certificates are signed by a "certificate authority"
 
 TIP: What if an attacker could get a fake certificate authorized by a real certificate authority?
 
-**that's a problem!**
+**That's a problem!**
 
-it's obviously hard to do but if someone was able to do this he could execute a "man in the middle" attack as described above. People were able to fool certificate authorities in the past and gain fake certificates using various methods so this is possible and probably doable for any government level attacker.
+It's obviously hard to do but if someone was able to do this he could execute a "man in the middle" attack as described above. People were able to fool certificate authorities in the past and gain fake certificates using various methods so this is possible and probably doable for any government level attacker.
 
 ==== Certificate pinning
 

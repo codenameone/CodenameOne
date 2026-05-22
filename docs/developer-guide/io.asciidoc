@@ -486,7 +486,7 @@ HTTP supports many "request methods," most commonly `GET` & `POST` but also a fe
 
 Arguments in HTTP are passed differently between `GET` and `POST` methods. that's what the `setPost` method in Codename One determines, whether arguments added to the request should be placed using the `GET` semantics or the `POST` semantics.
 
-if you continue your example from above you can do something like this:
+If you continue your example from above you can do something like this:
 
 [source,java]
 ----
@@ -577,7 +577,7 @@ Here you can extract the headers one by one to handle complex headers such as co
 
 As you noticed above practically all the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
 
-two distinct placed where you can handle a networking error:
+There are two distinct places where you can handle a networking error:
 
 - The `ConnectionRequest` - by overriding callback methods
 - The `NetworkManager` error handler
@@ -1178,7 +1178,7 @@ String first2[] = result.getAsStringArray("//player[position() < 3]/firstname");
 String secondLast = result.getAsString("//player[last() - 1]/firstName");
 ----
 
-it's also possible to select parent nodes, by using the ‘..’ expression. For example:
+It's also possible to select parent nodes, by using the ‘..’ expression. For example:
 
 
 [source,java]
@@ -1193,7 +1193,7 @@ Above, you globally find a lastname element with a value of ‘Hewitt’, then g
 int id = result.getAsInteger("//player[lastname='Hewitt']/@id");
 ----
 
-it's also possible to nest expressions, for example:
+It's also possible to nest expressions, for example:
 
 
 [source,java]
@@ -1296,14 +1296,14 @@ For example, when you introduced it you didn't have support for the cache filesy
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 
-that's what the new method of `URLImage` does:
+That's what the new method of `URLImage` does:
 
 [source,java]
 ----
 public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule);
 ----
 
-a few important things you need to notice about this method:
+A few important things you need to notice about this method:
 
 - It returns *Image* and not *URLImage*. This is crucial. Down casting to `URLImage* will work on the simulator but might fail in some platforms (for example: JavaScript) so don't do that! +
 Since this is implemented natively in JavaScript you need a different abstraction for that platform.
@@ -1388,7 +1388,7 @@ curl 'https://api.twilio.com/2010-04-01/Accounts/[accountSID]/Messages.json' -X 
 -u [accountSID]:[AuthToken]
 ----
 
-that's pretty cool as the curl command maps almost directly to the `Rest` API call!
+That's pretty cool as the curl command maps almost directly to the `Rest` API call!
 
 What you do here is actually pretty trivial, you open a connection the api messages URL. You add arguments to the body of the post request and define the basic authentication data.
 
@@ -1533,7 +1533,7 @@ private static final String DESTINATION_URL = "http://localhost:8080/HelloWebSer
 
 You would need to update the host name of the server for running on a device otherwise the device would need to live within your internal network and point to your IP address.
 
-it's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
+It's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
 
 This kind of method (synchronous method) is easy to work with since it's legal to call it from the event dispatch thread and it's easy to map it to application logic flow.
 
@@ -1605,7 +1605,7 @@ default using `setDefaultCacheMode(CachingMode)`.
 
 NOTE: Caching applies to `GET` operations, it won't work for `POST` or other methods
 
-many methods of interest to keep an eye for:
+There are many methods of interest to keep an eye for:
 
 [source,java]
 ----
@@ -2045,7 +2045,7 @@ public class Meeting {
 }
 ----
 
-that's a classic POJO and it's the force that underlies JavaBeans and a few tools in Java.
+That's a classic POJO and it's the force that underlies JavaBeans and a few tools in Java.
 
 The properties are effectively the getters/setters for example: `subject`, `when` etc. but properties have many features
 that are crucial:
@@ -2125,7 +2125,7 @@ This means that this code won't compile:
 meet.subject = otherValue;
 ----
 
-all setting/getting must happen thru the set/get methods and they can be replaced. For example: this is valid syntax
+All setting/getting must happen thru the set/get methods and they can be replaced. For example: this is valid syntax
 that prevents setting the property to null and defaults it to an empty string:
 
 [source,java]
@@ -2147,7 +2147,7 @@ NOTE: You will discuss the reason for returning the `Meeting` instance below
 Since `Property` is a common class it's pretty easy for introspective code to manipulate properties. For example,
 it can't detect properties in an object without reflection.
 
-that's why you've the index object and the `PropertyBusinessObject` interface (which defines `getPropertyIndex`).
+That's why you've the index object and the `PropertyBusinessObject` interface (which defines `getPropertyIndex`).
 
 The `PropertyIndex` class provides meta data for the surrounding class including the list of the properties within.
 It allows enumerating the properties and iterating over them making them accessible to all tools.
@@ -2162,7 +2162,7 @@ meet.subject.addChangeListener((p) -> Log.p("New property value is: " + p.get())
 
 ==== The cool stuff
 
-that's the simple stuff that can be done with properties, but they can do **much** more!
+That's the simple stuff that can be done with properties, but they can do **much** more!
 
 For starters all the common methods of `Object` can be implemented with almost no code:
 
@@ -2220,7 +2220,7 @@ but sqlite isn't big iron so it might be good enough.
 One of the problematic issues with constructors is that any change starts propagating everywhere. If you have
 fields in the constructor and you add a new field later you need to keep the old constructor for compatibility.
 
-you added a new syntax:
+You added a new syntax:
 
 [source,java]
 ----
@@ -2229,10 +2229,10 @@ Meeting meet = new Meeting().
         when.set(new Date());
 ----
 
-that's why every property in the definition needed the `Meeting` generic and the set method returns the `Meeting`
+That's why every property in the definition needed the `Meeting` generic and the set method returns the `Meeting`
 instance...
 
-you're pretty conflicted on this feature and are thinking about removing it.
+You're pretty conflicted on this feature and are thinking about removing it.
 
 Without this feature the code would look like this:
 
@@ -2376,7 +2376,7 @@ The arguments for the `select` method are:
 - Number of elements to fetch
 - Page to start with - in this case if you've more than 1000 elements you can fetch the next page using `sm.select(c, c.name, true, 1000, 1)`
 
-many more configurations where you can fine tune how a specific property maps to a column etc.
+There are many more configurations where you can fine tune how a specific property maps to a column etc.
 
 ====== What's still missing
 
@@ -2421,7 +2421,7 @@ Some objects make sense as global objects, you can use the `Preferences` API to 
 PreferencesObject.create(settingsInstance).bind();
 ----
 
-if settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
+If settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
 
 You can do some more elaborate bindings such as:
 
@@ -2571,7 +2571,7 @@ The picker component implicitly works for date type properties, numeric constrai
 
 However, how do you know to use an email constraint for the email property?
 
-you've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. it will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
+You've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. it will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
 
 [source,java]
 ----

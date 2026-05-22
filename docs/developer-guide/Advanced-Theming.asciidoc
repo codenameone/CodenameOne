@@ -751,7 +751,7 @@ The type is omitted for the default unselected type, and may be one of _sel_ (se
 *	`backgroundType` - a `Byte` object containing one of the constants for the background type defined in https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] under BACKGROUND_*.
 *	`backgroundGradient` - contains an `Object` array containing 2 integers for the colors of the gradient. If the gradient is radial it contains 3 floating points defining the x, y & size of the gradient.
 
-to set the foreground color of a selected button to red, a theme will define a property like:
+To set the foreground color of a selected button to red, a theme will define a property like:
 
 `Button.sel#fgColor=ff0000`
 
@@ -1118,7 +1118,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 
 ==== Styling the UI
 
-the code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
+The code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
 
 .Before applying the changes to the theme this is what you've
 image::img/psd2app-image15.png[Before applying the changes to the theme this is what you've,scaledwidth=20%]

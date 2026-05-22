@@ -332,7 +332,7 @@ The *correct* `<dependencies>` section, is located near the top of the file. You
 
 This is a special marker that's used by some Codename One tooling to help it locate the optimal place to inject dependencies.
 
-**don't REMOVE THIS COMMENT**. Just add your dependency snippet somewhere before or after it.
+**Don't REMOVE THIS COMMENT**. Just add your dependency snippet somewhere before or after it.
 ====
 
 ==== Compatibility with Codename One

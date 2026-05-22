@@ -313,7 +313,7 @@ This may seem daunting at first, but it's important to realize that 99% of the t
 
 ===== Important files
 
-a few key files in this project that you'll be using more than the others.
+A few key files in this project that you'll be using more than the others.
 
 pom.xml::
 The maven configuration file of the root module is where you will set project-wide properties such as the `cn1.version` property, which specifies the version of the Codename One libraries that the module should be compiled against. Periodically, you'll want to update the `cn1.version` property to point to the latest version.

@@ -118,21 +118,39 @@ def run_languagetool(text, language="en-US"):
     return all_matches
 
 
+def _attr(obj, *names, default=None):
+    """Read an attribute by the first matching name.
+
+    language_tool_python renamed its Match accessors from camelCase
+    (ruleId, errorLength) to snake_case (rule_id, error_length) between
+    versions; CI pins 2.9.4 (camelCase) while local dev may have a newer
+    release. Try both so the script works on either.
+    """
+    for name in names:
+        try:
+            val = getattr(obj, name)
+        except AttributeError:
+            continue
+        if val is not None:
+            return val
+    return default
+
+
 def matches_to_json(matches, text):
     out = []
     for m in matches:
         # Translate offset to a line number in the plain-text input.
-        offset = getattr(m, "_global_offset", m.offset)
+        offset = getattr(m, "_global_offset", _attr(m, "offset", default=0))
         line = text.count("\n", 0, offset) + 1
         out.append({
-            "rule": m.rule_id,
-            "category": m.category,
-            "message": m.message,
+            "rule": _attr(m, "rule_id", "ruleId", default=""),
+            "category": _attr(m, "category", default=""),
+            "message": _attr(m, "message", default=""),
             "line": line,
             "offset": offset,
-            "length": m.error_length,
-            "context": m.context,
-            "replacements": list(m.replacements[:5]),
+            "length": _attr(m, "error_length", "errorLength", default=0),
+            "context": _attr(m, "context", default=""),
+            "replacements": list(_attr(m, "replacements", default=[])[:5]),
         })
     return out
 
@@ -146,29 +164,46 @@ def main():
 
     text = extract_text(args.html)
 
+    report = {"status": "unknown", "matches": [], "total": 0}
     try:
-        matches = run_languagetool(text, language=args.language)
-    except Exception as exc:  # noqa: BLE001 — advisory check must not crash CI
-        print(f"LanguageTool failed to start: {exc}", file=sys.stderr)
-        matches = None
-        run_status = "error"
-        run_reason = str(exc)
-    else:
-        run_status = "ok" if matches is not None else "skipped"
-        run_reason = None if matches is not None else "language_tool_python not installed"
+        try:
+            matches = run_languagetool(text, language=args.language)
+        except Exception as exc:  # noqa: BLE001 — advisory check must not crash CI
+            print(f"LanguageTool failed to start: {exc}", file=sys.stderr)
+            report = {"status": "error", "reason": str(exc), "matches": [], "total": 0}
+        else:
+            if matches is None:
+                report = {
+                    "status": "skipped",
+                    "reason": "language_tool_python not installed",
+                    "matches": [],
+                    "total": 0,
+                }
+            else:
+                try:
+                    serialized = matches_to_json(matches, text)
+                except Exception as exc:  # noqa: BLE001
+                    print(
+                        f"LanguageTool: failed to serialize {len(matches)} match(es): {exc}",
+                        file=sys.stderr,
+                    )
+                    report = {
+                        "status": "error",
+                        "reason": f"serialization failed: {exc}",
+                        "matches": [],
+                        "total": len(matches),
+                    }
+                else:
+                    report = {"status": "ok", "matches": serialized, "total": len(serialized)}
+    finally:
+        os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
+        with open(args.output, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2)
+        print(
+            f"LanguageTool report written to {args.output} "
+            f"({report.get('total', 0)} match(es), status={report.get('status')})."
+        )
 
-    if matches is None:
-        report = {"status": run_status, "reason": run_reason, "matches": [], "total": 0}
-        issue_count = 0
-    else:
-        report = {"status": "ok", "matches": matches_to_json(matches, text), "total": len(matches)}
-        issue_count = len(matches)
-
-    os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
-    with open(args.output, "w", encoding="utf-8") as fh:
-        json.dump(report, fh, indent=2)
-
-    print(f"LanguageTool report written to {args.output} ({issue_count} match(es), status={report['status']}).")
     # Advisory check: never fails the build.
     return 0
 
