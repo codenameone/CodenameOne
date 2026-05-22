@@ -352,7 +352,7 @@ If the compliance check fails (that is, the app uses unsupported APIs), the buil
 [#managing-addons-in-control-center]
 ==== Managing Add-Ons in control center
 
-As mentioned throughout this guide, the best place to find and install add-ons for your project is in the Codename One Control Center (aka Codename One Preferences. aka Codename One Settings). See <<settings>>.
+As mentioned throughout this guide, the best place to find and install add-ons for your project is in the Codename One Control Center (also known as Codename One Preferences or Codename One Settings). See <<settings>>.
 
 From the dashboard, select "Advanced Settings" > "Extensions" in the navigation menu on the left as shown below:
 

@@ -169,7 +169,7 @@ for framework classes, but the IDE still needs to find the actual
   `CodenameOne/src` as a source root in your IDE's debug
   configuration. In IntelliJ: *Run → Edit Configurations… → Remote
   JVM Debug → Configuration → Source roots → +*.
-* *jdb command line.* Pass the framework source dir on the
+* *jdb command line.* Pass the framework source directory on the
   `-sourcepath`:
 +
 [source,bash]
@@ -194,11 +194,11 @@ in the IDE editor when stepping into framework code.
   jdb's `print myForm.getTitle()` and IntelliJ's "Evaluate Expression"
   pop-up work for the chains you actually want
   (`Display.getInstance().getCurrent().getTitle()` is the canonical
-  test). What doesn't work: methods on `java.io.*`, `java.net.*`,
-  `java.nio.*`, and `com.codename1.impl.*` — those classes are linked
+  test). Methods on `java.io.*`, `java.net.*`, `java.nio.*`, and
+  `com.codename1.impl.*` are unsupported — those classes are linked
   against hand-written native code that has fallen out of sync with
   the generic invoke-thunk calling convention, so the translator
-  skips them. Watching expressions follow the same rule.
+  skips them. The same limit applies to watch expressions.
 * *Constructor invocation* isn't supported. The debugger can call
   existing instance methods but not `new Foo(...)`.
 * *Hot-swap* isn't supported. Code changes require a rebuild and

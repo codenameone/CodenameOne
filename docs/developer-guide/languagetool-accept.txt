@@ -482,3 +482,12 @@ googleservice-info
 nestoria
 twilio
 xapplication
+
+# -----------------------------------------------------------------------------
+# Java tooling / networking terms — standard names LanguageTool's English
+# dictionary doesn't recognise.
+# -----------------------------------------------------------------------------
+jdb
+loopback
+rethrow
+rethrows
