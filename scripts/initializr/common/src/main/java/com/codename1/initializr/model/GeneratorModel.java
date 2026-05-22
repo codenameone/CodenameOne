@@ -128,33 +128,26 @@ public class GeneratorModel {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             writeProjectZip(baos);
             inMemoryZip = baos.toByteArray();
-            System.out.println("CN1INIT:generate:inMemory size=" + inMemoryZip.length);
         } catch (Throwable t) {
-            System.out.println("CN1INIT:generate:inMemoryErr " + t);
+            Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(String.valueOf(t)));
         }
         if (inMemoryZip != null) {
             DownloadNative dn = NativeLookup.create(DownloadNative.class);
             if (dn != null && dn.isSupported()) {
                 String name = appName.toLowerCase() + ".zip";
-                System.out.println("CN1INIT:download:native-try name=" + name + " size=" + inMemoryZip.length);
-                boolean ok = false;
                 try {
-                    ok = dn.downloadBytes(name, inMemoryZip);
+                    if (dn.downloadBytes(name, inMemoryZip)) {
+                        return;
+                    }
                 } catch (Throwable t) {
-                    System.out.println("CN1INIT:download:native-throw " + t);
-                }
-                System.out.println("CN1INIT:download:native-result=" + ok);
-                if (ok) {
-                    return;
+                    Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(String.valueOf(t)));
                 }
             }
         }
         // Fallback for platforms without DownloadNative: write to disk and open.
         String filePath = generateZip();
         if (filePath != null) {
-            System.out.println("CN1INIT:openZip:start path=" + filePath);
             openGeneratedZip(filePath);
-            System.out.println("CN1INIT:openZip:done");
         }
     }
 
@@ -168,21 +161,17 @@ public class GeneratorModel {
         // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
         // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
         // generation accumulates a multi-MB record until the browser quota is exhausted.
-        System.out.println("CN1INIT:generateZip:cleanup");
         cleanupGeneratedZips();
         String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
-        System.out.println("CN1INIT:generateZip:write path=" + filePath);
         try {
             writeProjectZipToStorage(filePath);
         } catch (Throwable firstErr) {
-            System.out.println("CN1INIT:generateZip:retry err=" + firstErr);
             // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
             // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
                 writeProjectZipToStorage(filePath);
             } catch (Throwable retryErr) {
-                System.out.println("CN1INIT:generateZip:retryFail err=" + retryErr);
                 Log.e(retryErr);
                 ToastBar.showErrorMessage(
                         "Browser storage is full. Open your browser settings, clear site "
@@ -190,7 +179,6 @@ public class GeneratorModel {
                 return null;
             }
         }
-        System.out.println("CN1INIT:generateZip:writeDone");
         return filePath;
     }
 
@@ -203,30 +191,30 @@ public class GeneratorModel {
         execute(filePath);
     }
 
+    // Explicit try/catch + manual fos.close() instead of try-with-resources:
+    // the JS-port translator silently elides every statement inside a
+    // try-with-resources block when the resource init's a Java object whose
+    // class has a static-init-time bug (zipme's ZipOutputStream is one;
+    // ours uses the manual writeStoredZip instead). Keeping the explicit
+    // close path here means the LocalForage-backed fallback FOS still gets
+    // its close() (which triggers the IndexedDB persist) even if
+    // writeProjectZip threw.
     private void writeProjectZipToStorage(String filePath) throws IOException {
-        System.out.println("CN1INIT:wpzs:openFos path=" + filePath);
         OutputStream fos = openFileOutputStream(filePath);
-        System.out.println("CN1INIT:wpzs:openedFos cls=" + (fos == null ? "null" : fos.getClass().getName()));
         Throwable primary = null;
         try {
             writeProjectZip(fos);
-            System.out.println("CN1INIT:wpzs:writeProjectZip-returned");
         } catch (Throwable t) {
-            System.out.println("CN1INIT:wpzs:writeProjectZip-threw cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
             primary = t;
         }
-        System.out.println("CN1INIT:wpzs:closingFos");
         try {
             fos.close();
-            System.out.println("CN1INIT:wpzs:closedFos-ok");
         } catch (Throwable t) {
-            System.out.println("CN1INIT:wpzs:closeFos-threw cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
             if (primary == null) {
                 primary = t;
             }
         }
         if (primary != null) {
-            System.out.println("CN1INIT:wpzs:rethrowing primary=" + primary);
             if (primary instanceof IOException) {
                 throw (IOException) primary;
             }
@@ -236,61 +224,41 @@ public class GeneratorModel {
 
     public static void cleanupGeneratedZips() {
         try {
-            System.out.println("CN1INIT:cleanup:getHome");
             String home = getAppHomePath();
-            System.out.println("CN1INIT:cleanup:listFiles home=" + home);
             String[] files = listFiles(home);
-            System.out.println("CN1INIT:cleanup:listed count=" + (files == null ? "null" : files.length));
             if (files == null) {
                 return;
             }
             for (String file : files) {
                 if (file != null && file.endsWith(".zip")) {
                     try {
-                        System.out.println("CN1INIT:cleanup:delete " + file);
                         delete(home + file);
-                        System.out.println("CN1INIT:cleanup:deleted " + file);
                     } catch (Throwable ignored) {
-                        System.out.println("CN1INIT:cleanup:deleteFail " + file + " err=" + ignored);
                     }
                 }
             }
-            System.out.println("CN1INIT:cleanup:done");
         } catch (Throwable ignored) {
-            System.out.println("CN1INIT:cleanup:fatal err=" + ignored);
         }
     }
 
     void writeProjectZip(OutputStream outputStream) throws IOException {
         Map<String, byte[]> mergedEntries = new LinkedHashMap<String, byte[]>();
 
-        System.out.println("CN1INIT:writeZip:ideZip=" + ide.ZIP);
         copyZipEntriesToMap(ide.ZIP, mergedEntries, ZipEntryType.IDE);
-        System.out.println("CN1INIT:writeZip:commonZip");
         copyZipEntriesToMap("/common.zip", mergedEntries, ZipEntryType.COMMON);
-        System.out.println("CN1INIT:writeZip:gitignore");
         copySingleTextEntryToMap(".gitignore", GENERATED_GITIGNORE, mergedEntries, ZipEntryType.COMMON);
-        System.out.println("CN1INIT:writeZip:readme");
         copySingleTextEntryToMap("README.md", buildReadmeMarkdown(), mergedEntries, ZipEntryType.COMMON);
         if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17) {
-            System.out.println("CN1INIT:writeZip:agentSkills");
             addAgentSkillEntries(mergedEntries);
         }
-        System.out.println("CN1INIT:writeZip:pom");
         copySingleTextEntryToMap("common/pom.xml", readResourceToString(template.POM_XML), mergedEntries, ZipEntryType.TEMPLATE_POM);
         if (template.CN1LIB_ZIP != null) {
-            System.out.println("CN1INIT:writeZip:cn1lib=" + template.CN1LIB_ZIP);
             copyZipEntriesToMap(template.CN1LIB_ZIP, mergedEntries, ZipEntryType.TEMPLATE_CN1LIB);
         }
-        System.out.println("CN1INIT:writeZip:css=" + template.CSS);
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
-        System.out.println("CN1INIT:writeZip:source=" + template.SOURCE_ZIP);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
-        System.out.println("CN1INIT:writeZip:l10n");
         addLocalizationEntries(mergedEntries);
-        System.out.println("CN1INIT:writeZip:emitZip entries=" + mergedEntries.size());
         writeStoredZip(outputStream, mergedEntries);
-        System.out.println("CN1INIT:writeZip:emitZipDone");
     }
 
     // STORED-mode (uncompressed) zip writer. Bypasses net.sf.zipme.ZipOutputStream
@@ -425,8 +393,6 @@ public class GeneratorModel {
         } finally {
             try { raw.close(); } catch (Throwable ignored) {}
         }
-        System.out.println("CN1INIT:nativeUnzip:open res=" + zipResource + " bytes=" + zipBytes.length);
-        int entries = 0;
         int pos = 0;
         while (pos + 30 <= zipBytes.length) {
             int sig = readUInt32LE(zipBytes, pos);
@@ -470,11 +436,9 @@ public class GeneratorModel {
                     throw new IOException("Unsupported zip compression method " + method + " for " + name + " in " + zipResource);
                 }
                 copyEntryToMap(name, data, mergedEntries, zipType);
-                entries++;
             }
             pos = dataStart + cSize;
         }
-        System.out.println("CN1INIT:nativeUnzip:close res=" + zipResource + " entries=" + entries);
     }
 
     private static int readUInt16LE(byte[] data, int off) {
@@ -561,69 +525,28 @@ public class GeneratorModel {
             return;
         }
         java.io.InputStream raw = getResourceAsStream(zipResource);
-        System.out.println("CN1INIT:copyZip:open res=" + zipResource + " stream=" + (raw == null ? "null" : raw.getClass().getSimpleName()));
         if (raw == null) {
             throw new IOException("Resource not found: " + zipResource);
         }
-        int entries = 0;
-        try(ZipInputStream zis = new ZipInputStream(raw)) {
-            ZipEntry entry;
-            try {
-                entry = zis.getNextEntry();
-            } catch (Throwable t) {
-                String cls;
-                String msg;
-                try { cls = t.getClass().getName(); } catch (Throwable ignored) { cls = "<no-class>"; }
-                try { msg = t.getMessage(); } catch (Throwable ignored) { msg = "<no-msg>"; }
-                System.out.println("CN1INIT:copyZip:getNextEntry-err res=" + zipResource + " cls=" + cls + " msg=" + msg);
-                IOException wrap = new IOException("getNextEntry " + cls + ": " + msg);
-                throw wrap;
-            }
+        try (ZipInputStream zis = new ZipInputStream(raw)) {
+            ZipEntry entry = zis.getNextEntry();
             while (entry != null) {
-                String name = entry.getName();
-                boolean isDir = entry.isDirectory();
-                System.out.println("CN1INIT:copyZip:iter res=" + zipResource + " idx=" + entries + " name=" + name + " dir=" + isDir);
-                if (!isDir) {
+                if (!entry.isDirectory()) {
+                    String name = entry.getName();
                     if (dropWindowsModule && (name.startsWith("win/") || name.startsWith("win\\"))) {
-                        try {
-                            zis.closeEntry();
-                            entry = zis.getNextEntry();
-                        } catch (Throwable t) {
-                            System.out.println("CN1INIT:copyZip:iter-skip-err res=" + zipResource + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-                            throw t instanceof IOException ? (IOException) t : new IOException("skip: " + t);
-                        }
+                        // Java 17 projects don't ship the UWP/Windows native module — strip
+                        // its source tree from the extracted skeleton. The matching root-pom
+                        // <profile id="win"> block is removed in applyDataReplacements below.
+                        zis.closeEntry();
+                        entry = zis.getNextEntry();
                         continue;
                     }
-                    byte[] data;
-                    try {
-                        data = readToBytesNoClose(zis);
-                    } catch (Throwable t) {
-                        System.out.println("CN1INIT:copyZip:read-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-                        throw t instanceof IOException ? (IOException) t : new IOException("read: " + t);
-                    }
-                    try {
-                        copyEntryToMap(name, data, mergedEntries, zipType);
-                    } catch (Throwable t) {
-                        System.out.println("CN1INIT:copyZip:put-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-                        throw t instanceof IOException ? (IOException) t : new IOException("put: " + t);
-                    }
-                    entries++;
+                    copyEntryToMap(name, readToBytesNoClose(zis), mergedEntries, zipType);
                 }
-                try {
-                    zis.closeEntry();
-                } catch (Throwable t) {
-                    System.out.println("CN1INIT:copyZip:closeEntry-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-                    throw t instanceof IOException ? (IOException) t : new IOException("closeEntry: " + t);
-                }
-                try {
-                    entry = zis.getNextEntry();
-                } catch (Throwable t) {
-                    System.out.println("CN1INIT:copyZip:nextEntry-err res=" + zipResource + " afterName=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-                    throw t instanceof IOException ? (IOException) t : new IOException("nextEntry: " + t);
-                }
+                zis.closeEntry();
+                entry = zis.getNextEntry();
             }
         }
-        System.out.println("CN1INIT:copyZip:close res=" + zipResource + " entries=" + entries);
     }
 
     private void copyEntryToMap(String sourceName, byte[] sourceData, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {

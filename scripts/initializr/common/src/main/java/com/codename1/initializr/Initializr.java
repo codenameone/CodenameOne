@@ -10,6 +10,7 @@ import com.codename1.initializr.model.IDE;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.initializr.ui.TemplatePreviewPanel;
+import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
@@ -200,20 +201,17 @@ public class Initializr extends Lifecycle {
             status.setExpires(0);
             status.show();
             // Defer the heavy work by one EDT cycle so the toast + disabled button
-            // get painted first. Then run generate() inline on the EDT -- LocalForage
-            // ops are async and yield between callbacks, so the UI stays responsive.
-            // Logs each phase so a "stuck toast" report can be diagnosed from the
-            // browser console even without ?parparDiag=1.
+            // get painted first. Then run generate() inline on the EDT -- the JS-port
+            // native download path yields between async steps so the UI stays
+            // responsive.
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    System.out.println("CN1INIT:generate:start");
                     String errorMessage = null;
                     try {
                         model.generate();
-                        System.out.println("CN1INIT:generate:done");
                     } catch (Throwable t) {
                         errorMessage = String.valueOf(t);
-                        System.out.println("CN1INIT:generate:error=" + errorMessage);
+                        Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(errorMessage));
                     }
                     status.clear();
                     generateButton.setEnabled(true);
@@ -222,7 +220,6 @@ public class Initializr extends Lifecycle {
                     if (errorMessage != null) {
                         ToastBar.showErrorMessage("Generation failed: " + errorMessage);
                     }
-                    System.out.println("CN1INIT:generate:finalized");
                 }
             });
         });

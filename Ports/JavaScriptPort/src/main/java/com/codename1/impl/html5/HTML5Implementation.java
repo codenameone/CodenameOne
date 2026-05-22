@@ -5313,17 +5313,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (bytes == null || fileName == null) {
             return false;
         }
-        Blob blob;
         try {
-            blob = BlobUtil.createBlob(bytes, "application/octet-stream");
-        } catch (Throwable t) {
-            System.out.println("CN1INIT:download:createBlob-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
-            return false;
-        }
-        try {
+            Blob blob = BlobUtil.createBlob(bytes, "application/octet-stream");
             registerSaveBlobHandler(fileName, blob);
         } catch (Throwable t) {
-            System.out.println("CN1INIT:download:register-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
             return false;
         }
         if (isBacksideHookAvailable()) {
@@ -5341,7 +5334,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             fireSaveBlobHandler();
             return true;
         } catch (Throwable t) {
-            System.out.println("CN1INIT:download:fire-err cls=" + t.getClass().getName() + " msg=" + t.getMessage());
             return false;
         }
     }
@@ -5356,7 +5348,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
-        System.out.println("CN1INIT:exec:enter url=" + url);
         if (url.startsWith("javascript:")) {
             String cmd = url.substring(url.indexOf(":")+1);
             eval_(cmd);
@@ -5370,30 +5361,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 !url.startsWith("http:") &&
                 !url.startsWith("mailto:") &&
                 !url.startsWith("data:")) {
-            boolean exists = exists(url);
-            System.out.println("CN1INIT:exec:exists=" + exists);
-            if (exists) {
+            if (exists(url)) {
                 try {
                     Blob blob = openFileAsBlob(url);
-                    System.out.println("CN1INIT:exec:openBlob ok blob=" + (blob == null ? "null" : "present"));
                     char sep = getFileSystemSeparator();
                     fileName = url;
                     if (fileName.indexOf(sep) >=0) {
                         fileName = fileName.substring(fileName.lastIndexOf(sep)+1);
                     }
-                    //String dataUrl = blobToDataURL(blob);
-                    //registerSaveBlobHandlerDataUrl(fileName, dataUrl);
                     registerSaveBlobHandler(fileName, blob);
-                    System.out.println("CN1INIT:exec:registerCalled fileName=" + fileName);
                     useBlobHandler = true;
 
                 } catch (Throwable ex) {
-                    System.out.println("CN1INIT:exec:openBlob err=" + ex);
+                    // openFileAsBlob failed -- fall through to the no-blob-handler
+                    // branch below which opens the URL in a new window instead.
                 }
             }
         }
-        System.out.println("CN1INIT:exec:useBlobHandler=" + useBlobHandler + " backsideAvail=" + isBacksideHookAvailable());
-        
+
         final boolean fuseBlobHandler = useBlobHandler;
         
         String buttonText = null;
@@ -7359,12 +7344,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         try {
             String wrapped = stripTrailingSlash(wrapFile(file));
-            Object v1 = LocalForage.getInstance().getItem(wrapped);
-            Object v2 = LocalForage.getInstance().getItem(wrapped+".cn1dir");
-            System.out.println("CN1INIT:exists key=" + wrapped + " v1=" + (v1 == null ? "null" : "present") + " v2cn1dir=" + (v2 == null ? "null" : "present"));
-            return v1 != null || v2 != null;
-        } catch (Throwable ex) {
-            System.out.println("CN1INIT:exists-err file=" + file + " cls=" + (ex == null ? "null" : ex.getClass().getName()) + " msg=" + (ex == null ? "null" : ex.getMessage()));
+            return LocalForage.getInstance().getItem(wrapped) != null
+                    || LocalForage.getInstance().getItem(wrapped + ".cn1dir") != null;
+        } catch (IOException ex) {
             return false;
         }
     }

@@ -386,16 +386,10 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        final String keyForLog = key;
-        final JSObject valForLog = value;
 
         impl.setItem(key, value, new SetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                String errStr = (err == null) ? "null" : (JS.isUndefined(err) ? "undef" : "obj");
-                String valStr = (val == null) ? "null" : (JS.isUndefined(val) ? "undef" : "obj");
-                String inStr  = (valForLog == null) ? "null" : (JS.isUndefined(valForLog) ? "undef" : "obj");
-                System.out.println("CN1INIT:lforage:setCb key=" + keyForLog + " err=" + errStr + " inVal=" + inStr + " cbVal=" + valStr);
                 if (err != null && !JS.isUndefined(err)) {
                     HTML5Implementation._logObj(err);
                     error[0] = new QuotaExceededException("Failed to set value");
@@ -417,21 +411,10 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        final String keyForLog = key;
 
         impl.getItem(key, new GetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                String errStr = (err == null) ? "null" : (JS.isUndefined(err) ? "undef" : "obj");
-                String valStr;
-                if (val == null) {
-                    valStr = "null";
-                } else if (JS.isUndefined(val)) {
-                    valStr = "undef";
-                } else {
-                    valStr = "obj";
-                }
-                System.out.println("CN1INIT:lforage:getCb key=" + keyForLog + " err=" + errStr + " val=" + valStr);
                 if (err != null && !JS.isUndefined(err)) {
                     error[0] = new IOException(JS.unwrapString(err));
                 } else {
@@ -612,18 +595,10 @@ public class LocalForage {
         private void save() throws IOException {
             byte[] bytes = this.toByteArray();
             int len = bytes.length;
-            System.out.println("CN1INIT:lforage:save key=" + key + " len=" + len);
             // Bulk-copy the Java byte[] into a Uint8Array in one JS
             // call instead of paying a JSO virtual dispatch per byte.
             Uint8Array arr = BlobUtil.byteArrayToUint8Array(bytes);
-            try {
-                inst.setItem(key, arr);
-                System.out.println("CN1INIT:lforage:setItem-ok key=" + key);
-            } catch (Throwable t) {
-                System.out.println("CN1INIT:lforage:setItem-err key=" + key + " cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
-                if (t instanceof IOException) throw (IOException) t;
-                throw new IOException("setItem " + t);
-            }
+            inst.setItem(key, arr);
             if (onComplete != null) {
                 ItemSavedEvent evt = new ItemSavedEvent();
                 evt.setKey(key);
