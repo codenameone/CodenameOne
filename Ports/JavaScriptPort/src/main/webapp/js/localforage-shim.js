@@ -50,6 +50,8 @@
   }
   function setItemImpl(key, value) {
     var serialised;
+    var valType = (value == null) ? "null" : (typeof value);
+    var valCtor = (value && value.constructor && value.constructor.name) ? value.constructor.name : valType;
     if (value == null) {
       serialised = null;
     } else if (typeof value === "string") {
@@ -58,15 +60,34 @@
       try { serialised = "j:" + JSON.stringify(value); }
       catch (_e) { serialised = "j:" + JSON.stringify(String(value)); }
     }
-    if (serialised == null) {
-      window.localStorage.removeItem(namespacedKey(key));
-    } else {
-      window.localStorage.setItem(namespacedKey(key), serialised);
+    var nk = namespacedKey(key);
+    try {
+      if (serialised == null) {
+        window.localStorage.removeItem(nk);
+      } else {
+        window.localStorage.setItem(nk, serialised);
+      }
+    } catch (e) {
+      try {
+        console.log("LF-SHIM:set-err key=" + nk + " valType=" + valCtor
+                + " serLen=" + (serialised == null ? "null" : serialised.length)
+                + " err=" + (e && e.message ? e.message : String(e)));
+      } catch (_l) {}
+      throw e;
     }
+    try {
+      console.log("LF-SHIM:set-ok key=" + nk + " valType=" + valCtor
+              + " serLen=" + (serialised == null ? "null" : serialised.length)
+              + " serPrefix=" + (serialised == null ? "null" : serialised.substring(0, Math.min(60, serialised.length))));
+    } catch (_l) {}
     return value;
   }
   function getItemImpl(key) {
-    var raw = window.localStorage.getItem(namespacedKey(key));
+    var nk = namespacedKey(key);
+    var raw = window.localStorage.getItem(nk);
+    try {
+      console.log("LF-SHIM:get key=" + nk + " raw=" + (raw == null ? "null" : ("len=" + raw.length + " prefix=" + raw.substring(0, Math.min(40, raw.length)))));
+    } catch (_l) {}
     if (raw == null) {
       return null;
     }
