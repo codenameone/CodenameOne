@@ -595,10 +595,18 @@ public class LocalForage {
         private void save() throws IOException {
             byte[] bytes = this.toByteArray();
             int len = bytes.length;
+            System.out.println("CN1INIT:lforage:save key=" + key + " len=" + len);
             // Bulk-copy the Java byte[] into a Uint8Array in one JS
             // call instead of paying a JSO virtual dispatch per byte.
             Uint8Array arr = BlobUtil.byteArrayToUint8Array(bytes);
-            inst.setItem(key, arr);
+            try {
+                inst.setItem(key, arr);
+                System.out.println("CN1INIT:lforage:setItem-ok key=" + key);
+            } catch (Throwable t) {
+                System.out.println("CN1INIT:lforage:setItem-err key=" + key + " cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
+                if (t instanceof IOException) throw (IOException) t;
+                throw new IOException("setItem " + t);
+            }
             if (onComplete != null) {
                 ItemSavedEvent evt = new ItemSavedEvent();
                 evt.setKey(key);
