@@ -12,12 +12,15 @@
 import XCTest
 
 final class InputValidationUITests: XCTestCase {
-    // Bundle identifier of the CN1-built iOS app under test. Set from the
-    // CN1IV_BUNDLE_ID env var so the driver script can target whatever value
-    // the CN1 Maven plugin generated, without us hard-coding it.
+    // Bundle identifier of the CN1-built iOS app under test. The CN1 maven
+    // plugin derives the iOS CFBundleIdentifier from
+    // `codename1.packageName` in common/codenameone_settings.properties, so
+    // keeping that property and this default in sync is enough. The
+    // CN1IV_BUNDLE_ID env var override is for local runs against an app
+    // built with a different packageName.
     private var bundleIdentifier: String {
         return ProcessInfo.processInfo.environment["CN1IV_BUNDLE_ID"]
-            ?? "com.codenameone.examples.inputvalidation"
+            ?? "com.codenameone.inputvalidation"
     }
 
     private var stepDelaySeconds: TimeInterval {

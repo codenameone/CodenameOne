@@ -133,11 +133,21 @@ trap cleanup EXIT INT TERM
 iv_log "Generating XCUITest project via xcodegen"
 ( cd "$TESTS_DIR" && xcodegen generate >> "$XCODEBUILD_LOG" 2>&1 )
 
-# Run the XCUITest suite. CN1IV_BUNDLE_ID tells the Swift code which app to
-# attach to; CN1IV_STEP_DELAY_SEC lets us slow the inter-gesture wait on
-# heavily loaded CI runners. `-resultBundlePath` captures the .xcresult so
-# we can extract the actual test failure reason post-hoc (without it,
-# xcodebuild just prints `** TEST FAILED **`).
+# Run the XCUITest suite. The Swift code uses XCUIApplication(bundleIdentifier:)
+# with a hard-coded id that mirrors common/codenameone_settings.properties --
+# xcodebuild `KEY=VALUE` args are build settings, not runtime env vars, so we
+# can't pass the bundle id through here. The driver verifies the installed
+# bundle id matches what the test will request before launching xcodebuild,
+# rather than trying to thread it into the test process.
+EXPECTED_BUNDLE_ID="com.codenameone.inputvalidation"
+if [ "$BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
+  iv_log "WARNING: installed bundle id ($BUNDLE_ID) does not match the value"
+  iv_log "WARNING: hard-coded in InputValidationUITests.swift ($EXPECTED_BUNDLE_ID)."
+  iv_log "WARNING: Update both or XCUITest will fail to launch the app."
+fi
+# `-resultBundlePath` captures the .xcresult so we can extract the actual
+# test failure reason post-hoc (without it, xcodebuild just prints
+# `** TEST FAILED **`).
 XCRESULT_BUNDLE="$ARTIFACTS_DIR/test.xcresult"
 rm -rf "$XCRESULT_BUNDLE"
 iv_log "Running XCUITest"
@@ -147,7 +157,6 @@ xcodebuild test \
   -scheme CN1InputValidationUITests \
   -destination "platform=iOS Simulator,id=$SIM_UDID" \
   -resultBundlePath "$XCRESULT_BUNDLE" \
-  CN1IV_BUNDLE_ID="$BUNDLE_ID" \
   CODE_SIGNING_ALLOWED=NO \
   | tee -a "$XCODEBUILD_LOG"
 XCB_RC=${PIPESTATUS[0]}
