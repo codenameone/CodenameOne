@@ -1,0 +1,95 @@
+name: Input validation gesture suite
+
+# Fast-running multi-platform suite that asserts physical taps / drags /
+# long-presses reach Component listeners end-to-end. Built to catch
+# regressions in the input chain (the class of bug PR #5003 fixed -- a
+# window-level UITapGestureRecognizer eating every tap was invisible to the
+# existing screenshot-only tests because none of them actually depended on a
+# touch event firing). Each platform job is independent; failure of one
+# doesn't cancel the others.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/input-validation.yml'
+      - 'scripts/input-validation-app/**'
+      - 'CodenameOne/src/com/codename1/ui/Component.java'
+      - 'CodenameOne/src/com/codename1/ui/Form.java'
+      - 'CodenameOne/src/com/codename1/ui/Button.java'
+      - 'Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'vm/ByteCodeTranslator/src/javascript/**'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/input-validation.yml'
+      - 'scripts/input-validation-app/**'
+  workflow_dispatch: {}
+
+jobs:
+  # iOS path is not wired into CI yet because scripts/build-ios-app.sh is
+  # hard-coded to the hellocodenameone module name and project file. The
+  # follow-up PR generalises it (CN1_APP_DIR override + dynamic xcodeproj
+  # name discovery) and flips this job on. Until then, the Swift target,
+  # XcodeGen spec, and drivers/run-ios.sh are exercised manually.
+  ios:
+    if: ${{ false }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build CN1 input-validation app (iOS)
+        run: |
+          # TODO: replace with a generalised build-ios-app.sh that accepts a
+          # CN1_APP_DIR=scripts/input-validation-app override and emits the
+          # .app bundle path on stdout.
+          echo "iOS app build step not wired yet" >&2
+          exit 1
+      - name: Drive gestures via XCUITest
+        run: scripts/input-validation-app/drivers/run-ios.sh "$APP_BUNDLE"
+        env:
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: input-validation-ios
+          path: artifacts/input-validation-ios
+          if-no-files-found: warn
+
+  javascript:
+    # Likewise pending a build step. The JavaScript port build is produced by
+    # the CN1 Maven plugin (mvn -P javascript package) but requires the JS
+    # toolchain pulled in by scripts/setup-workspace.sh + a static file server.
+    # We scaffold the job, leave it disabled, and turn it on in the follow-up
+    # PR that adds a publish step (or points CN1IV_URL at a known deployment).
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (Chromium only)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Build CN1 input-validation app (JavaScript)
+        run: |
+          # TODO: emit a CN1IV_URL pointing at the published bundle.
+          echo "JS app build step not wired yet" >&2
+          exit 1
+      - name: Drive gestures via Playwright
+        run: scripts/input-validation-app/drivers/run-js.sh "$CN1IV_URL"
+        env:
+          CN1IV_URL: ${{ env.CN1IV_URL }}
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: input-validation-js
+          path: artifacts/input-validation-js
+          if-no-files-found: warn

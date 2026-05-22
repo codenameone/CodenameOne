@@ -1,0 +1,126 @@
+= CN1 Input Validation App
+
+A minimal Codename One app whose only purpose is to assert that physical
+input events (tap, drag, long-press) reach Component listeners end-to-end
+on each port. Driven by per-platform OS-level automation (XCUITest on iOS,
+Playwright on JavaScript).
+
+== Why a separate pipeline?
+
+The existing `scripts/hellocodenameone` test suite builds every form
+programmatically and emits screenshots from `runTest()` without ever
+depending on a touch event reaching `Component.pointerPressed`. That
+gap let three independent input-chain regressions ship on iOS 26 (see
+https://github.com/codenameone/CodenameOne/pull/5003): a window-level
+`UITapGestureRecognizer` ate every tap, a hover recognizer cancelled
+touches on the simulator, and a class-literal comparison NPE fired from
+the background painter on every form show.
+
+This pipeline closes that gap by making input flow the only thing the
+app does. There is no theme, no resource bundle, no screenshot
+comparison -- the assertion is the stream of `CN1IV:EVENT:*` log lines
+emitted when each gesture fires.
+
+== Suite
+
+Each step waits up to 8 seconds for its expected event, then auto-advances
+on success or timeout. The driver script (XCUITest or Playwright) is
+responsible for issuing the actual OS input at the expected time.
+
+[cols="1,3"]
+|===
+| Step | What it asserts
+
+| `tap`
+| `Button.actionPerformed` fires for a single tap. The PR #5003
+  regression.
+
+| `drag`
+| `pointerDragged` is dispatched continuously between `pointerPressed`
+  and `pointerReleased`, with at least 3 intermediate samples. Catches
+  both the iOS 26 hover-recognizer regression and the empty-pointer-array
+  NPE fixed in 2fef7187.
+
+| `longpress`
+| `addLongPressListener` fires for a press-and-hold. Routes through the
+  same touch chain as tap, so a recognizer that cancels touches mid-press
+  causes this step to time out.
+|===
+
+== Log markers
+
+Everything the drivers care about is a single line on stdout:
+
+----
+CN1IV:SUITE:STARTED platform=<plat> w=<width> h=<height>
+CN1IV:READY:<step>             # step is armed and waiting for input
+CN1IV:EVENT:<step>:<details>   # input arrived; advancing to next step
+CN1IV:TIMEOUT:<step>           # 8s elapsed without input -- step failed
+CN1IV:SUITE:FINISHED
+----
+
+A successful run contains one `READY:` + one `EVENT:` per step and no
+`TIMEOUT:` lines. Drivers grep for these and fail non-zero on any miss.
+
+== Layout
+
+----
+scripts/input-validation-app/
+├── pom.xml                 # parent Maven project
+├── common/                 # CN1 Lifecycle + gesture screens
+├── ios/                    # CN1 iOS module (codename1.platform=ios)
+├── javascript/             # CN1 JavaScript module (codename1.platform=javascript)
+├── ios-tests/              # XCUITest target (XcodeGen-managed, no pbxproj)
+└── drivers/
+    ├── run-ios.sh          # boot sim, install, drive gestures, assert log
+    ├── run-js.sh           # wrap Playwright driver
+    └── playwright-driver.mjs
+----
+
+== Running locally
+
+=== iOS
+
+----
+# 1. Build the CN1 iOS .app bundle (currently goes through the regular CN1
+#    iOS build path; see TODO note in .github/workflows/input-validation.yml
+#    -- scripts/build-ios-app.sh is being generalised to accept this app).
+cd scripts/input-validation-app
+mvn -P ios package
+APP_BUNDLE=$(find ios/target -name '*.app' -type d | head -n 1)
+
+# 2. Drive the gesture suite on an iPhone 17 Pro simulator (override with
+#    CN1IV_DEVICE_NAME / CN1IV_DEVICE_RUNTIME).
+brew install xcodegen   # one-time
+./drivers/run-ios.sh "$APP_BUNDLE"
+----
+
+=== JavaScript
+
+----
+# 1. Build the JS bundle and serve it (any static server will do):
+cd scripts/input-validation-app
+mvn -P javascript package
+python3 -m http.server --directory javascript/target/<build-dir> 8080 &
+
+# 2. Drive gestures in headless Chromium:
+npm install --no-save playwright
+npx playwright install --with-deps chromium
+./drivers/run-js.sh http://localhost:8080
+----
+
+== CI status
+
+The workflow at `.github/workflows/input-validation.yml` is scaffolded but
+both jobs are gated by `if: false` pending build wiring -- see the TODO
+comments at each `Build CN1 ...` step. They run locally today.
+
+== Not yet covered
+
+* Android (UIAutomator path + Linux emulator integration)
+* JavaSE / desktop (java.awt.Robot)
+* Status-bar tap-to-top
+* Soft-keyboard show / character entry / dismiss
+* Multi-touch / pinch
+
+These belong to follow-up PRs once this pipeline shape is validated.

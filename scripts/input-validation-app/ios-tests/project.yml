@@ -1,0 +1,50 @@
+# XcodeGen project spec for the CN1 input-validation XCUITest target.
+#
+# We deliberately do not check in a .xcodeproj -- pbxproj diffs are unreadable
+# and break on every Xcode update. Instead the driver script invokes
+# `xcodegen generate` against this file to materialise the project on demand.
+#
+# The XCUITest target launches the already-installed CN1 app by bundle id
+# (see InputValidationUITests.swift) rather than building it here, so we have
+# no host-app dependency and don't need provisioning profiles. The test runs
+# under XCTest's `application-only` UI-testing mode, which works on simulators
+# out of the box.
+
+name: CN1InputValidationUITests
+options:
+  deploymentTarget:
+    iOS: "16.0"
+  minimumXcodeGenVersion: "2.38.0"
+  bundleIdPrefix: com.codenameone.cn1iv
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_ALLOWED: NO
+
+targets:
+  CN1InputValidationUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.cn1iv.uitests
+        TEST_TARGET_NAME: ""
+        USES_XCTRUNNER: YES
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ""
+
+schemes:
+  CN1InputValidationUITests:
+    build:
+      targets:
+        CN1InputValidationUITests: [test]
+    test:
+      targets:
+        - CN1InputValidationUITests
+      gatherCoverageData: false
+      parallelizable: false
