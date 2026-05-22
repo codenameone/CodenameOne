@@ -228,11 +228,19 @@ public class GeneratorModel {
         System.out.println("CN1INIT:writeZip:emitZip entries=" + mergedEntries.size());
 
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+            int emitIdx = 0;
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
                 ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
-                zos.putNextEntry(zipEntry);
-                zos.write(fileEntry.getValue());
-                zos.closeEntry();
+                byte[] data = fileEntry.getValue();
+                try {
+                    zos.putNextEntry(zipEntry);
+                    zos.write(data);
+                    zos.closeEntry();
+                } catch (Throwable t) {
+                    System.out.println("CN1INIT:writeZip:emitErr idx=" + emitIdx + " key=" + fileEntry.getKey() + " size=" + (data == null ? -1 : data.length) + " err=" + t);
+                    throw t instanceof IOException ? (IOException) t : new IOException("emit failed: " + t);
+                }
+                emitIdx++;
             }
         }
         System.out.println("CN1INIT:writeZip:emitZipDone");
@@ -305,8 +313,15 @@ public class GeneratorModel {
         if (raw == null) {
             throw new IOException("Resource not found: " + zipResource);
         }
+        int entries = 0;
         try(ZipInputStream zis = new ZipInputStream(raw)) {
-            ZipEntry entry = zis.getNextEntry();
+            ZipEntry entry;
+            try {
+                entry = zis.getNextEntry();
+            } catch (Throwable t) {
+                System.out.println("CN1INIT:copyZip:getNextEntry-err res=" + zipResource + " err=" + t);
+                throw t instanceof IOException ? (IOException) t : new IOException("getNextEntry: " + t);
+            }
             while (entry != null) {
                 if (!entry.isDirectory()) {
                     String name = entry.getName();
@@ -319,12 +334,13 @@ public class GeneratorModel {
                         continue;
                     }
                     copyEntryToMap(name, readToBytesNoClose(zis), mergedEntries, zipType);
+                    entries++;
                 }
                 zis.closeEntry();
                 entry = zis.getNextEntry();
             }
         }
-        System.out.println("CN1INIT:copyZip:close res=" + zipResource);
+        System.out.println("CN1INIT:copyZip:close res=" + zipResource + " entries=" + entries);
     }
 
     private void copyEntryToMap(String sourceName, byte[] sourceData, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
