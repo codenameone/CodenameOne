@@ -7307,9 +7307,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         try {
             String wrapped = stripTrailingSlash(wrapFile(file));
-            return LocalForage.getInstance().getItem(wrapped) != null || LocalForage.getInstance().getItem(wrapped+".cn1dir") != null;
-        } catch (IOException ex) {
-            //Log.e(ex);
+            Object v1 = LocalForage.getInstance().getItem(wrapped);
+            Object v2 = LocalForage.getInstance().getItem(wrapped+".cn1dir");
+            System.out.println("CN1INIT:exists key=" + wrapped + " v1=" + (v1 == null ? "null" : "present") + " v2cn1dir=" + (v2 == null ? "null" : "present"));
+            return v1 != null || v2 != null;
+        } catch (Throwable ex) {
+            System.out.println("CN1INIT:exists-err file=" + file + " cls=" + (ex == null ? "null" : ex.getClass().getName()) + " msg=" + (ex == null ? "null" : ex.getMessage()));
             return false;
         }
     }
