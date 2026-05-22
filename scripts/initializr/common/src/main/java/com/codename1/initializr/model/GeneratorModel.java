@@ -312,8 +312,19 @@ public class GeneratorModel {
         for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
             byte[] name = fileEntry.getKey().getBytes("UTF-8");
             byte[] data = fileEntry.getValue();
-            long crc = crc32(data);
-            int len = data.length;
+            int len;
+            long crc;
+            try {
+                len = data.length;
+                crc = crc32(data);
+            } catch (Throwable t) {
+                String cls;
+                String msg;
+                try { cls = t.getClass().getName(); } catch (Throwable ignored) { cls = "<no-class>"; }
+                try { msg = t.getMessage(); } catch (Throwable ignored) { msg = "<no-msg>"; }
+                System.out.println("CN1INIT:writeStoredZip:crc-err idx=" + entryCount + " key=" + fileEntry.getKey() + " cls=" + cls + " msg=" + msg);
+                throw t instanceof IOException ? (IOException) t : new IOException("crc failed at idx " + entryCount + " key=" + fileEntry.getKey() + ": " + msg);
+            }
             // Local file header
             write32(out, 0x04034b50L); // signature
             write16(out, 20);          // version needed to extract (2.0)
