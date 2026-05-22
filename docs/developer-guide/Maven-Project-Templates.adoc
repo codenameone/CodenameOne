@@ -7,7 +7,7 @@ Any Codename One project can be converted into a project template.
 
 === Converting a Codename One application project into a project template
 
-If you've an existing maven Codename One application project, you can convert it into a project template by adding a file named `generate-app-project.rpf` in the root directory of the project.
+If you have an existing maven Codename One application project, you can convert it into a project template by adding a file named `generate-app-project.rpf` in the root directory of the project.
 
 The contents of this file should look like:
 
@@ -49,5 +49,5 @@ You can test your project template by using it as the `sourceProject` parameter 
 
 === Add your template to Codename One intializr
 
-If you've a project template that you want to share with the community, please file an issue in the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker] with a link to a Github Repository of your project template, and request to have it added https://www.codenameone.com/initializr[Codename One initializr].
+If you have a project template that you want to share with the community, please file an issue in the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker] with a link to a GitHub Repository of your project template, and request to have it added https://www.codenameone.com/initializr[Codename One initializr].
 

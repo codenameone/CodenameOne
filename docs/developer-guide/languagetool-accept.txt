@@ -1,0 +1,484 @@
+# LanguageTool accept list for the developer guide.
+#
+# Each non-blank, non-comment line is a Python regex matched against the
+# exact text LanguageTool flagged (m.context[offsetInContext:
+# offsetInContext+errorLength]). The match must consume the full flagged
+# span; it is also bracketed by word boundaries so a bare "foo" matches
+# the standalone word "foo" but not "foobar".
+#
+# Use this for proper nouns, product names, class identifiers, file
+# extensions, and other technical terms that LanguageTool's English
+# dictionary does not recognize.
+#
+# Conventions:
+# - Entries are case-sensitive. Use a character class like [Ii] if both
+#   capitalizations should be accepted.
+# - When LanguageTool reports an actual typo, fix the source instead of
+#   allowlisting it here.
+
+# -----------------------------------------------------------------------------
+# Generic code-identifier shapes (overwhelmingly safe: a token that mixes
+# upper- and lower-case letters or includes digits is almost certainly a
+# class name, method name, variable, or other code-flavored identifier
+# that the dictionary will not know.)
+# -----------------------------------------------------------------------------
+
+# PascalCase (FooBar, FooBarBaz, FooBars). Stops at simple two-letter
+# starts like "Of" so it does not swallow real prose.
+[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]+)+s?
+
+# Class names with a leading acronym followed by mixed case
+# (URLImage, NSData, JSObject, HMACSHA, XMLWriter, ...).
+[A-Z]{2,}[a-z][A-Za-z0-9]*
+
+# camelCase (fooBar, fooBarBaz).
+[a-z]+[A-Z][a-zA-Z0-9]+
+
+# Any identifier-shaped token that contains a digit.
+[A-Za-z][A-Za-z0-9]*[0-9][A-Za-z0-9]*
+
+# Hyphenated technical tokens (cn1lib-archetype, mac-os-x-desktop, ...).
+[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+
+
+# Underscored identifiers (foo_bar, FOO_BAR).
+[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+
+
+# All-caps tokens (acronyms: UIID, HMAC, URL, ...). Excludes single-letter
+# matches; those are handled by LanguageTool's default behavior.
+[A-Z]{2,}s?
+
+# -----------------------------------------------------------------------------
+# Codename One product, project, and contributor names
+# -----------------------------------------------------------------------------
+Codename
+CodenameOne
+codenameone
+cn1
+cn1lib
+cn1libs
+cnlib
+hellocodenameone
+iapdemo
+ParparVM
+RoboVM
+TeaVM
+teavm
+teavmdbg
+LWUIT
+GUIBuilder
+UIBuilder
+UDID
+UIScene
+uiscene
+Initializr
+initializr
+intializr
+Mobihelp
+mobihelp
+Mirah
+mirah
+mirahc
+Shai
+Almog
+Hannah
+Fishbein
+Kamyk
+Chiran
+Coolman
+RegisFrey
+JHLabs
+Holo
+holo
+Webservice
+webservice
+webservices
+BlueZ
+Cheatsheet
+Externalizable
+Facebook
+Facebooks
+Geocoder
+Modeless
+Overlines
+RtL
+andlib
+dumbing
+handcoded
+navigatable
+
+# -----------------------------------------------------------------------------
+# Acronyms and product / framework names
+# -----------------------------------------------------------------------------
+AFNetworking
+AVKit
+AWT
+Appcompat
+appcompat
+Apache
+apache
+ATS
+BLE
+CommonCrypto
+CodeMirror
+CodeQL
+CORSProxy
+Cocoapod
+Cocoapods
+cocoapods
+cocopods
+cocoapod
+Cosmo
+Dalvik
+ETag
+FreshDesk
+freshdesk
+Foldables
+Glassfish
+GoogleMaps
+GoogleService-Info
+GZConnectionRequest
+GZip
+GZipInputStream
+GZipOutputStream
+Gzip
+gzip
+gzipped
+gziped
+HMAC
+HOTP
+ipad
+iphone
+itunes
+gmail
+facebook
+JHLabs
+JRuby
+JSObject
+JSProxy
+JSRef
+JavaSE
+Javadocs
+javadocs
+JSONParser
+XMLParser
+XMLWriter
+CSVParser
+Lighthouse
+Netbeans
+netbeans
+NSData
+NSObject
+NSString
+NSAppTransportSecurity
+NSAllowsArbitraryLoads
+NSCameraUsageDescription
+NSXXXUsageDescription
+OAuth
+OAuth2
+OpenJDK
+openjdk
+OSes
+PhoneGap
+Plist
+plist
+pplist
+Podfile
+PodFile
+proguard
+Proguard
+PR
+Retrolambda
+Retroweaver
+Roboto
+SQLDemo
+SQLMap
+Smalltalk
+snapchat
+Storyboard
+storyboards
+Temurin
+testflight
+ttf
+truetype
+viewbox
+WebKit
+WebTV
+WinPhone
+XOR
+xor
+
+# -----------------------------------------------------------------------------
+# Short technical tokens that LanguageTool's dictionary does not include.
+# -----------------------------------------------------------------------------
+aar
+aarrggbb
+actool
+al
+alloca
+api
+attr
+bool
+awt
+bg
+br
+cef
+clogic
+frida
+gc
+gcm
+gridbag
+http
+https
+handlee
+imap
+impl
+int
+javac
+keystore
+[Kk]eystore
+Keystores
+ks
+lastname
+ldpi
+mdpi
+hdpi
+xhdpi
+xxhdpi
+xxxhdpi
+lz
+malloc
+ftp
+ftps
+ssh
+mvn
+ftp
+gpg
+nginx
+overridable
+php
+pom
+pwd
+rgb
+rgba
+restful
+rpf
+rpmalloc
+sbyte
+scrollbars
+sed
+sel
+shadowX
+shadowY
+sku
+skus
+soure
+speedup
+sqlite
+SQLite
+tickering
+ttf
+uiswing
+untarring
+url
+intrinsics
+obfuscator
+resizability
+movability
+Thaana
+Sinhalese
+drieW
+varargs
+uncompiled
+Extra Extra
+Extra Small
+urls
+xor
+zlib
+\$number
+
+# -----------------------------------------------------------------------------
+# Technical terms that are commonly used in tech writing but not in the
+# default English dictionary
+# -----------------------------------------------------------------------------
+appstores
+archs
+asciidoc
+asciidoctor
+adoc
+artifactId
+groupId
+autocommit
+autodistributed
+autofold
+autoincrement
+autolayout
+autosnap
+autosizing
+Autosizing
+Autosnap
+barebones
+bitcode
+bool
+booleans
+broadcast
+bytecode
+bytecodes
+callSerially
+cer
+classloader
+classpath
+codegen
+deinitialization
+deinitialized
+dialer
+dataflow
+deathnote
+deserialize
+dialog
+dialogs
+filesystem
+firebase
+framebuffer
+geofencing
+geocoder
+geohash
+geolocation
+geospatial
+gitignore
+glasspane
+gradle
+hardcoding
+hardcoded
+homescreen
+honor
+honored
+imap
+init
+instanceof
+invokedynamic
+ios
+iOS
+janky
+jaxb
+json
+keypair
+keystore
+keystores
+keytool
+kitchensink
+ks
+lproj
+multidex
+Multidex
+multibutton
+multiline
+Multiline
+multilist
+mvn
+myapp
+mycompany
+nestoria
+noads
+nonatomic
+parseable
+pathname
+pkg
+playService
+ppi
+preloads
+prerendered
+querystring
+rasterizer
+recurse
+redeclaring
+redeclaration
+Redeclare
+reparent
+reparented
+reparenting
+restful
+runtimes
+safetynet
+sanitised
+sdk
+sidemenu
+softbutton
+somebutton
+splashscreen
+stackoverflow
+standin
+statusbar
+sub-container
+subcontainer
+subcontainers
+swipeable
+Swipeable
+threadsafe
+toastbar
+toolchain
+toolchains
+toolset
+transferal
+transpiler
+unix
+unlayout
+Unlayout
+unselect
+unzip
+url
+urls
+viewbox
+webcredentials
+webserver
+webservers
+webservices
+xcode
+xpermissions
+xintent
+
+# -----------------------------------------------------------------------------
+# British spellings — accept either form to match the source's mix.
+# -----------------------------------------------------------------------------
+behaviour
+behaviours
+centimetres
+colour
+colours
+enrolment
+enrols
+flavour
+flavours
+honour
+honoured
+millimetres
+realise
+realised
+recognise
+recognised
+sanitise
+sanitised
+unrecognised
+Unrecognised
+utilise
+utilised
+visualisation
+visualisations
+visualise
+visualised
+
+# -----------------------------------------------------------------------------
+# Domain-specific names from sample/demo apps and external services
+# -----------------------------------------------------------------------------
+admob
+Admob
+anapioficeandfire
+applinks
+Crashlytics
+googleProductId
+googleProductLogo
+googleProductName
+googleservice
+googleservice-info
+nestoria
+twilio
+xapplication

@@ -50,8 +50,6 @@ extern BOOL CN1useTapGestureRecognizer;
     self.delegate = self;
     [ctrl.view.window addGestureRecognizer:self];
     CN1useTapGestureRecognizer = YES;
-    
-    
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
@@ -60,6 +58,24 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         return true;
     }
     return false;
+}
+
+// iOS 26 auto-installs a UITapGestureRecognizer on every UIWindow with
+// _keyboardDismissalGestureRecognized: as its action. Its default
+// cancelsTouchesInView=YES, plus its position in the window-level recognizer
+// chain ahead of ours, means it can consume tap-down events before CN1TapGR
+// ever sees touchesBegan -- the simulator's indirect-pointer-as-touch
+// dispatch tickles this path. Insist that CN1TapGR is required to fail
+// before any window-level UITapGestureRecognizer can recognise, so we keep
+// first crack at every touch regardless of what iOS installed.
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+        shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    if (gestureRecognizer == self
+            && [otherGestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]
+            && otherGestureRecognizer.view == self.view) {
+        return YES;
+    }
+    return NO;
 }
 
 /**
@@ -87,7 +103,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 }
 
 - (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
-{   
+{
     [super touchesBegan:touches withEvent:event];
     POOL_BEGIN();
     if(touchesArray == nil) {

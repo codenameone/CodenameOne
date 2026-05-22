@@ -6570,6 +6570,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific NFC entry point. Default implementation
+    /// returns {@code null}; ports that implement
+    /// {@link com.codename1.nfc.Nfc} override this to return a cached
+    /// singleton. Application code should use
+    /// {@link com.codename1.nfc.Nfc#getInstance()} instead of calling this
+    /// directly --- it transparently substitutes a no-op fallback when the
+    /// port returns {@code null}.
+    public com.codename1.nfc.Nfc getNfc() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters

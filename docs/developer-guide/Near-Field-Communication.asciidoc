@@ -1,0 +1,206 @@
+== Near-Field Communication (NFC)
+
+Codename One ships an NFC API under `com.codename1.nfc` that covers the three things most apps need: read and write NDEF tags, exchange APDUs with ISO 7816 / MIFARE / FeliCa smart cards, and act as a host-emulated card for a nearby reader/terminal.
+
+A single entry point exposes the platform NFC controller, a typed enum reports the technologies the discovered tag supports, and a typed error enum lets callers react to failures without string matching.
+
+=== Quick start: Read an NDEF URI
+
+[source,java]
+----
+import com.codename1.nfc.Nfc;
+import com.codename1.nfc.NfcReadOptions;
+import com.codename1.nfc.NdefMessage;
+
+Nfc nfc = Nfc.getInstance();
+if (!nfc.canRead()) {
+    // no NFC hardware, or it is disabled in system settings
+    return;
+}
+nfc.readNdef(new NfcReadOptions()
+        .setNdefOnly(true)
+        .setAlertMessage("Hold near the poster"))
+   .onResult((NdefMessage msg, Throwable err) -> {
+        if (err != null) {
+            return;
+        }
+        String url = msg.getFirstRecord().getUriPayload();
+        Display.getInstance().execute(url);
+   });
+----
+
+`setNdefOnly(true)` picks the fastest iOS Core NFC session (`NFCNDEFReaderSession`) and matches the most common tag layout. For mixed payloads use `readTag(...)` and inspect `tag.getTypes()`.
+
+=== Quick start: Write an NDEF URI
+
+[source,java]
+----
+import com.codename1.nfc.NdefMessage;
+import com.codename1.nfc.NdefRecord;
+
+NdefMessage msg = new NdefMessage(
+        NdefRecord.createUri("https://codenameone.com"),
+        NdefRecord.createText("en", "Codename One"));
+Nfc.getInstance().writeNdef(
+        new NfcReadOptions().setAlertMessage("Tap a writable tag"),
+        msg)
+   .onResult((Boolean ok, Throwable err) -> {
+       if (err != null) {
+           NfcError code = ((NfcException) err).getError();
+           // READ_ONLY, CAPACITY_EXCEEDED, INVALID_NDEF, TAG_LOST, ...
+       }
+   });
+----
+
+NDEF records carry one of the well-known types (`T`, `U`, `Sp`), a MIME media type, an absolute URI, or an external `domain:type`. Use the factory methods on `NdefRecord` rather than constructing raw byte arrays:
+
+[options="header"]
+|===
+| Factory | Use for
+| `createUri(String)` | URI records -- launches the associated app on tap
+| `createText(String lang, String text)` | Human-readable text
+| `createMime(String mimeType, byte[] payload)` | Binary payloads (vCard, JSON, ...)
+| `createExternal(String domain, String type, byte[] payload)` | Custom vendor types
+| `createApplicationRecord(String pkg)` | Android Application Record (AAR)
+|===
+
+=== Tag-technology APIs
+
+Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
+
+[source,java]
+----
+nfc.readTag(new NfcReadOptions()
+        .setTechFilter(TagType.ISO_DEP)
+        .setIsoSelectAids(myAid))
+   .onResult((Tag tag, Throwable err) -> {
+        if (err != null) return;
+        IsoDep iso = tag.getIsoDep();
+        if (iso == null) return;
+        iso.transceive(myCommandApdu).onResult((byte[] resp, Throwable e) -> {
+            if (ApduResponse.isSuccess(resp)) {
+                byte[] body = ApduResponse.body(resp);
+                // application-specific parsing
+            }
+        });
+   });
+----
+
+Each accessor returns `null` when the tag doesn't advertise the corresponding technology, so always null-check before calling.
+
+[options="header"]
+|===
+| Accessor | Android | iOS | Notes
+| `getIsoDep()` | yes | yes | ISO 7816 -- EMV, ePassport, smart cards
+| `getMifareClassic()` | yes | -- | Apple doesn't expose MIFARE Classic on iOS
+| `getMifareUltralight()` | yes | yes | NTAG21x, Ultralight C
+| `getNfcA()` | yes | yes (limited) | Raw ISO 14443-3A
+| `getNfcB()` | yes | -- | Raw ISO 14443-3B (Android-only)
+| `getNfcF()` | yes | yes | FeliCa (Suica / PASMO / ICOCA)
+| `getNfcV()` | yes | -- | ISO 15693 (Android-only)
+|===
+
+For FeliCa on iOS, set the system codes in `NfcReadOptions`:
+
+[source,java]
+----
+new NfcReadOptions()
+    .setTechFilter(TagType.NFC_F)
+    .setFelicaSystemCodes("0003", "8008");
+----
+
+The Codename One Maven plugin and build daemon automatically register `com.apple.developer.nfc.readersession.felica.systemcodes` from these values.
+
+=== Quick start: Host card emulation
+
+Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
+
+[source,java]
+----
+class MyService extends HostCardEmulationService {
+    @Override
+    public String[] getAids() {
+        return new String[] { "F0010203040506" };
+    }
+    @Override
+    public byte[] processCommand(byte[] apdu) {
+        if (apdu.length > 1 && apdu[1] == (byte) 0xA4) {
+            // SELECT -- terminal has just routed an APDU to our AID
+            return ApduResponse.withStatus(
+                    new byte[] { 'O', 'K' },
+                    ApduResponse.swSuccess());
+        }
+        return ApduResponse.swInsNotSupported();
+    }
+}
+
+Nfc.getInstance().registerHostCardEmulationService(new MyService());
+----
+
+Set the AIDs as a build hint so they appear in the platform routing tables:
+
+[source]
+----
+android.hceAids=F0010203040506
+android.hceCategory=other
+----
+
+The Maven plugin and BuildDaemon generate `apduservice.xml` on Android, register the `CodenameOneHostApduService` in the manifest, and inject the iOS HCE entitlement so the same code path works on both platforms.
+
+iOS HCE (`CardSession`) requires iOS 17.4+ and, as of 2026, is EU-only. The Codename One plugin still injects the entitlement when you reference the class, but `canHostEmulate()` will report `false` on non-EU devices.
+
+=== Permissions and build hints
+
+The Codename One build pipeline auto-detects NFC usage. Apps that never touch `com.codename1.nfc` see no manifest / plist change.
+
+[options="header"]
+|===
+| Reference | Android injected | iOS injected
+| `com.codename1.nfc.*` | `android.permission.NFC` + `<uses-feature android:name="android.hardware.nfc">` | `NFCReaderUsageDescription`, `com.apple.developer.nfc.readersession.formats=TAG\nNDEF`, CoreNFC.framework
+| `com.codename1.nfc.HostCardEmulationService` | `BIND_NFC_SERVICE` permission, `android.hardware.nfc.hce` feature, `<service>` entry, generated `res/xml/apduservice.xml` | `com.apple.developer.nfc.hce` and `...hce.iso7816.select-identifiers` entitlements
+|===
+
+Override any of the defaults with the matching build hint:
+
+[options="header"]
+|===
+| Build hint | Default | Notes
+| `ios.NFCReaderUsageDescription` | "Hold near an NFC tag to continue" | Localise this -- Apple rejects builds that ship the default copy
+| `ios.entitlements.com.apple.developer.nfc.readersession.formats` | `TAG\nNDEF` | Multi-line entitlement value
+| `android.hceAids` | (none) | Comma-separated; required for HCE on Android
+| `android.hceCategory` | `other` | `payment` for EMV-conformant apps
+| `android.hceRequireUnlock` | `false` | Force lock screen unlock before APDU routing
+| `ios.hceAids` | falls back to `android.hceAids` | iOS HCE AID list
+|===
+
+=== Simulator support
+
+The JavaSE simulator implements `Nfc` via a virtual tag you can edit and tap from the `Simulate -> NFC` submenu:
+
+[options="header"]
+|===
+| Menu item | Effect
+| Hardware Available / NFC Enabled / HCE Available | Toggle what `isSupported()` / `canRead()` / `canHostEmulate()` return
+| Next read outcome | Pick `DISCOVER_TAG`, `USER_CANCELED`, `TAG_LOST`, `TIMEOUT`, or `READ_ONLY` for the next `readTag()` call
+| Tap virtual tag | Fire the configured outcome on any pending read or registered listener
+| Set virtual tag URI... | Replace the virtual tag's NDEF payload with a URI record
+| Set virtual tag text... | Replace the virtual tag's NDEF payload with a text record
+| Tag is read-only | Lock the virtual tag so the next write fails with `READ_ONLY`
+| Send APDU to HCE service... | Hex-entry dialog that dispatches the bytes to your registered `HostCardEmulationService` and shows the response
+| Deactivate HCE field | Fires `onDeactivated(DEACTIVATION_LINK_LOSS)` on the registered service
+|===
+
+All toggles persist between simulator runs (under `NfcSim.*` user preferences) so you can drive tests deterministically.
+
+=== Platform behaviour
+
+[options="header"]
+|===
+| Platform | NDEF read | NDEF write | Tag tech | HCE | Notes
+| Android | yes | yes | full set | yes | `NfcAdapter.enableReaderMode` (API 19+); `HostApduService` (API 19+)
+| iOS | yes (iOS 11+) | yes (iOS 13+) | ISO 7816, FeliCa, MIFARE Ultralight | iOS 17.4+ EU-only | MIFARE Classic and NFC-B/V not exposed by Apple
+| JavaSE simulator | yes (virtual tag) | yes (virtual tag) | configurable | yes (synthetic APDUs) | Drive everything from the Simulate -> NFC menu
+| Desktop deploy / JavaScript | no | no | no | no | Fallback base class -- every method completes with `NfcError.NOT_AVAILABLE`
+|===
+
+Always gate user-facing affordances on `canRead()` (for tag operations) or `canHostEmulate()` (for HCE). `isSupported()` only reports whether the hardware is present.
