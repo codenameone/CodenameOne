@@ -166,8 +166,33 @@ public class GeneratorModel {
     }
 
     private void writeProjectZipToStorage(String filePath) throws IOException {
-        try (OutputStream fos = openFileOutputStream(filePath)) {
+        System.out.println("CN1INIT:wpzs:openFos path=" + filePath);
+        OutputStream fos = openFileOutputStream(filePath);
+        System.out.println("CN1INIT:wpzs:openedFos cls=" + (fos == null ? "null" : fos.getClass().getName()));
+        Throwable primary = null;
+        try {
             writeProjectZip(fos);
+            System.out.println("CN1INIT:wpzs:writeProjectZip-returned");
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:wpzs:writeProjectZip-threw cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
+            primary = t;
+        }
+        System.out.println("CN1INIT:wpzs:closingFos");
+        try {
+            fos.close();
+            System.out.println("CN1INIT:wpzs:closedFos-ok");
+        } catch (Throwable t) {
+            System.out.println("CN1INIT:wpzs:closeFos-threw cls=" + (t == null ? "null" : t.getClass().getName()) + " msg=" + (t == null ? "null" : t.getMessage()));
+            if (primary == null) {
+                primary = t;
+            }
+        }
+        if (primary != null) {
+            System.out.println("CN1INIT:wpzs:rethrowing primary=" + primary);
+            if (primary instanceof IOException) {
+                throw (IOException) primary;
+            }
+            throw new IOException("writeProjectZipToStorage: " + primary);
         }
     }
 
