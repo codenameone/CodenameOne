@@ -43,6 +43,7 @@ public final class ProxyMain {
             else if (a.startsWith("--device-port=")) devicePort = Integer.parseInt(a.substring("--device-port=".length()));
             else if (a.startsWith("--jdwp-port=")) jdwpPort = Integer.parseInt(a.substring("--jdwp-port=".length()));
             else if (a.equals("--no-jdwp")) noJdwp = true;
+            else if (a.equals("--trace-jdwp")) JdwpServer.traceJdwp = true;
             else if (a.equals("--help") || a.equals("-h")) { printUsage(); return; }
             else {
                 System.err.println("Unrecognised argument: " + a);

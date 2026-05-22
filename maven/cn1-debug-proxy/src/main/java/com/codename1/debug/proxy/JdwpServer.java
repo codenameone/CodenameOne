@@ -253,9 +253,16 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             int cmdSet = in.readUnsignedByte();
             int cmd    = in.readUnsignedByte();
             in.readFully(payload);
+            if (traceJdwp) {
+                System.out.println("[jdwp-trace] CMD set=" + cmdSet + " cmd=" + cmd
+                        + " id=" + id + " len=" + payload.length);
+            }
             dispatchCommand(id, cmdSet, cmd, payload);
         }
     }
+
+    /** Set true to dump every inbound JDWP command. Toggled by --trace-jdwp. */
+    public static volatile boolean traceJdwp = false;
 
     // -------- Packet writers ------------------------------------------------
 
