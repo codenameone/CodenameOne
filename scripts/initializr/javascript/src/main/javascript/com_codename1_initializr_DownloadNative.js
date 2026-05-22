@@ -17,6 +17,32 @@
 (function(exports) {
   var o = {};
 
+  // Pulls a usable JS string out of whatever shape the host bridge hands
+  // a Java String to a native impl. Java Strings on the JS port carry
+  // their value as a char[] (cn1_java_lang_String_value) plus offset and
+  // count fields; some bridge paths also stash __nativeString as a
+  // ready-made JS string sidecar. A handful of legacy paths arrive as
+  // plain JS strings already.
+  function unwrapJavaString(s, fallback) {
+    if (s == null) return fallback;
+    if (typeof s === 'string') return s;
+    if (typeof s.__nativeString === 'string') return s.__nativeString;
+    var chars = s.cn1_java_lang_String_value;
+    if (chars && chars.length !== undefined) {
+      var off = s.cn1_java_lang_String_offset | 0;
+      var cnt = s.cn1_java_lang_String_count;
+      if (cnt == null) cnt = chars.length - off;
+      cnt = cnt | 0;
+      var out = '';
+      for (var i = 0; i < cnt; i++) {
+        out += String.fromCharCode(chars[off + i] & 0xffff);
+      }
+      return out;
+    }
+    try { console.log('CN1INIT:download:unwrapJavaString unknown shape keys=' + Object.keys(s).slice(0, 20).join(',')); } catch (_le) {}
+    return fallback;
+  }
+
   o.downloadBytes_ = function(fileName, bytes, callback) {
     try {
       // ``bytes`` is whatever shape the host bridge hands a Java byte[] to
@@ -36,22 +62,14 @@
         callback.complete(false);
         return;
       }
-      // The host bridge transfers a Java String as its boxed object (with
-      // ``__nativeString`` set to the JS-side value). Direct ``String(x)``
-      // on that object would give ``"[object Object]"``. Prefer the
-      // native-string sidecar, fall back to toString().
-      var name;
-      if (fileName == null || fileName === '') {
-        name = 'download';
-      } else if (typeof fileName === 'string') {
-        name = fileName;
-      } else if (fileName.__nativeString != null) {
-        name = String(fileName.__nativeString);
-      } else if (typeof fileName.toString === 'function') {
-        name = fileName.toString();
-      } else {
-        name = 'download';
-      }
+      // The host bridge transfers a Java String as its boxed object. The
+      // exact shape varies: some bridge paths set ``__nativeString``,
+      // others ship the char[] + offset + count directly (the
+      // ``cn1_java_lang_String_value`` / ``_offset`` / ``_count`` triple),
+      // others may already be a plain JS string. Cover all three, plus
+      // log the shape on first call so future regressions are debuggable
+      // without adding more probes.
+      var name = unwrapJavaString(fileName, 'download');
       var blob = new Blob([arr], { type: 'application/octet-stream' });
       try { console.log('CN1INIT:download:native-fire fileName=' + name + ' len=' + arr.length); } catch (_le) {}
       var doc = (typeof document !== 'undefined') ? document : (window && window.document);
