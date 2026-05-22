@@ -151,17 +151,28 @@ jobs:
           SCHEME='${{ steps.build-ios-app.outputs.scheme }}'
           DERIVED_DATA="${{ runner.temp }}/cn1iv-dd"
           rm -rf "$DERIVED_DATA"
-          if [[ "$WORKSPACE" == *.xcworkspace ]]; then
-            xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
-              -destination 'generic/platform=iOS Simulator' \
-              -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO build
-          else
-            xcodebuild -project "$WORKSPACE" -scheme "$SCHEME" \
-              -destination 'generic/platform=iOS Simulator' \
-              -derivedDataPath "$DERIVED_DATA" \
-              CODE_SIGNING_ALLOWED=NO build
+          # Force ARCHS to match the host. IOSSimd.m uses ARM NEON intrinsics
+          # under #if defined(__aarch64__) -- without ONLY_ACTIVE_ARCH=YES the
+          # generic simulator destination triggers a universal build whose
+          # x86_64 slice fails to compile. Matches what run-ios-ui-tests.sh
+          # does for the hellocodenameone build.
+          HOST_ARCH="$(uname -m)"
+          case "$HOST_ARCH" in
+            arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+            *) BUILD_ARCH=arm64 ;;
+          esac
+          XCB_CONTAINER_FLAG="-workspace"
+          if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+            XCB_CONTAINER_FLAG="-project"
           fi
+          xcodebuild $XCB_CONTAINER_FLAG "$WORKSPACE" -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA" \
+            ARCHS=$BUILD_ARCH ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="armv7 armv7s" \
+            CODE_SIGNING_ALLOWED=NO build
           APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
           if [ -z "$APP_BUNDLE" ]; then
             echo "Failed to locate .app bundle under $DERIVED_DATA" >&2
