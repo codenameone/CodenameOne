@@ -36,7 +36,22 @@
         callback.complete(false);
         return;
       }
-      var name = (fileName == null || fileName === '') ? 'download' : String(fileName);
+      // The host bridge transfers a Java String as its boxed object (with
+      // ``__nativeString`` set to the JS-side value). Direct ``String(x)``
+      // on that object would give ``"[object Object]"``. Prefer the
+      // native-string sidecar, fall back to toString().
+      var name;
+      if (fileName == null || fileName === '') {
+        name = 'download';
+      } else if (typeof fileName === 'string') {
+        name = fileName;
+      } else if (fileName.__nativeString != null) {
+        name = String(fileName.__nativeString);
+      } else if (typeof fileName.toString === 'function') {
+        name = fileName.toString();
+      } else {
+        name = 'download';
+      }
       var blob = new Blob([arr], { type: 'application/octet-stream' });
       try { console.log('CN1INIT:download:native-fire fileName=' + name + ' len=' + arr.length); } catch (_le) {}
       var doc = (typeof document !== 'undefined') ? document : (window && window.document);
