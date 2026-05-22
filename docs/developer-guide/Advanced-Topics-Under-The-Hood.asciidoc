@@ -1462,7 +1462,7 @@ For example, the Google Maps project includes the static callback method:
 include::../demos/common/src/main/java/com/codename1/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
 ----
 
-It is defined in the `com.codename1.googlemaps.MapContainer` class.
+It's defined in the `com.codename1.googlemaps.MapContainer` class.
 
 This method is called from Javascript inside a native interface using the following code:
 

@@ -2005,7 +2005,7 @@ image::img/components-table-with-spanning.png[Table with spanning and fixed widt
 
 To customize the table cell behavior you can derive the `Table` to create a "renderer like" widget, but unlike the list this component is "kept" and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
 
-Let's fix the example above to include far more capabilities:
+The example above can be extended to include far more capabilities:
 [source,java]
 ----
 Table table = new Table(model) {

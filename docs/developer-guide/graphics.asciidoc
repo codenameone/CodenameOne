@@ -1067,7 +1067,7 @@ You could also use the `Graphics.setTransform()` class to apply rotations and ot
 
 ==== Global alpha & Anti-Aliasing
 
-So far you've relied on the per-pixel alpha stored in images and gradients. `Graphics`
+Up to this point you've relied on the per-pixel alpha stored in images and gradients. `Graphics`
 also lets you apply a global alpha multiplier to every draw call by using
 `setAlpha(int)` or `concatenateAlpha(int)` after checking `isAlphaSupported()`.
 Both methods accept values from `0` (fully transparent) to `255` (fully opaque)
