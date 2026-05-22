@@ -86,17 +86,5 @@
                 <module>ios</module>
             </modules>
         </profile>
-        <profile>
-            <id>javascript</id>
-            <activation>
-                <property>
-                    <name>codename1.platform</name>
-                    <value>javascript</value>
-                </property>
-            </activation>
-            <modules>
-                <module>javascript</module>
-            </modules>
-        </profile>
     </profiles>
 </project>

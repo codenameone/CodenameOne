@@ -5,8 +5,6 @@
 package com.codenameone.inputvalidation;
 
 import com.codename1.system.Lifecycle;
-import com.codename1.ui.CN;
-import com.codename1.ui.Display;
 import com.codenameone.inputvalidation.gestures.GestureSuite;
 
 /// Lifecycle entry point for the input-validation CN1 app. The whole app does
@@ -17,11 +15,6 @@ import com.codenameone.inputvalidation.gestures.GestureSuite;
 public class InputValidationApp extends Lifecycle {
     @Override
     public void runApp() {
-        Runnable suite = () -> new GestureSuite().start();
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            CN.callSerially(suite);
-        } else {
-            new Thread(suite, "CN1IV-Suite").start();
-        }
+        new Thread(() -> new GestureSuite().start(), "CN1IV-Suite").start();
     }
 }

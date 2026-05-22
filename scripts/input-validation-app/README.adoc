@@ -2,8 +2,7 @@
 
 A minimal Codename One app whose only purpose is to assert that physical
 input events (tap, drag, long-press) reach Component listeners end-to-end
-on each port. Driven by per-platform OS-level automation (XCUITest on iOS,
-Playwright on JavaScript).
+on iOS. Driven by XCUITest on the iOS simulator.
 
 == Why a separate pipeline?
 
@@ -24,8 +23,8 @@ emitted when each gesture fires.
 == Suite
 
 Each step waits up to 8 seconds for its expected event, then auto-advances
-on success or timeout. The driver script (XCUITest or Playwright) is
-responsible for issuing the actual OS input at the expected time.
+on success or timeout. The XCUITest driver issues the actual OS input at
+the expected time.
 
 [cols="1,3"]
 |===
@@ -49,7 +48,7 @@ responsible for issuing the actual OS input at the expected time.
 
 == Log markers
 
-Everything the drivers care about is a single line on stdout:
+Everything the driver cares about is a single line on stdout:
 
 ----
 CN1IV:SUITE:STARTED platform=<plat> w=<width> h=<height>
@@ -60,7 +59,7 @@ CN1IV:SUITE:FINISHED
 ----
 
 A successful run contains one `READY:` + one `EVENT:` per step and no
-`TIMEOUT:` lines. Drivers grep for these and fail non-zero on any miss.
+`TIMEOUT:` lines. The driver greps for these and fails non-zero on any miss.
 
 == Layout
 
@@ -69,82 +68,47 @@ scripts/input-validation-app/
 ├── pom.xml                 # parent Maven project
 ├── common/                 # CN1 Lifecycle + gesture screens
 ├── ios/                    # CN1 iOS module (codename1.platform=ios)
-├── javascript/             # CN1 JavaScript module (codename1.platform=javascript)
-├── ios-tests/              # XCUITest target (XcodeGen-managed, no pbxproj)
+├── ios-tests/              # XCUITest target (XcodeGen-managed)
+│   ├── HostStub/           # minimal UIApplication host so the test
+│   │                       # runner has somewhere to attach -- the
+│   │                       # actual tests target the CN1 app by bundle id
+│   └── Sources/            # XCUITest Swift code
 └── drivers/
-    ├── run-ios.sh          # boot sim, install, drive gestures, assert log
-    ├── run-js.sh           # wrap Playwright driver
-    └── playwright-driver.mjs
+    └── run-ios.sh          # boot sim, install, drive gestures, assert log
 ----
 
 == Running locally
 
-=== iOS
-
 ----
-# 1. Build the CN1 iOS .app bundle (currently goes through the regular CN1
-#    iOS build path; see TODO note in .github/workflows/input-validation.yml
-#    -- scripts/build-ios-app.sh is being generalised to accept this app).
+# 1. Build the CN1 iOS .app bundle.
 cd scripts/input-validation-app
 mvn -P ios package
 APP_BUNDLE=$(find ios/target -name '*.app' -type d | head -n 1)
 
-# 2. Drive the gesture suite on an iPhone 17 Pro simulator (override with
-#    CN1IV_DEVICE_NAME / CN1IV_DEVICE_RUNTIME).
+# 2. Drive the gesture suite on whatever iPhone simulator is available
+#    (override with CN1IV_DEVICE_NAME / CN1IV_DEVICE_RUNTIME).
 brew install xcodegen   # one-time
 ./drivers/run-ios.sh "$APP_BUNDLE"
 ----
 
-=== JavaScript
+== CI
 
-----
-# 1. Build the JS bundle and serve it (any static server will do):
-cd scripts/input-validation-app
-mvn -P javascript package
-python3 -m http.server --directory javascript/target/<build-dir> 8080 &
+`.github/workflows/input-validation.yml` runs the iOS job on every PR. It
+reuses the `_build-ios-port.yml` reusable workflow so it shares the same
+port-build cache as the screenshot-based scripts-ios pipeline.
 
-# 2. Drive gestures in headless Chromium:
-npm install --no-save playwright
-npx playwright install --with-deps chromium
-./drivers/run-js.sh http://localhost:8080
-----
+The build script `scripts/build-ios-app.sh` accepts a
+`CN1_APP_DIR=scripts/input-validation-app` override so the same script
+can build either app; the default stays pointed at hellocodenameone so
+the existing CI keeps passing.
 
-== CI status
+== Not yet covered (follow-up PRs)
 
-Both jobs (iOS + JavaScript) run on every PR via
-`.github/workflows/input-validation.yml`. The iOS job reuses the
-`_build-ios-port.yml` reusable workflow so it shares the same port-build
-cache as the screenshot-based scripts-ios pipeline; the JavaScript job
-boots ParparVM + JavaScriptPort, bundles to a zip, serves it via
-`python3 -m http.server`, and drives Chromium against `localhost:8080`.
-
-Both jobs are currently marked `continue-on-error: true` while the
-input-dispatch ends of each port are stabilised:
-
-* **iOS**: XCUITest application-only mode (no host-app target) exits
-  with an opaque `** TEST FAILED **` under Xcode 16.4. The build /
-  install / launch / log-stream path is verified; the .xcresult
-  bundle is uploaded as an artifact for post-hoc inspection.
-* **JavaScript**: synthetic DOM events reach main-thread listeners
-  (the driver's `layout:{...selfTestFired:true}` artifact confirms this)
-  but the CN1 JS port runs Java in a Web Worker and registers its
-  pointer listeners through a host-bridge proxy; synthetic events from
-  the test driver don't propagate through that proxy the way real OS
-  events do. This needs JS-port-side work before end-to-end input flow
-  can be asserted.
-
-The underlying build scripts (`scripts/build-ios-app.sh` and
-`scripts/build-javascript-port-hellocodenameone.sh`) accept a
-`CN1_APP_DIR=scripts/input-validation-app` override so the same scripts
-build either app -- defaults stay pointed at hellocodenameone so the
-existing CI keeps passing.
-
-== Not yet covered
-
-* Android (UIAutomator path + Linux emulator integration)
-* JavaSE / desktop (java.awt.Robot)
-* Status-bar tap-to-top
-* Soft-keyboard show / character entry / dismiss
-* Multi-touch / pinch
-
-These belong to follow-up PRs once this pipeline shape is validated.
+* JavaScript port. Synthetic DOM events reach main-thread listeners but
+  the CN1 JS port registers its pointer listeners through a host-bridge
+  proxy from inside a Web Worker; synthetic events don't traverse that
+  proxy the way real OS events do. End-to-end input validation here
+  needs port-side changes that don't belong in this PR.
+* Android (UIAutomator) on Linux.
+* JavaSE / desktop (`java.awt.Robot`).
+* Status-bar tap-to-top, soft-keyboard show/dismiss, multi-touch.
