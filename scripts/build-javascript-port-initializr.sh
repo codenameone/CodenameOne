@@ -542,11 +542,29 @@ cat > "$DIST_DIR/initializr_native_bindings.js" <<'EOF'
   // InflateNative.inflateRaw(byte[]) -> byte[]. Forwards the compressed
   // bytes through invokeHostNative; the main-thread handler runs
   // DecompressionStream "deflate-raw" and returns the inflated bytes.
+  //
+  // The main-thread handler returns a Uint8Array (the natural
+  // DecompressionStream output). The worker-side Java code expects a
+  // proper Java byte[] shape -- a plain Array with ``__array = true``
+  // and the JAVA_BYTE classDef set by ``jvm.newArray``. Without the
+  // wrap step the ``byte[] data = nativeInflateRaw(...)`` assignment
+  // in GeneratorModel succeeds at the JS-binding boundary but the next
+  // ``data.length`` / ``data[i]`` / Map.put + Map.get cast triggers
+  // ClassCastException (the runtime's array helpers reject anything
+  // without ``__array``).
   bindNative([
     "cn1_com_codename1_initializr_InflateNativeImpl_nativeInflateRaw_byte_1ARRAY_R_byte_1ARRAY",
     "cn1_com_codename1_initializr_InflateNativeImpl_nativeInflateRaw__B_R_B"
   ], function*(compressed) {
-    return yield jvm.invokeHostNative("initializr.InflateNative.inflateRaw", [compressed]);
+    var raw = yield jvm.invokeHostNative("initializr.InflateNative.inflateRaw", [compressed]);
+    if (raw == null) return null;
+    var len = raw.length | 0;
+    var arr = jvm.newArray(len, "JAVA_BYTE", 1);
+    for (var i = 0; i < len; i++) {
+      var v = raw[i];
+      arr[i] = v > 127 ? v - 256 : v;
+    }
+    return arr;
   });
   bindBoolean([
     "cn1_com_codename1_initializr_InflateNativeImpl_nativeIsSupported_R_boolean",
