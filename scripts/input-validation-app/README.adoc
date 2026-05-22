@@ -118,6 +118,21 @@ cache as the screenshot-based scripts-ios pipeline; the JavaScript job
 boots ParparVM + JavaScriptPort, bundles to a zip, serves it via
 `python3 -m http.server`, and drives Chromium against `localhost:8080`.
 
+Both jobs are currently marked `continue-on-error: true` while the
+input-dispatch ends of each port are stabilised:
+
+* **iOS**: XCUITest application-only mode (no host-app target) exits
+  with an opaque `** TEST FAILED **` under Xcode 16.4. The build /
+  install / launch / log-stream path is verified; the .xcresult
+  bundle is uploaded as an artifact for post-hoc inspection.
+* **JavaScript**: synthetic DOM events reach main-thread listeners
+  (the driver's `layout:{...selfTestFired:true}` artifact confirms this)
+  but the CN1 JS port runs Java in a Web Worker and registers its
+  pointer listeners through a host-bridge proxy; synthetic events from
+  the test driver don't propagate through that proxy the way real OS
+  events do. This needs JS-port-side work before end-to-end input flow
+  can be asserted.
+
 The underlying build scripts (`scripts/build-ios-app.sh` and
 `scripts/build-javascript-port-hellocodenameone.sh`) accept a
 `CN1_APP_DIR=scripts/input-validation-app` override so the same scripts

@@ -135,19 +135,35 @@ iv_log "Generating XCUITest project via xcodegen"
 
 # Run the XCUITest suite. CN1IV_BUNDLE_ID tells the Swift code which app to
 # attach to; CN1IV_STEP_DELAY_SEC lets us slow the inter-gesture wait on
-# heavily loaded CI runners.
+# heavily loaded CI runners. `-resultBundlePath` captures the .xcresult so
+# we can extract the actual test failure reason post-hoc (without it,
+# xcodebuild just prints `** TEST FAILED **`).
+XCRESULT_BUNDLE="$ARTIFACTS_DIR/test.xcresult"
+rm -rf "$XCRESULT_BUNDLE"
 iv_log "Running XCUITest"
 set +e
 xcodebuild test \
   -project "$TESTS_DIR/CN1InputValidationUITests.xcodeproj" \
   -scheme CN1InputValidationUITests \
   -destination "platform=iOS Simulator,id=$SIM_UDID" \
+  -resultBundlePath "$XCRESULT_BUNDLE" \
   CN1IV_BUNDLE_ID="$BUNDLE_ID" \
   CODE_SIGNING_ALLOWED=NO \
   | tee -a "$XCODEBUILD_LOG"
 XCB_RC=${PIPESTATUS[0]}
 set -e
 iv_log "xcodebuild test exit=$XCB_RC"
+
+# Extract the human-readable failure summary if the result bundle is present
+# so the artifact upload has something searchable beyond the opaque
+# "** TEST FAILED **" line in xcodebuild-test.log.
+if [ -d "$XCRESULT_BUNDLE" ]; then
+  iv_log "Extracting xcresult diagnostics"
+  xcrun xcresulttool get test-results summary --path "$XCRESULT_BUNDLE" --format json \
+    > "$ARTIFACTS_DIR/xcresult-summary.json" 2>/dev/null || true
+  xcrun xcresulttool get log --type action --path "$XCRESULT_BUNDLE" \
+    > "$ARTIFACTS_DIR/xcresult-action.log" 2>/dev/null || true
+fi
 
 # Give the log stream a beat to flush the final CN1IV:SUITE:FINISHED line.
 sleep 2
