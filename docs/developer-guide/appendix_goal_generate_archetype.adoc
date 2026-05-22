@@ -2,7 +2,7 @@
 
 NOTE: This goal isn't used. It was originally developed to simplifying the maintenance of multiple application archetypes, but this approach was later abandoned in favor of <<creating-project-templates, application project templates>>.
 
-The `generate-archetype` mojo will generate a new archetype maven project based on an existing archetype project. it's designed to ease the maintenance of several similar archetypes which differe in some dependencies or default project source code. It takes as input a template file which references the base archetype project and specifies what to customize.
+The `generate-archetype` mojo will generate a new archetype maven project based on an existing archetype project. It's designed to ease the maintenance of several similar archetypes which differ in some dependencies or default project source code. It takes as input a template file which references the base archetype project and specifies what to customize.
 
 **Example Usage**
 
@@ -30,7 +30,8 @@ This goal doesn't require a project to run. You can run it directly using the fu
 
 Here is a sample template file:
 
-.A sample template, which is a.Java file.
+.A sample template, which is a.Java file:
+
 [source,text]
 -----
 #set( $symbol_pound = '#' )
@@ -122,11 +123,11 @@ public class ${mainName} {
 }
 
 -----
-<1> The `[archetype]` section specifies details about the archetype project to be generated. For example, the `groupId`, `artifactId`, etc...
+<1> The `[archetype]` section specifies details about the archetype project to be generated. For example, the `groupId`, `artifactId`, etc.
 <2> The `extends` property in the `[archetype]` section is required, and points to the location of the archetype project that this template is based on. Path is relative to the location of the template file.
-<3> The `[dependencies]` section includes content that should be injected into the `<dependencies>` section of the pom.xml file. Note that this isn't the pom file for the archetype project itself. it's the pom.xml file for the project that the archetype project is to generate.
+<3> The `[dependencies]` section includes content that should be injected into the `<dependencies>` section of the pom.xml file. Note that this isn't the pom file for the archetype project itself. It's the pom.xml file for the project that the archetype project is to generate.
 
-Notice that the above template is velocity template for a Java file. It will be used as the source code for the main class in the resulting project. it's a velocity template because maven's `archetype:generate` goal will process it to replace properties such as package and the main class name.
+Notice that the above template is velocity template for a Java file. It will be used as the source code for the main class in the resulting project. It's a velocity template because maven's `archetype:generate` goal will process it to replace properties such as package and the main class name.
 
 ===== Template sections
 

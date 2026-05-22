@@ -40,7 +40,7 @@ Just like in Java SE, the entries within the "JAR" are read and can't be modifie
 
 === Storage
 
-https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] is accessed through the `Storage` class. it's a flat, filesystem-like interface that can list, delete, and write named storage entries.
+https://www.codenameone.com/javadoc/com/codename1/io/Storage.html[Storage] is accessed through the `Storage` class. It's a flat, filesystem-like interface that can list, delete, and write named storage entries.
 
 The `Storage` API also provides convenient methods to write objects to `Storage` and read them back with `readObject` and `writeObject`.
 
@@ -126,7 +126,7 @@ String token = Preferences.get("token", null);
 
 The backing store filename defaults to `"codenameone.properties"`, but you can override it by calling `Preferences.setPreferencesLocation(String)` before your app touches the API. This is useful when you need separate preference namespaces per user or when you want to plug in an encrypted storage layer.
 
-When you've a batch of updates, prefer the `Preferences.set(Map<String,Object>)` overload so that all values are persisted with a single disk write.
+When you have a batch of updates, prefer the `Preferences.set(Map<String,Object>)` overload so that all values are persisted with a single disk write.
 
 Preferences can also tell interested code when a key changes. Register a `PreferenceListener` with `addPreferenceListener()` to react to updates made in other parts of your code or triggered remotely through `Codename One Push`.
 Remember to remove listeners you no longer need to avoid leaks.
@@ -140,13 +140,13 @@ https://www.codenameone.com/javadoc/com/codename1/io/FileSystemStorage.html[File
 
 Notice that the file system API is somewhat platform specific in its behavior. All paths used the API should be absolute otherwise they aren't guaranteed to work.
 
-The main reason `java.io.File` & `java.io.FileInputStream` weren't supported directly has a lot to do with the richness of those two API's. They effectively allow saving a file anywhere, but mobile devices are far more restrictive and don't allow apps to see/change files that are owned by other apps.
+The main reason `java.io.File` & `java.io.FileInputStream` weren't supported directly has a lot to do with the richness of those two APIs. They effectively allow saving a file anywhere, but mobile devices are far more restrictive and don't allow apps to see/change files that are owned by other apps.
 
 ==== File paths & app home
 
 All paths in `FileSystemStorage` are absolute, this simplifies the issue of portability since the concept of relativity and current working directory aren't portable.
 
-All URL's use the `/` as their path separator you try to enforce this behavior even in Windows.
+All URLs use the `/` as their path separator you try to enforce this behavior even on Windows.
 
 Directories end with the `/` character and thus can be distinguished by their name.
 
@@ -221,18 +221,18 @@ image::img/filesystem-tree.png[Simple sample of a tree for the FileSystemStorage
 
 The question of storage vs. file system is often confusing for novice mobile developers. This embeds two separate questions:
 
-- Why are there 2 API's where one would have worked?
+- Why are there 2 APIs where one would have worked?
 - Which one should you pick?
 
-The main reasons for the 2 API's are technical. Many OS's provide 2 ways of accessing data specific to the app and this is reflected within the API. For example: on Android the `FileSystemStorage` maps to API's such as `java.io.FileInputStream` whereas the `Storage` maps to `Context.openFileInput()`.
+The main reasons for the 2 APIs are technical. Many OSes provide 2 ways of accessing data specific to the app and this is reflected within the API. For example: on Android the `FileSystemStorage` maps to APIs such as `java.io.FileInputStream` whereas the `Storage` maps to `Context.openFileInput()`.
 
-The secondary reason for the two API's is conceptual. `FileSystemStorage` is more powerful and in a sense provides more ways to fail, this is compounded by the complex on-device behavior of the API. `Storage` is designed to be friendlier to the uninitiated and more portable.
+The secondary reason for the two APIs is conceptual. `FileSystemStorage` is more powerful and in a sense provides more ways to fail, this is compounded by the complex on-device behavior of the API. `Storage` is designed to be friendlier to the uninitiated and more portable.
 
-You should pick `Storage` unless you've a specific need that prevents it. Some API's such as `Capture` expect a `FileSystemStorage` URI so in those cases this would also be a need.
+You should pick `Storage` unless you have a specific need that prevents it. Some APIs such as `Capture` expect a `FileSystemStorage` URI so in those cases this would also be a need.
 
 Another case where `FileSystemStorage` is beneficial is the case of hierarchy or native API usage. If you need a directory structure or need to communicate with a native API the `FileSystemStorage` approach is easier.
 
-IMPORTANT: In some OS's the `FileSystemStorage` API can find the content of the `Storage` API. As one is implemented on top of the other. This is undocumented behavior that can change at any moment!
+IMPORTANT: In some OSes the `FileSystemStorage` API can find the content of the `Storage` API. As one is implemented on top of the other. This is undocumented behavior that can change at any moment!
 
 To summarize the differences between the 3 file storage options:
 
@@ -283,7 +283,7 @@ String path = Display.getInstance().getDatabasePath("databaseName");
 
 You can then use the `FileSystemStorage` class to write the content of your DB file into the path. Notice that it must be a valid SQLite file!
 
-WARNING: `getDatabasePath()` isn't supported in the Javascript port. It will always return null.
+WARNING: `getDatabasePath()` isn't supported in the JavaScript port. It will always return null.
 
 This is useful for applications that need to synchronize with a central server or applications that ship with a large database as part of their core product.
 
@@ -478,15 +478,15 @@ not for access control or fraud prevention by itself.
 
 ==== Arguments, headers & methods
 
-HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename One tries to simplify and abstract most of these complexities behind common sense API's while still providing the full low-level access you would expect from such an API.
+HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename One tries to simplify and abstract most of these complexities behind common sense APIs while still providing the full low-level access you would expect from such an API.
 
 ===== Arguments
 
 HTTP supports many "request methods," most commonly `GET` & `POST` but also a few others such as `HEAD`, `PUT`, `DELETE` etc.
 
-Arguments in HTTP are passed differently between `GET` and `POST` methods. that's what the `setPost` method in Codename One determines, whether arguments added to the request should be placed using the `GET` semantics or the `POST` semantics.
+Arguments in HTTP are passed differently between `GET` and `POST` methods. That's what the `setPost` method in Codename One determines, whether arguments added to the request should be placed using the `GET` semantics or the `POST` semantics.
 
-if you continue your example from above you can do something like this:
+If you continue your example from above you can do something like this:
 
 [source,java]
 ----
@@ -494,7 +494,7 @@ ConnectionRequest request = new ConnectionRequest(url, false);
 request.addArgument("MyArgName", value);
 ----
 
-This will implicitly add a get argument with the content of `value`. Notice that you don't care what value is. it's implicitly HTTP encoded based on the get/post semantics. In this case it will use the get encoding since you passed `false` to the constructor.
+This will implicitly add a get argument with the content of `value`. Notice that you don't care what value is. It's implicitly HTTP encoded based on the get/post semantics. In this case it will use the get encoding since you passed `false` to the constructor.
 
 A simpler implementation could do something like this:
 
@@ -524,7 +524,7 @@ request.setHttpMethod("HEAD");
 
 When communicating with HTTP servers you often pass data within headers for authentication/authorization but also to convey various properties.
 
-Some headers are built-in as direct API's for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content kind of a post request using:
+Some headers are built-in as direct APIs for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content kind of post request using:
 
 [source,java]
 ----
@@ -577,7 +577,7 @@ Here you can extract the headers one by one to handle complex headers such as co
 
 As you noticed above practically all the methods in the `ConectionRequest` throw `IOException`. This allows you to avoid the `try`/`catch` semantics and let the error propagate up the chain so it can be handled uniformly by the application.
 
-two distinct placed where you can handle a networking error:
+There are two distinct places where you can handle a networking error:
 
 - The `ConnectionRequest` - by overriding callback methods
 - The `NetworkManager` error handler
@@ -614,7 +614,7 @@ NetworkManager.getInstance().addToQueue(request);
 IMPORTANT: The error callback is triggered in the network thread! +
 As a result it can't access the UI to show a `Dialog` or anything like that.
 
-Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. it's a powerful strategy if you use the synchronous version of the API's for example:
+Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. It's a powerful strategy if you use the synchronous version of the APIs for example:
 
 [source,java]
 ----
@@ -632,7 +632,7 @@ TIP: This code will work with the synchronous "AndWait" version of the method si
 
 When you get an error code that isn't 200/300 you ignore the result. This is problematic as the result might contain information you need. For example: many webservices provide further XML/JSON based details describing the reason for the error code.
 
-Calling `setReadResponseForErrors(true)` will trigger a mode where even errors will receive the `readResponse` callback with the error stream. This also means that API's like `getData` and the listener API's will also work in case of error.
+Calling `setReadResponseForErrors(true)` will trigger a mode where even errors will receive the `readResponse` callback with the error stream. This also means that APIs like `getData` and the listener APIs will also work in case of error.
 
 ==== GZIP
 
@@ -656,7 +656,7 @@ Do the rest as usual and you should have smaller responses from the servers.
 
 https://www.codenameone.com/javadoc/com/codename1/io/MultipartRequest.html[MultipartRequest] tries to simplify the process of uploading a file from the local device to a remote server.
 
-You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in devices/size allowed. HTTP standardized file upload capabilities thru the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
+You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in devices/size allowed. HTTP standardized file upload capabilities through the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
 
 [source,java]
 ----
@@ -724,13 +724,13 @@ hi.show();
 .CSV parsing results, notice the escaped parentheses and comma
 image::img/csv-parsing.png[CSV parsing results notice the escaped parentheses and comma,scaledwidth=30%]
 
-The data contains a two dimensional array of the CSV content. You can change the delimiter character by using the `CSVParser` constructor that accepts a character.
+The data contains a two-dimensional array of the CSV content. You can change the delimiter character by using the `CSVParser` constructor that accepts a character.
 
 IMPORTANT: Notice that you used `CharArrayReader` from the `com.codename1.io` package for this sample. You would want to use `java.util.InputStreamReader` for real world data.
 
 ===== JSON
 
-The JSON ("Java Script Object Notation") format is popular on the web for passing values to/from webservices since it works so well with JavaScript. Parsing JSON is as easy but has two different variations. You can use the https://www.codenameone.com/javadoc/com/codename1/io/JSONParser.html[JSONParser] class to build a tree of the JSON data as such:
+The JSON ("JavaScript Object Notation") format is popular on the web for passing values to/from webservices since it works so well with JavaScript. Parsing JSON is as easy but has two different variations. You can use the https://www.codenameone.com/javadoc/com/codename1/io/JSONParser.html[JSONParser] class to build a tree of the JSON data as such:
 
 [source,java]
 ----
@@ -896,15 +896,15 @@ https://www.codenameone.com/manual/components.html#tree-section[Tree Section] of
 You've had a great sample of working with `XMLParser` in the <<tree-section,Tree Section>> of this guide.
 ////
 
-`XMLParser` has the complimentary https://www.codenameone.com/javadoc/com/codename1/xml/XMLWriter.html[XMLWriter] class which can generate XML from the `Element` hierarchy. This allows a developers to mutate (change) the elements and save them to a writer stream.
+`XMLParser` has the complimentary https://www.codenameone.com/javadoc/com/codename1/xml/XMLWriter.html[XMLWriter] class which can generate XML from the `Element` hierarchy. This allows developers to mutate (change) the elements and save them to a writer stream.
 
 ===== XPath processing
 
 The https://www.codenameone.com/javadoc/com/codename1/processing/Result.html[Result] class provides a subset of
 https://www.w3schools.com/xml/xpath_intro.asp[XPath], but it isn't limited to XML documents, it can also work with JSON documents, and even with raw `Map` objects.
 
-Lets start by demonstrating how to process a response from the
-https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geocoder API]. Lets start with this XML snippet:
+Start by demonstrating how to process a response from the
+https://developers.google.com/maps/documentation/geocoding/[Google Reverse Geocoder API]. Start with this XML snippet:
 
 [source,xml]
 ----
@@ -1124,7 +1124,7 @@ NOTE: Notice that Google’s JSON webservice uses plural form for each of the no
 
 ====== Second example
 
-It also possible to do some more complex expressions. You’ll use the following XML fragment for the next batch of examples:
+It's also possible to do some more complex expressions. You’ll use the following XML fragment for the next batch of examples:
 
 [source,xml]
 ----
@@ -1178,7 +1178,7 @@ String first2[] = result.getAsStringArray("//player[position() < 3]/firstname");
 String secondLast = result.getAsString("//player[last() - 1]/firstName");
 ----
 
-it's also possible to select parent nodes, by using the ‘..’ expression. For example:
+It's also possible to select parent nodes, by using the `..` expression. For example:
 
 
 [source,java]
@@ -1186,14 +1186,14 @@ it's also possible to select parent nodes, by using the ‘..’ expression. For
 int id = result.getAsInteger("//lastname[text()='Hewitt']/../@id");
 ----
 
-Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the id attribute from the player node. Or, you could get the same result from the following simpler statement:
+Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
 
 [source,java]
 ----
 int id = result.getAsInteger("//player[lastname='Hewitt']/@id");
 ----
 
-it's also possible to nest expressions, for example:
+It's also possible to nest expressions, for example:
 
 
 [source,java]
@@ -1234,7 +1234,7 @@ Keep in mind that the Codename One path expression language isn't a full impleme
 
 https://www.codenameone.com/javadoc/com/codename1/io/Properties.html[Properties] files are standard key/value pairs encoded into a text file. This file format is familiar to Java developers and the Codename One specific version tries to be as close as possible to the original Java implementation.
 
-Notice that properties file both in Java proper and in Codename One don't support non-ascii characters. To encode unicode values into the properties file format you should use the `native2ascii` tool that ships with the JDK.
+Notice that properties file both in Java proper and in Codename One don't support non-ascii characters. To encode Unicode values into the properties file format you should use the `native2ascii` tool that ships with the JDK.
 
 One major difference between standard Java properties and the ones in Codename One is that Codename One sorts properties alphabetically when saving. Java uses random order based on the `Hashtable` natural ordering.
 
@@ -1296,32 +1296,32 @@ For example, when you introduced it you didn't have support for the cache filesy
 
 JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when you're running there and fallback to using the cache filesystem if it's available and as a last resort go to storage...
 
-that's what the new method of `URLImage` does:
+That's what the new method of `URLImage` does:
 
 [source,java]
 ----
 public static Image createCachedImage(String imageName, String url, Image placeholder, int resizeRule);
 ----
 
-a few important things you need to notice about this method:
+A few important things you need to notice about this method:
 
 - It returns *Image* and not *URLImage*. This is crucial. Down casting to `URLImage* will work on the simulator but might fail in some platforms (for example: JavaScript) so don't do that! +
 Since this is implemented natively in JavaScript you need a different abstraction for that platform.
 
-- It doesn't support image adapters and instead uses a simplified resize rule. Image adapters work on `URLImage` since you've a lot of control in that class. For example, in the browser your control is limited and so an adapter won't work.
+- It doesn't support image adapters and instead uses a simplified resize rule. Image adapters work on `URLImage` since you have a lot of control in that class. For example, in the browser your control is limited and so an adapter won't work.
 
-If you do use this approach it would be far more efficient when running in the JavaScript port and will make better use of caching in most OS's.
+If you do use this approach it would be far more efficient when running in the JavaScript port and will make better use of caching in most OSes.
 
 === Rest API
 
-The `Rest` API makes it easy to invoke a restfull webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. To get a parsed JSON result from a URL you could do:
+The `Rest` API makes it easy to invoke a RESTful webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. To get a parsed JSON result from a URL you could do:
 
 [source,java]
 ----
 Map<String, Object> jsonData = Rest.get(myUrl).getAsJsonMap().getResponseData();
 ----
 
-For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. you've a special case support for that:
+For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. You have a special case support for that:
 
 [source,java]
 ----
@@ -1353,9 +1353,9 @@ The code in the kitchen sink webservice sample was updated to use this API. The 
 
 ==== Rest in practice - twilio
 
-The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation."
+The best way to explain the usage of this API is through a concrete "real world" example. Twilio provides many great telephony-oriented webservices to developers. One of those is an SMS sending webservice which can be useful for things such as "device activation."
 
-To get started you would need to signup to http://twillo.com/[Twilio] and have the following 3 variable values:
+To get started you would need to sign up to http://twillo.com/[Twilio] and have the following 3 variable values:
 
 [source,java]
 ----
@@ -1388,7 +1388,7 @@ curl 'https://api.twilio.com/2010-04-01/Accounts/[accountSID]/Messages.json' -X 
 -u [accountSID]:[AuthToken]
 ----
 
-that's pretty cool as the curl command maps almost directly to the `Rest` API call!
+That's pretty cool as the curl command maps almost directly to the `Rest` API call!
 
 What you do here is actually pretty trivial, you open a connection the api messages URL. You add arguments to the body of the post request and define the basic authentication data.
 
@@ -1443,7 +1443,7 @@ if(result.getResponseData() != null) {
 
 The Webservice Wizard can be invoked directly from the plugin. It generates stubs for the client side that allow performing simple method invocations on the server. It also generates a servlet that can be installed on any servlet container to intercept client side calls.
 
-The types of values that can be passed through the webservice wizard protocol have limits, but it's highly efficient since it's a binary protocol and extensible thru object externalization. All methods are provided both as asynchronous and synchronous calls for the convenience of the developer.
+The types of values that can be passed through the webservice wizard protocol have limits, but it's highly efficient since it's a binary protocol and extensible through object externalization. All methods are provided both as asynchronous and synchronous calls for the convenience of the developer.
 
 .The first step in creating a client/server connection using the webservice wizard is to create a web application
 image::img/webservice-wizard-step1-create-webapp.png[The first step in creating a client/server connection using the webservice wizard is to create a web application,scaledwidth=40%]
@@ -1459,8 +1459,8 @@ image::img/webservice-wizard-step3-setup-your-webserver.png[Setup your webserver
 .Configure the application server to the newly created app, notice the application context value which you will use later
 image::img/webservice-wizard-step4-configure-the-app-notice-context-path.png[Configure the application server to the newly created app, notice the application context value which you will use later]
 
-.In the main Codename One project right click and select the WebService Wizard option
-image::img/webservice-wizard-step5-main-project-rightclick-select-webservice-wizard.png[In the main Codename One project right click and select the WebService Wizard option,scaledwidth=40%]
+.In the main Codename One project right-click and select the WebService Wizard option
+image::img/webservice-wizard-step5-main-project-rightclick-select-webservice-wizard.png[In the main Codename One project right-click and select the WebService Wizard option,scaledwidth=40%]
 
 .Set the package and class name for the webservice abstraction (notice this isn't your main class name) and then add the methods you want in the webservice
 image::img/webservice-wizard-step6-set-package-and-class-names-add-methods.png[Set the package and class name for the webservice abstraction (notice this isn't your main class name) and then add the methods you want in the webservice,scaledwidth=40%]
@@ -1524,7 +1524,7 @@ public class GameOfThronesService {
 }
 ----
 
-The destination URL needs to point at the actual server which you will recall from the new project creation should include `HelloWebServiceWizard`. you can fix the URL to:
+The destination URL needs to point at the actual server which you will recall from the new project creation should include `HelloWebServiceWizard`. You can fix the URL to:
 
 [source,java]
 ----
@@ -1533,7 +1533,7 @@ private static final String DESTINATION_URL = "http://localhost:8080/HelloWebSer
 
 You would need to update the host name of the server for running on a device otherwise the device would need to live within your internal network and point to your IP address.
 
-it's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
+It's now time to write the actual client code that calls this. Every method you defined above is now defined as a static method within the `GameOfThronesService` class with two permutations. One is a synchronous permutation that behaves as expected. It blocks the calling thread while calling the server and might throw an `IOException` if something failed.
 
 This kind of method (synchronous method) is easy to work with since it's legal to call it from the event dispatch thread and it's easy to map it to application logic flow.
 
@@ -1598,14 +1598,14 @@ You added an experimental feature to connection request that allows you to set t
 - *OFF* is the default meaning no caching.
 - *SMART* means all get requests are cached intelligently and caching is "mostly" seamless
 - *MANUAL* means that the developer handles the actual caching but the system won't do a request on a resource that's already "fresh"
-- *OFFLINE* will fetch data from the cache and wont try to go to the server. It will generate a 404 error if data isn't available
+- *OFFLINE* will fetch data from the cache and won't try to go to the server. It will generate a 404 error if data isn't available
 
 You can toggle these in the specific request by using `setCacheMode(CachingMode)` and set the global
 default using `setDefaultCacheMode(CachingMode)`.
 
 NOTE: Caching applies to `GET` operations, it won't work for `POST` or other methods
 
-many methods of interest to keep an eye for:
+There are many methods of interest to keep an eye for:
 
 [source,java]
 ----
@@ -1644,7 +1644,7 @@ For example, you do remove the `ETag` and `Last-Modified` data so the files migh
 
 === Cached data service
 
-The https://www.codenameone.com/javadoc/com/codename1/io/services/CachedDataService.html[CachedDataService] allows caching data and updating it if the data changed on the server. The download API's won't check for update if there is a local cache of the data (for example: `URLImage` always uses the local copy). This isn't a bad thing, it's pretty efficient.
+The https://www.codenameone.com/javadoc/com/codename1/io/services/CachedDataService.html[CachedDataService] allows caching data and updating it if the data changed on the server. The download APIs won't check for update if there is a local cache of the data (for example: `URLImage` always uses the local copy). This isn't a bad thing, it's pretty efficient.
 
 For example, it might be important to update the image if it changed but you still want caching.
 
@@ -1716,10 +1716,10 @@ public void internalize(int version, DataInputStream in) throws IOException;
 public String getObjectId();
 ----
 
-The `getVersion()` method returns the current version of the object allowing the stored data to change its structure in the future (the version is then passed when internalizing the object). The object id is a `String` uniquely representing the object;
+The `getVersion()` method returns the current version of the object allowing the stored data to change its structure in the future (the version is then passed when internalizing the object). The object ID is a `String` uniquely representing the object;
 it corresponds to the class name (in the example above the Unique Name should be `MyClass`).
 
-WARNING: it's a common mistake to use `getClass().getName()` to implement `getObjectId()` and it would *seem to work* in the simulator. This isn't the case though! +
+WARNING: It's a common mistake to use `getClass().getName()` to implement `getObjectId()` and it would *seem to work* in the simulator. This isn't the case though! +
 Since devices obfuscate the class names this becomes a problem as data is stored in a random name that changes with every release.
 
 Developers need to write the data of the object in the externalize method using the methods in the data output stream and read the data of the object in the internalize method for example:
@@ -2045,9 +2045,9 @@ public class Meeting {
 }
 ----
 
-that's a classic POJO and it's the force that underlies JavaBeans and a few tools in Java.
+That's a classic POJO and it's the force that underlies JavaBeans and a few tools in Java.
 
-The properties are effectively the getters/setters for example: `subject`, `when` etc. but properties have many features
+The properties are effectively the getters/setters for example: `subject`, `when` etc. But properties have many features
 that are crucial:
 
 - They can be manipulated in runtime by a tool that had no knowledge of them during compile time
@@ -2125,7 +2125,7 @@ This means that this code won't compile:
 meet.subject = otherValue;
 ----
 
-all setting/getting must happen thru the set/get methods and they can be replaced. For example: this is valid syntax
+All setting/getting must happen through the set/get methods and they can be replaced. For example: this is valid syntax
 that prevents setting the property to null and defaults it to an empty string:
 
 [source,java]
@@ -2147,9 +2147,9 @@ NOTE: You will discuss the reason for returning the `Meeting` instance below
 Since `Property` is a common class it's pretty easy for introspective code to manipulate properties. For example,
 it can't detect properties in an object without reflection.
 
-that's why you've the index object and the `PropertyBusinessObject` interface (which defines `getPropertyIndex`).
+That's why you have the index object and the `PropertyBusinessObject` interface (which defines `getPropertyIndex`).
 
-The `PropertyIndex` class provides meta data for the surrounding class including the list of the properties within.
+The `PropertyIndex` class provides metadata for the surrounding class including the list of the properties within.
 It allows enumerating the properties and iterating over them making them accessible to all tools.
 
 Furthermore all properties are observable with the property change listener. You can write this to instantly print
@@ -2162,7 +2162,7 @@ meet.subject.addChangeListener((p) -> Log.p("New property value is: " + p.get())
 
 ==== The cool stuff
 
-that's the simple stuff that can be done with properties, but they can do **much** more!
+That's the simple stuff that can be done with properties, but they can do **much** more!
 
 For starters all the common methods of `Object` can be implemented with almost no code:
 
@@ -2205,14 +2205,14 @@ values from parsed JSON:
 meet.getPropertyIndex().populateFromMap(jsonParsedData);
 ----
 
-And visa versa:
+And vice versa:
 
 [source,java]
 ----
 String jsonString = meet.toJSON();
 ----
 
-You also have a simple ORM solution that maps values to table columns and can create tables. it's no hibernate
+You also have a simple ORM solution that maps values to table columns and can create tables. It's no hibernate
 but sqlite isn't big iron so it might be good enough.
 
 ===== Constructors
@@ -2220,7 +2220,7 @@ but sqlite isn't big iron so it might be good enough.
 One of the problematic issues with constructors is that any change starts propagating everywhere. If you have
 fields in the constructor and you add a new field later you need to keep the old constructor for compatibility.
 
-you added a new syntax:
+You added a new syntax:
 
 [source,java]
 ----
@@ -2229,10 +2229,10 @@ Meeting meet = new Meeting().
         when.set(new Date());
 ----
 
-that's why every property in the definition needed the `Meeting` generic and the set method returns the `Meeting`
+That's why every property in the definition needed the `Meeting` generic and the set method returns the `Meeting`
 instance...
 
-you're pretty conflicted on this feature and are thinking about removing it.
+You're pretty conflicted on this feature and are thinking about removing it.
 
 Without this feature the code would look like this:
 
@@ -2296,7 +2296,7 @@ Storage.getInstance().writeObject("MyContact", contact);
 Contact readContact = (Contact)Storage.getInstance().readObject("MyContact");
 ----
 
-This will obviously also work for things like `List<Contact>` etc...
+This will obviously also work for things like `List<Contact>` etc.
 
 ===== Seamless SQL storage
 
@@ -2374,17 +2374,17 @@ The arguments for the `select` method are:
 - The attribute by which you want to sort the result (can be null)
 - Whether sort is ascending
 - Number of elements to fetch
-- Page to start with - in this case if you've more than 1000 elements you can fetch the next page using `sm.select(c, c.name, true, 1000, 1)`
+- Page to start with - in this case if you have more than 1000 elements you can fetch the next page using `sm.select(c, c.name, true, 1000, 1)`
 
-many more configurations where you can fine tune how a specific property maps to a column etc.
+There are many more configurations where you can fine tune how a specific property maps to a column etc.
 
 ====== What's still missing
 
-The `SQLMap` API is simplistic and doesn't try to be Hibernate/JPA for mobile. basic things aren't available now and won't work. This isn't necessarily a problem as mobile databases don't need to be as powerful as server databases.
+The `SQLMap` API is simplistic and doesn't try to be Hibernate/JPA for mobile. Basic things aren't available now and won't work. This isn't necessarily a problem as mobile databases don't need to be as powerful as server databases.
 
 ====== Relational Mappings/JOIN
 
-Right now you can't map an object to another object in the database with the typical one-many, one-one etc. relationships that would could do with JPA. The `SQLMap` API is simplistic and isn't suited for that level of mapping now.
+Right now you can't map an object to another object in the database with the typical one-many, one-one etc. relationships that you could do with JPA. The `SQLMap` API is simplistic and isn't suited for that level of mapping now.
 
 If there is demand for this it's something you might add moving forward but your goal isn't to re-invent hibernate.
 
@@ -2414,14 +2414,14 @@ That means you need to pay attention to the way you cache objects to avoid a cas
 
 ===== Preferences binding
 
-Some objects make sense as global objects, you can use the `Preferences` API to store that data directly but then you don't have the type safety that property objects bring to the table. that's where the binding of property objects to preferences makes sense. For example: say you've a global `Settings` property object you can bind it to preferences using:
+Some objects make sense as global objects, you can use the `Preferences` API to store that data directly but then you don't have the type safety that property objects bring to the table. That's where the binding of property objects to preferences makes sense. For example: say you have a global `Settings` property object you can bind it to preferences using:
 
 [source,java]
 ----
 PreferencesObject.create(settingsInstance).bind();
 ----
 
-if settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
+If settings has a property called `companyName` it would bind into `Preferences` under the `Settings.companyName` entry.
 
 You can do some more elaborate bindings such as:
 
@@ -2437,7 +2437,7 @@ This would customize all entry keys to start with `MySettings-` instead of `Sett
 
 ===== UI binding
 
-One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class, say you've a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
+One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class, say you have a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
 
 [source,java]
 ----
@@ -2445,9 +2445,9 @@ myNameTextField.setText(myNameTextField.getText());
 myNameTextField.addActionListener(e -> myContact.name.set(myNameTextField.getText()));
 ----
 
-That would work but what if you changed the property value, that wouldn't be reflected back into the text field?
+That would work but what if you changed the property value, that wouldn't be reflected in the text field?
 
-Also that works for text field but what about other types for example: numbers, check boxes, pickers etc. this becomes a bit more tedious with those.
+Also that works for text field but what about other types for example: numbers, check boxes, pickers etc. This becomes a bit more tedious with those.
 
 Binding makes this all seamless. For example: the code above can be written as:
 
@@ -2522,17 +2522,17 @@ image::img/properties-demo-binding.png[Properties form for the contact,scaledwid
 ====== Binding object & auto commit
 
 // vale-skip: Microsoft.ComplexWords/TooWordy — 'an additional version' reads correctly; 'an more version' is ungrammatical.
-You skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. that's a bit advanced for now but I might discuss this later.
+You skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. That's a bit advanced for now but I might discuss this later.
 
 For example, the big thing "skipped" earlier was the return value... `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows you to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
 
-Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where you've an "OK" button and want the changes to the UI to update the properties when "OK" is pressed (this might not matter if you keep different instances of the object). When autocommit is on (the default which you can change through `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it's off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
+Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where you have an "OK" button and want the changes to the UI to update the properties when "OK" is pressed (this might not matter if you keep different instances of the object). When autocommit is on (the default which you can change through `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it's off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
 
 `commit()` applies the changes in the UI to the properties, `rollback()` restores the UI to the values from the properties object (useful for a "reset changes" button).
 
-Binding also includes the ability to "unbind" this is important if you've a global object that's bound to a UI that's discarded. Binding might hold a hard reference to the UI and the property object might create a memory leak.
+Binding also includes the ability to "unbind" this is important if you have a global object that's bound to a UI that's discarded. Binding might hold a hard reference to the UI and the property object might create a memory leak.
 
-By using the `disconnect()` method in `Binding` you can separate the UI from the object and allow the GC to cleanup.
+By using the `disconnect()` method in `Binding` you can separate the UI from the object and allow the GC to clean up.
 
 ===== UI generation
 
@@ -2558,7 +2558,7 @@ This still carries most of the flexibilities of the regular binding for example:
 UiBinding.Binding b = iui.getBindings(cnt);
 ----
 
-You might not have noticed this but in the previous vebose code you had lines like:
+You might not have noticed this but in the previous verbose code you had lines like:
 
 [source,java]
 ----
@@ -2571,7 +2571,7 @@ The picker component implicitly works for date type properties, numeric constrai
 
 However, how do you know to use an email constraint for the email property?
 
-you've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. it will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
+You've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. It will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
 
 [source,java]
 ----

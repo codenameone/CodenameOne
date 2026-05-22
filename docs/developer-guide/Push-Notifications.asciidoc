@@ -9,7 +9,7 @@ TIP: For a quick reference on setting up Push notifications, check out the https
 
 === Understanding push notifications
 
-Push notifications provide a way to inform users that something of interest has taken place. it's one of the few mechanisms available to interact with the user *even when the app isn't running*. If your app is registered to receive push notifications, then you can send messages to the user's device through REST API either from another device, or, as is the case, from a web server.
+Push notifications provide a way to inform users that something of interest has taken place. It's one of the few mechanisms available to interact with the user *even when the app isn't running*. If your app is registered to receive push notifications, then you can send messages to the user's device through REST API either from another device, or, as is the case, from a web server.
 
 Messages may contain a short title and text body that will be displayed to the user in their device's messages stream. They may also specify a badge to display on the app's icon (for example: that red circle on your mail app icon that indicates how many unread messages you've), a sound to play then the message arrives, an image attachment, and a set of "actions" that the user can perform directly in the push notification.
 
@@ -18,7 +18,7 @@ In addition to messages that the user *sees*, a push notification can contain no
 
 === Implementing push support
 
-Enabling push support in your application is a matter of implementing the `PushCallback` interface in your application's main class (that's: the class that includes your `start()`, `init()`, etc... methods.
+Enabling push support in your application is a matter of implementing the `PushCallback` interface in your application's main class (that's: the class that includes your `start()`, `init()`, etc. methods:
 
 [source,java]
 ----
@@ -38,7 +38,7 @@ public class MyApplication implements PushCallback {
     /**
      * Invoked when push registration is complete to pass the device ID to the application.
      *
-     * @param deviceId OS native push id you should not use this value and instead use <code>Push.getPushKey()</code>
+     * @param deviceId OS native push ID you should not use this value and instead use <code>Push.getPushKey()</code>
      * @see Push#getPushKey()
      */
     public void registeredForPush(String deviceId) {
@@ -57,7 +57,7 @@ public class MyApplication implements PushCallback {
 ----
 
 
-There will be more steps required to deploy to each platform (for example: iOS requires you to generate push certificates, Android needs you to register your app ID with their cloud messaging platform, etc...), but, fundamentally, this is all that's required to enable push support in your app.
+There will be more steps required to deploy to each platform (for example: iOS requires you to generate push certificates, Android needs you to register your app ID with their cloud messaging platform, etc.), but, fundamentally, this is all that's required to enable push support in your app.
 
 === The push lifecycle
 
@@ -81,13 +81,13 @@ Codename One provides a secure REST API for sending push notifications. As an HT
 
 ==== Receiving a push notification
 
-two different scenarios to be aware of when it comes to receiving push notifications. If your app is running in the foreground when the message arrives, then it will be passed directly to your `push()` callback. If your app is either in the background, or not running, then the notification will be displayed in your device's notifications. If the user then taps the notification, it will open your app, and the `push()` callback will be run with the contents of the message.
+There are two different scenarios to be aware of when it comes to receiving push notifications. If your app is running in the foreground when the message arrives, then it will be passed directly to your `push()` callback. If your app is either in the background, or not running, then the notification will be displayed in your device's notifications. If the user then taps the notification, it will open your app, and the `push()` callback will be run with the contents of the message.
 
-Some push message types include hidden content that won't be displayed in your device's notifications. These hidden messages (or portions of messages) are passed directly to the `push()` callback of your app for processing.
+Some push-message types include hidden content that won't be displayed in your device's notifications. These hidden messages (or portions of messages) are passed directly to the `push()` callback of your app for processing.
 
 NOTE: On iOS, hidden push messages (push type 2) won't be delivered when the app is in the background.
 
-TIP: You can set the `android.background_push_handling` build hint to "true" to deliver push messages on Android when the app is minimized (running in the background). no equivalent setting on other platforms.
+TIP: You can set the `android.background_push_handling` build hint to "true" to deliver push messages on Android when the app is minimized (running in the background). No equivalent setting on other platforms.
 
 [[delay-push-completion]]
 === Handling Long-Running background push tasks
@@ -190,7 +190,7 @@ In Android (before API 27) this will trigger the push(String) call with the mess
 - `3` - `1 + 2 = 3` allows combining a visual push with a non-visual portion. Expects a message in the form: `This is what the user will see;This is something he won't see`. For example: you can bundle a special ID or even a JSON string in the hidden part while including a friendly message in the visual part. +
 When active this will trigger the push(String) method twice, once with the visual and once with the hidden data.
 
-- `4` - Allows splitting a visual push request based on the format `title;body` to provide better visual representation in some OS's.
+- `4` - Allows splitting a visual push request based on the format `title;body` to provide better visual representation in some OSes.
 
 - `5` - Sends a regular push message but doesn't play a sound when the push arrives
 
@@ -249,7 +249,7 @@ This push will result in your `push()` callback being fired twice; once with the
 
 **Push Type 4; Message Body "Hello World;I am saying hello"**
 
-Push type 4 specifies a title and a message body. In this example, alert title will be `Hello World`, and the body will by `I am saying hello`.
+Push type 4 specifies a title and a message body. In this example, alert title will be `Hello World`, and the body will be `I am saying hello`.
 
 .Push type 4 "Hello World" message in simulator.
 image::img/push-type-4-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
@@ -305,9 +305,9 @@ On platforms that don't support badges or titles, the payload will fall back to 
 
 .Badging on iOS
 ****
-The badge number can be set thru code as well, this is useful if you want the badge to represent the unread count within your application.
+The badge number can be set through code as well, this is useful if you want the badge to represent the unread count within your application.
 
-To do this you've two methods in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class: `isBadgingSupported()` and `setBadgeNumber(int)`.
+To do this you have two methods in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class: `isBadgingSupported()` and `setBadgeNumber(int)`.
 Notice that even if `isBadgingSupported` will return `true`, it won't work unless you activate push support!
 
 To truly use this you might need to disable the clearing of the badges on startup which you can do with the
@@ -320,9 +320,9 @@ Rich push notifications refer to push notifications that include functionality a
 
 ==== Image attachment support
 
-When you attach an image to a push notification, it will appear as a large image in the push notification on the user's device if that device supports it. iOS supports image attachments in iOS 10, Android supports them in API 26. The Javascript port doesn't support image attachments. If a platform that doesn't support image attachments receives a push notification with an image attachment, it will ignore it.
+When you attach an image to a push notification, it will appear as a large image in the push notification on the user's device if that device supports it. iOS supports image attachments in iOS 10, Android supports them in API 26. The JavaScript port doesn't support image attachments. If a platform that doesn't support image attachments receives a push notification with an image attachment, it will ignore it.
 
-Push type "99" is used to send rich push notifications. it's sort of a "meta" push type, or a "container," as it can be used to send any of the other push types, but to attach more content, such as image attachments.
+Push type "99" is used to send rich push notifications. It's sort of a "meta" push type, or a "container," as it can be used to send any of the other push types, but to attach more content, such as image attachments.
 
 The message body should be an XML string. A minimal example of a push type 99 that *actually* sends a push type 1, which message "Hello World," but with an attached image is:
 
@@ -473,14 +473,14 @@ public void push(String message) {
 
 === Deploying Push-Enabled apps to device
 
-you've implemented the Push callback in your app, and tested it in the push simulator and it works. If you try to deploy your app to a device, you may be disappointed to discover that your app doesn't seem to be receiving push notifications when installed on the device. This is because each platform has its own bureaucracy and hoops that you've to jump through before they will deliver notifications to your app. Read on to find out how to meet their requirements.
+You've implemented the Push callback in your app, and tested it in the push simulator and it works. If you try to deploy your app to a device, you may be disappointed to discover that your app doesn't seem to be receiving push notifications when installed on the device. This is because each platform has its own bureaucracy and hoops that you've to jump through before they will deliver notifications to your app. Read on to find out how to meet their requirements.
 
 [[push-bureaucracy-android-section]]
 ==== The push bureaucracy - Android
 
 TIP: To set the push icon place a 24×24 icon named `ic_stat_notify.png` under the `native/android` folder of the app. The icon can be white with transparency areas
 
-Android Push goes thru Google servers and to do that you need to register with Google to get keys for server usage. Google uses Firebase for its cloud messaging, so you will begin by creating a Firebase project.
+Android Push goes through Google servers and to do that you need to register with Google to get keys for server usage. Google uses Firebase for its cloud messaging, so you will begin by creating a Firebase project.
 
 Go to https://console.firebase.google.com/ and click #Add project#:
 
@@ -544,7 +544,7 @@ The "Server Key" displayed here is the `FCM_SERVER_API_KEY` that you refer to th
 .Save the Server key for later use.
 image::img/push-fcm-server-key.png[Save the Server Key for later use,scaledwidth=30%]
 
-NOTE: The Sender ID shown in the above isn't required for your Android app, but it's helpful/required to support Push notifications in Javascript builds (in Chrome). This value is referred to elsewhere in this document as `GCM_SENDER_ID`.
+NOTE: The Sender ID shown in the above isn't required for your Android app, but it's helpful/required to support Push notifications in JavaScript builds (in Chrome). This value is referred to elsewhere in this document as `GCM_SENDER_ID`.
 
 [[push-bureaucracy-ios-section]]
 ==== The push bureaucracy - iOS
@@ -566,7 +566,7 @@ IMPORTANT: If you already have signing certificated defined for your app skip th
 You can then install the push certificates locally and use them later on but there is an easier way.
 
 You need to host the push certificates in the cloud so they will be reachable by the push servers, Codename One that for you seamlessly. +
-Once you go thru the wizard you should get an automated email containing information about push and the location of the push certificates, it should start like this:
+Once you go through the wizard you should get an automated email containing information about push and the location of the push certificates, it should start like this:
 
 ----
 iOS Push certificates have been created for your app with bundle ID com.mycompany.myapp.mypushdemo.  Please file this email away for safe keeping as you will need the details about the certificate locations and passwords to use Push successfully in your apps.
@@ -582,7 +582,7 @@ https://codename-one-push-certificates.s3.amazonaws.com/com.mycompany.myapp.mypu
 Production Push Certificate Password: ssDfdsfer324
 ----
 
-The URL's and passwords are everything that you will need later on to get push working on iOS. Notice that the wizard also performs a couple of other tasks specifically it sets the `ios.includePush` build hint to true & adds push to the provisioning profile etc.
+The URLs and passwords are everything that you will need later on to get push working on iOS. Notice that the wizard also performs a couple of other tasks specifically it sets the `ios.includePush` build hint to true & adds push to the provisioning profile etc.
 
 // HTML_ONLY_START
 You can read more about the certificate wizard in the https://www.codenameone.com/manual/signing.html[signing section].
@@ -609,7 +609,7 @@ Codename One apps support push in browsers that implement the Web Push API. At t
 
 Firefox doesn't require any special setup for Push. If your main class implements the `PushCallback` interface, it should * work*.
 
-Chrome uses FCM for its push notifications - the same system that Android uses. The directions for setting up a FCM account are the same as provided <<push-bureaucracy-android-section,here>>, and you can reuse the same `GCM_SENDER_ID` and `FCM_API_SERVER_KEY` values. For Chrome push support you will need to add the `GCM_SENDER_ID` in the `gcm.sender_id` build hint so that the GCM_SENDER_ID will be added to the app's manifest file:
+Chrome uses FCM for its push notifications - the same system that Android uses. The directions for setting up an FCM account are the same as provided <<push-bureaucracy-android-section,here>>, and you can reuse the same `GCM_SENDER_ID` and `FCM_API_SERVER_KEY` values. For Chrome push support you will need to add the `GCM_SENDER_ID` in the `gcm.sender_id` build hint so that the GCM_SENDER_ID will be added to the app's manifest file:
 
 ----
 gcm.sender_id=GCM_SENDER_ID
@@ -617,18 +617,18 @@ gcm.sender_id=GCM_SENDER_ID
 
 Where `GCM_SENDER_ID` is your GCM_SENDER_ID.
 
-NOTE: Push support requires that your app be served over https with a valid SSL certificate. It won't work with the "preview" version of your app. You'll need to download the.zip or.war file and host the file on your own site - with a valid SSL certificate.
+NOTE: Push support requires that your app be served over https with a valid SSL certificate. It won't work with the "preview" version of your app. You'll need to download the `.zip` or `.war` file and host the file on your own site - with a valid SSL certificate.
 
 === Sending push messages
 
-You can send a push message in many ways for example: from another device or any kind of server but there are some values that you will need regardless of the way in which you send the push message.
+You can send a push message in many ways for example: from another device or any kind of server but there are some values that you will need regardless of the way in which you send the push message:
 
 [source,java]
 -----
 private static final String PUSH_TOKEN = "********-****-****-****-*************";
 -----
 
-The push token is a unique "key" that you can use to send push thru your Codename One account. It allows you to send push messages without placing your Codename One email or password into your source files.
+The push token is a unique "key" that you can use to send push through your Codename One account. It allows you to send push messages without placing your Codename One email or password into your source files.
 
 You can get it by going to the Codename One build server dashboard at https://www.codenameone.com/build-server.html and selecting the #Account# tab.
 
@@ -637,7 +637,7 @@ The token should appear at the bottom as such:
 .Push Token from the build server
 image::img/push-token.png[Push Token from the build server,scaledwidth=30%]
 
-The instructions for extracting the API key for Google are <<push-bureaucracy-android-section,listed above>>.
+The instructions for extracting the API key for Google are <<push-bureaucracy-android-section,listed above>>:
 
 [source,java]
 -----
@@ -647,11 +647,11 @@ private static final String FCM_SERVER_API_KEY = "******************-***********
 Historical UWP push credentials (SID/client secret) were used by the discontinued UWP target, which was removed in release 7.0.229.
 
 
-When sending push to iOS devices you've two modes:
+When sending push to iOS devices you have two modes:
 - Production
 - Distribution
 
-This allows you to debug the push related functionality without risking the possibility of sending a push into a production app. Its important to send the values to the right server during development/production.
+This allows you to debug the push related functionality without risking the possibility of sending a push into a production app. Its important to send the values to the right server during development/production:
 
 [source,java]
 -----
@@ -662,7 +662,7 @@ iOS needs a certificate to send a push, this allows you to prove to Apples push 
 
 IMPORTANT: These aren't the signing certificates and are separate from them!
 
-You can get these two certificates (for development/App Store) through the certificate wizard as <<push-bureaucracy-ios-section,explained above>>.
+You can get these two certificates (for development/App Store) through the certificate wizard as <<push-bureaucracy-ios-section,explained above>>:
 
 [source,java]
 -----
@@ -720,14 +720,14 @@ Sending a push message from the server is a more elaborate affair and might requ
 
 You can send a push message as an HTTP `POST` request to https://push.codenameone.com/push/push[https://push.codenameone.com/push/push]. That URL accepts the following arguments:
 
-- *token* - your developer token to identify the account sending the push - `PUSH_TOKEN`
-- *device* - one or more device keys to send the push to. You can send push to up to 500 devices with a single request -
-- *type* - the message type identical to the old set of supported types in the old push servers
-- *body* - the body of the message
-- *auth* - the Google push auth key - `FCM_SERVER_API_KEY` (also used for sending to Chrome Javascript Apps)
-- *production* - `true`/`false` whether to push to production or sandbox environment in iOS - `ITUNES_PRODUCTION_PUSH`
-- *certPassword* - password for the push certificate in iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD` or `ITUNES_PRODUCTION_PUSH_CERT_PASSWORD`
-- *cert* - http or https URL containing the push certificate for an iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT` or `ITUNES_PRODUCTION_PUSH_CERT`
+- `token` - your developer token to identify the account sending the push - `PUSH_TOKEN`
+- `device` - one or more device keys to send the push to. You can send push to up to 500 devices with a single request -
+- `type` - the message type identical to the old set of supported types in the old push servers
+- `body` - the body of the message
+- `auth` - the Google push auth key - `FCM_SERVER_API_KEY` (also used for sending to Chrome JavaScript Apps)
+- `production` - `true`/`false` whether to push to production or sandbox environment in iOS - `ITUNES_PRODUCTION_PUSH`
+- `certPassword` - password for the push certificate in iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD` or `ITUNES_PRODUCTION_PUSH_CERT_PASSWORD`
+- `cert` - http or https URL containing the push certificate for an iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT` or `ITUNES_PRODUCTION_PUSH_CERT`
 
 You can thus send a push from Java EE using code like this:
 
@@ -766,9 +766,9 @@ Notice that you can send a push to 500 devices. To send in larger batches you ne
 
 ===== Server JSON responses
 
-The push servers send responses in JSON form. it's crucial to parse and manage those as they might contain important information.
+The push servers send responses in JSON form. It's crucial to parse and manage those as they might contain important information.
 
-If there is an error that isn't fatal such as quota exceeded etc. you will get an error message like this:
+If there is an error that isn't fatal such as quota exceeded etc. You will get an error message like this:
 
 [source,JavaScript]
 -----
@@ -789,9 +789,9 @@ A normal response, will be an array with results:
 -----
 
 
-many things to notice in the responses above:
+There are many things to notice in the responses above:
 
-- If the response contains `status=updateId` it means that the GCM server wants you to update the device id to a new device id. You should do that in the database and avoid sending pushes to the old key
+- If the response contains `status=updateId` it means that the GCM server wants you to update the device ID to a new device ID. You should do that in the database and avoid sending pushes to the old key
 - iOS doesn't acknowledge device receipt but it does send a `status=inactive` result which you should use to remove the device from the list of devices
 
 IMPORTANT: APNS (Apple's push service) returns uppercase key results. This means that code for managing the keys in your database must be case insensitive

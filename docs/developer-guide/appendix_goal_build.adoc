@@ -6,7 +6,8 @@ This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you do
 
 ==== Example
 
-.Submitting a Mac Desktop build directly using this goal.
+.Submitting a Mac Desktop build directly using this goal:
+
 [source,bash]
 ----
 mvn cn1:build -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop
@@ -29,7 +30,7 @@ The build target. Different platforms support different build sets of build targ
 | android-source | android | Generates an Android Gradle project locally that can be opened and built in Android Studio.
 | ios-device | ios | Sends an iOS build to the Codename One build server.
 | ios-source | ios | Generates an iOS Xcode project locally that can be opened and built in Xcode.
-| JavaScript | JavaScript | Sends a Javascript build to the Codename One build server.
+| JavaScript | JavaScript | Sends a JavaScript build to the Codename One build server.
 |====
 
 automated::

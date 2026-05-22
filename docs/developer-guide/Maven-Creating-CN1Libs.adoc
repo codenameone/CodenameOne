@@ -7,10 +7,10 @@ A cn1lib may contain any of the following:
 
 . Cross-platform Java classes.
 . Native code that targets specific platforms.
-. Build hints, which will affect how projects will be built that include this library. These can contain things like Gradle dependencies on Android, cocopods dependencies on iOS, and other hints to affect the build-server process.
+. Build hints, which will affect how projects will be built that include this library. These can contain things like Gradle dependencies on Android, Cocoapods dependencies on iOS, and other hints to affect the build-server process.
 . CSS files.
 
-..cn1lib vs.jar
+.`.cn1lib` vs `.jar`
 [sidebar]
 ****
 You may be wondering why the .cn1lib format is even necessary. Why not just distribute libraries as .jar files? The .cn1lib format offers several advantages over the plain .jar format:
@@ -44,7 +44,7 @@ mvn archetype:generate \
   -DinteractiveMode=false
 ----
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 In the above snippet you would change the `groupId`, `artifactId`, and `version` properties to reflect your project settings.
 
@@ -65,7 +65,7 @@ mvn archetype:generate -DarchetypeGroupId=com.codenameone \
   -DarchetypeArtifactId=cn1lib-archetype
 ----
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 And follow the prompts. This will, result in fewer prompts because you've already specified the archetype to use.
 ====
@@ -130,7 +130,7 @@ version, and package. The "Package" is unimportant here as it isn't used anywher
 +
 Once you've entered the information to your liking press the "Finish" button.
 
-This will create a new libary project for you at the location you specified.
+This will create a new library project for you at the location you specified.
 
 ==== Eclipse IDE
 
@@ -152,7 +152,7 @@ Select that option, and press _Next_
 +
 image:img/eclipse-new-maven-project-details.png[]
 
-This will create a new libary project for you at the location you specified.
+This will create a new library project for you at the location you specified.
 
 ==== Project structure
 
@@ -167,7 +167,7 @@ The module where you can implement native interfaces for the iOS platform. This 
 android::
 The module where you can implement native interfaces for the Android platform. This module is in the "android" directory of the main project.
 JavaScript::
-The module where you can implement native interfaces for the Javascript platform. This module is in the "JavaScript" directory of the main project.
+The module where you can implement native interfaces for the JavaScript platform. This module is in the "JavaScript" directory of the main project.
 lib::
 The library module which includes all the other modules as dependencies, and can be used as a pom dependency in Codename One application projects that wish to use this library. This module is in the "lib" directory of the main project.
 tests::
@@ -194,7 +194,7 @@ image::img/netbeans-myfirstlibrary-project-inspector.png[]
 
 This top-level view of the modules doesn't provide a clear view of the project landscape, but, since 99% of your development will occur inside the `common` submodule. Open that "common" sub-module project as well and take a peek.
 
-Right click on the "Common" sub-module, and select "Open Project" as shown below:
+Right-click on the "Common" sub-module, and select "Open Project" as shown below:
 
 image::img/netbeans-myfirstlibrary-open-common-submodule.png[]
 
@@ -313,7 +313,7 @@ This may seem daunting at first, but it's important to realize that 99% of the t
 
 ===== Important files
 
-a few key files in this project that you'll be using more than the others.
+A few key files in this project that you'll be using more than the others.
 
 pom.xml::
 The maven configuration file of the root module is where you will set project-wide properties such as the `cn1.version` property, which specifies the version of the Codename One libraries that the module should be compiled against. Periodically, you'll want to update the `cn1.version` property to point to the latest version.
@@ -321,13 +321,13 @@ The maven configuration file of the root module is where you will set project-wi
 When/if you decide to deploy your module to Maven central, you'll need to add more deployment-related settings in this file.
 
 common/pom.xml::
-The maven configuration file for the "common" module, which will contain most of your cn1lib's soure code, CSS files, and properties files. If your library depends on other libraries or jar files, you'll be adding them as dependencies in this file, and not the root pom.xml file.
+The maven configuration file for the "common" module, which will contain most of your cn1lib's source code, CSS files, and properties files. If your library depends on other libraries or jar files, you'll be adding them as dependencies in this file, and not the root pom.xml file.
 
 common/codenameone_library_appended.properties::
 This file is where you can specify properties that should be merged with the codenameone_settings.properties of application projects that include this library as a dependency. This is where you would add, for example, Gradle dependencies required for the Android builds, or CocoaPods dependencies that are required for iOS builds.
 
 common/codenameone_library_required.properties::
-This file allows you to specific build hints that *must* be present in application projects that include this library. If this libary requires a particular android build tools version, or a specific Java version, then those requirements should be specified in this file.
+This file allows you to specific build hints that *must* be present in application projects that include this library. If this library requires a particular android build tools version, or a specific Java version, then those requirements should be specified in this file.
 
 ===== Important directories
 
@@ -360,7 +360,7 @@ Press the "build" image:img/intellij-build-icon.png[] button on the toolbar.
 
 ===== NetBeans
 
-Right click on the "root" module in the project explorer and select `Build`.
+Right-click on the "root" module in the project explorer and select `Build`.
 
 image::img/netbeans-right-click-build.png[]
 
@@ -370,7 +370,7 @@ Or you could have selected the "root" module in the project explorer and pressed
 
 ===== Eclipse IDE
 
-Right click on the "root" module in the project explorer and select _Run as_ > _Maven Install_
+Right-click on the "root" module in the project explorer and select _Run as_ > _Maven Install_
 
 image::img/eclipse-build-cn1lib.png[]
 
@@ -381,7 +381,7 @@ TIP: If the build fails for any reason, check to make sure that your project is 
 
 When using the Maven build tool, you no longer require the.cn1lib file at all. Your library projects can be handled entirely via Maven's dependency mechanism. The preferred way to distribute your libraries is on Maven central, and the preferred way to add a library to an application is via a Maven "pom" dependency.
 
-That being said, you may still want to distribute your library as a.cn1lib file for the sake of users who are still using Ant as their build tool. For that reason, when you bulid a library project, the cn1lib is automatically built as well. After running a build, you can look in the common/target directory and find your.cn1lib file ready to be distributed.
+That being said, you may still want to distribute your library as a.cn1lib file for the sake of users who are still using Ant as their build tool. For that reason, when you build a library project, the cn1lib is automatically built as well. After running a build, you can look in the common/target directory and find your.cn1lib file ready to be distributed.
 
 ==== Editing Java Code
 
@@ -413,7 +413,7 @@ IMPORTANT: Make sure you're editing the common/pom.xml file of the *application 
 This file may look a little hairy as there is a lot of configuration in there. You will be looking for the `<dependencies>` section.
 
 
-The common/pom.xml file will have more than one `<dependencies>` tag, as it includes some profiles handling things like kotlin support. There will be one particular `<dependencies>` tag that includes a comment like
+The common/pom.xml file will have more than one `<dependencies>` tag, as it includes some profiles handling things like Kotlin support. There will be one particular `<dependencies>` tag that includes a comment like
 
 [source,xml]
 ----
@@ -461,7 +461,7 @@ Every menu item is also reachable from CN1 UnitTests (or any app code) through `
 
 ==== The contract
 
-Each cn1lib ships a properties file at a well-known classpath location. The simulator scans every jar on its classpath for this resource and merges the results, so multiple cn1libs coexist cleanly.
+Each cn1lib ships a properties file at a well-known classpath location. The simulator scans every jar on its classpath for this resource and merges the results, so multiple cn1libs coexist cleanly:
 
 [source,properties]
 ----
@@ -496,7 +496,7 @@ No groups, no submenus, no priority — flat by design. If you need ordering rel
 
 ==== The action method
 
-The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally.
+The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
 
 [source,java]
 ----

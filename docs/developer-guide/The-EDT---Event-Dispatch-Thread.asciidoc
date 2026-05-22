@@ -42,7 +42,7 @@ Codename One includes helper methods in the https://www.codenameone.com/javadoc/
 
 `callSerially(Runnable)` should normally be called off the EDT (in a separate thread), the run method within the submitted runnable will be invoked on the EDT.
 
-IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. use the `Runnable` interface as a convenient callback interface.
+IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. Use the `Runnable` interface as a convenient callback interface:
 
 [source,java]
 ----
@@ -91,7 +91,7 @@ If the work you're posting back to the EDT is expensive and can wait until the U
 
 ==== callSerially On The EDT
 
-One of the misunderstood topics is why you'd ever want to invoke `callSerially` when you're still on the EDT. This is best explained by example. Say you've a button that has quite a bit of functionality tied to its events e.g.:
+One of the misunderstood topics is why you'd ever want to invoke `callSerially` when you're still on the EDT. This is best explained by example. Say you have a button that has quite a bit of functionality tied to its events e.g.:
 
 1. A user added an action listener to show a Dialog.
 
@@ -234,7 +234,7 @@ All events and EDT behavior still work while `invokeAndBlock` is running, this i
 IMPORTANT: Notice that `invokeAndBlock` comes at a slight performance penalty. Also notice that nesting `invokeAndBlock` calls (or over using them) isn't recommended. +
 However, they're convenient when working with multiple threads/UI.
 
-Even if you never call `invokeAndBlock` directly you're probably using it indirectly in API's such as https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] that show a dialog while blocking the current thread e.g.:
+Even if you never call `invokeAndBlock` directly you're probably using it indirectly in APIs such as https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] that show a dialog while blocking the current thread e.g.:
 
 [source,java]
 ----
@@ -248,7 +248,7 @@ public void actionPerformed(ActionEvent ev) {
 
 Notice that the dialog show method will block the calling thread until the user clicks OK or Not OK...
 
-NOTE: Other API's such as `NetworkManager.addToQueueAndWait()` also make use of this feature. Pretty much every "AndWait" method or blocking method uses this API internally!
+NOTE: Other APIs such as `NetworkManager.addToQueueAndWait()` also make use of this feature. Pretty much every "AndWait" method or blocking method uses this API internally!
 
 To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
 
@@ -262,7 +262,7 @@ while(codenameOneRunning) {
 }
 ----
 
-`invokeAndBlock()` works in a similar way to this pseudo code:
+`invokeAndBlock()` works in a similar way to this pseudo-code:
 
 [source,java]
 ----
