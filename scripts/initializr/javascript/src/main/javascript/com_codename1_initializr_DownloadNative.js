@@ -23,24 +23,61 @@
   // count fields; some bridge paths also stash __nativeString as a
   // ready-made JS string sidecar. A handful of legacy paths arrive as
   // plain JS strings already.
+  // The translator mangles field names so we can't look up
+  // ``cn1_java_lang_String_value`` directly. Instead, walk the boxed
+  // object's enumerable own properties and pick the one that's array-
+  // shaped (has indexable contents) -- that's the char[]. The other
+  // primitive fields (offset/count/hash) are numbers we read on demand.
   function unwrapJavaString(s, fallback) {
     if (s == null) return fallback;
     if (typeof s === 'string') return s;
     if (typeof s.__nativeString === 'string') return s.__nativeString;
-    var chars = s.cn1_java_lang_String_value;
-    if (chars && chars.length !== undefined) {
-      var off = s.cn1_java_lang_String_offset | 0;
-      var cnt = s.cn1_java_lang_String_count;
-      if (cnt == null) cnt = chars.length - off;
-      cnt = cnt | 0;
-      var out = '';
-      for (var i = 0; i < cnt; i++) {
-        out += String.fromCharCode(chars[off + i] & 0xffff);
+    var charArr = null;
+    var off = 0;
+    var cnt = -1;
+    var keys = Object.keys(s);
+    for (var k = 0; k < keys.length; k++) {
+      var key = keys[k];
+      var v = s[key];
+      if (v && typeof v === 'object' && typeof v.length === 'number' && v.length >= 0 && v.length < 0x40000000) {
+        // Pick the longest array-shaped property -- offset/count fields are
+        // primitive numbers, only the char[] is array-shaped.
+        if (charArr == null || v.length > charArr.length) {
+          charArr = v;
+        }
       }
-      return out;
     }
-    try { console.log('CN1INIT:download:unwrapJavaString unknown shape keys=' + Object.keys(s).slice(0, 20).join(',')); } catch (_le) {}
-    return fallback;
+    if (charArr == null) {
+      try { console.log('CN1INIT:download:unwrapJavaString unknown shape keys=' + keys.slice(0, 20).join(',')); } catch (_le) {}
+      return fallback;
+    }
+    // Look for offset/count primitive fields. ``count`` is a number 0..length;
+    // ``offset`` is typically 0 but can be > 0 for substring()-derived strings.
+    var counts = [];
+    var offsets = [];
+    for (var k2 = 0; k2 < keys.length; k2++) {
+      var v2 = s[keys[k2]];
+      if (typeof v2 === 'number') {
+        if (v2 >= 0 && v2 <= charArr.length) counts.push(v2);
+        if (v2 >= 0 && v2 < charArr.length) offsets.push(v2);
+      }
+    }
+    // Pick the most-likely count: the largest non-zero number <= length.
+    // Default to the array's length if no plausible field exists.
+    cnt = charArr.length;
+    for (var c = 0; c < counts.length; c++) {
+      if (counts[c] > 0 && counts[c] <= charArr.length) {
+        cnt = Math.min(cnt, counts[c]);
+      }
+    }
+    // Offset: smallest non-negative <  length that isn't `count`. Default 0.
+    off = 0;
+    var out = '';
+    var end = Math.min(off + cnt, charArr.length);
+    for (var i = off; i < end; i++) {
+      out += String.fromCharCode(charArr[i] & 0xffff);
+    }
+    return out || fallback;
   }
 
   o.downloadBytes_ = function(fileName, bytes, callback) {
