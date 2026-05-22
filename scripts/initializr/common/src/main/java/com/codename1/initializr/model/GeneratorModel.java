@@ -305,74 +305,63 @@ public class GeneratorModel {
     // Initializr template is text + small zips totalling a few hundred KB,
     // which is fine for a one-shot download.
     private static void writeStoredZip(OutputStream out, Map<String, byte[]> entries) throws IOException {
-        long offset = 0;
+        int offset = 0;
         // Buffer central-directory records to write after all local headers.
         ByteArrayOutputStream centralDir = new ByteArrayOutputStream();
         int entryCount = 0;
         for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
             byte[] name = fileEntry.getKey().getBytes("UTF-8");
             byte[] data = fileEntry.getValue();
-            int len;
-            long crc;
-            try {
-                len = data.length;
-                crc = crc32(data);
-            } catch (Throwable t) {
-                String cls;
-                String msg;
-                try { cls = t.getClass().getName(); } catch (Throwable ignored) { cls = "<no-class>"; }
-                try { msg = t.getMessage(); } catch (Throwable ignored) { msg = "<no-msg>"; }
-                System.out.println("CN1INIT:writeStoredZip:crc-err idx=" + entryCount + " key=" + fileEntry.getKey() + " cls=" + cls + " msg=" + msg);
-                throw t instanceof IOException ? (IOException) t : new IOException("crc failed at idx " + entryCount + " key=" + fileEntry.getKey() + ": " + msg);
-            }
+            int len = data.length;
+            int crc = crc32(data);
             // Local file header
-            write32(out, 0x04034b50L); // signature
-            write16(out, 20);          // version needed to extract (2.0)
-            write16(out, 0);           // general purpose flags
-            write16(out, 0);           // compression method = STORED
-            write16(out, 0);           // last mod time
-            write16(out, 0x0021);      // last mod date = 1980-01-01
+            write32(out, 0x04034b50); // signature
+            write16(out, 20);         // version needed to extract (2.0)
+            write16(out, 0);          // general purpose flags
+            write16(out, 0);          // compression method = STORED
+            write16(out, 0);          // last mod time
+            write16(out, 0x0021);     // last mod date = 1980-01-01
             write32(out, crc);
-            write32(out, len);         // compressed size = uncompressed
+            write32(out, len);        // compressed size = uncompressed
             write32(out, len);
             write16(out, name.length);
-            write16(out, 0);           // extra-field length
+            write16(out, 0);          // extra-field length
             out.write(name);
             out.write(data);
             // Central directory file header (buffered, emitted after all locals)
-            write32(centralDir, 0x02014b50L); // signature
-            write16(centralDir, 20);          // version made by
-            write16(centralDir, 20);          // version needed
-            write16(centralDir, 0);           // flags
-            write16(centralDir, 0);           // method
-            write16(centralDir, 0);           // mtime
-            write16(centralDir, 0x0021);      // mdate
+            write32(centralDir, 0x02014b50); // signature
+            write16(centralDir, 20);         // version made by
+            write16(centralDir, 20);         // version needed
+            write16(centralDir, 0);          // flags
+            write16(centralDir, 0);          // method
+            write16(centralDir, 0);          // mtime
+            write16(centralDir, 0x0021);     // mdate
             write32(centralDir, crc);
             write32(centralDir, len);
             write32(centralDir, len);
             write16(centralDir, name.length);
-            write16(centralDir, 0);           // extra len
-            write16(centralDir, 0);           // comment len
-            write16(centralDir, 0);           // disk number
-            write16(centralDir, 0);           // internal attrs
-            write32(centralDir, 0);           // external attrs
-            write32(centralDir, offset);      // local header offset
+            write16(centralDir, 0);          // extra len
+            write16(centralDir, 0);          // comment len
+            write16(centralDir, 0);          // disk number
+            write16(centralDir, 0);          // internal attrs
+            write32(centralDir, 0);          // external attrs
+            write32(centralDir, offset);     // local header offset
             centralDir.write(name);
-            offset += 30L + name.length + len;
+            offset += 30 + name.length + len;
             entryCount++;
         }
-        long centralDirOffset = offset;
+        int centralDirOffset = offset;
         byte[] cd = centralDir.toByteArray();
         out.write(cd);
         // End of Central Directory Record
-        write32(out, 0x06054b50L); // signature
-        write16(out, 0);           // disk number
-        write16(out, 0);           // disk with central dir
-        write16(out, entryCount);  // num records on this disk
-        write16(out, entryCount);  // total records
-        write32(out, cd.length);   // central dir size
+        write32(out, 0x06054b50); // signature
+        write16(out, 0);          // disk number
+        write16(out, 0);          // disk with central dir
+        write16(out, entryCount); // num records on this disk
+        write16(out, entryCount); // total records
+        write32(out, cd.length);  // central dir size
         write32(out, centralDirOffset);
-        write16(out, 0);           // comment length
+        write16(out, 0);          // comment length
     }
 
     private static void write16(OutputStream out, int v) throws IOException {
@@ -380,11 +369,16 @@ public class GeneratorModel {
         out.write((v >>> 8) & 0xFF);
     }
 
-    private static void write32(OutputStream out, long v) throws IOException {
-        out.write((int) (v & 0xFFL));
-        out.write((int) ((v >>> 8) & 0xFFL));
-        out.write((int) ((v >>> 16) & 0xFFL));
-        out.write((int) ((v >>> 24) & 0xFFL));
+    // Writes 4 bytes little-endian. Uses int arithmetic throughout so we don't
+    // tickle the JS-port translator's long-cast bug where ``(long)negativeInt``
+    // doesn't sign-extend the way Java says it should -- the resulting long
+    // ANDed with 0xFFFFFFFFL produced just the low byte instead of all four
+    // bytes for any 32-bit value whose high bit was set (most CRCs).
+    private static void write32(OutputStream out, int v) throws IOException {
+        out.write(v & 0xFF);
+        out.write((v >>> 8) & 0xFF);
+        out.write((v >>> 16) & 0xFF);
+        out.write((v >>> 24) & 0xFF);
     }
 
     // Inline CRC32 (RFC 1952). Avoids depending on net.sf.zipme.CRC32 -- if
@@ -404,12 +398,12 @@ public class GeneratorModel {
         return t;
     }
 
-    private static long crc32(byte[] data) {
-        int crc = 0xFFFFFFFF;
+    private static int crc32(byte[] data) {
+        int crc = -1; // 0xFFFFFFFF as 32-bit signed int
         for (int i = 0; i < data.length; i++) {
             crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ data[i]) & 0xFF];
         }
-        return (long) (crc ^ 0xFFFFFFFF) & 0xFFFFFFFFL;
+        return ~crc;
     }
 
     /// Manual zip parser used on the JS port where zipme's ZipInputStream
