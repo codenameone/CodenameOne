@@ -118,7 +118,6 @@ try {
   logStream.end();
 }
 
-const missing = REQUIRED_EVENTS.filter(m => !seen.has(m));
 const log = (line) => process.stdout.write(`[playwright-driver] ${line}\n`);
 let failed = false;
 for (const m of REQUIRED_EVENTS) {
