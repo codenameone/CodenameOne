@@ -479,25 +479,50 @@ public class GeneratorModel {
                 try { msg = t.getMessage(); } catch (Throwable ignored) { msg = "<no-msg>"; }
                 System.out.println("CN1INIT:copyZip:getNextEntry-err res=" + zipResource + " cls=" + cls + " msg=" + msg);
                 IOException wrap = new IOException("getNextEntry " + cls + ": " + msg);
-                System.out.println("CN1INIT:copyZip:throwing wrap=" + wrap);
                 throw wrap;
             }
             while (entry != null) {
-                if (!entry.isDirectory()) {
-                    String name = entry.getName();
+                String name = entry.getName();
+                boolean isDir = entry.isDirectory();
+                System.out.println("CN1INIT:copyZip:iter res=" + zipResource + " idx=" + entries + " name=" + name + " dir=" + isDir);
+                if (!isDir) {
                     if (dropWindowsModule && (name.startsWith("win/") || name.startsWith("win\\"))) {
-                        // Java 17 projects don't ship the UWP/Windows native module — strip
-                        // its source tree from the extracted skeleton. The matching root-pom
-                        // <profile id="win"> block is removed in applyDataReplacements below.
-                        zis.closeEntry();
-                        entry = zis.getNextEntry();
+                        try {
+                            zis.closeEntry();
+                            entry = zis.getNextEntry();
+                        } catch (Throwable t) {
+                            System.out.println("CN1INIT:copyZip:iter-skip-err res=" + zipResource + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+                            throw t instanceof IOException ? (IOException) t : new IOException("skip: " + t);
+                        }
                         continue;
                     }
-                    copyEntryToMap(name, readToBytesNoClose(zis), mergedEntries, zipType);
+                    byte[] data;
+                    try {
+                        data = readToBytesNoClose(zis);
+                    } catch (Throwable t) {
+                        System.out.println("CN1INIT:copyZip:read-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+                        throw t instanceof IOException ? (IOException) t : new IOException("read: " + t);
+                    }
+                    try {
+                        copyEntryToMap(name, data, mergedEntries, zipType);
+                    } catch (Throwable t) {
+                        System.out.println("CN1INIT:copyZip:put-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+                        throw t instanceof IOException ? (IOException) t : new IOException("put: " + t);
+                    }
                     entries++;
                 }
-                zis.closeEntry();
-                entry = zis.getNextEntry();
+                try {
+                    zis.closeEntry();
+                } catch (Throwable t) {
+                    System.out.println("CN1INIT:copyZip:closeEntry-err res=" + zipResource + " name=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+                    throw t instanceof IOException ? (IOException) t : new IOException("closeEntry: " + t);
+                }
+                try {
+                    entry = zis.getNextEntry();
+                } catch (Throwable t) {
+                    System.out.println("CN1INIT:copyZip:nextEntry-err res=" + zipResource + " afterName=" + name + " cls=" + t.getClass().getName() + " msg=" + t.getMessage());
+                    throw t instanceof IOException ? (IOException) t : new IOException("nextEntry: " + t);
+                }
             }
         }
         System.out.println("CN1INIT:copyZip:close res=" + zipResource + " entries=" + entries);
