@@ -59,6 +59,21 @@
         "url": "https://dzone.com/content/3655676/edit.html",
         "syndicated_at": "2026-05-18T13:53:16+00:00"
       }
+    },
+    "skills-java17-and-theme-accents": {
+      "devto": {
+        "id": 3726146,
+        "url": "https://dev.to/codenameone/skills-java-17-and-theme-accents-59dp",
+        "syndicated_at": "2026-05-22T13:46:38+00:00"
+      },
+      "foojay": {
+        "id": 123913,
+        "url": "https://foojay.io/wp-admin/post.php?post=123913&action=edit",
+        "preview_url": "https://foojay.io/?p=123913",
+        "featured_media_id": 123912,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-05-22T13:47:26+00:00"
+      }
     }
   }
 }
