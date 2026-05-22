@@ -78,12 +78,21 @@ if [ -n "${IOS_DEPENDENCY_ARGS:-}" ]; then
   bia_log "Applying extra iOS build args: ${IOS_DEPENDENCY_ARGS}"
 fi
 
-APP_DIR="scripts/hellocodenameone"
+APP_DIR="${CN1_APP_DIR:-scripts/hellocodenameone}"
+
+# Derive the iOS project / scheme name from the app's own CN1 settings so
+# this script can build any CN1 app, not just hellocodenameone.
+CN1_SETTINGS_FILE="$REPO_ROOT/$APP_DIR/common/codenameone_settings.properties"
+if [ -f "$CN1_SETTINGS_FILE" ]; then
+  MAIN_NAME_FROM_SETTINGS="$(awk -F= '/^codename1.mainName=/{print $2; exit}' "$CN1_SETTINGS_FILE" | tr -d '\r')"
+fi
+APP_MAIN_NAME="${CN1_APP_MAIN_NAME:-${MAIN_NAME_FROM_SETTINGS:-HelloCodenameOne}}"
+bia_log "Using APP_DIR=$APP_DIR APP_MAIN_NAME=$APP_MAIN_NAME"
 
 xcodebuild -version
 
 bia_log "Building iOS Xcode project using Codename One port"
-cd $APP_DIR
+cd "$REPO_ROOT/$APP_DIR"
 VM_START=$(date +%s)
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
@@ -175,11 +184,11 @@ stage_bytecode_translator_sources() {
   bia_log "Created archive $zip_file"
 }
 
-bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
+bia_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
 (
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$BASE_PATH"
-  MVN_IOS_LOG="$ARTIFACTS_DIR/hellocn1-ios-build.log"
+  MVN_IOS_LOG="$ARTIFACTS_DIR/cn1-ios-build.log"
   MVN_CMD=(
     ./mvnw package
     -DskipTests
@@ -211,7 +220,7 @@ bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
 )
 VM_END=$(date +%s)
 VM_TIME=$((VM_END - VM_START))
-cd ../..
+cd "$REPO_ROOT"
 
 echo "$VM_TIME" > "$ARTIFACTS_DIR/vm_time.txt"
 bia_log "VM translation time: ${VM_TIME}s (saved to $ARTIFACTS_DIR/vm_time.txt)"
@@ -269,22 +278,22 @@ else
   bia_log "Podfile not found in generated project; skipping pod install"
 fi
 
-WORKSPACE_XML='<?xml version="1.0" encoding="UTF-8"?>
+WORKSPACE_XML="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Workspace
-   version = "1.0">
+   version = \"1.0\">
    <FileRef
-      location = "group:HelloCodenameOne.xcodeproj">
+      location = \"group:${APP_MAIN_NAME}.xcodeproj\">
    </FileRef>
-</Workspace>'
-if [ ! -d "$PROJECT_DIR/HelloCodenameOne.xcworkspace" ] && [ -d "$PROJECT_DIR/HelloCodenameOne.xcodeproj" ]; then
+</Workspace>"
+if [ ! -d "$PROJECT_DIR/${APP_MAIN_NAME}.xcworkspace" ] && [ -d "$PROJECT_DIR/${APP_MAIN_NAME}.xcodeproj" ]; then
   bia_log "Creating fallback xcworkspace for generated Xcode project"
-  mkdir -p "$PROJECT_DIR/HelloCodenameOne.xcworkspace"
-  printf '%s\n' "$WORKSPACE_XML" > "$PROJECT_DIR/HelloCodenameOne.xcworkspace/contents.xcworkspacedata"
+  mkdir -p "$PROJECT_DIR/${APP_MAIN_NAME}.xcworkspace"
+  printf '%s\n' "$WORKSPACE_XML" > "$PROJECT_DIR/${APP_MAIN_NAME}.xcworkspace/contents.xcworkspacedata"
 fi
 
-if [ -d "$PROJECT_DIR/HelloCodenameOne.xcodeproj" ]; then
+if [ -d "$PROJECT_DIR/${APP_MAIN_NAME}.xcodeproj" ]; then
   bia_log "Ensuring shared Xcode scheme exists"
-  "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" HelloCodenameOne
+  "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$APP_MAIN_NAME"
 fi
 
 # Locate workspace or project for the next step
@@ -315,11 +324,11 @@ bia_log "Found Xcode entrypoint: $WORKSPACE"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "workspace=$WORKSPACE"
-    echo "scheme=HelloCodenameOne"
+    echo "scheme=$APP_MAIN_NAME"
   } >> "$GITHUB_OUTPUT"
 fi
 
-bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=HelloCodenameOne"
+bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$APP_MAIN_NAME"
 
 # (Optional) dump xcodebuild -list for debugging
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"

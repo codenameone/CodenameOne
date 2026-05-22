@@ -26,11 +26,31 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HELLO_ROOT="$REPO_ROOT/scripts/hellocodenameone"
+
+# CN1_APP_DIR (relative to repo root) selects which CN1 Maven project to bundle
+# for the browser. Default keeps the original hellocodenameone behaviour so
+# existing callers stay green; pipelines that target a different app set
+# CN1_APP_DIR=scripts/<app>.
+APP_REL_DIR="${CN1_APP_DIR:-scripts/hellocodenameone}"
+HELLO_ROOT="$REPO_ROOT/$APP_REL_DIR"
 COMMON_ROOT="$HELLO_ROOT/common"
 PORT_ROOT="$REPO_ROOT/Ports/JavaScriptPort"
 PARPARVM_ROOT="$REPO_ROOT/maven/parparvm"
-OUTPUT_ZIP="${1:-$HELLO_ROOT/parparvm/target/hellocodenameone-javascript-port.zip}"
+
+# Read packageName / mainName from the app's CN1 settings so the generated
+# launcher imports the right class and the translator gets the right entry
+# point. Allow callers to override via env for unusual layouts.
+CN1_SETTINGS_FILE="$COMMON_ROOT/codenameone_settings.properties"
+if [ -f "$CN1_SETTINGS_FILE" ]; then
+  MAIN_NAME_FROM_SETTINGS="$(awk -F= '/^codename1.mainName=/{print $2; exit}' "$CN1_SETTINGS_FILE" | tr -d '\r')"
+  PACKAGE_NAME_FROM_SETTINGS="$(awk -F= '/^codename1.packageName=/{print $2; exit}' "$CN1_SETTINGS_FILE" | tr -d '\r')"
+fi
+APP_MAIN_NAME="${CN1_APP_MAIN_NAME:-${MAIN_NAME_FROM_SETTINGS:-HelloCodenameOne}}"
+APP_PACKAGE_NAME="${CN1_APP_PACKAGE_NAME:-${PACKAGE_NAME_FROM_SETTINGS:-com.codenameone.examples.hellocodenameone}}"
+APP_BUNDLE_BASENAME="${CN1_APP_BUNDLE_BASENAME:-$(echo "$APP_MAIN_NAME" | tr '[:upper:]' '[:lower:]')-javascript-port}"
+bj_log "Using APP_DIR=$APP_REL_DIR mainName=$APP_MAIN_NAME package=$APP_PACKAGE_NAME"
+
+OUTPUT_ZIP="${1:-$HELLO_ROOT/parparvm/target/${APP_BUNDLE_BASENAME}.zip}"
 
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
@@ -65,7 +85,7 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_PARPARVM_BUILD:-0}" != "1" ]
 fi
 
 if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; then
-  bj_log "Building HelloCodenameOne common module and compile-scope dependencies"
+  bj_log "Building $APP_MAIN_NAME common module and compile-scope dependencies"
   mkdir -p "$HOME/.codenameone"
   if [ -f "$REPO_ROOT/maven/UpdateCodenameOne.jar" ]; then
     cp "$REPO_ROOT/maven/UpdateCodenameOne.jar" "$HOME/.codenameone/" 2>/dev/null || true
@@ -93,10 +113,11 @@ done
 STAGE_CLASSES="$WORK_DIR/stage-classes"
 PORT_CLASSES="$WORK_DIR/port-classes"
 SOURCE_LIST="$WORK_DIR/javascript-port-sources.txt"
-LAUNCHER_SRC="$WORK_DIR/HelloCodenameOneJavaScriptMain.java"
+LAUNCHER_CLASS_NAME="${APP_MAIN_NAME}JavaScriptMain"
+LAUNCHER_SRC="$WORK_DIR/${LAUNCHER_CLASS_NAME}.java"
 TRANSLATOR_OUT="$WORK_DIR/translator-output"
-TRANSLATOR_APP_NAME="HelloCodenameOneJavaScriptMain"
-DIST_APP_NAME="HelloCodenameOne"
+TRANSLATOR_APP_NAME="$LAUNCHER_CLASS_NAME"
+DIST_APP_NAME="$APP_MAIN_NAME"
 mkdir -p "$STAGE_CLASSES" "$PORT_CLASSES" "$TRANSLATOR_OUT"
 
 bj_log "Staging JavaAPI and application classes"
@@ -148,24 +169,24 @@ fi
 # Both launchers work - they bootstrap the implementation factory before Display.init()
 bj_log "Preparing JavaScript-port launcher"
 if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  cat > "$LAUNCHER_SRC" <<'EOF'
+  cat > "$LAUNCHER_SRC" <<EOF
 import com.codename1.impl.html5.JavaScriptPortBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+import ${APP_PACKAGE_NAME}.${APP_MAIN_NAME};
 
-public final class HelloCodenameOneJavaScriptMain {
+public final class ${LAUNCHER_CLASS_NAME} {
     public static void main(String[] args) {
-        JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());
+        JavaScriptPortBootstrap.bootstrap(new ${APP_MAIN_NAME}());
     }
 }
 EOF
 else
-  cat > "$LAUNCHER_SRC" <<'EOF'
+  cat > "$LAUNCHER_SRC" <<EOF
 import com.codename1.impl.html5.ParparVMBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+import ${APP_PACKAGE_NAME}.${APP_MAIN_NAME};
 
-public final class HelloCodenameOneJavaScriptMain {
+public final class ${LAUNCHER_CLASS_NAME} {
     public static void main(String[] args) {
-        ParparVMBootstrap.bootstrap(new HelloCodenameOne());
+        ParparVMBootstrap.bootstrap(new ${APP_MAIN_NAME}());
     }
 }
 EOF
@@ -224,14 +245,14 @@ bj_log "Compiling JavaScript-port runtime sources"
 "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
 cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 
-bj_log "Running ByteCodeTranslator for HelloCodenameOne"
+bj_log "Running ByteCodeTranslator for $APP_MAIN_NAME"
 "$JAVA_BIN" -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
   javascript \
   "$STAGE_CLASSES" \
   "$TRANSLATOR_OUT" \
   "$TRANSLATOR_APP_NAME" \
-  "com.codenameone.examples.hellocodenameone" \
-  "HelloCodenameOne" \
+  "$APP_PACKAGE_NAME" \
+  "$APP_MAIN_NAME" \
   "1.0" \
   "ios" \
   "none"

@@ -111,9 +111,18 @@ npx playwright install --with-deps chromium
 
 == CI status
 
-The workflow at `.github/workflows/input-validation.yml` is scaffolded but
-both jobs are gated by `if: false` pending build wiring -- see the TODO
-comments at each `Build CN1 ...` step. They run locally today.
+Both jobs (iOS + JavaScript) run on every PR via
+`.github/workflows/input-validation.yml`. The iOS job reuses the
+`_build-ios-port.yml` reusable workflow so it shares the same port-build
+cache as the screenshot-based scripts-ios pipeline; the JavaScript job
+boots ParparVM + JavaScriptPort, bundles to a zip, serves it via
+`python3 -m http.server`, and drives Chromium against `localhost:8080`.
+
+The underlying build scripts (`scripts/build-ios-app.sh` and
+`scripts/build-javascript-port-hellocodenameone.sh`) accept a
+`CN1_APP_DIR=scripts/input-validation-app` override so the same scripts
+build either app -- defaults stay pointed at hellocodenameone so the
+existing CI keeps passing.
 
 == Not yet covered
 

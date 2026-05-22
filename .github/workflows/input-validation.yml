@@ -13,83 +13,325 @@ on:
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'CodenameOne/src/com/codename1/ui/Component.java'
       - 'CodenameOne/src/com/codename1/ui/Form.java'
       - 'CodenameOne/src/com/codename1/ui/Button.java'
       - 'Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'Ports/JavaScriptPort/**'
       - 'vm/ByteCodeTranslator/src/javascript/**'
   push:
     branches: [ master ]
     paths:
       - '.github/workflows/input-validation.yml'
       - 'scripts/input-validation-app/**'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/build-javascript-port-hellocodenameone.sh'
   workflow_dispatch: {}
 
 jobs:
-  # iOS path is not wired into CI yet because scripts/build-ios-app.sh is
-  # hard-coded to the hellocodenameone module name and project file. The
-  # follow-up PR generalises it (CN1_APP_DIR override + dynamic xcodeproj
-  # name discovery) and flips this job on. Until then, the Swift target,
-  # XcodeGen spec, and drivers/run-ios.sh are exercised manually.
+  build-port:
+    # Reused by `ios` so the iOS port .jar / native sources are available in
+    # the cache the build-ios-app step relies on. Same reusable workflow that
+    # scripts-ios.yml depends on -- piggybacking on its cache key.
+    uses: ./.github/workflows/_build-ios-port.yml
+
   ios:
-    if: ${{ false }}
+    needs: build-port
+    permissions:
+      contents: read
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 35
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-ios-${{ github.ref_name }}
+      cancel-in-progress: true
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1_APP_DIR: scripts/input-validation-app
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-ios-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-ios-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          fail-on-cache-miss: true
+
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Build CN1 input-validation app (iOS)
+
+      - name: Build CN1 input-validation iOS Xcode project
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 25
+
+      - name: Build .app bundle for simulator
+        id: build-app-bundle
         run: |
-          # TODO: replace with a generalised build-ios-app.sh that accepts a
-          # CN1_APP_DIR=scripts/input-validation-app override and emits the
-          # .app bundle path on stdout.
-          echo "iOS app build step not wired yet" >&2
-          exit 1
+          set -euo pipefail
+          WORKSPACE='${{ steps.build-ios-app.outputs.workspace }}'
+          SCHEME='${{ steps.build-ios-app.outputs.scheme }}'
+          DERIVED_DATA="${{ runner.temp }}/cn1iv-dd"
+          rm -rf "$DERIVED_DATA"
+          if [[ "$WORKSPACE" == *.xcworkspace ]]; then
+            xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath "$DERIVED_DATA" \
+              CODE_SIGNING_ALLOWED=NO build
+          else
+            xcodebuild -project "$WORKSPACE" -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath "$DERIVED_DATA" \
+              CODE_SIGNING_ALLOWED=NO build
+          fi
+          APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "Failed to locate .app bundle under $DERIVED_DATA" >&2
+            find "$DERIVED_DATA/Build/Products" -maxdepth 4 -type d -print >&2 || true
+            exit 1
+          fi
+          echo "app_bundle=$APP_BUNDLE" >> "$GITHUB_OUTPUT"
+        timeout-minutes: 15
+
       - name: Drive gestures via XCUITest
-        run: scripts/input-validation-app/drivers/run-ios.sh "$APP_BUNDLE"
         env:
-          APP_BUNDLE: ${{ env.APP_BUNDLE }}
-      - name: Upload artifacts
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/input-validation-ios
+        run: |
+          mkdir -p "$ARTIFACTS_DIR"
+          ./scripts/input-validation-app/drivers/run-ios.sh \
+            '${{ steps.build-app-bundle.outputs.app_bundle }}'
+        timeout-minutes: 15
+
+      - name: Upload iOS artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: input-validation-ios
           path: artifacts/input-validation-ios
           if-no-files-found: warn
+          retention-days: 14
 
   javascript:
-    # Likewise pending a build step. The JavaScript port build is produced by
-    # the CN1 Maven plugin (mvn -P javascript package) but requires the JS
-    # toolchain pulled in by scripts/setup-workspace.sh + a static file server.
-    # We scaffold the job, leave it disabled, and turn it on in the follow-up
-    # PR that adds a publish step (or points CN1IV_URL at a known deployment).
-    if: ${{ false }}
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/input-validation-js
+      CN1_APP_DIR: scripts/input-validation-app
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Set up Java 8 for ParparVM
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Prepare Codename One binaries for Maven plugin
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+
+      - name: Build ParparVM compiler bundle
+        run: mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Playwright (Chromium only)
+
+      - name: Cache npm modules
+        uses: actions/cache@v4
+        with:
+          path: scripts/node_modules
+          key: ${{ runner.os }}-scripts-npm-playwright-v1
+          restore-keys: |
+            ${{ runner.os }}-scripts-npm-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v2
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
-      - name: Build CN1 input-validation app (JavaScript)
+          cd scripts
+          npm init -y 2>/dev/null || true
+          npm install playwright
+          npx playwright install-deps chromium
+          npx playwright install chromium
+
+      - name: Install Xvfb for headless Java AWT
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Setup workspace
+        run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
+
+      - name: Build input-validation JavaScript port bundle
+        id: build-js-bundle
         run: |
-          # TODO: emit a CN1IV_URL pointing at the published bundle.
-          echo "JS app build step not wired yet" >&2
-          exit 1
+          set -euo pipefail
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          mkdir -p "${ARTIFACTS_DIR}"
+          OUTPUT_ZIP="${ARTIFACTS_DIR}/cn1iv-javascript-port.zip"
+          # xvfb-run is required because the CSS compiler in the CN1 maven
+          # plugin pulls in java.awt during the package phase even though
+          # this app has no CSS theme.
+          SKIP_PARPARVM_BUILD=1 xvfb-run \
+            ./scripts/build-javascript-port-hellocodenameone.sh "$OUTPUT_ZIP"
+          echo "bundle=$OUTPUT_ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Serve the JS bundle on localhost:8080
+        id: serve-js
+        run: |
+          set -euo pipefail
+          SERVE_DIR="${{ runner.temp }}/cn1iv-serve"
+          rm -rf "$SERVE_DIR"
+          mkdir -p "$SERVE_DIR"
+          unzip -q '${{ steps.build-js-bundle.outputs.bundle }}' -d "$SERVE_DIR"
+          # ByteCodeTranslator emits the playable bundle under <MainName>-js/
+          INDEX_DIR="$(find "$SERVE_DIR" -maxdepth 2 -type f -name index.html -print -quit | xargs -n1 dirname)"
+          if [ -z "$INDEX_DIR" ]; then
+            echo "No index.html found inside $SERVE_DIR" >&2
+            find "$SERVE_DIR" -maxdepth 3 -print >&2 || true
+            exit 1
+          fi
+          (cd "$INDEX_DIR" && python3 -m http.server 8080 > "${ARTIFACTS_DIR}/http-server.log" 2>&1) &
+          SERVER_PID=$!
+          echo "server_pid=$SERVER_PID" >> "$GITHUB_OUTPUT"
+          # Wait for the server to actually accept connections before driving.
+          for i in $(seq 1 30); do
+            if curl -sf "http://127.0.0.1:8080/" -o /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
       - name: Drive gestures via Playwright
-        run: scripts/input-validation-app/drivers/run-js.sh "$CN1IV_URL"
         env:
-          CN1IV_URL: ${{ env.CN1IV_URL }}
-      - name: Upload artifacts
+          CN1IV_URL: http://127.0.0.1:8080/
+        run: |
+          mkdir -p "$ARTIFACTS_DIR"
+          # Use the Playwright install under scripts/node_modules from the
+          # earlier step so we don't redownload.
+          export NODE_PATH="${{ github.workspace }}/scripts/node_modules"
+          ./scripts/input-validation-app/drivers/run-js.sh "$CN1IV_URL"
+        timeout-minutes: 10
+
+      - name: Stop http.server
+        if: always()
+        run: |
+          kill ${{ steps.serve-js.outputs.server_pid }} 2>/dev/null || true
+
+      - name: Upload JS artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: input-validation-js
           path: artifacts/input-validation-js
           if-no-files-found: warn
+          retention-days: 14
