@@ -76,6 +76,13 @@
 //#define INCLUDE_SPEECHRECOGNITION_USAGE
 //#define INCLUDE_NFCREADER_USAGE
 
+// CN1_INCLUDE_NFC gates the com.codename1.nfc native bridge (CoreNFC.framework
+// import, NFCNDEFReaderSession / NFCTagReaderSession code). IPhoneBuilder
+// uncomments this only when the classpath scanner saw com.codename1.nfc.*,
+// so apps that never touch NFC ship without any CoreNFC symbols and pass
+// Apple's API-usage scan without declaring an NFC privacy manifest.
+//#define CN1_INCLUDE_NFC
+
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 //#define USE_FACEBOOK_CONNECT_PODS

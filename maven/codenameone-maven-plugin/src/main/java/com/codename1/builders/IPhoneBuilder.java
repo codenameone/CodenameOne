@@ -86,6 +86,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
+    private boolean usesNfc;
+    private boolean usesNfcHce;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -665,6 +667,12 @@ public class IPhoneBuilder extends Executor {
                             usesBiometrics = true;
                         } else {
                             usesCryptoAPI = true;
+                        }
+                    }
+                    if (!usesNfc && cls.indexOf("com/codename1/nfc/") == 0) {
+                        usesNfc = true;
+                        if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
+                            usesNfcHce = true;
                         }
                     }
                 }
@@ -1617,6 +1625,84 @@ public class IPhoneBuilder extends Executor {
                     addLibs = "LocalAuthentication.framework";
                 } else if (!addLibs.toLowerCase().contains("localauthentication")) {
                     addLibs = addLibs + ";LocalAuthentication.framework";
+                }
+            }
+
+            // CoreNFC is required only when the app actually uses
+            // com.codename1.nfc. We weak-link it so older deployment targets
+            // still load on iOS 10 (Core NFC was introduced in iOS 11).
+            if (usesNfc) {
+                String coreNfc = "CoreNFC.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = coreNfc;
+                } else if (!addLibs.toLowerCase().contains("corenfc")) {
+                    addLibs = addLibs + ";" + coreNfc;
+                }
+                // Default the NFC reader usage description if the developer
+                // forgot the plist hint; Apple rejects builds that present
+                // an NFCNDEFReaderSession without one.
+                if (request.getArg("ios.NFCReaderUsageDescription", null) == null) {
+                    request.putArgument("ios.NFCReaderUsageDescription",
+                            "Hold near an NFC tag to continue");
+                }
+                // Inject the canonical NFC entitlement keys. The developer
+                // can override either via build hints.
+                String formats = request.getArg(
+                        "ios.entitlements.com.apple.developer.nfc.readersession.formats",
+                        null);
+                if (formats == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.nfc.readersession.formats",
+                            "TAG\nNDEF");
+                }
+                // Uncomment CN1_INCLUDE_NFC in CodenameOne_GLViewController.h
+                // so the NFC native block in IOSNative.m compiles in. Apps
+                // that do NOT reference com.codename1.nfc leave the define
+                // commented out, which means CoreNFC.framework symbols are
+                // never linked --- this is required to pass Apple's API-
+                // usage scan without a CoreNFC privacy manifest.
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_NFC",
+                            "#define CN1_INCLUDE_NFC");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_NFC", ex);
+                }
+            }
+
+            // HCE on iOS requires the iOS 17.4+ EU-only CardSession
+            // entitlement plus the AIDs to register. We inject the
+            // entitlement when the scanner saw HostCardEmulationService.
+            if (usesNfcHce) {
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.nfc.hce",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.nfc.hce",
+                            "true");
+                }
+                String aids = request.getArg("ios.hceAids",
+                        request.getArg("android.hceAids", null));
+                if (aids != null && aids.length() > 0
+                        && request.getArg(
+                            "ios.entitlements.com.apple.developer.nfc.hce.iso7816.select-identifiers",
+                            null) == null) {
+                    StringBuilder list = new StringBuilder();
+                    for (String aid : aids.split("[,;]")) {
+                        aid = aid.trim();
+                        if (aid.length() == 0) {
+                            continue;
+                        }
+                        if (list.length() > 0) {
+                            list.append("\n");
+                        }
+                        list.append(aid);
+                    }
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.nfc.hce.iso7816.select-identifiers",
+                            list.toString());
                 }
             }
 
