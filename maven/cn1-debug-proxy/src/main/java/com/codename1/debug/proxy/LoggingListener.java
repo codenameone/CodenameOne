@@ -54,7 +54,9 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
 
     @Override public void onVmDeath() { System.out.println("[event] VM_DEATH"); }
     @Override public void onStringValue(String value) { System.out.println("[event] STRING_VALUE=" + value); }
-    @Override public void onObjectClass(int classId) { System.out.println("[event] OBJECT_CLASS=" + classId); }
+    @Override public void onObjectClass(int classId, boolean isArray) {
+        System.out.println("[event] OBJECT_CLASS=" + classId + (isArray ? " (array)" : ""));
+    }
     @Override public void onObjectFields(byte[] typeCodes, long[] values) {
         System.out.println("[event] OBJECT_FIELDS count=" + typeCodes.length);
         for (int i = 0; i < typeCodes.length; i++) {
@@ -63,6 +65,12 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
     }
     @Override public void onInvokeResult(byte type, long value) {
         System.out.println("[event] INVOKE_RESULT type='" + (char) type + "' value=" + formatValue(type, value));
+    }
+    @Override public void onArrayLength(int length) {
+        System.out.println("[event] ARRAY_LENGTH=" + length);
+    }
+    @Override public void onArrayValues(byte tag, int count, byte[] rawBytes) {
+        System.out.println("[event] ARRAY_VALUES tag='" + (char) tag + "' count=" + count + " bytes=" + rawBytes.length);
     }
     @Override public void onReplyStatus() { System.out.println("[event] REPLY_STATUS"); }
     @Override public void onStdoutLine(String line) { System.out.println("[device] " + line); }

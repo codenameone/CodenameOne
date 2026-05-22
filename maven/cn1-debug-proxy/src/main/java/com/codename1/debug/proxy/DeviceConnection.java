@@ -40,9 +40,16 @@ public final class DeviceConnection implements AutoCloseable {
         void onLocals(int[] slots, byte[] typeCodes, long[] values);
         void onVmDeath();
         void onStringValue(String value);
-        void onObjectClass(int classId);
+        void onObjectClass(int classId, boolean isArray);
         void onObjectFields(byte[] typeCodes, long[] values);
         void onInvokeResult(byte type, long value);
+        void onArrayLength(int length);
+        /**
+         * Raw array values from the device. {@code tag} is the JVM type-char
+         * shared by every element, {@code rawBytes} is the wire payload with
+         * each element packed in big-endian.
+         */
+        void onArrayValues(byte tag, int count, byte[] rawBytes);
         void onReplyStatus();
         void onStdoutLine(String line);
         void onStderrLine(String line);
@@ -158,7 +165,9 @@ public final class DeviceConnection implements AutoCloseable {
             }
             case WireProtocol.EVT_OBJECT_CLASS: {
                 int cid = p.length >= 4 ? readInt(p, 0) : -1;
-                listener.onObjectClass(cid);
+                // 5th byte is isArray flag; older devices omit it.
+                boolean isArr = p.length >= 5 && p[4] != 0;
+                listener.onObjectClass(cid, isArr);
                 return;
             }
             case WireProtocol.EVT_OBJECT_FIELDS: {
@@ -172,6 +181,20 @@ public final class DeviceConnection implements AutoCloseable {
                     values[i] = readLong(p, off); off += 8;
                 }
                 listener.onObjectFields(types, values);
+                return;
+            }
+            case WireProtocol.EVT_ARRAY_LENGTH: {
+                int len = p.length >= 4 ? readInt(p, 0) : 0;
+                listener.onArrayLength(len);
+                return;
+            }
+            case WireProtocol.EVT_ARRAY_VALUES: {
+                if (p.length < 5) { listener.onUnknownEvent(code, p); return; }
+                byte tag = p[0];
+                int n = readInt(p, 1);
+                byte[] raw = new byte[p.length - 5];
+                System.arraycopy(p, 5, raw, 0, raw.length);
+                listener.onArrayValues(tag, n, raw);
                 return;
             }
             case WireProtocol.EVT_INVOKE_RESULT: {
@@ -283,6 +306,20 @@ public final class DeviceConnection implements AutoCloseable {
      * unpacks it into the typed C parameter the underlying function
      * expects.
      */
+    public void getArrayLength(long arrayPtr) throws IOException {
+        byte[] p = new byte[8];
+        writeLong(p, 0, arrayPtr);
+        sendCommand(WireProtocol.CMD_GET_ARRAY_LENGTH, p);
+    }
+
+    public void getArrayValues(long arrayPtr, int firstIndex, int count) throws IOException {
+        byte[] p = new byte[16];
+        writeLong(p, 0, arrayPtr);
+        writeInt(p, 8, firstIndex);
+        writeInt(p, 12, count);
+        sendCommand(WireProtocol.CMD_GET_ARRAY_VALUES, p);
+    }
+
     public void invokeMethod(long threadId, int methodId, long thisObj,
                              byte[] argTypes, long[] argValues) throws IOException {
         int n = argTypes.length;

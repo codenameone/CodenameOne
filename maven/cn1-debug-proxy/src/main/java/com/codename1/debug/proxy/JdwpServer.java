@@ -69,6 +69,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     // refTypeTag
     private static final int TYPE_TAG_CLASS = 1;
+    private static final int TYPE_TAG_INTERFACE = 2;
+    private static final int TYPE_TAG_ARRAY = 3;
 
     // SuspendPolicy
     private static final int SP_NONE         = 0;
@@ -315,7 +317,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 case CS_OBJECT_REFERENCE: handleObject(id, cmd, p); return;
                 case CS_CLASS_TYPE:       handleClassType(id, cmd, p); return;
                 case CS_STRING_REFERENCE: handleString(id, cmd, p); return;
-                case CS_ARRAY_REFERENCE:
+                case CS_ARRAY_REFERENCE:  handleArray(id, cmd, p); return;
                 case CS_CLASS_LOADER_REF:
                 case CS_CLASS_OBJECT_REF:
                     // Reply with NOT_IMPLEMENTED (100) so jdb falls back gracefully.
@@ -1058,12 +1060,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         switch (cmd) {
             case 1: { // ReferenceType — get class
                 int classId = blockingGetObjectClass(objectId);
+                boolean isArr;
+                synchronized (objectClassLock) { isArr = lastObjectIsArray; }
                 Buf b = new Buf();
                 if (classId < 0) {
                     b.writeByte(TYPE_TAG_CLASS);
                     b.writeLong(0);
                 } else {
-                    b.writeByte(TYPE_TAG_CLASS);
+                    b.writeByte(isArr ? TYPE_TAG_ARRAY : TYPE_TAG_CLASS);
                     b.writeLong(toJdwpRef(classId));
                 }
                 writeReply(id, 0, b.bytes());
@@ -1159,17 +1163,114 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         }
     }
 
+    private void handleArray(int id, int cmd, byte[] p) throws IOException {
+        long objectId = readLong(p, 0);
+        switch (cmd) {
+            case 1: { // Length
+                int length = blockingGetArrayLength(objectId);
+                Buf b = new Buf();
+                b.writeInt(length < 0 ? 0 : length);
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            case 2: { // GetValues
+                int first = readInt(p, 8);
+                int count = readInt(p, 12);
+                if (!blockingGetArrayValues(objectId, first, count)) {
+                    // ArrayRegion: tag byte 'L', count 0 — well-formed empty.
+                    Buf b = new Buf();
+                    b.writeByte('L');
+                    b.writeInt(0);
+                    writeReply(id, 0, b.bytes());
+                    return;
+                }
+                byte tag = lastArrayTag;
+                int n = lastArrayCount;
+                byte[] raw = lastArrayBytes != null ? lastArrayBytes : new byte[0];
+                Buf b = new Buf();
+                b.writeByte(tag & 0xff);
+                b.writeInt(n);
+                // JDWP ArrayRegion encoding: primitive arrays carry the
+                // packed primitive values directly; object arrays carry a
+                // tagged value (1-byte tag + objectID) per element.
+                if (tag == 'L' || tag == '[') {
+                    // Each element on the wire is 8 bytes (object reference).
+                    int per = 8;
+                    int off = 0;
+                    for (int i = 0; i < n; i++) {
+                        b.writeByte('L');
+                        // raw bytes are already big-endian
+                        for (int k = 0; k < per; k++) {
+                            b.writeByte(raw[off + k] & 0xff);
+                        }
+                        off += per;
+                    }
+                } else {
+                    // Primitive: just append the raw bytes — no per-element
+                    // tag, just count * width.
+                    for (byte by : raw) b.writeByte(by & 0xff);
+                }
+                writeReply(id, 0, b.bytes());
+                return;
+            }
+            default:
+                writeReply(id, 100, empty());
+        }
+    }
+
     // -------- Synchronous request/reply against the device ----------------
+
+    private final Object arrayLock = new Object();
+    private boolean pendingArrayLength = false;
+    private int lastArrayLength = 0;
+    private boolean pendingArrayValues = false;
+    private byte lastArrayTag = 'L';
+    private int lastArrayCount = 0;
+    private byte[] lastArrayBytes = null;
+
+    private int blockingGetArrayLength(long objectId) {
+        if (device == null) return -1;
+        synchronized (arrayLock) {
+            pendingArrayLength = true;
+            lastArrayLength = 0;
+            try { device.getArrayLength(objectId); }
+            catch (IOException io) { pendingArrayLength = false; return -1; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingArrayLength && System.currentTimeMillis() < deadline) {
+                try { arrayLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return lastArrayLength;
+        }
+    }
+
+    private boolean blockingGetArrayValues(long objectId, int firstIndex, int count) {
+        if (device == null) return false;
+        synchronized (arrayLock) {
+            pendingArrayValues = true;
+            lastArrayBytes = null;
+            try { device.getArrayValues(objectId, firstIndex, count); }
+            catch (IOException io) { pendingArrayValues = false; return false; }
+            long deadline = System.currentTimeMillis() + 2000;
+            while (pendingArrayValues && System.currentTimeMillis() < deadline) {
+                try { arrayLock.wait(deadline - System.currentTimeMillis()); }
+                catch (InterruptedException ie) { break; }
+            }
+            return lastArrayBytes != null;
+        }
+    }
 
     private final Object objectClassLock = new Object();
     private boolean pendingObjectClass = false;
     private int lastObjectClass = -1;
+    private boolean lastObjectIsArray = false;
 
     private int blockingGetObjectClass(long objectId) {
         if (device == null) return -1;
         synchronized (objectClassLock) {
             pendingObjectClass = true;
             lastObjectClass = -1;
+            lastObjectIsArray = false;
             try { device.getObjectClass(objectId); } catch (IOException io) { return -1; }
             long deadline = System.currentTimeMillis() + 2000;
             while (pendingObjectClass && System.currentTimeMillis() < deadline) {
@@ -1435,9 +1536,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             stringLock.notifyAll();
         }
     }
-    @Override public void onObjectClass(int classId) {
+    @Override public void onObjectClass(int classId, boolean isArray) {
         synchronized (objectClassLock) {
             lastObjectClass = classId;
+            lastObjectIsArray = isArray;
             pendingObjectClass = false;
             objectClassLock.notifyAll();
         }
@@ -1456,6 +1558,22 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             lastInvokeValue = value;
             pendingInvoke = false;
             invokeLock.notifyAll();
+        }
+    }
+    @Override public void onArrayLength(int length) {
+        synchronized (arrayLock) {
+            lastArrayLength = length;
+            pendingArrayLength = false;
+            arrayLock.notifyAll();
+        }
+    }
+    @Override public void onArrayValues(byte tag, int count, byte[] rawBytes) {
+        synchronized (arrayLock) {
+            lastArrayTag = tag;
+            lastArrayCount = count;
+            lastArrayBytes = rawBytes;
+            pendingArrayValues = false;
+            arrayLock.notifyAll();
         }
     }
     @Override public void onReplyStatus() {}

@@ -54,6 +54,8 @@
 #define CMD_GET_OBJECT_CLASS 0x0C
 #define CMD_GET_OBJECT_FIELDS 0x0D
 #define CMD_INVOKE_METHOD    0x0E
+#define CMD_GET_ARRAY_LENGTH 0x0F
+#define CMD_GET_ARRAY_VALUES 0x10
 
 // Events (device -> proxy)
 #define EVT_HELLO            0x80
@@ -70,6 +72,8 @@
 #define EVT_STDOUT_LINE      0x8B
 #define EVT_STDERR_LINE      0x8C
 #define EVT_INVOKE_RESULT    0x8D
+#define EVT_ARRAY_LENGTH     0x8E
+#define EVT_ARRAY_VALUES     0x8F
 
 // java.lang.String's clazz struct is emitted by the translator; we reference
 // it by symbol so cn1_debugger.m doesn't depend on the generated
@@ -862,14 +866,20 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             memcpy(&lo, payload + 4, 4);
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             int classId = -1;
+            uint8_t isArray = 0;
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
-                classId = obj->__codenameOneParentClsReference->classId;
+                struct clazz* cls = obj->__codenameOneParentClsReference;
+                classId = cls->classId;
+                isArray = cls->isArray ? 1 : 0;
             }
-            uint8_t reply[4];
+            // Reply: classId(4) + isArray(1). Older proxies that only read
+            // 4 bytes still work.
+            uint8_t reply[5];
             uint32_t cidBE = htonl((uint32_t)classId);
             memcpy(reply, &cidBE, 4);
-            sendEvent(EVT_OBJECT_CLASS, reply, 4);
+            reply[4] = isArray;
+            sendEvent(EVT_OBJECT_CLASS, reply, 5);
             return 0;
         }
         case CMD_GET_STRING: {
@@ -1055,6 +1065,146 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             }
             writeBE64(reply + 1, bits);
             sendEvent(EVT_INVOKE_RESULT, reply, 9);
+            return 0;
+        }
+        case CMD_GET_ARRAY_LENGTH: {
+            // Payload: objId(8). Reply: EVT_ARRAY_LENGTH with length(4).
+            if (len < 8) {
+                uint8_t err[4] = {0,0,0,0};
+                sendEvent(EVT_ARRAY_LENGTH, err, 4);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4); memcpy(&lo, payload + 4, 4);
+            uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
+            int length = 0;
+            if (obj != JAVA_NULL) {
+                length = ((JAVA_ARRAY)obj)->length;
+            }
+            uint8_t reply[4];
+            writeBE32(reply, (uint32_t)length);
+            sendEvent(EVT_ARRAY_LENGTH, reply, 4);
+            return 0;
+        }
+        case CMD_GET_ARRAY_VALUES: {
+            // Payload: objId(8) firstIndex(4) count(4)
+            // Reply: tag(1) + count(4) + values. Element width depends on tag.
+            if (len < 16) {
+                uint8_t err[5] = {'L', 0,0,0,0};
+                sendEvent(EVT_ARRAY_VALUES, err, 5);
+                return 0;
+            }
+            uint32_t hi, lo;
+            memcpy(&hi, payload, 4); memcpy(&lo, payload + 4, 4);
+            uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
+            uint32_t fstBE, cntBE;
+            memcpy(&fstBE, payload + 8, 4);
+            memcpy(&cntBE, payload + 12, 4);
+            int firstIdx = (int)ntohl(fstBE);
+            int reqCount = (int)ntohl(cntBE);
+            JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
+            if (obj == JAVA_NULL) {
+                uint8_t err[5] = {'L', 0,0,0,0};
+                sendEvent(EVT_ARRAY_VALUES, err, 5);
+                return 0;
+            }
+            JAVA_ARRAY arr = (JAVA_ARRAY)obj;
+            int arrLen = arr->length;
+            if (firstIdx < 0) firstIdx = 0;
+            if (firstIdx > arrLen) firstIdx = arrLen;
+            int avail = arrLen - firstIdx;
+            int count = (reqCount < 0 || reqCount > avail) ? avail : reqCount;
+
+            // Derive the JVM type-char for elements. primitiveSize==0 means
+            // object array; otherwise we use the element class's clsName to
+            // distinguish among same-width primitives (byte vs boolean, int
+            // vs float, ...).
+            char tag = 'L';
+            int elemSize = arr->primitiveSize;
+            struct clazz* arrCls = obj->__codenameOneParentClsReference;
+            struct clazz* elemCls = arrCls ? arrCls->arrayType : NULL;
+            if (elemSize == 0) {
+                tag = 'L';
+            } else if (elemCls && elemCls->clsName) {
+                const char* en = elemCls->clsName;
+                if      (strcmp(en, "int")     == 0) tag = 'I';
+                else if (strcmp(en, "long")    == 0) tag = 'J';
+                else if (strcmp(en, "boolean") == 0) tag = 'Z';
+                else if (strcmp(en, "byte")    == 0) tag = 'B';
+                else if (strcmp(en, "char")    == 0) tag = 'C';
+                else if (strcmp(en, "short")   == 0) tag = 'S';
+                else if (strcmp(en, "float")   == 0) tag = 'F';
+                else if (strcmp(en, "double")  == 0) tag = 'D';
+                else {
+                    // Unknown primitive — fall back to width-based guess.
+                    switch (elemSize) {
+                        case 1: tag = 'B'; break;
+                        case 2: tag = 'S'; break;
+                        case 4: tag = 'I'; break;
+                        case 8: tag = 'J'; break;
+                        default: tag = 'L'; break;
+                    }
+                }
+            } else {
+                switch (elemSize) {
+                    case 1: tag = 'B'; break;
+                    case 2: tag = 'S'; break;
+                    case 4: tag = 'I'; break;
+                    case 8: tag = 'J'; break;
+                    default: tag = 'L'; break;
+                }
+            }
+
+            // Element bytes on the wire match the tag's natural width.
+            int perElem;
+            switch (tag) {
+                case 'Z': case 'B': perElem = 1; break;
+                case 'S': case 'C': perElem = 2; break;
+                case 'I': case 'F': perElem = 4; break;
+                case 'J': case 'D': perElem = 8; break;
+                case 'L': case '[': default: perElem = 8; break;
+            }
+            uint32_t sz = 1 + 4 + (uint32_t)count * (uint32_t)perElem;
+            uint8_t* buf = (uint8_t*)malloc(sz);
+            if (!buf) {
+                uint8_t err[5] = {'L', 0,0,0,0};
+                sendEvent(EVT_ARRAY_VALUES, err, 5);
+                return 0;
+            }
+            buf[0] = (uint8_t)tag;
+            writeBE32(buf + 1, (uint32_t)count);
+            uint8_t* p = buf + 5;
+            for (int i = 0; i < count; i++) {
+                int idx = firstIdx + i;
+                switch (tag) {
+                    case 'Z': p[0] = ((JAVA_BOOLEAN*)arr->data)[idx] & 1; p += 1; break;
+                    case 'B': p[0] = (uint8_t)((JAVA_BYTE*)arr->data)[idx]; p += 1; break;
+                    case 'S': { JAVA_SHORT s = ((JAVA_SHORT*)arr->data)[idx];
+                                p[0] = (uint8_t)((s >> 8) & 0xff); p[1] = (uint8_t)(s & 0xff); }
+                              p += 2; break;
+                    case 'C': { JAVA_CHAR c = ((JAVA_CHAR*)arr->data)[idx];
+                                p[0] = (uint8_t)((c >> 8) & 0xff); p[1] = (uint8_t)(c & 0xff); }
+                              p += 2; break;
+                    case 'I': writeBE32(p, (uint32_t)((JAVA_INT*)arr->data)[idx]); p += 4; break;
+                    case 'F': { JAVA_FLOAT f = ((JAVA_FLOAT*)arr->data)[idx];
+                                uint32_t fb; memcpy(&fb, &f, 4);
+                                writeBE32(p, fb); }
+                              p += 4; break;
+                    case 'J': writeBE64(p, (uint64_t)((JAVA_LONG*)arr->data)[idx]); p += 8; break;
+                    case 'D': { JAVA_DOUBLE d = ((JAVA_DOUBLE*)arr->data)[idx];
+                                uint64_t db; memcpy(&db, &d, 8);
+                                writeBE64(p, db); }
+                              p += 8; break;
+                    case 'L': case '[': default: {
+                        JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
+                        writeBE64(p, (uint64_t)(uintptr_t)v);
+                        p += 8; break;
+                    }
+                }
+            }
+            sendEvent(EVT_ARRAY_VALUES, buf, sz);
+            free(buf);
             return 0;
         }
         case CMD_GET_THREADS:
