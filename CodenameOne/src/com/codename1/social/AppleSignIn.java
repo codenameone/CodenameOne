@@ -26,7 +26,6 @@ package com.codename1.social;
 import com.codename1.io.AccessToken;
 import com.codename1.io.Preferences;
 import com.codename1.io.oidc.OidcClient;
-import com.codename1.io.oidc.OidcConfiguration;
 import com.codename1.io.oidc.OidcException;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.security.Hash;
@@ -232,7 +231,6 @@ public final class AppleSignIn extends Login {
         OidcClient.discover(APPLE_ISSUER)
                 .ready(new SuccessCallback<OidcClient>() {
                     public void onSucess(OidcClient client) {
-                        OidcConfiguration cfg = client.getConfiguration();
                         // Apple does NOT issue refresh tokens to public clients; require
                         // form_post + `response_mode` for compatibility.
                         client.setClientId(serviceId)
