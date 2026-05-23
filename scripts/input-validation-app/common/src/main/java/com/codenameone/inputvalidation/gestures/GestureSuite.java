@@ -38,7 +38,8 @@ public final class GestureSuite {
         this.steps = new GestureStep[] {
                 new TapStep(),
                 new DragStep(),
-                new LongPressStep()
+                new LongPressStep(),
+                new KeyTypeStep()
         };
         this.form = new Form("Input Validation", new BorderLayout());
         this.statusLabel = new Label("Initializing");
