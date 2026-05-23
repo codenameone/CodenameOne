@@ -491,3 +491,8 @@ jdb
 loopback
 rethrow
 rethrows
+
+# Identity-provider product names used in the Authentication & Identity chapter.
+Keycloak
+Cognito
+Authentik

@@ -54,15 +54,15 @@ OidcClient.discover("https://accounts.google.com").ready(new SuccessCallback<Oid
 
 That call:
 
-. fetches `accounts.google.com/.well-known/openid-configuration`
-. generates a PKCE pair (S256), a `state`, and a `nonce`
-. opens the OS system-browser sheet at the discovered authorization endpoint
-. exchanges the code for tokens on the discovered token endpoint
-. verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
+. Fetches `accounts.google.com/.well-known/openid-configuration`.
+. Generates a PKCE pair (S256), a `state`, and a `nonce`.
+. Opens the OS system-browser sheet at the discovered authorization endpoint.
+. Exchanges the code for tokens on the discovered token endpoint.
+. Verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
 
 ==== Picking a redirect URI
 
-For mobile apps, use a *custom scheme* unique to your app, e.g. `com.example.app:/oauth2redirect`. Register the scheme with the OS via the build hints below so the system browser can hand the redirect back to your app.
+For mobile apps, use a *custom scheme* unique to your app, for example `com.example.app:/oauth2redirect`. Register the scheme with the OS via the build hints below so the system browser can hand the redirect back to your app.
 
 For web / simulator runs, use a normal HTTPS URL pointing at a page you control. The Codename One fallback `BrowserWindow` closes as soon as the URL matches.
 
@@ -74,7 +74,7 @@ Add the URL scheme to your Info.plist via the standard build hint:
 ios.urlScheme=<key>CFBundleURLTypes</key>\n<array>\n  <dict>\n    <key>CFBundleURLSchemes</key>\n    <array>\n      <string>com.example.app</string>\n    </array>\n  </dict>\n</array>
 ----
 
-`AuthenticationServices.framework` is auto-linked by the build whenever your app references anything in `com.codename1.io.oidc` or `com.codename1.social.AppleSignIn` -- you do **not** need to add `ios.add_libs=AuthenticationServices.framework` manually.
+`AuthenticationServices.framework` is autolinked by the build whenever your app references anything in `com.codename1.io.oidc` or `com.codename1.social.AppleSignIn` -- you don't need to add `ios.add_libs=AuthenticationServices.framework` manually.
 
 ===== Android
 
@@ -84,11 +84,11 @@ Add an intent filter for the redirect scheme to the application manifest via the
 android.xintent_filter=<intent-filter>\n  <action android:name="android.intent.action.VIEW"/>\n  <category android:name="android.intent.category.DEFAULT"/>\n  <category android:name="android.intent.category.BROWSABLE"/>\n  <data android:scheme="com.example.app"/>\n</intent-filter>
 ----
 
-The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is auto-injected whenever your app references anything in `com.codename1.io.oidc`. Override the version with build hint `android.customTabsVersion=1.x.y` if needed.
+The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is autoinjected whenever your app references anything in `com.codename1.io.oidc`. Override the version with build hint `android.customTabsVersion=1.x.y` if needed.
 
 ==== Saving and restoring tokens
 
-`OidcClient` saves the response under a per-issuer + per-client-ID key using `com.codename1.io.oidc.TokenStore.DefaultStorageTokenStore` (which serialises to `com.codename1.io.Storage`). To restore on next launch:
+`OidcClient` saves the response under a per-issuer + per-client-ID key using `com.codename1.io.oidc.TokenStore.DefaultStorageTokenStore` (which serializes to `com.codename1.io.Storage`). To restore on next launch:
 
 [source,java]
 ----
@@ -104,7 +104,7 @@ client.refreshIfExpired(60).ready(new SuccessCallback<OidcTokens>() {
 });
 ----
 
-If the saved access token is within 60 seconds of expiring and a refresh token is available, `refreshIfExpired` silently performs a refresh-token grant and persists the new tokens.
+If the saved access token is within 60 seconds of expiring and a refresh token is available, `refreshIfExpired` performs a refresh-token grant in the background and persists the new tokens.
 
 ==== Encrypting tokens at rest
 
@@ -183,7 +183,7 @@ The legacy `doLogin()` / `setClientSecret(...)` path is still available for sour
 
 If you currently rely on `GoogleConnect.doLogin()` with the Google Sign-In SDK on Android or `GIDSignIn` on iOS, you can switch to the modern flow without touching your build:
 
-* On Android, the legacy code uses `com.google.android.gms.auth.api.Auth.GoogleSignInApi` -- this is the part Google deprecated. New code via `signIn(...)` does not require the native SDK at all.
+* On Android, the legacy code uses `com.google.android.gms.auth.api.Auth.GoogleSignInApi` -- this is the part Google deprecated. New code via `signIn(...)` doesn't require the native SDK at all.
 * On iOS, the legacy code uses `GIDSignIn` (Google Sign-In SDK). The new code uses `ASWebAuthenticationSession` via `SystemBrowser`, which is what Google now recommends for non-broker apps.
 
 === Facebook Login
@@ -204,7 +204,7 @@ FacebookConnect.getInstance().signIn(
 });
 ----
 
-Facebook does not issue OpenID-Connect ID tokens for classic OAuth flows, so `getIdToken()` returns `null`. Read user profile fields via the Graph API.
+Facebook doesn't issue OpenID-Connect ID tokens for classic OAuth flows, so `getIdToken()` returns `null`. Read user profile fields via the Graph API.
 
 === Microsoft / Entra ID
 
