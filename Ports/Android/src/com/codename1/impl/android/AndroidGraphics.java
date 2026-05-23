@@ -1486,8 +1486,7 @@ class AndroidGraphics {
             clipSet = false;
         }
         canvas.restore();
-        Boolean prev = pushedClipSetStack.pop();
-        clipSet = (prev != null) && prev.booleanValue();
+        clipSet = pushedClipSetStack.pop().booleanValue();
         clipFresh = false;
     }
 
