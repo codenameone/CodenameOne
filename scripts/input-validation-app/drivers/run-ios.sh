@@ -187,6 +187,8 @@ REQUIRED_EVENTS=(
   "CN1IV:EVENT:drag"
   "CN1IV:READY:longpress"
   "CN1IV:EVENT:longpress"
+  "CN1IV:READY:keytype"
+  "CN1IV:EVENT:keytype"
   "CN1IV:SUITE:FINISHED"
 )
 FAILED=0

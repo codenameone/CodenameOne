@@ -52,6 +52,9 @@ final class InputValidationUITests: XCTestCase {
 
         try driveLongPress(app: app)
         Thread.sleep(forTimeInterval: stepDelaySeconds)
+
+        try driveKeyType(app: app)
+        Thread.sleep(forTimeInterval: stepDelaySeconds)
     }
 
     private func driveTap(app: XCUIApplication) throws {
@@ -70,5 +73,22 @@ final class InputValidationUITests: XCTestCase {
     private func driveLongPress(app: XCUIApplication) throws {
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         center.press(forDuration: 1.5)
+    }
+
+    private func driveKeyType(app: XCUIApplication) throws {
+        // KeyTypeStep places its TextField in BorderLayout.CENTER with
+        // generous padding/margin, matching the layout TapStep and
+        // LongPressStep use so a single screen-center tap focuses it on
+        // every iPhone size class on the CI runner. Wait briefly after
+        // the tap for CN1's editStringAtImpl to install the native
+        // CN1UITextField and animate the keyboard in -- typeText raises
+        // "Neither element nor any descendant has keyboard focus" if no
+        // first responder accepts input yet -- then type. typeText
+        // synthesises HW-keyboard UIPress events that walk through
+        // GLViewController, exactly the path #5010 broke.
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.tap()
+        Thread.sleep(forTimeInterval: 2.0)
+        app.typeText("cn1")
     }
 }
