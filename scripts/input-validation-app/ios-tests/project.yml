@@ -1,0 +1,69 @@
+# XcodeGen project spec for the CN1 input-validation XCUITest target.
+#
+# We don't check in a .xcodeproj -- pbxproj diffs are unreadable and break
+# on every Xcode update. drivers/run-ios.sh runs `xcodegen generate` against
+# this file to materialise the project on demand.
+#
+# Setup:
+#   - HostStub: a minimal UIApplication target the XCUITest bundle hosts
+#     into. Application-only UI testing (TEST_TARGET_NAME="") errors out
+#     opaquely under Xcode 16.4, so we give the test bundle a regular host.
+#     The stub does nothing -- the UI tests attach to the already-installed
+#     CN1 input-validation app via XCUIApplication(bundleIdentifier:).
+#   - CN1InputValidationUITests: the actual UI test bundle. TEST_HOST points
+#     at HostStub. Tests run by xcodebuild build the stub + the test bundle,
+#     install them, and then the Swift code launches the CN1 app by bundle id.
+
+name: CN1InputValidationUITests
+options:
+  deploymentTarget:
+    iOS: "16.0"
+  minimumXcodeGenVersion: "2.38.0"
+  bundleIdPrefix: com.codenameone.cn1iv
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGN_IDENTITY: ""
+
+targets:
+  HostStub:
+    type: application
+    platform: iOS
+    sources:
+      - HostStub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.cn1iv.hoststub
+        INFOPLIST_KEY_UILaunchStoryboardName: ""
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        GENERATE_INFOPLIST_FILE: YES
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+
+  CN1InputValidationUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - target: HostStub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.cn1iv.uitests
+        TEST_TARGET_NAME: HostStub
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+
+schemes:
+  CN1InputValidationUITests:
+    build:
+      targets:
+        HostStub: [test]
+        CN1InputValidationUITests: [test]
+    test:
+      targets:
+        - CN1InputValidationUITests
+      gatherCoverageData: false
+      parallelizable: false
