@@ -194,7 +194,10 @@ public final class AppleSignIn extends Login {
         try {
             hashed = Hash.sha256(plainNonce.getBytes("UTF-8"));
         } catch (java.io.UnsupportedEncodingException e) {
-            hashed = Hash.sha256(plainNonce.getBytes());
+            // UTF-8 is guaranteed by the Java spec on every JVM; reach this
+            // branch only on a malformed runtime. Rethrow rather than fall
+            // back to the platform default encoding (SpotBugs DM_DEFAULT_ENCODING).
+            throw new IllegalStateException("UTF-8 is not available on this JVM", e);
         }
         final String hashedNonce = strip(Base64.encodeUrlSafe(hashed));
         new Thread(new Runnable() {

@@ -63,8 +63,10 @@ public final class PkceChallenge {
         try {
             digest = Hash.sha256(verifier.getBytes("UTF-8"));
         } catch (java.io.UnsupportedEncodingException uee) {
-            // UTF-8 is guaranteed on every JVM; fall back defensively.
-            digest = Hash.sha256(verifier.getBytes());
+            // UTF-8 is guaranteed by the Java spec on every JVM; reach this
+            // branch only on a malformed runtime. Rethrow rather than fall
+            // back to the platform default encoding (SpotBugs DM_DEFAULT_ENCODING).
+            throw new IllegalStateException("UTF-8 is not available on this JVM", uee);
         }
         String challenge = strip(Base64.encodeUrlSafe(digest));
         return new PkceChallenge(verifier, challenge);

@@ -264,18 +264,37 @@ jobs:
           #define POOL_BEGIN()
           #define POOL_END()
           typedef void* CODENAME_ONE_THREAD_STATE;
+          // _SINGLE_ARG short-circuits the override block in the real
+          // CodenameOne_GLViewController.h so our threadStateData-bearing
+          // expansions survive the include.
+          #define CN1_THREAD_STATE_SINGLE_ARG
           #define CN1_THREAD_STATE_MULTI_ARG void* threadStateData,
           #define CN1_THREAD_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_STATE_PASS_SINGLE_ARG threadStateData
           #define CN1_THREAD_GET_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG threadStateData
           EOF
-          xcrun --sdk iphoneos clang \
-              -fsyntax-only \
-              -arch arm64 \
-              -fobjc-arc \
-              -Werror=incompatible-pointer-types \
-              -Werror=objc-method-access \
-              -Wno-unused-parameter \
-              -I"$STUB" \
-              -DNEW_CODENAME_ONE_VM=1 \
-              CN1OidcBrowser.m \
-              CN1AppleSignIn.m
+          # Exercise BOTH configurations -- the "stubs" path (apps that
+          # don't reference com.codename1.io.oidc / AppleSignIn) and the
+          # "full" path (apps that do). IPhoneBuilder flips the macros on
+          # via the classpath scanner; we want either to keep building.
+          for label in stubs full; do
+            extra=""
+            if [ "$label" = full ]; then
+              extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN"
+            fi
+            echo "::group::clang $label"
+            xcrun --sdk iphoneos clang \
+                -fsyntax-only \
+                -arch arm64 \
+                -fobjc-arc \
+                -Werror=incompatible-pointer-types \
+                -Werror=objc-method-access \
+                -Wno-unused-parameter \
+                -I"$STUB" \
+                -DNEW_CODENAME_ONE_VM=1 \
+                $extra \
+                CN1OidcBrowser.m \
+                CN1AppleSignIn.m
+            echo "::endgroup::"
+          done

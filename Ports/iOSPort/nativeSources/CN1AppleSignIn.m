@@ -31,6 +31,10 @@
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
 #endif
+#import "CodenameOne_GLViewController.h"
+
+#ifdef CN1_INCLUDE_APPLESIGNIN
+
 #import <UIKit/UIKit.h>
 #import <AuthenticationServices/AuthenticationServices.h>
 
@@ -221,3 +225,31 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java
     }
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG del.resultString);
 }
+
+#else
+
+// Stubs when CN1_INCLUDE_APPLESIGNIN is not defined: app didn't reference
+// com.codename1.social.AppleSignIn so the Java side won't load
+// AppleSignInNativeImpl, but ParparVM still needs symbols for the native
+// methods declared on IOSNative.java.
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInSupported__(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_appleSignInIsLoggedIn__(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_appleSignInSignOut__(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_appleSignIn___java_lang_String_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT scopesObj, JAVA_OBJECT nonceObj) {
+    return JAVA_NULL;
+}
+
+#endif // CN1_INCLUDE_APPLESIGNIN

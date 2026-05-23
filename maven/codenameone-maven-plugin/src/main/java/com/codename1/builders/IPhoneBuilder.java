@@ -1648,12 +1648,41 @@ public class IPhoneBuilder extends Executor {
             // ASAuthorizationAppleIDProvider (used by AppleSignIn). Linking
             // it always when the user references either API is the simplest
             // policy; iOS 12 is the deployment-target floor for both classes.
+            //
+            // We also flip the matching CN1_INCLUDE_OIDC / CN1_INCLUDE_APPLESIGNIN
+            // preprocessor defines so the .m source bodies in
+            // nativeSources/CN1OidcBrowser.m and CN1AppleSignIn.m compile
+            // in -- otherwise the .m files would reference framework symbols
+            // without the framework being linked, breaking the link step
+            // for apps that never use the API.
             if (usesOidc || usesAppleSignIn) {
                 String authSvc = "AuthenticationServices.framework";
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = authSvc;
                 } else if (!addLibs.toLowerCase().contains("authenticationservices")) {
                     addLibs = addLibs + ";" + authSvc;
+                }
+            }
+            if (usesOidc) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_OIDC",
+                            "#define CN1_INCLUDE_OIDC");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_OIDC", ex);
+                }
+            }
+            if (usesAppleSignIn) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_APPLESIGNIN",
+                            "#define CN1_INCLUDE_APPLESIGNIN");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_APPLESIGNIN", ex);
                 }
             }
 
