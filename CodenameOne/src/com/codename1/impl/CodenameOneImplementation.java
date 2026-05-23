@@ -6509,7 +6509,7 @@ public abstract class CodenameOneImplementation {
     }
 
     public Object startBonjourPublish(String name, String type, int port,
-                                      java.util.Map<String, String> txt) {
+                                      Map<String, String> txt) {
         return null;
     }
 
@@ -6541,17 +6541,17 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    public java.io.InputStream openUsbInputStream(UsbDevice device,
-                                                  int endpointAddress)
-            throws java.io.IOException {
-        throw new java.io.IOException(
+    public InputStream openUsbInputStream(UsbDevice device,
+                                          int endpointAddress)
+            throws IOException {
+        throw new IOException(
                 "USB is not supported on this platform");
     }
 
-    public java.io.OutputStream openUsbOutputStream(UsbDevice device,
-                                                    int endpointAddress)
-            throws java.io.IOException {
-        throw new java.io.IOException(
+    public OutputStream openUsbOutputStream(UsbDevice device,
+                                            int endpointAddress)
+            throws IOException {
+        throw new IOException(
                 "USB is not supported on this platform");
     }
 

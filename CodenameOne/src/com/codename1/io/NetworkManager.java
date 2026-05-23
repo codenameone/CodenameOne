@@ -936,8 +936,7 @@ public final class NetworkManager {
                 return;
             }
             Object[] arr = listeners.toArray();
-            for (int i = 0; i < arr.length; i++) {
-                Object o = arr[i];
+            for (Object o : arr) {
                 if (o instanceof NetworkTypeListener) {
                     ((NetworkTypeListener) o)
                             .onNetworkTypeChanged(oldType, newType, vpnActive);

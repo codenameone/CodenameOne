@@ -11,7 +11,6 @@ package com.codename1.io.bonjour;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Map;
 
 /// A Bonjour / mDNS service discovered by `BonjourBrowser` or registered by
