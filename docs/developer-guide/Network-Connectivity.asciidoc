@@ -1,0 +1,325 @@
+== Deeper Network Connectivity
+
+Codename One 8 ships a set of APIs under `com.codename1.io.wifi`, `com.codename1.io.bonjour`, `com.codename1.io.usb` and an extension of `com.codename1.io.NetworkManager` that lets apps inspect and manage the device's local network beyond plain HTTP.
+
+All of these APIs share three guarantees:
+
+* Every callback runs on the EDT so you can update UI directly from the result.
+* The build pipeline injects the matching Android permissions, iOS entitlements, and `NSXxxUsageDescription` / `NSBonjourServices` Info.plist entries automatically by scanning the classpath. Apps that never reference these classes see no manifest or entitlement changes.
+* The simulator implements best-effort versions of each API so you can wire and test your UI without a device. The simulator also prints the list of permissions/entitlements each API will need in a real build the first time you call it.
+
+The simulator's "API usage report" prints to stdout on JVM shutdown so you can spot anything you accidentally pulled in via a transitive cn1lib.
+
+=== WiFi information
+
+The fastest way to know whether the user is on WiFi, what SSID they joined, and what their local IP is:
+
+[source,java]
+----
+import com.codename1.io.wifi.WiFi;
+
+if (WiFi.isInfoSupported()) {
+    String ssid = WiFi.getCurrentSSID();   // e.g. "Codename One"
+    String bssid = WiFi.getBSSID();        // "aa:bb:cc:11:22:33"
+    String gw = WiFi.getGateway();         // "192.168.1.1"
+    String ip = WiFi.getIp();              // "192.168.1.42"
+}
+----
+
+Any of these calls may return `null` if the device isn't on WiFi, if the user denied a runtime permission, or if the platform never exposed the value to apps. The framework normalises the wrapping that Android adds to the SSID and treats `<unknown ssid>` and the obfuscated BSSID `02:00:00:00:00:00` as `null`.
+
+==== Required permissions and entitlements
+
+The build pipeline injects the following automatically the first time it sees `com.codename1.io.wifi.WiFi` on the classpath:
+
+[options="header"]
+|===
+| Platform | Injected | Notes
+| Android | `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE` | "normal" permissions; no runtime prompt
+| Android API 26+ | `ACCESS_FINE_LOCATION` (`maxSdkVersion=32`) | Required by the OS to return a real SSID
+| Android API 33+ | `NEARBY_WIFI_DEVICES` with `neverForLocation` | Replaces fine-location for scan flows
+| iOS | `com.apple.developer.networking.wifi-info` entitlement | Required since iOS 13
+| iOS | `NSLocationWhenInUseUsageDescription` | iOS still checks CoreLocation behind the scenes
+|===
+
+You can override any auto-injected value via the standard build hints:
+
+[source]
+----
+ios.locationUsageDescription=Allow access to read your Wi-Fi network name to discover printers on your network.
+android.xpermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+----
+
+=== WiFi scan
+
+Scanning returns an array of `WiFiNetwork`s sorted by signal strength. The callback fires once.
+
+[source,java]
+----
+WiFi.scan(new WiFiScanCallback() {
+    @Override
+    public void onScanComplete(WiFiNetwork[] networks, Throwable error) {
+        if (error != null) {
+            Log.e(error);
+            return;
+        }
+        for (WiFiNetwork n : networks) {
+            // n.getSSID(), n.getBSSID(), n.getRssi(), n.getSecurity()
+        }
+    }
+});
+----
+
+[NOTE]
+====
+iOS does not expose a public WiFi scan API. On iOS `WiFi.scan(...)` always reports an `UnsupportedOperationException`. Plan for a graceful fallback if your UI exposes a scan button.
+====
+
+Android throttles scans to 4 per 2 minutes per foreground app on API 28+; throttled scans return cached results, not an error.
+
+=== WiFi connect
+
+To associate the device with a specific SSID:
+
+[source,java]
+----
+WiFi.connect("MyAccessPoint", "s3cret!", WiFiSecurity.WPA_PSK,
+        new WiFiConnectCallback() {
+    @Override
+    public void onConnectResult(boolean connected, Throwable error) {
+        if (!connected) {
+            Log.e(error);
+            return;
+        }
+        // ssid is now joined
+    }
+});
+----
+
+* On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog cannot be bypassed.
+* On Android 9 and below the framework falls back to the legacy `WifiConfiguration` API and joins silently.
+* On iOS 11+ this uses `NEHotspotConfiguration`. The user is shown a system prompt the first time the app tries to join the SSID; subsequent attempts reuse the cached configuration.
+* `WiFiSecurity` must match the AP's actual security mode (`OPEN`, `WEP`, `WPA_PSK`, `WPA3_SAE`). Passing the wrong mode causes the join to fail.
+
+`WiFi.disconnect(ssid)` releases the request on Android 10+ and removes the hotspot configuration on iOS.
+
+[WARNING]
+====
+On iOS the build pipeline also enables the `NetworkExtension.framework` and the `HotspotConfiguration` entitlement only when it sees a call to `WiFi.connect(...)` or `WiFi.disconnect(...)`. Apps that only *read* SSID/BSSID will not pull in the framework, which keeps App Store API-usage scans clean.
+====
+
+=== Bonjour / mDNS discovery
+
+`BonjourBrowser` watches the local network for services of a given mDNS type. `BonjourPublisher` advertises a service.
+
+[source,java]
+----
+import com.codename1.io.bonjour.BonjourBrowser;
+import com.codename1.io.bonjour.BonjourService;
+import com.codename1.io.bonjour.BonjourServiceListener;
+
+BonjourBrowser browser = BonjourBrowser.browse("_http._tcp.",
+        new BonjourServiceListener() {
+    @Override
+    public void onServiceResolved(BonjourService s) {
+        Log.p("Found " + s.getName() + " at " + s.getHost() + ":" + s.getPort());
+    }
+    @Override
+    public void onServiceLost(BonjourService s) { /* ... */ }
+    @Override
+    public void onBrowseError(Throwable t) { Log.e(t); }
+});
+
+// when done:
+browser.stop();
+----
+
+To advertise an HTTP server you wrote on port 8080:
+
+[source,java]
+----
+BonjourPublisher pub = BonjourPublisher.publish(
+        "My Server", "_http._tcp.", 8080, null);
+
+// later:
+pub.unpublish();
+----
+
+==== iOS requirements
+
+Bonjour on iOS 14+ silently returns no results unless:
+
+* The Info.plist `NSLocalNetworkUsageDescription` key explains why the app needs local-network access.
+* The Info.plist `NSBonjourServices` array lists each service type the app expects to find.
+
+The build pipeline injects both keys automatically when `com.codename1.io.bonjour` is on the classpath, with `_http._tcp.` as the seed type. To publish or browse a custom type, set the build hint:
+
+[source]
+----
+ios.NSBonjourServices=_myapp._tcp.,_http._tcp.
+ios.NSLocalNetworkUsageDescription=Discover other instances of MyApp on this Wi-Fi network.
+----
+
+The comma-separated values are expanded into the Info.plist array at build time.
+
+==== Android requirements
+
+The pipeline adds `CHANGE_WIFI_MULTICAST_STATE` automatically. `NsdManager` does the rest; there is no runtime permission prompt.
+
+==== Simulator behaviour
+
+If `javax.jmdns.JmDNS` is on the simulator classpath, browse calls dispatch through it. Otherwise the listener receives a single `UnsupportedOperationException` and the simulator prints a hint. Add JmDNS to your simulator profile to exercise real discovery:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.jmdns</groupId>
+    <artifactId>jmdns</artifactId>
+    <version>3.5.9</version>
+    <scope>runtime</scope>
+</dependency>
+----
+
+=== Network type change events
+
+Subscribe to network type transitions (`WiFi <-> Cellular <-> Ethernet <-> None`):
+
+[source,java]
+----
+import com.codename1.io.NetworkManager;
+import com.codename1.io.NetworkTypeListener;
+
+NetworkManager.getInstance().addNetworkTypeListener(new NetworkTypeListener() {
+    @Override
+    public void onNetworkTypeChanged(int oldType, int newType, boolean vpnActive) {
+        if (newType == NetworkManager.NETWORK_TYPE_NONE) {
+            // offline -- queue uploads for later
+        }
+        if (vpnActive) {
+            // refuse to roam to corporate-only resources
+        }
+    }
+});
+----
+
+The current snapshot is available without subscribing:
+
+[source,java]
+----
+int type = NetworkManager.getInstance().getCurrentNetworkType();
+boolean vpn = NetworkManager.getInstance().isVPNActive();
+----
+
+The platform implementations are:
+
+* *Android*: `ConnectivityManager.registerNetworkCallback` on API 21+, falling back to the legacy `CONNECTIVITY_ACTION` broadcast on older devices.
+* *iOS*: `SCNetworkReachability` with a kernel callback scheduled on the main run loop.
+* *Simulator*: derives the type from `NetworkInterface.getDisplayName`; transitions are not synthesised.
+
+VPN detection is best-effort and intentionally heuristic. On Android it uses `NetworkCapabilities.TRANSPORT_VPN` plus an interface-name probe; on iOS it inspects `utun*`, `tun*`, `ppp*` and `ipsec*` interfaces. Use it as a hint, not as a security boundary.
+
+=== WiFi Direct (Wi-Fi P2P)
+
+WiFi Direct lets two devices form a peer-to-peer link without an access point. The API is Android-only -- iOS uses MultipeerConnectivity for similar scenarios and is intentionally out of scope.
+
+[source,java]
+----
+import com.codename1.io.wifi.WiFiDirect;
+import com.codename1.io.wifi.WiFiDirectListener;
+import com.codename1.io.wifi.WiFiDirectPeer;
+
+if (!WiFiDirect.isSupported()) {
+    return;
+}
+
+WiFiDirect.startDiscovery(new WiFiDirectListener() {
+    @Override
+    public void onPeersAvailable(WiFiDirectPeer[] peers) {
+        for (WiFiDirectPeer p : peers) {
+            // p.getDeviceName(), p.getDeviceAddress(), p.getState()
+        }
+    }
+    @Override
+    public void onDiscoveryError(Throwable error) { Log.e(error); }
+});
+
+// later, with the user's chosen peer:
+WiFiDirect.connect(peer, new WiFiConnectCallback() {
+    @Override
+    public void onConnectResult(boolean connected, Throwable error) { /* ... */ }
+});
+
+// when finished:
+WiFiDirect.disconnect();
+WiFiDirect.stopDiscovery();
+----
+
+The build pipeline injects `CHANGE_WIFI_STATE`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`, `ACCESS_FINE_LOCATION` and `NEARBY_WIFI_DEVICES` automatically when `WiFiDirect` is on the classpath, plus a `<uses-feature android:name="android.hardware.wifi.direct"/>` declaration so devices without the radio can still install the app via Play Store filtering.
+
+=== USB host
+
+The USB API in `com.codename1.io.usb` lets the device act as a USB host and talk to attached peripherals -- a barcode scanner, a serial converter, a microcontroller. It is **Android-only**; iOS has no third-party USB host access and the simulator stubs everything out.
+
+[source,java]
+----
+import com.codename1.io.usb.Usb;
+import com.codename1.io.usb.UsbDevice;
+import com.codename1.io.usb.UsbDeviceListener;
+
+if (!Usb.isSupported()) { return; }
+
+Usb.addDeviceListener(new UsbDeviceListener() {
+    @Override
+    public void onDeviceAttached(UsbDevice d) {
+        if (d.getVendorId() == 0x0403 && d.getProductId() == 0x6001) {
+            Usb.requestPermission(d);
+        }
+    }
+    @Override
+    public void onDeviceDetached(UsbDevice d) { }
+    @Override
+    public void onPermissionResult(UsbDevice d, boolean granted) {
+        if (granted) {
+            try (InputStream in = Usb.openInputStream(d, 0x81);
+                 OutputStream out = Usb.openOutputStream(d, 0x02)) {
+                out.write("AT\r\n".getBytes());
+                byte[] buf = new byte[64];
+                int n = in.read(buf);
+                // ...
+            } catch (IOException e) { Log.e(e); }
+        }
+    }
+});
+----
+
+The build pipeline injects:
+
+* `<uses-feature android:name="android.hardware.usb.host" android:required="false"/>`.
+
+If you want the OS to launch your app when a matching device is plugged in, ship a `device_filter.xml` resource and declare an `<intent-filter>` via the `android.xintent_filter` build hint:
+
+[source,xml]
+----
+<!-- native/android/res/xml/device_filter.xml -->
+<resources>
+    <usb-device vendor-id="1027" product-id="24577" />
+</resources>
+----
+
+[source]
+----
+android.xintent_filter=<intent-filter><action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" /></intent-filter><meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/device_filter" />
+----
+
+=== Threading and lifecycle
+
+Most of these APIs hold background resources (broadcast receivers, network callbacks, NSNetService delegates) that you must release explicitly:
+
+* `BonjourBrowser` -- call `.stop()`.
+* `BonjourPublisher` -- call `.unpublish()`.
+* `WiFiDirect` -- call `.stopDiscovery()` and `.disconnect()`.
+* `WiFi.connect(...)` -- call `WiFi.disconnect(ssid)` when the user navigates away.
+* `Usb.addDeviceListener(...)` -- call `removeDeviceListener(...)`.
+* `NetworkManager.addNetworkTypeListener(...)` -- call `removeNetworkTypeListener(...)`.
+
+Leaving them attached over a `Form` lifetime is fine; leaving them attached over the app lifetime drains battery on Android and leaks file descriptors on iOS. Pair each registration with a removal in your `Form#deinitializeImpl()`.

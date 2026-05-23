@@ -9881,6 +9881,149 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public int getCurrentNetworkType() {
+        return AndroidConnectivity.getCurrentNetworkType();
+    }
+
+    @Override
+    public void installNetworkTypeListener(NetworkManager target) {
+        AndroidConnectivity.installNetworkTypeListener(target);
+    }
+
+    @Override
+    public void uninstallNetworkTypeListener(NetworkManager target) {
+        AndroidConnectivity.uninstallNetworkTypeListener(target);
+    }
+
+    @Override
+    public boolean isWiFiInfoSupported() { return true; }
+
+    @Override
+    public boolean isWiFiManagementSupported() { return true; }
+
+    @Override
+    public String getWiFiSSID() { return AndroidConnectivity.getWiFiSSID(); }
+
+    @Override
+    public String getWiFiBSSID() { return AndroidConnectivity.getWiFiBSSID(); }
+
+    @Override
+    public String getWiFiGateway() { return AndroidConnectivity.getWiFiGateway(); }
+
+    @Override
+    public String getWiFiIp() { return AndroidConnectivity.getWiFiIp(); }
+
+    @Override
+    public void scanWiFi(com.codename1.io.wifi.WiFiScanCallback cb) {
+        AndroidConnectivity.scanWiFi(cb);
+    }
+
+    @Override
+    public void connectWiFi(String ssid, String password,
+                            com.codename1.io.wifi.WiFiSecurity security,
+                            com.codename1.io.wifi.WiFiConnectCallback cb) {
+        AndroidConnectivity.connectWiFi(ssid, password, security, cb);
+    }
+
+    @Override
+    public void disconnectWiFi(String ssid) {
+        AndroidConnectivity.disconnectWiFi(ssid);
+    }
+
+    @Override
+    public boolean isBonjourSupported() {
+        return AndroidConnectivity.isBonjourSupported();
+    }
+
+    @Override
+    public Object startBonjourBrowse(String type,
+                                     com.codename1.io.bonjour.BonjourServiceListener l) {
+        return AndroidConnectivity.startBonjourBrowse(type, l);
+    }
+
+    @Override
+    public void stopBonjourBrowse(Object handle) {
+        AndroidConnectivity.stopBonjourBrowse(handle);
+    }
+
+    @Override
+    public Object startBonjourPublish(String name, String type, int port,
+                                      java.util.Map<String, String> txt) {
+        return AndroidConnectivity.startBonjourPublish(name, type, port, txt);
+    }
+
+    @Override
+    public void stopBonjourPublish(Object handle) {
+        AndroidConnectivity.stopBonjourPublish(handle);
+    }
+
+    @Override
+    public boolean isWiFiDirectSupported() {
+        return AndroidConnectivity.isWiFiDirectSupported();
+    }
+
+    @Override
+    public void startWiFiDirectDiscovery(com.codename1.io.wifi.WiFiDirectListener l) {
+        AndroidConnectivity.startWiFiDirectDiscovery(l);
+    }
+
+    @Override
+    public void stopWiFiDirectDiscovery() {
+        AndroidConnectivity.stopWiFiDirectDiscovery();
+    }
+
+    @Override
+    public void connectWiFiDirect(com.codename1.io.wifi.WiFiDirectPeer peer,
+                                  com.codename1.io.wifi.WiFiConnectCallback cb) {
+        AndroidConnectivity.connectWiFiDirect(peer, cb);
+    }
+
+    @Override
+    public void disconnectWiFiDirect() {
+        AndroidConnectivity.disconnectWiFiDirect();
+    }
+
+    @Override
+    public boolean isUsbSupported() { return AndroidUsb.isSupported(); }
+
+    @Override
+    public com.codename1.io.usb.UsbDevice[] listUsbDevices() {
+        return AndroidUsb.listDevices();
+    }
+
+    @Override
+    public void addUsbDeviceListener(com.codename1.io.usb.UsbDeviceListener l) {
+        AndroidUsb.addDeviceListener(l);
+    }
+
+    @Override
+    public void removeUsbDeviceListener(com.codename1.io.usb.UsbDeviceListener l) {
+        AndroidUsb.removeDeviceListener(l);
+    }
+
+    @Override
+    public void requestUsbPermission(com.codename1.io.usb.UsbDevice device) {
+        AndroidUsb.requestPermission(device);
+    }
+
+    @Override
+    public boolean hasUsbPermission(com.codename1.io.usb.UsbDevice device) {
+        return AndroidUsb.hasPermission(device);
+    }
+
+    @Override
+    public java.io.InputStream openUsbInputStream(
+            com.codename1.io.usb.UsbDevice device, int endpoint) throws java.io.IOException {
+        return AndroidUsb.openInputStream(device, endpoint);
+    }
+
+    @Override
+    public java.io.OutputStream openUsbOutputStream(
+            com.codename1.io.usb.UsbDevice device, int endpoint) throws java.io.IOException {
+        return AndroidUsb.openOutputStream(device, endpoint);
+    }
+
     public String getCurrentAccessPoint() {
 
         ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);

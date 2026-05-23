@@ -40,6 +40,14 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.bonjour.BonjourServiceListener;
+import com.codename1.io.usb.UsbDevice;
+import com.codename1.io.usb.UsbDeviceListener;
+import com.codename1.io.wifi.WiFiConnectCallback;
+import com.codename1.io.wifi.WiFiDirectListener;
+import com.codename1.io.wifi.WiFiDirectPeer;
+import com.codename1.io.wifi.WiFiScanCallback;
+import com.codename1.io.wifi.WiFiSecurity;
 import com.codename1.io.tar.TarEntry;
 import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
@@ -6374,6 +6382,177 @@ public abstract class CodenameOneImplementation {
     /// `true` if the platform believes a VPN may be active.
     public boolean isVPNActive() {
         return false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Network type tracking (NetworkManager.addNetworkTypeListener)
+    // ---------------------------------------------------------------------
+
+    /// Returns the currently active network type as one of the
+    /// `NetworkManager.NETWORK_TYPE_*` constants. Default returns
+    /// `NETWORK_TYPE_OTHER` if any access point is configured (best-effort
+    /// fallback for older platform ports).
+    public int getCurrentNetworkType() {
+        return isAPSupported() && getCurrentAccessPoint() != null
+                ? NetworkManager.NETWORK_TYPE_OTHER
+                : NetworkManager.NETWORK_TYPE_NONE;
+    }
+
+    /// Platform hook: install a watcher that calls
+    /// `NetworkManager.fireNetworkTypeChange(...)` whenever the active
+    /// network type changes. Default is a no-op for platforms that cannot
+    /// observe network transitions.
+    public void installNetworkTypeListener(NetworkManager target) {
+    }
+
+    /// Platform hook: tear down the watcher installed by
+    /// `installNetworkTypeListener`. Default no-op.
+    public void uninstallNetworkTypeListener(NetworkManager target) {
+    }
+
+    // ---------------------------------------------------------------------
+    // WiFi information / management
+    // ---------------------------------------------------------------------
+
+    public boolean isWiFiInfoSupported() {
+        return false;
+    }
+
+    public boolean isWiFiManagementSupported() {
+        return false;
+    }
+
+    public String getWiFiSSID() {
+        return null;
+    }
+
+    public String getWiFiBSSID() {
+        return null;
+    }
+
+    public String getWiFiGateway() {
+        return null;
+    }
+
+    public String getWiFiIp() {
+        return null;
+    }
+
+    public void scanWiFi(WiFiScanCallback callback) {
+        if (callback != null) {
+            callback.onScanComplete(null,
+                    new UnsupportedOperationException(
+                            "WiFi scan is not supported on this platform"));
+        }
+    }
+
+    public void connectWiFi(String ssid, String password, WiFiSecurity security,
+                            WiFiConnectCallback callback) {
+        if (callback != null) {
+            callback.onConnectResult(false,
+                    new UnsupportedOperationException(
+                            "WiFi connect is not supported on this platform"));
+        }
+    }
+
+    public void disconnectWiFi(String ssid) {
+    }
+
+    // ---------------------------------------------------------------------
+    // WiFi Direct
+    // ---------------------------------------------------------------------
+
+    public boolean isWiFiDirectSupported() {
+        return false;
+    }
+
+    public void startWiFiDirectDiscovery(WiFiDirectListener listener) {
+        if (listener != null) {
+            listener.onDiscoveryError(new UnsupportedOperationException(
+                    "WiFi Direct is not supported on this platform"));
+        }
+    }
+
+    public void stopWiFiDirectDiscovery() {
+    }
+
+    public void connectWiFiDirect(WiFiDirectPeer peer,
+                                  WiFiConnectCallback callback) {
+        if (callback != null) {
+            callback.onConnectResult(false,
+                    new UnsupportedOperationException(
+                            "WiFi Direct is not supported on this platform"));
+        }
+    }
+
+    public void disconnectWiFiDirect() {
+    }
+
+    // ---------------------------------------------------------------------
+    // Bonjour / mDNS
+    // ---------------------------------------------------------------------
+
+    public boolean isBonjourSupported() {
+        return false;
+    }
+
+    public Object startBonjourBrowse(String type,
+                                     BonjourServiceListener listener) {
+        if (listener != null) {
+            listener.onBrowseError(new UnsupportedOperationException(
+                    "Bonjour is not supported on this platform"));
+        }
+        return null;
+    }
+
+    public void stopBonjourBrowse(Object handle) {
+    }
+
+    public Object startBonjourPublish(String name, String type, int port,
+                                      java.util.Map<String, String> txt) {
+        return null;
+    }
+
+    public void stopBonjourPublish(Object handle) {
+    }
+
+    // ---------------------------------------------------------------------
+    // USB host
+    // ---------------------------------------------------------------------
+
+    public boolean isUsbSupported() {
+        return false;
+    }
+
+    public UsbDevice[] listUsbDevices() {
+        return new UsbDevice[0];
+    }
+
+    public void addUsbDeviceListener(UsbDeviceListener listener) {
+    }
+
+    public void removeUsbDeviceListener(UsbDeviceListener listener) {
+    }
+
+    public void requestUsbPermission(UsbDevice device) {
+    }
+
+    public boolean hasUsbPermission(UsbDevice device) {
+        return false;
+    }
+
+    public java.io.InputStream openUsbInputStream(UsbDevice device,
+                                                  int endpointAddress)
+            throws java.io.IOException {
+        throw new java.io.IOException(
+                "USB is not supported on this platform");
+    }
+
+    public java.io.OutputStream openUsbOutputStream(UsbDevice device,
+                                                    int endpointAddress)
+            throws java.io.IOException {
+        throw new java.io.IOException(
+                "USB is not supported on this platform");
     }
 
     /// For some reason the standard code for writing UTF8 output in a server request

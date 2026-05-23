@@ -12463,6 +12463,103 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public int getCurrentNetworkType() {
+        return JavaSEConnectivity.getCurrentNetworkType();
+    }
+
+    @Override
+    public boolean isWiFiInfoSupported() {
+        return JavaSEConnectivity.isWiFiInfoSupported();
+    }
+
+    @Override
+    public boolean isWiFiManagementSupported() {
+        return JavaSEConnectivity.isWiFiManagementSupported();
+    }
+
+    @Override
+    public String getWiFiSSID() { return JavaSEConnectivity.getWiFiSSID(); }
+
+    @Override
+    public String getWiFiBSSID() { return JavaSEConnectivity.getWiFiBSSID(); }
+
+    @Override
+    public String getWiFiGateway() { return JavaSEConnectivity.getWiFiGateway(); }
+
+    @Override
+    public String getWiFiIp() { return JavaSEConnectivity.getWiFiIp(); }
+
+    @Override
+    public void scanWiFi(com.codename1.io.wifi.WiFiScanCallback cb) {
+        JavaSEConnectivity.scanWiFi(cb);
+    }
+
+    @Override
+    public void connectWiFi(String ssid, String password,
+                            com.codename1.io.wifi.WiFiSecurity security,
+                            com.codename1.io.wifi.WiFiConnectCallback cb) {
+        JavaSEConnectivity.connectWiFi(ssid, password, security, cb);
+    }
+
+    @Override
+    public void disconnectWiFi(String ssid) {
+        JavaSEConnectivity.disconnectWiFi(ssid);
+    }
+
+    @Override
+    public boolean isBonjourSupported() {
+        return JavaSEConnectivity.isBonjourSupported();
+    }
+
+    @Override
+    public Object startBonjourBrowse(String type,
+                                     com.codename1.io.bonjour.BonjourServiceListener l) {
+        return JavaSEConnectivity.startBonjourBrowse(type, l);
+    }
+
+    @Override
+    public void stopBonjourBrowse(Object handle) {
+        JavaSEConnectivity.stopBonjourBrowse(handle);
+    }
+
+    @Override
+    public Object startBonjourPublish(String name, String type, int port,
+                                      java.util.Map<String, String> txt) {
+        return JavaSEConnectivity.startBonjourPublish(name, type, port, txt);
+    }
+
+    @Override
+    public void stopBonjourPublish(Object handle) {
+        JavaSEConnectivity.stopBonjourPublish(handle);
+    }
+
+    @Override
+    public boolean isWiFiDirectSupported() {
+        return JavaSEConnectivity.isWiFiDirectSupported();
+    }
+
+    @Override
+    public void startWiFiDirectDiscovery(com.codename1.io.wifi.WiFiDirectListener l) {
+        JavaSEConnectivity.startWiFiDirectDiscovery(l);
+    }
+
+    @Override
+    public void stopWiFiDirectDiscovery() {
+        JavaSEConnectivity.stopWiFiDirectDiscovery();
+    }
+
+    @Override
+    public void connectWiFiDirect(com.codename1.io.wifi.WiFiDirectPeer peer,
+                                  com.codename1.io.wifi.WiFiConnectCallback cb) {
+        JavaSEConnectivity.connectWiFiDirect(peer, cb);
+    }
+
+    @Override
+    public void disconnectWiFiDirect() {
+        JavaSEConnectivity.disconnectWiFiDirect();
+    }
+
+    @Override
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
