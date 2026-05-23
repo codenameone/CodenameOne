@@ -63,9 +63,10 @@ public interface TokenStore {
     /// encrypted-at-rest -- the underlying storage on Android is the app's
     /// internal files directory, which is sandboxed but not protected against
     /// a rooted device with backups enabled.
-    public static final class DefaultStorageTokenStore implements TokenStore {
+    final class DefaultStorageTokenStore implements TokenStore {
         private static final String PREFIX = "cn1.oidc.";
 
+        @Override
         public AsyncResource<OidcTokens> load(String key) {
             AsyncResource<OidcTokens> r = new AsyncResource<OidcTokens>();
             try {
@@ -92,7 +93,10 @@ public interface TokenStore {
                         }
                         expiresAt = new Date(Long.parseLong(raw));
                     } catch (NumberFormatException nfe) {
-                        // ignore
+                        // Malformed expiry timestamp in persisted storage --
+                        // treat as "unknown expiry" so the caller can decide
+                        // whether to refresh; never let a parse failure tank
+                        // the load.
                     }
                 }
                 OidcTokens tokens = new OidcTokens(
@@ -112,6 +116,7 @@ public interface TokenStore {
             return r;
         }
 
+        @Override
         public AsyncResource<Boolean> save(String key, OidcTokens tokens) {
             AsyncResource<Boolean> r = new AsyncResource<Boolean>();
             try {
@@ -133,6 +138,7 @@ public interface TokenStore {
             return r;
         }
 
+        @Override
         public AsyncResource<Boolean> clear(String key) {
             AsyncResource<Boolean> r = new AsyncResource<Boolean>();
             try {
@@ -196,7 +202,7 @@ public interface TokenStore {
                         if (c < 0x20) {
                             String hex = Integer.toHexString(c);
                             b.append("\\u");
-                            for (int p = hex.length(); p < 4; p++) b.append('0');
+                            for (int p = hex.length(); p < 4; p++) { b.append('0'); }
                             b.append(hex);
                         } else {
                             b.append(c);

@@ -127,6 +127,7 @@ public final class OidcClient {
         }
         final String url = base + "/.well-known/openid-configuration";
         ConnectionRequest req = new ConnectionRequest() {
+            @Override
             protected void readResponse(InputStream input) throws IOException {
                 try {
                     byte[] body = Util.readInputStream(input);
@@ -146,6 +147,7 @@ public final class OidcClient {
                 }
             }
 
+            @Override
             protected void handleException(Exception err) {
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Failed to fetch discovery document at " + url + ": "
@@ -261,11 +263,13 @@ public final class OidcClient {
         String authUrl = buildAuthorizationUrl(state, nonce, pkce);
         SystemBrowser.authenticate(authUrl, redirectUri)
                 .ready(new SuccessCallback<String>() {
+                    @Override
                     public void onSucess(String redirectUrl) {
                         handleRedirect(redirectUrl, state, nonce, pkce, out);
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         out.error(err);
                     }
@@ -311,6 +315,7 @@ public final class OidcClient {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         loadStoredTokens()
                 .ready(new SuccessCallback<OidcTokens>() {
+                    @Override
                     public void onSucess(OidcTokens stored) {
                         if (stored == null) {
                             out.complete(null);
@@ -327,11 +332,13 @@ public final class OidcClient {
                         }
                         refresh(rt)
                                 .ready(new SuccessCallback<OidcTokens>() {
+                                    @Override
                                     public void onSucess(OidcTokens fresh) {
                                         out.complete(fresh);
                                     }
                                 })
                                 .except(new SuccessCallback<Throwable>() {
+                                    @Override
                                     public void onSucess(Throwable err) {
                                         out.error(err);
                                     }
@@ -339,6 +346,7 @@ public final class OidcClient {
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         out.error(err);
                     }
@@ -355,11 +363,13 @@ public final class OidcClient {
             return out;
         }
         ConnectionRequest req = new ConnectionRequest() {
+            @Override
             protected void readResponse(InputStream input) throws IOException {
                 Util.readInputStream(input);
                 out.complete(Boolean.TRUE);
             }
 
+            @Override
             protected void handleException(Exception err) {
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Token revocation failed: " + err.getMessage(), err));
@@ -452,7 +462,7 @@ public final class OidcClient {
         String error = params.get("error");
         if (error != null) {
             String description = params.get("error_description");
-            String code = error.equals("access_denied") ? OidcException.ACCESS_DENIED : error;
+            String code = "access_denied".equals(error) ? OidcException.ACCESS_DENIED : error;
             out.error(new OidcException(code,
                     description != null ? description : error));
             return;
@@ -506,8 +516,9 @@ public final class OidcClient {
                                      final AsyncResource<OidcTokens> out) {
         final boolean[] completed = new boolean[1];
         ConnectionRequest req = new ConnectionRequest() {
+            @Override
             protected void readResponse(InputStream input) throws IOException {
-                if (completed[0]) return;
+                if (completed[0]) { return; }
                 byte[] body = Util.readInputStream(input);
                 String json = StringUtil.newString(body);
                 Map<String, Object> parsed;
@@ -544,6 +555,7 @@ public final class OidcClient {
                 }
                 tokenStore.save(storageKey(), tokens)
                         .except(new SuccessCallback<Throwable>() {
+                            @Override
                             public void onSucess(Throwable t) {
                                 // Token persistence failure is non-fatal; tokens are still valid in-memory.
                             }
@@ -552,8 +564,9 @@ public final class OidcClient {
                 out.complete(tokens);
             }
 
+            @Override
             protected void handleException(Exception err) {
-                if (completed[0]) return;
+                if (completed[0]) { return; }
                 completed[0] = true;
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Token endpoint request failed: " + err.getMessage(), err));
@@ -594,10 +607,9 @@ public final class OidcClient {
 
     private static void merge(Map<String, String> out, String query) {
         String[] pairs = Util.split(query, "&");
-        for (int i = 0; i < pairs.length; i++) {
-            String p = pairs[i];
+        for (String p : pairs) {
             int eq = p.indexOf('=');
-            if (eq < 0) continue;
+            if (eq < 0) { continue; }
             String k = decode(p.substring(0, eq));
             String v = decode(p.substring(eq + 1));
             out.put(k, v);
@@ -634,7 +646,7 @@ public final class OidcClient {
     private static String join(String[] items) {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < items.length; i++) {
-            if (i > 0) b.append(' ');
+            if (i > 0) { b.append(' '); }
             b.append(items[i]);
         }
         return b.toString();
@@ -647,7 +659,7 @@ public final class OidcClient {
         int len = s.length();
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
-            if (c == '=' || c == '\n' || c == '\r') continue;
+            if (c == '=' || c == '\n' || c == '\r') { continue; }
             b.append(c);
         }
         return b.toString();

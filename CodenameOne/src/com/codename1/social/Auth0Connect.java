@@ -108,6 +108,7 @@ public final class Auth0Connect extends Login {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         OidcClient.discover("https://" + domain)
                 .ready(new SuccessCallback<OidcClient>() {
+                    @Override
                     public void onSucess(OidcClient client) {
                         client.setClientId(clientId)
                                 .setRedirectUri(redirectUri)
@@ -120,12 +121,14 @@ public final class Auth0Connect extends Login {
                         }
                         client.authorize()
                                 .ready(new SuccessCallback<OidcTokens>() {
+                                    @Override
                                     public void onSucess(OidcTokens t) {
                                         setAccessToken(t.toAccessToken());
                                         out.complete(t);
                                     }
                                 })
                                 .except(new SuccessCallback<Throwable>() {
+                                    @Override
                                     public void onSucess(Throwable err) {
                                         out.error(err);
                                     }
@@ -133,6 +136,7 @@ public final class Auth0Connect extends Login {
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         out.error(err);
                     }

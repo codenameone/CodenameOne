@@ -138,6 +138,7 @@ public class GoogleConnect extends Login {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         OidcClient.discover(GOOGLE_ISSUER)
                 .ready(new SuccessCallback<OidcClient>() {
+                    @Override
                     public void onSucess(OidcClient client) {
                         client.setClientId(clientId)
                                 .setRedirectUri(redirectUri)
@@ -152,12 +153,14 @@ public class GoogleConnect extends Login {
                                         "prompt", "consent");
                         client.authorize()
                                 .ready(new SuccessCallback<OidcTokens>() {
+                                    @Override
                                     public void onSucess(OidcTokens tokens) {
                                         setAccessToken(tokens.toAccessToken());
                                         out.complete(tokens);
                                     }
                                 })
                                 .except(new SuccessCallback<Throwable>() {
+                                    @Override
                                     public void onSucess(Throwable err) {
                                         out.error(err);
                                     }
@@ -165,6 +168,7 @@ public class GoogleConnect extends Login {
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         out.error(err);
                     }

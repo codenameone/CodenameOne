@@ -30,7 +30,6 @@ import com.codename1.io.oidc.OidcException;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.security.Hash;
 import com.codename1.security.SecureRandom;
-import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.SuccessCallback;
 
@@ -200,6 +199,7 @@ public final class AppleSignIn extends Login {
         }
         final String hashedNonce = strip(Base64.encodeUrlSafe(hashed));
         new Thread(new Runnable() {
+            @Override
             public void run() {
                 try {
                     String packed = n.signIn(scopes, hashedNonce);
@@ -230,6 +230,7 @@ public final class AppleSignIn extends Login {
         // Apple advertises `.well-known/openid-configuration` -- discover then auth.
         OidcClient.discover(APPLE_ISSUER)
                 .ready(new SuccessCallback<OidcClient>() {
+                    @Override
                     public void onSucess(OidcClient client) {
                         // Apple does NOT issue refresh tokens to public clients; require
                         // form_post + `response_mode` for compatibility.
@@ -242,6 +243,7 @@ public final class AppleSignIn extends Login {
                         }
                         client.authorize()
                                 .ready(new SuccessCallback<OidcTokens>() {
+                                    @Override
                                     public void onSucess(OidcTokens t) {
                                         AppleSignInResult r = fromOidcTokens(t);
                                         persistProfile(r);
@@ -250,6 +252,7 @@ public final class AppleSignIn extends Login {
                                     }
                                 })
                                 .except(new SuccessCallback<Throwable>() {
+                                    @Override
                                     public void onSucess(Throwable err) {
                                         if (err instanceof OidcException &&
                                                 OidcException.USER_CANCELLED.equals(
@@ -263,6 +266,7 @@ public final class AppleSignIn extends Login {
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         callback.onError("Apple OIDC discovery failed: " + err.getMessage());
                     }
@@ -291,9 +295,9 @@ public final class AppleSignIn extends Login {
     }
 
     private static String[] splitScopes(String scopes) {
-        if (scopes == null) return new String[0];
+        if (scopes == null) { return new String[0]; }
         String trimmed = scopes.trim();
-        if (trimmed.length() == 0) return new String[0];
+        if (trimmed.length() == 0) { return new String[0]; }
         return com.codename1.util.StringUtil.tokenize(trimmed, ' ').toArray(new String[0]);
     }
 
@@ -367,7 +371,7 @@ public final class AppleSignIn extends Login {
         int len = s.length();
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
-            if (c == '=' || c == '\n' || c == '\r') continue;
+            if (c == '=' || c == '\n' || c == '\r') { continue; }
             b.append(c);
         }
         return b.toString();
@@ -376,7 +380,13 @@ public final class AppleSignIn extends Login {
     private static final String PORT_IMPL_FQCN =
             "com.codename1.social.AppleSignInNativeImpl";
 
+    // volatile is required by the double-checked locking idiom in
+    // lookupNative(); without it, threads can observe a half-initialised
+    // reference. This is the textbook DCL pattern, not the anti-pattern PMD
+    // is guarding against.
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile AppleSignInNative CACHED_NATIVE;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile boolean NATIVE_PROBED;
 
     /// Registers a custom [AppleSignInNative] for cn1lib authors who want to
@@ -391,9 +401,9 @@ public final class AppleSignIn extends Login {
     }
 
     private static AppleSignInNative lookupNative() {
-        if (NATIVE_PROBED) return CACHED_NATIVE;
+        if (NATIVE_PROBED) { return CACHED_NATIVE; }
         synchronized (AppleSignIn.class) {
-            if (NATIVE_PROBED) return CACHED_NATIVE;
+            if (NATIVE_PROBED) { return CACHED_NATIVE; }
             try {
                 Class<?> cls = Class.forName(PORT_IMPL_FQCN);
                 CACHED_NATIVE = (AppleSignInNative) cls.newInstance();
@@ -408,6 +418,7 @@ public final class AppleSignIn extends Login {
     /// Bridges [AppleSignInCallback] into the legacy [LoginCallback] used by
     /// [Login#doLogin()].
     private final class LoginCallbackAdapter implements AppleSignInCallback {
+        @Override
         public void onSuccess(AppleSignInResult result) {
             // `callback` from Login is package-private; trigger success via setAccessToken side-effect.
             if (callback != null) {
@@ -415,12 +426,14 @@ public final class AppleSignIn extends Login {
             }
         }
 
+        @Override
         public void onError(String error) {
             if (callback != null) {
                 callback.loginFailed(error);
             }
         }
 
+        @Override
         public void onCancel() {
             if (callback != null) {
                 callback.loginFailed("cancelled");

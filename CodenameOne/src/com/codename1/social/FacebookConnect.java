@@ -294,12 +294,14 @@ public class FacebookConnect extends Login {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         client.authorize()
                 .ready(new SuccessCallback<OidcTokens>() {
+                    @Override
                     public void onSucess(OidcTokens t) {
                         setAccessToken(t.toAccessToken());
                         out.complete(t);
                     }
                 })
                 .except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable err) {
                         out.error(err);
                     }

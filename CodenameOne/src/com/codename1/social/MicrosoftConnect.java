@@ -128,6 +128,7 @@ public final class MicrosoftConnect extends Login {
             this.out = out;
         }
 
+        @Override
         public void onSucess(OidcClient client) {
             client.setClientId(clientId)
                     .setRedirectUri(redirectUri)
@@ -150,6 +151,7 @@ public final class MicrosoftConnect extends Login {
             this.out = out;
         }
 
+        @Override
         public void onSucess(OidcTokens t) {
             host.setAccessToken(t.toAccessToken());
             out.complete(t);
@@ -163,6 +165,7 @@ public final class MicrosoftConnect extends Login {
             this.out = out;
         }
 
+        @Override
         public void onSucess(Throwable err) {
             out.error(err);
         }

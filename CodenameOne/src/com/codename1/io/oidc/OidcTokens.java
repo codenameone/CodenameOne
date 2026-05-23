@@ -101,7 +101,10 @@ public final class OidcTokens {
                 long seconds = Long.parseLong(raw);
                 expiresAt = new Date(System.currentTimeMillis() + seconds * 1000L);
             } catch (NumberFormatException nfe) {
-                // ignore -- expiresAt stays null
+                // Provider returned a non-numeric `expires_in`; treat the
+                // expiry as unknown rather than failing the whole token
+                // response. `expiresAt` stays null and callers fall back to
+                // a 401 retry.
             }
         }
         Map<String, Object> claims = idToken != null ? decodeIdTokenClaims(idToken) : null;

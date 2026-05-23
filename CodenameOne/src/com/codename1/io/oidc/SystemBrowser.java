@@ -56,7 +56,12 @@ public final class SystemBrowser {
     /// link from core into platform classes.
     private static final String PORT_IMPL_FQCN = "com.codename1.io.oidc.OidcBrowserNativeImpl";
 
+    // volatile is required for the double-checked locking pattern in
+    // lookupNative(); without it, threads can observe a half-initialised
+    // reference. Standard idiom -- PMD's blanket warning does not apply.
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile OidcBrowserNative cachedNative;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile boolean nativeProbed;
 
     private SystemBrowser() {}
@@ -108,16 +113,16 @@ public final class SystemBrowser {
             throw new IllegalArgumentException("redirectUri must not be null");
         }
         final AsyncResource<String> out = new AsyncResource<String>();
-        OidcBrowserNative native_ = lookupNative();
-        if (native_ != null && native_.isSupported()) {
-            authenticateNative(native_, authorizationUrl, redirectUri, out);
+        OidcBrowserNative provider = lookupNative();
+        if (provider != null && provider.isSupported()) {
+            authenticateNative(provider, authorizationUrl, redirectUri, out);
         } else {
             authenticateBrowserWindow(authorizationUrl, redirectUri, out);
         }
         return out;
     }
 
-    private static void authenticateNative(final OidcBrowserNative native_,
+    private static void authenticateNative(final OidcBrowserNative provider,
                                            final String authUrl,
                                            final String redirectUri,
                                            final AsyncResource<String> out) {
@@ -126,9 +131,10 @@ public final class SystemBrowser {
         // on a pool thread.
         final String scheme = schemeOf(redirectUri);
         Runnable task = new Runnable() {
+            @Override
             public void run() {
                 try {
-                    String result = native_.startAuthorization(authUrl, scheme);
+                    String result = provider.startAuthorization(authUrl, scheme);
                     if (result == null) {
                         out.error(new OidcException(OidcException.USER_CANCELLED,
                                 "Sign-in sheet was dismissed before completion"));
@@ -149,11 +155,13 @@ public final class SystemBrowser {
                                                   final String redirectUri,
                                                   final AsyncResource<String> out) {
         Runnable show = new Runnable() {
+            @Override
             public void run() {
                 final BrowserWindow window = new BrowserWindow(authUrl);
                 window.setTitle("Sign in");
                 final boolean[] resolved = new boolean[1];
                 final ActionListener loadListener = new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         Object src = evt.getSource();
                         if (!(src instanceof String)) {
@@ -176,6 +184,7 @@ public final class SystemBrowser {
                 };
                 window.addLoadListener(loadListener);
                 window.addCloseListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent ev) {
                         if (!resolved[0]) {
                             resolved[0] = true;
