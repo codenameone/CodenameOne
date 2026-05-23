@@ -154,21 +154,19 @@ jobs:
             echo "::error::android_port_sources.jar not produced at ${BUNDLE}"
             exit 1
           fi
+          # Capture the listing once into a variable rather than re-piping
+          # `unzip -l | grep -q` per file. With pipefail set, `grep -q` exits
+          # as soon as it finds a match and SIGPIPEs unzip (status 141);
+          # the resulting non-zero pipeline status was being misread as
+          # "no match" even though the bundle actually contained the file.
+          LISTING="$(unzip -l "${BUNDLE}")"
           for required in \
               com/codename1/io/oidc/OidcBrowserNativeImpl.java \
               com/codename1/social/AppleSignInNativeImpl.java; do
-            if ! unzip -l "${BUNDLE}" | grep -q "${required}"; then
-              echo "::group::Diagnostic dump (bundle + source tree)"
-              echo "--- ls Ports/Android/src/com/codename1/io/oidc/"
-              ls -la Ports/Android/src/com/codename1/io/oidc/ 2>&1 || true
-              echo "--- ls Ports/Android/src/com/codename1/social/ | grep -i appleSignIn"
-              ls -la Ports/Android/src/com/codename1/social/ 2>&1 | grep -i apple || true
-              echo "--- bundle listing (oidc / social only)"
-              unzip -l "${BUNDLE}" | grep -E "oidc|social" || true
-              echo "--- bundle size"
-              ls -la "${BUNDLE}"
-              echo "::endgroup::"
+            if ! grep -qF "${required}" <<<"${LISTING}"; then
               echo "::error::${required} missing from android_port_sources.jar"
+              echo "Bundle listing (oidc / social entries):"
+              grep -E "oidc|social" <<<"${LISTING}" || true
               exit 1
             fi
           done
