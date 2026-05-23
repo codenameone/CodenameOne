@@ -2701,7 +2701,21 @@ bool lockDrawing;
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
+//
+// While a native text editor is up (editingComponent != nil) we must not
+// consume any UIPress -- UIKit's text-input pipeline needs every press
+// (including printable characters, which cn1MapUIKeyToKeyCode returns as
+// their unicode codepoint) to reach the focused CN1UITextField /
+// CN1UITextView for insertion. The original implementation swallowed
+// every press that mapped to a non-zero CN1 keycode, which on iOS 13.4+
+// broke hardware-keyboard typing outright and on iOS 26.x devices, where
+// some on-screen keyboard interactions also surface as UIPress events,
+// broke virtual-keyboard typing too -- see #5010.
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (editingComponent != nil) {
+        [super pressesBegan:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -2732,6 +2746,10 @@ bool lockDrawing;
 }
 
 - (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (editingComponent != nil) {
+        [super pressesEnded:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -2762,6 +2780,10 @@ bool lockDrawing;
 }
 
 - (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+    if (editingComponent != nil) {
+        [super pressesCancelled:presses withEvent:event];
+        return;
+    }
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
