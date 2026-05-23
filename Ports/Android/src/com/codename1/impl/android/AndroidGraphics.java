@@ -1464,7 +1464,33 @@ class AndroidGraphics {
     }
 
     private boolean clipSet = false;
-    
+
+    // Stack of clipSet values captured by pushClip. Each pushClip adds an
+    // unpaired canvas.save() so the clip can be widened (restored) on
+    // popClip. clipSet is reset to false after the push so that a setClip
+    // inside the push/pop block doesn't restore our pushed save.
+    private final java.util.ArrayDeque<Boolean> pushedClipSetStack = new java.util.ArrayDeque<Boolean>();
+
+    public void pushClip() {
+        canvas.save();
+        pushedClipSetStack.push(Boolean.valueOf(clipSet));
+        clipSet = false;
+    }
+
+    public void popClip() {
+        if (pushedClipSetStack.isEmpty()) {
+            return;
+        }
+        if (clipSet) {
+            canvas.restore();
+            clipSet = false;
+        }
+        canvas.restore();
+        Boolean prev = pushedClipSetStack.pop();
+        clipSet = (prev != null) && prev.booleanValue();
+        clipFresh = false;
+    }
+
     public void setClip(int x, int y, int width, int height) {
         //System.out.println("Setting clip  "+x+","+y+","+width+", "+height);
         if (clipSet) {
