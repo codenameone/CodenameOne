@@ -31,7 +31,6 @@ import com.codename1.io.oidc.OidcException;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.security.Hash;
 import com.codename1.security.SecureRandom;
-import com.codename1.system.NativeLookup;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.SuccessCallback;
@@ -373,14 +372,30 @@ public final class AppleSignIn extends Login {
         return b.toString();
     }
 
+    private static final String PORT_IMPL_FQCN =
+            "com.codename1.social.AppleSignInNativeImpl";
+
     private static volatile AppleSignInNative CACHED_NATIVE;
     private static volatile boolean NATIVE_PROBED;
+
+    /// Registers a custom [AppleSignInNative] for cn1lib authors who want to
+    /// plug in their own implementation (e.g. wrapping the
+    /// `AuthenticationServices` framework differently). Pass `null` to
+    /// revert to the port-provided default.
+    public static void setNative(AppleSignInNative provider) {
+        synchronized (AppleSignIn.class) {
+            CACHED_NATIVE = provider;
+            NATIVE_PROBED = true;
+        }
+    }
+
     private static AppleSignInNative lookupNative() {
         if (NATIVE_PROBED) return CACHED_NATIVE;
         synchronized (AppleSignIn.class) {
             if (NATIVE_PROBED) return CACHED_NATIVE;
             try {
-                CACHED_NATIVE = NativeLookup.create(AppleSignInNative.class);
+                Class<?> cls = Class.forName(PORT_IMPL_FQCN);
+                CACHED_NATIVE = (AppleSignInNative) cls.newInstance();
             } catch (Throwable t) {
                 CACHED_NATIVE = null;
             }

@@ -23,40 +23,40 @@
  */
 package com.codename1.io.oidc;
 
-import com.codename1.system.NativeInterface;
-
-/// Native bridge into the platform's system-browser sign-in primitive
+/// Service-provider interface that [SystemBrowser] uses to dispatch a sign-in
+/// flow through the OS's hardened sign-in surface
 /// (`ASWebAuthenticationSession` on iOS, `androidx.browser.customtabs` /
-/// `Credential Manager` on Android). Ports that implement this interface --
-/// or apps that ship a cn1lib doing so -- let [SystemBrowser] dispatch
-/// authorization-code flows through the OS's hardened, cookie-isolated
-/// sign-in sheet instead of the in-app fallback.
+/// `Credential Manager` on Android).
+///
+/// The platform port supplies an implementation named
+/// `com.codename1.io.oidc.OidcBrowserNativeImpl`; [SystemBrowser] loads it via
+/// `Class.forName` at first use. Cn1lib authors who want to plug in their own
+/// implementation (for example, one backed by a [com.codename1.system.NativeInterface]
+/// so a 3rd-party SDK can drive the browser) can declare a subtype and
+/// register it with [SystemBrowser#setNative(OidcBrowserNative)] -- there is
+/// no need to extend `NativeInterface` from this interface itself.
 ///
 /// `redirectScheme` is the scheme half of the registered redirect URI (e.g.
-/// the `"com.example.app"` part of `"com.example.app:/oauth2redirect"`). The
-/// native side completes by invoking the JavaScript-facing callback hosted by
-/// [SystemBrowser]; see [#startAuthorization(String, String)].
+/// the `"com.example.app"` part of `"com.example.app:/oauth2redirect"`).
 ///
 /// @since 8.0
-public interface OidcBrowserNative extends NativeInterface {
+public interface OidcBrowserNative {
+
+    /// `true` if this implementation is usable on the current device / OS
+    /// version. The default fallback ([SystemBrowser]'s in-app
+    /// [com.codename1.ui.BrowserWindow]) takes over when this returns
+    /// `false`, so a port that has a class on the file system but cannot
+    /// satisfy the runtime requirements (e.g. iOS 11 lacks
+    /// `ASWebAuthenticationSession`) should report `false` and the call
+    /// will degrade gracefully.
+    boolean isSupported();
 
     /// Starts the OS sign-in sheet for `authUrl` and resolves when the user
     /// is redirected to a URL matching `redirectScheme`. The return value is
-    /// the full redirect URL (including query / fragment).
+    /// the full redirect URL (including query / fragment), or `null` if the
+    /// user cancelled.
     ///
-    /// Implementations are expected to be asynchronous; they should block the
-    /// calling thread and post the resolved URL back via a private
-    /// completion path. The fallback [SystemBrowser] implementation already
-    /// handles the cross-thread plumbing; native ports just need to deliver
-    /// the URL on the EDT.
-    ///
-    /// #### Parameters
-    ///
-    /// - `authUrl`: Full authorization-endpoint URL with `client_id`,
-    ///   `redirect_uri`, `state`, `code_challenge`, etc. already encoded.
-    ///
-    /// - `redirectScheme`: The redirect URI scheme registered for the app.
-    ///   On iOS the OS uses this to dismiss `ASWebAuthenticationSession`
-    ///   automatically; on Android it informs the trusted-browser intent.
+    /// Implementations are expected to be blocking: the caller is on a
+    /// worker thread and waits for the result.
     String startAuthorization(String authUrl, String redirectScheme);
 }

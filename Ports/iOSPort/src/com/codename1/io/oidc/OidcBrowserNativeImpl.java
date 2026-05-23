@@ -21,14 +21,27 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+package com.codename1.io.oidc;
 
-#import <Foundation/Foundation.h>
+import com.codename1.impl.ios.IOSImplementation;
 
-@interface com_codename1_social_AppleSignInNativeImpl : NSObject
+/**
+ * iOS port implementation of {@link OidcBrowserNative}. Thin Java wrapper
+ * that delegates to the native methods exposed on
+ * {@link com.codename1.impl.ios.IOSNative} -- the C bodies live in
+ * {@code Ports/iOSPort/nativeSources/CN1OidcBrowser.m} and use
+ * {@code ASWebAuthenticationSession} (iOS 12+).
+ *
+ * <p>Loaded by {@link com.codename1.io.oidc.SystemBrowser} via
+ * {@code Class.forName("com.codename1.io.oidc.OidcBrowserNativeImpl")}.
+ */
+public class OidcBrowserNativeImpl implements OidcBrowserNative {
 
-- (NSString *)signIn:(NSString *)scopes param1:(NSString *)nonce;
-- (BOOL)isLoggedIn;
-- (void)signOut;
-- (BOOL)isSupported;
+    public boolean isSupported() {
+        return IOSImplementation.nativeInstance.oidcSystemBrowserSupported();
+    }
 
-@end
+    public String startAuthorization(String authUrl, String redirectScheme) {
+        return IOSImplementation.nativeInstance.oidcStartAuthorization(authUrl, redirectScheme);
+    }
+}

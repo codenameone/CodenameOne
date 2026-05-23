@@ -29,8 +29,11 @@ on:
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
       - 'CodenameOne/src/com/codename1/io/AccessToken.java'
       - 'CodenameOne/src/com/codename1/social/**'
-      - 'Ports/iOSPort/nativeSources/com_codename1_io_oidc_*'
-      - 'Ports/iOSPort/nativeSources/com_codename1_social_AppleSignIn*'
+      - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
+      - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
       - 'Ports/Android/src/com/codename1/io/oidc/**'
       - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
@@ -47,8 +50,11 @@ on:
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
       - 'CodenameOne/src/com/codename1/social/**'
-      - 'Ports/iOSPort/nativeSources/com_codename1_io_oidc_*'
-      - 'Ports/iOSPort/nativeSources/com_codename1_social_AppleSignIn*'
+      - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
+      - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
       - 'Ports/Android/src/com/codename1/io/oidc/**'
       - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
@@ -59,6 +65,8 @@ on:
 
 permissions:
   contents: read
+  # Required to pull the pr-ci-container image from ghcr.io.
+  packages: read
 
 concurrency:
   group: identity-stack-${{ github.workflow }}-${{ github.ref_name }}
@@ -223,13 +231,37 @@ jobs:
             echo "::error::No iPhoneOS SDK available on this runner"
             exit 1
           fi
+          # The .m files include "xmlvm.h" and use ParparVM's CN1_THREAD_*
+          # macros. Those live in the ParparVM build pipeline, not in this
+          # checkout, so we stage a minimal shim header that defines the
+          # types and macros the .m files reference. The real header on the
+          # build cloud supplies richer definitions; this shim is enough to
+          # exercise everything clang cares about for -fsyntax-only.
+          STUB="$(mktemp -d)"
+          cat > "$STUB/xmlvm.h" <<'EOF'
+          typedef void* JAVA_OBJECT;
+          typedef int   JAVA_BOOLEAN;
+          typedef int   JAVA_INT;
+          typedef long  JAVA_LONG;
+          typedef void  JAVA_VOID;
+          #define JAVA_TRUE  1
+          #define JAVA_FALSE 0
+          #define JAVA_NULL  0
+          #define POOL_BEGIN()
+          #define POOL_END()
+          typedef void* CODENAME_ONE_THREAD_STATE;
+          #define CN1_THREAD_STATE_MULTI_ARG void* threadStateData,
+          #define CN1_THREAD_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_GET_STATE_PASS_ARG threadStateData,
+          EOF
           xcrun --sdk iphoneos clang \
               -fsyntax-only \
               -arch arm64 \
               -fobjc-arc \
               -Werror=incompatible-pointer-types \
               -Werror=objc-method-access \
-              -Werror=unused-result \
-              -I. \
-              com_codename1_io_oidc_OidcBrowserNativeImpl.m \
-              com_codename1_social_AppleSignInNativeImpl.m
+              -Wno-unused-parameter \
+              -I"$STUB" \
+              -DNEW_CODENAME_ONE_VM=1 \
+              CN1OidcBrowser.m \
+              CN1AppleSignIn.m

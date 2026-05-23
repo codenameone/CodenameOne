@@ -27,19 +27,29 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import androidx.browser.customtabs.CustomTabsIntent;
+
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 
+import java.lang.reflect.Method;
+
 /**
- * Android implementation of {@link OidcBrowserNative} backed by
- * {@code androidx.browser.customtabs.CustomTabsIntent}.
+ * Android implementation of {@link OidcBrowserNative}. Uses Custom Tabs when
+ * the {@code androidx.browser:browser} dependency is on the app's runtime
+ * classpath (which the Codename One Maven plugin auto-injects when the app
+ * references {@code com.codename1.io.oidc.*}), and falls back to
+ * {@code Intent.ACTION_VIEW} when Custom Tabs is unavailable.
+ *
+ * <p>Lookup is performed via reflection so the Codename One Android port
+ * itself (which delivers Java sources, not Android-resolved gradle deps)
+ * can build without {@code androidx.browser} on its compile classpath.
  *
  * <p>Flow:
  *
  * <ol>
  *   <li>{@link #startAuthorization(String, String)} is called from a worker thread.
- *   <li>We launch a Custom Tabs intent at the authorization URL.
+ *   <li>We launch a Custom Tabs intent (or {@code ACTION_VIEW} fallback) at the
+ *       authorization URL.
  *   <li>The identity provider eventually redirects to a URL on the registered
  *       custom scheme (e.g. {@code com.example.app:/oauth2redirect?code=...}).
  *   <li>Android delivers that as an intent to {@code CodenameOneActivity}; we
@@ -74,12 +84,10 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
     /** Single shared lifecycle listener; installed lazily on first call. */
     private static LifecycleListener installedListener;
 
-    @Override
     public boolean isSupported() {
         return AndroidNativeUtil.getActivity() != null;
     }
 
-    @Override
     public String startAuthorization(final String authUrl, final String redirectScheme) {
         final Activity activity = AndroidNativeUtil.getActivity();
         if (activity == null) {
@@ -96,23 +104,11 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
             resultUrl = null;
         }
 
-        // Open the Custom Tab on the UI thread; the user is sent away from the
+        // Open the browser on the UI thread; the user is sent away from the
         // app and will be brought back via the registered intent filter.
         activity.runOnUiThread(new Runnable() {
             public void run() {
-                try {
-                    CustomTabsIntent customTabs =
-                            new CustomTabsIntent.Builder().build();
-                    customTabs.intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    customTabs.launchUrl(activity, Uri.parse(authUrl));
-                } catch (Throwable t) {
-                    // Fallback to ACTION_VIEW if Custom Tabs is unavailable for
-                    // any reason (e.g. no Chrome / Custom-Tabs-capable browser
-                    // installed). Most users will still complete the flow.
-                    Intent fallback = new Intent(Intent.ACTION_VIEW, Uri.parse(authUrl));
-                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    activity.startActivity(fallback);
-                }
+                launchBrowser(activity, authUrl);
             }
         });
 
@@ -139,6 +135,38 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
             pendingScheme = null;
             return r;
         }
+    }
+
+    /**
+     * Attempts a Custom Tabs launch via reflection; falls back to a plain
+     * {@code ACTION_VIEW} so users without {@code androidx.browser:browser}
+     * on the gradle classpath still complete the sign-in flow (just in the
+     * default system browser instead of an in-app sheet).
+     */
+    private static void launchBrowser(Activity activity, String authUrl) {
+        Uri uri = Uri.parse(authUrl);
+        try {
+            // androidx.browser.customtabs.CustomTabsIntent customTabs =
+            //     new CustomTabsIntent.Builder().build();
+            // customTabs.intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            // customTabs.launchUrl(activity, uri);
+            Class<?> builderCls = Class.forName("androidx.browser.customtabs.CustomTabsIntent$Builder");
+            Object builder = builderCls.getConstructor().newInstance();
+            Object customTabs = builderCls.getMethod("build").invoke(builder);
+            Class<?> customTabsCls = customTabs.getClass();
+            Object intent = customTabsCls.getField("intent").get(customTabs);
+            Method setFlags = intent.getClass().getMethod("setFlags", int.class);
+            setFlags.invoke(intent, Intent.FLAG_ACTIVITY_NEW_TASK);
+            Method launchUrl = customTabsCls.getMethod("launchUrl",
+                    android.content.Context.class, Uri.class);
+            launchUrl.invoke(customTabs, activity, uri);
+            return;
+        } catch (Throwable ignore) {
+            // Custom Tabs not on the runtime classpath; fall through.
+        }
+        Intent fallback = new Intent(Intent.ACTION_VIEW, uri);
+        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        activity.startActivity(fallback);
     }
 
     private void installRedirectListenerOnce() {
@@ -178,8 +206,6 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
                 if (pendingScheme == null) {
                     return;
                 }
-                // Match either the literal scheme (`com.example.app`) or the
-                // full URI prefix (`https://example.com/cb`).
                 boolean match = scheme.equalsIgnoreCase(pendingScheme)
                         || full.startsWith(pendingScheme);
                 if (!match) {

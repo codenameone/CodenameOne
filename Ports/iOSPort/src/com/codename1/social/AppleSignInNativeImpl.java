@@ -21,12 +21,34 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+package com.codename1.social;
 
-#import <Foundation/Foundation.h>
+import com.codename1.impl.ios.IOSImplementation;
 
-@interface com_codename1_io_oidc_OidcBrowserNativeImpl : NSObject
+/**
+ * iOS port implementation of {@link AppleSignInNative}. Delegates to the
+ * native methods on {@link com.codename1.impl.ios.IOSNative}; the C bodies
+ * live in {@code Ports/iOSPort/nativeSources/CN1AppleSignIn.m} and use
+ * {@code ASAuthorizationAppleIDProvider} (iOS 13+).
+ *
+ * <p>Loaded by {@link com.codename1.social.AppleSignIn} via
+ * {@code Class.forName("com.codename1.social.AppleSignInNativeImpl")}.
+ */
+public class AppleSignInNativeImpl implements AppleSignInNative {
 
-- (NSString *)startAuthorization:(NSString *)authUrl param1:(NSString *)redirectScheme;
-- (BOOL)isSupported;
+    public boolean isSupported() {
+        return IOSImplementation.nativeInstance.appleSignInSupported();
+    }
 
-@end
+    public String signIn(String scopes, String nonce) {
+        return IOSImplementation.nativeInstance.appleSignIn(scopes, nonce);
+    }
+
+    public boolean isLoggedIn() {
+        return IOSImplementation.nativeInstance.appleSignInIsLoggedIn();
+    }
+
+    public void signOut() {
+        IOSImplementation.nativeInstance.appleSignInSignOut();
+    }
+}

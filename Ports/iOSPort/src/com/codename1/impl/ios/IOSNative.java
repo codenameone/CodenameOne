@@ -494,9 +494,22 @@ public final class IOSNative {
     public native boolean isFacebookLoggedIn();
     public native String getFacebookToken();
     public native void facebookLogout();
-    public native boolean askPublishPermissions(LoginCallback lc);    
+    public native boolean askPublishPermissions(LoginCallback lc);
     public native boolean hasPublishPermissions();
-        
+
+    // OidcClient / SystemBrowser -- ASWebAuthenticationSession (iOS 12+).
+    // See nativeSources/CN1OidcBrowser.m for the Obj-C side.
+    public native boolean oidcSystemBrowserSupported();
+    public native String oidcStartAuthorization(String authUrl, String redirectScheme);
+
+    // AppleSignIn -- ASAuthorizationAppleIDProvider (iOS 13+).
+    // See nativeSources/CN1AppleSignIn.m for the Obj-C side.
+    public native boolean appleSignInSupported();
+    public native String appleSignIn(String scopes, String nonce);
+    public native boolean appleSignInIsLoggedIn();
+    public native void appleSignInSignOut();
+
+
     
     public native boolean isAsyncEditMode();
     public native void setAsyncEditMode(boolean b);

@@ -23,7 +23,6 @@
  */
 package com.codename1.io.oidc;
 
-import com.codename1.system.NativeLookup;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionEvent;
@@ -52,6 +51,11 @@ import com.codename1.util.AsyncResource;
 /// @since 8.0
 public final class SystemBrowser {
 
+    /// FQCN that ports drop on the classpath to provide a native
+    /// implementation. Loaded reflectively on first call to avoid a hard
+    /// link from core into platform classes.
+    private static final String PORT_IMPL_FQCN = "com.codename1.io.oidc.OidcBrowserNativeImpl";
+
     private static volatile OidcBrowserNative cachedNative;
     private static volatile boolean nativeProbed;
 
@@ -64,6 +68,17 @@ public final class SystemBrowser {
     public static boolean isNativeAvailable() {
         OidcBrowserNative n = lookupNative();
         return n != null && n.isSupported();
+    }
+
+    /// Registers a custom [OidcBrowserNative] -- for cn1lib authors who want
+    /// to override the port-provided one, e.g. to wrap a 3rd-party SDK that
+    /// drives the OS sheet differently. Pass `null` to revert to the
+    /// port-provided default.
+    public static void setNative(OidcBrowserNative provider) {
+        synchronized (SystemBrowser.class) {
+            cachedNative = provider;
+            nativeProbed = true;
+        }
     }
 
     /// Launches the system browser at `authorizationUrl` and resolves with
@@ -185,7 +200,8 @@ public final class SystemBrowser {
                 return cachedNative;
             }
             try {
-                cachedNative = NativeLookup.create(OidcBrowserNative.class);
+                Class<?> cls = Class.forName(PORT_IMPL_FQCN);
+                cachedNative = (OidcBrowserNative) cls.newInstance();
             } catch (Throwable t) {
                 cachedNative = null;
             }

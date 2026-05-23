@@ -23,13 +23,15 @@
  */
 package com.codename1.social;
 
-import com.codename1.system.NativeInterface;
-
-/// Native bridge for `Sign in with Apple` on iOS 13+. The iOS port implements
-/// this with `ASAuthorizationAppleIDProvider` and an
-/// `ASAuthorizationController`. Other platforms leave it unimplemented;
-/// [AppleSignIn] falls back to the web flow via
-/// [com.codename1.io.oidc.OidcClient] instead.
+/// Service-provider interface for native `Sign in with Apple`. The iOS port
+/// supplies a class `com.codename1.social.AppleSignInNativeImpl` that wraps
+/// `ASAuthorizationAppleIDProvider`; [AppleSignIn] loads it via
+/// `Class.forName` at first use. Cn1libs that want to plug in their own
+/// implementation can register one with [AppleSignIn#setNative(AppleSignInNative)]
+/// -- this interface does not extend
+/// [com.codename1.system.NativeInterface] because [AppleSignIn] is part of
+/// the core framework and the iOS impl talks to native code via
+/// `IOSImplementation.nativeInstance`, not through `NativeLookup`.
 ///
 /// The native side serialises its result as a single pipe-delimited string
 /// to keep the bridge boundary primitive-only:
@@ -42,10 +44,16 @@ import com.codename1.system.NativeInterface;
 /// profile on subsequent logins). The Java side persists them.
 ///
 /// @since 8.0
-public interface AppleSignInNative extends NativeInterface {
+public interface AppleSignInNative {
+
+    /// `true` if this implementation is usable on the current device / OS
+    /// version. iOS 13+ returns `true`; older iOS, non-iOS platforms, or
+    /// missing entitlement returns `false` so [AppleSignIn] falls back to
+    /// its web OIDC flow.
+    boolean isSupported();
 
     /// Starts the system Sign-in-with-Apple sheet. The call blocks the
-    /// native thread until the user completes or cancels.
+    /// calling thread until the user completes or cancels.
     ///
     /// #### Parameters
     ///

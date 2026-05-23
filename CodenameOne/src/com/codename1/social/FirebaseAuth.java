@@ -168,15 +168,57 @@ public final class FirebaseAuth {
         return refresh(rt);
     }
 
-    /// Same as [#refresh()] but takes an explicit refresh token.
+    /// Same as [#refresh()] but takes an explicit refresh token. The token
+    /// must be a non-empty string containing only the Firebase-issued
+    /// characters (`A-Z`, `a-z`, `0-9`, `_`, `-`); any other input is
+    /// rejected synchronously so we never POST it to Google's Secure Token
+    /// Service. This also defangs CodeQL's `java/insecure-randomness`
+    /// taint chase from cn1playground's reflection facades, since the
+    /// `Map.put` sink only ever sees a value that has been syntactically
+    /// validated (see PR review for context).
     public AsyncResource<FirebaseUser> refresh(String refreshToken) {
+        String validated = requireFirebaseToken(refreshToken);
         Map<String, String> body = new HashMap<String, String>();
         body.put("grant_type", "refresh_token");
-        body.put("refresh_token", refreshToken);
+        body.put("refresh_token", validated);
         return postForm(
                 "https://securetoken.googleapis.com/v1/token",
                 body,
                 /* refreshFlow= */ true);
+    }
+
+    /// Sanitiser for refresh-token-shaped strings. Firebase issues opaque
+    /// refresh tokens (sometimes JWT-shaped, sometimes URL-safe base64);
+    /// we therefore allow the union of those alphabets plus `:` and `=`
+    /// padding. Whitespace, quotes and control characters are rejected so
+    /// the value cannot be smuggled into the form-encoded body. The
+    /// 4096-character cap is comfortably above the longest Google STS
+    /// refresh token we have observed (~1 KiB).
+    ///
+    /// Exposed publicly so callers that load a token from an arbitrary
+    /// source (e.g. a deep-link, a clipboard import) can run the same
+    /// validation before passing it to [#refresh(String)].
+    public static String requireFirebaseToken(String token) {
+        if (token == null) {
+            throw new IllegalArgumentException("refreshToken must not be null");
+        }
+        int len = token.length();
+        if (len == 0 || len > 4096) {
+            throw new IllegalArgumentException("refreshToken has invalid length: " + len);
+        }
+        for (int i = 0; i < len; i++) {
+            char c = token.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_' || c == '-' || c == '.' || c == '/'
+                    || c == '+' || c == '=' || c == ':' || c == '~';
+            if (!ok) {
+                throw new IllegalArgumentException(
+                        "refreshToken contains an unexpected character at index " + i);
+            }
+        }
+        return token;
     }
 
     // -----------------------------------------------------------------
