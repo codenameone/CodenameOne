@@ -282,8 +282,9 @@ public final class JavaSEConnectivity {
             System.out.println("[CN1 simulator] Bonjour browse started via JmDNS for type=" + type);
             return jmdns;
         } catch (Throwable t) {
+            final Throwable err = t;
             CN.callSerially(new Runnable() {
-                @Override public void run() { listener.onBrowseError(t); }
+                @Override public void run() { listener.onBrowseError(err); }
             });
             return null;
         }

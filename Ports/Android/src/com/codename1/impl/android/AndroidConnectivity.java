@@ -521,8 +521,9 @@ public final class AndroidConnectivity {
         final String type = trimTrailingDot(typeIn);
         final NsdManager.DiscoveryListener disc = new NsdManager.DiscoveryListener() {
             @Override public void onStartDiscoveryFailed(String s, int errorCode) {
+                final int code = errorCode;
                 CN.callSerially(new Runnable() { @Override public void run() {
-                    listener.onBrowseError(new RuntimeException("startDiscovery failed: " + errorCode)); } });
+                    listener.onBrowseError(new RuntimeException("startDiscovery failed: " + code)); } });
             }
             @Override public void onStopDiscoveryFailed(String s, int errorCode) {
             }
@@ -550,8 +551,9 @@ public final class AndroidConnectivity {
         try {
             nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, disc);
         } catch (Throwable t) {
+            final Throwable err = t;
             CN.callSerially(new Runnable() { @Override public void run() {
-                listener.onBrowseError(t); } });
+                listener.onBrowseError(err); } });
             return null;
         }
         Object[] handle = new Object[]{nsd, disc};
