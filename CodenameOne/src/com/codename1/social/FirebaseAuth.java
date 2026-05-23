@@ -78,9 +78,9 @@ public final class FirebaseAuth {
         return INSTANCE;
     }
 
-    /// The *Web API key* from the Firebase console (Project Settings → General
-    /// → Your apps → Web API key). Required before any of the sign-in methods
-    /// will work.
+    /// The *Web API key* from the Firebase console
+    /// (Project Settings -&gt; General -&gt; Your apps -&gt; Web API key).
+    /// Required before any of the sign-in methods will work.
     public FirebaseAuth withApiKey(String apiKey) {
         this.apiKey = apiKey;
         return this;
