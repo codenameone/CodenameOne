@@ -5,11 +5,10 @@
 package com.codenameone.inputvalidation.gestures;
 
 import com.codename1.ui.Container;
-import com.codename1.ui.Label;
+import com.codename1.ui.Font;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 
 /// Validates that keyboard input lands in a CN1 TextField end-to-end.
 /// The XCUITest driver taps the field to bring up native iOS editing
@@ -44,10 +43,18 @@ public final class KeyTypeStep implements GestureStep {
         // land verbatim. Without this iOS auto-capitalisation can rewrite
         // the first character (`Cn1` instead of `cn1`) and make the
         // assertion brittle across keyboard configurations.
-        final TextField field = new TextField("", "Type here",
+        final TextField field = new TextField("", "Type " + EXPECTED_TEXT + " here",
                 EXPECTED_TEXT.length() + 8,
                 TextArea.ANY | TextArea.NON_PREDICTIVE);
         field.setName("cn1iv-keytype-target");
+        // Match TapStep / LongPressStep tap-target sizing so the XCUITest
+        // driver can use the same (0.5, 0.5) coordinate to focus the
+        // field on every iPhone size class on the CI runner. A NORTH
+        // placement put the field above where the existing steps tap
+        // and the driver missed it -- see #5010 CI failure.
+        field.getAllStyles().setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE));
+        field.getAllStyles().setPadding(48, 48, 48, 48);
+        field.getAllStyles().setMargin(48, 48, 48, 48);
         final boolean[] fired = {false};
         field.addDataChangedListener((type, index) -> {
             String text = field.getText();
@@ -56,10 +63,6 @@ public final class KeyTypeStep implements GestureStep {
                 callback.onDetected("text=" + text);
             }
         });
-        Container col = new Container(BoxLayout.y());
-        Label hint = new Label("Type " + EXPECTED_TEXT + " here");
-        col.add(hint);
-        col.add(field);
-        target.add(BorderLayout.NORTH, col);
+        target.add(BorderLayout.CENTER, field);
     }
 }
