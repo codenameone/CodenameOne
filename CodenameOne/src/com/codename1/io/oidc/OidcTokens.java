@@ -147,7 +147,11 @@ public final class OidcTokens {
             String json = new String(payload, "UTF-8");
             Map<String, Object> parsed = new JSONParser().parseJSON(new StringReader(json));
             return parsed != null ? parsed : Collections.<String, Object>emptyMap();
-        } catch (Exception e) {
+        } catch (java.io.UnsupportedEncodingException e) {
+            // UTF-8 always available -- defensive only.
+            return Collections.emptyMap();
+        } catch (java.io.IOException e) {
+            // JSONParser surfaces IOException for malformed payloads.
             return Collections.emptyMap();
         }
     }

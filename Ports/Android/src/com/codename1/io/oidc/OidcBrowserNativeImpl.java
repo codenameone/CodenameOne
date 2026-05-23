@@ -106,11 +106,7 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
 
         // Open the browser on the UI thread; the user is sent away from the
         // app and will be brought back via the registered intent filter.
-        activity.runOnUiThread(new Runnable() {
-            public void run() {
-                launchBrowser(activity, authUrl);
-            }
-        });
+        activity.runOnUiThread(new LaunchBrowserRunnable(activity, authUrl));
 
         // Block the calling worker thread until onResume captures the redirect
         // (or until an hour passes -- the cap is purely defensive).
@@ -185,6 +181,26 @@ public class OidcBrowserNativeImpl implements OidcBrowserNative {
      * installed for the lifetime of the process so multiple sign-in flows
      * over time all hit the same hook.
      */
+    /**
+     * Static-nested Runnable wrapper used in place of an anonymous one so
+     * SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet. The launch
+     * doesn't need a reference to the enclosing OidcBrowserNativeImpl
+     * instance; only the Activity + URL.
+     */
+    private static final class LaunchBrowserRunnable implements Runnable {
+        private final Activity activity;
+        private final String authUrl;
+
+        LaunchBrowserRunnable(Activity activity, String authUrl) {
+            this.activity = activity;
+            this.authUrl = authUrl;
+        }
+
+        public void run() {
+            launchBrowser(activity, authUrl);
+        }
+    }
+
     private static final class RedirectLifecycleListener implements LifecycleListener {
         public void onCreate(Bundle savedInstanceState) {}
         public void onPause() {}
