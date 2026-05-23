@@ -350,29 +350,32 @@ typedef struct clazz*       JAVA_CLASS;
     SP[-1].data.l = SP[-1].data.l ^ (*SP).data.l; \
 }
 
-#define BC_I2L() SP[-1].data.l = SP[-1].data.i
+// Conversion macros must rewrite the runtime type tag too. BC_DUP2_X1 /
+// BC_DUP2_X2 / BC_DUP_X2 dispatch via IS_DOUBLE_WORD on the tag, so a stale
+// tag corrupts the stack on chained assignments (issue #3108).
+#define BC_I2L() do { SP[-1].data.l = SP[-1].data.i; SP[-1].type = CN1_TYPE_LONG; } while(0)
 
-#define BC_L2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.l
+#define BC_L2I() do { SP[-1].data.i = (JAVA_INT)SP[-1].data.l; SP[-1].type = CN1_TYPE_INT; } while(0)
 
-#define BC_L2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l
+#define BC_L2F() do { SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l; SP[-1].type = CN1_TYPE_FLOAT; } while(0)
 
-#define BC_L2D() SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l
+#define BC_L2D() do { SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l; SP[-1].type = CN1_TYPE_DOUBLE; } while(0)
 
-#define BC_I2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i 
+#define BC_I2F() do { SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i; SP[-1].type = CN1_TYPE_FLOAT; } while(0)
 
-#define BC_F2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.f
+#define BC_F2I() do { SP[-1].data.i = (JAVA_INT)SP[-1].data.f; SP[-1].type = CN1_TYPE_INT; } while(0)
 
-#define BC_F2L() SP[-1].data.l = (JAVA_LONG)SP[-1].data.f
+#define BC_F2L() do { SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; SP[-1].type = CN1_TYPE_LONG; } while(0)
 
-#define BC_F2D() SP[-1].data.d = SP[-1].data.f
+#define BC_F2D() do { SP[-1].data.d = SP[-1].data.f; SP[-1].type = CN1_TYPE_DOUBLE; } while(0)
 
-#define BC_D2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.d
+#define BC_D2I() do { SP[-1].data.i = (JAVA_INT)SP[-1].data.d; SP[-1].type = CN1_TYPE_INT; } while(0)
 
-#define BC_D2L() SP[-1].data.l = (JAVA_LONG)SP[-1].data.d
+#define BC_D2L() do { SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; SP[-1].type = CN1_TYPE_LONG; } while(0)
 
-#define BC_I2D() SP[-1].data.d = SP[-1].data.i
+#define BC_I2D() do { SP[-1].data.d = SP[-1].data.i; SP[-1].type = CN1_TYPE_DOUBLE; } while(0)
 
-#define BC_D2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d
+#define BC_D2F() do { SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d; SP[-1].type = CN1_TYPE_FLOAT; } while(0)
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
 #define BC_ARRAYLENGTH() { \
