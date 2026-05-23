@@ -241,7 +241,7 @@ public final class AndroidConnectivity {
         if (s == null || "02:00:00:00:00:00".equals(s)) {
             return null;
         }
-        return s.toLowerCase();
+        return s.toLowerCase(java.util.Locale.US);
     }
 
     public static String getWiFiGateway() {
@@ -325,7 +325,7 @@ public final class AndroidConnectivity {
                     ScanResult r = results.get(j);
                     mapped[j] = new WiFiNetwork(
                             r.SSID,
-                            r.BSSID != null ? r.BSSID.toLowerCase() : null,
+                            r.BSSID != null ? r.BSSID.toLowerCase(java.util.Locale.US) : null,
                             r.level,
                             r.frequency,
                             mapAndroidSecurity(r.capabilities));
@@ -360,7 +360,7 @@ public final class AndroidConnectivity {
 
     private static WiFiSecurity mapAndroidSecurity(String capabilities) {
         if (capabilities == null) return WiFiSecurity.UNKNOWN;
-        String c = capabilities.toUpperCase();
+        String c = capabilities.toUpperCase(java.util.Locale.US);
         if (c.contains("WPA3") || c.contains("SAE")) return WiFiSecurity.WPA3_SAE;
         if (c.contains("WPA")) return WiFiSecurity.WPA_PSK;
         if (c.contains("WEP")) return WiFiSecurity.WEP;
@@ -612,7 +612,8 @@ public final class AndroidConnectivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
                 && info.getAttributes() != null) {
             for (Map.Entry<String, byte[]> e : info.getAttributes().entrySet()) {
-                txt.put(e.getKey(), e.getValue() == null ? "" : new String(e.getValue()));
+                txt.put(e.getKey(), e.getValue() == null
+                        ? "" : new String(e.getValue(), java.nio.charset.Charset.forName("UTF-8")));
             }
         }
         String host = info.getHost() != null ? info.getHost().getHostAddress() : null;

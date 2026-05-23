@@ -133,7 +133,7 @@ public final class JavaSEConnectivity {
             StringBuilder sb = new StringBuilder(17);
             for (int i = 0; i < mac.length; i++) {
                 if (sb.length() > 0) sb.append(':');
-                sb.append(String.format("%02x", mac[i] & 0xFF));
+                sb.append(String.format(java.util.Locale.US, "%02x", mac[i] & 0xFF));
             }
             return sb.toString();
         } catch (Throwable t) {
@@ -315,8 +315,8 @@ public final class JavaSEConnectivity {
         try {
             NetworkInterface ni = primaryInterface();
             if (ni == null) return NetworkManager.NETWORK_TYPE_NONE;
-            String name = ni.getName() == null ? "" : ni.getName().toLowerCase();
-            String display = ni.getDisplayName() == null ? "" : ni.getDisplayName().toLowerCase();
+            String name = ni.getName() == null ? "" : ni.getName().toLowerCase(java.util.Locale.US);
+            String display = ni.getDisplayName() == null ? "" : ni.getDisplayName().toLowerCase(java.util.Locale.US);
             if (name.startsWith("wlan") || name.startsWith("wifi")
                     || display.contains("wireless") || display.contains("wi-fi")) {
                 return NetworkManager.NETWORK_TYPE_WIFI;
