@@ -1,8 +1,8 @@
 = CN1 Input Validation App
 
 A minimal Codename One app whose only purpose is to assert that physical
-input events (tap, drag, long-press) reach Component listeners end-to-end
-on iOS. Driven by XCUITest on the iOS simulator.
+input events (tap, drag, long-press, keyboard) reach Component listeners
+end-to-end on iOS. Driven by XCUITest on the iOS simulator.
 
 == Why a separate pipeline?
 
@@ -44,6 +44,15 @@ the expected time.
 | `addLongPressListener` fires for a press-and-hold. Routes through the
   same touch chain as tap, so a recognizer that cancels touches mid-press
   causes this step to time out.
+
+| `keytype`
+| Typed characters reach a CN1 `TextField.DataChangedListener`. The
+  driver taps the field to bring up native iOS editing, then synthesises
+  keystrokes via `XCUIApplication.typeText`. typeText drives the
+  simulator's HW-keyboard pathway, which on iOS 13.4+ surfaces as
+  `UIPress` events through `GLViewController` -- the path #5010 broke
+  by treating every printable key as "handled" and never forwarding it
+  to UIKit's text-input pipeline.
 |===
 
 == Log markers

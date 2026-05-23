@@ -492,6 +492,14 @@ loopback
 rethrow
 rethrows
 
+# -----------------------------------------------------------------------------
+# Android tooling — names from the Android SDK / platform-tools that the
+# English dictionary doesn't recognise.
+# -----------------------------------------------------------------------------
+adb
+logcat
+pidof
+
 # Identity-provider product names used in the Authentication & Identity chapter.
 Keycloak
 Cognito

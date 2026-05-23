@@ -539,6 +539,23 @@ public class AndroidGradleBuilder extends Executor {
         // R8 configuration - disable full mode by default to prevent issues with reflection
         disableR8 = request.getArg("android.disableR8", "false").equals("true");
         disableR8FullMode = request.getArg("android.disableR8FullMode", "true").equals("true");
+
+        // On-device debugging: when set, mark the APK debuggable so Dalvik/ART exposes
+        // a JDWP socket the cn1:android-on-device-debugging Mojo can forward through adb.
+        // Forcing debuggable also flips off R8 and ProGuard so symbols, method names,
+        // and line numbers survive the build — we may be invoked from the android-device
+        // cloud target which would otherwise run full optimisation. Also force the build
+        // down to debug-only — Android otherwise produces both a release and a debug
+        // APK from the same manifest, so without this a stray hint could ship a
+        // release-signed, debuggable APK. Release builds and projects that don't opt
+        // in see no change.
+        boolean onDeviceDebug = request.getArg("android.onDeviceDebug", "false").equals("true");
+        if (onDeviceDebug) {
+            disableR8 = true;
+            request.putArgument("android.enableProguard", "false");
+            request.putArgument("android.release", "false");
+            request.putArgument("android.debug", "true");
+        }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             MIN_GRADLE_VERSION = 8;
@@ -2491,6 +2508,14 @@ public class AndroidGradleBuilder extends Executor {
             allowBackup = "";
         }
 
+        // On-device debugging needs the application to be marked debuggable so the
+        // runtime hands out a JDWP socket per-process. Idempotent: skip if the user
+        // already declared android:debuggable via android.xapplication_attr.
+        String debuggableAttr = "";
+        if (onDeviceDebug && !applicationAttr.contains("android:debuggable")) {
+            debuggableAttr = " android:debuggable=\"true\" ";
+        }
+
         String applicationNode = "  <application ";
         if (!applicationAttr.contains("android:label")) {
             applicationNode += " android:label=\"" + xmlizedDisplayName + "\" ";
@@ -2510,6 +2535,7 @@ public class AndroidGradleBuilder extends Executor {
 
         applicationNode += applicationAttr;
         applicationNode += allowBackup;
+        applicationNode += debuggableAttr;
         applicationNode += ">\n";
 
 
