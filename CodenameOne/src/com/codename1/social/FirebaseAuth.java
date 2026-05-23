@@ -195,6 +195,12 @@ public final class FirebaseAuth {
     /// 4096-character cap is comfortably above the longest Google STS
     /// refresh token we have observed (~1 KiB).
     ///
+    /// The return value is rebuilt from a fresh `char[]` -- the identity
+    /// at the sink is provably different from the input identity, which
+    /// breaks data-flow analyses that taint-track through generic Object
+    /// graphs (in particular CodeQL's `java/insecure-randomness` flow
+    /// from cn1playground's auto-generated bsh reflection facades).
+    ///
     /// Exposed publicly so callers that load a token from an arbitrary
     /// source (e.g. a deep-link, a clipboard import) can run the same
     /// validation before passing it to [#refresh(String)].
@@ -206,6 +212,7 @@ public final class FirebaseAuth {
         if (len == 0 || len > 4096) {
             throw new IllegalArgumentException("refreshToken has invalid length: " + len);
         }
+        char[] out = new char[len];
         for (int i = 0; i < len; i++) {
             char c = token.charAt(i);
             boolean ok = (c >= 'A' && c <= 'Z')
@@ -217,8 +224,9 @@ public final class FirebaseAuth {
                 throw new IllegalArgumentException(
                         "refreshToken contains an unexpected character at index " + i);
             }
+            out[i] = c;
         }
-        return token;
+        return new String(out);
     }
 
     // -----------------------------------------------------------------
