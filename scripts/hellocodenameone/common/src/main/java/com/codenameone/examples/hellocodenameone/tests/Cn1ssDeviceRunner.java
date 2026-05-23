@@ -321,29 +321,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private static boolean isJsSkippedThemeTest(String testName) {
-        // The native-theme fidelity tests (each emits a light+dark PNG pair)
-        // matter for iOS/Android/JavaSE where the user actually looks at
-        // visual output. NO JS-port goldens exist yet for the theme tests, so
-        // their first JS run needs to capture a new baseline rather than diff
-        // against an existing one. ``CssGradientsScreenshotTest`` is excluded
-        // -- its JS golden (css-gradients.png) has been around long enough to
-        // compare against. ``CssFilterBlurScreenshotTest`` depends on the
-        // gaussian-blur impl (now landed) but hasn't been baselined yet.
-        return "ButtonThemeScreenshotTest".equals(testName)
-                || "TextFieldThemeScreenshotTest".equals(testName)
-                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
-                || "SwitchThemeScreenshotTest".equals(testName)
-                || "PickerThemeScreenshotTest".equals(testName)
-                || "ToolbarThemeScreenshotTest".equals(testName)
-                || "TabsThemeScreenshotTest".equals(testName)
-                || "MultiButtonThemeScreenshotTest".equals(testName)
-                || "ListThemeScreenshotTest".equals(testName)
-                || "DialogThemeScreenshotTest".equals(testName)
-                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
-                || "SpanLabelThemeScreenshotTest".equals(testName)
-                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName)
-                || "CssFilterBlurScreenshotTest".equals(testName);
+        // All native-theme tests now run on JS port. Tests without an on-disk
+        // JS golden will report ``missing_expected`` (cn1ss.sh:448 -- not a
+        // failure mode). Confirmed-good captures get baselined per-PR after
+        // visual review against the iOS / Android renders.
+        return false;
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {
