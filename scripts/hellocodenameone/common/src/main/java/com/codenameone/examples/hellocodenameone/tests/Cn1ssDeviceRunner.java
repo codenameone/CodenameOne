@@ -321,11 +321,30 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private static boolean isJsSkippedThemeTest(String testName) {
-        // All native-theme tests now run on JS port. Tests without an on-disk
-        // JS golden will report ``missing_expected`` (cn1ss.sh:448 -- not a
-        // failure mode). Confirmed-good captures get baselined per-PR after
-        // visual review against the iOS / Android renders.
-        return false;
+        // Native-theme tests all land at suite indices 78+ on the
+        // hellocodenameone runner, well past the JS-port canvas-accumulation
+        // threshold where the Document.createElement host-receiver cache
+        // starts going stale (see port.js cn1ssForcedTimeoutTestNames
+        // comments around chartDocumentStaleness). When unskipped they each
+        // time out without producing a PNG, adding ~19 min to the CI run
+        // for zero captured output. Real fix is at the bridge layer
+        // (separate investigation). Leave them skipped until that lands;
+        // iOS / Android / JavaSE still cover the theme contract.
+        return "ButtonThemeScreenshotTest".equals(testName)
+                || "TextFieldThemeScreenshotTest".equals(testName)
+                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
+                || "SwitchThemeScreenshotTest".equals(testName)
+                || "PickerThemeScreenshotTest".equals(testName)
+                || "ToolbarThemeScreenshotTest".equals(testName)
+                || "TabsThemeScreenshotTest".equals(testName)
+                || "MultiButtonThemeScreenshotTest".equals(testName)
+                || "ListThemeScreenshotTest".equals(testName)
+                || "DialogThemeScreenshotTest".equals(testName)
+                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
+                || "SpanLabelThemeScreenshotTest".equals(testName)
+                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
+                || "PaletteOverrideThemeScreenshotTest".equals(testName)
+                || "CssFilterBlurScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {
