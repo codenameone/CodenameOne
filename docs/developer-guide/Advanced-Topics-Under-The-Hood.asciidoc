@@ -25,6 +25,9 @@ Here is the current list of supported arguments. Build hints change over time, s
 |android.release
 |true/false defaults to true - indicates whether to include the release version in the build
 
+|android.onDeviceDebug
+|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"` and R8/proguard is disabled so the Dalvik/ART JDWP socket is reachable for the resulting APK. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the link:#_ondevice_debugging_android[On-Device Debugging (Android) chapter] for the full flow.
+
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
 

@@ -538,6 +538,16 @@ public class AndroidGradleBuilder extends Executor {
         // R8 configuration - disable full mode by default to prevent issues with reflection
         disableR8 = request.getArg("android.disableR8", "false").equals("true");
         disableR8FullMode = request.getArg("android.disableR8FullMode", "true").equals("true");
+
+        // On-device debugging: when set, mark the APK debuggable so Dalvik/ART exposes
+        // a JDWP socket the cn1:android-on-device-debugging Mojo can forward through adb.
+        // Forcing debuggable also flips off R8/proguard (debug builds skip shrinking
+        // anyway, but we may be invoked from the android-device cloud target which
+        // would otherwise run full optimisation). Release builds are unaffected.
+        boolean onDeviceDebug = request.getArg("android.onDeviceDebug", "false").equals("true");
+        if (onDeviceDebug) {
+            disableR8 = true;
+        }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             MIN_GRADLE_VERSION = 8;
@@ -2483,6 +2493,14 @@ public class AndroidGradleBuilder extends Executor {
             allowBackup = "";
         }
 
+        // On-device debugging needs the application to be marked debuggable so the
+        // runtime hands out a JDWP socket per-process. Idempotent: skip if the user
+        // already declared android:debuggable via android.xapplication_attr.
+        String debuggableAttr = "";
+        if (onDeviceDebug && !applicationAttr.contains("android:debuggable")) {
+            debuggableAttr = " android:debuggable=\"true\" ";
+        }
+
         String applicationNode = "  <application ";
         if (!applicationAttr.contains("android:label")) {
             applicationNode += " android:label=\"" + xmlizedDisplayName + "\" ";
@@ -2502,6 +2520,7 @@ public class AndroidGradleBuilder extends Executor {
 
         applicationNode += applicationAttr;
         applicationNode += allowBackup;
+        applicationNode += debuggableAttr;
         applicationNode += ">\n";
 
 
