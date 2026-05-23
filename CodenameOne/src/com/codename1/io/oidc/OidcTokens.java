@@ -122,9 +122,17 @@ public final class OidcTokens {
             return Collections.emptyMap();
         }
         String payloadB64 = compactJwt.substring(firstDot + 1, secondDot);
-        // Pad to a multiple of 4 for the decoder.
-        while ((payloadB64.length() & 0x3) != 0) {
-            payloadB64 = payloadB64 + "=";
+        // Pad to a multiple of 4 for the decoder. Append via StringBuilder
+        // rather than `+= "="` so SpotBugs SBSC_USE_STRINGBUFFER_CONCATENATION
+        // stays quiet (and we avoid up to 3 String allocations on the hot path).
+        int pad = (4 - (payloadB64.length() & 0x3)) & 0x3;
+        if (pad != 0) {
+            StringBuilder padded = new StringBuilder(payloadB64.length() + pad)
+                    .append(payloadB64);
+            for (int i = 0; i < pad; i++) {
+                padded.append('=');
+            }
+            payloadB64 = padded.toString();
         }
         byte[] payload;
         try {
