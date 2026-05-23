@@ -110,6 +110,31 @@
         </Or>
     </Match>
 
+    <!--
+    AndroidConnectivity / AndroidUsb cache platform BroadcastReceivers and
+    NetworkCallbacks in static fields. The receivers are installed once when
+    the corresponding listener is registered and torn down when the last
+    listener detaches; the access pattern matches the EDT/main-thread
+    convention already documented for AndroidImplementation above.
+    Suppressing the lazy-init warnings keeps the cache-init code readable
+    without spurious double-checked-locking ceremony.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.impl\.android\.(AndroidConnectivity|AndroidUsb)(\$.*)?" />
+        <Or>
+            <Bug pattern="LI_LAZY_INIT_UPDATE_STATIC" />
+            <Bug pattern="LI_LAZY_INIT_STATIC" />
+            <Bug pattern="MS_PKGPROTECT" />
+            <Bug pattern="MS_SHOULD_BE_FINAL" />
+            <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+            <!-- Defensive null-checks on static caches read on the EDT. -->
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE" />
+            <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE" />
+            <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+        </Or>
+    </Match>
+
     <!-- canExecute returns null when the platform cannot answer (API contract). -->
     <Match>
         <Class name="com.codename1.impl.android.AndroidImplementation" />
