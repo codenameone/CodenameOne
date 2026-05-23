@@ -11,9 +11,10 @@
 #ifndef CN1_DEBUGGER_H
 #define CN1_DEBUGGER_H
 
+#ifdef CN1_ON_DEVICE_DEBUG
+
 #include "cn1_globals.h"
 
-#ifdef CN1_ON_DEVICE_DEBUG
 
 /**
  * Boots the on-device-debug listener thread (non-blocking). Reads the

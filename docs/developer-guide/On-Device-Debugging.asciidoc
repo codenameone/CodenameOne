@@ -6,9 +6,9 @@ on a real device — ParparVM's threading model, iOS-specific native
 behaviour, performance characteristics on real hardware, memory
 pressure under iOS background limits, and timing around UIKit
 interactions are common examples. On-device debugging lets you keep
-using a standard Java debugger (jdb, IntelliJ IDEA, VS Code,
+using a standard Java debugger (IntelliJ IDEA, jdb, VS Code,
 anything that speaks JDWP) against the running iOS app on either
-the iOS Simulator or a physical device.
+the native iOS simulator or a physical device.
 
 It works by adding a small listener thread to the
 ParparVM-generated iOS binary. The app dials out to a desktop proxy
@@ -30,24 +30,32 @@ to the IDE everything looks like attaching to a normal remote JVM.
 If your bug is reproducible in the simulator, stay in the simulator
 — its debugger is faster and has fewer limitations.
 
-=== Quick start
+=== Quick start (IntelliJ IDEA)
+
+Codename One projects generated from the `cn1app-archetype` ship with
+two ready-made IntelliJ run configurations under the *On-Device Debug*
+folder in the run-config dropdown: *CN1 Debug Proxy* and *CN1 Attach
+iOS*. The rest of this section assumes you're using them. Skip to
+<<on-device-debug-jdb,Using jdb instead>> if you prefer the
+command-line debugger.
 
 ==== 1. Enable the build hints
 
-Set the following build hints on your project:
+In `common/codenameone_settings.properties`, uncomment the four lines
+the archetype generated:
 
 [source,properties]
 ----
-ios.onDeviceDebug=true
-ios.onDeviceDebug.proxyHost=127.0.0.1
-ios.onDeviceDebug.proxyPort=55333
-# Optional: block the app at startup until the proxy is attached.
-# ios.onDeviceDebug.waitForAttach=true
+codename1.arg.ios.onDeviceDebug=true
+codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
+codename1.arg.ios.onDeviceDebug.proxyPort=55333
+# Optional: block the app at startup until the IDE attaches.
+codename1.arg.ios.onDeviceDebug.waitForAttach=true
 ----
 
-For a physical device, set `ios.onDeviceDebug.proxyHost` to the
-laptop's LAN IP (run `ifconfig | grep "inet "`) instead of
-`127.0.0.1`. The simulator can always use `127.0.0.1`.
+For a physical device, set `proxyHost` to the laptop's LAN IP (run
+`ifconfig | grep "inet "`) instead of `127.0.0.1`. The native iOS
+simulator can always use `127.0.0.1`.
 
 ==== 2. Build the app as you normally do
 
@@ -55,73 +63,77 @@ Either the local Xcode path (`cn1:buildIosXcodeProject`) or a cloud
 build (`cn1:buildIosOnDeviceDebug`) will produce an app instrumented
 for on-device debugging once the build hints are set.
 
-==== 3. Start the proxy
+==== 3. Run the proxy from IntelliJ
 
-[source,bash]
-----
-mvn cn1:ios-on-device-debugging
-----
-
-The proxy prints two listening ports and waits for both the device
-and a debugger to connect:
+Select *CN1 Debug Proxy* from the Run-config dropdown and click ▶
+*Run* (the green play icon — not the bug icon; *Debug* on this config
+would attach IntelliJ's own debugger to the proxy process, which is
+not what you want). The Run tool window opens and shows:
 
 ----
 On-device-debug proxy starting:
   symbols : .../cn1-symbols.txt
   device  : listening on tcp://0.0.0.0:55333
   jdwp    : listening on tcp://0.0.0.0:8000
-
-Next steps:
-  1. Run the built app on the simulator or device.
-  2. Once it boots, it'll dial in and the proxy will log a HELLO.
-  3. Attach a debugger:  jdb -attach localhost:8000
+[device] listening on port 55333 for ParparVM app to dial in
+[jdwp] listening on port 8000 for debugger (jdb) to attach
 ----
 
-==== 4. Attach a debugger
+When the last line appears, the JDWP port is bound and ready.
 
-From a second terminal, point your debugger at the proxy's JDWP port.
+==== 4. Attach the debugger from IntelliJ
 
-For `jdb`:
+Switch the Run-config dropdown to *CN1 Attach iOS* and click 🐞
+*Debug*. IntelliJ connects to `localhost:8000` and opens a Debug tool
+window.
+
+==== 5. Launch the app
+
+Launch the iOS app (in the native iOS simulator under Xcode, or
+deploy to a tethered device). With `waitForAttach=true` the app boots
+to a "Waiting for debugger" overlay until the proxy's first
+RESUME — set your breakpoints, then let the proxy resume automatically.
+
+Set breakpoints, step, inspect, evaluate expressions, just like a
+normal remote attach. Device output from
+`System.out.println` / `Log.p` / `printf` / `NSLog` lands in the
+*CN1 Debug Proxy* Run window prefixed with `[device]`.
+
+=== Quick start (Maven from the command line)
+
+If you don't want to use the IntelliJ run configs, the same flow is
+two terminals:
 
 [source,bash]
 ----
+# Terminal 1 — start the proxy
+mvn cn1:ios-on-device-debugging
+
+# Terminal 2 — attach jdb
 jdb -attach localhost:8000
 ----
 
-For IntelliJ IDEA: *Run* → *Edit Configurations…* → *+* → *Remote
-JVM Debug*. Set the host to `localhost`, port to `8000`, leave the
-rest at the defaults, and click *Debug*.
-
-For VS Code (Debugger for Java extension): add a launch
+For VS Code (Debugger for Java extension), add a launch
 configuration of type `java` with `"request": "attach"`,
 `"hostName": "localhost"`, `"port": 8000`.
 
-When the app starts running on the device, it'll connect to the
-proxy and the IDE will see a fresh suspended VM. Set breakpoints,
-step, inspect, just like a normal remote attach.
+[#on-device-debug-jdb]
+==== Using jdb instead
 
-==== Surfacing device output in the IDE console
+`jdb` is a minimal Java debugger that ships with every JDK and works
+fine over the same JDWP socket. Useful when you don't have an IDE
+available, or for scripted regression checks. Source path resolution
+is manual:
 
-The proxy prints every `[device]` line to its own stdout. An IDE
-remote-attach configuration sees the JDWP socket but not the
-proxy's console, so device prints don't appear in the *Debug*
-window by default.
+[source,bash]
+----
+jdb -attach localhost:8000 \
+    -sourcepath src/main/java:$HOME/.m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT-sources.jar
+----
 
-Two workarounds:
-
-* *Tail the proxy log in a terminal.* If the proxy was started
-  via `mvn cn1:ios-on-device-debugging` you can run
-  `tail -f target/cn1-debug-proxy.log` in another terminal.
-* *Launch the proxy as an additional IDE Run config.* In IntelliJ
-  IDEA: *Run* → *Edit Configurations…* → *+* → *Application*. Set
-  the main class to `com.codename1.debug.proxy.ProxyMain`, fill in
-  *Program arguments* with `--symbols=path/to/cn1-symbols.txt`
-  `--device-port=55333 --jdwp-port=8000`, and put
-  `com.codenameone:cn1-debug-proxy:8.0-SNAPSHOT` on the classpath
-  (Modules → Dependencies → +). The proxy's stdout now lands in
-  IntelliJ's *Run* window, which is the easiest way to follow
-  `[device]` lines alongside the JDWP attach session — group both
-  configs into a *Compound* run config so they start together.
+The `-sourcepath` is required for `list` / `where` to render framework
+source — jdb won't unzip the `-sources.jar` automatically; if you
+prefer plain files, extract it once and point at the directory.
 
 === What works today
 
@@ -155,33 +167,32 @@ Two workarounds:
   down the debugger.
 * Native device output — `System.out.println`, `Log.p`, and
   `printf` / `NSLog` from native code are surfaced in the proxy's
-  console (and the IDE's debug console when the proxy is launched
-  as an IDE run configuration) prefixed with `[device]`.
+  console (the IntelliJ *CN1 Debug Proxy* Run window when launched
+  via the run config) prefixed with `[device]`.
 * Pause and resume from the IDE.
 
 === Pointing the IDE at the Codename One sources
 
 The proxy answers `Method.LineTable` and `ReferenceType.SourceFile`
 for framework classes, but the IDE still needs to find the actual
-`.java` files to render the source pane while stepping. Three options:
+`.java` files to render the source pane while stepping. Three options
+in order of convenience:
 
-* *Working from a clone of this repository.* Add
-  `CodenameOne/src` as a source root in your IDE's debug
-  configuration. In IntelliJ: *Run → Edit Configurations… → Remote
-  JVM Debug → Configuration → Source roots → +*.
+* *Maven sources jar (recommended).* The
+  `codenameone-core-<version>-sources.jar` is published alongside
+  the regular `codenameone-core` artifact. IntelliJ resolves it
+  automatically once you run *Maven → Reimport* with "Sources"
+  enabled in the Maven settings. Other IDEs work the same way as
+  long as their Maven integration is set to download sources.
+* *Local clone of the Codename One repository.* If you've already
+  checked out https://github.com/codenameone/CodenameOne[the
+  CodenameOne GitHub repository] (for instance to follow the
+  contributor workflow), point the IDE at its `CodenameOne/src`
+  directory. In IntelliJ: *Run → Edit Configurations… → CN1 Attach
+  iOS → Configuration → Source roots → +*.
 * *jdb command line.* Pass the framework source directory on the
-  `-sourcepath`:
-+
-[source,bash]
-----
-jdb -attach localhost:8000 \
-    -sourcepath src/main/java:/path/to/CodenameOne/CodenameOne/src
-----
-* *Using the Maven artifacts.* Make sure the IDE has the
-  `codenameone-core-X.Y.Z-sources.jar` attached to the
-  `com.codenameone:codenameone-core` dependency. IntelliJ does this
-  automatically once you run *Maven → Reimport* with "Sources" enabled
-  in the Maven settings.
+  `-sourcepath`, as shown in <<on-device-debug-jdb,Using jdb
+  instead>>.
 
 Without a source path, breakpoints in framework classes still trigger
 and locals / fields still read — you'll just see "Sources not found"
@@ -216,10 +227,10 @@ in the IDE editor when stepping into framework code.
 * *Static field reads* are unsupported. Instance field reads are
   fully wired; static-field support requires an additional per-class
   static table that hasn't been emitted yet.
-* *NSLog on a real device* (as opposed to the simulator) may not
-  reach the `[device]` console. NSLog on iOS routes to `os_log`
-  which doesn't always mirror to `stderr`. `printf` / `fprintf` /
-  `Log.p` are unaffected and show up correctly.
+* *NSLog on a real device* (as opposed to the native iOS simulator)
+  may not reach the `[device]` console. NSLog on iOS routes to
+  `os_log` which doesn't always mirror to `stderr`. `printf` /
+  `fprintf` / `Log.p` are unaffected and show up correctly.
 
 === Performance
 
@@ -252,7 +263,7 @@ log for a device-side I/O error.
 The device's `ios.onDeviceDebug.proxyHost` value is wrong, or a
 firewall is blocking the port. Verify:
 
-* The simulator can always reach `127.0.0.1`.
+* The native iOS simulator can always reach `127.0.0.1`.
 * A physical device needs the laptop's *LAN IP* (not `localhost`),
   and the laptop's firewall must allow incoming connections on
   the configured port (default `55333`).
