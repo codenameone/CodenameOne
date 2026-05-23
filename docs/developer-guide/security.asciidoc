@@ -472,7 +472,7 @@ The maximum-compatibility settings -- 6 digits, 30 second step, SHA-1 -- are the
 
 *Rendering the QR code.* Codename One core doesn't currently ship a QR-code generator. Pick whichever option fits your deployment:
 
-* *Server-side render* (simplest). Send `uri` to your backend over HTTPS and have it return a PNG. The Google Charts API endpoint `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=<URL-encoded-uri>` and the open-source `https://api.qrserver.com/v1/create-qr-code/?data=<URL-encoded-uri>` both work; the latter doesn't require Google API setup. Render the resulting PNG with `URLImage` or `EncodedImage.create(bytes)`.
+* *Server-side render* (simplest). Send `uri` to your backend over HTTPS and have it return a PNG. The Google Charts API endpoint `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl={url-encoded-uri}` and the open-source `https://api.qrserver.com/v1/create-qr-code/?data={url-encoded-uri}` both work; the latter doesn't require Google API setup. Render the resulting PNG with `URLImage` or `EncodedImage.create(bytes)`.
 
 * *Use a QR cn1lib.* Community cn1libs such as `QRMaker` provide native generation. Add as a normal cn1lib dependency.
 
