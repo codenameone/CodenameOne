@@ -530,52 +530,57 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 b.append("    SP--; SP[-1].data.l = SP[-1].data.l ^ (*SP).data.l; /* LXOR */\n") ;
                 break;
                 
+            // The conversion opcodes below must also rewrite SP[-1].type to
+            // match the new category. BC_DUP2_X1 / BC_DUP2_X2 / BC_DUP_X2
+            // dispatch via the runtime tag (IS_DOUBLE_WORD), so a stale tag
+            // (e.g. INT left over after I2D) sends the dup macro down the
+            // cat-1 branch and corrupts the stack. See issue #3108.
             case Opcodes.I2L:
-                b.append("    SP[-1].data.l = SP[-1].data.i; /* I2L */\n");
+                b.append("    SP[-1].data.l = SP[-1].data.i; SP[-1].type = CN1_TYPE_LONG; /* I2L */\n");
                 break;
-                
+
             case Opcodes.I2F:
-                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i; /* I2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i; SP[-1].type = CN1_TYPE_FLOAT; /* I2F */\n");
                 break;
-                
+
             case Opcodes.I2D:
-                b.append("    SP[-1].data.d = SP[-1].data.i; /* I2D */;\n");
+                b.append("    SP[-1].data.d = SP[-1].data.i; SP[-1].type = CN1_TYPE_DOUBLE; /* I2D */;\n");
                 break;
-                
+
             case Opcodes.L2I:
-                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.l; /* L2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.l; SP[-1].type = CN1_TYPE_INT; /* L2I */\n");
                 break;
-                
+
             case Opcodes.L2F:
-                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l; /* L2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l; SP[-1].type = CN1_TYPE_FLOAT; /* L2F */\n");
                 break;
-                
+
             case Opcodes.L2D:
-                b.append("    SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l; /* L2D */\n");
+                b.append("    SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l; SP[-1].type = CN1_TYPE_DOUBLE; /* L2D */\n");
                 break;
-                
+
             case Opcodes.F2I:
-                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.f; /* F2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.f; SP[-1].type = CN1_TYPE_INT; /* F2I */\n");
                 break;
-                
+
             case Opcodes.F2L:
-                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; /* F2L */\n");
+                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; SP[-1].type = CN1_TYPE_LONG; /* F2L */\n");
                 break;
-                
+
             case Opcodes.F2D:
-                b.append("    SP[-1].data.d = SP[-1].data.f; /* F2D */\n");
+                b.append("    SP[-1].data.d = SP[-1].data.f; SP[-1].type = CN1_TYPE_DOUBLE; /* F2D */\n");
                 break;
-                
+
             case Opcodes.D2I:
-                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.d; /* D2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.d; SP[-1].type = CN1_TYPE_INT; /* D2I */\n");
                 break;
-                
+
             case Opcodes.D2L:
-                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; /* D2L */\n");
+                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; SP[-1].type = CN1_TYPE_LONG; /* D2L */\n");
                 break;
-                
+
             case Opcodes.D2F:
-                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d; /* D2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d; SP[-1].type = CN1_TYPE_FLOAT; /* D2F */\n");
                 break;
                 
             case Opcodes.I2B:
