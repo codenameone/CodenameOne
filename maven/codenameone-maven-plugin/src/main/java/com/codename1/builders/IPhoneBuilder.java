@@ -87,6 +87,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesOidc;
+    private boolean usesAppleSignIn;
     private boolean usesNfcHce;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
@@ -674,6 +676,19 @@ public class IPhoneBuilder extends Executor {
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
                             usesNfcHce = true;
                         }
+                    }
+                    // OidcClient + SystemBrowser rely on
+                    // ASWebAuthenticationSession (AuthenticationServices.framework,
+                    // iOS 12+).
+                    if (!usesOidc && cls.indexOf("com/codename1/io/oidc/") == 0) {
+                        usesOidc = true;
+                    }
+                    // Sign in with Apple (ASAuthorizationAppleIDProvider) lives
+                    // in the same framework and only matters when the user
+                    // actually references AppleSignIn.
+                    if (!usesAppleSignIn
+                            && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
+                        usesAppleSignIn = true;
                     }
                 }
 
@@ -1628,6 +1643,20 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // AuthenticationServices.framework hosts both
+            // ASWebAuthenticationSession (used by SystemBrowser) and
+            // ASAuthorizationAppleIDProvider (used by AppleSignIn). Linking
+            // it always when the user references either API is the simplest
+            // policy; iOS 12 is the deployment-target floor for both classes.
+            if (usesOidc || usesAppleSignIn) {
+                String authSvc = "AuthenticationServices.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = authSvc;
+                } else if (!addLibs.toLowerCase().contains("authenticationservices")) {
+                    addLibs = addLibs + ";" + authSvc;
+                }
+            }
+
             // CoreNFC is required only when the app actually uses
             // com.codename1.nfc. We weak-link it so older deployment targets
             // still load on iOS 10 (Core NFC was introduced in iOS 11).
@@ -1669,6 +1698,20 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_NFC", ex);
+                }
+            }
+
+            // Sign in with Apple requires the
+            // com.apple.developer.applesignin entitlement; Apple rejects
+            // builds whose binary references ASAuthorizationAppleIDProvider
+            // without it. Inject the canonical "Default" value automatically.
+            if (usesAppleSignIn) {
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.applesignin",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.applesignin",
+                            "Default");
                 }
             }
 

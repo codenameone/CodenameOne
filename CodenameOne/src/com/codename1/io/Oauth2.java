@@ -49,11 +49,26 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 
-/// This is a utility class that allows Oauth2 authentication This utility uses
-/// the Codename One XHTML Component to display the authentication pages.
-/// http://tools.ietf.org/pdf/draft-ietf-oauth-v2-12.pdf
+/// Legacy OAuth2 authentication helper. **Deprecated as of Codename One 8.0**;
+/// new code should use [com.codename1.io.oidc.OidcClient] instead, which:
+///
+/// - Drives sign-in via the system browser ([com.codename1.io.oidc.SystemBrowser])
+///   instead of an in-app WebView. Modern identity providers (Google, Apple,
+///   Microsoft, Facebook) refuse to render their sign-in pages inside an
+///   embedded WebView and will block this class.
+/// - Performs PKCE on every authorization-code flow (mandatory now on most
+///   providers).
+/// - Parses the OpenID Connect discovery document so you do not have to
+///   hard-code the authorization / token endpoints.
+/// - Verifies the `state` and `nonce` parameters returned by the server.
+///
+/// This class is preserved as-is for source compatibility but no new
+/// functionality will be added. See the *Authentication and Identity*
+/// chapter of the developer guide for a migration recipe.
 ///
 /// @author Chen Fishbein
+/// @deprecated Use [com.codename1.io.oidc.OidcClient] for new code.
+@Deprecated
 public class Oauth2 {
     public static final String TOKEN = "access_token";
     private static String expires;

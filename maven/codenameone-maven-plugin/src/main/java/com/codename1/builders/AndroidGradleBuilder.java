@@ -284,6 +284,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesBiometrics;
     private boolean usesNfc;
     private boolean usesNfcHce;
+    private boolean usesOidc;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1260,6 +1261,13 @@ public class AndroidGradleBuilder extends Executor {
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
                             usesNfcHce = true;
                         }
+                    }
+
+                    // OidcClient / SystemBrowser drive sign-in through
+                    // androidx.browser Custom Tabs on Android. Mark usage so
+                    // the gradle dep gets pulled in (see further below).
+                    if (!usesOidc && cls.indexOf("com/codename1/io/oidc/") == 0) {
+                        usesOidc = true;
                     }
                 }
 
@@ -3733,6 +3741,19 @@ public class AndroidGradleBuilder extends Executor {
         if (purchasePermissions) {
             String billingClientVersion = request.getArg("android.billingclient.version", "4.0.0");
             additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
+        }
+
+        // OidcClient routes sign-in through androidx.browser Custom Tabs.
+        // Pull the browser dep in automatically when the app references
+        // anything in com.codename1.io.oidc -- otherwise apps that don't
+        // touch the API pay nothing.
+        if (usesOidc && useAndroidX) {
+            String customTabsVersion = request.getArg("android.customTabsVersion", "1.8.0");
+            if (!additionalDependencies.contains("androidx.browser:browser")
+                    && !request.getArg("android.gradleDep", "").contains("androidx.browser:browser")) {
+                additionalDependencies +=
+                        " implementation 'androidx.browser:browser:" + customTabsVersion + "'\n";
+            }
         }
 
         String useLegacyApache = "";

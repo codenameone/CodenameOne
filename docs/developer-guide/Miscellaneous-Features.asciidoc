@@ -1056,6 +1056,12 @@ TIP: Check out the <<sharebutton-section,ShareButton section>> it might be enoug
 
 Codename One supports Facebooks https://www.codenameone.com/javadoc/com/codename1/io/Oauth2.html[Oauth2] login and Facebooks single sign on for iOS and Android.
 
+[IMPORTANT]
+====
+**The `Oauth2` class is deprecated as of Codename One 8.0.** It opens an in-app `WebBrowser`, which Facebook, Google, Apple, Microsoft and other identity providers now actively block as a phishing-detection measure. For new code, use the modern `com.codename1.io.oidc.OidcClient` documented in the <<authentication-and-identity, Authentication and Identity>> chapter; the new `FacebookConnect.signIn(...)`, `GoogleConnect.signIn(...)` and `AppleSignIn.signIn(...)` methods drive the system browser instead.
+====
+
+
 ==== Getting started - web setup
 
 To get started first you will need to create a facebook app on the Facebook developer portal

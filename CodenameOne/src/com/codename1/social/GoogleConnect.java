@@ -25,23 +25,34 @@ package com.codename1.social;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 import java.util.Arrays;
 import java.util.Hashtable;
 
-/// The GoogleConnect Login class allows the sign in with google functionality.
-/// The GoogleConnect requires to create a corresponding google cloud project.
-/// To enable the GoogleConnect to sign-in on the Simulator create a corresponding
-/// web login - https://developers.google.com/+/web/signin/
+/// Sign-in-with-Google for Codename One.
 ///
-/// To enable the GoogleConnect to sign-in on Android
-/// Follow step 1 from here - https://developers.google.com/+/mobile/android/getting-started
+/// As of 2025 Google replaced the legacy Sign-In SDK with the Google Identity
+/// Services (GIS) family of APIs. GIS encourages the OAuth 2.0 authorization
+/// code flow with PKCE driven from the system browser -- exactly what
+/// [com.codename1.io.oidc.OidcClient] does. New apps should call
+/// [#signIn(String, String, String[])] which goes through that modern path
+/// and works on every Codename One platform without a native SDK dependency.
 ///
-/// To enable the GoogleConnect to sign-in on iOS
-/// follow step 1 from here - https://developers.google.com/+/mobile/ios/getting-started
+/// The older [#doLogin()] / [#nativelogin()] path remains for source
+/// compatibility, and on iOS / Android it still delegates to the native
+/// implementation provided by the port (see `Ports/iOSPort` and
+/// `Ports/Android`). On other platforms the legacy path also now goes
+/// through `OidcClient` instead of the deprecated [Oauth2] in-app WebView.
 ///
 /// @author Chen
 public class GoogleConnect extends Login {
+
+    /// Google's well-known OIDC issuer.
+    public static final String GOOGLE_ISSUER = "https://accounts.google.com";
 
     private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     private static final Object INSTANCE_LOCK = new Object();
@@ -93,6 +104,72 @@ public class GoogleConnect extends Login {
         params.put("access_type", "offline");
 
         return new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);
+    }
+
+    /// Modern Google sign-in. Goes through the Google Identity Services OIDC
+    /// endpoints with PKCE, using the system browser. Works the same on every
+    /// platform (iOS, Android, JavaSE, Web) provided the platform port wires
+    /// the system browser native interface; otherwise it falls back to an
+    /// in-app browser window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`: OAuth 2.0 client ID issued in Google Cloud Console.
+    ///   Use the *iOS / Android* client for the matching native build, or the
+    ///   *Web* client when running in the simulator / web port.
+    /// - `redirectUri`: Redirect URI registered for that client. Custom
+    ///   schemes (`com.example.app:/oauth2redirect`) for mobile; HTTPS
+    ///   for web.
+    /// - `scopes`: OAuth scopes to request -- include `openid email profile`
+    ///   to get an ID token plus user metadata, plus any Google API scopes
+    ///   you need.
+    ///
+    /// #### Returns
+    ///
+    /// An [AsyncResource] resolving to the [OidcTokens] for the signed-in
+    /// user.
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public AsyncResource<OidcTokens> signIn(final String clientId,
+                                            final String redirectUri,
+                                            final String... scopes) {
+        final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        OidcClient.discover(GOOGLE_ISSUER)
+                .ready(new SuccessCallback<OidcClient>() {
+                    public void onSucess(OidcClient client) {
+                        client.setClientId(clientId)
+                                .setRedirectUri(redirectUri)
+                                .setScopes(scopes != null && scopes.length > 0
+                                        ? scopes
+                                        : new String[] {"openid", "email", "profile"})
+                                // `access_type=offline` is Google-specific and is needed
+                                // to get a refresh token; `prompt=consent` forces the
+                                // refresh-token grant on subsequent sign-ins.
+                                .setAuthorizationParameters(
+                                        "access_type", "offline",
+                                        "prompt", "consent");
+                        client.authorize()
+                                .ready(new SuccessCallback<OidcTokens>() {
+                                    public void onSucess(OidcTokens tokens) {
+                                        setAccessToken(tokens.toAccessToken());
+                                        out.complete(tokens);
+                                    }
+                                })
+                                .except(new SuccessCallback<Throwable>() {
+                                    public void onSucess(Throwable err) {
+                                        out.error(err);
+                                    }
+                                });
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+        return out;
     }
 
     @Override
