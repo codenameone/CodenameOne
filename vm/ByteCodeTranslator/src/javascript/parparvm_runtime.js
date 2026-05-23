@@ -1766,10 +1766,24 @@ const jvm = {
     const resolvedClass = this.inferJsObjectClass(value, expectedClass);
     const classDef = this.classes[resolvedClass] || this.classes[expectedClass] || null;
     if (wrapper) {
-      wrapper.__class = resolvedClass;
-      this.enhanceJsWrapper(wrapper, resolvedClass);
-      if (expectedClass && expectedClass !== resolvedClass) {
+      // Don't overwrite a known good class with a null/empty inferred class.
+      // The screenshot test suite ran into a recurring
+      // ``cn1_s_save ... receiverClass=null`` VIRTUAL_FAIL once ~60 prior
+      // tests had accumulated ~420 host-ref-tracked canvases: re-wrapping
+      // a previously-known Canvas2D context whose owning wrapper still
+      // held the right ``__class`` was wiping it back to undefined/null
+      // because ``inferJsObjectClass`` returned a falsy value for an
+      // already-cached wrapper coming through a re-wrap path. Preserve
+      // the prior class when the inferred one isn't useful.
+      if (resolvedClass) {
+        wrapper.__class = resolvedClass;
+        this.enhanceJsWrapper(wrapper, resolvedClass);
+      }
+      if (expectedClass && expectedClass !== wrapper.__class) {
         this.enhanceJsWrapper(wrapper, expectedClass);
+        if (!wrapper.__class) {
+          wrapper.__class = expectedClass;
+        }
       }
       return wrapper;
     }
