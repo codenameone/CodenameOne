@@ -5546,6 +5546,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void pushClip(Object graphics) {
+        ((AndroidGraphics) graphics).pushClip();
+    }
+
+    @Override
+    public void popClip(Object graphics) {
+        ((AndroidGraphics) graphics).popClip();
+    }
+
+    @Override
     public boolean isTranslateMatrixSupported() {
         return true;
     }
