@@ -1504,11 +1504,8 @@ public class AndroidGradleBuilder extends Executor {
             if (!xPermissions.contains("android.permission.CHANGE_WIFI_MULTICAST_STATE")) {
                 xPermissions = "    <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />\n" + xPermissions;
             }
-            if (targetSDKVersionInt >= 33
-                    && !xPermissions.contains("android.permission.INTERNET")) {
-                // INTERNET is already in basePermissions but we double-check
-                // here because Bonjour over IPv6 multicast needs it.
-            }
+            // INTERNET is already in basePermissions and Bonjour over IPv6
+            // multicast inherits it transparently, so nothing extra needed.
         }
         if (usesUsbHost) {
             if (!xPermissions.contains("android.hardware.usb.host")) {
