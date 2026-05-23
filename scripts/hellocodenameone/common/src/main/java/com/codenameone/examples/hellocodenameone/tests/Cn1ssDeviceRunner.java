@@ -357,41 +357,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private static boolean isJsSkippedScreenshotTest(String testName) {
-        // Screenshot-emitting tests whose chunk streams the JS port truncates
-        // under logcat-style line drops. The Cn1ssChunkTools gap-detection
-        // (added in 963dd5af "Improved image emission") correctly fails these
-        // captures because the reassembled PNG is missing bytes; this skip
-        // refuses to attempt them on HTML5 until the port emits chunks
-        // reliably. The validation stays on iOS/Android so dropped chunks
-        // still surface as failures there.
-        // The truncation diagnosis is dated -- bulk-read fix (c5080d78b) and
-        // Cn1ssChunkTools gap detection landed since this list was drawn up,
-        // so most of these should be re-evaluated. Keeping the screenshot
-        // tests skipped here pending a focused per-test investigation.
-        // Graphics tests and chart tests have all been flipped on since
-        // their JS goldens already exist on disk; only ClipUnderRotation
-        // stays skipped (active bug, see project_jsport_clip_under_rotation_open).
-        return "KotlinUiTest".equals(testName)
-                || "MainScreenScreenshotTest".equals(testName)
-                || "SheetScreenshotTest".equals(testName)
-                || "StatusBarTapDiagnosticScreenshotTest".equals(testName)
-                || "ImageViewerNavigationScreenshotTest".equals(testName)
-                || "TabsScreenshotTest".equals(testName)
-                || "TextAreaAlignmentScreenshotTest".equals(testName)
-                || "ToastBarTopPositionScreenshotTest".equals(testName)
-                || "ValidatorLightweightPickerScreenshotTest".equals(testName)
-                || "LightweightPickerButtonsScreenshotTest".equals(testName)
-                || "StickyHeaderScreenshotTest".equals(testName)
-                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
-                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
-                // Whole-form rotation bug in ``graphics-clip-under-rotation``
-                // -- the bridge logs report identity setTransform but the
-                // captured PNG shows the form rotated. 2b6f31864 fixed the
-                // off-screen mutable-image transform leak which is one
-                // contributing factor; the whole-form symptom may also be
-                // resolved but has not been verified in CI yet, so this stays
-                // skipped until a post-fix run confirms.
-                || "ClipUnderRotation".equals(testName);
+        // Whole-form rotation bug in ``graphics-clip-under-rotation`` -- the
+        // bridge logs report identity setTransform but the captured PNG shows
+        // the form rotated. See project_jsport_clip_under_rotation_open for
+        // the full diagnosis (5+ hypotheses ruled out; needs another focused
+        // pass). Stays skipped until the rendering is fixed.
+        //
+        // The previous chunk-truncation skips (KotlinUiTest, MainScreen,
+        // Sheet, StatusBarTap, ImageViewerNavigation, Tabs, TextAreaAlignment,
+        // ToastBarTopPosition, ValidatorLightweightPicker, LightweightPicker
+        // Buttons, StickyHeader{,SlideTransition,FadeTransition}) have all
+        // been re-enabled now that bulk-read (c5080d78b) and Cn1ssChunkTools
+        // gap detection have landed. Tests without an on-disk JS golden will
+        // report `missing_expected` (not a failure per cn1ss.sh:448);
+        // tests with goldens will fail loudly if they regress.
+        return "ClipUnderRotation".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
