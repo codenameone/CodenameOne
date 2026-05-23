@@ -158,6 +158,16 @@ jobs:
               com/codename1/io/oidc/OidcBrowserNativeImpl.java \
               com/codename1/social/AppleSignInNativeImpl.java; do
             if ! unzip -l "${BUNDLE}" | grep -q "${required}"; then
+              echo "::group::Diagnostic dump (bundle + source tree)"
+              echo "--- ls Ports/Android/src/com/codename1/io/oidc/"
+              ls -la Ports/Android/src/com/codename1/io/oidc/ 2>&1 || true
+              echo "--- ls Ports/Android/src/com/codename1/social/ | grep -i appleSignIn"
+              ls -la Ports/Android/src/com/codename1/social/ 2>&1 | grep -i apple || true
+              echo "--- bundle listing (oidc / social only)"
+              unzip -l "${BUNDLE}" | grep -E "oidc|social" || true
+              echo "--- bundle size"
+              ls -la "${BUNDLE}"
+              echo "::endgroup::"
               echo "::error::${required} missing from android_port_sources.jar"
               exit 1
             fi

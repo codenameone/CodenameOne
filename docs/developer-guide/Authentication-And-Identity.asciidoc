@@ -74,7 +74,7 @@ Add the URL scheme to your Info.plist via the standard build hint:
 ios.urlScheme=<key>CFBundleURLTypes</key>\n<array>\n  <dict>\n    <key>CFBundleURLSchemes</key>\n    <array>\n      <string>com.example.app</string>\n    </array>\n  </dict>\n</array>
 ----
 
-`AuthenticationServices.framework` is autolinked by the build whenever your app references anything in `com.codename1.io.oidc` or `com.codename1.social.AppleSignIn` -- you don't need to add `ios.add_libs=AuthenticationServices.framework` manually.
+`AuthenticationServices.framework` is added to the linker automatically whenever your app references anything in `com.codename1.io.oidc` or `com.codename1.social.AppleSignIn` -- you don't need to add `ios.add_libs=AuthenticationServices.framework` manually.
 
 ===== Android
 
@@ -84,7 +84,7 @@ Add an intent filter for the redirect scheme to the application manifest via the
 android.xintent_filter=<intent-filter>\n  <action android:name="android.intent.action.VIEW"/>\n  <category android:name="android.intent.category.DEFAULT"/>\n  <category android:name="android.intent.category.BROWSABLE"/>\n  <data android:scheme="com.example.app"/>\n</intent-filter>
 ----
 
-The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is autoinjected whenever your app references anything in `com.codename1.io.oidc`. Override the version with build hint `android.customTabsVersion=1.x.y` if needed.
+The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is added to your app's Gradle build automatically whenever it references anything in `com.codename1.io.oidc`. Override the version with build hint `android.customTabsVersion=1.x.y` if needed.
 
 ==== Saving and restoring tokens
 
