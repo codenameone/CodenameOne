@@ -125,15 +125,21 @@ jobs:
 
       - name: Compile Maven plugin (verifies IPhoneBuilder + AndroidGradleBuilder scanner edits)
         working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
           set -euo pipefail
-          # `-pl codenameone-maven-plugin compile` (no -am) requires the
-          # plugin's deps to be in the local repo; the unit-test step above
-          # already installed them via -am.
+          # `-am` (also-make) pulls in the plugin's intra-repo deps
+          # (designer, parparvm, ios bundle, javase, android, java-runtime).
+          # Without it the build can't resolve those SNAPSHOT artifacts
+          # because only core / factory / core-unittests landed in the
+          # local repo from the previous step.
           mvn -B -Dmaven.javadoc.skip=true \
-              -pl codenameone-maven-plugin \
+              -pl codenameone-maven-plugin -am \
               -Plocal-dev-javase \
-              compile
+              -Dcn1.binaries="${CN1_BINARIES}" \
+              -DskipTests \
+              install
 
       - name: Package Android port (verifies new Java sources bundle correctly)
         run: |
