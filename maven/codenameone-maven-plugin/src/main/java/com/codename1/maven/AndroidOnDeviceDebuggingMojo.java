@@ -192,11 +192,13 @@ public class AndroidOnDeviceDebuggingMojo extends AbstractCN1Mojo {
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logcatProc.destroy();
             try {
-                logcatProc.destroy();
                 // Best-effort cleanup so a re-run doesn't trip over a stale forward.
                 runAdb(adb, serial, "forward", "--remove", "tcp:" + jdwpPort);
-            } catch (Exception ignored) {
+            } catch (MojoFailureException e) {
+                System.err.println("[adb] failed to remove port forward on shutdown: "
+                        + e.getMessage());
             }
         }));
 

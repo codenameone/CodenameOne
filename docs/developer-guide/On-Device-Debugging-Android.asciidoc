@@ -126,7 +126,7 @@ adb pair 192.168.1.42:37051
 adb connect 192.168.1.42:5555
 ----
 +
-The connect port is *not* the pairing port — it is the one shown on
+The connect port is *not* the pairing port — it's the one shown on
 the *Wireless debugging* screen above the *Pair device* button.
 . Run the debug session as normal. Pass the IP and port through the
   Mojo if you prefer to do the `adb connect` in one step:
@@ -180,8 +180,8 @@ configuration of type `java` with `"request": "attach"`,
 
 === Useful command-line flags
 
-The Mojo's defaults match what the archetype's run config does — you
-rarely need any of these — but they exist for unusual setups:
+The Mojo's defaults match what the archetype's run config does. The
+flags below exist for unusual setups:
 
 [cols="1,2", options="header"]
 |===
@@ -307,15 +307,15 @@ Check the *CN1 Attach Android* run config:
   IntelliJ can resolve your `.java` files.
 
 If a class loaded on the device doesn't match the class IntelliJ
-thinks is current, breakpoints silently drop. Rebuild and reinstall
-(`cn1:buildAndroidOnDeviceDebug` + re-run *CN1 Android On-Device
-Debug*).
+thinks is current, breakpoints stop firing with no error message.
+Rebuild and reinstall (`cn1:buildAndroidOnDeviceDebug` + re-run
+*CN1 Android On-Device Debug*).
 
 ==== logcat shows the app exiting with `Debug.waitForDebugger`-like noise
 
 The system killed the process for taking too long to attach. Set
 `-Dcn1.android.onDeviceDebug.waitForAttach=false` and trigger the
-codepath you want to debug manually after attach — Android's debug-app
+code path you want to debug manually after attach — Android's debug-app
 wait isn't bound to the breakpoint, only to process start.
 
 ==== Wireless connection drops mid-session
