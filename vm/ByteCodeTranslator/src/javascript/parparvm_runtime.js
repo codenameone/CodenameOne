@@ -1766,6 +1766,28 @@ const jvm = {
     const resolvedClass = this.inferJsObjectClass(value, expectedClass);
     const classDef = this.classes[resolvedClass] || this.classes[expectedClass] || null;
     if (wrapper) {
+      // Diagnostic: log when a cached wrapper's __class transitions from a
+      // truthy value to null/undefined. Targets the chartDocumentStaleness
+      // bug (task #43): late-suite VIRTUAL_FAIL with receiverClass=null on
+      // cn1_s_createElement etc. We don't yet know whether the wipe happens
+      // here or somewhere else, so this log surfaces the wipe at this site
+      // if it does occur. Rate-limited globally to 30 lines to avoid
+      // flooding successful boots.
+      if (wrapper.__class && !resolvedClass) {
+        if (!jvm._classWipeLogged) jvm._classWipeLogged = 0;
+        if (jvm._classWipeLogged < 30) {
+          jvm._classWipeLogged++;
+          try {
+            const hostCls = value && value.__cn1HostClass ? value.__cn1HostClass : 'none';
+            const expCls = expectedClass || 'none';
+            const wrapperId = wrapper.__id != null ? wrapper.__id : 'noid';
+            vmDiag('CLASS_WIPE', 'prior', String(wrapper.__class));
+            vmDiag('CLASS_WIPE', 'expected', String(expCls));
+            vmDiag('CLASS_WIPE', 'hostClass', String(hostCls));
+            vmDiag('CLASS_WIPE', 'wrapperId', String(wrapperId));
+          } catch (_e) {}
+        }
+      }
       wrapper.__class = resolvedClass;
       this.enhanceJsWrapper(wrapper, resolvedClass);
       if (expectedClass && expectedClass !== resolvedClass) {
@@ -3034,6 +3056,27 @@ function cn1_ivResolve(target, mid) {
     method = resolveMethodEntry(classDef.methods, mid);
   }
   if (!method) {
+    // Diagnostic for chartDocumentStaleness (task #43): when virtual
+    // dispatch falls through to resolveVirtual with no target.__class,
+    // dump the receiver's full shape so the next session can identify
+    // which JSO produced the null receiver. Rate-limited.
+    if (target && target.__class == null) {
+      if (!jvm._dispatchNullClassLogged) jvm._dispatchNullClassLogged = 0;
+      if (jvm._dispatchNullClassLogged < 30) {
+        jvm._dispatchNullClassLogged++;
+        try {
+          const hasJsValue = target.__jsValue !== undefined ? 'yes' : 'no';
+          const hostCls = target.__cn1HostClass != null ? String(target.__cn1HostClass) : 'none';
+          const hostRef = target.__cn1HostRef != null ? String(target.__cn1HostRef) : 'none';
+          const keys = Object.keys(target).slice(0, 12).join(',');
+          vmDiag('NULL_RECEIVER', 'mid', String(mid));
+          vmDiag('NULL_RECEIVER', 'hasJsValue', hasJsValue);
+          vmDiag('NULL_RECEIVER', 'hostClass', hostCls);
+          vmDiag('NULL_RECEIVER', 'hostRef', hostRef);
+          vmDiag('NULL_RECEIVER', 'keys', keys);
+        } catch (_e) {}
+      }
+    }
     method = jvm.resolveVirtual(target.__class, mid);
   }
   return method;
