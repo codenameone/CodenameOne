@@ -100,7 +100,9 @@ public final class FirebaseAuth {
 
     /// `true` if a token is stored and not past its expiry.
     public boolean isSignedIn() {
-        if (getIdToken() == null) { return false; }
+        if (getIdToken() == null) {
+            return false;
+        }
         long exp = Preferences.get(PREF_EXPIRES, 0L);
         return exp == 0L || exp > System.currentTimeMillis();
     }
@@ -269,7 +271,9 @@ public final class FirebaseAuth {
                     String message = "Firebase error";
                     if (err instanceof Map) {
                         Object m = ((Map<?, ?>) err).get("message");
-                        if (m != null) { message = m.toString(); }
+                        if (m != null) {
+                            message = m.toString();
+                        }
                     }
                     out.error(new IOException(message));
                     return;
@@ -319,7 +323,9 @@ public final class FirebaseAuth {
         StringBuilder b = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<String, String> e : m.entrySet()) {
-            if (!first) { b.append(','); }
+            if (!first) {
+                b.append(',');
+            }
             first = false;
             b.append('"').append(escape(e.getKey())).append("\":");
             b.append('"').append(escape(e.getValue())).append('"');
@@ -343,7 +349,9 @@ public final class FirebaseAuth {
                     if (c < 0x20) {
                         String hex = Integer.toHexString(c);
                         b.append("\\u");
-                        for (int p = hex.length(); p < 4; p++) { b.append('0'); }
+                        for (int p = hex.length(); p < 4; p++) {
+                            b.append('0');
+                        }
                         b.append(hex);
                     } else {
                         b.append(c);
@@ -389,16 +397,28 @@ public final class FirebaseAuth {
                     : null;
         }
 
-        public String getIdToken() { return idToken; }
-        public String getRefreshToken() { return refreshToken; }
-        public String getUid() { return uid; }
+        public String getIdToken() {
+            return idToken;
+        }
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+        public String getUid() {
+            return uid;
+        }
         public String getEmail() {
-            if (email != null) { return email; }
+            if (email != null) {
+                return email;
+            }
             return claims != null && claims.get("email") != null
                     ? claims.get("email").toString() : null;
         }
-        public Date getExpiresAt() { return expiresAt; }
-        public Map<String, Object> getIdTokenClaims() { return claims; }
+        public Date getExpiresAt() {
+            return expiresAt;
+        }
+        public Map<String, Object> getIdTokenClaims() {
+            return claims;
+        }
 
         private static String strVal(Map<String, Object> json, String k) {
             Object v = json.get(k);
@@ -407,11 +427,15 @@ public final class FirebaseAuth {
 
         private static long longVal(Map<String, Object> json, String k) {
             Object v = json.get(k);
-            if (v == null) { return 0L; }
+            if (v == null) {
+                return 0L;
+            }
             try {
                 String raw = v.toString();
                 int dot = raw.indexOf('.');
-                if (dot >= 0) { raw = raw.substring(0, dot); }
+                if (dot >= 0) {
+                    raw = raw.substring(0, dot);
+                }
                 return Long.parseLong(raw);
             } catch (NumberFormatException nfe) {
                 return 0L;

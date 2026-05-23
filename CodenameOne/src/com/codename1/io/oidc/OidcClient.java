@@ -518,7 +518,9 @@ public final class OidcClient {
         ConnectionRequest req = new ConnectionRequest() {
             @Override
             protected void readResponse(InputStream input) throws IOException {
-                if (completed[0]) { return; }
+                if (completed[0]) {
+                    return;
+                }
                 byte[] body = Util.readInputStream(input);
                 String json = StringUtil.newString(body);
                 Map<String, Object> parsed;
@@ -566,7 +568,9 @@ public final class OidcClient {
 
             @Override
             protected void handleException(Exception err) {
-                if (completed[0]) { return; }
+                if (completed[0]) {
+                    return;
+                }
                 completed[0] = true;
                 out.error(new OidcException(OidcException.TRANSPORT_ERROR,
                         "Token endpoint request failed: " + err.getMessage(), err));
@@ -609,7 +613,9 @@ public final class OidcClient {
         String[] pairs = Util.split(query, "&");
         for (String p : pairs) {
             int eq = p.indexOf('=');
-            if (eq < 0) { continue; }
+            if (eq < 0) {
+                continue;
+            }
             String k = decode(p.substring(0, eq));
             String v = decode(p.substring(eq + 1));
             out.put(k, v);
@@ -646,7 +652,9 @@ public final class OidcClient {
     private static String join(String[] items) {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < items.length; i++) {
-            if (i > 0) { b.append(' '); }
+            if (i > 0) {
+                b.append(' ');
+            }
             b.append(items[i]);
         }
         return b.toString();
@@ -659,7 +667,9 @@ public final class OidcClient {
         int len = s.length();
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
-            if (c == '=' || c == '\n' || c == '\r') { continue; }
+            if (c == '=' || c == '\n' || c == '\r') {
+                continue;
+            }
             b.append(c);
         }
         return b.toString();

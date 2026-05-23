@@ -295,9 +295,13 @@ public final class AppleSignIn extends Login {
     }
 
     private static String[] splitScopes(String scopes) {
-        if (scopes == null) { return new String[0]; }
+        if (scopes == null) {
+            return new String[0];
+        }
         String trimmed = scopes.trim();
-        if (trimmed.length() == 0) { return new String[0]; }
+        if (trimmed.length() == 0) {
+            return new String[0];
+        }
         return com.codename1.util.StringUtil.tokenize(trimmed, ' ').toArray(new String[0]);
     }
 
@@ -371,7 +375,9 @@ public final class AppleSignIn extends Login {
         int len = s.length();
         for (int i = 0; i < len; i++) {
             char c = s.charAt(i);
-            if (c == '=' || c == '\n' || c == '\r') { continue; }
+            if (c == '=' || c == '\n' || c == '\r') {
+                continue;
+            }
             b.append(c);
         }
         return b.toString();
@@ -401,9 +407,13 @@ public final class AppleSignIn extends Login {
     }
 
     private static AppleSignInNative lookupNative() {
-        if (NATIVE_PROBED) { return CACHED_NATIVE; }
+        if (NATIVE_PROBED) {
+            return CACHED_NATIVE;
+        }
         synchronized (AppleSignIn.class) {
-            if (NATIVE_PROBED) { return CACHED_NATIVE; }
+            if (NATIVE_PROBED) {
+                return CACHED_NATIVE;
+            }
             try {
                 Class<?> cls = Class.forName(PORT_IMPL_FQCN);
                 CACHED_NATIVE = (AppleSignInNative) cls.newInstance();

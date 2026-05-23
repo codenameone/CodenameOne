@@ -202,7 +202,9 @@ public interface TokenStore {
                         if (c < 0x20) {
                             String hex = Integer.toHexString(c);
                             b.append("\\u");
-                            for (int p = hex.length(); p < 4; p++) { b.append('0'); }
+                            for (int p = hex.length(); p < 4; p++) {
+                                b.append('0');
+                            }
                             b.append(hex);
                         } else {
                             b.append(c);
