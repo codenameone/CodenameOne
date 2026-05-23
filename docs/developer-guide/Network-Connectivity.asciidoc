@@ -2,13 +2,13 @@
 
 Codename One 8 ships a set of APIs under `com.codename1.io.wifi`, `com.codename1.io.bonjour`, `com.codename1.io.usb` and an extension of `com.codename1.io.NetworkManager` that lets apps inspect and manage the device's local network beyond plain HTTP.
 
-All of these APIs share three guarantees:
+These APIs share three guarantees:
 
 * Every callback runs on the EDT so you can update UI directly from the result.
 * The build pipeline injects the matching Android permissions, iOS entitlements, and `NSXxxUsageDescription` / `NSBonjourServices` Info.plist entries automatically by scanning the classpath. Apps that never reference these classes see no manifest or entitlement changes.
 * The simulator implements best-effort versions of each API so you can wire and test your UI without a device. The simulator also prints the list of permissions/entitlements each API will need in a real build the first time you call it.
 
-The simulator's "API usage report" prints to stdout on JVM shutdown so you can spot anything you accidentally pulled in via a transitive cn1lib.
+The simulator's "API usage report" prints to stdout on JVM shutdown so you can spot anything you pulled in via a transitive cn1lib.
 
 === WiFi information
 
@@ -26,7 +26,7 @@ if (WiFi.isInfoSupported()) {
 }
 ----
 
-Any of these calls may return `null` if the device isn't on WiFi, if the user denied a runtime permission, or if the platform never exposed the value to apps. The framework normalises the wrapping that Android adds to the SSID and treats `<unknown ssid>` and the obfuscated BSSID `02:00:00:00:00:00` as `null`.
+Any of these calls may return `null` if the device isn't on WiFi, if the user denied a runtime permission, or if the platform never exposed the value to apps. The framework normalizes the wrapping that Android adds to the SSID and treats `<unknown ssid>` and the obfuscated BSSID `02:00:00:00:00:00` as `null`.
 
 ==== Required permissions and entitlements
 
@@ -42,7 +42,7 @@ The build pipeline injects the following automatically the first time it sees `c
 | iOS | `NSLocationWhenInUseUsageDescription` | iOS still checks CoreLocation behind the scenes
 |===
 
-You can override any auto-injected value via the standard build hints:
+You can override any injected automatically value via the standard build hints:
 
 [source]
 ----
@@ -72,7 +72,7 @@ WiFi.scan(new WiFiScanCallback() {
 
 [NOTE]
 ====
-iOS does not expose a public WiFi scan API. On iOS `WiFi.scan(...)` always reports an `UnsupportedOperationException`. Plan for a graceful fallback if your UI exposes a scan button.
+iOS doesn't expose a public WiFi scan API. On iOS `WiFi.scan(...)` always reports an `UnsupportedOperationException`. Plan for a graceful fallback if your UI exposes a scan button.
 ====
 
 Android throttles scans to 4 per 2 minutes per foreground app on API 28+; throttled scans return cached results, not an error.
@@ -96,8 +96,8 @@ WiFi.connect("MyAccessPoint", "s3cret!", WiFiSecurity.WPA_PSK,
 });
 ----
 
-* On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog cannot be bypassed.
-* On Android 9 and below the framework falls back to the legacy `WifiConfiguration` API and joins silently.
+* On Android 10+ the OS shows a system confirmation dialog with the SSID before joining; this dialog can't be bypassed.
+* On Android 9 and below the framework falls back to the legacy `WifiConfiguration` API and joins without an in-app prompt.
 * On iOS 11+ this uses `NEHotspotConfiguration`. The user is shown a system prompt the first time the app tries to join the SSID; subsequent attempts reuse the cached configuration.
 * `WiFiSecurity` must match the AP's actual security mode (`OPEN`, `WEP`, `WPA_PSK`, `WPA3_SAE`). Passing the wrong mode causes the join to fail.
 
@@ -105,7 +105,7 @@ WiFi.connect("MyAccessPoint", "s3cret!", WiFiSecurity.WPA_PSK,
 
 [WARNING]
 ====
-On iOS the build pipeline also enables the `NetworkExtension.framework` and the `HotspotConfiguration` entitlement only when it sees a call to `WiFi.connect(...)` or `WiFi.disconnect(...)`. Apps that only *read* SSID/BSSID will not pull in the framework, which keeps App Store API-usage scans clean.
+On iOS the build pipeline also enables the `NetworkExtension.framework` and the `HotspotConfiguration` entitlement only when it sees a call to `WiFi.connect(...)` or `WiFi.disconnect(...)`. Apps that only *read* SSID/BSSID won't pull in the framework, which keeps App Store API-usage scans clean.
 ====
 
 === Bonjour / mDNS discovery
@@ -147,7 +147,7 @@ pub.unpublish();
 
 ==== iOS requirements
 
-Bonjour on iOS 14+ silently returns no results unless:
+Bonjour on iOS 14+ returns no results unless:
 
 * The Info.plist `NSLocalNetworkUsageDescription` key explains why the app needs local-network access.
 * The Info.plist `NSBonjourServices` array lists each service type the app expects to find.
@@ -214,7 +214,7 @@ The platform implementations are:
 
 * *Android*: `ConnectivityManager.registerNetworkCallback` on API 21+, falling back to the legacy `CONNECTIVITY_ACTION` broadcast on older devices.
 * *iOS*: `SCNetworkReachability` with a kernel callback scheduled on the main run loop.
-* *Simulator*: derives the type from `NetworkInterface.getDisplayName`; transitions are not synthesised.
+* *Simulator*: derives the type from `NetworkInterface.getDisplayName`; transitions aren't synthesized.
 
 VPN detection is best-effort and intentionally heuristic. On Android it uses `NetworkCapabilities.TRANSPORT_VPN` plus an interface-name probe; on iOS it inspects `utun*`, `tun*`, `ppp*` and `ipsec*` interfaces. Use it as a hint, not as a security boundary.
 
@@ -258,7 +258,7 @@ The build pipeline injects `CHANGE_WIFI_STATE`, `ACCESS_WIFI_STATE`, `ACCESS_NET
 
 === USB host
 
-The USB API in `com.codename1.io.usb` lets the device act as a USB host and talk to attached peripherals -- a barcode scanner, a serial converter, a microcontroller. It is **Android-only**; iOS has no third-party USB host access and the simulator stubs everything out.
+The USB API in `com.codename1.io.usb` lets the device act as a USB host and talk to attached peripherals -- a barcode scanner, a serial converter, a microcontroller. It's **Android-only**; iOS has no third-party USB host access and the simulator stubs everything out.
 
 [source,java]
 ----
