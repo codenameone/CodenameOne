@@ -3231,7 +3231,12 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // 80bfa41de) tracked separately from the chunk-emit fix. Skip
   // these charts under a distinct reason so the cause is obvious in
   // CI logs.
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
+  // Temporarily un-parked so the chartDocumentStaleness cascade fires in
+  // CI and the NULL_RECEIVER / CLASS_WIPE diagnostics from bf2b805bc
+  // capture the actual receiver shape. The test will fail (no PNG ->
+  // no compare entry -> non-fatal for the screenshot job); we re-park
+  // once the diag data lands.
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
