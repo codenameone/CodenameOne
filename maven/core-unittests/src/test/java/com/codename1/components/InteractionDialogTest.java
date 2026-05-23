@@ -97,6 +97,36 @@ class InteractionDialogTest extends UITestBase {
         dialog.dispose();
     }
 
+    @Test
+    void showPopupDialogLandscapeFullWidthRectGetsVisibleSize() {
+        // Regression for #4991: in landscape, when the anchor rect spans the
+        // full available width (Picker in a Y-axis BoxLayout row), the legacy
+        // "popup left" fallback computed width = max(0, rect.getX()) = 0 and
+        // the dialog rendered zero-width. JS port desktop builds reproduced
+        // this because their viewport satisfies isTablet() (sw>=600) AND
+        // isPortrait()==false, sending Picker into the showPopupDialog branch.
+        implementation.setDisplaySize(1440, 900);
+        implementation.setPortrait(false);
+        try {
+            Form form = new Form(new BorderLayout());
+            implementation.setCurrentForm(form);
+            InteractionDialog dialog = new InteractionDialog();
+            dialog.setAnimateShow(false);
+            Label body = new Label("Body content with enough width to matter");
+            dialog.addComponent(body);
+            Rectangle fullWidthRect = new Rectangle(0, 80, 1440, 60);
+            dialog.showPopupDialog(fullWidthRect);
+            assertTrue(dialog.isShowing(), "dialog should be on the layered pane");
+            assertTrue(dialog.getWidth() > 0,
+                    "dialog must have non-zero width after a full-width anchor in landscape; got "
+                            + dialog.getWidth());
+            dialog.dispose();
+        } finally {
+            implementation.setDisplaySize(1080, 1920);
+            implementation.setPortrait(true);
+        }
+    }
+
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);

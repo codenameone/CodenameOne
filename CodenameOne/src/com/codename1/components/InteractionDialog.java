@@ -809,6 +809,18 @@ public class InteractionDialog extends Container implements AbstractDialog {
         } else {
             if (availableWidth < prefWidth && availableHeight / 2 > availableWidth - rect.getWidth()) {
                 showPortrait = true;
+            } else if (prefWidth >= rect.getX()
+                    && prefWidth >= availableWidth - rect.getX() - rect.getWidth()) {
+                // Landscape placement below picks the side of the rect with
+                // room for a side-by-side popup. When the rect spans (or
+                // nearly spans) the full available width -- e.g. a Picker in
+                // a Y-axis BoxLayout row -- neither side has room and the
+                // "popup left" else branch computes width = max(0,
+                // rect.getX()) = 0. The dialog then renders zero-width and
+                // looks invisible while still consuming the click (#4991).
+                // Fall back to portrait-style placement (centered
+                // horizontally, popping above or below the rect).
+                showPortrait = true;
             }
         }
 
