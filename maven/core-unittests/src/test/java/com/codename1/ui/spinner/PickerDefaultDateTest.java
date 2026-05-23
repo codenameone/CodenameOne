@@ -141,6 +141,64 @@ public class PickerDefaultDateTest extends UITestBase {
                 "A getter that returns null must fall back to a fresh Date, never null");
     }
 
+    /// Regression for #5014: with a default-date getter installed and no
+    /// explicit `setDate(non-null)`, tapping the picker stages the resolved
+    /// default into `value` so the popup can show it. Pressing Cancel must
+    /// roll that staging back so the picker keeps showing its placeholder
+    /// ("...") and a re-open re-resolves the getter, exactly as before the
+    /// RFE #4973 change.
+    @FormTest
+    public void cancelOnFirstOpenKeepsPlaceholderAndDoesNotPinValue() {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        if (impl != null) {
+            impl.setTablet(false);
+        }
+        final Picker picker = new Picker();
+        picker.setDefaultDate(new Picker.DateGetter() {
+            @Override
+            public Date get() {
+                return date(2030, Calendar.JUNE, 15);
+            }
+        });
+        picker.setType(Display.PICKER_TYPE_DATE);
+        picker.setUseLightweightPopup(true);
+        picker.setDate(null);
+        Assertions.assertEquals("...", picker.getText(),
+                "Before the first tap the picker must show its placeholder");
+
+        Form f = new Form(new BoxLayout(BoxLayout.Y_AXIS));
+        f.add(picker);
+        f.show();
+
+        picker.pressed();
+        picker.released();
+        runAnimations(f);
+
+        InteractionDialog dlg = findInteractionDialog(f);
+        Assertions.assertNotNull(dlg, "Lightweight popup should be open");
+        Button cancel = findButtonWithText(dlg, "Cancel");
+        Assertions.assertNotNull(cancel, "Cancel button should be present");
+        cancel.pressed();
+        cancel.released();
+        DisplayTest.flushEdt();
+        runAnimations(f);
+
+        Assertions.assertEquals("...", picker.getText(),
+                "Cancel on the first open must leave the placeholder intact (#5014)");
+        // Bump the slot the getter would return so we can prove the next
+        // getDate() call still resolves through the getter rather than
+        // returning a leaked staged value from the cancelled open.
+        final Date[] slot = new Date[] { date(2031, Calendar.FEBRUARY, 2) };
+        picker.setDefaultDate(new Picker.DateGetter() {
+            @Override
+            public Date get() {
+                return slot[0];
+            }
+        });
+        Assertions.assertEquals(slot[0], picker.getDate(),
+                "After Cancel the default getter must still drive getDate()");
+    }
+
     @FormTest
     public void cancelAfterCustomButtonRollsBackExplicitFlag() {
         TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
