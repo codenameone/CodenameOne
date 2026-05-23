@@ -92,7 +92,7 @@ public interface TokenStore {
                             raw = raw.substring(0, dot);
                         }
                         expiresAt = new Date(Long.parseLong(raw));
-                    } catch (NumberFormatException nfe) {
+                    } catch (NumberFormatException ignored) {
                         // Malformed expiry timestamp in persisted storage --
                         // treat as "unknown expiry" so the caller can decide
                         // whether to refresh; never let a parse failure tank

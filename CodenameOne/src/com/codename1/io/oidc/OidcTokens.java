@@ -100,7 +100,7 @@ public final class OidcTokens {
                 }
                 long seconds = Long.parseLong(raw);
                 expiresAt = new Date(System.currentTimeMillis() + seconds * 1000L);
-            } catch (NumberFormatException nfe) {
+            } catch (NumberFormatException ignored) {
                 // Provider returned a non-numeric `expires_in`; treat the
                 // expiry as unknown rather than failing the whole token
                 // response. `expiresAt` stays null and callers fall back to
