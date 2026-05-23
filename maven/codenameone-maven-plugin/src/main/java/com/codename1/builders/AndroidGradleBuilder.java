@@ -541,12 +541,19 @@ public class AndroidGradleBuilder extends Executor {
 
         // On-device debugging: when set, mark the APK debuggable so Dalvik/ART exposes
         // a JDWP socket the cn1:android-on-device-debugging Mojo can forward through adb.
-        // Forcing debuggable also flips off R8/proguard (debug builds skip shrinking
-        // anyway, but we may be invoked from the android-device cloud target which
-        // would otherwise run full optimisation). Release builds are unaffected.
+        // Forcing debuggable also flips off R8 and ProGuard so symbols, method names,
+        // and line numbers survive the build — we may be invoked from the android-device
+        // cloud target which would otherwise run full optimisation. Also force the build
+        // down to debug-only — Android otherwise produces both a release and a debug
+        // APK from the same manifest, so without this a stray hint could ship a
+        // release-signed, debuggable APK. Release builds and projects that don't opt
+        // in see no change.
         boolean onDeviceDebug = request.getArg("android.onDeviceDebug", "false").equals("true");
         if (onDeviceDebug) {
             disableR8 = true;
+            request.putArgument("android.enableProguard", "false");
+            request.putArgument("android.release", "false");
+            request.putArgument("android.debug", "true");
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
