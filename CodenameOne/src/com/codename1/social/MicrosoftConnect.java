@@ -104,33 +104,67 @@ public final class MicrosoftConnect extends Login {
         final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
         String issuer = "https://login.microsoftonline.com/" + tenant + "/v2.0";
         OidcClient.discover(issuer)
-                .ready(new SuccessCallback<OidcClient>() {
-                    public void onSucess(OidcClient client) {
-                        client.setClientId(clientId)
-                                .setRedirectUri(redirectUri)
-                                .setScopes(scopes != null && scopes.length > 0
-                                        ? scopes
-                                        : new String[] {"openid", "email", "profile",
-                                                "offline_access"});
-                        client.authorize()
-                                .ready(new SuccessCallback<OidcTokens>() {
-                                    public void onSucess(OidcTokens t) {
-                                        setAccessToken(t.toAccessToken());
-                                        out.complete(t);
-                                    }
-                                })
-                                .except(new SuccessCallback<Throwable>() {
-                                    public void onSucess(Throwable err) {
-                                        out.error(err);
-                                    }
-                                });
-                    }
-                })
-                .except(new SuccessCallback<Throwable>() {
-                    public void onSucess(Throwable err) {
-                        out.error(err);
-                    }
-                });
+                .ready(new DiscoveredCallback(this, clientId, redirectUri, scopes, out))
+                .except(new ErrorCallback(out));
         return out;
+    }
+
+    /// Static so SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet.
+    /// `host` is passed explicitly because [Login#setAccessToken] is an
+    /// instance method.
+    private static final class DiscoveredCallback implements SuccessCallback<OidcClient> {
+        private final MicrosoftConnect host;
+        private final String clientId;
+        private final String redirectUri;
+        private final String[] scopes;
+        private final AsyncResource<OidcTokens> out;
+
+        DiscoveredCallback(MicrosoftConnect host, String clientId, String redirectUri,
+                           String[] scopes, AsyncResource<OidcTokens> out) {
+            this.host = host;
+            this.clientId = clientId;
+            this.redirectUri = redirectUri;
+            this.scopes = scopes;
+            this.out = out;
+        }
+
+        public void onSucess(OidcClient client) {
+            client.setClientId(clientId)
+                    .setRedirectUri(redirectUri)
+                    .setScopes(scopes != null && scopes.length > 0
+                            ? scopes
+                            : new String[] {"openid", "email", "profile",
+                                    "offline_access"});
+            client.authorize()
+                    .ready(new AuthorizedCallback(host, out))
+                    .except(new ErrorCallback(out));
+        }
+    }
+
+    private static final class AuthorizedCallback implements SuccessCallback<OidcTokens> {
+        private final MicrosoftConnect host;
+        private final AsyncResource<OidcTokens> out;
+
+        AuthorizedCallback(MicrosoftConnect host, AsyncResource<OidcTokens> out) {
+            this.host = host;
+            this.out = out;
+        }
+
+        public void onSucess(OidcTokens t) {
+            host.setAccessToken(t.toAccessToken());
+            out.complete(t);
+        }
+    }
+
+    private static final class ErrorCallback implements SuccessCallback<Throwable> {
+        private final AsyncResource<OidcTokens> out;
+
+        ErrorCallback(AsyncResource<OidcTokens> out) {
+            this.out = out;
+        }
+
+        public void onSucess(Throwable err) {
+            out.error(err);
+        }
     }
 }

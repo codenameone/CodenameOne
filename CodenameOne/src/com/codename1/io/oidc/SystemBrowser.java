@@ -160,7 +160,10 @@ public final class SystemBrowser {
                             return;
                         }
                         String url = (String) src;
-                        if (url == null || !url.startsWith(redirectUri)) {
+                        // `src` was already proven non-null by the
+                        // instanceof above, so url cannot be null here --
+                        // SpotBugs RCN_REDUNDANT_NULLCHECK was right.
+                        if (!url.startsWith(redirectUri)) {
                             return;
                         }
                         if (resolved[0]) {
