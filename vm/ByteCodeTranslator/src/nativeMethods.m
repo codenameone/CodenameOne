@@ -1283,7 +1283,14 @@ struct ThreadLocalData* getThreadLocalData() {
         
         i->callStackMethod = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
         memset(i->callStackMethod, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        
+
+#ifdef CN1_ON_DEVICE_DEBUG
+        i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+        memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+        i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+        memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+#endif
+
         i->callStackOffset = 0;
         
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
@@ -1538,6 +1545,10 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     free(head->callStackClass);
     free(head->callStackLine);
     free(head->callStackMethod);
+#ifdef CN1_ON_DEVICE_DEBUG
+    free(head->callStackLocalsAddresses);
+    free(head->callStackFrameInfo);
+#endif
     free(head->pendingHeapAllocations);
     free(head);
     nThreadsToKill--;

@@ -1780,3 +1780,19 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);
     return (JAVA_OBJECT)arr;
 }
+
+#ifdef CN1_ON_DEVICE_DEBUG
+// Default-zero flag. The iOS on-device-debug listener flips this to 1 once
+// it has accepted a proxy connection. Weak so a stronger definition in
+// cn1_debugger.m (iOS port) wins when that file is linked into the build.
+__attribute__((weak)) volatile int cn1DebuggerActive = 0;
+
+// Weak stub that lets non-iOS / clean-output builds link even without the
+// real listener. The strong implementation lives in
+// Ports/iOSPort/nativeSources/cn1_debugger.m and is included in the iOS
+// build when ios.onDeviceDebug=true.
+__attribute__((weak)) void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line) {
+    (void)threadStateData;
+    (void)line;
+}
+#endif

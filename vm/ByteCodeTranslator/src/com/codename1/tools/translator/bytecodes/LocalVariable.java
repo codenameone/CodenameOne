@@ -98,6 +98,17 @@ public class LocalVariable extends Instruction {
         }
     }
     
+    /**
+     * Returns the JVM type-descriptor first character (I/J/F/D/Z/B/S/C for
+     * primitives, 'L' for objects, '[' for arrays). Distinct from
+     * {@link #getQualifier()}, which collapses byte/short/char/boolean/int
+     * onto 'i'. Used by the on-device-debug side-table so the proxy can
+     * present primitives at their declared narrow width.
+     */
+    public char getTypeCode() {
+        return desc.charAt(0);
+    }
+
     public char getQualifier() {
         switch (desc.charAt(0)) {
             case 'B' :
@@ -124,6 +135,10 @@ public class LocalVariable extends Instruction {
     
     public String getOrigName() {
         return name;
+    }
+
+    public String getDesc() {
+        return desc;
     }
     
     public String getVarName() {

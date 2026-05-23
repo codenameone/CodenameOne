@@ -1,0 +1,293 @@
+== On-Device Debugging (iOS)
+
+The Codename One simulator runs your app on the JVM, so the IDE's
+normal Java debugger works against it directly. Some bugs only appear
+on a real device — ParparVM's threading model, iOS-specific native
+behaviour, performance characteristics on real hardware, memory
+pressure under iOS background limits, and timing around UIKit
+interactions are common examples. On-device debugging lets you keep
+using a standard Java debugger (IntelliJ IDEA, jdb, VS Code,
+anything that speaks JDWP) against the running iOS app on either
+the native iOS simulator or a physical device.
+
+It works by adding a small listener thread to the
+ParparVM-generated iOS binary. The app dials out to a desktop proxy
+over Wi-Fi or loopback; the proxy speaks JDWP on the other side, so
+to the IDE everything looks like attaching to a normal remote JVM.
+
+=== When to use it
+
+* You can reproduce a bug on a built iOS app but not in the
+  Codename One simulator — for instance a native-call issue, a
+  layout glitch that only shows up on iOS modern theme, or an
+  AOT-vs.-JIT numerical discrepancy.
+* You want to single-step through real ParparVM-translated code
+  and read the values its variables actually hold at runtime.
+* You want to inspect object state on a tethered device while
+  reproducing a problem a customer reported, without having to
+  add log lines and rebuild.
+
+If your bug is reproducible in the simulator, stay in the simulator
+— its debugger is faster and has fewer limitations.
+
+=== Quick start (IntelliJ IDEA)
+
+Codename One projects generated from the `cn1app-archetype` ship with
+two ready-made IntelliJ run configurations under the *On-Device Debug*
+folder in the run-config dropdown: *CN1 Debug Proxy* and *CN1 Attach
+iOS*. The rest of this section assumes you're using them. Skip to
+<<on-device-debug-jdb,Using jdb instead>> if you prefer the
+command-line debugger.
+
+==== 1. Enable the build hints
+
+In `common/codenameone_settings.properties`, uncomment the four lines
+the archetype generated:
+
+[source,properties]
+----
+codename1.arg.ios.onDeviceDebug=true
+codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
+codename1.arg.ios.onDeviceDebug.proxyPort=55333
+# Optional: block the app at startup until the IDE attaches.
+codename1.arg.ios.onDeviceDebug.waitForAttach=true
+----
+
+For a physical device, set `proxyHost` to the laptop's LAN IP (run
+`ifconfig | grep "inet "`) instead of `127.0.0.1`. The native iOS
+simulator can always use `127.0.0.1`.
+
+==== 2. Build the app as you normally do
+
+Either the local Xcode path (`cn1:buildIosXcodeProject`) or a cloud
+build (`cn1:buildIosOnDeviceDebug`) will produce an app instrumented
+for on-device debugging once the build hints are set.
+
+==== 3. Run the proxy from IntelliJ
+
+Select *CN1 Debug Proxy* from the Run-config dropdown and click ▶
+*Run* (the green play icon — not the bug icon; *Debug* on this config
+would attach IntelliJ's own debugger to the proxy process, which is
+not what you want). The Run tool window opens and shows:
+
+----
+On-device-debug proxy starting:
+  symbols : .../cn1-symbols.txt
+  device  : listening on tcp://0.0.0.0:55333
+  jdwp    : listening on tcp://0.0.0.0:8000
+[device] listening on port 55333 for ParparVM app to dial in
+[jdwp] listening on port 8000 for debugger (jdb) to attach
+----
+
+When the last line appears, the JDWP port is bound and ready.
+
+==== 4. Attach the debugger from IntelliJ
+
+Switch the Run-config dropdown to *CN1 Attach iOS* and click 🐞
+*Debug*. IntelliJ connects to `localhost:8000` and opens a Debug tool
+window.
+
+==== 5. Launch the app
+
+Launch the iOS app (in the native iOS simulator under Xcode, or
+deploy to a tethered device). With `waitForAttach=true` the app boots
+to a "Waiting for debugger" overlay until the proxy's first
+RESUME — set your breakpoints, then let the proxy resume automatically.
+
+Set breakpoints, step, inspect, evaluate expressions, just like a
+normal remote attach. Device output from
+`System.out.println` / `Log.p` / `printf` / `NSLog` lands in the
+*CN1 Debug Proxy* Run window prefixed with `[device]`.
+
+=== Quick start (Maven from the command line)
+
+If you don't want to use the IntelliJ run configs, the same flow is
+two terminals:
+
+[source,bash]
+----
+# Terminal 1 — start the proxy
+mvn cn1:ios-on-device-debugging
+
+# Terminal 2 — attach jdb
+jdb -attach localhost:8000
+----
+
+For VS Code (Debugger for Java extension), add a launch
+configuration of type `java` with `"request": "attach"`,
+`"hostName": "localhost"`, `"port": 8000`.
+
+[#on-device-debug-jdb]
+==== Using jdb instead
+
+`jdb` is a minimal Java debugger that ships with every JDK and works
+fine over the same JDWP socket. Useful when you don't have an IDE
+available, or for scripted regression checks. Source path resolution
+is manual:
+
+[source,bash]
+----
+jdb -attach localhost:8000 \
+    -sourcepath src/main/java:$HOME/.m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT-sources.jar
+----
+
+The `-sourcepath` is required for `list` / `where` to render framework
+source — jdb won't unzip the `-sources.jar` automatically; if you
+prefer plain files, extract it once and point at the directory.
+
+=== What works today
+
+* Class loading: the IDE sees every class in your build.
+* Line breakpoints in user code *and* in the Codename One framework
+  classes (`com.codename1.ui.*`, `com.codename1.io.*`, etc.).
+* Step into / over / out.
+* Stack walking — full Java stack including the Codename One
+  framework frames above your code.
+* Inspecting primitive locals (int, long, float, double, boolean,
+  byte, char, short).
+* Inspecting `java.lang.String` values directly.
+* Inspecting object references — class name and identity, plus
+  field-by-field drilldown via the IDE's variables view. The proxy
+  walks the ParparVM struct layout to read instance fields directly
+  at known offsets, so `dump this` / "Variables" shows the same
+  fields you'd see in a simulator debug session.
+* Array inspection — `Object[]`, `int[]`, `byte[]`, etc. report
+  their length and per-index values to the IDE so expanding e.g.
+  `ArrayList.elementData` shows the actual element references
+  rather than an opaque reference. Primitive element types
+  round-trip with their JVM type tag.
+* Method invocation — the IDE's "Evaluate Expression" /
+  `print` command can call instance and static methods on objects
+  in scope. The classic chain
+  `Display.getInstance().getCurrent().getTitle()` evaluates to the
+  current form's title string, so `myForm.getComponentCount()` and
+  similar accessor calls work too. The call runs on the suspended
+  Java thread inside a catch-all try block, so uncaught throws
+  round-trip back as an exception reference rather than tearing
+  down the debugger.
+* Native device output — `System.out.println`, `Log.p`, and
+  `printf` / `NSLog` from native code are surfaced in the proxy's
+  console (the IntelliJ *CN1 Debug Proxy* Run window when launched
+  via the run config) prefixed with `[device]`.
+* Pause and resume from the IDE.
+
+=== Pointing the IDE at the Codename One sources
+
+The proxy answers `Method.LineTable` and `ReferenceType.SourceFile`
+for framework classes, but the IDE still needs to find the actual
+`.java` files to render the source pane while stepping. Three options
+in order of convenience:
+
+* *Maven sources jar (recommended).* The
+  `codenameone-core-<version>-sources.jar` is published alongside
+  the regular `codenameone-core` artifact. IntelliJ resolves it
+  automatically once you run *Maven → Reimport* with "Sources"
+  enabled in the Maven settings. Other IDEs work the same way as
+  long as their Maven integration is set to download sources.
+* *Local clone of the Codename One repository.* If you've already
+  checked out https://github.com/codenameone/CodenameOne[the
+  CodenameOne GitHub repository] (for instance to follow the
+  contributor workflow), point the IDE at its `CodenameOne/src`
+  directory. In IntelliJ: *Run → Edit Configurations… → CN1 Attach
+  iOS → Configuration → Source roots → +*.
+* *jdb command line.* Pass the framework source directory on the
+  `-sourcepath`, as shown in <<on-device-debug-jdb,Using jdb
+  instead>>.
+
+Without a source path, breakpoints in framework classes still trigger
+and locals / fields still read — you'll just see "Sources not found"
+in the IDE editor when stepping into framework code.
+
+=== Known limitations
+
+* *Method invocation is partial.* The debugger can call instance and
+  static methods on Codename One framework classes and on user code:
+  jdb's `print myForm.getTitle()` and IntelliJ's "Evaluate Expression"
+  pop-up work for the chains you actually want
+  (`Display.getInstance().getCurrent().getTitle()` is the canonical
+  test). Methods on `java.io.*`, `java.net.*`, `java.nio.*`, and
+  `com.codename1.impl.*` are unsupported — those classes are linked
+  against hand-written native code that has fallen out of sync with
+  the generic invoke-thunk calling convention, so the translator
+  skips them. The same limit applies to watch expressions.
+* *Constructor invocation* isn't supported. The debugger can call
+  existing instance methods but not `new Foo(...)`.
+* *Hot-swap* isn't supported. Code changes require a rebuild and
+  reinstall of the app.
+* *Hot threads* — if your app is doing heavy work on a non-EDT
+  thread when a breakpoint hits, that other thread continues
+  running. Only the thread that hit the breakpoint suspends by
+  default. Use the IDE's "suspend VM" if you need a fully frozen
+  picture.
+* *Local variable names* are present only when the user's Java
+  sources were compiled with `-g`. Codename One's archetypes do
+  compile with debug info by default; if a variable shows up as
+  `v1`, `v2`, ... that's because that particular class was
+  compiled without debug info.
+* *Static field reads* are unsupported. Instance field reads are
+  fully wired; static-field support requires an additional per-class
+  static table that hasn't been emitted yet.
+* *NSLog on a real device* (as opposed to the native iOS simulator)
+  may not reach the `[device]` console. NSLog on iOS routes to
+  `os_log` which doesn't always mirror to `stderr`. `printf` /
+  `fprintf` / `Log.p` are unaffected and show up correctly.
+
+=== Performance
+
+The on-device-debug instrumentation is gated by a compile-time
+flag that's *only set in debug builds*. Release builds are
+completely unaffected — no listener thread, no per-line callback,
+no extra metadata in the binary.
+
+In debug builds, the per-line callback adds a predictable
+load+branch around the macro that ParparVM already emits to
+record source line numbers for stack traces. When no debugger is
+attached, the runtime cost is close to zero. When a debugger
+*is* attached, expect numerical inner loops to run on the order
+of two to three times slower than a release build — this is
+normal and matches the overhead of `-g`-style debugging on
+other native VMs.
+
+=== Troubleshooting
+
+==== The proxy reports "device disconnected" before the breakpoint fires
+
+The app might be crashing before it reaches user code. Run the
+app from Xcode and watch the console — `installSignalHandlers`
+will intercept native crashes and rethrow them as Java exceptions
+you can see. If the connection drops mid-debug, check the proxy
+log for a device-side I/O error.
+
+==== "Connection refused" when the device tries to reach the proxy
+
+The device's `ios.onDeviceDebug.proxyHost` value is wrong, or a
+firewall is blocking the port. Verify:
+
+* The native iOS simulator can always reach `127.0.0.1`.
+* A physical device needs the laptop's *LAN IP* (not `localhost`),
+  and the laptop's firewall must allow incoming connections on
+  the configured port (default `55333`).
+* macOS will prompt the first time the proxy listens — accept the
+  *Allow incoming connections* dialog.
+
+==== jdb reports "Internal exception: Unexpected JDWP Error: 100"
+
+This means an unsupported JDWP command was invoked. The session
+itself survives; the most common cause is the IDE asking for
+something the proxy explicitly stubs (see "Known limitations"
+above). If you hit a less obvious case, the proxy logs the unknown
+command code — file an issue with that code attached.
+
+==== The app launches but the breakpoint never fires
+
+Confirm the build hint actually took effect. Inspect the
+generated Xcode project's `cn1_globals.h` and look for `#define
+CN1_ON_DEVICE_DEBUG` *without* a leading `//`. If the line is
+still commented out, the build was a release/non-debug build, or
+`ios.onDeviceDebug` wasn't set as a build hint.
+
+==== Make the app wait before running so the IDE can attach first
+
+Set `ios.onDeviceDebug.waitForAttach=true`. The app will block
+at startup until the proxy is connected and the IDE tells the
+VM to continue.

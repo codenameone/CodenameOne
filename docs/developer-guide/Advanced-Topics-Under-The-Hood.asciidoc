@@ -442,6 +442,18 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.generateSplashScreens
 |Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
 
+|ios.onDeviceDebug
+|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the link:#_ondevice_debugging_ios[On-Device Debugging chapter] for the full flow.
+
+|ios.onDeviceDebug.proxyHost
+|Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.
+
+|ios.onDeviceDebug.proxyPort
+|TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.
+
+|ios.onDeviceDebug.waitForAttach
+|Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
+
 |desktop.width
 |Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.
 

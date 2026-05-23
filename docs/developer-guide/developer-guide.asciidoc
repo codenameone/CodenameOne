@@ -90,6 +90,8 @@ include::signing.asciidoc[]
 
 include::Working-With-iOS.asciidoc[]
 
+include::On-Device-Debugging.asciidoc[]
+
 include::Working-With-Javascript.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
