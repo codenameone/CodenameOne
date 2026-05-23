@@ -35,6 +35,16 @@ public class StickyHeaderScreenshotTest extends AbstractStickyHeaderScreenshotTe
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
         sticky.setScrollPosition(scrollMotion.getValue());
+        // The transition-variant tests (StickyHeader{Slide,Fade}TransitionScreenshotTest)
+        // already call updateSticky() per-frame and render correctly on every
+        // platform including the JS port. The fast-scroll variant relied on
+        // ``setScrollPosition`` alone triggering the recompute via the
+        // scroll-listener path; on the JS port that path doesn't drive a
+        // sticky recompute synchronously, leaving the container in an
+        // empty/uninitialised state at paint time and the captured PNG blank.
+        // Calling updateSticky() explicitly matches the transition variants
+        // and is harmless on the other ports.
+        sticky.updateSticky();
         host.paintComponent(g, true);
     }
 
