@@ -74,6 +74,10 @@ node_modules
 **/genfiles.properties
 **/private/private.properties
 .idea/
+# Same exception as for **/.idea/* above: keep the archetype's
+# bundled IDE configs versioned.
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 .claude/
 target
 pom.xml.versionsBackup
