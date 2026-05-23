@@ -166,7 +166,9 @@ public final class AndroidUsb {
             ctx.registerReceiver(permReceiver, new IntentFilter(ACTION_PERM));
         }
         int flags = 0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        // Build.VERSION_CODES.S (=31) is not present on the legacy compile
+        // SDK shipped in cn1-binaries; use the literal SDK int instead.
+        if (Build.VERSION.SDK_INT >= 31) {
             flags = PendingIntent.FLAG_IMMUTABLE;
         }
         PendingIntent pi = PendingIntent.getBroadcast(ctx, 0,

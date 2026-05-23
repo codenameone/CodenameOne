@@ -30,7 +30,10 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.net.wifi.WifiNetworkSpecifier;
+// android.net.wifi.WifiNetworkSpecifier is API 29+ and the compile-SDK
+// vendored in cn1-binaries is API 25. We instantiate it reflectively in
+// connectWiFiQ so the build still passes on the legacy SDK while the
+// runtime path still works on Android 10+.
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
@@ -373,6 +376,10 @@ public final class AndroidConnectivity {
     private static final Map<String, ConnectivityManager.NetworkCallback> pendingConnects
             = new HashMap<String, ConnectivityManager.NetworkCallback>();
 
+    // SDK_INT thresholds. Build.VERSION_CODES.Q (=29) is not present in the
+    // legacy compile SDK, so we use the integer constant directly.
+    private static final int SDK_Q = 29;
+
     public static void connectWiFi(final String ssid, final String password,
                                    final WiFiSecurity security,
                                    final WiFiConnectCallback cb) {
@@ -382,7 +389,7 @@ public final class AndroidConnectivity {
             failConnect(cb, "WiFi unavailable");
             return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= SDK_Q) {
             connectWiFiQ(ctx, ssid, password, security, cb);
         } else {
             connectWiFiLegacy(wm, ssid, password, security, cb);
@@ -392,16 +399,28 @@ public final class AndroidConnectivity {
     private static void connectWiFiQ(Context ctx, final String ssid,
                                      String password, WiFiSecurity security,
                                      final WiFiConnectCallback cb) {
-        WifiNetworkSpecifier.Builder b = new WifiNetworkSpecifier.Builder()
-                .setSsid(ssid);
-        if (password != null && password.length() > 0) {
-            if (security == WiFiSecurity.WPA3_SAE) {
-                b.setWpa3Passphrase(password);
-            } else {
-                b.setWpa2Passphrase(password);
+        // WifiNetworkSpecifier.Builder is API 29+. Reach it reflectively so
+        // this file compiles against the legacy android.jar shipped in
+        // cn1-binaries while the code path still runs on Android 10+.
+        NetworkSpecifier spec;
+        try {
+            Class<?> builderCls = Class.forName(
+                    "android.net.wifi.WifiNetworkSpecifier$Builder");
+            Object builder = builderCls.getConstructor().newInstance();
+            builderCls.getMethod("setSsid", String.class)
+                    .invoke(builder, ssid);
+            if (password != null && password.length() > 0) {
+                String setter = security == WiFiSecurity.WPA3_SAE
+                        ? "setWpa3Passphrase" : "setWpa2Passphrase";
+                builderCls.getMethod(setter, String.class)
+                        .invoke(builder, password);
             }
+            spec = (NetworkSpecifier) builderCls.getMethod("build")
+                    .invoke(builder);
+        } catch (Throwable t) {
+            failConnect(cb, "WifiNetworkSpecifier not available: " + t);
+            return;
         }
-        NetworkSpecifier spec = b.build();
         NetworkRequest req = new NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -468,7 +487,7 @@ public final class AndroidConnectivity {
 
     public static void disconnectWiFi(String ssid) {
         ConnectivityManager.NetworkCallback cb = pendingConnects.remove(ssid);
-        if (cb != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (cb != null && Build.VERSION.SDK_INT >= SDK_Q) {
             try {
                 ConnectivityManager c = cm();
                 if (c != null) c.unregisterNetworkCallback(cb);
