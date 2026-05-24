@@ -71,7 +71,7 @@ import java.util.Map;
 /// });
 /// ```
 ///
-/// @since 7.1
+/// @since 7.0.245
 public final class AppleSignIn extends Login {
 
     /// Apple's public OIDC issuer.

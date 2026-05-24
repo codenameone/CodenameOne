@@ -47,7 +47,7 @@ import com.codename1.util.SuccessCallback;
 /// your custom API) pass it via [#withAudience(String)] before calling
 /// [#signIn(String, String, String...)].
 ///
-/// @since 7.1
+/// @since 7.0.245
 public final class Auth0Connect extends Login {
 
     private static Auth0Connect INSTANCE;

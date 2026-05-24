@@ -53,7 +53,7 @@ import com.codename1.util.SuccessCallback;
 ///     });
 /// ```
 ///
-/// @since 7.1
+/// @since 7.0.245
 public final class MicrosoftConnect extends Login {
 
     /// "common" -- accepts personal, work, and school accounts. Use this for
