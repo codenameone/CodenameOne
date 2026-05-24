@@ -98,6 +98,83 @@ class InteractionDialogTest extends UITestBase {
     }
 
     @Test
+    void showPopupDialogStraddlingMidlineDoesNotOverlapTarget() {
+        // Regression for #5028: when the anchor rect straddles the
+        // vertical midline, the legacy placement logic fell through to a
+        // "popup over aligned with top of rect" branch that drew the
+        // popup ON TOP of the target (covering the Close button in the
+        // reporter's screenshot). The fix prefers above / below based on
+        // available space; the popup must end up entirely outside the
+        // target rect.
+        implementation.setDisplaySize(1080, 1920);
+        implementation.setPortrait(true);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimateShow(false);
+        dialog.addComponent(new Label("Popup body content"));
+
+        // 60px target straddling the midline at y=960.
+        int targetHeight = 60;
+        int targetY = 1920 / 2 - targetHeight / 2;
+        Rectangle anchor = new Rectangle(490, targetY, 100, targetHeight);
+        dialog.showPopupDialog(anchor);
+
+        int dlgTop = dialog.getAbsoluteY();
+        int dlgBottom = dlgTop + dialog.getHeight();
+        int targetBottom = targetY + targetHeight;
+        assertTrue(dialog.getHeight() > 0, "popup must have non-zero height");
+        boolean overlaps = dlgTop < targetBottom && dlgBottom > targetY;
+        assertFalse(overlaps,
+                "#5028: popup [" + dlgTop + ".." + dlgBottom
+                        + ") overlaps anchor [" + targetY + ".." + targetBottom
+                        + ") -- expected the popup to land entirely above or below the rect");
+
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogArrowDirectionConsistentWithPlacement() {
+        // Regression for #5029: with the popup ending up overlapping the
+        // target (the #5028 bug), CSSBorder.Arrow could not pick a
+        // consistent direction (cabsY straddles trackY..trackY+h) so the
+        // arrow tip rendered on the wrong edge. The arrow logic needs the
+        // popup to be either fully above or fully below the target; this
+        // test mirrors the reporter's geometry (target halfway down a
+        // tall column) and pins that invariant.
+        implementation.setDisplaySize(1080, 1920);
+        implementation.setPortrait(true);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimateShow(false);
+        dialog.addComponent(new Label("Popup body content"));
+
+        // Target lives at y = available/2 - 1 (rect.getY() < availableHeight/2,
+        // rect.bottom > availableHeight/2). This is the exact case that
+        // used to hit the buggy "popup over aligned with top of rect"
+        // branch before the fix.
+        Rectangle anchor = new Rectangle(490, 1920 / 2 - 1, 100, 80);
+        dialog.showPopupDialog(anchor);
+
+        int dlgTop = dialog.getAbsoluteY();
+        int dlgBottom = dlgTop + dialog.getHeight();
+        int targetTop = anchor.getY();
+        int targetBottom = targetTop + anchor.getHeight();
+
+        boolean popupBelowTarget = dlgTop >= targetBottom;
+        boolean popupAboveTarget = dlgBottom <= targetTop;
+        assertTrue(popupBelowTarget || popupAboveTarget,
+                "#5029: popup at [" + dlgTop + ".." + dlgBottom
+                        + ") is neither fully above nor fully below target ["
+                        + targetTop + ".." + targetBottom
+                        + ") -- CSSBorder.Arrow has no consistent direction"
+                        + " to point at the target");
+
+        dialog.dispose();
+    }
+
+    @Test
     void showPopupDialogLandscapeFullWidthRectGetsVisibleSize() {
         // Regression for #4991: in landscape, when the anchor rect spans the
         // full available width (Picker in a Y-axis BoxLayout row), the legacy
