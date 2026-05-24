@@ -839,23 +839,48 @@ public class InteractionDialog extends Container implements AbstractDialog {
                     }
                 }
             }
-            if (rect.getY() + rect.getHeight() < availableHeight / 2) {
+            // Pick the side of the rect (above vs. below) the popup goes
+            // on. The original logic chose purely by which half of the
+            // screen the rect sat in, which placed the popup ON TOP of
+            // the rect whenever it straddled the midline -- the symptom
+            // in #5028 (popup covers target) and #5029 (CSSBorder.Arrow
+            // can't pick a consistent direction so the tip renders on
+            // the wrong edge). Prefer whichever side fits the popup's
+            // preferred height, falling back to the larger side. The
+            // historical "over the rect" branches are kept as a last
+            // resort for the degenerate case where neither side has any
+            // room at all.
+            int spaceAbove = Math.max(0, rect.getY());
+            int spaceBelow = Math.max(0, availableHeight - rect.getY() - rect.getHeight());
+            boolean placeBelow;
+            if (spaceBelow >= prefHeight) {
+                placeBelow = true;
+            } else if (spaceAbove >= prefHeight) {
+                placeBelow = false;
+            } else if (spaceBelow >= spaceAbove) {
+                placeBelow = spaceBelow > 0;
+            } else {
+                placeBelow = false;
+            }
+            if (placeBelow && spaceBelow > 0) {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
-                int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
+                int height = Math.min(prefHeight, spaceBelow);
                 padOrientation(contentPaneStyle, TOP, 1);
                 show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
-            } else if (rect.getY() > availableHeight / 2) {
+            } else if (!placeBelow && spaceAbove > 0) {
                 // popup upwards
-                int height = Math.min(prefHeight, rect.getY());
+                int height = Math.min(prefHeight, spaceAbove);
                 y = rect.getY() - height;
                 padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, BOTTOM, -1);
             } else if (rect.getY() < availableHeight / 2) {
-                // popup over aligned with top of rect, but inset a few mm
+                // popup over aligned with top of rect, but inset a few
+                // mm. Fallback for the truly degenerate case where the
+                // rect fills the viewport top-to-bottom.
                 y = rect.getY() + CN.convertToPixels(3);
 
                 int height = Math.min(prefHeight, availableHeight - y);
