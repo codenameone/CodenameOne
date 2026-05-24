@@ -2794,7 +2794,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     s = new java.net.Socket();
                     s.connect(new java.net.InetSocketAddress("127.0.0.1", 11434), 250);
                     System.setProperty("cn1.ai.ollamaDetected", "true");
-                    com.codename1.io.Log.p("Ollama detected at localhost:11434 — "
+                    com.codename1.io.Log.p("Ollama detected at localhost:11434 -- "
                             + "set cn1.ai.simulatorRedirect=ollama to route LlmClient calls locally.");
                 } catch (Throwable ignored) {
                     // Not running; that's the normal case.

@@ -132,7 +132,7 @@ public class SecureStorage {
     // The methods above all gate reads on biometric authentication.
     // That is the right contract for refresh tokens and other things
     // the user actively unlocks, but it is the wrong contract for
-    // secrets that the app needs to read on every network call —
+    // secrets that the app needs to read on every network call --
     // notably LLM API keys, where prompting at chat-call time would
     // be unusable.
     //

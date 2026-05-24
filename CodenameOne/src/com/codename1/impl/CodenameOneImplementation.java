@@ -1537,14 +1537,26 @@ public abstract class CodenameOneImplementation {
     }
 
     public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
-                                       final com.codename1.media.RecognitionCallback callback) {
+                                       com.codename1.media.RecognitionCallback callback) {
         if (callback != null) {
-            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    callback.onError(new UnsupportedOperationException(
-                            "Speech recognition is not supported on this platform"));
-                }
-            });
+            com.codename1.ui.Display.getInstance().callSerially(
+                    new UnsupportedSpeechFallback(callback));
+        }
+    }
+
+    /// Static helper that fires the no-op fallback error on the EDT.
+    /// Named so SpotBugs' SIC_INNER_SHOULD_BE_STATIC_ANON doesn't
+    /// flag the equivalent anonymous Runnable.
+    private static final class UnsupportedSpeechFallback implements Runnable {
+        private final com.codename1.media.RecognitionCallback callback;
+
+        UnsupportedSpeechFallback(com.codename1.media.RecognitionCallback callback) {
+            this.callback = callback;
+        }
+
+        public void run() {
+            callback.onError(new UnsupportedOperationException(
+                    "Speech recognition is not supported on this platform"));
         }
     }
 
