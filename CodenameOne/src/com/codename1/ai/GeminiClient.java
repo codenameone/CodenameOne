@@ -51,9 +51,9 @@ class GeminiClient extends LlmClient {
         AsyncResource<ChatResponse> r = new AsyncResource<ChatResponse>();
         r.error(new UnsupportedOperationException(
                 "GeminiClient (native) is not yet implemented in this release. "
-              + "Use LlmClient.localOpenAiCompatible("
-              + "\"https://generativelanguage.googleapis.com/v1beta/openai\", apiKey, model) "
-              + "to reach Gemini through Google's OpenAI-compatible shim."));
+                + "Use LlmClient.localOpenAiCompatible("
+                + "\"https://generativelanguage.googleapis.com/v1beta/openai\", apiKey, model) "
+                + "to reach Gemini through Google's OpenAI-compatible shim."));
         return r;
     }
 
@@ -67,7 +67,7 @@ class GeminiClient extends LlmClient {
         AsyncResource<EmbeddingResponse> r = new AsyncResource<EmbeddingResponse>();
         r.error(new UnsupportedOperationException(
                 "GeminiClient.embed is not yet implemented. Use the OpenAI-compatible shim "
-              + "or LlmClient.openai(...) with text-embedding-3-small."));
+                + "or LlmClient.openai(...) with text-embedding-3-small."));
         return r;
     }
 

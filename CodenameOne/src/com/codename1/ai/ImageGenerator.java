@@ -75,7 +75,7 @@ public abstract class ImageGenerator {
                 AsyncResource<Image> out = new AsyncResource<Image>();
                 out.error(new UnsupportedOperationException(
                         "On-device image generation requires the cn1-ai-stablediffusion cn1lib. "
-                      + "Add it to your dependencies or use ImageGenerator.openai(...) instead."));
+                        + "Add it to your dependencies or use ImageGenerator.openai(...) instead."));
                 return out;
             }
         };
@@ -211,7 +211,7 @@ public abstract class ImageGenerator {
             // Replicate-compatible endpoint or the OpenAI path.
             result.error(new UnsupportedOperationException(
                     "Replicate's prediction API requires long-polling that is not implemented yet. "
-                  + "Use ImageGenerator.openai(...) or run a Replicate-compatible server behind LlmClient.localOpenAiCompatible(...)."));
+                    + "Use ImageGenerator.openai(...) or run a Replicate-compatible server behind LlmClient.localOpenAiCompatible(...)."));
             return result;
         }
     }

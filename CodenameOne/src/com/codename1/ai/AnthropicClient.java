@@ -52,7 +52,7 @@ class AnthropicClient extends LlmClient {
         AsyncResource<ChatResponse> r = new AsyncResource<ChatResponse>();
         r.error(new UnsupportedOperationException(
                 "AnthropicClient is not yet implemented in this release. "
-              + "Use LlmClient.openai(...) or run the model behind an OpenAI-compatible proxy."));
+                + "Use LlmClient.openai(...) or run the model behind an OpenAI-compatible proxy."));
         return r;
     }
 
@@ -66,7 +66,7 @@ class AnthropicClient extends LlmClient {
         AsyncResource<EmbeddingResponse> r = new AsyncResource<EmbeddingResponse>();
         r.error(new UnsupportedOperationException(
                 "Anthropic does not publish a first-party embeddings endpoint. "
-              + "Use a Voyage AI key via LlmClient.localOpenAiCompatible(\"https://api.voyageai.com/v1\", key, model)."));
+                + "Use a Voyage AI key via LlmClient.localOpenAiCompatible(\"https://api.voyageai.com/v1\", key, model)."));
         return r;
     }
 
