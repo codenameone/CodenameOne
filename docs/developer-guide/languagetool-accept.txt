@@ -504,3 +504,8 @@ pidof
 Keycloak
 Cognito
 Authentik
+
+# Codename One router & JS port — technical identifiers used in the Routing
+# and Deep Links chapters.
+parparvm
+assetlinks

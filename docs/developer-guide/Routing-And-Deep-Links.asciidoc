@@ -327,7 +327,7 @@ Router.getInstance().addLocationListener(new LocationListener() {
 });
 ----
 
-=== JavaScript port: browser history integration
+=== JavaScript port: Browser history integration
 
 On the JavaScript port the router can mirror its stack to `window.history` so
 the address bar shows the right URL and the browser's back button works:
@@ -351,7 +351,7 @@ Include the bundled JS shim alongside the parparvm runtime in the host page:
 Router as POP navigations; the Router pushes `history.pushState` entries on
 every push/replace.
 
-=== End-to-end recipe: a deep link opens a routed Form
+=== End-to-end recipe: A deep link opens a routed Form
 
 This recipe walks through the full flow from an external link tap to a routed
 Form with state preservation.

@@ -3,7 +3,7 @@
 [[tutorial-routing-top-section,Routing Tutorial Section]]
 This tutorial walks from an empty Codename One project to a working
 deep-linkable app with three Forms, route guards, a per-tab navigation
-shell, and `@Route` annotations validated at build time. It is meant to be
+shell, and `@Route` annotations validated at build time. It's meant to be
 read end-to-end the first time you reach for the router; once you have the
 shape in your head, the reference page at
 the *Routing & Deep Links* reference chapter is the working
@@ -195,7 +195,7 @@ treatment: a single combined error pointing at both offenders.
 === Step 5 — Add a `TabsForm` shell with per-tab stacks
 
 Build a bottom-tab navigator where each tab keeps its own stack. Pushing
-deeper inside one tab does not affect the others:
+deeper inside one tab doesn't affect the others:
 
 [source,java]
 ----
@@ -317,7 +317,7 @@ public void start() {
 When the user kills the app and reopens it, they land exactly where they
 left off. Combined with the deep-link handler above, the same code path
 handles both the cold-restart-from-prefs case and the launched-from-link
-case — they are both `Router.start(path)`.
+case — they're both `Router.start(path)`.
 
 === Where to next
 
