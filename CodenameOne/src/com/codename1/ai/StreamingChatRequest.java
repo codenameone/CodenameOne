@@ -78,8 +78,11 @@ abstract class StreamingChatRequest extends ConnectionRequest {
             // The framework will normally pump the body into `data`
             // and we map to an LlmException via handleErrorResponseCode.
             // Still drain so the body is captured.
+            // Util.readInputStream is documented to never return null;
+            // skip the redundant null guard to satisfy the static
+            // analyzer.
             byte[] body = com.codename1.io.Util.readInputStream(input);
-            String text = body == null ? "" : new String(body, "UTF-8");
+            String text = new String(body, "UTF-8");
             failWith(decoder.mapError(status, text));
             return;
         }
