@@ -7,6 +7,9 @@
     <booleanAttribute key="M2_OFFLINE" value="false"/>
     <stringAttribute key="M2_PROFILES" value=""/>
     <listAttribute key="M2_PROPERTIES">
+        <listEntry value="jansi.passthrough=false"/>
+        <listEntry value="jansi.strip=false"/>
+        <listEntry value="jansi.force=false"/>
         <listEntry value="codename1.platform=javase"/>
         <listEntry value="codename1.buildTarget=windows-desktop"/>
     </listAttribute>
