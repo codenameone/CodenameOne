@@ -34,7 +34,7 @@ import java.util.Map;
 /// from a blank slate; use [#newBuilder(OidcConfiguration)] to derive one from
 /// an existing instance.
 ///
-/// @since 8.0
+/// @since 7.1
 public final class OidcConfiguration {
 
     private final String issuer;

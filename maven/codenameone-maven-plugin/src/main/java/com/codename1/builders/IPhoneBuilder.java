@@ -877,6 +877,22 @@ public class IPhoneBuilder extends Executor {
         }
 
         
+        // OidcClient + SystemBrowser bootstrap: when the scanner saw any
+        // com.codename1.io.oidc.* reference, the port's
+        // OidcBrowserNativeImpl.init() must run before the app starts so
+        // SystemBrowser.getProvider() returns the iOS native bridge.
+        String integrateOidcBrowser = "";
+        if (usesOidc) {
+            integrateOidcBrowser =
+                "        com.codename1.io.oidc.OidcBrowserNativeImpl.init();\n";
+        }
+        // AppleSignIn bootstrap -- same mechanism, separate gate.
+        String integrateAppleSignIn = "";
+        if (usesAppleSignIn) {
+            integrateAppleSignIn =
+                "        com.codename1.social.AppleSignInNativeImpl.init();\n";
+        }
+
         String integrateGoogleConnect = "";
         if (useGoogleSignIn) {
             try {
@@ -1104,6 +1120,8 @@ public class IPhoneBuilder extends Executor {
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
+                    + integrateOidcBrowser
+                    + integrateAppleSignIn
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"

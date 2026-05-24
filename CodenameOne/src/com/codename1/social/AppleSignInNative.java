@@ -43,7 +43,7 @@ package com.codename1.social;
 /// populated on the **first** authorization (Apple does not re-send the
 /// profile on subsequent logins). The Java side persists them.
 ///
-/// @since 8.0
+/// @since 7.1
 public interface AppleSignInNative {
 
     /// `true` if this implementation is usable on the current device / OS

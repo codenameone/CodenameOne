@@ -31,10 +31,18 @@ import com.codename1.impl.ios.IOSImplementation;
  * live in {@code Ports/iOSPort/nativeSources/CN1AppleSignIn.m} and use
  * {@code ASAuthorizationAppleIDProvider} (iOS 13+).
  *
- * <p>Loaded by {@link com.codename1.social.AppleSignIn} via
- * {@code Class.forName("com.codename1.social.AppleSignInNativeImpl")}.
+ * <p>{@link #init()} is invoked from the generated iOS app stub by
+ * {@code IPhoneBuilder} when the scanner sees a reference to
+ * {@code com.codename1.social.AppleSignIn}. The build system obfuscates
+ * class names so {@code Class.forName} is unreliable; the port hands the
+ * instance directly to {@link AppleSignIn#setProvider}.
  */
 public class AppleSignInNativeImpl implements AppleSignInNative {
+
+    /** Invoked from the generated app stub at startup. */
+    public static void init() {
+        AppleSignIn.setProvider(new AppleSignInNativeImpl());
+    }
 
     public boolean isSupported() {
         return IOSImplementation.nativeInstance.appleSignInSupported();

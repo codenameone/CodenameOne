@@ -81,7 +81,7 @@ import java.util.Map;
 /// - **Implicit / hybrid / device flows.** Use the lower-level
 ///   [com.codename1.io.ConnectionRequest] APIs if you need those.
 ///
-/// @since 8.0
+/// @since 7.1
 public final class OidcClient {
 
     private final OidcConfiguration configuration;

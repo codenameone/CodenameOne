@@ -36,8 +36,9 @@ import com.codename1.util.SuccessCallback;
 import java.util.Map;
 
 /// `Sign in with Apple` for Codename One. Replaces the external
-/// `cn1-applesignin` library; that library is now deprecated and forwards to
-/// this class.
+/// `cn1-applesignin` library for new code; the cn1lib continues to work
+/// on its own (this class doesn't depend on it and doesn't forward to it
+/// -- they're independent implementations).
 ///
 /// Behavior by platform:
 ///
@@ -70,7 +71,7 @@ import java.util.Map;
 /// });
 /// ```
 ///
-/// @since 8.0
+/// @since 7.1
 public final class AppleSignIn extends Login {
 
     /// Apple's public OIDC issuer.
@@ -383,45 +384,27 @@ public final class AppleSignIn extends Login {
         return b.toString();
     }
 
-    private static final String PORT_IMPL_FQCN =
-            "com.codename1.social.AppleSignInNativeImpl";
+    private static AppleSignInNative provider;
 
-    // volatile is required by the double-checked locking idiom in
-    // lookupNative(); without it, threads can observe a half-initialised
-    // reference. This is the textbook DCL pattern, not the anti-pattern PMD
-    // is guarding against.
-    @SuppressWarnings("PMD.AvoidUsingVolatile")
-    private static volatile AppleSignInNative CACHED_NATIVE;
-    @SuppressWarnings("PMD.AvoidUsingVolatile")
-    private static volatile boolean NATIVE_PROBED;
-
-    /// Registers a custom [AppleSignInNative] for cn1lib authors who want to
-    /// plug in their own implementation (e.g. wrapping the
-    /// `AuthenticationServices` framework differently). Pass `null` to
-    /// revert to the port-provided default.
-    public static void setNative(AppleSignInNative provider) {
+    /// Registers the native [AppleSignInNative] implementation. Called at
+    /// app startup by the port (`AppleSignInNativeImpl.init()`); cn1lib
+    /// authors can also call this to plug in their own implementation, e.g.
+    /// wrapping the `AuthenticationServices` framework differently. Pass
+    /// `null` to fall back to the [com.codename1.io.oidc.OidcClient] web
+    /// flow.
+    ///
+    /// We use an explicit setter rather than `Class.forName` because
+    /// Codename One obfuscates class names; the port instantiates the impl
+    /// itself and passes the instance here.
+    public static void setProvider(AppleSignInNative p) {
         synchronized (AppleSignIn.class) {
-            CACHED_NATIVE = provider;
-            NATIVE_PROBED = true;
+            provider = p;
         }
     }
 
     private static AppleSignInNative lookupNative() {
-        if (NATIVE_PROBED) {
-            return CACHED_NATIVE;
-        }
         synchronized (AppleSignIn.class) {
-            if (NATIVE_PROBED) {
-                return CACHED_NATIVE;
-            }
-            try {
-                Class<?> cls = Class.forName(PORT_IMPL_FQCN);
-                CACHED_NATIVE = (AppleSignInNative) cls.newInstance();
-            } catch (Throwable t) {
-                CACHED_NATIVE = null;
-            }
-            NATIVE_PROBED = true;
-            return CACHED_NATIVE;
+            return provider;
         }
     }
 

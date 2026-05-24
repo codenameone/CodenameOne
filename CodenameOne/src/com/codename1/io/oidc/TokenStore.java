@@ -42,7 +42,7 @@ import java.util.Map;
 /// All methods are asynchronous and may run network or biometric prompts on
 /// the calling thread.
 ///
-/// @since 8.0
+/// @since 7.1
 public interface TokenStore {
 
     /// Reads previously-saved tokens for `key`, or completes with `null` if

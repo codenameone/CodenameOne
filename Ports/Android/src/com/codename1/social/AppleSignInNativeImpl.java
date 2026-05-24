@@ -39,6 +39,11 @@ package com.codename1.social;
  */
 public class AppleSignInNativeImpl implements AppleSignInNative {
 
+    /** Invoked from the generated Android app stub at startup. */
+    public static void init() {
+        AppleSignIn.setProvider(new AppleSignInNativeImpl());
+    }
+
     @Override
     public boolean isSupported() {
         return false;

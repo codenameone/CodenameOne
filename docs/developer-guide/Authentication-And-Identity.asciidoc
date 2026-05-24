@@ -2,14 +2,14 @@
 
 This chapter covers Codename One's modern sign-in stack: OpenID Connect, Sign in with Apple, Google, Facebook, Microsoft Entra ID, Auth0 and Firebase Authentication.
 
-The stack is rebuilt around two new primitives in Codename One 8.0:
+The stack is rebuilt around two new primitives:
 
 * `com.codename1.io.oidc.OidcClient` -- a full OpenID Connect / OAuth 2.0 client with PKCE, discovery, refresh and token persistence.
 * `com.codename1.io.oidc.SystemBrowser` -- routes the sign-in step through the platform's hardened sign-in surface (`ASWebAuthenticationSession` on iOS, Android Custom Tabs, the user's default browser on JavaSE / Web).
 
 Every provider-specific class is a thin layer on top of these primitives, so once you learn the underlying client you understand the whole stack.
 
-WARNING: The legacy `com.codename1.io.Oauth2` class is **deprecated** as of Codename One 8.0. It opens an in-app `WebBrowser`, which modern identity providers (Google, Apple, Microsoft, Facebook) now refuse to render -- they detect the embedded view and block the page. The new `OidcClient` works the same on every supported platform without that limitation. See <<migrating-from-oauth2>> for a migration recipe.
+WARNING: The legacy `com.codename1.io.Oauth2` class is **deprecated**. It opens an in-app `WebBrowser`, which modern identity providers (Google, Apple, Microsoft, Facebook) now refuse to render -- they detect the embedded view and block the page. The new `OidcClient` works the same on every supported platform without that limitation. See <<migrating-from-oauth2>> for a migration recipe.
 
 === Why the change
 

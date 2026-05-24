@@ -58,7 +58,7 @@ import java.util.Map;
 /// They are **not** encrypted-at-rest by default -- bring your own
 /// [com.codename1.io.oidc.TokenStore] strategy if that matters to you.
 ///
-/// @since 8.0
+/// @since 7.1
 public final class FirebaseAuth {
 
     private static final String PREF_ID = "cn1.firebase.idToken";

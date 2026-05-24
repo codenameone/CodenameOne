@@ -32,10 +32,18 @@ import com.codename1.impl.ios.IOSImplementation;
  * {@code Ports/iOSPort/nativeSources/CN1OidcBrowser.m} and use
  * {@code ASWebAuthenticationSession} (iOS 12+).
  *
- * <p>Loaded by {@link com.codename1.io.oidc.SystemBrowser} via
- * {@code Class.forName("com.codename1.io.oidc.OidcBrowserNativeImpl")}.
+ * <p>{@link #init()} is invoked from the generated iOS app stub by
+ * {@code IPhoneBuilder} when the classpath scanner sees any reference to
+ * {@code com.codename1.io.oidc.*}. The Codename One build system obfuscates
+ * class names so {@code Class.forName} is unreliable; the port hands the
+ * instance directly to {@link SystemBrowser#setProvider}.
  */
 public class OidcBrowserNativeImpl implements OidcBrowserNative {
+
+    /** Invoked from the generated app stub at startup. */
+    public static void init() {
+        SystemBrowser.setProvider(new OidcBrowserNativeImpl());
+    }
 
     public boolean isSupported() {
         return IOSImplementation.nativeInstance.oidcSystemBrowserSupported();

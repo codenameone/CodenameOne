@@ -36,7 +36,7 @@ import com.codename1.util.Base64;
 /// Microsoft both require it for mobile public clients and tolerate it for
 /// confidential clients.
 ///
-/// @since 8.0
+/// @since 7.1
 public final class PkceChallenge {
 
     /// Always `"S256"` -- the only value [OidcClient] emits. RFC 7636 also

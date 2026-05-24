@@ -72,6 +72,11 @@ import java.lang.reflect.Method;
  */
 public class OidcBrowserNativeImpl implements OidcBrowserNative {
 
+    /** Invoked from the generated Android app stub at startup. */
+    public static void init() {
+        SystemBrowser.setProvider(new OidcBrowserNativeImpl());
+    }
+
     /** Guards {@link #pendingScheme} / {@link #resultUrl} and acts as a wait monitor. */
     private static final Object LOCK = new Object();
 

@@ -285,6 +285,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesNfc;
     private boolean usesNfcHce;
     private boolean usesOidc;
+    private boolean usesAppleSignIn;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1285,6 +1286,10 @@ public class AndroidGradleBuilder extends Executor {
                     // the gradle dep gets pulled in (see further below).
                     if (!usesOidc && cls.indexOf("com/codename1/io/oidc/") == 0) {
                         usesOidc = true;
+                    }
+                    if (!usesAppleSignIn
+                            && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
+                        usesAppleSignIn = true;
                     }
                 }
 
@@ -4328,6 +4333,20 @@ public class AndroidGradleBuilder extends Executor {
                 retVal += "com.codename1.social.GoogleImpl.init();\n";
                 retVal += "com.codename1.impl.android.AndroidNativeUtil.addLifecycleListener((com.codename1.impl.android.LifecycleListener) com.codename1.social.GoogleConnect.getInstance());\n";
 
+        }
+
+        // OidcClient / SystemBrowser bootstrap on Android: register the
+        // Custom-Tabs-backed provider so the core SystemBrowser can route
+        // through it without falling back to BrowserWindow.
+        if (usesOidc) {
+            retVal += "com.codename1.io.oidc.OidcBrowserNativeImpl.init();\n";
+        }
+        // AppleSignIn bootstrap. Android's impl is a no-op stub that reports
+        // isSupported() = false, which makes AppleSignIn fall through to its
+        // OidcClient-backed web flow. We still register so the lookup is
+        // deterministic rather than relying on Class.forName.
+        if (usesAppleSignIn) {
+            retVal += "com.codename1.social.AppleSignInNativeImpl.init();\n";
         }
 
         if (request.getArg("android.web_loading_hidden", "false").equalsIgnoreCase("true")) {

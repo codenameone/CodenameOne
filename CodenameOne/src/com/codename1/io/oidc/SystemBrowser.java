@@ -48,21 +48,14 @@ import com.codename1.util.AsyncResource;
 /// preserves cookies for single sign-on, and integrates with password and
 /// passkey autofill.
 ///
-/// @since 8.0
+/// @since 7.1
 public final class SystemBrowser {
 
-    /// FQCN that ports drop on the classpath to provide a native
-    /// implementation. Loaded reflectively on first call to avoid a hard
-    /// link from core into platform classes.
-    private static final String PORT_IMPL_FQCN = "com.codename1.io.oidc.OidcBrowserNativeImpl";
-
-    // volatile is required for the double-checked locking pattern in
-    // lookupNative(); without it, threads can observe a half-initialised
-    // reference. Standard idiom -- PMD's blanket warning does not apply.
-    @SuppressWarnings("PMD.AvoidUsingVolatile")
-    private static volatile OidcBrowserNative cachedNative;
-    @SuppressWarnings("PMD.AvoidUsingVolatile")
-    private static volatile boolean nativeProbed;
+    /// Port-supplied implementation, registered at app startup. Reads /
+    /// writes are guarded by a synchronized block; no volatile required
+    /// because every observer goes through [#getProvider()] which performs
+    /// the synchronization itself.
+    private static OidcBrowserNative provider;
 
     private SystemBrowser() {}
 
@@ -71,18 +64,28 @@ public final class SystemBrowser {
     /// call falls back to an in-app [BrowserWindow]. Call this if you want
     /// to surface a clear UX warning to the user.
     public static boolean isNativeAvailable() {
-        OidcBrowserNative n = lookupNative();
+        OidcBrowserNative n = getProvider();
         return n != null && n.isSupported();
     }
 
-    /// Registers a custom [OidcBrowserNative] -- for cn1lib authors who want
-    /// to override the port-provided one, e.g. to wrap a 3rd-party SDK that
-    /// drives the OS sheet differently. Pass `null` to revert to the
-    /// port-provided default.
-    public static void setNative(OidcBrowserNative provider) {
+    /// Registers the native [OidcBrowserNative] implementation. Called at
+    /// app startup by the port (`OidcBrowserNativeImpl.init()`); cn1lib
+    /// authors can also call this to plug in their own implementation -- for
+    /// example to wrap a 3rd-party SDK that drives the OS sheet differently.
+    /// Pass `null` to revert to the [BrowserWindow] fallback.
+    ///
+    /// Class.forName-based lookup is intentionally avoided because
+    /// Codename One obfuscates class names; the port instead instantiates
+    /// the impl itself and passes the instance here.
+    public static void setProvider(OidcBrowserNative p) {
         synchronized (SystemBrowser.class) {
-            cachedNative = provider;
-            nativeProbed = true;
+            provider = p;
+        }
+    }
+
+    private static OidcBrowserNative getProvider() {
+        synchronized (SystemBrowser.class) {
+            return provider;
         }
     }
 
@@ -113,9 +116,9 @@ public final class SystemBrowser {
             throw new IllegalArgumentException("redirectUri must not be null");
         }
         final AsyncResource<String> out = new AsyncResource<String>();
-        OidcBrowserNative provider = lookupNative();
-        if (provider != null && provider.isSupported()) {
-            authenticateNative(provider, authorizationUrl, redirectUri, out);
+        OidcBrowserNative p = getProvider();
+        if (p != null && p.isSupported()) {
+            authenticateNative(p, authorizationUrl, redirectUri, out);
         } else {
             authenticateBrowserWindow(authorizationUrl, redirectUri, out);
         }
@@ -200,25 +203,6 @@ public final class SystemBrowser {
             show.run();
         } else {
             CN.callSerially(show);
-        }
-    }
-
-    private static OidcBrowserNative lookupNative() {
-        if (nativeProbed) {
-            return cachedNative;
-        }
-        synchronized (SystemBrowser.class) {
-            if (nativeProbed) {
-                return cachedNative;
-            }
-            try {
-                Class<?> cls = Class.forName(PORT_IMPL_FQCN);
-                cachedNative = (OidcBrowserNative) cls.newInstance();
-            } catch (Throwable t) {
-                cachedNative = null;
-            }
-            nativeProbed = true;
-            return cachedNative;
         }
     }
 
