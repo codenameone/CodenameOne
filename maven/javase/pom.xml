@@ -101,10 +101,15 @@
             <version>2.1.1e</version>
             <scope>provided</scope>
         </dependency>
+        <!-- JUnit Jupiter is "provided" so com.codename1.testing.junit.*
+             support classes compile against it, but downstream apps must
+             add their own JUnit dependency in test scope. This keeps the
+             simulator's runtime classpath free of JUnit for apps that
+             don't write JUnit tests. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
     <properties>
