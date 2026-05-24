@@ -3196,7 +3196,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // bytecode-emitted dispatch chain. Force-timeout so the rest of
   // the screenshot suite can finalize.
   "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  //"com_codenameone_examples_hellocodenameone_tests_ButtonThemeScreenshotTest": "themeScreenshot",
+  "com_codenameone_examples_hellocodenameone_tests_ButtonThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_TextFieldThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
   "com_codenameone_examples_hellocodenameone_tests_SwitchThemeScreenshotTest": "themeScreenshot",
@@ -3325,7 +3325,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "Base64NativePerformanceTest": "base64NativePerformance",
   "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
-  //"ButtonThemeScreenshotTest": "themeScreenshot",
+  "ButtonThemeScreenshotTest": "themeScreenshot",
   "TextFieldThemeScreenshotTest": "themeScreenshot",
   "CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
   "SwitchThemeScreenshotTest": "themeScreenshot",
