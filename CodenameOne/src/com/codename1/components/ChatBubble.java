@@ -28,7 +28,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.plaf.UIManager;
 
 /// One row in a [ChatView]. Renders a [ChatMessage] as a styled
 /// container holding a `TextArea` for the body text. Defaults the
@@ -123,16 +122,7 @@ public class ChatBubble extends Container {
         // TextArea in the constructor.
     }
 
-    @Override
-    protected void initComponent() {
-        super.initComponent();
-        // Honor any theme-driven UIID overrides at component-attach
-        // time. UIManager will pick up the user's CSS / .res theme.
-        UIManager um = UIManager.getInstance();
-        if (um != null) {
-            // The theme is consulted by the framework when styles
-            // are read; no explicit work needed beyond ensuring the
-            // UIID is set before this point.
-        }
-    }
+    // No initComponent() override needed -- the framework consults
+    // UIManager for the bubble's UIID-driven styles during the
+    // default attach lifecycle.
 }

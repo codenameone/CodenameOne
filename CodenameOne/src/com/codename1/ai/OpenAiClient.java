@@ -92,13 +92,10 @@ class OpenAiClient extends LlmClient {
                             result.complete(cr2);
                         }
                     });
-                } catch (Exception exc) {
-                    final Exception ex = exc;
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            result.error(new LlmException("Failed to parse response", ex));
-                        }
-                    });
+                } catch (java.io.IOException ex) {
+                    failParse(result, ex, "Failed to parse response");
+                } catch (RuntimeException ex) {
+                    failParse(result, ex, "Failed to parse response");
                 }
             }
 
@@ -120,7 +117,10 @@ class OpenAiClient extends LlmClient {
                 try {
                     byte[] d = getResponseData();
                     bodyText = d == null ? "" : new String(d, "UTF-8");
-                } catch (Exception ex) {
+                } catch (java.io.UnsupportedEncodingException ex) {
+                    // UTF-8 is universally available; this branch is
+                    // theoretical, but it satisfies the strict-catch
+                    // static analyzer.
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             result.error(new LlmNetworkException(err.getMessage(), err));
@@ -241,12 +241,10 @@ class OpenAiClient extends LlmClient {
                             result.complete(er);
                         }
                     });
-                } catch (final Exception ex) {
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            result.error(new LlmException("Failed to parse embedding response", ex));
-                        }
-                    });
+                } catch (java.io.IOException ex) {
+                    failParse(result, ex, "Failed to parse embedding response");
+                } catch (RuntimeException ex) {
+                    failParse(result, ex, "Failed to parse embedding response");
                 }
             }
 
@@ -434,5 +432,20 @@ class OpenAiClient extends LlmClient {
             return tc;
         }
         return c.getMode();
+    }
+
+    /// Shared error-fan-out for the post-response JSON parsers.
+    /// Wraps `t` in an `LlmException` with the given message and
+    /// completes the result on the EDT. Reused by the two catch
+    /// blocks (IOException + RuntimeException) we need to keep
+    /// the strict-catch static analyzer happy.
+    private static void failParse(final AsyncResource<?> result,
+                                  final Throwable t,
+                                  final String message) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                ((AsyncResource) result).error(new LlmException(message, t));
+            }
+        });
     }
 }

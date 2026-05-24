@@ -144,7 +144,9 @@ public abstract class ImageGenerator {
                                 result.complete(img);
                             }
                         });
-                    } catch (Exception ex) {
+                    } catch (java.io.IOException ex) {
+                        failOnEdt(result, new LlmException("Failed to decode image", ex));
+                    } catch (RuntimeException ex) {
                         failOnEdt(result, new LlmException("Failed to decode image", ex));
                     }
                 }
@@ -161,7 +163,8 @@ public abstract class ImageGenerator {
                     try {
                         byte[] d = getResponseData();
                         bodyText = d == null ? "" : new String(d, "UTF-8");
-                    } catch (Exception ignored) {
+                    } catch (java.io.UnsupportedEncodingException ignored) {
+                        // UTF-8 is universally available; defensive only.
                     }
                     failOnEdt(result, OpenAiSseDecoder.mapErrorStatic(sc, bodyText));
                 }
@@ -183,10 +186,11 @@ public abstract class ImageGenerator {
     // --------------------- Replicate ---------------------
 
     private static final class ReplicateImageGenerator extends ImageGenerator {
-        private final String apiKey;
-
         ReplicateImageGenerator(String apiKey) {
-            this.apiKey = apiKey == null ? "" : apiKey;
+            // apiKey is currently unused -- this generator is a
+            // scaffold pending long-poll support. The parameter is
+            // accepted so the factory signature stays stable when
+            // the real implementation lands.
         }
 
         public AsyncResource<Image> generate(GenerateImageRequest req) {

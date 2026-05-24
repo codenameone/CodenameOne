@@ -170,7 +170,10 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                     return new LlmContextLengthException(message, code, body);
                 }
             }
-        } catch (Exception ignored) {
+        } catch (java.io.IOException ignored) {
+            // Body wasn't valid JSON; fall through to status-only mapping.
+        } catch (RuntimeException ignored) {
+            // Cast / NPE while walking the error map; same fallback.
         }
         if (httpStatus == 401 || httpStatus == 403) {
             return new LlmAuthException(message, httpStatus, code, body);
