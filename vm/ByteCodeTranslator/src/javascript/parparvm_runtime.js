@@ -3143,7 +3143,13 @@ function cn1_ivResolve(target, mid) {
         cn1_s_fillText_java_lang_String_double_double: 1,
         cn1_s_strokeText_java_lang_String_double_double: 1,
         cn1_s_bezierCurveTo_double_double_double_double_double_double: 1,
-        cn1_s_quadraticCurveTo_double_double_double_double: 1
+        cn1_s_quadraticCurveTo_double_double_double_double: 1,
+        // drawImage with image + dest-rect (4 doubles) -- another paint
+        // op that fires on the broken Canvas2DContext.
+        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLImageElement_double_double_double_double: 1,
+        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLCanvasElement_double_double_double_double: 1,
+        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLImageElement_double_double: 1,
+        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLCanvasElement_double_double: 1
       };
       if (canvasVoidMethods[mid]) {
         return function*() { /* no-op for {} receiver */ };
