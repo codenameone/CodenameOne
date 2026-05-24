@@ -4514,27 +4514,18 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
   } else if (shouldUseDomFallback) {
     let capturedDataUrl = "";
     if (jvm && typeof jvm.invokeHostNative === "function") {
-      // Two-attempt loop: the canvas-capture path produces a noCanvas
-      // failure on its first call when the form has only just been
-      // attached to the DOM (the OffscreenCanvas hasn't transferred its
-      // backing buffer to the main thread yet). LWPicker / Validator
-      // / Toast all flake into noCanvas because of this. A second
-      // attempt with another force-present + extended ui-settle hop
-      // gives the main thread time to receive the canvas content.
-      for (let captureAttempt = 0; captureAttempt < 2 && !capturedDataUrl; captureAttempt++) {
-        try {
-          yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
-          yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
-            reason: "screenshot:" + normalizedTest + (captureAttempt > 0 ? ":retry" : ""),
-            maxFrames: 48,
-            stableFrames: 3,
-            quietFrames: 3
-          }]);
-          const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
-          capturedDataUrl = hostResult == null ? "" : String(hostResult);
-        } catch (_hostCaptureErr) {
-          capturedDataUrl = "";
-        }
+      try {
+        yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
+        yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+          reason: "screenshot:" + normalizedTest,
+          maxFrames: 48,
+          stableFrames: 3,
+          quietFrames: 3
+        }]);
+        const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+        capturedDataUrl = hostResult == null ? "" : String(hostResult);
+      } catch (_hostCaptureErr) {
+        capturedDataUrl = "";
       }
     }
     if (capturedDataUrl && capturedDataUrl.indexOf("data:image/") === 0) {
