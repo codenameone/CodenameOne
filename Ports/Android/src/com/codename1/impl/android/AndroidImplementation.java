@@ -9881,6 +9881,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    // Deeper-network connectivity platform factories. Each returns a small
+    // platform-specific class living under
+    // com.codename1.impl.android.connectivity. Those classes are loaded
+    // lazily on first call so apps that never reference WiFi / Bonjour /
+    // USB / NetworkTypeListener never pay the loading cost.
+
+    @Override
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new com.codename1.impl.android.connectivity.AndroidWifiPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.wifi.WifiDirectPlatform createWifiDirectPlatform() {
+        return new com.codename1.impl.android.connectivity.AndroidWifiDirectPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new com.codename1.impl.android.connectivity.AndroidBonjourPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.usb.UsbPlatform createUsbPlatform() {
+        return new com.codename1.impl.android.connectivity.AndroidUsbPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new com.codename1.impl.android.connectivity.AndroidNetworkTypePlatform();
+    }
+
     public String getCurrentAccessPoint() {
 
         ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);

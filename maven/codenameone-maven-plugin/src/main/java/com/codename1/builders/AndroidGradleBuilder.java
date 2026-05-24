@@ -315,6 +315,19 @@ public class AndroidGradleBuilder extends Executor {
     private boolean browserBookmarksPermissions;
     private boolean launcherPermissions;
 
+    // Deeper-network connectivity flags. Set by the classpath scanner when
+    // the app references com.codename1.io.wifi.* / com.codename1.io.bonjour.*
+    // / com.codename1.io.usb.* / NetworkManager.addNetworkTypeListener. The
+    // corresponding <uses-permission> / <uses-feature> elements are emitted
+    // further down based on these flags; apps that never touch the APIs see
+    // no change in their manifest.
+    private boolean usesWifiInfo;
+    private boolean usesWifiManagement;
+    private boolean usesWifiDirect;
+    private boolean usesBonjour;
+    private boolean usesUsbHost;
+    private boolean usesNetworkTypeListener;
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -1278,6 +1291,32 @@ public class AndroidGradleBuilder extends Executor {
                             usesNfcHce = true;
                         }
                     }
+
+                    // Deeper-network connectivity: each subpackage maps to a
+                    // distinct permission set. The scanner sets booleans; the
+                    // injection block below builds the manifest fragments only
+                    // for the flags that fired.
+                    if (cls.indexOf("com/codename1/io/wifi/WiFiDirect") == 0) {
+                        usesWifiDirect = true;
+                        usesWifiInfo = true;
+                    } else if (cls.indexOf("com/codename1/io/wifi/") == 0) {
+                        usesWifiInfo = true;
+                        if (cls.endsWith("WiFi")) {
+                            // The umbrella WiFi class references both info
+                            // and management methods; tag management so the
+                            // CHANGE_WIFI_STATE permission is injected too.
+                            usesWifiManagement = true;
+                        }
+                    }
+                    if (cls.indexOf("com/codename1/io/bonjour/") == 0) {
+                        usesBonjour = true;
+                    }
+                    if (cls.indexOf("com/codename1/io/usb/") == 0) {
+                        usesUsbHost = true;
+                    }
+                    if (cls.equals("com/codename1/io/NetworkTypeListener")) {
+                        usesNetworkTypeListener = true;
+                    }
                 }
 
 
@@ -1365,6 +1404,23 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/contacts/ContactsManager") == 0 && method.indexOf("deleteContact") > -1) {
                         contactsWritePermission = true;
                     }
+                    // WiFi scan implies management. We detect the method
+                    // rather than just the class so that apps that only read
+                    // SSID/BSSID (no scan) do not pick up CHANGE_WIFI_STATE.
+                    if (cls.equals("com/codename1/io/wifi/WiFi")
+                            && (method.indexOf("scan") > -1
+                                || method.indexOf("connect") > -1
+                                || method.indexOf("disconnect") > -1)) {
+                        usesWifiManagement = true;
+                    }
+                    // NetworkManager.addNetworkTypeListener is the active
+                    // signal; reading getCurrentNetworkType alone needs only
+                    // ACCESS_NETWORK_STATE which we'd already inject via
+                    // accessNetworkStatePermission below.
+                    if (cls.equals("com/codename1/io/NetworkManager")
+                            && method.indexOf("NetworkTypeListener") > -1) {
+                        usesNetworkTypeListener = true;
+                    }
                 }
             });
         } catch (IOException ex) {
@@ -1407,6 +1463,53 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (!xPermissions.contains("android.hardware.nfc.hce")) {
                 xPermissions = "    <uses-feature android:name=\"android.hardware.nfc.hce\" android:required=\"false\" />\n" + xPermissions;
+            }
+        }
+
+        // Deeper-network connectivity permission injection. Each block is
+        // gated on a flag set by the scanner above so apps that never touch
+        // the API see no manifest change. Permissions are "normal" or
+        // "runtime"; runtime permissions still need the app to call
+        // Display.requestPermission at runtime -- the manifest entry only
+        // makes them eligible to ask.
+        if (usesWifiInfo || usesWifiManagement || usesWifiDirect || usesBonjour
+                || usesNetworkTypeListener) {
+            if (!xPermissions.contains("android.permission.ACCESS_WIFI_STATE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />\n" + xPermissions;
+            }
+            if (!xPermissions.contains("android.permission.ACCESS_NETWORK_STATE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />\n" + xPermissions;
+            }
+        }
+        if (usesWifiManagement || usesWifiDirect) {
+            if (!xPermissions.contains("android.permission.CHANGE_WIFI_STATE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.CHANGE_WIFI_STATE\" />\n" + xPermissions;
+            }
+            if (!xPermissions.contains("android.permission.CHANGE_NETWORK_STATE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\" />\n" + xPermissions;
+            }
+            // Reading the SSID/BSSID on Android 8.0+ requires a location
+            // permission; on 13+ the dedicated NEARBY_WIFI_DEVICES permission
+            // can replace it for scan-only flows. We declare both with
+            // appropriate maxSdkVersion so the right one is requested per OS.
+            if (!xPermissions.contains("android.permission.ACCESS_FINE_LOCATION")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"32\" />\n" + xPermissions;
+            }
+            if (targetSDKVersionInt >= 33
+                    && !xPermissions.contains("android.permission.NEARBY_WIFI_DEVICES")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.NEARBY_WIFI_DEVICES\" android:usesPermissionFlags=\"neverForLocation\" />\n" + xPermissions;
+            }
+        }
+        if (usesBonjour) {
+            if (!xPermissions.contains("android.permission.CHANGE_WIFI_MULTICAST_STATE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />\n" + xPermissions;
+            }
+            // INTERNET is already in basePermissions and Bonjour over IPv6
+            // multicast inherits it transparently, so nothing extra needed.
+        }
+        if (usesUsbHost) {
+            if (!xPermissions.contains("android.hardware.usb.host")) {
+                xPermissions = "    <uses-feature android:name=\"android.hardware.usb.host\" android:required=\"false\" />\n" + xPermissions;
             }
         }
 

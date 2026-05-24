@@ -12463,6 +12463,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEWifiPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.wifi.WifiDirectPlatform createWifiDirectPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEWifiDirectPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEBonjourPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSENetworkTypePlatform();
+    }
+
+    @Override
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
