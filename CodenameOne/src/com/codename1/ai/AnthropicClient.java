@@ -42,10 +42,12 @@ class AnthropicClient extends LlmClient {
         this.apiKey = apiKey;
     }
 
+    @Override
     public String getProvider() {
         return "anthropic";
     }
 
+    @Override
     public AsyncResource<ChatResponse> chat(ChatRequest req) {
         AsyncResource<ChatResponse> r = new AsyncResource<ChatResponse>();
         r.error(new UnsupportedOperationException(
@@ -54,10 +56,12 @@ class AnthropicClient extends LlmClient {
         return r;
     }
 
+    @Override
     public AsyncResource<ChatResponse> chatStream(ChatRequest req, StreamingListener listener) {
         return chat(req);
     }
 
+    @Override
     public AsyncResource<EmbeddingResponse> embed(EmbeddingRequest req) {
         AsyncResource<EmbeddingResponse> r = new AsyncResource<EmbeddingResponse>();
         r.error(new UnsupportedOperationException(

@@ -31,6 +31,7 @@ import com.codename1.util.Base64;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,7 @@ public abstract class ImageGenerator {
         // `NativeLookup.register(...)` when it ships, but for the
         // base framework we just return a no-op stub.
         return new ImageGenerator() {
+            @Override
             public AsyncResource<Image> generate(GenerateImageRequest req) {
                 AsyncResource<Image> out = new AsyncResource<Image>();
                 out.error(new UnsupportedOperationException(
@@ -90,6 +92,7 @@ public abstract class ImageGenerator {
             this.apiKey = apiKey == null ? "" : apiKey;
         }
 
+        @Override
         public AsyncResource<Image> generate(GenerateImageRequest req) {
             final AsyncResource<Image> result = new AsyncResource<Image>();
             final byte[] body;
@@ -99,8 +102,12 @@ public abstract class ImageGenerator {
                 root.put("prompt", req.getPrompt());
                 root.put("n", Integer.valueOf(req.getCount()));
                 root.put("size", req.getSize());
-                if (req.getStyle() != null) root.put("style", req.getStyle());
-                if (req.getQuality() != null) root.put("quality", req.getQuality());
+                if (req.getStyle() != null) {
+                    root.put("style", req.getStyle());
+                }
+                if (req.getQuality() != null) {
+                    root.put("quality", req.getQuality());
+                }
                 // b64_json keeps the request self-contained; the
                 // alternative `url` requires a second fetch and
                 // expires after an hour, which is hostile to caching.
@@ -140,11 +147,12 @@ public abstract class ImageGenerator {
                         byte[] bytes = Base64.decode(b64.getBytes("UTF-8"));
                         final Image img = Image.createImage(bytes, 0, bytes.length);
                         Display.getInstance().callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 result.complete(img);
                             }
                         });
-                    } catch (java.io.IOException ex) {
+                    } catch (IOException ex) {
                         failOnEdt(result, new LlmException("Failed to decode image", ex));
                     } catch (RuntimeException ex) {
                         failOnEdt(result, new LlmException("Failed to decode image", ex));
@@ -163,7 +171,7 @@ public abstract class ImageGenerator {
                     try {
                         byte[] d = getResponseData();
                         bodyText = d == null ? "" : new String(d, "UTF-8");
-                    } catch (java.io.UnsupportedEncodingException ignored) {
+                    } catch (UnsupportedEncodingException ignored) {
                         // UTF-8 is universally available; defensive only.
                     }
                     failOnEdt(result, OpenAiSseDecoder.mapErrorStatic(sc, bodyText));
@@ -186,6 +194,7 @@ public abstract class ImageGenerator {
     // --------------------- Replicate ---------------------
 
     private static final class ReplicateImageGenerator extends ImageGenerator {
+        @SuppressWarnings("PMD.UnusedFormalParameter")
         ReplicateImageGenerator(String apiKey) {
             // apiKey is currently unused -- this generator is a
             // scaffold pending long-poll support. The parameter is
@@ -193,6 +202,7 @@ public abstract class ImageGenerator {
             // the real implementation lands.
         }
 
+        @Override
         public AsyncResource<Image> generate(GenerateImageRequest req) {
             AsyncResource<Image> result = new AsyncResource<Image>();
             // Replicate's "predictions" API is async/polled; full
@@ -208,6 +218,7 @@ public abstract class ImageGenerator {
 
     private static void failOnEdt(final AsyncResource<Image> result, final Throwable t) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 result.error(t);
             }

@@ -91,10 +91,7 @@ public final class RetryPolicy {
             // 5xx server errors typically reflect transient state.
             return true;
         }
-        if (t instanceof LlmNetworkException) {
-            return true;
-        }
-        return false;
+        return t instanceof LlmNetworkException;
     }
 
     /// Returns the delay to wait before the next attempt, honouring

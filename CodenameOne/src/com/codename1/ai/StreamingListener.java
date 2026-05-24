@@ -58,16 +58,20 @@ public interface StreamingListener {
 
     /// No-op default implementation. Subclass and override only what
     /// you need.
-    public static class Adapter implements StreamingListener {
+    class Adapter implements StreamingListener {
+        @Override
         public void onContentDelta(String textDelta) {
         }
 
+        @Override
         public void onToolCallDelta(int index, String id, String name, String argumentsFragment) {
         }
 
+        @Override
         public void onUsage(Usage usage) {
         }
 
+        @Override
         public void onError(Throwable t) {
         }
     }

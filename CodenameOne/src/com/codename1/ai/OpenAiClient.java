@@ -29,6 +29,7 @@ import com.codename1.util.AsyncResource;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,10 +51,12 @@ class OpenAiClient extends LlmClient {
         this.defaultModel = m;
     }
 
+    @Override
     public String getProvider() {
         return "openai";
     }
 
+    @Override
     public AsyncResource<ChatResponse> chat(ChatRequest req) {
         final AsyncResource<ChatResponse> result = new AsyncResource<ChatResponse>();
         String reject = runSafetyFilter(req);
@@ -88,11 +91,12 @@ class OpenAiClient extends LlmClient {
                     Map root = JsonHelper.parseObject(data);
                     final ChatResponse cr2 = OpenAiSseDecoder.parseNonStreaming(root);
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             result.complete(cr2);
                         }
                     });
-                } catch (java.io.IOException ex) {
+                } catch (IOException ex) {
                     failParse(result, ex, "Failed to parse response");
                 } catch (RuntimeException ex) {
                     failParse(result, ex, "Failed to parse response");
@@ -107,6 +111,7 @@ class OpenAiClient extends LlmClient {
                     sc = getResponseCode();
                 } catch (Throwable ignore) {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             result.error(new LlmNetworkException(err.getMessage(), err));
                         }
@@ -117,11 +122,12 @@ class OpenAiClient extends LlmClient {
                 try {
                     byte[] d = getResponseData();
                     bodyText = d == null ? "" : new String(d, "UTF-8");
-                } catch (java.io.UnsupportedEncodingException ex) {
+                } catch (UnsupportedEncodingException ex) {
                     // UTF-8 is universally available; this branch is
                     // theoretical, but it satisfies the strict-catch
                     // static analyzer.
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             result.error(new LlmNetworkException(err.getMessage(), err));
                         }
@@ -130,6 +136,7 @@ class OpenAiClient extends LlmClient {
                 }
                 final LlmException mapped = OpenAiSseDecoder.mapErrorStatic(sc, bodyText);
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         result.error(mapped);
                     }
@@ -141,6 +148,7 @@ class OpenAiClient extends LlmClient {
         return result;
     }
 
+    @Override
     public AsyncResource<ChatResponse> chatStream(ChatRequest req, StreamingListener listener) {
         final AsyncResource<ChatResponse> result = new AsyncResource<ChatResponse>();
         String reject = runSafetyFilter(req);
@@ -171,6 +179,7 @@ class OpenAiClient extends LlmClient {
         // AsyncResource is Observable and fires `setChanged()` from
         // cancel(), complete(), and error(); we only act on cancellation.
         result.addObserver(new java.util.Observer() {
+            @Override
             public void update(java.util.Observable o, Object arg) {
                 if (result.isCancelled()) {
                     scr.kill();
@@ -180,6 +189,7 @@ class OpenAiClient extends LlmClient {
         return result;
     }
 
+    @Override
     public AsyncResource<EmbeddingResponse> embed(EmbeddingRequest req) {
         final AsyncResource<EmbeddingResponse> result = new AsyncResource<EmbeddingResponse>();
         final byte[] body;
@@ -237,11 +247,12 @@ class OpenAiClient extends LlmClient {
                     final EmbeddingResponse er = new EmbeddingResponse(out, u,
                             JsonHelper.string(root, "model"));
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             result.complete(er);
                         }
                     });
-                } catch (java.io.IOException ex) {
+                } catch (IOException ex) {
                     failParse(result, ex, "Failed to parse embedding response");
                 } catch (RuntimeException ex) {
                     failParse(result, ex, "Failed to parse embedding response");
@@ -252,6 +263,7 @@ class OpenAiClient extends LlmClient {
             protected void handleException(Exception errIn) {
                 final Exception err = errIn;
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         result.error(new LlmNetworkException(err.getMessage(), err));
                     }
@@ -304,11 +316,21 @@ class OpenAiClient extends LlmClient {
             so.put("include_usage", Boolean.TRUE);
             root.put("stream_options", so);
         }
-        if (req.getTemperature() != null) root.put("temperature", req.getTemperature());
-        if (req.getMaxTokens() != null) root.put("max_tokens", req.getMaxTokens());
-        if (req.getTopP() != null) root.put("top_p", req.getTopP());
-        if (req.getSeed() != null) root.put("seed", req.getSeed());
-        if (!req.getStopSequences().isEmpty()) root.put("stop", req.getStopSequences());
+        if (req.getTemperature() != null) {
+            root.put("temperature", req.getTemperature());
+        }
+        if (req.getMaxTokens() != null) {
+            root.put("max_tokens", req.getMaxTokens());
+        }
+        if (req.getTopP() != null) {
+            root.put("top_p", req.getTopP());
+        }
+        if (req.getSeed() != null) {
+            root.put("seed", req.getSeed());
+        }
+        if (!req.getStopSequences().isEmpty()) {
+            root.put("stop", req.getStopSequences());
+        }
         if (req.getResponseFormat() == ResponseFormat.JSON_OBJECT) {
             Map<String, Object> rf = new HashMap<String, Object>();
             rf.put("type", "json_object");
@@ -443,6 +465,7 @@ class OpenAiClient extends LlmClient {
                                   final Throwable t,
                                   final String message) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 ((AsyncResource) result).error(new LlmException(message, t));
             }

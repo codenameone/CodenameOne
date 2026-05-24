@@ -38,6 +38,7 @@ public interface SafetyFilter {
     /// (in `com.codename1.ai.filters` or a separate cn1lib) for the
     /// OpenAI Moderation gate.
     SafetyFilter ALLOW_ALL = new SafetyFilter() {
+        @Override
         public String check(List<ChatMessage> messages) {
             return null;
         }

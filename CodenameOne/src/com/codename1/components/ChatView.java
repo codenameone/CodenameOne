@@ -100,6 +100,7 @@ public class ChatView extends Container {
     public ChatBubble addMessage(final ChatMessage message) {
         final ChatBubble[] out = new ChatBubble[1];
         Runnable r = new Runnable() {
+            @Override
             public void run() {
                 ChatBubble b = createBubble(message);
                 history.add(message);
@@ -144,6 +145,7 @@ public class ChatView extends Container {
 
     public void setTypingIndicatorVisible(final boolean v) {
         Runnable r = new Runnable() {
+            @Override
             public void run() {
                 typing.setVisible(v);
                 typing.getParent().revalidateLater();
@@ -184,6 +186,7 @@ public class ChatView extends Container {
     /// initial system message you've already supplied) participate.
     public void bindToLlm(final LlmClient client, final ChatRequest baseRequest) {
         setOnSend(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 final String text = input.getText();
                 if (text == null || text.length() == 0) {
@@ -198,24 +201,29 @@ public class ChatView extends Container {
                         .build();
                 AsyncResource<ChatResponse> result = client.chatStream(replay,
                         new StreamingListener() {
+                            @Override
                             public void onContentDelta(String textDelta) {
                                 assistant.appendText(textDelta);
                             }
 
+                            @Override
                             public void onToolCallDelta(int index, String id, String name, String argumentsFragment) {
                                 // Default binding doesn't surface
                                 // tool calls -- apps that use tools
                                 // should wire up their own handler.
                             }
 
+                            @Override
                             public void onUsage(Usage usage) {
                             }
 
+                            @Override
                             public void onError(Throwable t) {
                                 assistant.appendText("\n\n[error: " + t.getMessage() + "]");
                             }
                         });
                 result.ready(new SuccessCallback<ChatResponse>() {
+                    @Override
                     public void onSucess(ChatResponse arg) {
                         setTypingIndicatorVisible(false);
                     }

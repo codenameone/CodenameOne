@@ -64,6 +64,7 @@ public class ChatBubble extends Container {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 applyText(text);
             }
@@ -86,6 +87,7 @@ public class ChatBubble extends Container {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 applyText(body.getText() + delta);
             }
@@ -107,9 +109,15 @@ public class ChatBubble extends Container {
     }
 
     private static String defaultUiidFor(Role role) {
-        if (role == Role.USER) return "ChatBubbleUser";
-        if (role == Role.ASSISTANT) return "ChatBubbleAssistant";
-        if (role == Role.SYSTEM) return "ChatBubbleSystem";
+        if (role == Role.USER) {
+            return "ChatBubbleUser";
+        }
+        if (role == Role.ASSISTANT) {
+            return "ChatBubbleAssistant";
+        }
+        if (role == Role.SYSTEM) {
+            return "ChatBubbleSystem";
+        }
         return "ChatBubble";
     }
 

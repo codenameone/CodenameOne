@@ -72,16 +72,19 @@ public class ChatInput extends Container {
         // Pressing Enter (or "Done" on a mobile soft keyboard) acts
         // like tapping Send.
         field.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 fireSendIfNonEmpty();
             }
         });
         send.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 fireSendIfNonEmpty();
             }
         });
         attach.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (onAttach != null) {
                     onAttach.actionPerformed(new ActionEvent(ChatInput.this));
@@ -89,6 +92,7 @@ public class ChatInput extends Container {
             }
         });
         voice.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (onVoice != null) {
                     onVoice.actionPerformed(new ActionEvent(ChatInput.this));

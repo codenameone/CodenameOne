@@ -39,6 +39,10 @@ import java.util.Map;
 final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
 
     private final String requestedModel;
+    // The decoder accumulates tokens for a single short-lived SSE
+    // stream; not a long-running container that risks growing
+    // unbounded -- AvoidStringBufferField doesn't apply here.
+    @SuppressWarnings("PMD.AvoidStringBufferField")
     private final StringBuilder content = new StringBuilder();
     private final List<StreamingToolCall> toolCalls = new ArrayList<StreamingToolCall>();
     private String finishReason;
@@ -49,6 +53,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
         this.requestedModel = requestedModel;
     }
 
+    @Override
     public void consume(String dataPayload, final StreamingListener listener) throws Exception {
         Map root = JsonHelper.parseObject(dataPayload);
         if (root == null) {
@@ -66,6 +71,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                     JsonHelper.intValue(u, "total_tokens", -1));
             final Usage emit = usage;
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     listener.onUsage(emit);
                 }
@@ -94,6 +100,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
             content.append(contentDelta);
             final String emit = contentDelta;
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     listener.onContentDelta(emit);
                 }
@@ -101,8 +108,9 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
         }
         List<Object> tcs = JsonHelper.asList(delta.get("tool_calls"));
         if (tcs != null) {
-            for (int i = 0; i < tcs.size(); i++) {
-                Map tc = JsonHelper.asMap(tcs.get(i));
+            int i = 0;
+            for (Object rawTc : tcs) {
+                Map tc = JsonHelper.asMap(rawTc);
                 final int idx = JsonHelper.intValue(tc, "index", i);
                 while (toolCalls.size() <= idx) {
                     toolCalls.add(new StreamingToolCall());
@@ -125,18 +133,20 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 final String emitName = name;
                 final String emitArgs = argsFrag == null ? "" : argsFrag;
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         listener.onToolCallDelta(idx, emitId, emitName, emitArgs);
                     }
                 });
+                i++;
             }
         }
     }
 
+    @Override
     public ChatResponse finish() {
         List<ToolCall> calls = new ArrayList<ToolCall>(toolCalls.size());
-        for (int i = 0; i < toolCalls.size(); i++) {
-            StreamingToolCall sc = toolCalls.get(i);
+        for (StreamingToolCall sc : toolCalls) {
             calls.add(new ToolCall(sc.id, sc.name, sc.arguments.toString()));
         }
         ChatMessage assistant = new ChatMessage(Role.ASSISTANT,
@@ -148,6 +158,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 modelUsed == null ? requestedModel : modelUsed);
     }
 
+    @Override
     public LlmException mapError(int httpStatus, String body) {
         return mapErrorStatic(httpStatus, body);
     }
@@ -215,8 +226,8 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 }
                 List<Object> tcs = JsonHelper.asList(msg.get("tool_calls"));
                 if (tcs != null) {
-                    for (int i = 0; i < tcs.size(); i++) {
-                        Map tc = JsonHelper.asMap(tcs.get(i));
+                    for (Object rawTc : tcs) {
+                        Map tc = JsonHelper.asMap(rawTc);
                         Map fn = JsonHelper.asMap(tc.get("function"));
                         toolCalls.add(new ToolCall(
                                 JsonHelper.string(tc, "id"),
@@ -242,6 +253,9 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
     private static final class StreamingToolCall {
         String id;
         String name;
+        // Accumulates argument fragments for one tool call only;
+        // same justification as `content` above.
+        @SuppressWarnings("PMD.AvoidStringBufferField")
         StringBuilder arguments = new StringBuilder();
     }
 }

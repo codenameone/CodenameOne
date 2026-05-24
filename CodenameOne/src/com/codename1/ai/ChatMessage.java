@@ -118,8 +118,7 @@ public final class ChatMessage {
     /// rendering when you don't care about multi-modal content.
     public String getText() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.size(); i++) {
-            MessagePart p = parts.get(i);
+        for (MessagePart p : parts) {
             if (p instanceof TextPart) {
                 if (sb.length() > 0) {
                     sb.append('\n');

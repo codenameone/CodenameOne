@@ -23,6 +23,7 @@
 package com.codename1.ai;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
@@ -147,6 +148,7 @@ abstract class StreamingChatRequest extends ConnectionRequest {
 
     private void completeWith(final ChatResponse r) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (!result.isDone()) {
                     result.complete(r);
@@ -157,11 +159,15 @@ abstract class StreamingChatRequest extends ConnectionRequest {
 
     private void failWith(final Throwable t) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (listener != null) {
                     try {
                         listener.onError(t);
                     } catch (Throwable ignore) {
+                        // Listener errors are swallowed so the
+                        // AsyncResource.error below still fires.
+                        Log.e(ignore);
                     }
                 }
                 if (!result.isDone()) {

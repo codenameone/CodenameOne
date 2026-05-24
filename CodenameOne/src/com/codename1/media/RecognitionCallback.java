@@ -44,16 +44,20 @@ public interface RecognitionCallback {
     void onError(Throwable t);
 
     /// No-op adapter. Subclass and override only what you need.
-    public static class Adapter implements RecognitionCallback {
+    class Adapter implements RecognitionCallback {
+        @Override
         public void onPartialResult(String transcript) {
         }
 
+        @Override
         public void onResult(String transcript, float confidence, String[] alternatives) {
         }
 
+        @Override
         public void onEnd() {
         }
 
+        @Override
         public void onError(Throwable t) {
         }
     }

@@ -26,7 +26,6 @@ import com.codename1.io.Storage;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,14 +105,14 @@ public final class ConversationStore {
             return new ArrayList<ChatMessage>();
         }
         List<ChatMessage> out = new ArrayList<ChatMessage>(serialized.size());
-        for (int i = 0; i < serialized.size(); i++) {
-            Map jm = JsonHelper.asMap(serialized.get(i));
+        for (Object rawJm : serialized) {
+            Map jm = JsonHelper.asMap(rawJm);
             Role role = parseRole(JsonHelper.string(jm, "role"));
             List<MessagePart> parts = new ArrayList<MessagePart>();
             List<Object> jparts = JsonHelper.asList(jm.get("parts"));
             if (jparts != null) {
-                for (int j = 0; j < jparts.size(); j++) {
-                    Map jp = JsonHelper.asMap(jparts.get(j));
+                for (Object rawJp : jparts) {
+                    Map jp = JsonHelper.asMap(rawJp);
                     String kind = JsonHelper.string(jp, "kind");
                     if (KIND_TOOL_RESULT.equals(kind)) {
                         parts.add(new ToolResultPart(
@@ -139,15 +138,13 @@ public final class ConversationStore {
     }
 
     private static Role parseRole(String name) {
-        if (name == null) return Role.USER;
+        if (name == null) {
+            return Role.USER;
+        }
         try {
             return Role.valueOf(name);
         } catch (IllegalArgumentException iae) {
             return Role.USER;
         }
     }
-
-    // Suppress unused-import warning for Arrays in some toolchains.
-    @SuppressWarnings("unused")
-    private static final Object[] UNUSED = new Object[]{Arrays.class};
 }

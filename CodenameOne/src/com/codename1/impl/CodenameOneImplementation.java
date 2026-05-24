@@ -1539,7 +1539,7 @@ public abstract class CodenameOneImplementation {
     public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
                                        com.codename1.media.RecognitionCallback callback) {
         if (callback != null) {
-            com.codename1.ui.Display.getInstance().callSerially(
+            Display.getInstance().callSerially(
                     new UnsupportedSpeechFallback(callback));
         }
     }
@@ -1554,6 +1554,7 @@ public abstract class CodenameOneImplementation {
             this.callback = callback;
         }
 
+        @Override
         public void run() {
             callback.onError(new UnsupportedOperationException(
                     "Speech recognition is not supported on this platform"));
