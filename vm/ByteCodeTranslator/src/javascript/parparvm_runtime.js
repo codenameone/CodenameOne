@@ -3110,7 +3110,40 @@ function cn1_ivResolve(target, mid) {
         cn1_s_setTransform_double_double_double_double_double_double: 1,
         // rect() with 4 doubles -- drainPendingDisplayFrame line 2314
         // ``context.rect(cropX, cropY, cropW, cropH)`` is the call site.
-        cn1_s_rect_double_double_double_double: 1
+        cn1_s_rect_double_double_double_double: 1,
+        // Canvas2D state setters (called heavily during paint). Each is
+        // a single-arg setter so no-op-with-return-null is safe.
+        cn1_s_setFillStyle_java_lang_String: 1,
+        cn1_s_setStrokeStyle_java_lang_String: 1,
+        cn1_s_setLineWidth_double: 1,
+        cn1_s_setGlobalAlpha_double: 1,
+        cn1_s_setFont_java_lang_String: 1,
+        cn1_s_setTextAlign_java_lang_String: 1,
+        cn1_s_setTextBaseline_java_lang_String: 1,
+        cn1_s_setLineCap_java_lang_String: 1,
+        cn1_s_setLineJoin_java_lang_String: 1,
+        cn1_s_setMiterLimit_double: 1,
+        cn1_s_setShadowBlur_double: 1,
+        cn1_s_setShadowColor_java_lang_String: 1,
+        cn1_s_setShadowOffsetX_double: 1,
+        cn1_s_setShadowOffsetY_double: 1,
+        cn1_s_setGlobalCompositeOperation_java_lang_String: 1,
+        // Canvas2D drawing methods (also called heavily during paint).
+        cn1_s_fillRect_double_double_double_double: 1,
+        cn1_s_strokeRect_double_double_double_double: 1,
+        cn1_s_clearRect_double_double_double_double: 1,
+        cn1_s_moveTo_double_double: 1,
+        cn1_s_lineTo_double_double: 1,
+        cn1_s_arc_double_double_double_double_double_boolean: 1,
+        cn1_s_arc_double_double_double_double_double: 1,
+        cn1_s_translate_double_double: 1,
+        cn1_s_rotate_double: 1,
+        cn1_s_scale_double_double: 1,
+        cn1_s_transform_double_double_double_double_double_double: 1,
+        cn1_s_fillText_java_lang_String_double_double: 1,
+        cn1_s_strokeText_java_lang_String_double_double: 1,
+        cn1_s_bezierCurveTo_double_double_double_double_double_double: 1,
+        cn1_s_quadraticCurveTo_double_double_double_double: 1
       };
       if (canvasVoidMethods[mid]) {
         return function*() { /* no-op for {} receiver */ };
