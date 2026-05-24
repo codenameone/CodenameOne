@@ -26,6 +26,18 @@
 (function (global) {
   "use strict";
 
+  // The Codename One JavaScript port runs the translated bytecode inside a Web
+  // Worker, and its bundler imports every .js file that lands in the build
+  // output (including this one) via `importScripts`. The worker context has no
+  // `document` or page-level history API, so accessing them here would crash
+  // the worker before the app boots. Bail out cleanly when this shim is
+  // imported anywhere other than the main browser page.
+  if (typeof document === "undefined"
+      || typeof global.addEventListener !== "function"
+      || typeof global.history === "undefined") {
+    return;
+  }
+
   var CODE = 0x43524831; // "CRH1"
 
   function currentPath() {
