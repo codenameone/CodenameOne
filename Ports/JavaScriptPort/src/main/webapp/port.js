@@ -3231,7 +3231,16 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // 80bfa41de) tracked separately from the chunk-emit fix. Skip
   // these charts under a distinct reason so the cause is obvious in
   // CI logs.
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
+  // Un-parked after wrapJsObject class-wipe fix landed: the previous
+  // logic at parparvm_runtime.js wrapJsObject unconditionally
+  // overwrote cached wrapper.__class with whatever inferJsObjectClass
+  // returned, including null. Re-wrapping the same Document value via
+  // a host-bridge round-trip without ``__cn1HostClass`` set wiped its
+  // class, and the next ``cn1_s_createElement`` virtual dispatch
+  // failed with receiverClass=null, cascading through every chart
+  // that ran later. The fix preserves the cached class when the new
+  // resolution is null.
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
   "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
@@ -3312,7 +3321,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   // on master in #4875 (8582151ec). The chart short-names below stay
   // until the canvas-accumulation / Document-wrapper-staleness bug
   // tracked under "chartDocumentStaleness" is resolved.
-  "ChartDoughnutScreenshotTest": "chartDocumentStaleness",
+  //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   "ChartRadarScreenshotTest": "chartDocumentStaleness",
   "ChartTimeChartScreenshotTest": "chartDocumentStaleness",
   "ChartCombinedXYScreenshotTest": "chartDocumentStaleness",

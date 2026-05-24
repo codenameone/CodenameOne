@@ -1766,31 +1766,27 @@ const jvm = {
     const resolvedClass = this.inferJsObjectClass(value, expectedClass);
     const classDef = this.classes[resolvedClass] || this.classes[expectedClass] || null;
     if (wrapper) {
-      // Diagnostic: log when a cached wrapper's __class transitions from a
-      // truthy value to null/undefined. Targets the chartDocumentStaleness
-      // bug (task #43): late-suite VIRTUAL_FAIL with receiverClass=null on
-      // cn1_s_createElement etc. We don't yet know whether the wipe happens
-      // here or somewhere else, so this log surfaces the wipe at this site
-      // if it does occur. Rate-limited globally to 30 lines to avoid
-      // flooding successful boots.
-      if (wrapper.__class && !resolvedClass) {
-        if (!jvm._classWipeLogged) jvm._classWipeLogged = 0;
-        if (jvm._classWipeLogged < 30) {
-          jvm._classWipeLogged++;
-          try {
-            const hostCls = value && value.__cn1HostClass ? value.__cn1HostClass : 'none';
-            const expCls = expectedClass || 'none';
-            const wrapperId = wrapper.__id != null ? wrapper.__id : 'noid';
-            vmDiag('CLASS_WIPE', 'prior', String(wrapper.__class));
-            vmDiag('CLASS_WIPE', 'expected', String(expCls));
-            vmDiag('CLASS_WIPE', 'hostClass', String(hostCls));
-            vmDiag('CLASS_WIPE', 'wrapperId', String(wrapperId));
-          } catch (_e) {}
-        }
+      // Preserve a cached wrapper's existing __class when re-wrapping the
+      // same value returns a less-specific (or unresolvable) class. Root
+      // cause of the chartDocumentStaleness cascade (task #43): when the
+      // late-suite Document wrapper is re-resolved via @JSBody host calls
+      // that pass through host-ref markers without __cn1HostClass set,
+      // inferJsObjectClass falls back to ``null``. Overwriting __class with
+      // null turns the cached Document wrapper into a typeless object;
+      // subsequent ``cn1_s_createElement`` virtual dispatch reads
+      // receiver.__class as null and emits VIRTUAL_FAIL ... receiverClass=null
+      // -- the entire chart suite tail then cascades through that null.
+      //
+      // The cached wrapper's prior class is the authoritative answer (it
+      // was resolved when the value first entered the worker with full
+      // host-ref context). Only widen it -- never narrow to null.
+      if (!wrapper.__class || resolvedClass) {
+        wrapper.__class = resolvedClass || wrapper.__class;
       }
-      wrapper.__class = resolvedClass;
-      this.enhanceJsWrapper(wrapper, resolvedClass);
-      if (expectedClass && expectedClass !== resolvedClass) {
+      if (resolvedClass) {
+        this.enhanceJsWrapper(wrapper, resolvedClass);
+      }
+      if (expectedClass && expectedClass !== wrapper.__class) {
         this.enhanceJsWrapper(wrapper, expectedClass);
       }
       return wrapper;
