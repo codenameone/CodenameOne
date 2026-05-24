@@ -1525,6 +1525,50 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    // -----------------------------------------------------------------
+    // Speech recognition + Text-to-speech hooks
+    //
+    // Default to no-op so existing platform ports compile unchanged.
+    // iOS / Android / JavaSE override these in their own impl classes.
+    // -----------------------------------------------------------------
+
+    public boolean speechRecognitionIsSupported() {
+        return false;
+    }
+
+    public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
+                                       final com.codename1.media.RecognitionCallback callback) {
+        if (callback != null) {
+            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    callback.onError(new UnsupportedOperationException(
+                            "Speech recognition is not supported on this platform"));
+                }
+            });
+        }
+    }
+
+    public void stopSpeechRecognition() {
+        // No-op: platforms with no recognizer have nothing to stop.
+    }
+
+    public boolean textToSpeechIsSupported() {
+        return false;
+    }
+
+    public void textToSpeechSpeak(String text, com.codename1.media.TtsOptions options) {
+        // No-op fallback: apps can probe textToSpeechIsSupported()
+        // first; calling speak() on an unsupported platform is silent
+        // by design so simulator/test code paths keep flowing.
+    }
+
+    public void textToSpeechStop() {
+    }
+
+    public String[] textToSpeechAvailableVoices() {
+        return new String[0];
+    }
+
 /// Translates the X/Y location for drawing on the underlying surface. Translation
     /// is incremental so the new value will be added to the current translation and
     /// in order to reset translation we have to invoke
