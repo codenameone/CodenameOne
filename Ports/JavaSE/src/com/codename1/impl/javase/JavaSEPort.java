@@ -2770,9 +2770,161 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    
-    
-    
+    // -----------------------------------------------------------------
+    // Simulator AI helpers: Ollama detection + best-effort TTS via OS
+    // command. These run only on JavaSE; mobile platforms get proper
+    // native impls in their own ports.
+    // -----------------------------------------------------------------
+
+    private static volatile boolean cn1AiOllamaProbeStarted;
+
+    /// Fires a quick TCP probe at the loopback Ollama port. Sets the
+    /// `cn1.ai.ollamaDetected` system property to `"true"` when the
+    /// server is reachable so [com.codename1.ai.LlmClient]'s
+    /// simulator-redirect can route there automatically.
+    private static void probeOllamaAsync() {
+        if (cn1AiOllamaProbeStarted) {
+            return;
+        }
+        cn1AiOllamaProbeStarted = true;
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                java.net.Socket s = null;
+                try {
+                    s = new java.net.Socket();
+                    s.connect(new java.net.InetSocketAddress("127.0.0.1", 11434), 250);
+                    System.setProperty("cn1.ai.ollamaDetected", "true");
+                    com.codename1.io.Log.p("Ollama detected at localhost:11434 -- "
+                            + "set cn1.ai.simulatorRedirect=ollama to route LlmClient calls locally.");
+                } catch (Throwable ignored) {
+                    // Not running; that's the normal case.
+                } finally {
+                    if (s != null) {
+                        try { s.close(); } catch (Throwable ignored) {}
+                    }
+                }
+            }
+        }, "cn1-ai-ollama-probe");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    @Override
+    public boolean textToSpeechIsSupported() {
+        // On macOS the `say` binary ships with the OS. On Linux we
+        // require `espeak`/`espeak-ng` to be installed. On Windows
+        // we shell out to PowerShell's System.Speech (XP+). Detect
+        // lazily on first call so startup cost stays at zero for
+        // apps that never use TTS.
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("mac")) {
+            return true;
+        }
+        if (os.contains("win")) {
+            return true;
+        }
+        if (os.contains("linux") || os.contains("nix") || os.contains("nux")) {
+            return probeBinary("espeak") || probeBinary("espeak-ng");
+        }
+        return false;
+    }
+
+    @Override
+    public void textToSpeechSpeak(final String text, final com.codename1.media.TtsOptions options) {
+        if (text == null || text.length() == 0) {
+            return;
+        }
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+                java.util.List<String> cmd = new java.util.ArrayList<String>();
+                if (os.contains("mac")) {
+                    cmd.add("say");
+                    if (options != null && options.getVoiceId() != null) {
+                        cmd.add("-v");
+                        cmd.add(options.getVoiceId());
+                    }
+                    cmd.add(text);
+                } else if (os.contains("win")) {
+                    String escaped = text.replace("'", "''");
+                    cmd.add("powershell");
+                    cmd.add("-Command");
+                    cmd.add("Add-Type -AssemblyName System.Speech; "
+                            + "(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('"
+                            + escaped + "')");
+                } else {
+                    cmd.add(probeBinary("espeak-ng") ? "espeak-ng" : "espeak");
+                    cmd.add(text);
+                }
+                try {
+                    new ProcessBuilder(cmd).inheritIO().start().waitFor();
+                } catch (Throwable err) {
+                    com.codename1.io.Log.p("TTS failed: " + err.getMessage());
+                }
+            }
+        }, "cn1-tts");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    @Override
+    public void textToSpeechStop() {
+        // Best-effort: kill any active `say` / `espeak`. On Windows
+        // we can't reach the spawned PowerShell process easily; for
+        // most desktop workflows that's acceptable since utterances
+        // are typically short.
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        try {
+            if (os.contains("mac")) {
+                new ProcessBuilder("killall", "say").redirectErrorStream(true).start();
+            } else if (os.contains("linux") || os.contains("nix") || os.contains("nux")) {
+                new ProcessBuilder("pkill", "-x", "espeak").redirectErrorStream(true).start();
+                new ProcessBuilder("pkill", "-x", "espeak-ng").redirectErrorStream(true).start();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String[] textToSpeechAvailableVoices() {
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (!os.contains("mac")) {
+            // `say -v ?` is the only one of the three platforms that
+            // exposes a structured voice list. Linux espeak's list
+            // is voluminous and not portable; Windows PowerShell
+            // SAPI list query is slow. Return empty rather than
+            // pretending.
+            return new String[0];
+        }
+        try {
+            Process p = new ProcessBuilder("say", "-v", "?").redirectErrorStream(true).start();
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream(), "UTF-8"));
+            java.util.List<String> voices = new java.util.ArrayList<String>();
+            String line;
+            while ((line = r.readLine()) != null) {
+                int spaceIdx = line.indexOf(' ');
+                if (spaceIdx > 0) {
+                    voices.add(line.substring(0, spaceIdx));
+                }
+            }
+            p.waitFor();
+            return voices.toArray(new String[voices.size()]);
+        } catch (Throwable t) {
+            return new String[0];
+        }
+    }
+
+    private static boolean probeBinary(String name) {
+        try {
+            Process p = new ProcessBuilder("which", name).redirectErrorStream(true).start();
+            p.waitFor();
+            return p.exitValue() == 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void loadSkinFile(InputStream skin, final JFrame frm) {
         try {
             ZipInputStream z = new ZipInputStream(skin);
@@ -6552,6 +6704,10 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void init(Object m) {
         inInit = true;
+
+        // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
+        // can detect a local Ollama install without blocking startup.
+        probeOllamaAsync();
 
 /*        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
         if(!updater.exists()) {
