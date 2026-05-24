@@ -3149,8 +3149,23 @@ function cn1_ivResolve(target, mid) {
         cn1_s_drawImage_com_codename1_html5_js_dom_HTMLImageElement_double_double_double_double: 1,
         cn1_s_drawImage_com_codename1_html5_js_dom_HTMLCanvasElement_double_double_double_double: 1,
         cn1_s_drawImage_com_codename1_html5_js_dom_HTMLImageElement_double_double: 1,
-        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLCanvasElement_double_double: 1
+        cn1_s_drawImage_com_codename1_html5_js_dom_HTMLCanvasElement_double_double: 1,
+        // setFillStyle / setStrokeStyle with gradient or pattern (not just String).
+        cn1_s_setFillStyle_com_codename1_html5_js_canvas_CanvasPattern: 1,
+        cn1_s_setFillStyle_com_codename1_html5_js_canvas_CanvasGradient: 1,
+        cn1_s_setStrokeStyle_com_codename1_html5_js_canvas_CanvasPattern: 1,
+        cn1_s_setStrokeStyle_com_codename1_html5_js_canvas_CanvasGradient: 1
       };
+      // Prefix-match for any setFillStyle / setStrokeStyle overload we
+      // haven't enumerated yet -- the Canvas2D setter pattern is uniform
+      // across overloads and no-op is always safe (void return).
+      if (!canvasVoidMethods[mid]
+          && (typeof mid === 'string')
+          && (mid.indexOf('cn1_s_setFillStyle_') === 0
+              || mid.indexOf('cn1_s_setStrokeStyle_') === 0
+              || mid.indexOf('cn1_s_drawImage_') === 0)) {
+        return function*() { return null; };
+      }
       if (canvasVoidMethods[mid]) {
         return function*() { /* no-op for {} receiver */ };
       }
