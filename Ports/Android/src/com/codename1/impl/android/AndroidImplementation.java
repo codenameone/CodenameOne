@@ -7733,6 +7733,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){
+        share(text, image, mimeType, sourceRect, null);
+    }
+
+    @Override
+    public void share(String text, String image, String mimeType, Rectangle sourceRect, final com.codename1.share.ShareResultListener listener) {
         /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
             return;
         }*/
@@ -7750,7 +7755,81 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(image)));
             shareIntent.putExtra(Intent.EXTRA_TEXT, text);
         }
-        getContext().startActivity(Intent.createChooser(shareIntent, "Share with..."));
+
+        Intent chooser;
+        try {
+            if (listener != null && android.os.Build.VERSION.SDK_INT >= 22) {
+                chooser = buildShareChooserWithCallback(shareIntent, listener);
+            } else {
+                chooser = Intent.createChooser(shareIntent, "Share with...");
+            }
+        } catch (Throwable t) {
+            // Fall back to the plain chooser, then synthesise a listener
+            // result so the app does not hang on an unfulfilled callback.
+            chooser = Intent.createChooser(shareIntent, "Share with...");
+            if (listener != null) {
+                listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
+            }
+        }
+        getContext().startActivity(chooser);
+    }
+
+    private static int nextShareReceiverId = 1;
+
+    @TargetApi(22)
+    private Intent buildShareChooserWithCallback(Intent shareIntent, final com.codename1.share.ShareResultListener listener) {
+        final Context appCtx = getContext().getApplicationContext();
+        final String action = appCtx.getPackageName() + ".CN1_SHARE_CHOSEN." + (nextShareReceiverId++);
+        // The receiver fires once when the user picks a target. Android
+        // does not expose a dismissal signal for the chooser, so the
+        // listener simply does not fire on user-cancel (see comment
+        // further down).
+        final boolean[] delivered = new boolean[1];
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context ctx, Intent intent) {
+                if (delivered[0]) return;
+                delivered[0] = true;
+                try { appCtx.unregisterReceiver(this); } catch (Throwable ignore) {}
+                String pkg = null;
+                try {
+                    android.content.ComponentName cn = intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT);
+                    if (cn != null) pkg = cn.getPackageName();
+                } catch (Throwable ignore) {}
+                listener.onResult(com.codename1.share.ShareResult.sharedTo(pkg));
+            }
+        };
+        IntentFilter filter = new IntentFilter(action);
+        boolean registered = false;
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            // RECEIVER_EXPORTED = 0x2 -- constant exists at runtime on
+            // API 33+ but is not present in older android.jar build deps,
+            // so call the 3-arg overload via reflection to stay source-
+            // compatible.
+            try {
+                java.lang.reflect.Method m = Context.class.getMethod(
+                        "registerReceiver", BroadcastReceiver.class, IntentFilter.class, int.class);
+                m.invoke(appCtx, receiver, filter, Integer.valueOf(0x2));
+                registered = true;
+            } catch (Throwable ignore) {}
+        }
+        if (!registered) {
+            appCtx.registerReceiver(receiver, filter);
+        }
+        // Android's chooser IntentSender callback never fires on
+        // dismissal: there is no public API to observe a user-cancel.
+        // Apps that need a dismissal signal must use Activity-resume.
+
+        Intent pi = new Intent(action).setPackage(appCtx.getPackageName());
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            // FLAG_MUTABLE was introduced in API 31; its numeric value
+            // (0x02000000) is referenced here directly so the source
+            // still compiles against pre-31 android.jar build deps.
+            piFlags |= 0x02000000;
+        }
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(appCtx, 0, pi, piFlags);
+        return Intent.createChooser(shareIntent, "Share with...", pendingIntent.getIntentSender());
     }
 
     /**

@@ -25,6 +25,8 @@ package com.codename1.components;
 import com.codename1.share.EmailShare;
 import com.codename1.share.FacebookShare;
 import com.codename1.share.SMSShare;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
 import com.codename1.share.ShareService;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
@@ -76,6 +78,7 @@ public class ShareButton extends Button implements ActionListener {
     private String textToShare;
     private String imageToShare;
     private String imageMimeType;
+    private ShareResultListener shareResultListener;
 
     /// Default constructor
     public ShareButton() {
@@ -133,6 +136,26 @@ public class ShareButton extends Button implements ActionListener {
         shareServices.addElement(share);
     }
 
+    /// Listener invoked once when the underlying share sheet (native or
+    /// fallback dialog) finishes. May be `null` to clear a prior
+    /// listener.
+    ///
+    /// On platforms that cannot observe the chosen target the listener
+    /// still fires with [ShareResult#sharedTo] passing a `null` package
+    /// name, so the app can resume its flow.
+    ///
+    /// #### Since
+    ///
+    /// 9.0
+    public void setShareResultListener(ShareResultListener listener) {
+        this.shareResultListener = listener;
+    }
+
+    /// Returns the listener registered via [#setShareResultListener] or null.
+    public ShareResultListener getShareResultListener() {
+        return shareResultListener;
+    }
+
     /// invoked when the button is pressed
     ///
     /// #### Parameters
@@ -145,13 +168,14 @@ public class ShareButton extends Button implements ActionListener {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
+                final ShareResultListener listener = shareResultListener;
                 if (Display.getInstance().isNativeShareSupported()) {
                     Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(
                             ShareButton.this.getAbsoluteX(),
                             ShareButton.this.getAbsoluteY(),
                             ShareButton.this.getWidth(),
                             ShareButton.this.getHeight()
-                    ));
+                    ), listener);
                     return;
                 }
                 Vector sharing;
@@ -171,17 +195,27 @@ public class ShareButton extends Button implements ActionListener {
                     share.setMessage(textToShare);
                     share.setImage(imageToShare, imageMimeType);
                     share.setOriginalForm(getComponentForm());
+                    share.setShareResultListener(listener);
                 }
                 List l = new List(sharing);
                 l.setCommandList(true);
                 final Dialog dialog = new Dialog("Share");
                 dialog.setLayout(new BorderLayout());
                 dialog.addComponent(BorderLayout.CENTER, l);
-                dialog.placeButtonCommands(new Command[]{new Command("Cancel")});
+                final boolean[] picked = new boolean[1];
+                dialog.placeButtonCommands(new Command[]{new Command("Cancel") {
+                    @Override
+                    public void actionPerformed(ActionEvent ev) {
+                        if (!picked[0] && listener != null) {
+                            listener.onResult(ShareResult.dismissed());
+                        }
+                    }
+                }});
                 l.addActionListener(new ActionListener() {
 
                     @Override
                     public void actionPerformed(ActionEvent evt) {
+                        picked[0] = true;
                         dialog.dispose();
                     }
                 });

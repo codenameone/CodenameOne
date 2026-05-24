@@ -9428,22 +9428,72 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){
-        if(image != null && image.length() > 0) {
+        share(text, image, mimeType, sourceRect, null);
+    }
+
+    @Override
+    public void share(String text, String image, String mimeType, Rectangle sourceRect, com.codename1.share.ShareResultListener listener) {
+        long imagePeer = 0;
+        if (image != null && image.length() > 0) {
             try {
                 Image img = Image.createImage(image);
-                if(img == null) {
-                    nativeInstance.socialShare(text, 0, sourceRect );
+                if (img != null) {
+                    NativeImage n = (NativeImage) img.getImage();
+                    imagePeer = n.peer;
+                }
+            } catch (IOException err) {
+                err.printStackTrace();
+                if (listener != null) {
+                    listener.onResult(com.codename1.share.ShareResult.failed("Error loading image: " + image));
                     return;
                 }
-                NativeImage n = (NativeImage)img.getImage();
-                nativeInstance.socialShare(text, n.peer, sourceRect);
-            } catch(IOException err) {
-                err.printStackTrace();
                 Dialog.show("Error", "Error loading image: " + image, "OK", null);
+                return;
             }
-        } else {
-            nativeInstance.socialShare(text, 0, sourceRect);
         }
+        if (listener == null) {
+            nativeInstance.socialShare(text, imagePeer, sourceRect);
+            return;
+        }
+        int callbackId = registerShareCallback(listener);
+        nativeInstance.socialShareWithCallback(text, imagePeer, sourceRect, callbackId);
+    }
+
+    // Pending share-result callbacks. Native code invokes
+    // socialShareCallback(...) once per id.
+    private static final java.util.HashMap<Integer, com.codename1.share.ShareResultListener> pendingShareCallbacks = new java.util.HashMap<Integer, com.codename1.share.ShareResultListener>();
+    private static int nextShareCallbackId = 1;
+
+    private static synchronized int registerShareCallback(com.codename1.share.ShareResultListener l) {
+        int id = nextShareCallbackId++;
+        pendingShareCallbacks.put(Integer.valueOf(id), l);
+        return id;
+    }
+
+    /// Invoked from native code with the outcome of a share. Public so the
+    /// VM-emitted symbol stays stable. `status` matches
+    /// [com.codename1.share.ShareResult]: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
+    public static void socialShareCallback(int callbackId, int status, String activityType, String errorMessage) {
+        com.codename1.share.ShareResultListener listener;
+        synchronized (IOSImplementation.class) {
+            listener = pendingShareCallbacks.remove(Integer.valueOf(callbackId));
+        }
+        if (listener == null) {
+            return;
+        }
+        com.codename1.share.ShareResult result;
+        switch (status) {
+            case 1:
+                result = com.codename1.share.ShareResult.sharedTo(activityType);
+                break;
+            case 2:
+                result = com.codename1.share.ShareResult.dismissed();
+                break;
+            default:
+                result = com.codename1.share.ShareResult.failed(errorMessage);
+                break;
+        }
+        listener.onResult(result);
     }
 
     private Purchase pur;

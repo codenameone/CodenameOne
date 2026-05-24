@@ -2278,6 +2278,118 @@ image::img/components-sharebutton-android.png[The share button running on the An
 
 IMPORTANT: The `ShareButton` features some share service classes to allow plugging in more share services. For example, this functionality is relevant to devices where native sharing isn't supported. This code isn't used on iOS/Android...
 
+==== Share Result Callback
+
+Since version 9.0 the share API can report what the user did with the share sheet. Register a `ShareResultListener` on either `ShareButton` or directly with `Display.share(...)` and you receive a single `ShareResult` describing the outcome:
+
+* `SHARED_TO(packageName)` -- the user picked a destination. `packageName` is the chosen target's identifier: an Android package name (e.g. `com.whatsapp`) or, on iOS, a `UIActivityType` such as `com.apple.UIKit.activity.PostToTwitter`. It may be `null` when the platform does not expose the selection (e.g. older Android, Web Share API).
+* `DISMISSED` -- the user cancelled without picking a target. iOS reports this reliably; Android's chooser has no public dismissal signal, so on Android the listener simply does not fire on cancel.
+* `FAILED` -- the share could not be completed. `getError()` may carry a short platform-supplied message.
+
+The listener is always invoked on the EDT, exactly once per share request.
+
+[source,java]
+----
+ShareButton sb = new ShareButton();
+sb.setTextToShare("Check this out!");
+sb.setShareResultListener(result -> {
+    if (result.isSharedTo()) {
+        Log.p("Shared to " + result.getPackageName());
+    } else if (result.isDismissed()) {
+        Log.p("User dismissed the share sheet");
+    } else if (result.isFailed()) {
+        Log.p("Share failed: " + result.getError());
+    }
+});
+form.add(sb);
+----
+
+If you call `Display` directly instead of using `ShareButton`, pass the listener as the final argument to the new overload:
+
+[source,java]
+----
+Display.getInstance().share(
+        "Check this out!", imagePath, "image/png", sourceRect,
+        result -> handleResult(result));
+----
+
+When the share is dispatched through the non-native fallback dialog (platforms without `isNativeShareSupported`), the listener still fires: it reports `DISMISSED` when the user picks the Cancel button, and the underlying `ShareService` implementations report `SHARED_TO` once they call `ShareService.finish()`. Custom `ShareService` subclasses can call `deliverResult(ShareResult.failed("..."))` from inside `share(...)` to publish a failure explicitly; otherwise `finish()` falls back to a default `SHARED_TO(commandName)`.
+
+[[ios-share-extension-section]]
+=== iOS Share Extension Authoring Helper
+
+An iOS *share extension* is a separate app target that the system shows inside `UIActivityViewController` when the user shares from another app (Safari, Photos, etc.). It runs in a sandboxed process and persists payloads to the host app via an *App Group* shared `NSUserDefaults` suite.
+
+Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project (see `IPhoneBuilder.extractAppExtensions`). The `IOSShareExtensionBuilder` helper, added in version 9.0, generates that archive for you so you do not have to create the extension target in Xcode first.
+
+==== What the helper produces
+
+For a single call the helper writes four files at the root of the extension bundle:
+
+* `Info.plist` -- declares the `NSExtension` dictionary, activation rules (`SupportsText` / `SupportsWebURL` / `SupportsImage`), and the principal class (`ShareViewController`).
+* `<ExtensionName>.entitlements` -- declares `com.apple.security.application-groups` with the configured App Group identifier.
+* `ShareViewController.swift` -- a `SLComposeServiceViewController` subclass that extracts text / URL / image attachments from `extensionContext`, packs them into a dictionary, and writes that dictionary to `UserDefaults(suiteName: appGroupId)` under the key `cn1.shareExtension.payload`.
+* `buildSettings.properties` -- Xcode build setting overrides (deployment target, Swift version, entitlements path, plist path) picked up by `IPhoneBuilder`.
+
+==== Generating the bundle
+
+Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
+
+[source,java]
+----
+import com.codename1.util.IOSShareExtensionBuilder;
+
+new IOSShareExtensionBuilder()
+        .setExtensionName("MyShareExtension")
+        .setDisplayName("Share to MyApp")
+        .setHostBundleId("com.example.myapp")
+        .setAppGroupId("group.com.example.myapp.shared")
+        .acceptText(true)
+        .acceptURLs(true)
+        .acceptImages(true)
+        .writeAppext(new File("src/main/resources/MyShareExtension.ios.appext"));
+----
+
+The next iOS build picks up the `.ios.appext` archive automatically; no Xcode steps are required.
+
+If you prefer a directory layout (for example, to commit the generated sources or to feed a future `ios/app_extensions/` pipeline) use `writeTo(File)` instead of `writeAppext(File)` -- the file contents are identical.
+
+==== Reading the payload from the host app
+
+The host app reads the most recent payload from the same App Group at startup or when it resumes:
+
+[source,objective-c]
+----
+// Inside an iOS native interface
+NSUserDefaults* shared =
+    [[NSUserDefaults alloc] initWithSuiteName:@"group.com.example.myapp.shared"];
+NSDictionary* payload = [shared dictionaryForKey:@"cn1.shareExtension.payload"];
+----
+
+The payload dictionary contains:
+
+* `text` -- the user-composed text (`String`).
+* `items` -- an array of `{ kind, value }` dictionaries where `kind` is `"text"`, `"url"` or `"image"`. For images, `value` is a file URL inside the App Group container.
+* `timestamp` -- a `Double` UNIX time.
+
+Expose this to your CN1 code via a small native interface and clear the key once handled so the next share is unambiguous.
+
+==== Activation rules and validation
+
+The builder validates its inputs before writing anything:
+
+* `extensionName` must be a non-empty identifier (letters, digits, `_`, `-`). It becomes the Xcode target name and the `.appex` bundle name. The extension's bundle id is set to `<hostBundleId>.<extensionName>` by `IPhoneBuilder`.
+* `appGroupId` must start with `group.` (an Apple requirement). Create the matching App Group in your Apple Developer account and add it to both the host app's and the extension's provisioning profile.
+* At least one of `acceptText`, `acceptURLs`, `acceptImages` must be enabled, otherwise iOS will never present your extension.
+
+The default deployment target is iOS 12.0; override with `setDeploymentTarget("13.0")` if you need newer APIs in your customised controller.
+
+==== Customising the generated controller
+
+The generated Swift controller covers the common case (read attachments, persist to App Group, finish the request). If you need bespoke logic -- custom UI, server upload, image transcoding -- treat the helper's output as a starting point: run it once, copy the directory under `ios/app_extensions/MyShareExtension/`, edit `ShareViewController.swift`, and zip it back into `.ios.appext` (or wait for the directory-based pipeline tracked by issue #3427).
+
+NOTE: Provisioning profiles for the extension target are not generated by the helper. You still need to provision the extension's bundle id (`<hostBundleId>.<extensionName>`) and add the App Group capability to it on the Apple Developer portal, alongside the host app.
+
 === Tabs
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html[Tabs] `Container` arranges components into groups within "tabbed" containers. `Tabs` is a container type that allows leafing through its children using labeled toggle buttons. The tabs can be placed in many different ways (top, bottom, left or right) with the default being determined by the platform. This class also allows swiping between components to leaf between said tabs (for this purpose the tabs themselves can also be hidden).

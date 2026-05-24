@@ -53,6 +53,8 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -7239,6 +7241,22 @@ public abstract class CodenameOneImplementation {
     /// higher) to dictate where the popover dialog should be placed.
     public void share(String text, String image, String mimeType, Rectangle sourceRect) {
 
+    }
+
+    /// Share variant that delivers an outcome through `listener`.
+    ///
+    /// The default implementation delegates to the legacy
+    /// [#share(String,String,String,Rectangle)] entry point and reports
+    /// `SHARED_TO(null)` once it returns, since this base class has no
+    /// way to observe the platform sheet. Ports that can observe the
+    /// result (iOS, Android API 22+) override this method.
+    ///
+    /// `listener` is guaranteed non-null by [com.codename1.ui.Display#share].
+    public void share(String text, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        share(text, image, mimeType, sourceRect);
+        if (listener != null) {
+            listener.onResult(ShareResult.sharedTo(null));
+        }
     }
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
