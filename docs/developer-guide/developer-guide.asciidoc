@@ -84,6 +84,8 @@ include::security.asciidoc[]
 
 include::Biometric-Authentication.asciidoc[]
 
+include::Authentication-And-Identity.asciidoc[]
+
 include::Near-Field-Communication.asciidoc[]
 
 include::Network-Connectivity.asciidoc[]

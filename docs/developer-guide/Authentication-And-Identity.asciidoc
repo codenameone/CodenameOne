@@ -1,0 +1,360 @@
+== Authentication and Identity
+
+This chapter covers Codename One's modern sign-in stack: OpenID Connect, Sign in with Apple, Google, Facebook, Microsoft Entra ID, Auth0 and Firebase Authentication.
+
+The stack is rebuilt around two new primitives:
+
+* `com.codename1.io.oidc.OidcClient` -- a full OpenID Connect / OAuth 2.0 client with PKCE, discovery, refresh and token persistence.
+* `com.codename1.io.oidc.SystemBrowser` -- routes the sign-in step through the platform's hardened sign-in surface (`ASWebAuthenticationSession` on iOS, Android Custom Tabs, the user's default browser on JavaSE / Web).
+
+Every provider-specific class is a thin layer on top of these primitives, so once you learn the underlying client you understand the whole stack.
+
+WARNING: The legacy `com.codename1.io.Oauth2` class is **deprecated**. It opens an in-app `WebBrowser`, which modern identity providers (Google, Apple, Microsoft, Facebook) now refuse to render -- they detect the embedded view and block the page. The new `OidcClient` works the same on every supported platform without that limitation. See <<migrating-from-oauth2>> for a migration recipe.
+
+=== Why the change
+
+Identity providers tightened their rules in 2023 and 2024:
+
+* **Google** -- the legacy `GoogleSignIn` SDK has been replaced by Google Identity Services (GIS). GIS expects PKCE and discourages embedded WebViews.
+* **Apple** -- Sign in with Apple, mandatory for App Store apps that offer any other social login, requires a native ASAuthorizationAppleIDProvider call on iOS 13+ or a web flow with `form_post` `response_mode`.
+* **Microsoft** -- Entra ID (formerly Azure AD) requires PKCE for public clients and forwards all browser flows through Microsoft Authenticator when installed.
+* **Facebook** -- Facebook Login still supports OAuth 2.0 but its embedded-WebView detection now blocks unknown user agents.
+
+The old `Oauth2` class drove the entire flow through `com.codename1.components.WebBrowser`, which is an embedded view. That model no longer works on a Codename One device build for these providers.
+
+=== Quick start -- any OpenID Connect provider
+
+If your identity provider publishes a standard `.well-known/openid-configuration` document (Google, Microsoft, Apple, Auth0, Okta, Keycloak, AWS Cognito, Authentik, and most others do) you can sign users in with about ten lines of code.
+
+[source,java]
+----
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
+
+OidcClient.discover("https://accounts.google.com").ready(new SuccessCallback<OidcClient>() {
+    public void onSucess(OidcClient client) {
+        client.setClientId("YOUR_CLIENT_ID")
+              .setRedirectUri("com.example.app:/oauth2redirect")
+              .setScopes("openid", "email", "profile");
+        client.authorize().ready(new SuccessCallback<OidcTokens>() {
+            public void onSucess(OidcTokens tokens) {
+                // tokens.getAccessToken() -- bearer for API calls
+                // tokens.getIdToken()      -- JWT with user identity claims
+                // tokens.getEmail()        -- convenience accessor
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable err) {
+                System.out.println("Sign-in failed: " + err.getMessage());
+            }
+        });
+    }
+});
+----
+
+That call:
+
+. Fetches `accounts.google.com/.well-known/openid-configuration`.
+. Generates a PKCE pair (S256), a `state`, and a `nonce`.
+. Opens the OS system-browser sheet at the discovered authorization endpoint.
+. Exchanges the code for tokens on the discovered token endpoint.
+. Verifies `state` and `nonce`, decodes the ID token, and persists the tokens via the default `TokenStore`.
+
+==== Picking a redirect URI
+
+For mobile apps, use a *custom scheme* unique to your app, for example `com.example.app:/oauth2redirect`. Register the scheme with the OS via the build hints below so the system browser can hand the redirect back to your app.
+
+For web / simulator runs, use a normal HTTPS URL pointing at a page you control. The Codename One fallback `BrowserWindow` closes as soon as the URL matches.
+
+===== iOS
+
+Add the URL scheme to your Info.plist via the standard build hint:
+
+----
+ios.urlScheme=<key>CFBundleURLTypes</key>\n<array>\n  <dict>\n    <key>CFBundleURLSchemes</key>\n    <array>\n      <string>com.example.app</string>\n    </array>\n  </dict>\n</array>
+----
+
+`AuthenticationServices.framework` is added to the linker automatically whenever your app references anything in `com.codename1.io.oidc` or `com.codename1.social.AppleSignIn` -- you don't need to add `ios.add_libs=AuthenticationServices.framework` manually.
+
+===== Android
+
+Add an intent filter for the redirect scheme to the application manifest via the `android.xintent_filter` build hint:
+
+----
+android.xintent_filter=<intent-filter>\n  <action android:name="android.intent.action.VIEW"/>\n  <category android:name="android.intent.category.DEFAULT"/>\n  <category android:name="android.intent.category.BROWSABLE"/>\n  <data android:scheme="com.example.app"/>\n</intent-filter>
+----
+
+The `androidx.browser:browser:1.8.0` Gradle dependency (for Custom Tabs) is added to your app's Gradle build automatically whenever it references anything in `com.codename1.io.oidc`. Override the version with build hint `android.customTabsVersion=1.x.y` if needed.
+
+==== Saving and restoring tokens
+
+`OidcClient` saves the response under a per-issuer + per-client-ID key using `com.codename1.io.oidc.TokenStore.DefaultStorageTokenStore` (which serializes to `com.codename1.io.Storage`). To restore on next launch:
+
+[source,java]
+----
+client.refreshIfExpired(60).ready(new SuccessCallback<OidcTokens>() {
+    public void onSucess(OidcTokens tokens) {
+        if (tokens == null) {
+            // No saved tokens, or they expired and we have no refresh token.
+            client.authorize();
+        } else {
+            // Reuse `tokens.getAccessToken()` -- still valid (refreshed if needed).
+        }
+    }
+});
+----
+
+If the saved access token is within 60 seconds of expiring and a refresh token is available, `refreshIfExpired` performs a refresh-token grant in the background and persists the new tokens.
+
+==== Encrypting tokens at rest
+
+The default token store uses `com.codename1.io.Storage`, which is sandboxed but not encrypted. For biometric-gated storage, implement `TokenStore` over `com.codename1.security.SecureStorage` (see the source of `DefaultStorageTokenStore` for the pattern -- swap the `Storage.writeObject` / `readObject` calls for `SecureStorage.set` / `get`).
+
+=== Sign in with Apple
+
+`com.codename1.social.AppleSignIn` consolidates the previous `cn1-applesignin` cn1lib into core. On iOS 13+ it uses native ASAuthorizationAppleIDProvider; on Android, JavaSE and the Web port it uses the public Apple OIDC issuer through `OidcClient`.
+
+==== iOS
+
+The iOS port implements the `com.codename1.social.AppleSignInNative` interface. No build hints are required beyond enabling the `Sign in with Apple` capability:
+
+----
+ios.signinwithapple=true
+----
+
+[source,java]
+----
+AppleSignIn.getInstance().signIn("name email", new AppleSignInCallback() {
+    public void onSuccess(AppleSignInResult result) {
+        // result.getIdentityToken()  -- JWT to verify on your server
+        // result.getUserId()         -- stable opaque user id, use as PK
+        // result.getEmail()          -- may be a real or relay address
+    }
+    public void onError(String err) { ... }
+    public void onCancel()          { ... }
+});
+----
+
+NOTE: Apple only returns the user's name and email on the *first* authorization. AppleSignIn persists those values in `Preferences` so the result is consistent on subsequent sign-ins.
+
+==== Android, JavaSE, Web
+
+Apple requires a separate *Services ID* (a "web client") for non-iOS environments and a `client_secret` JWT generated by your server. The recipe lives at <<apple-services-id-setup>>.
+
+[source,java]
+----
+AppleSignIn.getInstance()
+    .withServiceId("com.example.appleweb")
+    .withRedirectUri("https://example.com/auth/apple/callback")
+    .withClientSecret(serverGeneratedJwt)
+    .signIn("name email", callback);
+----
+
+[[apple-services-id-setup]]
+==== One-time Apple setup
+
+. In the Apple Developer portal, create a *Services ID* alongside your App ID. Enable "Sign in with Apple" for both.
+. Configure the Services ID's *Web Authentication Configuration* with the primary App ID and your redirect URI.
+. Generate an *AuthKey* private key in the Apple developer portal (`.p8` file). Apple does not allow public mobile clients to mint the `client_secret` JWT themselves; your backend must do it. See https://developer.apple.com/documentation/sign_in_with_apple/generate_and_validate_tokens[Apple's docs] for the JWT recipe.
+
+=== Google Sign-In
+
+`com.codename1.social.GoogleConnect` now offers a modern `signIn(...)` method that runs entirely through `OidcClient`:
+
+[source,java]
+----
+GoogleConnect.getInstance().signIn(
+    "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+    "com.example.app:/oauth2redirect",
+    "openid", "email", "profile"
+).ready(new SuccessCallback<OidcTokens>() {
+    public void onSucess(OidcTokens t) {
+        String email = t.getEmail();
+        String idToken = t.getIdToken();
+    }
+});
+----
+
+`signIn` works on iOS, Android, JavaSE and Web with the same code, against the *Web Application* OAuth 2.0 client ID from Google Cloud Console. The redirect URI you supply must match one of the *Authorized redirect URIs* configured for that client.
+
+The legacy `doLogin()` / `setClientSecret(...)` path is still available for source compatibility but is no longer recommended.
+
+==== Migrating from the legacy Google integration
+
+If you currently rely on `GoogleConnect.doLogin()` with the Google Sign-In SDK on Android or `GIDSignIn` on iOS, you can switch to the modern flow without touching your build:
+
+* On Android, the legacy code uses `com.google.android.gms.auth.api.Auth.GoogleSignInApi` -- this is the part Google deprecated. New code via `signIn(...)` doesn't require the native SDK at all.
+* On iOS, the legacy code uses `GIDSignIn` (Google Sign-In SDK). The new code uses `ASWebAuthenticationSession` via `SystemBrowser`, which is what Google now recommends for non-broker apps.
+
+=== Facebook Login
+
+`com.codename1.social.FacebookConnect` exposes both the old SDK-based `doLogin()` and a new SDK-free `signIn(...)` that uses the system browser via `OidcClient`. Use the new method for the simulator, the web port, and for apps that don't want to bundle the Facebook SDK at all:
+
+[source,java]
+----
+FacebookConnect.getInstance().signIn(
+    "FB_APP_ID",
+    "com.example.app:/oauth2redirect",
+    "public_profile", "email"
+).ready(new SuccessCallback<OidcTokens>() {
+    public void onSucess(OidcTokens t) {
+        String accessToken = t.getAccessToken(); // ID token will be null
+        // call https://graph.facebook.com/me with the access token for user data
+    }
+});
+----
+
+Facebook doesn't issue OpenID-Connect ID tokens for classic OAuth flows, so `getIdToken()` returns `null`. Read user profile fields via the Graph API.
+
+=== Microsoft / Entra ID
+
+`com.codename1.social.MicrosoftConnect` wraps the same OIDC client against `https://login.microsoftonline.com/{tenant}/v2.0`. The default tenant `common` accepts personal and work / school accounts; pass a tenant GUID, `organizations`, or `consumers` to restrict.
+
+[source,java]
+----
+MicrosoftConnect.getInstance()
+    .withTenant("common")
+    .signIn(
+        "YOUR_ENTRA_CLIENT_ID",
+        "com.example.app:/oauth2redirect",
+        "openid", "email", "profile", "User.Read"
+    ).ready(new SuccessCallback<OidcTokens>() {
+        public void onSucess(OidcTokens t) {
+            // t.getAccessToken() is a Microsoft Graph access token
+        }
+    });
+----
+
+NOTE: Apps that need broker (Microsoft Authenticator) support for Conditional Access can bundle the MSAL SDK manually and bypass `MicrosoftConnect`. For the vast majority of apps the system-browser flow is sufficient and lets the simulator and web port share the same code path.
+
+=== Auth0
+
+[source,java]
+----
+Auth0Connect.getInstance()
+    .withDomain("dev-xyz.us.auth0.com")
+    .withAudience("https://api.example.com")        // optional
+    .signIn(
+        "YOUR_AUTH0_CLIENT_ID",
+        "com.example.app:/oauth2redirect",
+        "openid", "email", "profile"
+    ).ready(new SuccessCallback<OidcTokens>() {
+        public void onSucess(OidcTokens t) {
+            String idToken = t.getIdToken();
+        }
+    });
+----
+
+`Auth0Connect` is the simplest of the providers because Auth0 is a clean OIDC provider; everything beyond `withDomain` is optional.
+
+=== Firebase Authentication
+
+Firebase Auth is *not* an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
+
+[source,java]
+----
+FirebaseAuth.getInstance()
+    .withApiKey("YOUR_FIREBASE_WEB_API_KEY")
+    .signInWithEmailAndPassword("a@b.com", "hunter2")
+    .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+        public void onSucess(FirebaseAuth.FirebaseUser u) {
+            String uid = u.getUid();
+            String firebaseIdToken = u.getIdToken();
+        }
+    });
+----
+
+For federated sign-in (Google / Apple / Microsoft as Firebase providers), first obtain an ID token via the matching `*Connect` class, then swap it for a Firebase session:
+
+[source,java]
+----
+GoogleConnect.getInstance().signIn(..., "openid", "email")
+    .ready(new SuccessCallback<OidcTokens>() {
+        public void onSucess(OidcTokens g) {
+            FirebaseAuth.getInstance().signInWithIdpIdToken(g.getIdToken(), "google.com")
+                .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+                    public void onSucess(FirebaseAuth.FirebaseUser u) {
+                        // Firebase user is now signed in.
+                    }
+                });
+        }
+    });
+----
+
+Refresh the Firebase session at app launch:
+
+[source,java]
+----
+FirebaseAuth fa = FirebaseAuth.getInstance().withApiKey(KEY);
+if (!fa.isSignedIn()) {
+    fa.refresh().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+        public void onSucess(FirebaseAuth.FirebaseUser u) {
+            // u is null if no refresh token was stored
+        }
+    });
+}
+----
+
+[[migrating-from-oauth2]]
+=== Migrating from `Oauth2`
+
+A typical legacy snippet:
+
+[source,java]
+----
+Oauth2 oauth = new Oauth2(
+    "https://provider.example.com/oauth2/authorize",
+    "CLIENT_ID",
+    "https://example.com/callback",
+    "openid email",
+    "https://provider.example.com/oauth2/token",
+    "CLIENT_SECRET");
+oauth.showAuthentication(new ActionListener() {
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() instanceof AccessToken) {
+            AccessToken t = (AccessToken) e.getSource();
+            // ...
+        }
+    }
+});
+----
+
+becomes:
+
+[source,java]
+----
+OidcConfiguration cfg = OidcConfiguration.newBuilder()
+    .authorizationEndpoint("https://provider.example.com/oauth2/authorize")
+    .tokenEndpoint("https://provider.example.com/oauth2/token")
+    .build();
+OidcClient client = OidcClient.create(cfg)
+    .setClientId("CLIENT_ID")
+    .setClientSecret("CLIENT_SECRET")
+    .setRedirectUri("https://example.com/callback")
+    .setScopes("openid", "email");
+client.authorize().ready(new SuccessCallback<OidcTokens>() {
+    public void onSucess(OidcTokens t) {
+        AccessToken legacy = t.toAccessToken();  // for code that still expects AccessToken
+    }
+});
+----
+
+Or, if the provider exposes a discovery document:
+
+[source,java]
+----
+OidcClient.discover("https://provider.example.com").ready(new SuccessCallback<OidcClient>() {
+    public void onSucess(OidcClient client) {
+        client.setClientId("CLIENT_ID")
+              .setRedirectUri("https://example.com/callback")
+              .setScopes("openid", "email");
+        client.authorize().ready(/* ... */);
+    }
+});
+----
+
+`OidcTokens#toAccessToken()` returns a `com.codename1.io.AccessToken`, so callers that already deal in `AccessToken` (most subclasses of `com.codename1.social.Login`) can adopt `OidcClient` without changing their token type.
+
+=== A universal sign-in demo
+
+A complete sample is included under `samples/UniversalSignInDemo` in the repository. It renders one button per provider (Apple, Google, Microsoft, Facebook, Auth0, Firebase, generic OIDC) and dumps the resulting tokens to a `TextArea` so you can inspect them. See its `README.md` for the credentials wiring.

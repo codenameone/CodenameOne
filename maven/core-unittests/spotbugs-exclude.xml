@@ -139,6 +139,27 @@
     </Match>
 
     <!--
+    The identity-stack classes (com.codename1.io.oidc.*, the *Connect
+    classes, AppleSignIn) chain AsyncResource.ready(...) / .except(...)
+    via anonymous SuccessCallback instances per the framework's async
+    idiom. Many of those instances don't actually use the enclosing
+    instance, but rewriting each into a named static nested class
+    bloats the call sites without making the behavior clearer. We accept
+    the implicit-this capture; the enclosing instances are short-lived
+    method-locals that the GC reclaims as soon as the callback fires.
+    -->
+    <Match>
+        <Or>
+            <Class name="~com\.codename1\.io\.oidc\..*" />
+            <Class name="~com\.codename1\.social\.AppleSignIn(\$.*)?" />
+            <Class name="~com\.codename1\.social\.Auth0Connect(\$.*)?" />
+            <Class name="~com\.codename1\.social\.FacebookConnect(\$.*)?" />
+            <Class name="~com\.codename1\.social\.GoogleConnect(\$.*)?" />
+        </Or>
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+    </Match>
+
+    <!--
     Map adapters register themselves in the constructor for simplicity.
     Changing this would force developers to use a more obtuse API for no
     valid reason.

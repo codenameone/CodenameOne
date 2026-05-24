@@ -499,3 +499,8 @@ rethrows
 adb
 logcat
 pidof
+
+# Identity-provider product names used in the Authentication & Identity chapter.
+Keycloak
+Cognito
+Authentik

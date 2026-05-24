@@ -83,6 +83,21 @@
 // Apple's API-usage scan without declaring an NFC privacy manifest.
 //#define CN1_INCLUDE_NFC
 
+// CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
+// (AuthenticationServices.framework import, ASWebAuthenticationSession code
+// in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the
+// classpath scanner saw com.codename1.io.oidc.*, so apps that never use
+// OidcClient ship without the AuthenticationServices link dependency.
+//#define CN1_INCLUDE_OIDC
+
+// CN1_INCLUDE_APPLESIGNIN gates the com.codename1.social.AppleSignIn native
+// bridge (ASAuthorizationAppleIDProvider code in CN1AppleSignIn.m).
+// IPhoneBuilder uncomments this only when the scanner saw AppleSignIn
+// references; without it the .m's body compiles to nothing and apps that
+// never reference AppleSignIn don't need the `com.apple.developer.applesignin`
+// entitlement.
+//#define CN1_INCLUDE_APPLESIGNIN
+
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 //#define USE_FACEBOOK_CONNECT_PODS

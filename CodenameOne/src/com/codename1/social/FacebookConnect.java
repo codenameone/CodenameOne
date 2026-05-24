@@ -28,7 +28,12 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcConfiguration;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
+import com.codename1.util.SuccessCallback;
 
 import java.util.Arrays;
 
@@ -243,6 +248,65 @@ public class FacebookConnect extends Login {
     ///
     /// The Facebook SDK no longer supports app invites https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
     public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
+    }
+
+    /// Modern Facebook Login. Goes through Facebook's OAuth 2.0 endpoints
+    /// via the system browser ([com.codename1.io.oidc.SystemBrowser]),
+    /// independent of the native Facebook SDK. Use this method for
+    /// browser-based and cross-platform consistency; the older
+    /// [#doLogin()] path remains for code that depends on the iOS/Android
+    /// Facebook SDK integration.
+    ///
+    /// #### Parameters
+    ///
+    /// - `appId`: Facebook App ID.
+    /// - `redirectUri`: Must match a Valid OAuth Redirect URI configured
+    ///   in the app dashboard.
+    /// - `permissions`: Facebook permissions (`public_profile`, `email`, ...).
+    ///   Defaults to `public_profile email` when empty.
+    ///
+    /// #### Returns
+    ///
+    /// An [AsyncResource] resolving to the granted access token wrapped in
+    /// [OidcTokens] (note: Facebook does not issue OIDC ID tokens for
+    /// classic OAuth flows -- `getIdToken()` will be `null`; use
+    /// `getAccessToken()` and call the Graph API to read user profile data).
+    ///
+    /// #### Since
+    ///
+    /// 8.0
+    public AsyncResource<OidcTokens> signIn(String appId,
+                                            String redirectUri,
+                                            String... permissions) {
+        OidcConfiguration cfg = OidcConfiguration.newBuilder()
+                .issuer("https://www.facebook.com")
+                .authorizationEndpoint("https://www.facebook.com/v18.0/dialog/oauth")
+                .tokenEndpoint("https://graph.facebook.com/v18.0/oauth/access_token")
+                .build();
+        OidcClient client = OidcClient.create(cfg)
+                .setClientId(appId)
+                .setRedirectUri(redirectUri)
+                .setScopes(permissions == null || permissions.length == 0
+                        ? new String[] {"public_profile", "email"}
+                        : permissions)
+                // Facebook does not echo a nonce; skip the check.
+                .setEnforceNonce(false);
+        final AsyncResource<OidcTokens> out = new AsyncResource<OidcTokens>();
+        client.authorize()
+                .ready(new SuccessCallback<OidcTokens>() {
+                    @Override
+                    public void onSucess(OidcTokens t) {
+                        setAccessToken(t.toAccessToken());
+                        out.complete(t);
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+        return out;
     }
 
     /// Returns true if inviteFriends is implemented, it is supported on iOS and

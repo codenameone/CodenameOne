@@ -87,6 +87,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesOidc;
+    private boolean usesAppleSignIn;
     private boolean usesNfcHce;
 
     // Deeper-network connectivity flags. Set by the classpath scanner when
@@ -684,6 +686,19 @@ public class IPhoneBuilder extends Executor {
                             usesNfcHce = true;
                         }
                     }
+                    // OidcClient + SystemBrowser rely on
+                    // ASWebAuthenticationSession (AuthenticationServices.framework,
+                    // iOS 12+).
+                    if (!usesOidc && cls.indexOf("com/codename1/io/oidc/") == 0) {
+                        usesOidc = true;
+                    }
+                    // Sign in with Apple (ASAuthorizationAppleIDProvider) lives
+                    // in the same framework and only matters when the user
+                    // actually references AppleSignIn.
+                    if (!usesAppleSignIn
+                            && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
+                        usesAppleSignIn = true;
+                    }
                     if (cls.indexOf("com/codename1/io/wifi/WiFi") == 0
                             && !cls.equals("com/codename1/io/wifi/WiFiDirect")) {
                         // WiFi info or scan/connect. iOS has no scan API so
@@ -890,6 +905,22 @@ public class IPhoneBuilder extends Executor {
         }
 
         
+        // OidcClient + SystemBrowser bootstrap: when the scanner saw any
+        // com.codename1.io.oidc.* reference, the port's
+        // OidcBrowserNativeImpl.init() must run before the app starts so
+        // SystemBrowser.getProvider() returns the iOS native bridge.
+        String integrateOidcBrowser = "";
+        if (usesOidc) {
+            integrateOidcBrowser =
+                "        com.codename1.io.oidc.OidcBrowserNativeImpl.init();\n";
+        }
+        // AppleSignIn bootstrap -- same mechanism, separate gate.
+        String integrateAppleSignIn = "";
+        if (usesAppleSignIn) {
+            integrateAppleSignIn =
+                "        com.codename1.social.AppleSignInNativeImpl.init();\n";
+        }
+
         String integrateGoogleConnect = "";
         if (useGoogleSignIn) {
             try {
@@ -1117,6 +1148,8 @@ public class IPhoneBuilder extends Executor {
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
+                    + integrateOidcBrowser
+                    + integrateAppleSignIn
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
@@ -1656,6 +1689,49 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // AuthenticationServices.framework hosts both
+            // ASWebAuthenticationSession (used by SystemBrowser) and
+            // ASAuthorizationAppleIDProvider (used by AppleSignIn). Linking
+            // it always when the user references either API is the simplest
+            // policy; iOS 12 is the deployment-target floor for both classes.
+            //
+            // We also flip the matching CN1_INCLUDE_OIDC / CN1_INCLUDE_APPLESIGNIN
+            // preprocessor defines so the .m source bodies in
+            // nativeSources/CN1OidcBrowser.m and CN1AppleSignIn.m compile
+            // in -- otherwise the .m files would reference framework symbols
+            // without the framework being linked, breaking the link step
+            // for apps that never use the API.
+            if (usesOidc || usesAppleSignIn) {
+                String authSvc = "AuthenticationServices.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = authSvc;
+                } else if (!addLibs.toLowerCase().contains("authenticationservices")) {
+                    addLibs = addLibs + ";" + authSvc;
+                }
+            }
+            if (usesOidc) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_OIDC",
+                            "#define CN1_INCLUDE_OIDC");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_OIDC", ex);
+                }
+            }
+            if (usesAppleSignIn) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_APPLESIGNIN",
+                            "#define CN1_INCLUDE_APPLESIGNIN");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_APPLESIGNIN", ex);
+                }
+            }
+
             // CoreNFC is required only when the app actually uses
             // com.codename1.nfc. We weak-link it so older deployment targets
             // still load on iOS 10 (Core NFC was introduced in iOS 11).
@@ -1697,6 +1773,20 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_NFC", ex);
+                }
+            }
+
+            // Sign in with Apple requires the
+            // com.apple.developer.applesignin entitlement; Apple rejects
+            // builds whose binary references ASAuthorizationAppleIDProvider
+            // without it. Inject the canonical "Default" value automatically.
+            if (usesAppleSignIn) {
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.applesignin",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.applesignin",
+                            "Default");
                 }
             }
 
