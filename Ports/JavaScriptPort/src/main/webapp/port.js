@@ -1130,8 +1130,23 @@ bindNative([
   // calls ``Window.getDocument`` 9-10 times via UIManager /
   // BrowserComponent / Resources init; each was a round-trip JSO
   // bridge call. The host-thread document never changes.
-  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper) {
+  // Defensive validation: a cached doc wrapper without __class is a
+  // signal that something (cooperative scheduler interleaving, partial
+  // wrapper construction, or an upstream bug we haven't traced yet)
+  // produced a broken wrapper. The NULL_RECEIVER diag captured at
+  // 4d564b1bc proved this happens: cn1_iv1 then dispatches on the
+  // empty {} and fails with VIRTUAL_FAIL receiverClass=null. Forcing
+  // a re-fetch through the host bridge yields a fresh, well-formed
+  // wrapper. This is also what causes the late-suite tests
+  // (Sheet/SheetSlide/Toast/CssGradients/themes) to flake-hang.
+  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
+          && win.__cn1CachedDocWrapper.__class) {
     return win.__cn1CachedDocWrapper;
+  }
+  if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
+          && !win.__cn1CachedDocWrapper.__class) {
+    // Clear the broken cache so the next branch re-fetches.
+    try { win.__cn1CachedDocWrapper = null; } catch (_e) {}
   }
   if (win && win.__cn1HostRef != null && typeof jvm.invokeHostNative === "function") {
     const hostResult = yield jvm.invokeHostNative("__cn1_jso_bridge__", [{
