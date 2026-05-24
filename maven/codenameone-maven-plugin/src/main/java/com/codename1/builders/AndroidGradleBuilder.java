@@ -282,6 +282,8 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean capturePermission;
     private boolean usesBiometrics;
+    private boolean usesNfc;
+    private boolean usesNfcHce;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -536,6 +538,23 @@ public class AndroidGradleBuilder extends Executor {
         // R8 configuration - disable full mode by default to prevent issues with reflection
         disableR8 = request.getArg("android.disableR8", "false").equals("true");
         disableR8FullMode = request.getArg("android.disableR8FullMode", "true").equals("true");
+
+        // On-device debugging: when set, mark the APK debuggable so Dalvik/ART exposes
+        // a JDWP socket the cn1:android-on-device-debugging Mojo can forward through adb.
+        // Forcing debuggable also flips off R8 and ProGuard so symbols, method names,
+        // and line numbers survive the build — we may be invoked from the android-device
+        // cloud target which would otherwise run full optimisation. Also force the build
+        // down to debug-only — Android otherwise produces both a release and a debug
+        // APK from the same manifest, so without this a stray hint could ship a
+        // release-signed, debuggable APK. Release builds and projects that don't opt
+        // in see no change.
+        boolean onDeviceDebug = request.getArg("android.onDeviceDebug", "false").equals("true");
+        if (onDeviceDebug) {
+            disableR8 = true;
+            request.putArgument("android.enableProguard", "false");
+            request.putArgument("android.release", "false");
+            request.putArgument("android.debug", "true");
+        }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             MIN_GRADLE_VERSION = 8;
@@ -1252,6 +1271,13 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/security/") == 0) {
                         usesBiometrics = true;
                     }
+
+                    if (cls.indexOf("com/codename1/nfc/") == 0) {
+                        usesNfc = true;
+                        if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
+                            usesNfcHce = true;
+                        }
+                    }
                 }
 
 
@@ -1357,6 +1383,30 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (!xPermissions.contains("android.permission.USE_FINGERPRINT")) {
                 xPermissions = "    <uses-permission android:name=\"android.permission.USE_FINGERPRINT\" android:maxSdkVersion=\"28\" />\n" + xPermissions;
+            }
+        }
+
+        // NFC: classpath scanner sets usesNfc / usesNfcHce. Both permissions
+        // are "normal" so the injection is invisible to the user; apps that
+        // never reference com.codename1.nfc see no manifest change. HCE
+        // additionally needs BIND_NFC_SERVICE and android.hardware.nfc.hce
+        // feature + a registered HostApduService.
+        if (usesNfc || "true".equalsIgnoreCase(request.getArg("android.hce", "false"))) {
+            usesNfc = true;
+            if (!xPermissions.contains("android.permission.NFC")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.NFC\" />\n" + xPermissions;
+            }
+            if (!xPermissions.contains("android.hardware.nfc")) {
+                xPermissions = "    <uses-feature android:name=\"android.hardware.nfc\" android:required=\"false\" />\n" + xPermissions;
+            }
+        }
+        if (usesNfcHce || request.getArg("android.hceAids", null) != null) {
+            usesNfcHce = true;
+            if (!xPermissions.contains("android.permission.BIND_NFC_SERVICE")) {
+                xPermissions = "    <uses-permission android:name=\"android.permission.BIND_NFC_SERVICE\" />\n" + xPermissions;
+            }
+            if (!xPermissions.contains("android.hardware.nfc.hce")) {
+                xPermissions = "    <uses-feature android:name=\"android.hardware.nfc.hce\" android:required=\"false\" />\n" + xPermissions;
             }
         }
 
@@ -2192,6 +2242,67 @@ public class AndroidGradleBuilder extends Executor {
         String backgroundFetchService = "<service android:name=\"com.codename1.impl.android.BackgroundFetchHandler\" android:exported=\"false\" />\n"+
                 "<activity android:name=\"com.codename1.impl.android.CodenameOneBackgroundFetchActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n";
 
+        // Host card emulation service is generated only when the classpath
+        // scanner saw a HostCardEmulationService reference (or the developer
+        // set the android.hceAids build hint). The matching apduservice.xml
+        // resource is created below.
+        String hceService = "";
+        if (usesNfcHce) {
+            String hceCategory = request.getArg("android.hceCategory", "other");
+            hceService = "<service android:name=\"com.codename1.impl.android.CodenameOneHostApduService\"\n"
+                    + "            android:exported=\"true\"\n"
+                    + "            android:permission=\"android.permission.BIND_NFC_SERVICE\">\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"android.nfc.cardemulation.action.HOST_APDU_SERVICE\" />\n"
+                    + "                <category android:name=\"android.intent.category.DEFAULT\" />\n"
+                    + "            </intent-filter>\n"
+                    + "            <meta-data android:name=\"android.nfc.cardemulation.host_apdu_service\"\n"
+                    + "                       android:resource=\"@xml/apduservice\" />\n"
+                    + "        </service>\n";
+
+            // apduservice.xml is required by Android to declare the AID
+            // groups this HCE service answers. Generate it from the
+            // android.hceAids build hint (comma-separated). Default is a
+            // sensible placeholder that the developer should override.
+            String aids = request.getArg("android.hceAids", "F0010203040506");
+            String desc = request.getArg("android.hceDescription",
+                    request.getDisplayName());
+            StringBuilder apduXml = new StringBuilder();
+            apduXml.append("<host-apdu-service xmlns:android=\"http://schemas.android.com/apk/res/android\"\n");
+            apduXml.append("                   android:description=\"@string/app_name\"\n");
+            apduXml.append("                   android:requireDeviceUnlock=\"")
+                   .append(request.getArg("android.hceRequireUnlock", "false"))
+                   .append("\">\n");
+            apduXml.append("    <aid-group android:description=\"@string/app_name\"\n");
+            apduXml.append("               android:category=\"").append(hceCategory).append("\">\n");
+            for (String aid : aids.split("[,;]")) {
+                aid = aid.trim();
+                if (aid.length() == 0) {
+                    continue;
+                }
+                apduXml.append("        <aid-filter android:name=\"")
+                       .append(aid).append("\" />\n");
+            }
+            apduXml.append("    </aid-group>\n");
+            apduXml.append("</host-apdu-service>\n");
+            File hceXmlDir = new File(projectDir, "src/main/res/xml");
+            hceXmlDir.mkdirs();
+            try {
+                OutputStream apduStream = new FileOutputStream(
+                        new File(hceXmlDir, "apduservice.xml"));
+                apduStream.write(apduXml.toString().getBytes(StandardCharsets.UTF_8));
+                apduStream.close();
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write apduservice.xml", ex);
+            }
+            debug("Generated apduservice.xml with AIDs: " + aids);
+            // Suppress the unused warning when desc is not consumed (the
+            // description string itself is taken from @string/app_name).
+            if (desc != null) {
+                debug("HCE description: " + desc);
+            }
+        }
+
 
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
@@ -2389,6 +2500,14 @@ public class AndroidGradleBuilder extends Executor {
             allowBackup = "";
         }
 
+        // On-device debugging needs the application to be marked debuggable so the
+        // runtime hands out a JDWP socket per-process. Idempotent: skip if the user
+        // already declared android:debuggable via android.xapplication_attr.
+        String debuggableAttr = "";
+        if (onDeviceDebug && !applicationAttr.contains("android:debuggable")) {
+            debuggableAttr = " android:debuggable=\"true\" ";
+        }
+
         String applicationNode = "  <application ";
         if (!applicationAttr.contains("android:label")) {
             applicationNode += " android:label=\"" + xmlizedDisplayName + "\" ";
@@ -2408,6 +2527,7 @@ public class AndroidGradleBuilder extends Executor {
 
         applicationNode += applicationAttr;
         applicationNode += allowBackup;
+        applicationNode += debuggableAttr;
         applicationNode += ">\n";
 
 
@@ -2530,6 +2650,7 @@ public class AndroidGradleBuilder extends Executor {
                 + locationServices
                 + mediaService
                 + remoteControlService
+                + hceService
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions

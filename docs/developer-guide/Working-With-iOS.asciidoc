@@ -10,7 +10,7 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 
 - Make sure the device isn't locked for installing third-party apps. This can happen on devices configured with parental controls.
 
-- Check that you own the package name. For example, if you earlier installed an app with the same package name but a different certificate, a new install will fail. This is true for Android too. If you installed the kitchen sink from the store and then built your own app with the same package name, the install will collide.
+- Check that you own the package name. For example, if you earlier installed an app with the same package name but a different certificate, a new install will fail. This is true for Android too. If you installed the kitchen sink from the store and then built your own app with the same package name, the installation will collide.
 - This can be a problem if you use a generic package name that someone else already claimed, so use your own domain.
 
 - Make sure the device has a recent enough version of iOS for the dependencies. As of 2024, Codename One builds target iOS 12.0 or newer by default. You can raise the need with the `ios.deployment_target` build hint if a library needs a newer version.
@@ -71,7 +71,7 @@ The default storyboard expects PNG assets with the following characteristics. Al
 
 NOTE: Changes to the launch screen don't take effect until the device has been restarted. If you install your app on a device, then change the launch screen and update the app, the launch screen won't change until the device is restarted.
 
-When iterating locally with a Mac, open the generated Xcode project and run it on a device or simulator to verify that the layout adapts. On Windows or Linux, submit a TestFlight or Ad Hoc build and check on hardware before shipping.
+When iterating locally with a Mac, open the generated Xcode project and run it on a device or simulator to verify that the layout adapts. On Windows or Linux, submit a TestFlight or Ad-Hoc build and check on hardware before shipping.
 
 === Local notifications on iOS and Android
 
@@ -214,9 +214,9 @@ For most apps the default is the right choice. Apps that need a different color 
 // vale-skip: Microsoft.Avoid: "OpenGL ES 2 backend" names the alternate rendering pipeline, not a server.
 NOTE: The hint only takes effect when `ios.metal=true`. With the OpenGL ES 2 backend the layer is `CAEAGLLayer` and the color space is fixed by the system.
 
-=== Accessing insecure URL's
+=== Accessing insecure URLs
 
-Due to security exploits Apple blocked some access to insecure URL's which means that http code that worked before could stop working for you on iOS 9+. This is a good move, you should use https and avoid http as much as possible but that's sometimes impractical when working with an internal or debug environment.
+Due to security exploits Apple blocked some access to insecure URLs which means that http code that worked before could stop working for you on iOS 9+. This is a good move, you should use https and avoid http as much as possible but that's sometimes impractical when working with an internal or debug environment.
 
 You can disable the strict URL checks from Apple by using the venerable `ios.plistInject` build hint and setting it to:
 
@@ -311,6 +311,6 @@ Supported need formats are `from:`, `exact:`, `branch:`, `revision:`, and `range
 
 If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to your native/ios directory.
 
-for example: native/ios/SomeThirdPartySDK.framework.zip
+For example: native/ios/SomeThirdPartySDK.framework.zip
 
-no build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.
+No build hints necessary for this approach. The build server will automatically detect the framework and link it into your app.

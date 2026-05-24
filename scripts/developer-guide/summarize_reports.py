@@ -165,6 +165,64 @@ def summarize_vale(
     write_outputs([(summary_key, summary)], output)
 
 
+def summarize_paragraph_capitalization(
+    report: Path, status: str, summary_key: str, output: Path | None
+) -> None:
+    total = 0
+    if report.is_file():
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+        if isinstance(data, dict):
+            total = int(data.get("total", 0) or 0)
+
+    if total or _has_nonzero_status(status):
+        summary = f"{total} paragraph(s) starting with a lowercase word"
+    else:
+        summary = "No paragraph capitalization issues"
+
+    write_outputs([(summary_key, summary)], output)
+
+
+def summarize_languagetool(
+    report: Path, summary_key: str, output: Path | None
+) -> None:
+    total = 0
+    status = "missing"
+    top_rules: list[tuple[str, int]] = []
+    if report.is_file():
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+        if isinstance(data, dict):
+            total = int(data.get("total", 0) or 0)
+            status = str(data.get("status", "unknown"))
+            matches = data.get("matches", []) or []
+            if isinstance(matches, list):
+                counts: dict[str, int] = {}
+                for m in matches:
+                    if isinstance(m, dict):
+                        rule = str(m.get("rule", "?"))
+                        counts[rule] = counts.get(rule, 0) + 1
+                top_rules = sorted(counts.items(), key=lambda kv: -kv[1])[:3]
+
+    if status == "error":
+        summary = "LanguageTool failed to run (advisory only)"
+    elif status == "skipped":
+        summary = "LanguageTool skipped (advisory only)"
+    elif total:
+        rules_hint = ""
+        if top_rules:
+            rules_hint = " — top: " + ", ".join(f"{r} ({c})" for r, c in top_rules)
+        summary = f"{total} advisory match(es){rules_hint}"
+    else:
+        summary = "No grammar matches"
+
+    write_outputs([(summary_key, summary)], output)
+
+
 def summarize_unused_images(
     report: Path,
     summary_key: str,
@@ -246,6 +304,23 @@ def parse_args() -> argparse.Namespace:
     unused_parser.add_argument("--details-key", default=None)
     unused_parser.add_argument("--preview-limit", type=int, default=10)
 
+    paragraph_parser = subparsers.add_parser(
+        "paragraph-capitalization",
+        help="Summarize paragraph capitalization check results.",
+        parents=[common],
+    )
+    paragraph_parser.add_argument("--report", type=Path, required=True)
+    paragraph_parser.add_argument("--status", default="0")
+    paragraph_parser.add_argument("--summary-key", default="summary")
+
+    lt_parser = subparsers.add_parser(
+        "languagetool",
+        help="Summarize LanguageTool advisory report results.",
+        parents=[common],
+    )
+    lt_parser.add_argument("--report", type=Path, required=True)
+    lt_parser.add_argument("--summary-key", default="summary")
+
     return parser.parse_args()
 
 
@@ -265,6 +340,12 @@ def main() -> None:
             args.preview_limit,
             output,
         )
+    elif command == "paragraph-capitalization":
+        summarize_paragraph_capitalization(
+            args.report, args.status, args.summary_key, output
+        )
+    elif command == "languagetool":
+        summarize_languagetool(args.report, args.summary_key, output)
     else:
         raise ValueError(f"Unsupported command: {command}")
 

@@ -192,18 +192,33 @@ public class Picker extends Button {
 
     /// Listener fired when a custom popup button is pressed. Static (rather than an anonymous
     /// inner class) so it does not retain a reference to the enclosing `Picker`; the only
-    /// state it needs is the matching `LightweightPopupButton` whose `action` it invokes.
+    /// state it needs is the matching `LightweightPopupButton` whose `action` it invokes
+    /// and the spinner `Component` to refresh after the action runs. The spinner reference
+    /// is dropped along with the popup dialog so it does not outlive the editing session.
     private static final class PopupButtonActionListener implements ActionListener {
         private final LightweightPopupButton popupButton;
+        private final Container spinnerContainer;
 
-        private PopupButtonActionListener(LightweightPopupButton popupButton) {
+        private PopupButtonActionListener(LightweightPopupButton popupButton, Container spinnerContainer) {
             this.popupButton = popupButton;
+            this.spinnerContainer = spinnerContainer;
         }
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (popupButton.action != null) {
-                popupButton.action.run();
+            if (popupButton.action == null) {
+                return;
+            }
+            popupButton.action.run();
+            // Force a layout + repaint of the spinner so a setDate / setTime /
+            // setSelectedString / setDuration call inside the action propagates
+            // to the visible wheels. Spinner3D.setModel only flags the scroller
+            // as needing a new preferred size; on Android nothing else triggers
+            // the relayout, so the wheels stay stale until the user touches
+            // them. Issue #5019.
+            if (spinnerContainer != null) {
+                spinnerContainer.revalidate();
+                spinnerContainer.repaint();
             }
         }
     }
@@ -245,6 +260,16 @@ public class Picker extends Button {
                     evt.consume();
                     return;
                 }
+                // Snapshot the pre-tap state BEFORE applyDefaultDateIfNeeded()
+                // mutates `value`, so a Cancel can roll back to what the picker
+                // showed when the user tapped it (including a null placeholder
+                // that renders as "...") rather than to the just-staged default.
+                // The lightweight popup, native picker, and synchronous
+                // heavyweight Dialog branches below all use this snapshot - see
+                // the matching cancel-time restore in endEditing() (lightweight)
+                // and inline in this method (native + heavyweight). Issue #5014.
+                preEditValue = value;
+                preEditDateValueExplicitlySet = dateValueExplicitlySet;
                 // For date-type pickers that haven't been pinned with setDate, fold the
                 // resolved default into `value` before any show path reads it. Both
                 // showInteractionDialog() and the native/heavyweight branches below
@@ -280,8 +305,17 @@ public class Picker extends Button {
                         updateValue();
                     } else {
                         // cancel pressed.   Don't send the rest of the events.
+                        // Roll back the default-date staging done before the
+                        // native picker was shown, otherwise a Cancel on the
+                        // first open of a setDefaultDate-configured picker
+                        // would pin today's date into `value`. Issue #5014.
+                        value = preEditValue;
+                        dateValueExplicitlySet = preEditDateValueExplicitlySet;
+                        updateValue();
                         evt.consume();
                     }
+                    preEditValue = null;
+                    preEditDateValueExplicitlySet = false;
                     setEnabled(true);
                 } else {
                     Dialog pickerDlg = new Dialog();
@@ -336,8 +370,16 @@ public class Picker extends Button {
                                 value = cld.getTime();
                                 dateValueExplicitlySet = true;
                             } else {
+                                // Roll back the default-date staging from
+                                // applyDefaultDateIfNeeded() so a Cancel on
+                                // an unset picker doesn't pin the default
+                                // into `value`. Issue #5014.
+                                value = preEditValue;
+                                dateValueExplicitlySet = preEditDateValueExplicitlySet;
                                 evt.consume();
                             }
+                            preEditValue = null;
+                            preEditDateValueExplicitlySet = false;
                             break;
                         }
                         case Display.PICKER_TYPE_TIME: {
@@ -399,8 +441,15 @@ public class Picker extends Button {
                                 value = cld.getTime();
                                 dateValueExplicitlySet = true;
                             } else {
+                                // Roll back the default-date staging from
+                                // applyDefaultDateIfNeeded() on Cancel.
+                                // Issue #5014.
+                                value = preEditValue;
+                                dateValueExplicitlySet = preEditDateValueExplicitlySet;
                                 evt.consume();
                             }
+                            preEditValue = null;
+                            preEditDateValueExplicitlySet = false;
                             break;
                         }
                         case Display.PICKER_TYPE_DURATION_HOURS:
@@ -612,14 +661,15 @@ public class Picker extends Button {
                         throw new IllegalArgumentException("Unsupported picker type " + type);
                 }
                 currentSpinner = spinner;
-                // Snapshot the committed value so a Cancel press can restore it.
-                // Custom popup buttons stage their result through setDate / setTime /
-                // setDuration / setSelectedString etc., which now mutate `value`
-                // directly so that getDate() during the edit returns the staged
-                // value; without this snapshot a Cancel after such a button would
-                // leak the staged value into the picker (#4897 follow-up).
-                preEditValue = value;
-                preEditDateValueExplicitlySet = dateValueExplicitlySet;
+                // The Cancel-restore snapshot (`preEditValue` /
+                // `preEditDateValueExplicitlySet`) is taken in the parent
+                // actionPerformed() *before* applyDefaultDateIfNeeded() runs,
+                // so it reflects the state the picker had when the user
+                // tapped it - not the post-default-staging `value`. Custom
+                // popup buttons that stage via setDate / setTime /
+                // setDuration / setSelectedString continue to be rolled back
+                // by endEditing(COMMAND_CANCEL) the same way. Issues #4897,
+                // #5014.
                 final InteractionDialog dlg = new InteractionDialog() {
 
                     ActionListener keyListener;
@@ -692,8 +742,9 @@ public class Picker extends Button {
                         .setBgTransparency(0)
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
-                Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
-                Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
+                final Container spinnerContainer = spinnerC instanceof Container ? (Container) spinnerC : null;
+                Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet, spinnerContainer);
+                Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet, spinnerContainer);
                 if (topCustomButtons != null || bottomCustomButtons != null) {
                     Container spinnerSection = new Container(new BorderLayout());
                     spinnerSection.add(BorderLayout.CENTER, wrapper);
@@ -789,7 +840,7 @@ public class Picker extends Button {
                     west.add(nextButton);
                 }
 
-                Container centerButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet);
+                Container centerButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet, spinnerContainer);
                 Container buttonBar = BorderLayout.centerEastWest(centerButtons, doneButton, west);
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
@@ -863,7 +914,7 @@ public class Picker extends Button {
         updateValue();
     }
 
-    private Container createLightweightPopupButtonRow(int placement, boolean isTablet) {
+    private Container createLightweightPopupButtonRow(int placement, boolean isTablet, Container spinnerContainer) {
         Container left = null;
         Container center = null;
         Container right = null;
@@ -872,7 +923,7 @@ public class Picker extends Button {
                 continue;
             }
             Button button = new Button(entry.text, isTablet ? "PickerButtonTablet" : "PickerButton");
-            button.addActionListener(new PopupButtonActionListener(entry));
+            button.addActionListener(new PopupButtonActionListener(entry, spinnerContainer));
             switch (entry.alignment) {
                 case Component.CENTER:
                     if (center == null) {

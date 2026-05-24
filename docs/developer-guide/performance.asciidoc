@@ -13,7 +13,7 @@ image::img/performance-image-sizes.png[Image sizes window that allows you to fin
 
 This produces a list of images sorted by size with their sizes. Often the top entries will be multi-images, which include HD resolution values that can be pretty large. These high-resolution images take up a significant amount of space!
 
-Just going to the multi-images, selecting the unnecessary resolutions & deleting these images can saves significant amounts of space:
+Just going to the multi-images, selecting the unnecessary resolutions & deleting these images can save significant amounts of space:
 
 .Removing unused DPI's
 image::img/performance-image-remove-dpi.png[Removing unused DPI's,scaledwidth=50%]
@@ -22,7 +22,7 @@ TIP: You can see the size in KB at the top right side in the designers image vie
 
 Applications using the old GUI builder can use the #Images# -> #Delete Unused Images# menu option (it’s also under the Images menu). This tool allows detecting and deleting images that aren’t used within the theme/GUI.
 
-If you've a large image that's opaque you might want to consider converting it to JPEG and replacing the built in PNG’s. Notice that JPEG's work on all supported devices and are typically smaller.
+If you have a large image that's opaque you might want to consider converting it to JPEG and replacing the built in PNG’s. Notice that JPEGs work on all supported devices and are typically smaller.
 
 .Convert a MultiImage to use JPEGs instead of PNGs
 image::img/performance-image-to-jpen.png[Convert a MultiImage to use JPEGs instead of PNGs]
@@ -39,7 +39,7 @@ The simulator contains some tools to measure performance overhead of a specific 
 
 * *Avoid round rect borders* - they have a huge overhead on all platforms. Use image borders instead (counter intuitively they're MUCH faster)
 // vale-skip: Microsoft.Adverbs: "perform poorly" is a precise performance descriptor (slow / inefficient), not a softener.
-* *Avoid Gradients* - they perform poorly on most OS's. Use a background image instead
+* *Avoid Gradients* - they perform poorly on most OSes. Use a background image instead
 // vale-skip: Microsoft.Adverbs: "tiling it repeatedly" describes the precise rendering operation, not authorial padding.
 * *Use larger images* when tiling or building image borders, using a 1 pixel (or event a few pixels) wide or high image and tiling it repeatedly can be expensive
 * *Shrink resource file sizes* - Otherwise data might get collected by the garbage collector and reloading data might be expensive
@@ -309,11 +309,11 @@ The framework enforces four rules at build and run time:
   `IOSSimd`, or `JavaSESimd`. Helper methods outside the SIMD package
   might themselves violate one of the other rules.
 . Don't pass an `alloca*` array through `invokedynamic`; dynamic dispatch
-  can't be analysed statically.
+  can't be analyzed statically.
 
 Inside the defining method you are free to pass the array to any number
 of `Simd` primitives, copy values into and out of it, combine it with
-other buffers, etc..
+other buffers, etc.
 
 ==== Build-Time verification
 
@@ -337,8 +337,7 @@ The verifier fails the build if a tainted value reaches any of:
 * `INVOKEDYNAMIC`: refused unconditionally
 
 Every violation is reported with the offending class, method, and the
-hint "Keep SIMD alloca scratch arrays method-local and only pass them to
-Simd methods." Because this is wired into the Maven build, code that
+hint "Keep SIMD alloca scratch arrays method-local and only pass them to SIMD methods." Because this is wired into the Maven build, code that
 would dereference freed stack memory on device can't ship.
 
 A complementary guard lives inside the translator itself:
@@ -419,7 +418,7 @@ The rendering tree view allows you to inspect the hierarchy painting. You can pr
 
 You can then inspect the hierarchy and see what was drawn by the various components. You can click the "stack" buttons to see the specific stack trace that lead to that specific drawing operation.
 
-This is a powerful debugging tool as you can see "overdraw" within this tool. E.g if you see `fillRect` or similar API's invoked in the parent and then again and again in the children this could show a problem.
+This is a powerful debugging tool as you can see "overdraw" within this tool. E.g if you see `fillRect` or similar APIs invoked in the parent and then again and again in the children this could show a problem.
 
 TIP: Android devices have a nice overdraw debugging tool
 
@@ -436,16 +435,16 @@ For this purpose the Codename One simulator allows you to slow down networking o
 
 When you debug your app with your source code you can place breakpoints deep within Codename One and gain unique insight. You can also use the profilers and profile into Codename One to gain similar performance specific insight.
 
-When you run into a bug or a missing feature you can push that feature/fix back to https://www.codenameone.com/[Codename One] using a pull request. Github makes that process trivial and in this new video and slides below you show you how.
+When you run into a bug or a missing feature you can push that feature/fix back to https://www.codenameone.com/[Codename One] using a pull request. GitHub makes that process trivial and in this new video and slides below you show you how.
 The steps to use the code are:
 
-. Signup for Github
+. Signup for GitHub
 . Fork http://github.com/codenameone/CodenameOne and
  http://github.com/codenameone/codenameone-skins
  (also star and watch the projects for good measure).
-. Clone the git URL's from the projects into the IDE using the #Team# -> #Git# -> #Clone# menu option. Notice that you must deselect projects in the IDE for the menu to appear.
+. Clone the git URLs from the projects into the IDE using the #Team# -> #Git# -> #Clone# menu option. Notice that you must deselect projects in the IDE for the menu to appear.
 
-. Download the cn1-binaries project from github https://github.com/codenameone/cn1-binaries/archive/master.zip[here].
+. Download the cn1-binaries project from GitHub https://github.com/codenameone/cn1-binaries/archive/master.zip[here].
 . Unzip the cn1-binaries project and make sure the directory has the name cn1-binaries. Verify that cn1-binaries, CodenameOne and codenameone-skins are within the same parent directory.
 .In your own project remove the jars both in the build & run libraries section. Replace the build libraries with the `CodenameOne/CodenameOne` project. Replace the runtime libraries with the `CodenameOne/Ports/JavaSEPort` project.
 
@@ -453,14 +452,14 @@ This allows you to run the existing Codename One project with the Codename One s
 
 === Device testing Framework/Unit testing
 
-Codename One includes a built in testing framework and test recorder tool as part of the simulator. This allows developers to build both functional and unit test execution on top of Codename One. It even enables sending tests for execution on the device (pro- feature).
+Codename One includes a built in testing framework and test recorder tool as part of the simulator. This allows developers to build both functional and unit test execution on top of Codename One. It even enables sending tests for execution on the device (pro-feature).
 
 To get started with the testing framework, launch the application and open the test recorder in the simulator menu.
 
 .The test recorder tool in the simulator
 image::img/test-recorder-blank.png[The test recorder tool in the simulator,scaledwidth=50%]
 
-Once you press record a test will be generate for you as you use the application.
+Once you press record a test will be generated for you as you use the application.
 
 .Test recording in progress, when done press the save icon
 image::img/test-recorder-in-progress.png[Test recording in progress, when done press the save icon,scaledwidth=50%]
@@ -503,7 +502,7 @@ https://www.codenameone.com/javadoc/com/codename1/system/CrashReport.html[`Crash
 callback will receive the exception, device information, and log payload so you
 can forward it to services like Firebase Crashlytics or your in-house tools.
 
-To truly gain from this feature you need to use the `Log` class for all logging and exception handling instead of API's such as `System.out`.
+To truly gain from this feature you need to use the `Log` class for all logging and exception handling instead of APIs such as `System.out`.
 
 To log standard printouts you can use the `Log.p(String)` method and to log exceptions with their stack trace you can use `Log.e(Throwable)`.
 
@@ -515,7 +514,7 @@ While debugging the contacts demo (part of the new kitchen sink demo), its perfo
 
 This led to the discovery that you're loading the same resource file over and over again for every single contact in the list!
 
-In the new Contacts demo you've a share button for each contact, the code for constructing a `ShareButton` looks like this:
+In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
 
 [source,java]
 ----

@@ -4674,6 +4674,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         simulateMenu.add(biometricMenu);
 
+        installNfcSimulationMenu(simulateMenu, pref);
+
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
         // top of Toolbar created by Toolbar.initTitleBarStatus). The native
@@ -6035,6 +6037,250 @@ public class JavaSEPort extends CodenameOneImplementation {
             largerTextMenu.add(item);
         }
         parent.add(largerTextMenu);
+    }
+
+    /**
+     * Wires up the Simulate -> NFC submenu so apps that touch
+     * {@link com.codename1.nfc.Nfc} can be exercised in the simulator
+     * without an NFC device. Items:
+     * <ul>
+     *   <li>"Tap virtual tag" -- fires the configured outcome (discovery,
+     *       cancel, tag lost, timeout, read-only) on any pending
+     *       readTag() / listeners.</li>
+     *   <li>"Edit virtual tag URI..." / "Edit virtual tag text..." -- set
+     *       the NDEF message returned by the tap.</li>
+     *   <li>"Hardware Available" / "NFC Enabled" / "HCE Available" toggles
+     *       so canRead() / canHostEmulate() return the simulator-configured
+     *       value.</li>
+     *   <li>"Send APDU to HCE service..." -- pops a hex-entry dialog,
+     *       dispatches the bytes to the application's registered
+     *       HostCardEmulationService, and shows the response.</li>
+     *   <li>"Make tag read-only" -- mark the virtual tag locked so the
+     *       next write fails with READ_ONLY.</li>
+     * </ul>
+     * Preferences keys all start with "NfcSim." so they survive simulator
+     * restarts.
+     */
+    private void installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu nfcMenu = new JMenu("NFC");
+
+        final JCheckBoxMenuItem hwAvailable = new JCheckBoxMenuItem(
+                "Hardware Available", pref.getBoolean("NfcSim.supported", true));
+        JavaSENfc.simSupported = hwAvailable.isSelected();
+        hwAvailable.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simSupported = hwAvailable.isSelected();
+                pref.putBoolean("NfcSim.supported", hwAvailable.isSelected());
+            }
+        });
+        nfcMenu.add(hwAvailable);
+
+        final JCheckBoxMenuItem enabled = new JCheckBoxMenuItem(
+                "NFC Enabled", pref.getBoolean("NfcSim.enabled", true));
+        JavaSENfc.simEnabled = enabled.isSelected();
+        enabled.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simEnabled = enabled.isSelected();
+                pref.putBoolean("NfcSim.enabled", enabled.isSelected());
+            }
+        });
+        nfcMenu.add(enabled);
+
+        final JCheckBoxMenuItem hce = new JCheckBoxMenuItem(
+                "HCE Available", pref.getBoolean("NfcSim.hce", true));
+        JavaSENfc.simHceSupported = hce.isSelected();
+        hce.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simHceSupported = hce.isSelected();
+                pref.putBoolean("NfcSim.hce", hce.isSelected());
+            }
+        });
+        nfcMenu.add(hce);
+
+        nfcMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Next read outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        String savedOutcome = pref.get("NfcSim.outcome",
+                JavaSENfc.SimReadOutcome.DISCOVER_TAG.name());
+        try {
+            JavaSENfc.nextReadOutcome =
+                    JavaSENfc.SimReadOutcome.valueOf(savedOutcome);
+        } catch (IllegalArgumentException ex) {
+            JavaSENfc.nextReadOutcome = JavaSENfc.SimReadOutcome.DISCOVER_TAG;
+        }
+        for (final JavaSENfc.SimReadOutcome o : JavaSENfc.SimReadOutcome.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(o.name(),
+                    o == JavaSENfc.nextReadOutcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSENfc.nextReadOutcome = o;
+                    pref.put("NfcSim.outcome", o.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        nfcMenu.add(outcomeMenu);
+
+        JMenuItem tap = new JMenuItem("Tap virtual tag");
+        tap.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                com.codename1.nfc.Nfc n = getNfc();
+                if (n instanceof JavaSENfc) {
+                    ((JavaSENfc) n).simulateTap();
+                }
+            }
+        });
+        nfcMenu.add(tap);
+
+        nfcMenu.addSeparator();
+
+        JMenuItem setUri = new JMenuItem("Set virtual tag URI...");
+        setUri.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.uri",
+                        "https://codenameone.com");
+                String uri = JOptionPane.showInputDialog(
+                        canvas,
+                        "Virtual tag URI:",
+                        def);
+                if (uri != null) {
+                    JavaSENfc.simNdef = new com.codename1.nfc.NdefMessage(
+                            com.codename1.nfc.NdefRecord.createUri(uri));
+                    pref.put("NfcSim.uri", uri);
+                }
+            }
+        });
+        nfcMenu.add(setUri);
+
+        JMenuItem setText = new JMenuItem("Set virtual tag text...");
+        setText.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.text", "Hello Codename One");
+                String t = JOptionPane.showInputDialog(
+                        canvas,
+                        "Virtual tag text:",
+                        def);
+                if (t != null) {
+                    JavaSENfc.simNdef = new com.codename1.nfc.NdefMessage(
+                            com.codename1.nfc.NdefRecord.createText("en", t));
+                    pref.put("NfcSim.text", t);
+                }
+            }
+        });
+        nfcMenu.add(setText);
+
+        final JCheckBoxMenuItem locked = new JCheckBoxMenuItem(
+                "Tag is read-only", !pref.getBoolean("NfcSim.writable", true));
+        JavaSENfc.tagWritable = !locked.isSelected();
+        locked.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.tagWritable = !locked.isSelected();
+                pref.putBoolean("NfcSim.writable", !locked.isSelected());
+            }
+        });
+        nfcMenu.add(locked);
+
+        nfcMenu.addSeparator();
+
+        JMenuItem sendApdu = new JMenuItem("Send APDU to HCE service...");
+        sendApdu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.apdu",
+                        "00A4040007F0010203040506");
+                String hex = JOptionPane.showInputDialog(
+                        canvas,
+                        "APDU bytes (hex):",
+                        def);
+                if (hex == null) {
+                    return;
+                }
+                byte[] command;
+                try {
+                    command = parseHex(hex);
+                } catch (RuntimeException re) {
+                    JOptionPane.showMessageDialog(canvas,
+                            "Invalid hex: " + re.getMessage());
+                    return;
+                }
+                pref.put("NfcSim.apdu", hex);
+                com.codename1.nfc.Nfc n = getNfc();
+                if (!(n instanceof JavaSENfc)) {
+                    JOptionPane.showMessageDialog(canvas,
+                            "NFC simulator unavailable.");
+                    return;
+                }
+                byte[] resp = ((JavaSENfc) n).simulateApdu(command);
+                JOptionPane.showMessageDialog(canvas,
+                        "Response: " + toHex(resp));
+            }
+        });
+        nfcMenu.add(sendApdu);
+
+        JMenuItem deactivate = new JMenuItem("Deactivate HCE field");
+        deactivate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                com.codename1.nfc.Nfc n = getNfc();
+                if (n instanceof JavaSENfc) {
+                    ((JavaSENfc) n).simulateDeactivate(
+                            com.codename1.nfc.HostCardEmulationService.DEACTIVATION_LINK_LOSS);
+                }
+            }
+        });
+        nfcMenu.add(deactivate);
+
+        simulateMenu.add(nfcMenu);
+    }
+
+    private static byte[] parseHex(String hex) {
+        if (hex == null) {
+            return new byte[0];
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < hex.length(); i++) {
+            char c = hex.charAt(i);
+            if (c != ' ' && c != ':' && c != '-') {
+                sb.append(c);
+            }
+        }
+        String clean = sb.toString();
+        if ((clean.length() & 1) != 0) {
+            throw new IllegalArgumentException("hex must have an even number of chars");
+        }
+        byte[] out = new byte[clean.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            int hi = Character.digit(clean.charAt(i * 2), 16);
+            int lo = Character.digit(clean.charAt(i * 2 + 1), 16);
+            if (hi < 0 || lo < 0) {
+                throw new IllegalArgumentException("non-hex digit at " + i);
+            }
+            out[i] = (byte) ((hi << 4) | lo);
+        }
+        return out;
+    }
+
+    private static String toHex(byte[] in) {
+        if (in == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(in.length * 2);
+        for (int i = 0; i < in.length; i++) {
+            int b = in[i] & 0xFF;
+            sb.append(Character.forDigit((b >>> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
+        }
+        return sb.toString().toUpperCase();
     }
 
     @Override
@@ -11858,7 +12104,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
+    private JavaSENfc nfc;
     private boolean biometricsBuildHintsInstalled;
+    private boolean nfcBuildHintsInstalled;
 
     @Override
     public Biometrics getBiometrics() {
@@ -11876,6 +12124,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             secureStorage = new JavaSESecureStorage((JavaSEBiometrics) getBiometrics());
         }
         return secureStorage;
+    }
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        installNfcBuildHintsIfNeeded();
+        if (nfc == null) {
+            nfc = new JavaSENfc();
+        }
+        return nfc;
+    }
+
+    /**
+     * The first time the app reaches the NFC API in the simulator, write
+     * placeholders for ios.NFCReaderUsageDescription if the developer has
+     * not supplied one. Apple rejects builds that ship Core NFC without
+     * the plist entry, so this keeps simulator-developed projects buildable
+     * on iOS without the developer remembering the build hint. The
+     * placeholder should be replaced with locale-specific copy before
+     * shipping.
+     */
+    private void installNfcBuildHintsIfNeeded() {
+        if (nfcBuildHintsInstalled) {
+            return;
+        }
+        nfcBuildHintsInstalled = true;
+        Map<String, String> existing = getProjectBuildHints();
+        if (existing == null) {
+            return;
+        }
+        if (!existing.containsKey("ios.NFCReaderUsageDescription")) {
+            try {
+                setProjectBuildHint(
+                        "ios.NFCReaderUsageDescription",
+                        "Hold near an NFC tag to continue");
+            } catch (RuntimeException ignore) {
+                // codenameone_settings.properties became unwritable; not
+                // fatal -- the device builder will surface the missing hint.
+            }
+        }
     }
 
     /**

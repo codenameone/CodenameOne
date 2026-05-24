@@ -1257,10 +1257,121 @@ public class ByteCodeClass {
         b.append(");\n");
 
         b.append("__").append(clsName).append("_LOADED__=1;\n");
-        
+
         b.append("}\n\n");
-        
+
+        // On-device-debug: emit the instance-field offset table for this
+        // class. Wrapped in CN1_ON_DEVICE_DEBUG so release builds don't pay
+        // the data or registration cost.
+        if (BytecodeMethod.isOnDeviceDebug()) {
+            appendOnDeviceDebugFieldTable(b);
+            appendOnDeviceDebugInvokeThunks(b);
+        }
+
         return b.toString();
+    }
+
+    /**
+     * Emits a per-method shim that lets the debugger runtime call any
+     * translated method generically. Each thunk unpacks an argument array
+     * into the typed C parameters that the underlying function expects,
+     * wraps the call in a catch-all try block so an uncaught Throwable
+     * round-trips back as a value instead of unwinding past
+     * suspendCurrent, and packs the return value into a uniform
+     * {@code cn1_invoke_result}. A __attribute__((constructor)) at the
+     * bottom registers each thunk with the global registry keyed by
+     * methodOffset.
+     */
+    private void appendOnDeviceDebugInvokeThunks(StringBuilder b) {
+        // Skip thunk generation for classes whose impl is hand-written
+        // native code that's been allowed to fall out of sync with the
+        // translator's calling convention. Without thunks the linker
+        // dead-strips the C wrapper (since user code typically doesn't
+        // call those wrappers); with thunks the wrapper is forced live
+        // and the link fails on missing native impls.
+        //
+        // The skip list is intentionally narrow — only the packages
+        // where this is known to bite. java.lang / java.util etc. are
+        // fine and worth keeping (jdb leans on Object.toString for
+        // "print" output, and we want lists/strings to round-trip too).
+        if (clsName.startsWith("java_io_") || clsName.startsWith("java_net_")
+                || clsName.startsWith("java_nio_")
+                || clsName.startsWith("com_codename1_impl_")) {
+            return;
+        }
+        // We emit a constructor PER class that registers all of that
+        // class's invoke thunks in one go. The thunks themselves are
+        // file-static so they don't leak symbols.
+        List<BytecodeMethod> eligible = new ArrayList<>();
+        for (BytecodeMethod m : methods) {
+            if (m.isEliminated()) continue;
+            if (m.isConstructor()) continue;
+            String name = m.getMethodName();
+            if ("__CLINIT__".equals(name) || "<clinit>".equals(name)) continue;
+            // Abstract methods have no body to call. Native methods are
+            // fine — their impls live in nativeMethods.m / iOS port
+            // hand-written code, with the same C name our thunk calls.
+            // We rely on the class-prefix filter above to skip whole
+            // packages whose native sidecar isn't linked in this build
+            // (java.io / java.net / java.nio / com.codename1.impl).
+            if (m.isAbstract()) continue;
+            eligible.add(m);
+        }
+        if (eligible.isEmpty()) return;
+
+        b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
+        b.append("#include <setjmp.h>\n");
+        b.append("#include <string.h>\n");
+        for (BytecodeMethod m : eligible) {
+            m.appendOnDeviceDebugInvokeThunk(clsName, b);
+        }
+        b.append("__attribute__((constructor)) static void __cn1_dbg_register_invoke_thunks_")
+                .append(clsName).append("(void) {\n");
+        for (BytecodeMethod m : eligible) {
+            b.append("    cn1_debugger_register_invoke_thunk(")
+              .append(m.getMethodOffset())
+              .append(", &__cn1_dbg_invoke_").append(m.getMethodOffset()).append(");\n");
+        }
+        b.append("}\n");
+        b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
+    }
+
+    private void appendOnDeviceDebugFieldTable(StringBuilder b) {
+        // Inherit-through layout-order list: parents first, this class last.
+        // Matches addFields() so offsetof() lines up with the actual struct.
+        List<ByteCodeField> instance = getAllInstanceFieldsInLayoutOrder();
+        // Drop any field whose declaring class isn't itself in the
+        // translation unit. We can't take offsetof of a field whose struct
+        // we don't have, but this should never happen — translator pulls in
+        // parents transitively.
+        b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
+        b.append("#import \"cn1_debugger.h\"\n");
+        b.append("static const cn1_field_entry __cn1_dbg_fields_").append(clsName).append("[] = {\n");
+        for (ByteCodeField bf : instance) {
+            String declCls = bf.getClsName().replace('/', '_').replace('$', '_');
+            int fid = Parser.getOrAssignFieldId(declCls, bf.getFieldName());
+            char tc = onDeviceDebugTypeCharFor(bf);
+            b.append("    { ").append(fid)
+              .append(", (int)offsetof(struct obj__").append(clsName)
+              .append(", ").append(declCls).append("_").append(bf.getFieldName())
+              .append("), '").append(tc).append("', \"")
+              .append(bf.getFieldName()).append("\" },\n");
+        }
+        b.append("};\n");
+        b.append("__attribute__((constructor)) static void __cn1_dbg_register_").append(clsName).append("(void) {\n");
+        b.append("    cn1_debugger_register_fields(cn1_class_id_").append(clsName).append(",\n");
+        b.append("            __cn1_dbg_fields_").append(clsName).append(",\n");
+        b.append("            (int)(sizeof(__cn1_dbg_fields_").append(clsName).append(") / sizeof(cn1_field_entry)));\n");
+        b.append("}\n");
+        b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
+    }
+
+    private static char onDeviceDebugTypeCharFor(ByteCodeField bf) {
+        // Object and arrays — both stored as JAVA_OBJECT in the C struct.
+        if (bf.isObjectType()) return 'L';
+        String d = bf.getRuntimeDescriptor();
+        if (d != null && d.length() == 1) return d.charAt(0);
+        return 'L';
     }
 
     private boolean doesImplement(ByteCodeClass interfaceObj) {
@@ -1932,7 +2043,11 @@ public class ByteCodeClass {
 
     public void setSourceFile(String sourceFile) {
         this.sourceFile = sourceFile;
-    } 
+    }
+
+    public String getSourceFile() {
+        return sourceFile;
+    }
 
     /**
      * @return the classOffset
@@ -1975,6 +2090,30 @@ public class ByteCodeClass {
 
     public List<ByteCodeField> getFields() {
         return fields;
+    }
+
+    /**
+     * Walks the inheritance chain and collects every instance field this class
+     * physically stores in its C struct (in declaration order, parents first
+     * to match {@link #addFields}). Used by the on-device-debug sidecar so the
+     * proxy can ask the device for inherited fields by their declaring-class
+     * fieldId without a JDWP-level type walk.
+     */
+    public List<ByteCodeField> getAllInstanceFieldsInLayoutOrder() {
+        List<ByteCodeField> out = new ArrayList<>();
+        collectInstanceFieldsInLayoutOrder(out);
+        return out;
+    }
+
+    private void collectInstanceFieldsInLayoutOrder(List<ByteCodeField> out) {
+        if (baseClassObject != null) {
+            baseClassObject.collectInstanceFieldsInLayoutOrder(out);
+        }
+        for (ByteCodeField bf : fields) {
+            if (!bf.isStaticField()) {
+                out.add(bf);
+            }
+        }
     }
 
     /**

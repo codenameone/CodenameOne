@@ -1,8 +1,8 @@
-== Working with Mac OS X
+== Working with macOS
 
-=== Mac OS Desktop Build Options
+=== macOS Desktop Build Options
 
-You can configure Desktop Mac OS build settings, by opening Codename One Settings, and clicking the "Mac Desktop Settings" button:
+You can configure Desktop macOS build settings, by opening Codename One Settings, and clicking the "Mac Desktop Settings" button:
 
 .Mac Desktop settings
 image::img/mac-desktop-settings-button.png[Mac Desktop settings,scaledwidth=30%]
@@ -16,7 +16,7 @@ Here you can provide your certificate(s) as a `.p12` file, and select a bundle t
 
 ==== Bundle Types
 
-Three bundle types dictate what the build server produces for you when you build your project as a Desktop Mac OS App.
+Three bundle types dictate what the build server produces for you when you build your project as a Desktop macOS App.
 
 . **DMG** - Produces a `.DMG` disk image with your app. This is the preferred format for distributing your app outside of the Mac App Store. If you provide a Developer ID Application certificate (see "Understanding Certificates" below), the app will be signed so that users won't receive warnings about "Unidentified developer" when they install your app.
 . **Sandboxed DMG** - Same as **DMG** bundle type except that your app is set up to use the app sandbox. This is typically used to test an app that's being distributed via the App Store, since App Store apps *must* use the sandbox. If you select this bundle type, you're *required* to provide a Mac App Distribution Certificate, and you should also specify entitlements required for your app to function correctly. For more information about the app sandbox, see https://developer.apple.com/app-sandboxing/[Apple's documentation on the subject].
@@ -81,7 +81,7 @@ The "Sandboxed DMG" target will look for a "Mac App Distribution Certificate" ce
 
 The "Mac App Store Upload (PKG)" target will require both a "Mac App Distribution Certificate" and a "Mac App Installer Certificate" to be included in the P12.
 
-The easiest way to produce a P12 that includes all 3 kinds of certificates is to export them from the Keychain Access app (Requires a Mac). Select all 3 certificates at once (using CMD-click), then right click and select "Export 3 Items..."
+The easiest way to produce a P12 that includes all 3 kinds of certificates is to export them from the Keychain Access app (Requires a Mac). Select all 3 certificates at once (using CMD-click), then right-click and select "Export 3 Items..."
 
 image::img/mac-desktop-export-certificates-as-p12.png[Exporting certificates as P12,scaledwidth=10%]
 

@@ -7,7 +7,7 @@ working with the higher level events is far more potable since it might map to d
 
 === High-level events
 
-high-level events are broadcast using an `addListener`/`setListener` - publish/subscribe system. Most of them are channeled via the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which further simplifies that and makes sending events far easier.
+High-level events are broadcast using an `addListener`/`setListener` - publish/subscribe system. Most of them are channeled via the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which further simplifies that and makes sending events far easier.
 
 TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` makes sure of that.
 
@@ -15,7 +15,7 @@ TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` ma
 
 Since all events fire on the EDT some complexities occur. E.g.:
 
-you have two listeners monitoring the same event (or related events for example, pointer event and button click event both of which will fire when the button is touched).
+You have two listeners monitoring the same event (or related events for example, pointer event and button click event both of which will fire when the button is touched).
 
 When the event occurs you can run into a scenario like this:
 
@@ -106,7 +106,9 @@ Notice that you can check if an event was already consumed using the `isConsumed
 
 ===== NetworkEvent
 
-https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEvent] is a subclass of `ActionEvent` that's passed to `actionPerformed` callbacks made in relation to generic network code. For example, [source,java]
+https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEvent] is a subclass of `ActionEvent` that's passed to `actionPerformed` callbacks made in relation to generic network code. For example:
+
+[source,java]
 ----
 NetworkManager.getInstance().addErrorListener(new ActionListener<NetworkEvent>() {
     public void actionPerformed(NetworkEvent ev) {
@@ -124,7 +126,7 @@ NetworkManager.getInstance().addErrorListener((ev) -> {
 });
 ----
 
-The `NetworkEvent` allows the networking code to reuse the `EventDispatcher` infrastructure and to simplify event firing thru the EDT. But you should notice that some code might not be equivalent for example, you could do this to read the input stream:
+The `NetworkEvent` allows the networking code to reuse the `EventDispatcher` infrastructure and to simplify event firing through the EDT. But you should notice that some code might not be equivalent for example, you could do this to read the input stream:
 
 [source,java]
 ----
@@ -136,7 +138,7 @@ ConnectionRequest r = new ConnectionRequest() {
 };
 ----
 
-or you can do something similar using this code:
+Or you can do something similar using this code:
 
 [source,java]
 ----
@@ -233,7 +235,7 @@ cmp.getUnselectedStyle().setFgColor(0xffffff);
 ----
 
 This will trigger a style event that will eventually lead to the component being repainted. This is quite important
-for the component class but not a important event for general user code. it's recommended that developers don't bind a style listener.
+for the component class but not an important event for general user code. It's recommended that developers don't bind a style listener.
 
 ==== Component state change events
 
@@ -269,13 +271,13 @@ private void fireEvent(ActionEvent ev) {
 
 === Low-level events
 
-low-level events map to "system" events directly. Touch events are considered low-level since they might expose platform specific nuances to your code.
+Low-level events map to "system" events directly. Touch events are considered low-level since they might expose platform specific nuances to your code.
 
 For example, one platform might send many events during drag while another might send a few. The high-level event handling hides those complexities but some of them trickle down into the low-level event handling.
 
 TIP: Codename One tries to hide some complexities from the low-level events as well. But, due to the nature of the event types it's a more challenging task.
 
-low-level events can be bound in one of 3 ways:
+Low-level events can be bound in one of 3 ways:
 
 * Use one of the add listener methods in https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] for example, `addPointerPressedListener`.
 
@@ -289,7 +291,7 @@ Each of those has advantages and disadvantages, specifically:
 
 * 'Form' based events and callbacks deliver pointer events in the 'Form' coordinate space.
 * 'Component' based events require focus
-* 'Form' based events can block existing functionality from proceeding thru the event chain for example, you can avoid calling super in a form event and thus block other events from happening (for example, block a listener or component event from triggering).
+* 'Form' based events can block existing functionality from proceeding through the event chain for example, you can avoid calling super in a form event and thus block other events from happening (for example, block a listener or component event from triggering).
 
 .Event type map
 [cols="4*"]
@@ -309,7 +311,7 @@ Each of those has advantages and disadvantages, specifically:
 
 ==== Low-level event types
 
-two basic types of low-level events: Key and Pointer.
+There are two basic types of low-level events: Key and Pointer.
 
 IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangeListener` as mentioned above.
 
@@ -342,7 +344,7 @@ Drag lifecycles also expose a completion hook. When `Component.addDragFinishedLi
 
 Drag events are quite difficult to handle across devices. Some devices send a ridiculous number of events for even the lightest touch while others send too little. It seems like too many drag events wouldn't be a problem, but if you drag over a button then it might disable the buttons action event (since this might be the user trying to scroll).
 
-Drag sensitivity is about the component being dragged which is why you've the method `getDragRegionStatus` that allows you to "hint" to the drag API whether you're interested in drag events or not and if so in which directional bias.
+Drag sensitivity is about the component being dragged which is why you have the method `getDragRegionStatus` that allows you to "hint" to the drag API whether you're interested in drag events or not and if so in which directional bias.
 
 For example, if your component is a painting app where you're trying to draw using drag gestures you would use code such as:
 
@@ -363,7 +365,7 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/events/BrowserNavigatio
 
 IMPORTANT: The callback method of this interface is invoked off the EDT! You must **NEVER** block this method and must not access UI or Codename One sensitive elements in this method!
 
-The browser navigation callback is invoked directly from the native web component as it navigates to a new page. Because of that it's invoked on the native OS thread and gives you a unique opportunity to handle the navigation ourselves as you see fit. that's why it MUST be invoked on the native thread, since the native browser is pending on your response to that method, spanning an invokeAndBlock/callSerially would be to slow and would bog down the browser.
+The browser navigation callback is invoked directly from the native web component as it navigates to a new page. Because of that it's invoked on the native OS thread and gives you a unique opportunity to handle the navigation ourselves as you see fit. That's why it MUST be invoked on the native thread, since the native browser is pending on your response to that method, spanning an invokeAndBlock/callSerially would be to slow and would bog down the browser.
 
 You can use the browser navigation callback to change the UI or even to invoke Java code from JavaScript code e.g.:
 

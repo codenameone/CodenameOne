@@ -71,6 +71,7 @@
         <module>codenameone-maven-plugin</module>
         <module>cn1app-archetype</module>
         <module>cn1lib-archetype</module>
+        <module>cn1-debug-proxy</module>
     </modules>
     <dependencyManagement>
         <dependencies>

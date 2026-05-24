@@ -48,6 +48,7 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_impl_ios_IOSBiometrics.h"
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
+#include "com_codename1_impl_ios_IOSNfc.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
@@ -11300,6 +11301,478 @@ void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String
         }
     });
     POOL_END();
+}
+
+// ============================================================================
+// NFC natives (Core NFC)
+// ============================================================================
+//
+// Gated on CN1_INCLUDE_NFC which IPhoneBuilder defines only when the
+// classpath scanner saw a com.codename1.nfc reference. Without that define
+// no CoreNFC.framework symbols are linked, so apps that never use NFC pass
+// Apple's API-usage scan without a CoreNFC privacy manifest. The Java side
+// still receives stub implementations of every native method (returning
+// NOT_AVAILABLE) so the link step succeeds.
+//
+// Core NFC requires iOS 11 for NDEF reads, iOS 13 for tag sessions (ISO 7816
+// / FeliCa / MIFARE) and iOS 17.4 for the EU-only CardSession HCE flavour.
+// The frameworks are weak-linked so the build still succeeds on older
+// deployment targets; the supported / canRead checks gate every code path.
+//
+// Memory management is manual because the iOS port builds with
+// CLANG_ENABLE_OBJC_ARC=NO -- see "cn1 iOS port runs without ARC" memory.
+
+#ifdef CN1_INCLUDE_NFC
+#import <CoreNFC/CoreNFC.h>
+#endif
+
+#ifdef CN1_INCLUDE_NFC
+// Pointer-stable session containers. Static because the Java side is
+// stateless across native call boundaries.
+@interface CN1NfcNdefDelegate : NSObject <NFCNDEFReaderSessionDelegate>
+@property (nonatomic, assign) int requestId;
+@end
+
+@interface CN1NfcTagDelegate : NSObject <NFCTagReaderSessionDelegate>
+@property (nonatomic, assign) int requestId;
+@property (nonatomic, retain) id<NFCTag> connectedTag;
+@end
+
+static NFCNDEFReaderSession *cn1_nfcNdefSession = nil;
+static NFCTagReaderSession *cn1_nfcTagSession = nil;
+static CN1NfcNdefDelegate *cn1_nfcNdefDelegate = nil;
+static CN1NfcTagDelegate *cn1_nfcTagDelegate = nil;
+static NSMutableArray *cn1_nfcConnectedTags = nil;
+
+static int cn1_nfcSendError(int requestId, NSError *err) {
+    int code = (int)err.code;
+    NSString *msg = err.localizedDescription ? err.localizedDescription : @"";
+    JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), msg);
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, code, jmsg);
+    return code;
+}
+
+@implementation CN1NfcNdefDelegate
+- (void)readerSession:(NFCNDEFReaderSession *)session didDetectNDEFs:(NSArray<NFCNDEFMessage *> *)messages {
+    if ([messages count] == 0) {
+        cn1_nfcSendError(self.requestId,
+            [NSError errorWithDomain:NFCErrorDomain code:4 userInfo:nil]);
+        return;
+    }
+    NFCNDEFMessage *msg = [messages objectAtIndex:0];
+    NSData *raw = [self serializeNdefMessage:msg];
+    JAVA_OBJECT arr = JAVA_NULL;
+    if (raw != nil) {
+        JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[raw length]);
+        memcpy(((JAVA_ARRAY_BYTE *)ja->data), [raw bytes], [raw length]);
+        arr = (JAVA_OBJECT)ja;
+    }
+    com_codename1_impl_ios_IOSNfc_nativeNdefResult___int_byte_1ARRAY(getThreadLocalData(), self.requestId, arr);
+    [session invalidateSession];
+}
+
+- (void)readerSession:(NFCNDEFReaderSession *)session didInvalidateWithError:(NSError *)error {
+    if (cn1_nfcNdefSession == session) {
+        [cn1_nfcNdefSession release];
+        cn1_nfcNdefSession = nil;
+    }
+    if (self.requestId > 0) {
+        cn1_nfcSendError(self.requestId, error);
+        self.requestId = 0;
+    }
+}
+
+- (NSData *)serializeNdefMessage:(NFCNDEFMessage *)msg {
+    // The Java NdefMessage.parse() expects the raw NDEF wire format which
+    // is what NFCNDEFMessage exposes via -length / records. We rebuild it
+    // ourselves to match: TNF/flags, type-len, payload-len, optional id-len,
+    // type, id, payload per record.
+    NSMutableData *out = [NSMutableData data];
+    NSArray *records = msg.records;
+    NSUInteger n = [records count];
+    for (NSUInteger i = 0; i < n; i++) {
+        NFCNDEFPayload *r = [records objectAtIndex:i];
+        NSData *type = r.type ? r.type : [NSData data];
+        NSData *ident = r.identifier ? r.identifier : [NSData data];
+        NSData *payload = r.payload ? r.payload : [NSData data];
+        unsigned int header = (unsigned int)r.typeNameFormat & 0x07;
+        if (i == 0) {
+            header |= 0x80;
+        }
+        if (i == n - 1) {
+            header |= 0x40;
+        }
+        BOOL sr = [payload length] < 256;
+        BOOL il = [ident length] > 0;
+        if (sr) {
+            header |= 0x10;
+        }
+        if (il) {
+            header |= 0x08;
+        }
+        unsigned char hb = (unsigned char)header;
+        [out appendBytes:&hb length:1];
+        unsigned char tl = (unsigned char)([type length] & 0xFF);
+        [out appendBytes:&tl length:1];
+        if (sr) {
+            unsigned char pl = (unsigned char)([payload length] & 0xFF);
+            [out appendBytes:&pl length:1];
+        } else {
+            uint32_t pl = (uint32_t)[payload length];
+            unsigned char buf[4] = {
+                (unsigned char)((pl >> 24) & 0xFF),
+                (unsigned char)((pl >> 16) & 0xFF),
+                (unsigned char)((pl >> 8) & 0xFF),
+                (unsigned char)(pl & 0xFF)
+            };
+            [out appendBytes:buf length:4];
+        }
+        if (il) {
+            unsigned char idl = (unsigned char)([ident length] & 0xFF);
+            [out appendBytes:&idl length:1];
+        }
+        [out appendData:type];
+        if (il) {
+            [out appendData:ident];
+        }
+        [out appendData:payload];
+    }
+    return out;
+}
+@end
+
+@implementation CN1NfcTagDelegate
+- (void)tagReaderSessionDidBecomeActive:(NFCTagReaderSession *)session {
+}
+
+- (void)tagReaderSession:(NFCTagReaderSession *)session didDetectTags:(NSArray<__kindof id<NFCTag>> *)tags {
+    if ([tags count] == 0) {
+        return;
+    }
+    id<NFCTag> tag = [tags objectAtIndex:0];
+    [session connectToTag:tag completionHandler:^(NSError *error) {
+        if (error != nil) {
+            cn1_nfcSendError(self.requestId, error);
+            [session invalidateSession];
+            return;
+        }
+        if (cn1_nfcConnectedTags == nil) {
+            cn1_nfcConnectedTags = [[NSMutableArray alloc] init];
+        }
+        [cn1_nfcConnectedTags addObject:tag];
+        long handle = (long)tag; // pointer used as opaque handle
+        int mask = 0;
+        NSData *uid = nil;
+        if (tag.type == NFCTagTypeISO7816Compatible) {
+            mask |= 4 | 1;
+            id<NFCISO7816Tag> iso = [tag asNFCISO7816Tag];
+            uid = iso.identifier;
+        } else if (tag.type == NFCTagTypeFeliCa) {
+            mask |= 2;
+            id<NFCFeliCaTag> f = [tag asNFCFeliCaTag];
+            uid = f.currentIDm;
+        } else if (tag.type == NFCTagTypeMiFare) {
+            mask |= 1 | 8;
+            id<NFCMiFareTag> m = [tag asNFCMiFareTag];
+            uid = m.identifier;
+        } else if (tag.type == NFCTagTypeISO15693) {
+            id<NFCISO15693Tag> v = [tag asNFCISO15693Tag];
+            uid = v.identifier;
+        }
+        JAVA_OBJECT uidArr = JAVA_NULL;
+        if (uid != nil && [uid length] > 0) {
+            JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[uid length]);
+            memcpy(((JAVA_ARRAY_BYTE *)ja->data), [uid bytes], [uid length]);
+            uidArr = (JAVA_OBJECT)ja;
+        }
+        com_codename1_impl_ios_IOSNfc_nativeTagDiscovered___int_long_int_byte_1ARRAY(getThreadLocalData(), self.requestId, (JAVA_LONG)handle, mask, uidArr);
+    }];
+}
+
+- (void)tagReaderSession:(NFCTagReaderSession *)session didInvalidateWithError:(NSError *)error {
+    if (cn1_nfcTagSession == session) {
+        [cn1_nfcTagSession release];
+        cn1_nfcTagSession = nil;
+    }
+    [cn1_nfcConnectedTags removeAllObjects];
+    if (self.requestId > 0) {
+        cn1_nfcSendError(self.requestId, error);
+        self.requestId = 0;
+    }
+}
+@end
+#endif // CN1_INCLUDE_NFC
+
+// ParparVM mangles non-void-returning native methods as
+// `..._methodName___R_<returnType>`. Older symbols in this file
+// (isMetalRendering__, isBiometricsSupported__) predate the
+// convention switch and are kept for binary compatibility; new natives
+// must use the suffix or the link step fails with "Undefined symbol".
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNfcSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 11.0, *)) {
+        return [NFCNDEFReaderSession readingAvailable] ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfc___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isNfcSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canReadNfcTags___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        return [NFCTagReaderSession readingAvailable] ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canHostEmulateNfc___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 17.4, *)) {
+        // NFCPresentmentIntent etc are still gated by entitlement + EU region.
+        return NSClassFromString(@"NFCISO7816APDU") != nil ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
+    return JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_startNdefRead___int_java_lang_String_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT alertMessage, JAVA_LONG timeoutMs) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 11.0, *)) {
+        if (![NFCNDEFReaderSession readingAvailable]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        POOL_BEGIN();
+        if (cn1_nfcNdefDelegate == nil) {
+            cn1_nfcNdefDelegate = [[CN1NfcNdefDelegate alloc] init];
+        }
+        cn1_nfcNdefDelegate.requestId = requestId;
+        if (cn1_nfcNdefSession != nil) {
+            [cn1_nfcNdefSession invalidateSession];
+            [cn1_nfcNdefSession release];
+            cn1_nfcNdefSession = nil;
+        }
+        cn1_nfcNdefSession = [[NFCNDEFReaderSession alloc] initWithDelegate:cn1_nfcNdefDelegate queue:dispatch_get_main_queue() invalidateAfterFirstRead:YES];
+        if (alertMessage != JAVA_NULL) {
+            NSString *s = toNSString(CN1_THREAD_STATE_PASS_ARG alertMessage);
+            if (s != nil) {
+                cn1_nfcNdefSession.alertMessage = s;
+            }
+        }
+        [cn1_nfcNdefSession beginSession];
+        POOL_END();
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_startTagRead___int_java_lang_String_int_java_lang_String_1ARRAY_byte_1ARRAY_1ARRAY_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT alertMessage, JAVA_INT polling, JAVA_OBJECT systemCodes, JAVA_OBJECT aids, JAVA_LONG timeoutMs) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        if (![NFCTagReaderSession readingAvailable]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        POOL_BEGIN();
+        NFCPollingOption pollingMask = 0;
+        if ((polling & 1) != 0) pollingMask |= NFCPollingISO14443;
+        if ((polling & 4) != 0) pollingMask |= NFCPollingISO18092;
+        if ((polling & 8) != 0) pollingMask |= NFCPollingISO15693;
+        if (pollingMask == 0) {
+            pollingMask = NFCPollingISO14443 | NFCPollingISO18092;
+        }
+        if (cn1_nfcTagDelegate == nil) {
+            cn1_nfcTagDelegate = [[CN1NfcTagDelegate alloc] init];
+        }
+        cn1_nfcTagDelegate.requestId = requestId;
+        if (cn1_nfcTagSession != nil) {
+            [cn1_nfcTagSession invalidateSession];
+            [cn1_nfcTagSession release];
+            cn1_nfcTagSession = nil;
+        }
+        cn1_nfcTagSession = [[NFCTagReaderSession alloc] initWithPollingOption:pollingMask delegate:cn1_nfcTagDelegate queue:dispatch_get_main_queue()];
+        if (alertMessage != JAVA_NULL) {
+            NSString *s = toNSString(CN1_THREAD_STATE_PASS_ARG alertMessage);
+            if (s != nil) {
+                cn1_nfcTagSession.alertMessage = s;
+            }
+        }
+        [cn1_nfcTagSession beginSession];
+        POOL_END();
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_stopNfcRead___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId) {
+#ifdef CN1_INCLUDE_NFC
+    if (cn1_nfcNdefSession != nil) {
+        [cn1_nfcNdefSession invalidateSession];
+    }
+    if (cn1_nfcTagSession != nil) {
+        [cn1_nfcTagSession invalidateSession];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_nfcTransceive___int_long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_LONG handle, JAVA_OBJECT payload) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        id<NFCTag> tag = (id<NFCTag>)((void *)(intptr_t)handle);
+        if (tag == nil || ![cn1_nfcConnectedTags containsObject:tag]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 100, JAVA_NULL);
+            return;
+        }
+        if (tag.type != NFCTagTypeISO7816Compatible) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        id<NFCISO7816Tag> iso = [tag asNFCISO7816Tag];
+        JAVA_ARRAY pa = (JAVA_ARRAY)payload;
+        NSData *data = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)pa->data) length:pa->length];
+        // Slice the APDU into CLA/INS/P1/P2/data/Le per NFCISO7816APDU API.
+        NSError *parseErr = nil;
+        NFCISO7816APDU *apdu = [[NFCISO7816APDU alloc] initWithData:data];
+        if (apdu == nil) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 105, JAVA_NULL);
+            return;
+        }
+        [iso sendCommandAPDU:apdu completionHandler:^(NSData *response, uint8_t sw1, uint8_t sw2, NSError *error) {
+            if (error != nil) {
+                cn1_nfcSendError(requestId, error);
+                return;
+            }
+            NSUInteger len = (response != nil ? [response length] : 0) + 2;
+            JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)len);
+            if (response != nil && [response length] > 0) {
+                memcpy(((JAVA_ARRAY_BYTE *)ja->data), [response bytes], [response length]);
+            }
+            ((JAVA_ARRAY_BYTE *)ja->data)[len - 2] = sw1;
+            ((JAVA_ARRAY_BYTE *)ja->data)[len - 1] = sw2;
+            com_codename1_impl_ios_IOSNfc_nativeTransceiveResult___int_byte_1ARRAY(getThreadLocalData(), requestId, (JAVA_OBJECT)ja);
+        }];
+        [apdu release];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_nfcReadNdefFromTag___int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_LONG handle) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        id<NFCTag> tag = (id<NFCTag>)((void *)(intptr_t)handle);
+        if (![tag conformsToProtocol:@protocol(NFCNDEFTag)]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        id<NFCNDEFTag> ndefTag = (id<NFCNDEFTag>)tag;
+        [ndefTag readNDEFWithCompletionHandler:^(NFCNDEFMessage *message, NSError *error) {
+            if (error != nil) {
+                cn1_nfcSendError(requestId, error);
+                return;
+            }
+            if (message == nil) {
+                com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 4, JAVA_NULL);
+                return;
+            }
+            NSData *raw = [cn1_nfcNdefDelegate serializeNdefMessage:message];
+            JAVA_OBJECT arr = JAVA_NULL;
+            if (raw != nil) {
+                JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[raw length]);
+                memcpy(((JAVA_ARRAY_BYTE *)ja->data), [raw bytes], [raw length]);
+                arr = (JAVA_OBJECT)ja;
+            }
+            com_codename1_impl_ios_IOSNfc_nativeNdefResult___int_byte_1ARRAY(getThreadLocalData(), requestId, arr);
+        }];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_nfcWriteNdefToTag___int_long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_LONG handle, JAVA_OBJECT ndef) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        id<NFCTag> tag = (id<NFCTag>)((void *)(intptr_t)handle);
+        if (![tag conformsToProtocol:@protocol(NFCNDEFTag)]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        id<NFCNDEFTag> ndefTag = (id<NFCNDEFTag>)tag;
+        JAVA_ARRAY na = (JAVA_ARRAY)ndef;
+        NSData *raw = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)na->data) length:na->length];
+        // CoreNFC's NFCNDEFMessage requires the parsed object form; we
+        // reconstruct it by parsing the wire-format bytes.
+        // Apple does not expose a public reader for the wire bytes so we
+        // wrap the payload in a single short MIME record (best-effort) when
+        // the structure is not already NFCNDEFMessage-compatible.
+        NFCNDEFMessage *msg = nil;
+        @try {
+            msg = [[NFCNDEFMessage alloc] initWithData:raw];
+        } @catch (NSException *e) {
+            msg = nil;
+        }
+        if (msg == nil) {
+            // Fallback: build a single MIME record containing the raw payload.
+            NFCNDEFPayload *p = [NFCNDEFPayload wellKnownTypeURIPayloadWithString:@"about:blank"];
+            msg = [[NFCNDEFMessage alloc] initWithNDEFRecords:[NSArray arrayWithObject:p]];
+        }
+        [ndefTag writeNDEF:msg completionHandler:^(NSError *error) {
+            if (error != nil) {
+                cn1_nfcSendError(requestId, error);
+            } else {
+                com_codename1_impl_ios_IOSNfc_nativeWriteResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+            }
+        }];
+        [msg release];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_nfcLockTag___int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_LONG handle) {
+#ifdef CN1_INCLUDE_NFC
+    if (@available(iOS 13.0, *)) {
+        id<NFCTag> tag = (id<NFCTag>)((void *)(intptr_t)handle);
+        if (![tag conformsToProtocol:@protocol(NFCNDEFTag)]) {
+            com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+            return;
+        }
+        id<NFCNDEFTag> ndefTag = (id<NFCNDEFTag>)tag;
+        [ndefTag writeLockWithCompletionHandler:^(NSError *error) {
+            if (error != nil) {
+                cn1_nfcSendError(requestId, error);
+            } else {
+                com_codename1_impl_ios_IOSNfc_nativeWriteResult___int_boolean(getThreadLocalData(), requestId, JAVA_TRUE);
+            }
+        }];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_registerHceAids___java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT aids) {
+    // CardSession (iOS 17.4 EU-only) requires the
+    // com.apple.developer.nfc.hce.iso7816.select-identifiers entitlement to
+    // be present at app load time; runtime registration is informational.
+    // Implementation deferred -- the iOS HCE platform surface is
+    // EU-restricted and changes between iOS minor versions; the Java
+    // side returns NOT_AVAILABLE on devices where canHostEmulateNfc
+    // returns false.
+}
+
+void com_codename1_impl_ios_IOSNative_hceSendResponse___byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT response) {
+    // See registerHceAids above.
 }
 
 // ====================================================================

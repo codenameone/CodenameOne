@@ -1,6 +1,6 @@
 === Generate native interfaces (`generate-native-interfaces`)
 
-Generates stub implementations for all native interfaces defined in the project. This won't overwrite any existing implemetations that may exist.
+Generates stub implementations for all native interfaces defined in the project. This won't overwrite any existing implementations that may exist.
 
 You should run this goal explicitly after you create a native interface in your class.
 

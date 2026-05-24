@@ -91,8 +91,179 @@ public class Parser extends ClassVisitor {
             if(bc.getClsName().equals(name)) {
                 return bc;
             }
-        }        
+        }
         return null;
+    }
+
+    /**
+     * Resolves a class by name and returns its post-{@link #writeOutput}
+     * classOffset, or -1 if no class with that name exists. Used by the
+     * on-device-debug side-table emitter to wire stable IDs into the
+     * generated frame_info structs.
+     */
+    public static int getClassOffset(String name) {
+        ByteCodeClass bc = getClassByName(name);
+        return bc == null ? -1 : bc.getClassOffset();
+    }
+
+    /**
+     * On-device-debug field-id allocator. Maps a (declaring-class, field-name)
+     * pair to a stable int the device and proxy both use to address an
+     * instance field. Field ids start at 1 — 0 is reserved as a "no-field"
+     * sentinel so JDWP code can use 0 to mean "skip".
+     *
+     * IDs are persistent only within a single translator invocation; the
+     * sidecar carries them so the proxy doesn't need to recompute the same
+     * mapping.
+     */
+    private static final java.util.LinkedHashMap<String, Integer> fieldIdByKey = new java.util.LinkedHashMap<>();
+    private static int nextFieldId = 1;
+
+    public static int getOrAssignFieldId(String declClassMangled, String fieldName) {
+        String key = declClassMangled + "." + fieldName;
+        Integer id = fieldIdByKey.get(key);
+        if (id != null) return id;
+        id = nextFieldId++;
+        fieldIdByKey.put(key, id);
+        return id;
+    }
+
+    /**
+     * Returns the JVM-style descriptor for a ByteCodeField — "I" for int,
+     * "Lcom/example/Foo;" for object, "[I" for int[], etc. The translator
+     * normally exposes underscore-mangled type names; this helper converts
+     * to JVM form for JDWP wire compatibility.
+     */
+    public static String jvmDescriptorOf(ByteCodeField bf) {
+        StringBuilder sb = new StringBuilder();
+        String rd = bf.getRuntimeDescriptor();
+        // getRuntimeDescriptor returns either a JVM single-char (I/J/...)
+        // or an underscore-mangled object type, possibly followed by "[]"
+        // repeats for array dimensions.
+        int arrayDims = 0;
+        while (rd != null && rd.endsWith("[]")) {
+            arrayDims++;
+            rd = rd.substring(0, rd.length() - 2);
+        }
+        for (int i = 0; i < arrayDims; i++) sb.append('[');
+        if (rd != null && rd.length() == 1 && "ZBSCIJFD".indexOf(rd.charAt(0)) >= 0) {
+            sb.append(rd);
+        } else if (rd != null && !rd.isEmpty()) {
+            sb.append('L').append(rd.replace('_', '/')).append(';');
+        } else {
+            sb.append("Ljava/lang/Object;");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns a JDWP-style modifier bitmask (PUBLIC=1, PRIVATE=2, STATIC=8,
+     * FINAL=16, VOLATILE=64, TRANSIENT=128). We don't track protected/transient
+     * — fields are reported as public unless flagged private.
+     */
+    public static int jdwpAccessFlagsOf(ByteCodeField bf) {
+        int f = 0;
+        if (bf.isPrivate()) f |= 0x0002; else f |= 0x0001;
+        if (bf.isStaticField()) f |= 0x0008;
+        if (bf.isFinal()) f |= 0x0010;
+        if (bf.isVolatile()) f |= 0x0040;
+        return f;
+    }
+
+    /**
+     * Writes the on-device-debug symbol sidecar (cn1-symbols.txt) to the
+     * output directory. Format is line-based ASCII for trivial parsing
+     * by the desktop proxy:
+     *   version &lt;n&gt;
+     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt;
+     *   method  &lt;methodId&gt; &lt;classId&gt; &lt;methodName&gt; &lt;desc&gt;
+     *   line    &lt;methodId&gt; &lt;sourceLine&gt;
+     * The proxy uses this to map JDWP class signatures and source-line
+     * breakpoints back onto the (classId, methodId, line) tuples the
+     * device wire protocol speaks.
+     */
+    private static void writeSymbolSidecar(File outputDirectory) throws IOException {
+        File f = new File(outputDirectory, "cn1-symbols.txt");
+        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
+            w.write("version\t1\n");
+            for (ByteCodeClass bc : classes) {
+                String src = bc.getSourceFile();
+                if (src == null) {
+                    src = "";
+                }
+                // Extended class row: id, name, sourceFile, superId.
+                // Older proxies (4-column form) ignore the trailing
+                // column since the parser tolerates extras.
+                int superId = -1;
+                if (bc.getBaseClassObject() != null) {
+                    superId = bc.getBaseClassObject().getClassOffset();
+                }
+                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
+                        + "\t" + src + "\t" + superId + "\n");
+            }
+            // Emit instance-field metadata so the proxy can answer JDWP
+            // ClassType.Fields / FieldsWithGeneric without a device round-trip,
+            // and so ObjectReference.GetValues knows what (type, declaring class)
+            // each fieldId resolves to. We list inherited fields under each
+            // class that physically stores them — JDWP expects a class's
+            // Fields response to include only its own declarations, but
+            // listing inherited fields too keeps single-table lookup cheap on
+            // the proxy side; the proxy filters to "declared here" itself.
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (ByteCodeField bf : bc.getFields()) {
+                    if (bf.isStaticField()) continue;
+                    int fid = getOrAssignFieldId(bc.getClsName(), bf.getFieldName());
+                    String desc = jvmDescriptorOf(bf);
+                    int access = jdwpAccessFlagsOf(bf);
+                    w.write("field\t" + classId + "\t" + fid
+                            + "\t" + bf.getFieldName()
+                            + "\t" + desc
+                            + "\t" + access + "\n");
+                }
+            }
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (BytecodeMethod m : bc.getMethods()) {
+                    if (m.isEliminated()) {
+                        continue;
+                    }
+                    String desc = m.getDesc();
+                    if (desc == null) {
+                        desc = "";
+                    }
+                    // Extended method row: classId, name, desc, isStatic.
+                    // Older proxies that only know 4 columns ignore the 5th
+                    // because the parser slices with `split("\t", -1)` and
+                    // size-checks before reading.
+                    w.write("method\t" + m.getMethodOffset() + "\t" + classId
+                            + "\t" + m.getMethodName()
+                            + "\t" + desc
+                            + "\t" + (m.isStatic() ? "1" : "0") + "\n");
+                    Set<Integer> lines = new TreeSet<>();
+                    for (com.codename1.tools.translator.bytecodes.Instruction ins : m.getInstructions()) {
+                        if (ins instanceof com.codename1.tools.translator.bytecodes.LineNumber) {
+                            lines.add(((com.codename1.tools.translator.bytecodes.LineNumber)ins).getLine());
+                        }
+                    }
+                    for (Integer line : lines) {
+                        w.write("line\t" + m.getMethodOffset() + "\t" + line + "\n");
+                    }
+                    // Local variables: emitted as "always-live" scope until a
+                    // follow-up resolves ASM labels to source lines properly.
+                    // jdb tolerates this — uninitialised slots just show 0.
+                    for (com.codename1.tools.translator.bytecodes.LocalVariable lv : m.getLocalVariables()) {
+                        w.write("var\t" + m.getMethodOffset()
+                                + "\t" + lv.getIndex()
+                                + "\t" + lv.getOrigName()
+                                + "\t" + lv.getDesc() + "\n");
+                    }
+                }
+            }
+        }
+        if (ByteCodeTranslator.verbose) {
+            System.out.println("Wrote on-device-debug symbol sidecar: " + f.getAbsolutePath());
+        }
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {
@@ -497,6 +668,10 @@ public class Parser extends ClassVisitor {
                     writeFile(bc, outputDirectory, cos);
                 }
                 if (cos != null) cos.realClose();
+
+                if (BytecodeMethod.isOnDeviceDebug()) {
+                    writeSymbolSidecar(outputDirectory);
+                }
             }
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
@@ -559,6 +734,16 @@ public class Parser extends ClassVisitor {
                             System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
                         }
                     }
+                    continue;
+                }
+                // Preserve virtual-root methods of java.lang.Object when
+                // on-device-debug is on. jdb's `print` formats objects by
+                // calling Object.toString, and a debugger user can ask to
+                // invoke equals/hashCode/etc. without a static call site
+                // to keep their body alive on its own.
+                if (BytecodeMethod.isOnDeviceDebug()
+                        && "java_lang_Object".equals(bc.getClsName())
+                        && !mtd.isStatic()) {
                     continue;
                 }
 

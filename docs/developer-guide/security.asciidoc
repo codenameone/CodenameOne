@@ -8,7 +8,7 @@ ____
 Codename One applications are secure on the devices by the nature of the mobile OS security.
 ____
 
-For most intents and purposes this will be enough, unless you're specifically concerned about security this section isn't for you. Mobile OS's isolate applications from one another so it's hard for an application to damage the OS or even damage/spy on a different app.
+For most intents and purposes this will be enough, unless you're specifically concerned about security this section isn't for you. Mobile OSes isolate applications from one another so it's hard for an application to damage the OS or even damage/spy on a different app.
 
 The restrictions laid on apps are here to make them extra secure and on top of that Codename One lays a few big advantages in security:
 
@@ -17,13 +17,13 @@ The restrictions laid on apps are here to make them extra secure and on top of t
 - Codename One compiles the UI to native code too which means typical reverse engineering code will have a harder time following
 - Codename One disables debug flags so a hacker won't be able to debug your production app on the device
 
-Despite that you still need to keep in mind that the binary could still be reverse engineered and so it's important to avoid storing keys in the client side code. For example, if you've an API key to access a service (for example, Google Cloud key) it needs to be stored in your server and not as a constant in your app!
+Despite that you still need to keep in mind that the binary could still be reverse engineered and so it's important to avoid storing keys in the client side code. For example, if you have an API key to access a service (for example, Google Cloud key) it needs to be stored in your server and not as a constant in your app!
 
 Each section below discusses some attack vectors against applications and how they can be stopped. Pretty much all these attacks require a sophisticated attacker which will exist for high value targets (for example, bank apps, government etc.).
 
 === Constant obfuscation
 
-One of the first things a hacker will do when compromising an app is look at it. For example, an attacker wanting to exploit a bank's login UI would look at the label next to the login and then search for it in the decompiled code. If the UI has the String "enter user name and password" they can search for that.
+One of the first things a hacker will do when compromising an app is look at it. For example, an attacker wanting to exploit a bank's login UI would look at the label next to the login and then search for it in the decompiled code. If the UI has the String "enter username and password" they can search for that.
 
 It won't lead directly to a hack or exploit, but it will narrow down the area of the code where you should look and it makes the first step that much easier. Obfuscation helps as it removes descriptive method names but it can't hide the Strings you use in constants. If an app has a secret key within obfuscating it can make a difference (albeit a slight difference).
 
@@ -31,7 +31,7 @@ Notice that this is a temporary roadblock as any savvy hacker would compile the 
 
 NOTE: This isn't encoding or encryption — it's a simple obfuscation of the data.
 
-two simple methods in the `Util` class:
+There are two simple methods in the `Util` class:
 
 [source,java]
 ----
@@ -54,7 +54,7 @@ You might be concerned about the secret, then this would make it slightly harder
 private static final String SECRET = Util.xorDecode("RW1tI3Ema219KmpidGFhdTFhdnE1Yn9xajQ1MjM=");
 ----
 
-Notice that this **isn't secure**, if you've a crucial value that must not be found you need to store it in the server. No alternative exists because everything that's sent to the client can be compromised by a determined hacker.
+Notice that this **isn't secure**, if you have a crucial value that must not be found you need to store it in the server. No alternative exists because everything that's sent to the client can be compromised by a determined hacker.
 
 TIP: Use the comment to help you find the string in the code
 
@@ -103,14 +103,14 @@ Notice that you can't use storage or preferences to store this data as it would 
 changes his password you might have a problem. In that case you might need the old password to migrate to
 a new password.
 
-This works thru a new mechanism in storage where you can replace the storage instance with another instance using:
+This works through a new mechanism in storage where you can replace the storage instance with another instance using:
 
 [source,java]
 ----
 Storage.setStorageInstance(new MyCustomStorageSubclass());
 ----
 
-You can leverage that knowledge to change the encryption password on the encryption storage using pseudo code like this:
+You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
 
 [source,java]
 ----
@@ -163,9 +163,9 @@ NOTE: Notice that the inverse of using `false` might not work as expected
 
 iOS & Android are walled gardens which is both a blessing and a curse. Looking at the bright side the walled garden aspect of locked down devices means the devices are more secure by nature. For example, on a PC that was compromised you can detect the banking details of a user logging into a bank. But on a phone it would be much harder due to the deep process isolation.
 
-This isn't true for jailbroken or rooted devices. In these devices security has been compromised often with good intentions (opening up the ecosystem) but it can also be used as a step in a serious attack on an application!
+This isn't true for jailbroken or rooted devices. In these devices security has often been compromised with good intentions (opening up the ecosystem) but it can also be used as a step in a serious attack on an application!
 
-For obvious reasons it's hard to accurately detect a jailbroken or rooted device but when possible if you've a high security app you might want to block the functionality or even raise a "silent alarm" in such a case. To detect this you can use the `isJailbrokenDevice` method as such:
+For obvious reasons it's hard to accurately detect a jailbroken or rooted device but when possible if you have a high security app you might want to block the functionality or even raise a "silent alarm" in such a case. To detect this you can use the `isJailbrokenDevice` method as such:
 
 [source,java]
 ----
@@ -176,17 +176,17 @@ if(Display.getInstance().isJailbrokenDevice()) {
 }
 ----
 
-Notice that this isn't right, you can't be 100% sure as there are no official ways to detect jailbreak. that's why it's crucial to encrypt everything and assume the device was compromised to begin with when dealing with sensitive data. Still it's worthwhile to use these API's to make the life of an attacker a little bit harder.
+Notice that this isn't right, you can't be 100% sure as there are no official ways to detect jailbreak. That's why it's crucial to encrypt everything and assume the device was compromised to begin with when dealing with sensitive data. Still it's worthwhile to use these APIs to make the life of an attacker a little bit harder.
 
 === Strong Android certificates
 
 When Android launched RSA1024 with SHA1 was considered strong enough for the foreseeable future, this hasn't changed completely but the recommendation today is to use stronger cyphers for signing & encrypting as those can be compromised.
 
-APK's are signed as part of the build process when you upload an app to the Google Play Store. This process seems redundant as you generate the signature/certificate ourselves (unlike Apple which generates it for you). But, this is a crucial step as it allows the device to verify upgrades and make sure a new update is from the same original author!
+APKs are signed as part of the build process when you upload an app to the Google Play Store. This process seems redundant as you generate the signature/certificate ourselves (unlike Apple which generates it for you). But, this is a crucial step as it allows the device to verify upgrades and make sure a new update is from the same original author!
 
-This means that if a hacker takes over your account on Google Play, he still won't be able to ship fake updates to your apps without your certificate. that's important since if a hacker would have access to your certificate he could create an app update that would send him all the users private information for example, if you're a bank this could be a disaster.
+This means that if a hacker takes over your account on Google Play, he still won't be able to ship fake updates to your apps without your certificate. That's important since if a hacker would have access to your certificate he could create an app update that would send him all the users private information for example, if you're a bank this could be a disaster.
 
-Android launched with RSA1024/SHA1 as the signing certificates. This was good enough at the time and is still pretty secure. But, these algorithms are eroding and it's conceivable that within the 10-15 year lifetime of an app they might be compromised using powerful hardware. that's why Google introduced support for stronger cryptographic signing into newer versions of Android and you can use that.
+Android launched with RSA1024/SHA1 as the signing certificates. This was good enough at the time and is still pretty secure. But, these algorithms are eroding and it's conceivable that within the 10-15 year lifetime of an app they might be compromised using powerful hardware. That's why Google introduced support for stronger cryptographic signing in newer versions of Android and you can use that.
 
 ==== The bad news
 
@@ -204,11 +204,11 @@ If you're using #Codename One Setting# you can check the box to generate an SHA5
 
 === Certificate pinning
 
-When you connect to HTTPS servers your networking code checks the certificate on the server. If the certificate was issued by a trusted certificate authority then the connection goes through, otherwise it fails. Imagine you're sitting in a coffee shop connected to the local wifi, and you try to connect to Gmail to check your email. Since you use HTTPS to Google you trust the connection is secure.
+When you connect to HTTPS servers your networking code checks the certificate on the server. If the certificate was issued by a trusted certificate authority then the connection goes through, otherwise it fails. Imagine you're sitting in a coffee shop connected to the local Wi-Fi, and you try to connect to Gmail to check your email. Since you use HTTPS to Google you trust the connection is secure.
 
 TIP: What if the coffee shop was hacked and the router is listening in on everything?
 
-HTTPS is encrypted and the way encryption works is thru the certificate. The server sends you a certificate and you can use that to send encrypted data to it.
+HTTPS is encrypted and the way encryption works is through the certificate. The server sends you a certificate and you can use that to send encrypted data to it.
 
 TIP: What if the router grabs the server's certificate and communicates with Google on your behalf?
 
@@ -220,15 +220,15 @@ That won't work either. All certificates are signed by a "certificate authority"
 
 TIP: What if an attacker could get a fake certificate authorized by a real certificate authority?
 
-**that's a problem!**
+**That's a problem!**
 
-it's obviously hard to do but if someone was able to do this he could execute a "man in the middle" attack as described above. People were able to fool certificate authorities in the past and gain fake certificates using various methods so this is possible and probably doable for any government level attacker.
+It's obviously hard to do but if someone was able to do this he could execute a "man in the middle" attack as described above. People were able to fool certificate authorities in the past and gain fake certificates using various methods so this is possible and probably doable for any government level attacker.
 
 ==== Certificate pinning
 
 This is the attack certificate pinning (or SSL pinning) aims to prevent. You code into your app the "fingerprint" of the certificate that's "good" and thus prevent the app from working when the certificate is changed. This might break the app if you replace the certificate at some point but that might be reasonable in such a case.
 
-To do this you've a https://github.com/codenameone/SSLCertificateFingerprint/[cn1lib]. that fetches the certificate fingerprint from the server, you can check this fingerprint against a list of "authorized" keys to decide whether it's valid. You can install the `SSLCertificateFingerprint` from the extensions section in #Codename One Settings# and use something like this to verify your server:
+To do this you have a https://github.com/codenameone/SSLCertificateFingerprint/[cn1lib]. That fetches the certificate fingerprint from the server, you can check this fingerprint against a list of "authorized" keys to decide whether it's valid. You can install the `SSLCertificateFingerprint` from the extensions section in #Codename One Settings# and use something like this to verify your server:
 
 [source,java]
 ----
@@ -264,7 +264,7 @@ NOTE: Cryptographic operations only throw `com.codename1.security.CryptoExceptio
 
 ==== Hashing
 
-`com.codename1.security.Hash` implements MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512. SHA-256 is the recommended default for new code; MD5 and SHA-1 are exposed only for compatibility with older protocols since both are broken for collision resistance.
+`com.codename1.security.Hash` implements MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512. SHA-256 is the recommended default for new code; MD5 and SHA-1 are exposed only for compatibility with older protocols since both are broken for collision resistance:
 
 [source,java]
 ----
@@ -286,7 +286,7 @@ The algorithm identifier strings (`Hash.MD5`, `Hash.SHA256`, etc.) are also acce
 
 ==== Message authentication (HMAC)
 
-`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, or TOTP token generation.
+`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, or TOTP token generation:
 
 [source,java]
 ----
@@ -305,7 +305,7 @@ When comparing authentication tags, use `Hmac.constantTimeEquals(a, b)` instead 
 
 ==== Secure random numbers
 
-`com.codename1.security.SecureRandom` exposes the platform's cryptographically secure RNG (`SecRandomCopyBytes` on iOS, `/dev/urandom` on Linux/Android, etc.). Use it for keys, nonces, salts, password reset tokens, and any other security-sensitive value. Never use `java.util.Random` or `Math.random()` for these purposes.
+`com.codename1.security.SecureRandom` exposes the platform's cryptographically secure RNG (`SecRandomCopyBytes` on iOS, `/dev/urandom` on Linux/Android, etc.). Use it for keys, nonces, salts, password reset tokens, and any other security-sensitive value. Never use `java.util.Random` or `Math.random()` for these purposes:
 
 [source,java]
 ----
@@ -318,7 +318,7 @@ long   id  = SecureRandom.longBelow(1L << 53);
 
 ==== Symmetric encryption (AES)
 
-`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it's authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data.
+`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it's authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data:
 
 [source,java]
 ----
@@ -339,7 +339,7 @@ The `Cipher` class exposes the standard JCE-style transformation strings as cons
 
 ==== Asymmetric encryption and digital signatures (RSA, ECDSA)
 
-`com.codename1.security.Cipher` also covers RSA encryption, and `com.codename1.security.Signature` covers digital signatures (RSA and ECDSA). Keys are represented by `com.codename1.security.PublicKey` and `com.codename1.security.PrivateKey`, which wrap X.509 SubjectPublicKeyInfo and PKCS#8 DER blobs respectively -- the same encodings used by OpenSSL.
+`com.codename1.security.Cipher` also covers RSA encryption, and `com.codename1.security.Signature` covers digital signatures (RSA and ECDSA). Keys are represented by `com.codename1.security.PublicKey` and `com.codename1.security.PrivateKey`, which wrap X.509 SubjectPublicKeyInfo and PKCS#8 DER blobs respectively -- the same encodings used by OpenSSL:
 
 [source,java]
 ----
@@ -373,7 +373,7 @@ The `Signature` class exposes the JCE algorithm strings as constants: `SHA256_WI
 
 ==== JSON Web Tokens
 
-`com.codename1.security.Jwt` provides JWT (RFC 7519) signing and verification. The `HS` family (HMAC-SHA-2) is pure Java so it works on every platform; the `RS` family (RSA-PKCS#1 v1.5 with SHA-2) and the `ES` family (ECDSA with SHA-2) route through the platform's native crypto.
+`com.codename1.security.Jwt` provides JWT (RFC 7519) signing and verification. The `HS` family (HMAC-SHA-2) is pure Java so it works on every platform; the `RS` family (RSA-PKCS#1 v1.5 with SHA-2) and the `ES` family (ECDSA with SHA-2) route through the platform's native crypto:
 
 [source,java]
 ----
@@ -412,7 +412,7 @@ WARNING: `Jwt.parse(token)` does not verify the signature -- you must call one o
 
 `com.codename1.security.Otp` implements counter-based HOTP (RFC 4226) and time-based TOTP (RFC 6238). The output is identical to standard authenticator apps (Google Authenticator, Microsoft Authenticator, 1Password, Authy, etc.) -- you can use this class to generate codes inside your app, to validate codes sent by an authenticator on a sign-in flow, or for SMS-based two-factor flows.
 
-Shared secrets are commonly distributed as Base32 strings (the format embedded in QR codes by authenticator apps). `com.codename1.security.Base32` handles the encoding.
+Shared secrets are commonly distributed as Base32 strings (the format embedded in QR codes by authenticator apps). `com.codename1.security.Base32` handles the encoding:
 
 [source,java]
 ----
@@ -445,7 +445,7 @@ The typical TOTP-based two-factor authentication flow has two distinct phases. T
 The TOTP secret should be generated and stored on your *server*, not on the Codename One client. The client only ever sees the secret long enough to display the enrolment QR code, then forgets it. Verification on every subsequent sign-in is also a server-side concern (the client just sends the code the user types in). The code samples below put the cryptography on the client only to keep the example self-contained -- in production, the server does the actual generation and verification.
 ====
 
-*Phase 1 -- Enrolment.* When the user opts into 2FA, generate a 20-byte random secret and show it to their authenticator app as a QR code that encodes a standard `otpauth://totp/...` URI:
+*Phase 1 -- Enrollment.* When the user opts into 2FA, generate a 20-byte random secret and show it to their authenticator app as a QR code that encodes a standard `otpauth://totp/...` URI:
 
 [source,java]
 ----
@@ -510,7 +510,7 @@ form.add(field);
 
 ==== OTP input widget
 
-`com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens.
+`com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens:
 
 [source,java]
 ----

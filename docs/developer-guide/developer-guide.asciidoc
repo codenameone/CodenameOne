@@ -84,9 +84,15 @@ include::security.asciidoc[]
 
 include::Biometric-Authentication.asciidoc[]
 
+include::Near-Field-Communication.asciidoc[]
+
 include::signing.asciidoc[]
 
 include::Working-With-iOS.asciidoc[]
+
+include::On-Device-Debugging.asciidoc[]
+
+include::On-Device-Debugging-Android.asciidoc[]
 
 include::Working-With-Javascript.asciidoc[]
 

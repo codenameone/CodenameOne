@@ -3333,6 +3333,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private IOSBiometrics biometrics;
     private IOSSecureStorage secureStorage;
+    private IOSNfc nfc;
 
     @Override
     public com.codename1.security.Biometrics getBiometrics() {
@@ -3348,6 +3349,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             secureStorage = new IOSSecureStorage(nativeInstance);
         }
         return secureStorage;
+    }
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        if (nfc == null) {
+            nfc = new IOSNfc(nativeInstance);
+        }
+        return nfc;
     }
 
     public LocationManager getLocationManager() {
