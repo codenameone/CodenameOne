@@ -3241,11 +3241,11 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // that ran later. The fix preserves the cached class when the new
   // resolution is null.
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartDocumentStaleness",
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartDocumentStaleness",
+  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartDocumentStaleness",
   // Two more late-suite tests that hit the canvas-accumulation
   // threshold and hang waiting for SCREENSHOT_DONE. On the run that
   // didn't get this far they finish cleanly, but the canary-test
@@ -3322,11 +3322,11 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   // until the canvas-accumulation / Document-wrapper-staleness bug
   // tracked under "chartDocumentStaleness" is resolved.
   //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
-  "ChartRadarScreenshotTest": "chartDocumentStaleness",
-  "ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  "ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
-  "ChartTransformScreenshotTest": "chartDocumentStaleness",
-  "ChartRotatedScreenshotTest": "chartDocumentStaleness",
+  //"ChartRadarScreenshotTest": "chartDocumentStaleness",
+  //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
+  //"ChartCombinedXYScreenshotTest": "chartDocumentStaleness",
+  //"ChartTransformScreenshotTest": "chartDocumentStaleness",
+  //"ChartRotatedScreenshotTest": "chartDocumentStaleness",
   "ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
   "SheetSlideUpAnimationScreenshotTest": "chartDocumentStaleness",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
