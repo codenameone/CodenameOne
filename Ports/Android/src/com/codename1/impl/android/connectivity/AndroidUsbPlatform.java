@@ -57,6 +57,10 @@ public final class AndroidUsbPlatform extends UsbPlatform {
     }
 
     private UsbManager usb() {
+        return staticUsb();
+    }
+
+    private static UsbManager staticUsb() {
         Context ctx = AndroidImplementation.getContext();
         if (ctx == null) return null;
         return (UsbManager) ctx.getSystemService(Context.USB_SERVICE);
@@ -199,15 +203,16 @@ public final class AndroidUsbPlatform extends UsbPlatform {
     }
 
     /// Adapter that bridges an Android USB endpoint to a Java stream.
-    /// Uses bulk transfers with a 5-second timeout.
-    private final class UsbStream {
+    /// Uses bulk transfers with a 5-second timeout. Declared static so it
+    /// doesn't pin an AndroidUsbPlatform instance for the stream's lifetime.
+    private static final class UsbStream {
         private final UsbDeviceConnection conn;
         private final UsbEndpoint endpoint;
         private final UsbInterface iface;
 
         UsbStream(UsbDevice device, int endpointAddr, int direction)
                 throws IOException {
-            UsbManager um = usb();
+            UsbManager um = staticUsb();
             if (um == null) throw new IOException("UsbManager unavailable");
             android.hardware.usb.UsbDevice native_ =
                     (android.hardware.usb.UsbDevice) device.getNativeDevice();

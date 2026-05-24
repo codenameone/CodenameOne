@@ -42,14 +42,22 @@ public final class IOSWifiPlatform extends WifiPlatform {
     public void scan(final WiFiScanCallback cb) {
         // iOS doesn't expose a public scan API.
         if (cb != null) {
-            CN.callSerially(new Runnable() {
-                @Override public void run() {
-                    cb.onScanComplete(null,
-                            new UnsupportedOperationException(
-                                    "iOS does not expose a WiFi scan API"));
-                }
-            });
+            scheduleScanUnsupported(cb);
         }
+    }
+
+    // Static helper so the Runnable below is a static anonymous class
+    // (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON otherwise flags it because
+    // declaring it inside an instance method makes it carry an implicit
+    // reference to the enclosing IOSWifiPlatform).
+    private static void scheduleScanUnsupported(final WiFiScanCallback cb) {
+        CN.callSerially(new Runnable() {
+            @Override public void run() {
+                cb.onScanComplete(null,
+                        new UnsupportedOperationException(
+                                "iOS does not expose a WiFi scan API"));
+            }
+        });
     }
 
     @Override

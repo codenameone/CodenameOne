@@ -29,16 +29,21 @@ public final class IOSBonjourPlatform extends BonjourPlatform {
         if (listener == null) return null;
         long handle = IOSImplementation.nativeInstance.bonjourBrowseStart(type);
         if (handle == 0) {
-            final BonjourServiceListener lf = listener;
-            CN.callSerially(new Runnable() {
-                @Override public void run() {
-                    lf.onBrowseError(new RuntimeException("Bonjour unavailable"));
-                }
-            });
+            scheduleBonjourUnavailable(listener);
             return null;
         }
         IOSConnectivity.registerBonjour(handle, listener);
         return Long.valueOf(handle);
+    }
+
+    // Static helper to keep the Runnable below a static anonymous class
+    // (avoids SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void scheduleBonjourUnavailable(final BonjourServiceListener l) {
+        CN.callSerially(new Runnable() {
+            @Override public void run() {
+                l.onBrowseError(new RuntimeException("Bonjour unavailable"));
+            }
+        });
     }
 
     @Override
