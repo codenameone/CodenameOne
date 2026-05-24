@@ -7764,8 +7764,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 chooser = Intent.createChooser(shareIntent, "Share with...");
             }
         } catch (Throwable t) {
-            // Fall back to the plain chooser, then synthesise a listener
-            // result so the app does not hang on an unfulfilled callback.
+            // Fall back to the plain chooser, then synthesize a listener
+            // result so the app doesn't hang on an unfulfilled callback.
             chooser = Intent.createChooser(shareIntent, "Share with...");
             if (listener != null) {
                 listener.onResult(com.codename1.share.ShareResult.sharedTo(null));
