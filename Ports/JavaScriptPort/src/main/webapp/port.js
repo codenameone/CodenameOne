@@ -3262,13 +3262,13 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // ~88 fallback-path captures (the wipe fix unblocked rendering but
   // this test hits a separate screenshot-capture hang). Re-park until
   // canvasToBlob_hang fallback is investigated separately.
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
   // Transform + Rotated weren't reached on the unpark-all run because
   // CombinedXY took down the suite first. Leave parked under the same
   // canvasToBlob-capture suspicion until CombinedXY is sorted; if
   // that fix unblocks them too, un-park in a follow-up.
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartCombinedXyCapture",
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartCombinedXyCapture",
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartCombinedXyCapture",
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   // Two more late-suite tests that hit the canvas-accumulation
   // threshold and hang waiting for SCREENSHOT_DONE. On the run that
   // didn't get this far they finish cleanly, but the canary-test
@@ -3357,9 +3357,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  //"ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
-  //"ChartTransformScreenshotTest": "chartCombinedXyCapture",
-  //"ChartRotatedScreenshotTest": "chartCombinedXyCapture",
+  "ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
+  "ChartTransformScreenshotTest": "chartCombinedXyCapture",
+  "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   //"ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   "SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
