@@ -3720,12 +3720,16 @@ public final class Display extends CN1Constants {
     ///
     /// #### Since 8.0
     public boolean dispatchDeepLink(final String url) {
-        if (url == null || url.length() == 0) { return false; }
+        if (url == null || url.length() == 0) {
+            return false;
+        }
         if (deepLinkHandler == null) {
             pendingDeepLinkArg = url;
             // Still expose to legacy AppArg consumers.
             try {
-                if (impl != null) { impl.setAppArg(url); }
+                if (impl != null) {
+                    impl.setAppArg(url);
+                }
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -3750,11 +3754,17 @@ public final class Display extends CN1Constants {
     /// Anything else (empty strings, single tokens, app-internal non-URL AppArg
     /// payloads) is passed through to AppArg without dispatch.
     private static boolean looksLikeUrl(String v) {
-        if (v == null) { return false; }
-        if (v.indexOf("://") >= 0) { return true; }
+        if (v == null) {
+            return false;
+        }
+        if (v.indexOf("://") >= 0) {
+            return true;
+        }
         // Custom scheme with no `//` -- e.g. `mailto:foo@bar` or `myapp:do/x`.
         int colon = v.indexOf(':');
-        if (colon <= 0) { return false; }
+        if (colon <= 0) {
+            return false;
+        }
         for (int i = 0; i < colon; i++) {
             char c = v.charAt(i);
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -3775,7 +3785,9 @@ public final class Display extends CN1Constants {
         if (!consumed) {
             // Fall back to AppArg so legacy code paths still see it.
             try {
-                if (impl != null) { impl.setAppArg(raw); }
+                if (impl != null) {
+                    impl.setAppArg(raw);
+                }
             } catch (Throwable t) {
                 Log.e(t);
             }

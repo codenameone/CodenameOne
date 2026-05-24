@@ -114,7 +114,9 @@ public class TabsForm extends Form {
     /// The component is wrapped in an internal holder so this class can swap in
     /// pushed children without touching `Tabs`'s own children list.
     public int addTab(String title, Image icon, Component root) {
-        if (root == null) { throw new IllegalArgumentException("root cannot be null"); }
+        if (root == null) {
+            throw new IllegalArgumentException("root cannot be null");
+        }
         Container holder = new Container(new BorderLayout());
         holder.add(BorderLayout.CENTER, root);
         tabs.addTab(title, icon, holder);
@@ -149,7 +151,9 @@ public class TabsForm extends Form {
     /// visible content for that tab. Existing pushed content is preserved
     /// underneath and will reappear on `popInActiveTab`.
     public void pushInActiveTab(Component c) {
-        if (c == null) { throw new IllegalArgumentException("component cannot be null"); }
+        if (c == null) {
+            throw new IllegalArgumentException("component cannot be null");
+        }
         TabStack ts = activeStack();
         ts.push(c);
     }
@@ -223,7 +227,9 @@ public class TabsForm extends Form {
             this.entries.add(root);
         }
 
-        int depth() { return entries.size(); }
+        int depth() {
+            return entries.size();
+        }
 
         void push(Component c) {
             Component current = entries.get(entries.size() - 1);
@@ -232,7 +238,9 @@ public class TabsForm extends Form {
         }
 
         boolean pop() {
-            if (entries.size() <= 1) { return false; }
+            if (entries.size() <= 1) {
+                return false;
+            }
             Component current = entries.remove(entries.size() - 1);
             Component prev = entries.get(entries.size() - 1);
             holder.replace(current, prev, null);

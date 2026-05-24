@@ -45,17 +45,25 @@ public final class Location {
     }
 
     /// The active path (URL path component, including query when present in the link).
-    public String getPath() { return path; }
+    public String getPath() {
+        return path;
+    }
 
     /// The full deep link that produced this location.
-    public DeepLink getLink() { return link; }
+    public DeepLink getLink() {
+        return link;
+    }
 
     /// The route pattern that matched (e.g., `/users/:id`), or null if no route matched
     /// (the not-found path).
-    public String getMatchedPattern() { return matchedPattern; }
+    public String getMatchedPattern() {
+        return matchedPattern;
+    }
 
     /// Zero-based position on the Router's stack. The root entry has index 0.
-    public int getStackIndex() { return stackIndex; }
+    public int getStackIndex() {
+        return stackIndex;
+    }
 
     @Override
     public String toString() {
@@ -64,8 +72,12 @@ public final class Location {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) { return true; }
-        if (!(o instanceof Location)) { return false; }
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Location)) {
+            return false;
+        }
         Location other = (Location) o;
         return stackIndex == other.stackIndex && path.equals(other.path);
     }

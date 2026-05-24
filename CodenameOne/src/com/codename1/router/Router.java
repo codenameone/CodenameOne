@@ -86,7 +86,9 @@ public final class Router {
 
     /// Returns the singleton Router. There is exactly one router per app; nested
     /// routers (e.g. inside a `TabsForm` tab) are implemented as scopes on this one.
-    public static Router getInstance() { return INSTANCE; }
+    public static Router getInstance() {
+        return INSTANCE;
+    }
 
     // ---- registry -----------------------------------------------------------
 
@@ -106,7 +108,8 @@ public final class Router {
     /// notifying the bridge again to avoid double-pushing entries.
     private boolean suppressBridgeOnce;
 
-    private Router() { }
+    private Router() {
+    }
 
     // -------------------------------------------------------------------------
     // Registration (fluent)
@@ -116,7 +119,9 @@ public final class Router {
     /// wildcards, and `**` catch-all wildcards. Last registration wins on exact
     /// duplicate; on overlap, the more specific pattern wins regardless of order.
     public Router route(String pattern, RouteBuilder builder) {
-        if (builder == null) { throw new IllegalArgumentException("builder cannot be null"); }
+        if (builder == null) {
+            throw new IllegalArgumentException("builder cannot be null");
+        }
         // Replace any existing exact pattern.
         for (int i = 0; i < routes.size(); i++) {
             if (routes.get(i).getPattern().equals(normalize(pattern))) {
@@ -185,13 +190,19 @@ public final class Router {
 
     /// Pushes a new entry on the stack and shows its Form. Static shortcut over
     /// `getInstance().pushPath(path)`.
-    public static void push(String path) { INSTANCE.pushPath(path); }
+    public static void push(String path) {
+        INSTANCE.pushPath(path);
+    }
 
     /// Replaces the top stack entry. Static shortcut.
-    public static void replace(String path) { INSTANCE.replacePath(path); }
+    public static void replace(String path) {
+        INSTANCE.replacePath(path);
+    }
 
     /// Pops the top stack entry and shows the entry beneath. Static shortcut.
-    public static boolean pop() { return INSTANCE.popOne(); }
+    public static boolean pop() {
+        return INSTANCE.popOne();
+    }
 
     /// Instance form of #push.
     public Router pushPath(String path) {
@@ -208,7 +219,9 @@ public final class Router {
     /// Instance form of #pop. Returns false if the stack has 0 or 1 entries
     /// (nothing to pop back to).
     public boolean popOne() {
-        if (stack.size() <= 1) { return false; }
+        if (stack.size() <= 1) {
+            return false;
+        }
         StackEntry leaving = stack.get(stack.size() - 1);
         Form current = leaving.form;
         if (current != null && !current.checkPopGuard(PopReason.PROGRAMMATIC)) {
@@ -228,12 +241,16 @@ public final class Router {
 
     /// Returns the current `Location`, or null if the stack is empty.
     public Location getCurrentLocation() {
-        if (stack.isEmpty()) { return null; }
+        if (stack.isEmpty()) {
+            return null;
+        }
         return locationFor(stack.get(stack.size() - 1), stack.size() - 1);
     }
 
     /// Returns the stack depth (1 for a single entry).
-    public int getStackDepth() { return stack.size(); }
+    public int getStackDepth() {
+        return stack.size();
+    }
 
     /// Installs a `BrowserHistoryBridge` (typically only used by the JavaScript
     /// port). When set, every push/pop/replace is reflected in the bridge so the
@@ -246,7 +263,9 @@ public final class Router {
     }
 
     /// Returns the installed `BrowserHistoryBridge`, or null.
-    public BrowserHistoryBridge getBrowserHistoryBridge() { return historyBridge; }
+    public BrowserHistoryBridge getBrowserHistoryBridge() {
+        return historyBridge;
+    }
 
     /// Called by the `BrowserHistoryBridge` when the host history reported a
     /// navigation that the Router should mirror **without** re-notifying the
@@ -276,7 +295,9 @@ public final class Router {
 
     /// Adds a location listener. Listeners are notified after every push/pop/replace/reset.
     public Router addLocationListener(LocationListener l) {
-        if (l != null && !listeners.contains(l)) { listeners.add(l); }
+        if (l != null && !listeners.contains(l)) {
+            listeners.add(l);
+        }
         return this;
     }
 
@@ -307,7 +328,9 @@ public final class Router {
     /// retained as its own method so we can pass the raw link to guards/builders in
     /// the future (e.g. include host in matching for multi-host universal links).
     public boolean handle(DeepLink link) {
-        if (link == null || link.isEmpty()) { return false; }
+        if (link == null || link.isEmpty()) {
+            return false;
+        }
         // If the same pattern is already on top, replace rather than push so two
         // taps of the same universal link don't accumulate history.
         String path = link.getPath();
@@ -346,19 +369,25 @@ public final class Router {
                         break;
                     }
                 }
-                if (!redirected) { break; }
+                if (!redirected) {
+                    break;
+                }
             }
 
             MatchResult match = findMatch(link);
 
             // Guard chain.
             for (GuardEntry ge : guards) {
-                if (ge.scope.match(link.getPath()) == null) { continue; }
+                if (ge.scope.match(link.getPath()) == null) {
+                    continue;
+                }
                 RouteContext ctx = new RouteContext(link,
                         match == null ? new LinkedHashMap<String, String>() : match.params,
                         match == null ? null : match.route.getPattern());
                 RouteGuard.Decision d = ge.guard.check(ctx);
-                if (d == null || d.getKind() == RouteGuard.Decision.Kind.PROCEED) { continue; }
+                if (d == null || d.getKind() == RouteGuard.Decision.Kind.PROCEED) {
+                    continue;
+                }
                 if (d.getKind() == RouteGuard.Decision.Kind.BLOCK) {
                     return null;
                 }
@@ -444,7 +473,9 @@ public final class Router {
         int bestScore = Integer.MIN_VALUE;
         for (RouteMatch r : routes) {
             Map<String, String> p = r.match(link.getPath());
-            if (p == null) { continue; }
+            if (p == null) {
+                continue;
+            }
             int sc = r.specificity();
             if (sc > bestScore) {
                 bestScore = sc;
@@ -472,7 +503,9 @@ public final class Router {
 
     private void notifyBridge(LocationListener.Kind kind, Location loc) {
         BrowserHistoryBridge b = historyBridge;
-        if (b == null || suppressBridgeOnce) { return; }
+        if (b == null || suppressBridgeOnce) {
+            return;
+        }
         try {
             switch (kind) {
                 case PUSH:    b.onPush(loc); break;
@@ -486,7 +519,9 @@ public final class Router {
     }
 
     private static String normalize(String path) {
-        if (path == null || path.length() == 0) { return "/"; }
+        if (path == null || path.length() == 0) {
+            return "/";
+        }
         return path.charAt(0) == '/' ? path : "/" + path;
     }
 
@@ -498,33 +533,45 @@ public final class Router {
         final DeepLink link;
         final String matchedPattern;
         final Form form;
-        StackEntry(DeepLink l, String mp, Form f) { this.link = l; this.matchedPattern = mp; this.form = f; }
+        StackEntry(DeepLink l, String mp, Form f) {
+            this.link = l; this.matchedPattern = mp; this.form = f;
+        }
     }
 
     private static final class MatchResult {
         final RouteMatch route;
         final Map<String, String> params;
-        MatchResult(RouteMatch r, Map<String, String> p) { this.route = r; this.params = p; }
+        MatchResult(RouteMatch r, Map<String, String> p) {
+            this.route = r; this.params = p;
+        }
     }
 
     private static final class GuardEntry {
         final RouteMatch scope;
         final RouteGuard guard;
-        GuardEntry(RouteMatch s, RouteGuard g) { this.scope = s; this.guard = g; }
+        GuardEntry(RouteMatch s, RouteGuard g) {
+            this.scope = s; this.guard = g;
+        }
     }
 
     private static final class RedirectEntry {
         final RouteMatch from;
         final String to;
-        RedirectEntry(RouteMatch f, String t) { this.from = f; this.to = t; }
+        RedirectEntry(RouteMatch f, String t) {
+            this.from = f; this.to = t;
+        }
     }
 
     /// Carries a Form through `Display.callSerially` when `navigate()` is invoked
     /// off-EDT. Named/static so it doesn't carry an implicit outer reference.
     private static final class ShowOnEdt implements Runnable {
         private final Form form;
-        ShowOnEdt(Form form) { this.form = form; }
+        ShowOnEdt(Form form) {
+            this.form = form;
+        }
         @Override
-        public void run() { form.show(); }
+        public void run() {
+            form.show();
+        }
     }
 }

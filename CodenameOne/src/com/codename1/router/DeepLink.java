@@ -78,32 +78,48 @@ public final class DeepLink {
 
     /// The raw input URL exactly as it was received from the platform. Never null;
     /// returns an empty string when constructed from a null input.
-    public String getRaw() { return raw; }
+    public String getRaw() {
+        return raw;
+    }
 
     /// Lower-cased URL scheme such as `https`, `myapp`. Empty when the input was a
     /// bare path (e.g. an internal `Router.push("/profile/42")`).
-    public String getScheme() { return scheme; }
+    public String getScheme() {
+        return scheme;
+    }
 
     /// Lower-cased URL host such as `example.com`. Empty for custom-scheme links
     /// that don't include a host (e.g. `myapp:profile/42`).
-    public String getHost() { return host; }
+    public String getHost() {
+        return host;
+    }
 
     /// URL path starting with `/`. Always non-null; the root is `/`. Trailing slashes
     /// are preserved.
-    public String getPath() { return path; }
+    public String getPath() {
+        return path;
+    }
 
     /// URL fragment without the leading `#`. Empty when no fragment was present.
-    public String getFragment() { return fragment; }
+    public String getFragment() {
+        return fragment;
+    }
 
     /// Decoded non-empty path segments. For `/users/42` this returns `["users", "42"]`.
     /// Unmodifiable.
-    public List<String> getSegments() { return segments; }
+    public List<String> getSegments() {
+        return segments;
+    }
 
     /// Decoded query parameters. Repeated keys keep only the last value. Unmodifiable.
-    public Map<String, String> getQueryParameters() { return query; }
+    public Map<String, String> getQueryParameters() {
+        return query;
+    }
 
     /// Returns the decoded value of a single query parameter, or null if absent.
-    public String getQueryParameter(String name) { return query.get(name); }
+    public String getQueryParameter(String name) {
+        return query.get(name);
+    }
 
     /// Returns true when the link is fully empty (no scheme, host, or non-root path).
     /// Useful for `getAppArg` cold-launches where the value may be blank.
@@ -128,8 +144,12 @@ public final class DeepLink {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) { return true; }
-        if (!(o instanceof DeepLink)) { return false; }
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DeepLink)) {
+            return false;
+        }
         return raw.equals(((DeepLink) o).raw);
     }
 
@@ -191,7 +211,9 @@ public final class DeepLink {
         } else {
             // Bare path -- internal Router.push("/x") and similar.
             path = (rest.length() == 0 || rest.charAt(0) == '/') ? rest : "/" + rest;
-            if (path.length() == 0) { path = "/"; }
+            if (path.length() == 0) {
+                path = "/";
+            }
         }
 
         return new DeepLink(raw, scheme, host.toLowerCase(), path, fragment,
@@ -199,12 +221,18 @@ public final class DeepLink {
     }
 
     private static boolean isValidSchemePrefix(String s, int colon) {
-        if (colon <= 0) { return false; }
+        if (colon <= 0) {
+            return false;
+        }
         char c0 = s.charAt(0);
-        if (!isAlpha(c0)) { return false; }
+        if (!isAlpha(c0)) {
+            return false;
+        }
         for (int i = 1; i < colon; i++) {
             char c = s.charAt(i);
-            if (!(isAlpha(c) || isDigit(c) || c == '+' || c == '-' || c == '.')) { return false; }
+            if (!(isAlpha(c) || isDigit(c) || c == '+' || c == '-' || c == '.')) {
+                return false;
+            }
         }
         return true;
     }
@@ -220,31 +248,43 @@ public final class DeepLink {
     private static String stripUserAndPort(String hostPart) {
         // Strip user-info `user:pass@`.
         int at = hostPart.lastIndexOf('@');
-        if (at >= 0) { hostPart = hostPart.substring(at + 1); }
+        if (at >= 0) {
+            hostPart = hostPart.substring(at + 1);
+        }
         // Strip port.
         int colon = hostPart.indexOf(':');
-        if (colon >= 0) { hostPart = hostPart.substring(0, colon); }
+        if (colon >= 0) {
+            hostPart = hostPart.substring(0, colon);
+        }
         return hostPart;
     }
 
     private static List<String> splitSegments(String path) {
         ArrayList<String> out = new ArrayList<String>();
-        if (path == null || path.length() == 0 || "/".equals(path)) { return out; }
+        if (path == null || path.length() == 0 || "/".equals(path)) {
+            return out;
+        }
         String p = path.charAt(0) == '/' ? path.substring(1) : path;
         int start = 0;
         for (int i = 0; i < p.length(); i++) {
             if (p.charAt(i) == '/') {
-                if (i > start) { out.add(decode(p.substring(start, i))); }
+                if (i > start) {
+                    out.add(decode(p.substring(start, i)));
+                }
                 start = i + 1;
             }
         }
-        if (start < p.length()) { out.add(decode(p.substring(start))); }
+        if (start < p.length()) {
+            out.add(decode(p.substring(start)));
+        }
         return out;
     }
 
     private static Map<String, String> parseQuery(String q) {
         LinkedHashMap<String, String> out = new LinkedHashMap<String, String>();
-        if (q == null || q.length() == 0) { return out; }
+        if (q == null || q.length() == 0) {
+            return out;
+        }
         int start = 0;
         for (int i = 0; i <= q.length(); i++) {
             if (i == q.length() || q.charAt(i) == '&') {

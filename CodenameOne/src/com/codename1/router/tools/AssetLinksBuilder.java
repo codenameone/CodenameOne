@@ -88,13 +88,17 @@ public final class AssetLinksBuilder {
             sb.append("      \"package_name\": \"").append(jsonEscape(e.pkg)).append("\",\n");
             sb.append("      \"sha256_cert_fingerprints\": [");
             for (int j = 0; j < e.fingerprints.size(); j++) {
-                if (j > 0) { sb.append(", "); }
+                if (j > 0) {
+                    sb.append(", ");
+                }
                 sb.append('"').append(jsonEscape(e.fingerprints.get(j))).append('"');
             }
             sb.append("]\n");
             sb.append("    }\n");
             sb.append("  }");
-            if (i < entries.size() - 1) { sb.append(','); }
+            if (i < entries.size() - 1) {
+                sb.append(',');
+            }
             sb.append('\n');
         }
         sb.append("]\n");
@@ -123,6 +127,8 @@ public final class AssetLinksBuilder {
     private static final class Entry {
         final String pkg;
         final List<String> fingerprints = new ArrayList<String>();
-        Entry(String p) { this.pkg = p; }
+        Entry(String p) {
+            this.pkg = p;
+        }
     }
 }

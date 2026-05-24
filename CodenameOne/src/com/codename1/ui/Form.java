@@ -1579,7 +1579,9 @@ public class Form extends Container {
     /// #### Since 8.0
     public boolean checkPopGuard(com.codename1.router.PopReason reason) {
         com.codename1.router.PopGuard g = this.popGuard;
-        if (g == null) { return true; }
+        if (g == null) {
+            return true;
+        }
         try {
             return g.canPop(this, reason);
         } catch (Throwable t) {
@@ -2471,7 +2473,9 @@ public class Form extends Container {
         // own action listener never runs.
         if (popGuard != null && cmd == menuBar.getBackCommand()) { //NOPMD CompareObjectsWithEquals
             if (!checkPopGuard(com.codename1.router.PopReason.BACK_COMMAND)) {
-                if (ev != null) { ev.consume(); }
+                if (ev != null) {
+                    ev.consume();
+                }
                 return;
             }
         }

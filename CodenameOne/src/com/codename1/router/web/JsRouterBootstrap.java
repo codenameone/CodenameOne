@@ -44,12 +44,15 @@ public final class JsRouterBootstrap {
 
     private static boolean installed;
 
-    private JsRouterBootstrap() { }
+    private JsRouterBootstrap() {
+    }
 
     /// Installs the bridge. Safe to call multiple times; subsequent calls are
     /// no-ops.
     public static void install() {
-        if (installed) { return; }
+        if (installed) {
+            return;
+        }
         installed = true;
 
         final Router router = Router.getInstance();
@@ -78,11 +81,17 @@ public final class JsRouterBootstrap {
         Display.getInstance().addMessageListener(new ActionListener<MessageEvent>() {
             @Override
             public void actionPerformed(MessageEvent e) {
-                if (e.getCode() != MESSAGE_CODE) { return; }
+                if (e.getCode() != MESSAGE_CODE) {
+                    return;
+                }
                 String payload = e.getMessage();
-                if (payload == null) { return; }
+                if (payload == null) {
+                    return;
+                }
                 int colon = payload.indexOf(':');
-                if (colon < 0) { return; }
+                if (colon < 0) {
+                    return;
+                }
                 String verb = payload.substring(0, colon);
                 String path = payload.substring(colon + 1);
                 if ("pop".equals(verb)) {

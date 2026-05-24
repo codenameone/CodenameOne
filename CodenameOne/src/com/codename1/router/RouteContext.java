@@ -57,21 +57,31 @@ public final class RouteContext {
     }
 
     /// The deep link that triggered this navigation. Never null.
-    public DeepLink getLink() { return link; }
+    public DeepLink getLink() {
+        return link;
+    }
 
     /// The route pattern that matched, e.g. `/users/:id`. Null when no route was
     /// matched (the not-found path).
-    public String getMatchedPattern() { return matchedPattern; }
+    public String getMatchedPattern() {
+        return matchedPattern;
+    }
 
     /// Returns a named path parameter, or null if absent.
     /// For pattern `/users/:id` and path `/users/42`, `param("id")` returns `"42"`.
-    public String param(String name) { return params.get(name); }
+    public String param(String name) {
+        return params.get(name);
+    }
 
     /// All path parameters as an unmodifiable map.
-    public Map<String, String> params() { return params; }
+    public Map<String, String> params() {
+        return params;
+    }
 
     /// Returns a query parameter, or null. Equivalent to `getLink().getQueryParameter(name)`.
-    public String query(String name) { return query.get(name); }
+    public String query(String name) {
+        return query.get(name);
+    }
 
     /// Stores a value in the per-navigation extras bag. Useful for guards passing
     /// resolved data to builders.
@@ -81,5 +91,7 @@ public final class RouteContext {
     }
 
     /// Reads a value from the per-navigation extras bag.
-    public Object get(String key) { return extras.get(key); }
+    public Object get(String key) {
+        return extras.get(key);
+    }
 }

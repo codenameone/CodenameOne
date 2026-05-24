@@ -49,9 +49,15 @@ public final class PopReason {
 
     private final String name;
 
-    private PopReason(String name) { this.name = name; }
+    private PopReason(String name) {
+        this.name = name;
+    }
 
-    public String name() { return name; }
+    public String name() {
+        return name;
+    }
 
-    @Override public String toString() { return name; }
+    @Override public String toString() {
+        return name;
+    }
 }

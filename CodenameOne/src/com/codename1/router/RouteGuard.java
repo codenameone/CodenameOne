@@ -53,15 +53,21 @@ public interface RouteGuard {
         private final Kind kind;
         private final String redirectTo;
 
-        private Decision(Kind k, String to) { this.kind = k; this.redirectTo = to; }
+        private Decision(Kind k, String to) {
+            this.kind = k; this.redirectTo = to;
+        }
 
         /// Redirect the navigation to a different in-app path.
         public static Decision redirect(String path) {
             return new Decision(Kind.REDIRECT, path);
         }
 
-        public Kind getKind() { return kind; }
-        public String getRedirectTo() { return redirectTo; }
+        public Kind getKind() {
+            return kind;
+        }
+        public String getRedirectTo() {
+            return redirectTo;
+        }
 
         public enum Kind { PROCEED, BLOCK, REDIRECT }
     }

@@ -78,7 +78,9 @@ final class RouteMatch {
             }
             // Take one segment.
             int end = normalized.indexOf('/', i);
-            if (end < 0) { end = normalized.length(); }
+            if (end < 0) {
+                end = normalized.length();
+            }
             String seg = normalized.substring(i, end);
             if ("**".equals(seg)) {
                 // Ant-style catch-all: `/admin/**` must match `/admin`,
@@ -118,18 +120,26 @@ final class RouteMatch {
         this.isWildcard = wildcard;
     }
 
-    String getPattern() { return pattern; }
+    String getPattern() {
+        return pattern;
+    }
 
-    RouteBuilder getBuilder() { return builder; }
+    RouteBuilder getBuilder() {
+        return builder;
+    }
 
     /// Returns the param map on a match, or null on no match.
     Map<String, String> match(String path) {
-        if (path == null) { return null; }
+        if (path == null) {
+            return null;
+        }
         // `RE.match` finds the pattern anywhere in `path`; the leading `^` and
         // trailing `$` we emit anchor that find to the full string. We also
         // assert the matched span covers the input as belt-and-braces against
         // any anchoring quirks in the engine.
-        if (!regex.match(path, 0)) { return null; }
+        if (!regex.match(path, 0)) {
+            return null;
+        }
         if (regex.getParenStart(0) != 0 || regex.getParenEnd(0) != path.length()) {
             return null;
         }
@@ -153,7 +163,9 @@ final class RouteMatch {
     }
 
     /// Returns whether this pattern uses a catch-all `**`.
-    boolean isCatchAll() { return isWildcard; }
+    boolean isCatchAll() {
+        return isWildcard;
+    }
 
     /// Helper used by guard matching where patterns may be path-prefix globs.
     static boolean simpleMatch(String pattern, String path) {
@@ -166,9 +178,13 @@ final class RouteMatch {
         int score = 0;
         int i = 0;
         while (i < pattern.length()) {
-            if (pattern.charAt(i) == '/') { i++; continue; }
+            if (pattern.charAt(i) == '/') {
+                i++; continue;
+            }
             int end = pattern.indexOf('/', i);
-            if (end < 0) { end = pattern.length(); }
+            if (end < 0) {
+                end = pattern.length();
+            }
             String seg = pattern.substring(i, end);
             if ("**".equals(seg)) {
                 score -= 100;
@@ -183,7 +199,9 @@ final class RouteMatch {
     }
 
     static String joinSegments(List<String> segs) {
-        if (segs == null || segs.isEmpty()) { return "/"; }
+        if (segs == null || segs.isEmpty()) {
+            return "/";
+        }
         StringBuilder sb = new StringBuilder();
         for (String s : segs) {
             sb.append('/').append(s);
@@ -198,7 +216,9 @@ final class RouteMatch {
         StringBuilder sb = new StringBuilder(s.length() + 4);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (REGEX_META.indexOf(c) >= 0) { sb.append('\\'); }
+            if (REGEX_META.indexOf(c) >= 0) {
+                sb.append('\\');
+            }
             sb.append(c);
         }
         return sb.toString();
