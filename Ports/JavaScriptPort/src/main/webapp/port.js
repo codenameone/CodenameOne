@@ -3278,7 +3278,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // reaches comparison.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a
   // (defensive __cn1CachedDocWrapper invalidation in getDocument).
-  //"com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
+  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   // SheetSlide hits a separate Canvas2DContext class-wipe (cn1_s_save
   // VIRTUAL_FAIL receiverClass=null) that hangs the suite even after
   // the AbstractAnimationScreenshotTest safety net (efc9bdb67) calls
@@ -3312,7 +3312,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // reliably -- park here in the meantime so the rest of the suite
   // is deterministic.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  //"com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "canvasContextWipe",
+  "com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "canvasContextWipe",
   // Sheet's backdrop blur path produces a cn1_s_save VIRTUAL_FAIL loop
   // on the canvas-accumulation tail (same ~suite-position-90 staleness
   // as ChartDoughnut etc.). The runtime fix in 618629361 turned the
@@ -3320,7 +3320,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // half of CI runs sits at SheetScreenshotTest for the remainder of
   // the budget. Park here for deterministic completion.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  //"com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe"
+  "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3360,13 +3360,13 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
   "ChartTransformScreenshotTest": "chartCombinedXyCapture",
   "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
-  //"ToastBarTopPositionScreenshotTest": "canvasContextWipe",
+  "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   "SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
   //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
-  //"CssGradientsScreenshotTest": "canvasContextWipe",
-  //"SheetScreenshotTest": "canvasContextWipe"
+  "CssGradientsScreenshotTest": "canvasContextWipe",
+  "SheetScreenshotTest": "canvasContextWipe"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
