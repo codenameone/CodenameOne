@@ -3355,7 +3355,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   "SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
-  "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak"
+  "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
   //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
   //"CssGradientsScreenshotTest": "chartDocumentStaleness",
