@@ -65,16 +65,42 @@ public class PickerDefaultDateTest extends UITestBase {
                 "Once a date is explicitly pinned, the default getter must not be consulted");
     }
 
+    /// Regression for #5024: `setDate(null)` is an explicit clear, not a request
+    /// to fall back to the default getter for `getDate()`. Before the fix,
+    /// `getDate()` after `setDate(null)` returned the default-getter result,
+    /// effectively pretending the user had accepted a date they never saw.
     @Test
-    public void setDateNullReEnablesDefault() {
+    public void setDateNullClearsValueEvenWhenDefaultGetterInstalled() {
         Picker p = new Picker();
         p.setType(Display.PICKER_TYPE_DATE);
         Date defaultDate = date(2030, Calendar.JUNE, 15);
         p.setDefaultDate(defaultDate);
         p.setDate(date(2028, Calendar.MARCH, 20));
         p.setDate(null);
-        Assertions.assertEquals(defaultDate, p.getDate(),
-                "setDate(null) should clear the explicit pin and restore the default");
+        Assertions.assertNull(p.getDate(),
+                "setDate(null) must clear the picker's value rather than silently restoring the default (#5024)");
+        Assertions.assertEquals("...", p.getText(),
+                "setDate(null) must leave the picker text showing the placeholder");
+    }
+
+    /// Regression for #5024: even when the caller never pinned a non-null
+    /// value first, `setDate(null)` should still latch as an explicit clear.
+    /// This matches the original report, where the picker was constructed,
+    /// configured with `setDefaultDate(...)`, and then `setDate(null)` was
+    /// called before the user ever interacted with it.
+    @Test
+    public void setDateNullOnFreshPickerReturnsNull() {
+        Picker p = new Picker();
+        p.setType(Display.PICKER_TYPE_DATE);
+        p.setDefaultDate(new Picker.DateGetter() {
+            @Override
+            public Date get() {
+                return new Date();
+            }
+        });
+        p.setDate(null);
+        Assertions.assertNull(p.getDate(),
+                "After setDate(null), getDate() must return null even if the picker was never opened (#5024)");
     }
 
     @Test
@@ -185,18 +211,14 @@ public class PickerDefaultDateTest extends UITestBase {
 
         Assertions.assertEquals("...", picker.getText(),
                 "Cancel on the first open must leave the placeholder intact (#5014)");
-        // Bump the slot the getter would return so we can prove the next
-        // getDate() call still resolves through the getter rather than
-        // returning a leaked staged value from the cancelled open.
-        final Date[] slot = new Date[] { date(2031, Calendar.FEBRUARY, 2) };
-        picker.setDefaultDate(new Picker.DateGetter() {
-            @Override
-            public Date get() {
-                return slot[0];
-            }
-        });
-        Assertions.assertEquals(slot[0], picker.getDate(),
-                "After Cancel the default getter must still drive getDate()");
+        // Proof the staged default did not leak past Cancel: the explicit
+        // setDate(null) state must survive, so getDate() returns null rather
+        // than the staged default that briefly populated `value` while the
+        // popup was shown. With the #5024 fix, setDate(null) is a latched
+        // explicit clear; a non-null result here would indicate Cancel left
+        // the staged default behind.
+        Assertions.assertNull(picker.getDate(),
+                "After Cancel the explicit setDate(null) state must survive (#5024, #5014)");
     }
 
     @FormTest

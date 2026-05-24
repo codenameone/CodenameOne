@@ -116,11 +116,14 @@ public class Picker extends Button {
     /// default tracks "one hour before the current due date" can keep returning
     /// fresh values as the due date moves. Null means fall back to `new Date()`.
     private DateGetter defaultDateGetter;
-    /// True once the picker's date has been pinned by an explicit
-    /// `setDate(non-null)` call or a successful user selection. While false the
-    /// picker treats `value` as a placeholder and prefers `defaultDateGetter`
-    /// (when set) as the displayed value, so callers can install a default
-    /// after construction and still see it take effect.
+    /// True once the picker's date has been pinned by an explicit `setDate(...)`
+    /// call (including `setDate(null)` to clear) or a successful user selection.
+    /// While false the picker treats `value` as a placeholder and prefers
+    /// `defaultDateGetter` (when set) as the displayed value, so callers can
+    /// install a default after construction and still see it take effect. Once
+    /// the caller has explicitly set a value - even `null` - `getDate()` returns
+    /// exactly that value; the default getter only continues to seed the popup
+    /// UI when the picker is opened with a `null` value. Issue #5024.
     private boolean dateValueExplicitlySet;
 
     // Variables to store the form's previous margins before showing
@@ -1367,6 +1370,9 @@ public class Picker extends Button {
         }
         // No explicit setDate yet -> let the default getter take over so the
         // value returned here matches what the picker would show if opened now.
+        // Once the caller has explicitly set a value (including null via
+        // setDate(null)) we return it as-is; the default is reserved for
+        // seeding the popup UI in applyDefaultDateIfNeeded(). Issue #5024.
         if (!dateValueExplicitlySet && defaultDateGetter != null) {
             return resolveDefaultDate();
         }
@@ -1375,13 +1381,19 @@ public class Picker extends Button {
 
     /// Primes `value` with the resolved default before a date-type picker is
     /// shown, so the existing show paths (which read `value` directly) display
-    /// the configured default. Does nothing for non-date types, when the
-    /// caller has already pinned a date with `setDate(Date)`, or when no
-    /// default getter has been configured - in that last case the picker
+    /// the configured default. Applies whenever the picker has no usable date
+    /// to show - either the caller never pinned one with `setDate(Date)`, or
+    /// they explicitly cleared it with `setDate(null)`. Does nothing for
+    /// non-date types, when there's already a non-null pinned date, or when
+    /// no default getter has been configured - in that last case the picker
     /// keeps the legacy behavior of showing whatever was in `value` (typically
-    /// the construction-time `new Date()`).
+    /// the construction-time `new Date()`, or `null` after a `setDate(null)`).
+    /// Issue #5024.
     private void applyDefaultDateIfNeeded() {
-        if (dateValueExplicitlySet || defaultDateGetter == null) {
+        if (defaultDateGetter == null) {
+            return;
+        }
+        if (dateValueExplicitlySet && value != null) {
             return;
         }
         switch (type) {
@@ -1428,14 +1440,24 @@ public class Picker extends Button {
     /// native popup is open updates the committed `value` but leaves the on-screen wheels
     /// unchanged until the user dismisses and re-opens the picker.
     ///
+    /// Passing `null` explicitly clears the picker's value: subsequent `getDate()` calls
+    /// return `null` (the picker text falls back to the `...` placeholder) until either
+    /// `setDate(non-null)` is called or the user opens the popup and commits a selection.
+    /// A configured `setDefaultDate` getter still seeds the popup wheels on the next open
+    /// so the user has a sensible starting point, but it no longer leaks into `getDate()`
+    /// as an unselected value. Issue #5024.
+    ///
     /// #### Parameters
     ///
-    /// - `d`: the new date
+    /// - `d`: the new date, or `null` to clear the picker
     public void setDate(Date d) {
         value = d;
-        // A null clears the explicit value, restoring the default-date behavior
-        // (so a subsequent setDefaultDate / new Date() fallback takes effect again).
-        dateValueExplicitlySet = d != null;
+        // Mark as explicitly set even when d is null, so getDate() returns the
+        // caller's chosen value (null included) instead of silently substituting
+        // the default getter's result. The default still primes the popup wheels
+        // through applyDefaultDateIfNeeded() when the picker is opened against a
+        // null value, so the UI keeps a usable starting point. Issue #5024.
+        dateValueExplicitlySet = true;
         if (currentSpinner != null) {
             currentSpinner.setValue(d);
         }
