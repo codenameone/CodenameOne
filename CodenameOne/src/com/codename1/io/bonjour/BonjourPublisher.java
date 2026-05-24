@@ -9,7 +9,7 @@
  */
 package com.codename1.io.bonjour;
 
-import com.codename1.io.IOImpl;
+import com.codename1.ui.Display;
 
 import java.util.Hashtable;
 import java.util.Map;
@@ -59,8 +59,8 @@ public final class BonjourPublisher {
         if (txt == null) {
             txt = new Hashtable<String, String>();
         }
-        Object handle = IOImpl.impl()
-                .startBonjourPublish(name, type, port, txt);
+        Object handle = Display.getInstance().getBonjourPlatform()
+                .startPublish(name, type, port, txt);
         return new BonjourPublisher(name, type, port, handle);
     }
 
@@ -82,6 +82,6 @@ public final class BonjourPublisher {
             return;
         }
         unpublished = true;
-        IOImpl.impl().stopBonjourPublish(nativeHandle);
+        Display.getInstance().getBonjourPlatform().stopPublish(nativeHandle);
     }
 }

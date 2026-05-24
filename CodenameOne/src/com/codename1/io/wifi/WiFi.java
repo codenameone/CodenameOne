@@ -9,7 +9,7 @@
  */
 package com.codename1.io.wifi;
 
-import com.codename1.io.IOImpl;
+import com.codename1.ui.Display;
 
 /// Entry point for inspecting, scanning and connecting to WiFi networks.
 ///
@@ -46,40 +46,44 @@ public final class WiFi {
     private WiFi() {
     }
 
+    private static WifiPlatform platform() {
+        return Display.getInstance().getWifiPlatform();
+    }
+
     /// `true` if the current platform can query WiFi information.
     public static boolean isInfoSupported() {
-        return IOImpl.impl().isWiFiInfoSupported();
+        return platform().isInfoSupported();
     }
 
     /// `true` if the current platform supports active scan / connect.
     public static boolean isManagementSupported() {
-        return IOImpl.impl().isWiFiManagementSupported();
+        return platform().isManagementSupported();
     }
 
     /// The SSID of the currently associated WiFi network, or `null` if not
     /// connected to WiFi or if permission was denied. On iOS 13+ the OS
     /// returns `null` unless the app has CoreLocation authorization.
     public static String getCurrentSSID() {
-        return IOImpl.impl().getWiFiSSID();
+        return platform().getCurrentSSID();
     }
 
     /// The BSSID (MAC address of the access point) of the currently associated
     /// WiFi network, formatted as colon-separated lowercase hex
     /// (e.g. `aa:bb:cc:11:22:33`), or `null` if unavailable.
     public static String getBSSID() {
-        return IOImpl.impl().getWiFiBSSID();
+        return platform().getBSSID();
     }
 
     /// Default gateway IP address as a dotted quad (e.g. `192.168.1.1`), or
     /// `null` if no default gateway is configured.
     public static String getGateway() {
-        return IOImpl.impl().getWiFiGateway();
+        return platform().getGateway();
     }
 
     /// Local IP address on the WiFi interface as a dotted quad
     /// (e.g. `192.168.1.42`), or `null` if WiFi is not active.
     public static String getIp() {
-        return IOImpl.impl().getWiFiIp();
+        return platform().getIp();
     }
 
     /// Triggers a one-shot WiFi scan and reports results to `callback` on the
@@ -96,7 +100,7 @@ public final class WiFi {
     /// - **Simulator**: returns a small synthetic list and prints a warning
     ///   reminding the developer the data is fabricated.
     public static void scan(WiFiScanCallback callback) {
-        IOImpl.impl().scanWiFi(callback);
+        platform().scan(callback);
     }
 
     /// Attempts to associate the device with `ssid`. `password` may be `null`
@@ -109,7 +113,7 @@ public final class WiFi {
     /// - **Android 10+**: uses `WifiNetworkSpecifier` via
     ///   `ConnectivityManager.requestNetwork()`. The OS shows a system
     ///   dialog asking the user to approve the association; this dialog
-    ///   cannot be bypassed.
+    ///   can't be bypassed.
     /// - **Android 9 and below**: uses the legacy
     ///   `WifiConfiguration` API and `WifiManager.enableNetwork()`. The user
     ///   is not prompted but the call may be a no-op on OEM builds that
@@ -120,13 +124,13 @@ public final class WiFi {
     public static void connect(String ssid, String password,
                                WiFiSecurity security,
                                WiFiConnectCallback callback) {
-        IOImpl.impl().connectWiFi(ssid, password, security, callback);
+        platform().connect(ssid, password, security, callback);
     }
 
     /// Disconnect the request made via `connect`. On Android 10+ this releases
     /// the `NetworkSpecifier`; on iOS it removes the hotspot configuration.
-    /// Apps cannot force-disconnect a network the user joined manually.
+    /// Apps can't force-disconnect a network the user joined manually.
     public static void disconnect(String ssid) {
-        IOImpl.impl().disconnectWiFi(ssid);
+        platform().disconnect(ssid);
     }
 }

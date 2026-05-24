@@ -9,7 +9,7 @@
  */
 package com.codename1.io.wifi;
 
-import com.codename1.io.IOImpl;
+import com.codename1.ui.Display;
 
 /// WiFi Direct (Wi-Fi P2P) discovery and grouping.
 ///
@@ -31,21 +31,25 @@ public final class WiFiDirect {
     private WiFiDirect() {
     }
 
+    private static WifiDirectPlatform platform() {
+        return Display.getInstance().getWifiDirectPlatform();
+    }
+
     /// `true` if the current platform implements WiFi Direct.
     public static boolean isSupported() {
-        return IOImpl.impl().isWiFiDirectSupported();
+        return platform().isSupported();
     }
 
     /// Starts peer discovery. `listener` is invoked on the EDT for every peer
     /// list change. Call `stopDiscovery()` to release radio resources when
     /// you're done.
     public static void startDiscovery(WiFiDirectListener listener) {
-        IOImpl.impl().startWiFiDirectDiscovery(listener);
+        platform().startDiscovery(listener);
     }
 
     /// Stops peer discovery and detaches all listeners.
     public static void stopDiscovery() {
-        IOImpl.impl().stopWiFiDirectDiscovery();
+        platform().stopDiscovery();
     }
 
     /// Forms a P2P group with `peer`. The user is shown a confirmation prompt
@@ -53,11 +57,11 @@ public final class WiFiDirect {
     /// reuse the cached pairing where possible.
     public static void connect(WiFiDirectPeer peer,
                                WiFiConnectCallback callback) {
-        IOImpl.impl().connectWiFiDirect(peer, callback);
+        platform().connect(peer, callback);
     }
 
     /// Drops the current group, if any.
     public static void disconnect() {
-        IOImpl.impl().disconnectWiFiDirect();
+        platform().disconnect();
     }
 }

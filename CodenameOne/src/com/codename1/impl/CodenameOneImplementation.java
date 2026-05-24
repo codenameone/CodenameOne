@@ -37,17 +37,14 @@ import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.NetworkTypePlatform;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
-import com.codename1.io.bonjour.BonjourServiceListener;
-import com.codename1.io.usb.UsbDevice;
-import com.codename1.io.usb.UsbDeviceListener;
-import com.codename1.io.wifi.WiFiConnectCallback;
-import com.codename1.io.wifi.WiFiDirectListener;
-import com.codename1.io.wifi.WiFiDirectPeer;
-import com.codename1.io.wifi.WiFiScanCallback;
-import com.codename1.io.wifi.WiFiSecurity;
+import com.codename1.io.bonjour.BonjourPlatform;
+import com.codename1.io.usb.UsbPlatform;
+import com.codename1.io.wifi.WifiDirectPlatform;
+import com.codename1.io.wifi.WifiPlatform;
 import com.codename1.io.tar.TarEntry;
 import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
@@ -6385,174 +6382,104 @@ public abstract class CodenameOneImplementation {
     }
 
     // ---------------------------------------------------------------------
-    // Network type tracking (NetworkManager.addNetworkTypeListener)
+    // Deeper-network connectivity platform accessors.
+    //
+    // Each create*Platform() factory returns a narrow abstract class that
+    // the public-facing APIs in com.codename1.io.{wifi,bonjour,usb} ask for
+    // via Display.getInstance().getXxxPlatform(). Platform ports override
+    // the factory they care about; everything else falls through to the
+    // default no-op implementations. Keeping these as small factories
+    // (instead of dozens of methods on this class) lets each port ship its
+    // platform-specific code in a dedicated class and keeps this base
+    // implementation modular.
     // ---------------------------------------------------------------------
 
-    /// Returns the currently active network type as one of the
-    /// `NetworkManager.NETWORK_TYPE_*` constants. Default returns
-    /// `NETWORK_TYPE_OTHER` if any access point is configured (best-effort
-    /// fallback for older platform ports).
-    public int getCurrentNetworkType() {
-        return isAPSupported() && getCurrentAccessPoint() != null
-                ? NetworkManager.NETWORK_TYPE_OTHER
-                : NetworkManager.NETWORK_TYPE_NONE;
-    }
+    private WifiPlatform wifiPlatform;
+    private WifiDirectPlatform wifiDirectPlatform;
+    private BonjourPlatform bonjourPlatform;
+    private UsbPlatform usbPlatform;
+    private NetworkTypePlatform networkTypePlatform;
 
-    /// Platform hook: install a watcher that calls
-    /// `NetworkManager.fireNetworkTypeChange(...)` whenever the active
-    /// network type changes. Default is a no-op for platforms that cannot
-    /// observe network transitions.
-    public void installNetworkTypeListener(NetworkManager target) {
-    }
-
-    /// Platform hook: tear down the watcher installed by
-    /// `installNetworkTypeListener`. Default no-op.
-    public void uninstallNetworkTypeListener(NetworkManager target) {
-    }
-
-    // ---------------------------------------------------------------------
-    // WiFi information / management
-    // ---------------------------------------------------------------------
-
-    public boolean isWiFiInfoSupported() {
-        return false;
-    }
-
-    public boolean isWiFiManagementSupported() {
-        return false;
-    }
-
-    public String getWiFiSSID() {
-        return null;
-    }
-
-    public String getWiFiBSSID() {
-        return null;
-    }
-
-    public String getWiFiGateway() {
-        return null;
-    }
-
-    public String getWiFiIp() {
-        return null;
-    }
-
-    public void scanWiFi(WiFiScanCallback callback) {
-        if (callback != null) {
-            callback.onScanComplete(null,
-                    new UnsupportedOperationException(
-                            "WiFi scan is not supported on this platform"));
+    public final WifiPlatform getWifiPlatform() {
+        if (wifiPlatform == null) {
+            wifiPlatform = createWifiPlatform();
+            if (wifiPlatform == null) {
+                wifiPlatform = new WifiPlatform() {};
+            }
         }
+        return wifiPlatform;
     }
 
-    public void connectWiFi(String ssid, String password, WiFiSecurity security,
-                            WiFiConnectCallback callback) {
-        if (callback != null) {
-            callback.onConnectResult(false,
-                    new UnsupportedOperationException(
-                            "WiFi connect is not supported on this platform"));
-        }
-    }
-
-    public void disconnectWiFi(String ssid) {
-    }
-
-    // ---------------------------------------------------------------------
-    // WiFi Direct
-    // ---------------------------------------------------------------------
-
-    public boolean isWiFiDirectSupported() {
-        return false;
-    }
-
-    public void startWiFiDirectDiscovery(WiFiDirectListener listener) {
-        if (listener != null) {
-            listener.onDiscoveryError(new UnsupportedOperationException(
-                    "WiFi Direct is not supported on this platform"));
-        }
-    }
-
-    public void stopWiFiDirectDiscovery() {
-    }
-
-    public void connectWiFiDirect(WiFiDirectPeer peer,
-                                  WiFiConnectCallback callback) {
-        if (callback != null) {
-            callback.onConnectResult(false,
-                    new UnsupportedOperationException(
-                            "WiFi Direct is not supported on this platform"));
-        }
-    }
-
-    public void disconnectWiFiDirect() {
-    }
-
-    // ---------------------------------------------------------------------
-    // Bonjour / mDNS
-    // ---------------------------------------------------------------------
-
-    public boolean isBonjourSupported() {
-        return false;
-    }
-
-    public Object startBonjourBrowse(String type,
-                                     BonjourServiceListener listener) {
-        if (listener != null) {
-            listener.onBrowseError(new UnsupportedOperationException(
-                    "Bonjour is not supported on this platform"));
-        }
+    /// Platform ports override to return their WiFi implementation. The
+    /// default returns `null`, which the caller turns into an unsupported
+    /// stub.
+    protected WifiPlatform createWifiPlatform() {
         return null;
     }
 
-    public void stopBonjourBrowse(Object handle) {
+    public final WifiDirectPlatform getWifiDirectPlatform() {
+        if (wifiDirectPlatform == null) {
+            wifiDirectPlatform = createWifiDirectPlatform();
+            if (wifiDirectPlatform == null) {
+                wifiDirectPlatform = new WifiDirectPlatform() {};
+            }
+        }
+        return wifiDirectPlatform;
     }
 
-    public Object startBonjourPublish(String name, String type, int port,
-                                      Map<String, String> txt) {
+    protected WifiDirectPlatform createWifiDirectPlatform() {
         return null;
     }
 
-    public void stopBonjourPublish(Object handle) {
+    public final BonjourPlatform getBonjourPlatform() {
+        if (bonjourPlatform == null) {
+            bonjourPlatform = createBonjourPlatform();
+            if (bonjourPlatform == null) {
+                bonjourPlatform = new BonjourPlatform() {};
+            }
+        }
+        return bonjourPlatform;
     }
 
-    // ---------------------------------------------------------------------
-    // USB host
-    // ---------------------------------------------------------------------
-
-    public boolean isUsbSupported() {
-        return false;
+    protected BonjourPlatform createBonjourPlatform() {
+        return null;
     }
 
-    public UsbDevice[] listUsbDevices() {
-        return new UsbDevice[0];
+    public final UsbPlatform getUsbPlatform() {
+        if (usbPlatform == null) {
+            usbPlatform = createUsbPlatform();
+            if (usbPlatform == null) {
+                usbPlatform = new UsbPlatform() {};
+            }
+        }
+        return usbPlatform;
     }
 
-    public void addUsbDeviceListener(UsbDeviceListener listener) {
+    protected UsbPlatform createUsbPlatform() {
+        return null;
     }
 
-    public void removeUsbDeviceListener(UsbDeviceListener listener) {
+    public final NetworkTypePlatform getNetworkTypePlatform() {
+        if (networkTypePlatform == null) {
+            networkTypePlatform = createNetworkTypePlatform();
+            if (networkTypePlatform == null) {
+                // Default falls back to the legacy access-point bridge so
+                // ports that haven't been updated still report a non-NONE
+                // value when an AP is configured.
+                networkTypePlatform = new NetworkTypePlatform() {
+                    @Override public int getCurrentNetworkType() {
+                        return isAPSupported() && getCurrentAccessPoint() != null
+                                ? NetworkManager.NETWORK_TYPE_OTHER
+                                : NetworkManager.NETWORK_TYPE_NONE;
+                    }
+                };
+            }
+        }
+        return networkTypePlatform;
     }
 
-    public void requestUsbPermission(UsbDevice device) {
-    }
-
-    public boolean hasUsbPermission(UsbDevice device) {
-        return false;
-    }
-
-    public InputStream openUsbInputStream(UsbDevice device,
-                                          int endpointAddress)
-            throws IOException {
-        throw new IOException(
-                "USB is not supported on this platform");
-    }
-
-    public OutputStream openUsbOutputStream(UsbDevice device,
-                                            int endpointAddress)
-            throws IOException {
-        throw new IOException(
-                "USB is not supported on this platform");
+    protected NetworkTypePlatform createNetworkTypePlatform() {
+        return null;
     }
 
     /// For some reason the standard code for writing UTF8 output in a server request

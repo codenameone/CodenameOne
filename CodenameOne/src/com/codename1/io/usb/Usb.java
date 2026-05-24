@@ -9,7 +9,7 @@
  */
 package com.codename1.io.usb;
 
-import com.codename1.io.IOImpl;
+import com.codename1.ui.Display;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,7 +19,7 @@ import java.io.OutputStream;
 ///
 /// Lets the device act as a USB host and talk to attached peripherals -- a
 /// barcode scanner, a serial-over-USB device, a microcontroller. This is
-/// **Android-only** in practice; iOS does not expose third-party USB host
+/// **Android-only** in practice; iOS doesn't expose third-party USB host
 /// access and the simulator/JavaSE port stubs everything out.
 ///
 /// #### Android specifics
@@ -34,35 +34,39 @@ public final class Usb {
     private Usb() {
     }
 
+    private static UsbPlatform platform() {
+        return Display.getInstance().getUsbPlatform();
+    }
+
     /// `true` if the current platform implements USB host access.
     public static boolean isSupported() {
-        return IOImpl.impl().isUsbSupported();
+        return platform().isSupported();
     }
 
     /// All currently-attached USB devices.
     public static UsbDevice[] listDevices() {
-        return IOImpl.impl().listUsbDevices();
+        return platform().listDevices();
     }
 
     /// Subscribes `listener` to attach / detach events. Returns immediately.
     /// Calls on the EDT.
     public static void addDeviceListener(UsbDeviceListener listener) {
-        IOImpl.impl().addUsbDeviceListener(listener);
+        platform().addDeviceListener(listener);
     }
 
     public static void removeDeviceListener(UsbDeviceListener listener) {
-        IOImpl.impl().removeUsbDeviceListener(listener);
+        platform().removeDeviceListener(listener);
     }
 
     /// Requests permission from the user to talk to `device`. The result is
     /// reported asynchronously via `UsbDeviceListener.onPermissionResult`.
     public static void requestPermission(UsbDevice device) {
-        IOImpl.impl().requestUsbPermission(device);
+        platform().requestPermission(device);
     }
 
     /// `true` if the user has granted access to `device`.
     public static boolean hasPermission(UsbDevice device) {
-        return IOImpl.impl().hasUsbPermission(device);
+        return platform().hasPermission(device);
     }
 
     /// Opens a bulk-transfer endpoint on the device. `endpointAddress` matches
@@ -71,12 +75,12 @@ public final class Usb {
     public static InputStream openInputStream(UsbDevice device,
                                               int endpointAddress)
             throws IOException {
-        return IOImpl.impl().openUsbInputStream(device, endpointAddress);
+        return platform().openInputStream(device, endpointAddress);
     }
 
     public static OutputStream openOutputStream(UsbDevice device,
                                                 int endpointAddress)
             throws IOException {
-        return IOImpl.impl().openUsbOutputStream(device, endpointAddress);
+        return platform().openOutputStream(device, endpointAddress);
     }
 }

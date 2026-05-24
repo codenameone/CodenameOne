@@ -1352,121 +1352,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public int getCurrentNetworkType() {
-        return nativeInstance.wifiNetworkType();
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new IOSWifiPlatform();
     }
 
     @Override
-    public void installNetworkTypeListener(com.codename1.io.NetworkManager target) {
-        IOSConnectivity.registerNetworkTypeTarget(target);
-        nativeInstance.wifiInstallTypeListener(IOSConnectivity.class);
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new IOSBonjourPlatform();
     }
 
     @Override
-    public void uninstallNetworkTypeListener(com.codename1.io.NetworkManager target) {
-        nativeInstance.wifiUninstallTypeListener();
-        IOSConnectivity.unregisterNetworkTypeTarget();
-    }
-
-    @Override
-    public boolean isWiFiInfoSupported() { return true; }
-
-    @Override
-    public boolean isWiFiManagementSupported() { return true; }
-
-    @Override
-    public String getWiFiSSID() { return nativeInstance.wifiCurrentSSID(); }
-
-    @Override
-    public String getWiFiBSSID() { return nativeInstance.wifiCurrentBSSID(); }
-
-    @Override
-    public String getWiFiGateway() { return nativeInstance.wifiGateway(); }
-
-    @Override
-    public String getWiFiIp() { return nativeInstance.wifiIpAddress(); }
-
-    @Override
-    public void scanWiFi(com.codename1.io.wifi.WiFiScanCallback cb) {
-        // iOS does not expose a public scan API.
-        if (cb != null) {
-            final com.codename1.io.wifi.WiFiScanCallback cbf = cb;
-            com.codename1.ui.CN.callSerially(new Runnable() {
-                @Override public void run() {
-                    cbf.onScanComplete(null,
-                            new UnsupportedOperationException(
-                                    "iOS does not expose a WiFi scan API"));
-                }
-            });
-        }
-    }
-
-    @Override
-    public void connectWiFi(String ssid, String password,
-                            com.codename1.io.wifi.WiFiSecurity security,
-                            com.codename1.io.wifi.WiFiConnectCallback cb) {
-        IOSConnectivity.setPendingConnect(cb);
-        int sec = security == null ? 0 : security.ordinal();
-        nativeInstance.wifiConnect(ssid, password, sec);
-    }
-
-    @Override
-    public void disconnectWiFi(String ssid) {
-        nativeInstance.wifiDisconnect(ssid);
-    }
-
-    @Override
-    public boolean isBonjourSupported() { return true; }
-
-    @Override
-    public Object startBonjourBrowse(String type,
-                                     com.codename1.io.bonjour.BonjourServiceListener l) {
-        // The native side uses the listener identity via handle. Native
-        // start returns the handle; IOSConnectivity tracks the mapping.
-        if (l == null) return null;
-        long handle = nativeInstance.bonjourBrowseStart(type);
-        if (handle == 0) {
-            final com.codename1.io.bonjour.BonjourServiceListener lf = l;
-            com.codename1.ui.CN.callSerially(new Runnable() {
-                @Override public void run() {
-                    lf.onBrowseError(new RuntimeException("Bonjour unavailable"));
-                }
-            });
-            return null;
-        }
-        IOSConnectivity.registerBonjour(handle, l);
-        return Long.valueOf(handle);
-    }
-
-    @Override
-    public void stopBonjourBrowse(Object handle) {
-        if (handle == null) return;
-        long h = ((Long) handle).longValue();
-        nativeInstance.bonjourBrowseStop(h);
-        IOSConnectivity.unregisterBonjour(h);
-    }
-
-    @Override
-    public Object startBonjourPublish(String name, String type, int port,
-                                      java.util.Map<String, String> txt) {
-        String[] keys = new String[txt == null ? 0 : txt.size()];
-        String[] vals = new String[keys.length];
-        if (txt != null) {
-            int i = 0;
-            for (java.util.Map.Entry<String, String> e : txt.entrySet()) {
-                keys[i] = e.getKey();
-                vals[i] = e.getValue() == null ? "" : e.getValue();
-                i++;
-            }
-        }
-        long h = nativeInstance.bonjourPublishStart(name, type, port, keys, vals);
-        return h == 0 ? null : Long.valueOf(h);
-    }
-
-    @Override
-    public void stopBonjourPublish(Object handle) {
-        if (handle == null) return;
-        nativeInstance.bonjourPublishStop(((Long) handle).longValue());
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new IOSNetworkTypePlatform();
     }
 
     @Override

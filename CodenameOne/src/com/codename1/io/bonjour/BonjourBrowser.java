@@ -9,7 +9,7 @@
  */
 package com.codename1.io.bonjour;
 
-import com.codename1.io.IOImpl;
+import com.codename1.ui.Display;
 
 /// Browses the local network for Bonjour / mDNS services.
 ///
@@ -25,7 +25,7 @@ import com.codename1.io.IOImpl;
 /// - **Android**: `android.net.nsd.NsdManager`.
 /// - **iOS**: `NSNetServiceBrowser` + `NSNetService`. The build pipeline
 ///   injects `NSLocalNetworkUsageDescription` and the service type into
-///   `NSBonjourServices` so iOS 14+ does not block discovery.
+///   `NSBonjourServices` so iOS 14+ doesn't block discovery.
 /// - **Simulator**: JmDNS is used when present on the classpath; otherwise
 ///   discovery is a no-op and the listener is told the platform is
 ///   unsupported.
@@ -59,14 +59,14 @@ public final class BonjourBrowser {
     /// optional). `listener` is invoked on the EDT.
     public static BonjourBrowser browse(String type,
                                         BonjourServiceListener listener) {
-        Object handle = IOImpl.impl()
-                .startBonjourBrowse(type, listener);
+        Object handle = Display.getInstance().getBonjourPlatform()
+                .startBrowse(type, listener);
         return new BonjourBrowser(type, handle);
     }
 
     /// `true` if the platform implements Bonjour at all.
     public static boolean isSupported() {
-        return IOImpl.impl().isBonjourSupported();
+        return Display.getInstance().getBonjourPlatform().isSupported();
     }
 
     /// The service type passed to `browse(...)`.
@@ -80,6 +80,6 @@ public final class BonjourBrowser {
             return;
         }
         stopped = true;
-        IOImpl.impl().stopBonjourBrowse(nativeHandle);
+        Display.getInstance().getBonjourPlatform().stopBrowse(nativeHandle);
     }
 }

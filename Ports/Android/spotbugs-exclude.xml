@@ -111,23 +111,33 @@
     </Match>
 
     <!--
-    AndroidConnectivity / AndroidUsb cache platform BroadcastReceivers and
-    NetworkCallbacks in static fields. The receivers are installed once when
-    the corresponding listener is registered and torn down when the last
-    listener detaches; the access pattern matches the EDT/main-thread
-    convention already documented for AndroidImplementation above.
-    Suppressing the lazy-init warnings keeps the cache-init code readable
-    without spurious double-checked-locking ceremony.
+    The com.codename1.impl.android.connectivity.* platform classes
+    (AndroidWifiPlatform, AndroidUsbPlatform, ...) are obtained through
+    CodenameOneImplementation.getXxxPlatform() and are effectively
+    singletons cached per JVM. They install Android BroadcastReceivers and
+    NetworkCallbacks the first time WiFi.scan(...) / Usb.addDeviceListener(...)
+    / NetworkManager.addNetworkTypeListener(...) is called.
+
+    Each install/uninstall happens on the EDT only (the public API
+    contract is "callable from any thread but the implementations
+    serialize through CN.callSerially") so the LI_LAZY_INIT_* findings
+    SpotBugs reports here are not real race conditions -- the rule's
+    premise that multiple threads might race to initialise the receiver
+    does not hold for the EDT-bound install pattern. The alternative
+    would be double-checked locking around fields that are only ever
+    touched from one thread, which is dead weight.
+
+    Scope this exception to the connectivity package only so the rule
+    still catches genuine lazy-init races elsewhere in the port.
     -->
     <Match>
-        <Class name="~com\.codename1\.impl\.android\.(AndroidConnectivity|AndroidUsb)(\$.*)?" />
+        <Class name="~com\.codename1\.impl\.android\.connectivity\.[^.]+(\$.*)?" />
         <Or>
             <Bug pattern="LI_LAZY_INIT_UPDATE_STATIC" />
             <Bug pattern="LI_LAZY_INIT_STATIC" />
             <Bug pattern="MS_PKGPROTECT" />
             <Bug pattern="MS_SHOULD_BE_FINAL" />
             <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
-            <!-- Defensive null-checks on static caches read on the EDT. -->
             <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
             <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE" />
             <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE" />

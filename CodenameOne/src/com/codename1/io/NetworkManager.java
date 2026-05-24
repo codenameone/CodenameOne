@@ -868,7 +868,21 @@ public final class NetworkManager {
     /// no connectivity. Distinct from `getAPType` which describes a configured
     /// access point rather than the active data path.
     public int getCurrentNetworkType() {
-        return Util.getImplementation().getCurrentNetworkType();
+        return com.codename1.ui.Display.getInstance()
+                .getNetworkTypePlatform().getCurrentNetworkType();
+    }
+
+    /// Fast best-effort connectivity check. Returns `false` only when the
+    /// platform reports `NETWORK_TYPE_NONE`; all other states (WiFi,
+    /// cellular, ethernet, VPN-only, or "other") return `true`. Avoids the
+    /// HTTP probe that `getInstance().assignToThread(...)` performs against
+    /// `autoDetectURL` so the check is suitable to call from the EDT.
+    ///
+    /// Apps that need a stronger "can I reach my server" guarantee should
+    /// still fire a real `ConnectionRequest`; this method only reports
+    /// whether the device has *any* usable network interface up.
+    public boolean isConnected() {
+        return getCurrentNetworkType() != NETWORK_TYPE_NONE;
     }
 
     /// Registers `l` to be notified when the device's active network type
@@ -884,7 +898,8 @@ public final class NetworkManager {
             if (networkTypeListeners == null) {
                 networkTypeListeners = new EventDispatcher();
                 networkTypeListeners.setBlocking(false);
-                Util.getImplementation().installNetworkTypeListener(this);
+                com.codename1.ui.Display.getInstance()
+                        .getNetworkTypePlatform().install(this);
                 lastNetworkType = getCurrentNetworkType();
                 lastVpnActive = isVPNActive();
             }
@@ -905,7 +920,8 @@ public final class NetworkManager {
             networkTypeListeners.removeListener(l);
             Collection v = networkTypeListeners.getListenerCollection();
             if (v == null || v.isEmpty()) {
-                Util.getImplementation().uninstallNetworkTypeListener(this);
+                com.codename1.ui.Display.getInstance()
+                        .getNetworkTypePlatform().uninstall(this);
                 networkTypeListeners = null;
             }
         }

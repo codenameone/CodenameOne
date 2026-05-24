@@ -1,6 +1,8 @@
 == Deeper Network Connectivity
 
-Codename One 8 ships a set of APIs under `com.codename1.io.wifi`, `com.codename1.io.bonjour`, `com.codename1.io.usb` and an extension of `com.codename1.io.NetworkManager` that lets apps inspect and manage the device's local network beyond plain HTTP.
+Codename One ships a set of APIs under `com.codename1.io.wifi`, `com.codename1.io.bonjour`, `com.codename1.io.usb` and an extension of `com.codename1.io.NetworkManager` that lets apps inspect and manage the device's local network beyond plain HTTP.
+
+A quick connectivity check is `NetworkManager.getInstance().isConnected()` -- it reads the cached platform network state and returns immediately without an HTTP probe, so it's safe to call from the EDT before deciding whether to fire a `ConnectionRequest`.
 
 These APIs share three guarantees:
 
@@ -168,10 +170,13 @@ The pipeline adds `CHANGE_WIFI_MULTICAST_STATE` automatically. `NsdManager` does
 
 ==== Simulator behaviour
 
-If `javax.jmdns.JmDNS` is on the simulator classpath, browse calls dispatch through it. Otherwise the listener receives a single `UnsupportedOperationException` and the simulator prints a hint. Add JmDNS to your simulator profile to exercise real discovery:
+If `javax.jmdns.JmDNS` is on the simulator classpath, browse calls dispatch through it. Otherwise the listener receives a single `UnsupportedOperationException` and the simulator prints a hint. Add JmDNS to your *application's* `executable-jar` / simulator profile (typically the `<profile id="executable-jar">` block in your cn1app's `common/pom.xml` or your `javase/pom.xml`) to exercise real discovery in the simulator:
 
 [source,xml]
 ----
+<!-- in YOUR app's pom, NOT in the framework / common pom that gets shipped
+     to the device. The cn1app archetype's executable-jar profile is the
+     right place because it only applies when launching the simulator. -->
 <dependency>
     <groupId>org.jmdns</groupId>
     <artifactId>jmdns</artifactId>
@@ -179,6 +184,11 @@ If `javax.jmdns.JmDNS` is on the simulator classpath, browse calls dispatch thro
     <scope>runtime</scope>
 </dependency>
 ----
+
+[WARNING]
+====
+Don't add JmDNS to the cn1app `common/pom.xml` outside a simulator-scoped profile -- it would then ship with your Android / iOS binaries even though both platforms supply native mDNS implementations.
+====
 
 === Network type change events
 
@@ -311,7 +321,7 @@ If you want the OS to launch your app when a matching device is plugged in, ship
 android.xintent_filter=<intent-filter><action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" /></intent-filter><meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/device_filter" />
 ----
 
-=== Threading and lifecycle
+=== Releasing platform resources
 
 Most of these APIs hold background resources (broadcast receivers, network callbacks, NSNetService delegates) that you must release explicitly:
 
@@ -322,4 +332,4 @@ Most of these APIs hold background resources (broadcast receivers, network callb
 * `Usb.addDeviceListener(...)` -- call `removeDeviceListener(...)`.
 * `NetworkManager.addNetworkTypeListener(...)` -- call `removeNetworkTypeListener(...)`.
 
-Leaving them attached over a `Form` lifetime is fine; leaving them attached over the app lifetime drains battery on Android and leaks file descriptors on iOS. Pair each registration with a removal in your `Form#deinitializeImpl()`.
+Each of these keeps a radio or system service awake. Bonjour browsers and WiFi scans in particular drain battery noticeably -- they're fine during a few user-facing screens but shouldn't stay armed for the lifetime of the app. Release them as soon as the screen that needs them is no longer visible.

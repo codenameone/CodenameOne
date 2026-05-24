@@ -7,7 +7,7 @@
  * particular file as subject to the "Classpath" exception as provided
  * by Codename One in the LICENSE file that accompanied this code.
  */
-package com.codename1.impl.android;
+package com.codename1.impl.android.connectivity;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -21,49 +21,49 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
-import android.util.Log;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.io.usb.UsbDevice;
 import com.codename1.io.usb.UsbDeviceListener;
+import com.codename1.io.usb.UsbPlatform;
 import com.codename1.ui.CN;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// USB host implementation for Android. Activity-scoped (uses
-/// `AndroidImplementation.getContext()`); detach events flow via a single
-/// shared `BroadcastReceiver`.
-public final class AndroidUsb {
-    private static final String TAG = "CN1Usb";
+/// Android USB host implementation. All Android USB symbols touched here
+/// are API 12+ so the class verifies on the minimum supported Android
+/// (KitKat / API 19).
+public final class AndroidUsbPlatform extends UsbPlatform {
     private static final String ACTION_PERM = "com.codename1.usb.PERMISSION";
+    // Build.VERSION_CODES.S (=31) isn't on the legacy compile SDK; use the
+    // literal value.
+    private static final int SDK_S = 31;
 
-    private static final List<UsbDeviceListener> listeners
-            = new ArrayList<UsbDeviceListener>();
-    private static BroadcastReceiver attachReceiver;
-    private static BroadcastReceiver permReceiver;
+    private final List<UsbDeviceListener> listeners = new ArrayList<UsbDeviceListener>();
+    private BroadcastReceiver attachReceiver;
+    private BroadcastReceiver permReceiver;
 
-    private AndroidUsb() {
-    }
-
-    public static boolean isSupported() {
+    @Override
+    public boolean isSupported() {
         Context ctx = AndroidImplementation.getContext();
         if (ctx == null) return false;
         return ctx.getPackageManager()
                 .hasSystemFeature(PackageManager.FEATURE_USB_HOST);
     }
 
-    private static UsbManager usb() {
+    private UsbManager usb() {
         Context ctx = AndroidImplementation.getContext();
         if (ctx == null) return null;
         return (UsbManager) ctx.getSystemService(Context.USB_SERVICE);
     }
 
-    public static UsbDevice[] listDevices() {
+    @Override
+    public UsbDevice[] listDevices() {
         UsbManager um = usb();
         if (um == null) return new UsbDevice[0];
         Map<String, android.hardware.usb.UsbDevice> map = um.getDeviceList();
@@ -85,20 +85,22 @@ public final class AndroidUsb {
                 d.getProductId(), prod, mfr, d);
     }
 
-    public static synchronized void addDeviceListener(UsbDeviceListener l) {
+    @Override
+    public synchronized void addDeviceListener(UsbDeviceListener l) {
         if (listeners.contains(l)) return;
         listeners.add(l);
         ensureReceiverInstalled();
     }
 
-    public static synchronized void removeDeviceListener(UsbDeviceListener l) {
+    @Override
+    public synchronized void removeDeviceListener(UsbDeviceListener l) {
         listeners.remove(l);
         if (listeners.isEmpty()) {
             uninstallReceiver();
         }
     }
 
-    private static void ensureReceiverInstalled() {
+    private void ensureReceiverInstalled() {
         if (attachReceiver != null) return;
         Context ctx = AndroidImplementation.getContext();
         if (ctx == null) return;
@@ -112,7 +114,7 @@ public final class AndroidUsb {
                 CN.callSerially(new Runnable() {
                     @Override public void run() {
                         UsbDeviceListener[] arr;
-                        synchronized (AndroidUsb.class) {
+                        synchronized (AndroidUsbPlatform.this) {
                             arr = listeners.toArray(new UsbDeviceListener[listeners.size()]);
                         }
                         for (UsbDeviceListener l : arr) {
@@ -129,7 +131,7 @@ public final class AndroidUsb {
         ctx.registerReceiver(attachReceiver, f);
     }
 
-    private static void uninstallReceiver() {
+    private void uninstallReceiver() {
         Context ctx = AndroidImplementation.getContext();
         if (ctx != null && attachReceiver != null) {
             try { ctx.unregisterReceiver(attachReceiver); } catch (Throwable ignored) { }
@@ -137,7 +139,8 @@ public final class AndroidUsb {
         attachReceiver = null;
     }
 
-    public static void requestPermission(final UsbDevice device) {
+    @Override
+    public void requestPermission(final UsbDevice device) {
         Context ctx = AndroidImplementation.getContext();
         UsbManager um = usb();
         if (ctx == null || um == null || device == null) return;
@@ -153,7 +156,7 @@ public final class AndroidUsb {
                     CN.callSerially(new Runnable() {
                         @Override public void run() {
                             UsbDeviceListener[] arr;
-                            synchronized (AndroidUsb.class) {
+                            synchronized (AndroidUsbPlatform.this) {
                                 arr = listeners.toArray(new UsbDeviceListener[listeners.size()]);
                             }
                             for (UsbDeviceListener l : arr) {
@@ -166,9 +169,7 @@ public final class AndroidUsb {
             ctx.registerReceiver(permReceiver, new IntentFilter(ACTION_PERM));
         }
         int flags = 0;
-        // Build.VERSION_CODES.S (=31) is not present on the legacy compile
-        // SDK shipped in cn1-binaries; use the literal SDK int instead.
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (Build.VERSION.SDK_INT >= SDK_S) {
             flags = PendingIntent.FLAG_IMMUTABLE;
         }
         PendingIntent pi = PendingIntent.getBroadcast(ctx, 0,
@@ -176,19 +177,22 @@ public final class AndroidUsb {
         um.requestPermission((android.hardware.usb.UsbDevice) device.getNativeDevice(), pi);
     }
 
-    public static boolean hasPermission(UsbDevice device) {
+    @Override
+    public boolean hasPermission(UsbDevice device) {
         UsbManager um = usb();
         if (um == null || device == null) return false;
         return um.hasPermission((android.hardware.usb.UsbDevice) device.getNativeDevice());
     }
 
-    public static InputStream openInputStream(UsbDevice device, int endpoint)
+    @Override
+    public InputStream openInputStream(UsbDevice device, int endpoint)
             throws IOException {
         return new UsbStream(device, endpoint, UsbConstants.USB_DIR_IN)
                 .asInputStream();
     }
 
-    public static OutputStream openOutputStream(UsbDevice device, int endpoint)
+    @Override
+    public OutputStream openOutputStream(UsbDevice device, int endpoint)
             throws IOException {
         return new UsbStream(device, endpoint, UsbConstants.USB_DIR_OUT)
                 .asOutputStream();
@@ -196,7 +200,7 @@ public final class AndroidUsb {
 
     /// Adapter that bridges an Android USB endpoint to a Java stream.
     /// Uses bulk transfers with a 5-second timeout.
-    private static final class UsbStream {
+    private final class UsbStream {
         private final UsbDeviceConnection conn;
         private final UsbEndpoint endpoint;
         private final UsbInterface iface;
