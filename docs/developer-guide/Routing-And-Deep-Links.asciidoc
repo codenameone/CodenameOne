@@ -1,0 +1,480 @@
+== Routing & Deep Links
+
+[[routing-top-level-section,Routing Section]]
+The `com.codename1.router` package provides a declarative, fluent navigation
+router that layers URL-based addressing, deep-link integration, route guards,
+and a stack of named locations on top of the existing `Form` infrastructure.
+
+NOTE: The router is **optional**. Existing `Form.show()` / `Form.showBack()`
+code keeps working unchanged. The router adds an alternative entry point — apps
+mix and match as suits them.
+
+=== When to reach for the router
+
+Use the router when the app needs any of:
+
+* **Deep links** — universal links, custom-scheme URLs, push notifications that
+  must open a specific screen with parameters.
+* **Reverse-navigation paths** — sending a "share to /users/42" link inside the
+  app and having one place that knows how to open it.
+* **Route guards** — a single declarative place to redirect unauthenticated
+  users to a login screen.
+* **Browser-back integration on the JavaScript port** — every navigation should
+  be reflected in `window.history`.
+
+Plain `Form.show()` is still the right tool for one-off transitions and small
+apps that don't benefit from URL addressability.
+
+=== Quick start
+
+[source,java]
+----
+import com.codename1.router.*;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+public void init(Object context) {
+    Router.getInstance()
+        .route("/", new RouteBuilder() {
+            public Form build(RouteContext c) { return new HomeForm(); }
+        })
+        .route("/users/:id", new RouteBuilder() {
+            public Form build(RouteContext c) { return new ProfileForm(c.param("id")); }
+        })
+        .guard("/account/**", new RouteGuard() {
+            public RouteGuard.Decision check(RouteContext c) {
+                return UserSession.isLoggedIn()
+                        ? RouteGuard.Decision.PROCEED
+                        : RouteGuard.Decision.redirect("/login");
+            }
+        })
+        .redirect("/old/profile/*", "/users/me")
+        .notFound(new RouteBuilder() {
+            public Form build(RouteContext c) { return new NotFoundForm(); }
+        });
+
+    Display.getInstance().setDeepLinkHandler(
+            Router.getInstance().asDeepLinkHandler());
+}
+
+public void start() {
+    Router.getInstance().start("/");
+}
+
+// Anywhere in the app:
+Router.push("/users/42");
+Router.replace("/login");
+Router.pop();
+----
+
+=== Path syntax
+
+|===
+|Pattern              |Matches                              |Bound
+
+|`/about`             |`/about`                             |—
+|`/users/:id`         |`/users/42`                          |`id = "42"`
+|`/files/*`           |`/files/photo.png` (one segment)     |`* = "photo.png"`
+|`/files/**`          |`/files/a/b/c` (catch-all)           |`* = "a/b/c"`
+|===
+
+When multiple routes match, the **more specific** pattern wins — literal
+segments outscore `:params`, which outscore `*` wildcards, which outscore `**`
+catch-alls.
+
+=== Deep links
+
+The `com.codename1.router.DeepLink` value class is a normalized parse of any
+URL: scheme, host, path, decoded segments, query map, fragment. Install a
+`LinkHandler` once and it receives both **cold launches** (the URL that started
+the app) and **warm launches** (URLs delivered while the app is already
+running):
+
+[source,java]
+----
+Display.getInstance().setDeepLinkHandler(new LinkHandler() {
+    public boolean handle(DeepLink link) {
+        log("got deep link: " + link.getRaw());
+        Router.getInstance().handle(link);
+        return true;
+    }
+});
+----
+
+Returning `false` from the handler lets the legacy `Display.getProperty("AppArg")`
+mechanism still pick up the URL.
+
+==== Cold-launch replay
+
+If the URL arrives before the app installs its handler, the URL is cached and
+replayed automatically as soon as `setDeepLinkHandler` is called. App init
+order doesn't matter.
+
+==== iOS Universal Links
+
+Build the `apple-app-site-association` file with `AasaBuilder`:
+
+[source,java]
+----
+String json = new AasaBuilder()
+    .appId("ABCD1234.com.example.app")
+    .addRouterPattern("/users/:id")   // emits /users/*
+    .addRouterPattern("/share/**")    // emits /share/*
+    .addPath("NOT /admin/*")          // exclude
+    .build();
+----
+
+Host the result at `https://example.com/.well-known/apple-app-site-association`
+**served over HTTPS, no redirects, `Content-Type: application/json`**. Then in
+Xcode enable the **Associated Domains** capability with entry
+`applinks:example.com`.
+
+In the iOS build hints, add the
+`ios.plistInject` for `LSApplicationQueriesSchemes` if you also want to invoke
+your custom scheme from other apps.
+
+==== Android App Links
+
+[source,java]
+----
+String json = new AssetLinksBuilder()
+    .addApp("com.example.app",
+            "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5")
+    .addFingerprint("AB:CD:..."  /* Play App Signing upload cert */)
+    .build();
+----
+
+Host at `https://example.com/.well-known/assetlinks.json`. Add an intent filter
+to the manifest via the `android.xintent_filter` build hint with
+`autoVerify="true"`:
+
+[source,xml]
+----
+<intent-filter android:autoVerify="true">
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="https" android:host="example.com" />
+</intent-filter>
+----
+
+Extract the SHA-256 fingerprint with:
+
+[source,sh]
+----
+keytool -list -v -keystore your.keystore -alias your-alias | grep SHA256:
+----
+
+If you use **Play App Signing**, the upload cert fingerprint comes from the Play
+Console under **Setup > App integrity**.
+
+=== Pop guards
+
+A `PopGuard` is consulted **before** back/pop navigation leaves a form — useful
+for "discard unsaved changes?" confirms and analogous patterns.
+
+[source,java]
+----
+editForm.setPopGuard(new PopGuard() {
+    public boolean canPop(Form form, PopReason reason) {
+        if (!isDirty()) return true;
+        Dialog.show("Discard changes?", "You have unsaved edits.",
+                    "Stay", "Discard");
+        // Block the pop; show our own UI; the user will call Router.pop()
+        // again if they choose to discard.
+        return false;
+    }
+});
+----
+
+The guard fires for:
+
+* The toolbar back button (via `Button.fireActionEvent`)
+* The Android hardware back key / iOS edge-swipe (via `MenuBar.keyReleased`)
+* `Router.pop()` / `Router.replace()`
+
+`PopReason` distinguishes between these triggers so a guard can be selective.
+
+=== Tab navigation with per-tab stacks
+
+`TabsForm` is a `Form` whose body is a `Tabs` where **each tab keeps its own
+nav stack** — switching tabs preserves the stack, and back navigates within the
+active tab before exiting:
+
+[source,java]
+----
+TabsForm shell = new TabsForm();
+int home = shell.addTab("Home", null, new HomeContent());
+int chat = shell.addTab("Chat", null, new ChatList());
+shell.show();
+
+shell.switchToTab(chat);
+shell.pushInActiveTab(new ConversationView(chatId));
+// Hardware back pops the conversation view, leaving the chat list visible.
+// Tap Home then Chat again: conversation view is still on top.
+----
+
+=== Sheet result API
+
+`Sheet.showForResult()` returns an `AsyncResource` that resolves when the sheet
+finishes. Inside the sheet, `finish(value)` completes it; user dismissal
+(back/swipe) resolves with `null`:
+
+[source,java]
+----
+PickerSheet sheet = new PickerSheet();
+sheet.<String>showForResult().ready(new SuccessCallback<String>() {
+    public void onSuccess(String picked) {
+        if (picked != null) handle(picked);
+    }
+});
+
+// inside PickerSheet:
+button.addActionListener(e -> finish(currentValue));
+----
+
+=== Annotation-driven route declaration
+
+For larger apps, annotate Form classes with `@Route` and let the build emit
+the registration code:
+
+[source,java]
+----
+@Route("/profile/:id")
+public class ProfileForm extends Form {
+    public ProfileForm() { setTitle("Profile"); }
+
+    // Optional: the generator prefers this constructor when present.
+    public ProfileForm(RouteContext ctx) {
+        this();
+        setTitle("Profile of " + ctx.param("id"));
+    }
+}
+----
+
+Wire two goals into the project's `pom.xml`:
+
+[source,xml]
+----
+<plugin>
+  <groupId>com.codenameone</groupId>
+  <artifactId>codenameone-maven-plugin</artifactId>
+  <executions>
+    <!-- generate-sources: emit compile-time stubs so app code can
+         resolve com.codename1.router.generated.RoutesIndex. -->
+    <execution>
+      <id>cn1-annotation-stubs</id>
+      <phase>generate-sources</phase>
+      <goals><goal>generate-annotation-stubs</goal></goals>
+    </execution>
+    <!-- process-classes: ASM-scan target/classes for @Route, validate
+         (fail-fast on mistakes), emit the real RoutesIndex bytecode. -->
+    <execution>
+      <id>cn1-process-annotations</id>
+      <phase>process-classes</phase>
+      <goals><goal>process-annotations</goal></goals>
+    </execution>
+  </executions>
+</plugin>
+----
+
+The first goal writes a no-op stub at
+`target/generated-sources/cn1-annotations/com/codename1/router/generated/RoutesIndex.java`
+and adds it as a compile source root. The second goal scans the project's
+compiled bytecode after compile, validates every `@Route` (extends `Form`,
+non-empty path starting with `/`, accessible constructor, no duplicate
+patterns), and replaces the stub's `.class` with the real registrations.
+
+**Validation is fail-fast**: any malformed `@Route` aborts the build with a
+single error listing every offender; no generated class is written when
+errors are pending.
+
+Call `com.codename1.router.generated.RoutesIndex.register()` once during app
+init. This works on every port — iOS (ParparVM), Android, JavaSE, JavaScript —
+because the generated bytecode contains explicit `new ProfileForm(ctx)` calls.
+No runtime reflection is required.
+
+==== Extending the framework with custom annotations
+
+The same machinery is reusable for any compile-time annotation that needs to
+emit registration code. Implement `com.codename1.maven.annotations.AnnotationProcessor`
+(or extend `AbstractAnnotationProcessor`) and register it via
+`META-INF/services/com.codename1.maven.annotations.AnnotationProcessor`. The
+existing Mojos pick the new processor up automatically.
+
+Each processor:
+
+* Declares the annotation descriptors it wants via `getAnnotationDescriptors()`.
+* Optionally emits compile-time stubs in `emitStubs(ProcessorContext)`.
+* Receives every annotated class via `processClass(AnnotatedClass, ProcessorContext)`.
+* Emits generated bytecode in `finish(ProcessorContext)` through
+  `ProcessorContext.emitClass`.
+
+Validation errors go to `ProcessorContext.error(...)` and are reported
+together so a single build run surfaces every offender.
+
+=== Location listeners
+
+Subscribe to back/forward/replace events for analytics or breadcrumb UI:
+
+[source,java]
+----
+Router.getInstance().addLocationListener(new LocationListener() {
+    public void onLocationChanged(Location previous, Location current,
+                                  Kind kind) {
+        Analytics.track("nav", current.getPath(), kind.name());
+    }
+});
+----
+
+=== JavaScript port: browser history integration
+
+On the JavaScript port the router can mirror its stack to `window.history` so
+the address bar shows the right URL and the browser's back button works:
+
+[source,java]
+----
+if ("HTML5".equals(Display.getInstance().getPlatformName())) {
+    JsRouterBootstrap.install();
+}
+----
+
+Include the bundled JS shim alongside the parparvm runtime in the host page:
+
+[source,html]
+----
+<script src="parparvm_runtime.js"></script>
+<script src="cn1-router-history.js"></script>
+----
+
+`cn1-router-history.js` listens for `popstate` events and forwards them to the
+Router as POP navigations; the Router pushes `history.pushState` entries on
+every push/replace.
+
+=== End-to-end recipe: a deep link opens a routed Form
+
+This recipe walks through the full flow from an external link tap to a routed
+Form with state preservation.
+
+==== 1. Declare the route
+
+[source,java]
+----
+@Route("/users/:id")
+public class ProfileForm extends Form {
+    private final String userId;
+
+    public ProfileForm(RouteContext ctx) {
+        this.userId = ctx.param("id");
+        setTitle("Profile " + userId);
+        loadUser(userId);
+    }
+    // ...
+}
+----
+
+==== 2. Wire the router at startup
+
+[source,java]
+----
+public void init(Object context) {
+    com.codename1.router.generated.RoutesIndex.register();  // generated
+    Router.getInstance().notFound(new RouteBuilder() {
+        public Form build(RouteContext c) { return new NotFoundForm(); }
+    });
+    Display.getInstance().setDeepLinkHandler(
+            Router.getInstance().asDeepLinkHandler());
+}
+
+public void start() {
+    Router.getInstance().start("/");
+}
+----
+
+==== 3. Configure platform association files
+
+Host the AASA + assetlinks JSON files generated by `AasaBuilder` and
+`AssetLinksBuilder` (see the iOS Universal Links and Android App Links sections
+above). Update Xcode's Associated Domains capability and the Android intent
+filter.
+
+==== 4. Tap the link
+
+The user taps `https://example.com/users/42` on a device. iOS or Android
+verifies the association file and launches the app, delivering the URL through
+the OS lifecycle (`application:continueUserActivity:` on iOS, `onCreate` /
+`onNewIntent` on Android).
+
+The CN1 port plumbs the URL through `Display.setProperty("AppArg", url)`. That
+call now also dispatches through `Display.dispatchDeepLink`, which delivers the
+parsed `DeepLink` to the registered `LinkHandler`. Because the handler is the
+Router's own handler, the router matches `/users/:id` and shows `ProfileForm`.
+
+==== 5. State preservation across back
+
+`ProfileForm` is on the router stack at index 1 (the root `/` is at 0).
+Pressing back pops the router stack — the Router invokes `Form.showBack()` on
+the previous entry's form. Because `Form` retains the form instance, scroll
+position, form state, and field values are preserved automatically.
+
+If the app needs to **also** preserve state across cold restarts, persist
+`Router.getInstance().getCurrentLocation().getPath()` in `Preferences` on every
+location change and restore on `start()`:
+
+[source,java]
+----
+Router.getInstance().addLocationListener(new LocationListener() {
+    public void onLocationChanged(Location prev, Location current, Kind k) {
+        Preferences.set("router.path", current.getPath());
+    }
+});
+
+// In start():
+String last = Preferences.get("router.path", "/");
+Router.getInstance().start(last);
+----
+
+=== Testing deep links
+
+==== iOS simulator
+
+[source,sh]
+----
+xcrun simctl openurl booted "https://example.com/users/42"
+xcrun simctl openurl booted "myapp://users/42"
+----
+
+==== Android emulator
+
+[source,sh]
+----
+adb shell am start -a android.intent.action.VIEW \
+    -d "https://example.com/users/42" com.example.app
+----
+
+==== JavaSE simulator
+
+Pass `--cn1-arg=https://example.com/users/42` on the run command, or call
+`Display.getInstance().dispatchDeepLink("https://example.com/users/42")`
+from the Groovy console at runtime.
+
+=== Threading
+
+All Router methods run on the EDT. Route builders, guards, and pop guards are
+invoked on the EDT. If a builder needs to do network work, kick it off in a
+background thread and render a placeholder Form synchronously:
+
+[source,java]
+----
+.route("/users/:id", new RouteBuilder() {
+    public Form build(RouteContext c) {
+        final String id = c.param("id");
+        ProfileForm f = new ProfileForm();
+        f.showLoading();
+        UserApi.fetch(id).ready(new SuccessCallback<User>() {
+            public void onSuccess(User u) { f.bind(u); }
+        });
+        return f;
+    }
+})
+----

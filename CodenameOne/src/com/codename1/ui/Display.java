@@ -226,6 +226,14 @@ public final class Display extends CN1Constants {
     private Runnable bookmark;
     private EventDispatcher messageListeners;
     private EventDispatcher windowListeners;
+    /// Deep-link handler registered by `#setDeepLinkHandler`. Receives normalized
+    /// links from the platform (iOS Universal Links, Android App Links / intents,
+    /// JavaScript URL navigations) and from cold-launch `AppArg` replay.
+    private com.codename1.router.LinkHandler deepLinkHandler;
+    /// `AppArg` snapshot replayed to a freshly installed deep-link handler so a
+    /// cold-launch URL still reaches the handler even if the handler is registered
+    /// after the platform has already delivered the launch URL into `AppArg`.
+    private String pendingDeepLinkArg;
     /// Tracks whether the initial window size hint has already been consumed for the first shown form.
     private boolean initialWindowSizeApplied;
     private boolean disableInvokeAndBlock;
@@ -3653,6 +3661,126 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Registers a handler for deep links delivered by the platform.
+    ///
+    /// The handler is invoked on the EDT with a normalized `com.codename1.router.DeepLink`
+    /// for:
+    /// - **Cold launches** — when the OS starts the app from a URL (iOS universal/custom
+    ///   scheme, Android `VIEW` intent, JS port direct URL). If a launch URL was
+    ///   already cached in the `AppArg` property when this handler is registered,
+    ///   it is replayed immediately so app code only needs the single entry point.
+    /// - **Warm launches** — URLs delivered while the app is already running
+    ///   (`application:openURL:` / `continueUserActivity:` on iOS, `onNewIntent`
+    ///   on Android, `popstate`/`pushState` on JS).
+    ///
+    /// If the handler returns `false` (link not consumed), the legacy `AppArg`
+    /// property mechanism still receives the URL so existing apps keep working.
+    ///
+    /// Pass `null` to unregister.
+    ///
+    /// #### Since 8.0
+    public void setDeepLinkHandler(com.codename1.router.LinkHandler handler) {
+        this.deepLinkHandler = handler;
+        if (handler != null && pendingDeepLinkArg != null) {
+            final String arg = pendingDeepLinkArg;
+            pendingDeepLinkArg = null;
+            // Replay asynchronously: many apps install the handler during init
+            // before their first Form has been shown.
+            callSerially(new Runnable() {
+                public void run() {
+                    dispatchDeepLink(arg);
+                }
+            });
+        }
+    }
+
+    /// Returns the currently installed deep-link handler, or null.
+    ///
+    /// #### Since 8.0
+    public com.codename1.router.LinkHandler getDeepLinkHandler() {
+        return deepLinkHandler;
+    }
+
+    /// Dispatches a deep-link URL through the registered handler. Called by
+    /// platform glue code (iOS `cn1OpenURL` / `cn1ContinueUserActivity`, Android
+    /// `onNewIntent`, JS popstate listener) and may be called directly by app
+    /// code that obtains a URL from another source (push notification payload,
+    /// QR code, etc.).
+    ///
+    /// If no handler is registered, the URL is cached so it can be replayed when
+    /// one is installed (handles the cold-launch-before-init race) and is also
+    /// pushed to the legacy `AppArg` property for backwards compatibility.
+    ///
+    /// #### Parameters
+    /// - `url`: the raw URL as delivered by the platform. May be null or empty.
+    ///
+    /// #### Returns
+    /// `true` when the handler reported consuming the link.
+    ///
+    /// #### Since 8.0
+    public boolean dispatchDeepLink(final String url) {
+        if (url == null || url.length() == 0) return false;
+        if (deepLinkHandler == null) {
+            pendingDeepLinkArg = url;
+            // Still expose to legacy AppArg consumers.
+            try {
+                if (impl != null) impl.setAppArg(url);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+            return false;
+        }
+        final com.codename1.router.DeepLink link = com.codename1.router.DeepLink.parse(url);
+        // Ensure dispatch happens on the EDT.
+        if (isEdt()) {
+            return dispatchDeepLinkOnEdt(link, url);
+        }
+        final boolean[] holder = new boolean[1];
+        callSeriallyAndWait(new Runnable() {
+            public void run() {
+                holder[0] = dispatchDeepLinkOnEdt(link, url);
+            }
+        });
+        return holder[0];
+    }
+
+    /// Heuristic: treats values containing `://` or a `scheme:` prefix as a URL.
+    /// Anything else (empty strings, single tokens, app-internal non-URL AppArg
+    /// payloads) is passed through to AppArg without dispatch.
+    private static boolean looksLikeUrl(String v) {
+        if (v == null) return false;
+        if (v.indexOf("://") >= 0) return true;
+        // Custom scheme with no `//` — e.g. `mailto:foo@bar` or `myapp:do/x`.
+        int colon = v.indexOf(':');
+        if (colon <= 0) return false;
+        for (int i = 0; i < colon; i++) {
+            char c = v.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean dispatchDeepLinkOnEdt(com.codename1.router.DeepLink link, String raw) {
+        boolean consumed = false;
+        try {
+            consumed = deepLinkHandler.handle(link);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        if (!consumed) {
+            // Fall back to AppArg so legacy code paths still see it.
+            try {
+                if (impl != null) impl.setAppArg(raw);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        return consumed;
+    }
+
     /// Returns the property from the underlying platform deployment or the default
     /// value if no deployment values are supported. This is equivalent to the
     /// getAppProperty from the jad file.
@@ -3710,6 +3838,19 @@ public final class Display extends CN1Constants {
     public void setProperty(String key, String value) {
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);
+            // Platform glue: every CN1 port (iOS `cn1OpenURL` / `cn1ContinueUserActivity`,
+            // Android `onNewIntent`, JS port URL navigation) already pipes the
+            // incoming URL through `setProperty("AppArg", url)`. Routing that same
+            // call through the deep-link handler means apps get cold and warm
+            // deep-link delivery without any port-side changes — they only need
+            // to install a `LinkHandler` via `#setDeepLinkHandler`.
+            //
+            // We avoid dispatching for empty/null values (clearing AppArg) and
+            // for non-URL-looking strings, since `setProperty("AppArg", ...)` is
+            // sometimes used internally to carry non-link data.
+            if (value != null && value.length() > 0 && looksLikeUrl(value)) {
+                dispatchDeepLink(value);
+            }
             return;
         }
         if ("blockOverdraw".equals(key)) {

@@ -37,6 +37,7 @@ import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.AsyncResource;
 
 import static com.codename1.ui.ComponentSelector.$;
 
@@ -127,6 +128,10 @@ public class Sheet extends Container {
     private Component titleComponent = title;
     private final EventDispatcher closeListeners = new EventDispatcher();
     private final EventDispatcher backListeners = new EventDispatcher();
+    /// Pending result resource published by `#showForResult` and completed by
+    /// `#finish`. When the sheet is dismissed without an explicit `finish()` the
+    /// resource is completed with `null` (cancellation analogue).
+    private AsyncResource<Object> pendingResult;
     private final Button backButton = new Button(FontImage.MATERIAL_CLOSE);
     private final Container commandsContainer = new Container(BoxLayout.x());
     private final Container titleComponentContainer = FlowLayout.encloseCenterMiddle(title);
@@ -726,6 +731,68 @@ public class Sheet extends Container {
     /// - #show(int)
     public void show() {
         show(DEFAULT_TRANSITION_DURATION);
+    }
+
+    /// Shows the sheet and returns an `AsyncResource` that will be completed when
+    /// the sheet finishes — either with `#finish(Object)` carrying a chosen value,
+    /// or with `null` when the sheet is dismissed via back/swipe.
+    ///
+    /// Lets sheets be used as inline confirmation dialogs / pickers without
+    /// wiring up `addCloseListener` + state-shared variables:
+    ///
+    /// ```java
+    /// PickerSheet sheet = new PickerSheet();
+    /// sheet.<String>showForResult().ready(new SuccessCallback<String>() {
+    ///     public void onSuccess(String picked) {
+    ///         if (picked != null) handle(picked);
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// The result type is supplied at the call site; use `Sheet#finish(Object)`
+    /// internally to complete it. The cast is unchecked at runtime — pick a type
+    /// you control inside the sheet.
+    ///
+    /// #### Since 8.0
+    public <T> AsyncResource<T> showForResult() {
+        return showForResult(DEFAULT_TRANSITION_DURATION);
+    }
+
+    /// `#showForResult` with a custom slide duration.
+    ///
+    /// #### Since 8.0
+    @SuppressWarnings("unchecked")
+    public <T> AsyncResource<T> showForResult(int duration) {
+        // Always create a fresh resource per show — re-showing a Sheet via
+        // showForResult is a new transaction.
+        pendingResult = new AsyncResource<Object>();
+        show(duration);
+        return (AsyncResource<T>) pendingResult;
+    }
+
+    /// Completes the result resource returned by `#showForResult` and dismisses the
+    /// sheet. No-op (besides dismissal) if `showForResult` was not used to open
+    /// this sheet.
+    ///
+    /// #### Parameters
+    /// - `result`: the value to deliver to the resource subscriber. May be null,
+    ///   in which case subscribers see the same outcome as a user-initiated
+    ///   dismissal.
+    ///
+    /// #### Since 8.0
+    public void finish(Object result) {
+        AsyncResource<Object> r = pendingResult;
+        pendingResult = null;
+        if (r != null && !r.isDone()) {
+            try {
+                r.complete(result);
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+        }
+        // Dismiss the sheet: walk up parents to the root and hide. Reuse back()
+        // semantics so transitions match.
+        back();
     }
 
     /// Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
@@ -1358,6 +1425,19 @@ public class Sheet extends Container {
         closeListeners.fireActionEvent(new ActionEvent(this));
         if (parentsToo && parentSheet != null) {
             parentSheet.fireCloseEvent(true);
+        }
+        // Auto-resolve a pending showForResult() with null when the sheet closes
+        // without finish() having been called (back, swipe-dismiss, or being
+        // replaced by another sheet). This mirrors how Android Activity onResult
+        // semantics treat a cancelled return: subscribers see a null payload.
+        AsyncResource<Object> r = pendingResult;
+        if (r != null && !r.isDone()) {
+            pendingResult = null;
+            try {
+                r.complete(null);
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
         }
     }
 

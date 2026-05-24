@@ -135,6 +135,9 @@ public class Form extends Container {
     private EventDispatcher commandListener;
     /// Relevant for modal forms where the previous form should be rendered underneath
     private Form previousForm;
+    /// Optional guard consulted before back/pop navigation leaves this form.
+    /// Installed with `#setPopGuard(com.codename1.router.PopGuard)`.
+    private com.codename1.router.PopGuard popGuard;
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
     /// Listeners for key release events
@@ -1537,6 +1540,54 @@ public class Form extends Container {
         menuBar.setBackCommand(backCommand);
     }
 
+    /// Installs an optional guard that is consulted before back/pop navigation
+    /// leaves this form.
+    ///
+    /// The guard fires for:
+    /// - The back command (toolbar / menu back button).
+    /// - Hardware back (Android back button, iOS edge-swipe back).
+    /// - Programmatic `com.codename1.router.Router#pop` and `replace` calls.
+    ///
+    /// If the guard returns `false` the navigation is suppressed; the guard itself
+    /// is responsible for any follow-up UI (e.g. showing a confirm dialog and then
+    /// calling `Router.pop()` once the user accepts).
+    ///
+    /// Pass `null` to remove a previously installed guard.
+    ///
+    /// #### Since 8.0
+    ///
+    /// #### See also
+    ///
+    /// - `com.codename1.router.PopGuard`
+    public void setPopGuard(com.codename1.router.PopGuard guard) {
+        this.popGuard = guard;
+    }
+
+    /// Returns the currently installed pop guard, or null.
+    ///
+    /// #### Since 8.0
+    public com.codename1.router.PopGuard getPopGuard() {
+        return popGuard;
+    }
+
+    /// Consults the installed pop guard for the given reason. Returns `true` when
+    /// no guard is installed or the guard permits the pop. Called by `Router`, by
+    /// the back-command dispatcher, by platform back-key glue, and may be called
+    /// by developer code that implements its own back navigation and wants to
+    /// honor any pop guard installed on the form.
+    ///
+    /// #### Since 8.0
+    public boolean checkPopGuard(com.codename1.router.PopReason reason) {
+        com.codename1.router.PopGuard g = this.popGuard;
+        if (g == null) return true;
+        try {
+            return g.canPop(this, reason);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+            return true;
+        }
+    }
+
     /// This method returns the Content pane instance
     ///
     /// #### Returns
@@ -2412,6 +2463,17 @@ public class Form extends Container {
     void actionCommandImpl(Command cmd, ActionEvent ev) {
         if (cmd == null) {
             return;
+        }
+
+        // PopGuard hook: if the dispatched command is this form's back command and
+        // a pop guard is installed, consult it before the back actually fires. A
+        // guard that vetoes the pop also consumes the event so the back-command's
+        // own action listener never runs.
+        if (popGuard != null && cmd == menuBar.getBackCommand()) { //NOPMD CompareObjectsWithEquals
+            if (!checkPopGuard(com.codename1.router.PopReason.BACK_COMMAND)) {
+                if (ev != null) ev.consume();
+                return;
+            }
         }
 
         if (comboLock) {

@@ -1388,6 +1388,17 @@ public class MenuBar extends Container implements ActionListener {
             }
         }
         if (c != null) {
+            // PopGuard hook: hardware back-key path. We check before invoking the
+            // back command so a vetoing guard suppresses the entire back chain
+            // (including any user-supplied action listener registered with the
+            // back command). Only consults the guard for the back-command path —
+            // clear/backspace keys (handled through getClearCommand above) are
+            // not pop events.
+            if (keyCode == backSK && c == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals
+                if (!parent.checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {
+                    return;
+                }
+            }
             ActionEvent ev = new ActionEvent(c, keyCode);
             c.actionPerformed(ev);
             if (!ev.isConsumed()) {

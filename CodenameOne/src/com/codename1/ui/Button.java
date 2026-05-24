@@ -699,6 +699,16 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     protected void fireActionEvent(int x, int y) {
         super.fireActionEvent();
         if (cmd != null) {
+            // PopGuard hook: if this button's command is the form's back command
+            // and the form has a pop guard installed, consult the guard before
+            // we dispatch to listeners. Vetoing here suppresses the user's back
+            // action listener cleanly, which is the natural pop-scope behavior.
+            Form f0 = getComponentForm();
+            if (f0 != null && cmd == f0.getBackCommand()) { //NOPMD CompareObjectsWithEquals
+                if (!f0.checkPopGuard(com.codename1.router.PopReason.BACK_COMMAND)) {
+                    return;
+                }
+            }
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
             dispatcher.fireActionEvent(ev);
             if (!ev.isConsumed()) {
