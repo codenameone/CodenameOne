@@ -19,7 +19,7 @@ import java.io.OutputStream;
 ///
 /// Part of the framework's service-provider interface, not intended for
 /// application use.
-public abstract class UsbPlatform {
+public class UsbPlatform {
     public boolean isSupported() {
         return false;
     }

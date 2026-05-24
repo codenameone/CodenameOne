@@ -19,7 +19,7 @@ package com.codename1.io.wifi;
 ///
 /// This is part of the framework's service-provider interface and not
 /// intended for application use.
-public abstract class WifiPlatform {
+public class WifiPlatform {
     public boolean isInfoSupported() {
         return false;
     }

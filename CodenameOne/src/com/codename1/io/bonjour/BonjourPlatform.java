@@ -17,7 +17,7 @@ import java.util.Map;
 ///
 /// Part of the framework's service-provider interface, not intended for
 /// application use.
-public abstract class BonjourPlatform {
+public class BonjourPlatform {
     public boolean isSupported() {
         return false;
     }

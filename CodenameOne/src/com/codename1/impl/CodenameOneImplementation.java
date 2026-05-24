@@ -6402,27 +6402,23 @@ public abstract class CodenameOneImplementation {
 
     public final WifiPlatform getWifiPlatform() {
         if (wifiPlatform == null) {
-            wifiPlatform = createWifiPlatform();
-            if (wifiPlatform == null) {
-                wifiPlatform = new WifiPlatform() {};
-            }
+            WifiPlatform p = createWifiPlatform();
+            wifiPlatform = p != null ? p : new WifiPlatform();
         }
         return wifiPlatform;
     }
 
     /// Platform ports override to return their WiFi implementation. The
-    /// default returns `null`, which the caller turns into an unsupported
-    /// stub.
+    /// default returns `null`, which the caller turns into the
+    /// unsupported stub built into `WifiPlatform`.
     protected WifiPlatform createWifiPlatform() {
         return null;
     }
 
     public final WifiDirectPlatform getWifiDirectPlatform() {
         if (wifiDirectPlatform == null) {
-            wifiDirectPlatform = createWifiDirectPlatform();
-            if (wifiDirectPlatform == null) {
-                wifiDirectPlatform = new WifiDirectPlatform() {};
-            }
+            WifiDirectPlatform p = createWifiDirectPlatform();
+            wifiDirectPlatform = p != null ? p : new WifiDirectPlatform();
         }
         return wifiDirectPlatform;
     }
@@ -6433,10 +6429,8 @@ public abstract class CodenameOneImplementation {
 
     public final BonjourPlatform getBonjourPlatform() {
         if (bonjourPlatform == null) {
-            bonjourPlatform = createBonjourPlatform();
-            if (bonjourPlatform == null) {
-                bonjourPlatform = new BonjourPlatform() {};
-            }
+            BonjourPlatform p = createBonjourPlatform();
+            bonjourPlatform = p != null ? p : new BonjourPlatform();
         }
         return bonjourPlatform;
     }
@@ -6447,10 +6441,8 @@ public abstract class CodenameOneImplementation {
 
     public final UsbPlatform getUsbPlatform() {
         if (usbPlatform == null) {
-            usbPlatform = createUsbPlatform();
-            if (usbPlatform == null) {
-                usbPlatform = new UsbPlatform() {};
-            }
+            UsbPlatform p = createUsbPlatform();
+            usbPlatform = p != null ? p : new UsbPlatform();
         }
         return usbPlatform;
     }
@@ -6461,25 +6453,30 @@ public abstract class CodenameOneImplementation {
 
     public final NetworkTypePlatform getNetworkTypePlatform() {
         if (networkTypePlatform == null) {
-            networkTypePlatform = createNetworkTypePlatform();
-            if (networkTypePlatform == null) {
-                // Default falls back to the legacy access-point bridge so
-                // ports that haven't been updated still report a non-NONE
-                // value when an AP is configured.
-                networkTypePlatform = new NetworkTypePlatform() {
-                    @Override public int getCurrentNetworkType() {
-                        return isAPSupported() && getCurrentAccessPoint() != null
-                                ? NetworkManager.NETWORK_TYPE_OTHER
-                                : NetworkManager.NETWORK_TYPE_NONE;
-                    }
-                };
-            }
+            NetworkTypePlatform p = createNetworkTypePlatform();
+            networkTypePlatform = p != null ? p : new LegacyAccessPointNetworkType(this);
         }
         return networkTypePlatform;
     }
 
     protected NetworkTypePlatform createNetworkTypePlatform() {
         return null;
+    }
+
+    /// Fallback `NetworkTypePlatform` for ports that haven't been updated
+    /// to provide their own. Bridges to the legacy access-point API so
+    /// `NetworkManager.getCurrentNetworkType()` still distinguishes
+    /// "online" from "offline" when an AP is configured.
+    private static final class LegacyAccessPointNetworkType extends NetworkTypePlatform {
+        private final CodenameOneImplementation impl;
+        LegacyAccessPointNetworkType(CodenameOneImplementation impl) {
+            this.impl = impl;
+        }
+        @Override public int getCurrentNetworkType() {
+            return impl.isAPSupported() && impl.getCurrentAccessPoint() != null
+                    ? NetworkManager.NETWORK_TYPE_OTHER
+                    : NetworkManager.NETWORK_TYPE_NONE;
+        }
     }
 
     /// For some reason the standard code for writing UTF8 output in a server request

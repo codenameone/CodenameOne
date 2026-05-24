@@ -16,7 +16,7 @@ package com.codename1.io;
 ///
 /// Part of the framework's service-provider interface, not intended for
 /// application use.
-public abstract class NetworkTypePlatform {
+public class NetworkTypePlatform {
     /// One of the `NetworkManager.NETWORK_TYPE_*` constants. Default
     /// returns `NETWORK_TYPE_OTHER` when an access point is configured so
     /// stub platforms still indicate "some connectivity present".

@@ -16,7 +16,7 @@ package com.codename1.io.wifi;
 ///
 /// This is part of the framework's service-provider interface and not
 /// intended for application use.
-public abstract class WifiDirectPlatform {
+public class WifiDirectPlatform {
     public boolean isSupported() {
         return false;
     }
