@@ -3107,7 +3107,10 @@ function cn1_ivResolve(target, mid) {
         // ``context.setTransform(1, 0, 0, 1, 0, 0)``) hits this exact
         // signature, so without it the no-op recovery does nothing for
         // the most common offender.
-        cn1_s_setTransform_double_double_double_double_double_double: 1
+        cn1_s_setTransform_double_double_double_double_double_double: 1,
+        // rect() with 4 doubles -- drainPendingDisplayFrame line 2314
+        // ``context.rect(cropX, cropY, cropW, cropH)`` is the call site.
+        cn1_s_rect_double_double_double_double: 1
       };
       if (canvasVoidMethods[mid]) {
         return function*() { /* no-op for {} receiver */ };
