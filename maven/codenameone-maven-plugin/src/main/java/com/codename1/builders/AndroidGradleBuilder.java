@@ -1224,12 +1224,20 @@ public class AndroidGradleBuilder extends Executor {
             wakeLock = true;
         }
         mediaPlaybackPermission = false;
+
+        // Accumulator for AI/ML class hits. After the scan we apply
+        // every matched AiDependencyTable.Entry — appending Gradle
+        // deps to additionalDependencies (later) and permissions/
+        // features to xPermissions right now.
+        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
 
 
                 @Override
                 public void usesClass(String cls) {
+                    aiAcc.consume(cls);
                     if (cls.indexOf("com/codename1/notifications") == 0) {
                         recieveBootCompletedPermission = true;
                         if (targetSDKVersionInt >= 33) {
@@ -1425,6 +1433,32 @@ public class AndroidGradleBuilder extends Executor {
             });
         } catch (IOException ex) {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
+        }
+
+        // Apply AI/ML dependency table hits accumulated during the
+        // scan. Permissions / features go to xPermissions right
+        // away (so they're visible to all the downstream manifest
+        // assembly). Gradle deps are stashed in
+        // aiExtraGradleDependencies and appended just before
+        // additionalDependencies is written to build.gradle below.
+        StringBuilder aiExtraGradleDependencies = new StringBuilder();
+        for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+            for (String perm : entry.androidPermissions()) {
+                String addString = "    <uses-permission android:name=\"" + perm + "\" />\n";
+                xPermissions += permissionAdd(request, perm, addString);
+            }
+            for (String feat : entry.androidFeatures()) {
+                String addString = "    <uses-feature android:name=\"" + feat + "\" android:required=\"false\" />\n";
+                if (!xPermissions.contains("<uses-feature android:name=\"" + feat + "\"")) {
+                    xPermissions += addString;
+                }
+            }
+            for (String gav : entry.androidGradleDeps()) {
+                aiExtraGradleDependencies.append("    implementation '").append(gav).append("'\n");
+            }
+        }
+        if (aiAcc.anyRequiresBigUpload()) {
+            request.putArgument("cn1.ai.requiresBigUpload", "true");
         }
 
         // Inject USE_BIOMETRIC / USE_FINGERPRINT only when the app actually
@@ -4144,6 +4178,7 @@ public class AndroidGradleBuilder extends Executor {
                 + request.getArg("android.supportv4Dep",supportV4Default) + "\n"
                 + kotlinRuntimeDependency
                 + addNewlineIfMissing(additionalDependencies)
+                + addNewlineIfMissing(aiExtraGradleDependencies.toString())
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
                 + addNewlineIfMissing(aarDependencies)
                 + "}\n"

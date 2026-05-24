@@ -649,11 +649,18 @@ public class IPhoneBuilder extends Executor {
             addMinDeploymentTarget("8.0");
         }
         
+        // Accumulator for AI/ML class hits. After the scan we apply
+        // every matched AiDependencyTable.Entry — appending pods,
+        // SPM specs, plist defaults and Android perms — so the user
+        // doesn't have to declare them by hand.
+        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
                 public void usesClass(String cls) {
                     if (cls == null) return;
+                    aiAcc.consume(cls);
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -714,6 +721,78 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         stopwatch.split("Scan Classes");
+
+        // Apply AI/ML dependency table hits accumulated during the
+        // scan. We route iOS pods through the existing
+        // iosPods string and SPM entries through the request build
+        // hints, so the IOSDependencyManager.resolve() call below can
+        // pick them up consistently with manually-declared deps.
+        if (!aiAcc.hits().isEmpty()) {
+            // Prefer SPM when the project already uses SPM and the
+            // entry exposes an SPM spec; otherwise pods. A handful
+            // of ML Kit libs are pods-only — those force pods on
+            // regardless of project preference (the resolver will
+            // upgrade the effective mode to BOTH below).
+            boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
+            StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
+            for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+                boolean handledViaSpm = false;
+                if (projectPrefersSpm && !entry.iosSpmSpecs().isEmpty()) {
+                    for (AiDependencyTable.IosSpm spm : entry.iosSpmSpecs()) {
+                        if (spmPackages.length() > 0) spmPackages.append(';');
+                        spmPackages.append(spm.identity).append('|')
+                                .append(spm.url).append('|')
+                                .append(spm.requirement);
+                        StringBuilder products = new StringBuilder();
+                        for (int i = 0; i < spm.products.size(); i++) {
+                            if (i > 0) products.append(',');
+                            products.append(spm.products.get(i));
+                        }
+                        // Honor any user-declared products — append, don't overwrite.
+                        String existingProducts = request.getArg("ios.spm.products." + spm.identity, "");
+                        if (existingProducts != null && existingProducts.length() > 0) {
+                            products.insert(0, existingProducts + ",");
+                        }
+                        request.putArgument("ios.spm.products." + spm.identity, products.toString());
+                    }
+                    handledViaSpm = true;
+                }
+                if (!handledViaSpm) {
+                    for (String pod : entry.iosPods()) {
+                        if (iosPods.length() > 0) iosPods += ",";
+                        iosPods += pod;
+                    }
+                }
+                for (String[] plistEntry : entry.iosPlistEntries()) {
+                    String key = "ios." + plistEntry[0];
+                    if (request.getArg(key, null) == null) {
+                        request.putArgument(key, plistEntry[1]);
+                    }
+                }
+            }
+            if (spmPackages.length() > 0) {
+                request.putArgument("ios.spm.packages", spmPackages.toString());
+            }
+            // Surface the upload-size flag for the cloud build server
+            // so it can abort early with a friendly message.
+            if (aiAcc.anyRequiresBigUpload()) {
+                request.putArgument("cn1.ai.requiresBigUpload", "true");
+            }
+            // Re-resolve in case AI deps pushed us into a different
+            // mode (e.g. pods-only-when-the-project-was-SPM-only).
+            dependencyConfig = IOSDependencyManager.resolve(request, iosPods);
+            iosPods = dependencyConfig.iosPods;
+            boolean newRunPods = dependencyConfig.usesCocoaPods();
+            boolean newRunSpm = dependencyConfig.usesSwiftPackages();
+            if (newRunPods && !runPods) {
+                ensurePodsInstalled();
+            }
+            if (newRunSpm && !runSpm) {
+                ensureXcodeprojInstalled();
+            }
+            runPods = newRunPods;
+            runSpm = newRunSpm;
+        }
 
         debug("Local Notifications "+(usesLocalNotifications?"enabled":"disabled"));
         try {
