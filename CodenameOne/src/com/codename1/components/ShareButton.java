@@ -203,14 +203,15 @@ public class ShareButton extends Button implements ActionListener {
                 dialog.setLayout(new BorderLayout());
                 dialog.addComponent(BorderLayout.CENTER, l);
                 final boolean[] picked = new boolean[1];
-                dialog.placeButtonCommands(new Command[]{new Command("Cancel") {
+                Command cancel = new Command("Cancel") {
                     @Override
                     public void actionPerformed(ActionEvent ev) {
                         if (!picked[0] && listener != null) {
                             listener.onResult(ShareResult.dismissed());
                         }
                     }
-                }});
+                };
+                dialog.placeButtonCommands(new Command[]{cancel});
                 l.addActionListener(new ActionListener() {
 
                     @Override
