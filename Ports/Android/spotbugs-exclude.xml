@@ -121,7 +121,7 @@
     Each install/uninstall happens on the EDT only (the public API
     contract is "callable from any thread but the implementations
     serialize through CN.callSerially") so the LI_LAZY_INIT_* findings
-    SpotBugs reports here are not real race conditions -- the rule's
+    SpotBugs reports here are not real race conditions: the rule's
     premise that multiple threads might race to initialise the receiver
     does not hold for the EDT-bound install pattern. The alternative
     would be double-checked locking around fields that are only ever
