@@ -49,7 +49,7 @@ import java.lang.annotation.Target;
 /// }
 /// ```
 ///
-/// `@Route` is a build-time hint only — there is no reflection at runtime. Pure
+/// `@Route` is a build-time hint only -- there is no reflection at runtime. Pure
 /// Java code generation keeps the contract portable across iOS (ParparVM),
 /// Android, JavaSE, and the JavaScript port without changes.
 ///
@@ -59,10 +59,10 @@ import java.lang.annotation.Target;
 ///
 /// #### Path syntax
 ///
-/// - **Literal segments** — `/about`
-/// - **Named parameters** — `/users/:id`, accessible as `ctx.param("id")`
-/// - **Single-segment wildcard** — `/files/*`
-/// - **Catch-all wildcard** — `/files/**`
+/// - **Literal segments** -- `/about`
+/// - **Named parameters** -- `/users/:id`, accessible as `ctx.param("id")`
+/// - **Single-segment wildcard** -- `/files/*`
+/// - **Catch-all wildcard** -- `/files/**`
 ///
 /// #### Since 8.0
 @Retention(RetentionPolicy.CLASS)

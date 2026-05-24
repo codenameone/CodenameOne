@@ -3665,11 +3665,11 @@ public final class Display extends CN1Constants {
     ///
     /// The handler is invoked on the EDT with a normalized `com.codename1.router.DeepLink`
     /// for:
-    /// - **Cold launches** — when the OS starts the app from a URL (iOS universal/custom
+    /// - **Cold launches** -- when the OS starts the app from a URL (iOS universal/custom
     ///   scheme, Android `VIEW` intent, JS port direct URL). If a launch URL was
     ///   already cached in the `AppArg` property when this handler is registered,
     ///   it is replayed immediately so app code only needs the single entry point.
-    /// - **Warm launches** — URLs delivered while the app is already running
+    /// - **Warm launches** -- URLs delivered while the app is already running
     ///   (`application:openURL:` / `continueUserActivity:` on iOS, `onNewIntent`
     ///   on Android, `popstate`/`pushState` on JS).
     ///
@@ -3687,6 +3687,7 @@ public final class Display extends CN1Constants {
             // Replay asynchronously: many apps install the handler during init
             // before their first Form has been shown.
             callSerially(new Runnable() {
+                @Override
                 public void run() {
                     dispatchDeepLink(arg);
                 }
@@ -3719,12 +3720,12 @@ public final class Display extends CN1Constants {
     ///
     /// #### Since 8.0
     public boolean dispatchDeepLink(final String url) {
-        if (url == null || url.length() == 0) return false;
+        if (url == null || url.length() == 0) { return false; }
         if (deepLinkHandler == null) {
             pendingDeepLinkArg = url;
             // Still expose to legacy AppArg consumers.
             try {
-                if (impl != null) impl.setAppArg(url);
+                if (impl != null) { impl.setAppArg(url); }
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -3737,6 +3738,7 @@ public final class Display extends CN1Constants {
         }
         final boolean[] holder = new boolean[1];
         callSeriallyAndWait(new Runnable() {
+            @Override
             public void run() {
                 holder[0] = dispatchDeepLinkOnEdt(link, url);
             }
@@ -3748,11 +3750,11 @@ public final class Display extends CN1Constants {
     /// Anything else (empty strings, single tokens, app-internal non-URL AppArg
     /// payloads) is passed through to AppArg without dispatch.
     private static boolean looksLikeUrl(String v) {
-        if (v == null) return false;
-        if (v.indexOf("://") >= 0) return true;
-        // Custom scheme with no `//` — e.g. `mailto:foo@bar` or `myapp:do/x`.
+        if (v == null) { return false; }
+        if (v.indexOf("://") >= 0) { return true; }
+        // Custom scheme with no `//` -- e.g. `mailto:foo@bar` or `myapp:do/x`.
         int colon = v.indexOf(':');
-        if (colon <= 0) return false;
+        if (colon <= 0) { return false; }
         for (int i = 0; i < colon; i++) {
             char c = v.charAt(i);
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -3773,7 +3775,7 @@ public final class Display extends CN1Constants {
         if (!consumed) {
             // Fall back to AppArg so legacy code paths still see it.
             try {
-                if (impl != null) impl.setAppArg(raw);
+                if (impl != null) { impl.setAppArg(raw); }
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -3842,7 +3844,7 @@ public final class Display extends CN1Constants {
             // Android `onNewIntent`, JS port URL navigation) already pipes the
             // incoming URL through `setProperty("AppArg", url)`. Routing that same
             // call through the deep-link handler means apps get cold and warm
-            // deep-link delivery without any port-side changes — they only need
+            // deep-link delivery without any port-side changes -- they only need
             // to install a `LinkHandler` via `#setDeepLinkHandler`.
             //
             // We avoid dispatching for empty/null values (clearing AppArg) and

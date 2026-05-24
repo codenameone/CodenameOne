@@ -33,10 +33,10 @@ import java.util.Map;
 /// Compiled route pattern paired with its handler, plus matching logic.
 ///
 /// Patterns support:
-/// - **Literals** — `/about` matches only `/about`.
-/// - **Named params** — `/users/:id` matches `/users/42` (`:id` → `"42"`).
-/// - **Single-segment wildcard** — `/files/*` matches `/files/x` but not `/files/x/y`.
-/// - **Catch-all wildcard** — `/files/**` matches `/files`, `/files/`, and
+/// - **Literals** -- `/about` matches only `/about`.
+/// - **Named params** -- `/users/:id` matches `/users/42` (`:id` -> `"42"`).
+/// - **Single-segment wildcard** -- `/files/*` matches `/files/x` but not `/files/x/y`.
+/// - **Catch-all wildcard** -- `/files/**` matches `/files`, `/files/`, and
 ///   `/files/x/y/...`. The matched suffix is exposed as the special `*` param value.
 ///
 /// Internally each pattern is compiled into a regex once at registration time using
@@ -51,7 +51,6 @@ final class RouteMatch {
     private static final String REGEX_META = "\\.^$|?*+()[]{}";
 
     private final String pattern;
-    private final String compiledRegex;
     private final RE regex;
     private final String[] paramNames;
     private final RouteBuilder builder;
@@ -79,13 +78,13 @@ final class RouteMatch {
             }
             // Take one segment.
             int end = normalized.indexOf('/', i);
-            if (end < 0) end = normalized.length();
+            if (end < 0) { end = normalized.length(); }
             String seg = normalized.substring(i, end);
-            if (seg.equals("**")) {
+            if ("**".equals(seg)) {
                 // Ant-style catch-all: `/admin/**` must match `/admin`,
                 // `/admin/`, and `/admin/foo/bar`. We absorb the preceding
                 // `/` we already emitted and replace it with an alternation
-                // — either an empty tail OR `/<suffix>` with the suffix
+                // -- either an empty tail OR `/<suffix>` with the suffix
                 // captured. Using alternation rather than `(?:/(.*))?` keeps
                 // us compatible with CN1's RE engine, which can drop the
                 // inner capture group when an optional non-capturing wrapper
@@ -96,7 +95,7 @@ final class RouteMatch {
                 regex.append("(?:|/(.*))");
                 wildcard = true;
                 names.add("*");
-            } else if (seg.equals("*")) {
+            } else if ("*".equals(seg)) {
                 names.add("*");
                 regex.append("([^/]+)");
             } else if (seg.length() > 1 && seg.charAt(0) == ':') {
@@ -108,9 +107,9 @@ final class RouteMatch {
             i = end;
         }
         regex.append("/?$");
-        this.compiledRegex = regex.toString();
+        String compiledRegex = regex.toString();
         try {
-            this.regex = new RE(this.compiledRegex);
+            this.regex = new RE(compiledRegex);
         } catch (RESyntaxException e) {
             throw new IllegalArgumentException(
                     "Invalid route pattern \"" + pattern + "\" produced bad regex: " + e.getMessage(), e);
@@ -125,12 +124,12 @@ final class RouteMatch {
 
     /// Returns the param map on a match, or null on no match.
     Map<String, String> match(String path) {
-        if (path == null) return null;
+        if (path == null) { return null; }
         // `RE.match` finds the pattern anywhere in `path`; the leading `^` and
         // trailing `$` we emit anchor that find to the full string. We also
         // assert the matched span covers the input as belt-and-braces against
         // any anchoring quirks in the engine.
-        if (!regex.match(path, 0)) return null;
+        if (!regex.match(path, 0)) { return null; }
         if (regex.getParenStart(0) != 0 || regex.getParenEnd(0) != path.length()) {
             return null;
         }
@@ -169,11 +168,11 @@ final class RouteMatch {
         while (i < pattern.length()) {
             if (pattern.charAt(i) == '/') { i++; continue; }
             int end = pattern.indexOf('/', i);
-            if (end < 0) end = pattern.length();
+            if (end < 0) { end = pattern.length(); }
             String seg = pattern.substring(i, end);
-            if (seg.equals("**")) {
+            if ("**".equals(seg)) {
                 score -= 100;
-            } else if (seg.equals("*") || (seg.length() > 0 && seg.charAt(0) == ':')) {
+            } else if ("*".equals(seg) || (seg.length() > 0 && seg.charAt(0) == ':')) {
                 score += 1;
             } else {
                 score += 10;
@@ -184,10 +183,10 @@ final class RouteMatch {
     }
 
     static String joinSegments(List<String> segs) {
-        if (segs == null || segs.isEmpty()) return "/";
+        if (segs == null || segs.isEmpty()) { return "/"; }
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < segs.size(); i++) {
-            sb.append('/').append(segs.get(i));
+        for (String s : segs) {
+            sb.append('/').append(s);
         }
         return sb.toString();
     }
@@ -199,7 +198,7 @@ final class RouteMatch {
         StringBuilder sb = new StringBuilder(s.length() + 4);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (REGEX_META.indexOf(c) >= 0) sb.append('\\');
+            if (REGEX_META.indexOf(c) >= 0) { sb.append('\\'); }
             sb.append(c);
         }
         return sb.toString();

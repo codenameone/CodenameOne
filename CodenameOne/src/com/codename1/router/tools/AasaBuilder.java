@@ -57,7 +57,7 @@ public final class AasaBuilder {
         if (pending == null) {
             throw new IllegalStateException("call appId(...) before addPath(...)");
         }
-        if (pattern == null || pattern.length() == 0) return this;
+        if (pattern == null || pattern.length() == 0) { return this; }
         pending.paths.add(pattern);
         return this;
     }
@@ -82,12 +82,12 @@ public final class AasaBuilder {
             for (int j = 0; j < a.paths.size(); j++) {
                 String p = a.paths.get(j);
                 sb.append("          ").append(toComponent(p));
-                if (j < a.paths.size() - 1) sb.append(',');
+                if (j < a.paths.size() - 1) { sb.append(','); }
                 sb.append('\n');
             }
             sb.append("        ]\n");
             sb.append("      }");
-            if (i < apps.size() - 1) sb.append(',');
+            if (i < apps.size() - 1) { sb.append(','); }
             sb.append('\n');
         }
         sb.append("    ]\n");
@@ -97,19 +97,19 @@ public final class AasaBuilder {
     }
 
     static String toAasaPath(String routerPattern) {
-        if (routerPattern == null) return "/*";
+        if (routerPattern == null) { return "/*"; }
         StringBuilder sb = new StringBuilder();
         int i = 0;
-        if (routerPattern.length() == 0 || routerPattern.charAt(0) != '/') sb.append('/');
+        if (routerPattern.length() == 0 || routerPattern.charAt(0) != '/') { sb.append('/'); }
         while (i < routerPattern.length()) {
             char c = routerPattern.charAt(i);
             if (c == ':') {
                 // skip :name token
                 sb.append('*');
-                while (i < routerPattern.length() && routerPattern.charAt(i) != '/') i++;
+                while (i < routerPattern.length() && routerPattern.charAt(i) != '/') { i++; }
             } else if (c == '*') {
                 sb.append('*');
-                while (i < routerPattern.length() && routerPattern.charAt(i) == '*') i++;
+                while (i < routerPattern.length() && routerPattern.charAt(i) == '*') { i++; }
             } else {
                 sb.append(c);
                 i++;
@@ -126,7 +126,7 @@ public final class AasaBuilder {
             p = p.substring(4);
         }
         StringBuilder sb = new StringBuilder("{ \"/\": \"").append(jsonEscape(p)).append("\"");
-        if (exclude) sb.append(", \"exclude\": true");
+        if (exclude) { sb.append(", \"exclude\": true"); }
         sb.append(" }");
         return sb.toString();
     }
@@ -135,11 +135,17 @@ public final class AasaBuilder {
         StringBuilder sb = new StringBuilder(s.length() + 2);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '"' || c == '\\') sb.append('\\').append(c);
-            else if (c == '\n') sb.append("\\n");
-            else if (c == '\r') sb.append("\\r");
-            else if (c == '\t') sb.append("\\t");
-            else sb.append(c);
+            if (c == '"' || c == '\\') {
+                sb.append('\\').append(c);
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else if (c == '\r') {
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else {
+                sb.append(c);
+            }
         }
         return sb.toString();
     }

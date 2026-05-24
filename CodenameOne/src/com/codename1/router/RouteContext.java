@@ -37,7 +37,7 @@ import java.util.Map;
 ///   builders without resorting to globals.
 ///
 /// Instances are mutable only via the `extras` bag; pattern and query maps are
-/// unmodifiable. Treat the object itself as a single-navigation scratchpad — it
+/// unmodifiable. Treat the object itself as a single-navigation scratchpad -- it
 /// is not retained across navigations.
 ///
 /// #### Since 8.0

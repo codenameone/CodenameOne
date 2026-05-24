@@ -14,7 +14,7 @@ package com.codename1.router;
 /// pops the router stack.
 ///
 /// On native ports this interface is a no-op extension point. iOS and Android
-/// don't have a browser address bar — but a future SceneKit-style URL routing
+/// don't have a browser address bar -- but a future SceneKit-style URL routing
 /// could plug in here without changes to the rest of the router.
 ///
 /// Implementations must be thread-safe; the router calls them on the EDT.

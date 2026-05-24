@@ -50,7 +50,7 @@ public final class AssetLinksBuilder {
     /// certificate, colon-separated hex.
     ///
     /// To support multiple build flavors (debug + release), call this method
-    /// multiple times — assetlinks.json supports an array of entries.
+    /// multiple times -- assetlinks.json supports an array of entries.
     public AssetLinksBuilder addApp(String packageName, String sha256Fingerprint) {
         if (packageName == null || packageName.length() == 0) {
             throw new IllegalArgumentException("packageName required");
@@ -64,7 +64,7 @@ public final class AssetLinksBuilder {
         return this;
     }
 
-    /// Adds an additional fingerprint to the most recently added app entry —
+    /// Adds an additional fingerprint to the most recently added app entry --
     /// useful when both Play App Signing's upload cert and your release cert
     /// should be verified.
     public AssetLinksBuilder addFingerprint(String sha256Fingerprint) {
@@ -88,13 +88,13 @@ public final class AssetLinksBuilder {
             sb.append("      \"package_name\": \"").append(jsonEscape(e.pkg)).append("\",\n");
             sb.append("      \"sha256_cert_fingerprints\": [");
             for (int j = 0; j < e.fingerprints.size(); j++) {
-                if (j > 0) sb.append(", ");
+                if (j > 0) { sb.append(", "); }
                 sb.append('"').append(jsonEscape(e.fingerprints.get(j))).append('"');
             }
             sb.append("]\n");
             sb.append("    }\n");
             sb.append("  }");
-            if (i < entries.size() - 1) sb.append(',');
+            if (i < entries.size() - 1) { sb.append(','); }
             sb.append('\n');
         }
         sb.append("]\n");
@@ -105,11 +105,17 @@ public final class AssetLinksBuilder {
         StringBuilder sb = new StringBuilder(s.length() + 2);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c == '"' || c == '\\') sb.append('\\').append(c);
-            else if (c == '\n') sb.append("\\n");
-            else if (c == '\r') sb.append("\\r");
-            else if (c == '\t') sb.append("\\t");
-            else sb.append(c);
+            if (c == '"' || c == '\\') {
+                sb.append('\\').append(c);
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else if (c == '\r') {
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else {
+                sb.append(c);
+            }
         }
         return sb.toString();
     }

@@ -734,7 +734,7 @@ public class Sheet extends Container {
     }
 
     /// Shows the sheet and returns an `AsyncResource` that will be completed when
-    /// the sheet finishes — either with `#finish(Object)` carrying a chosen value,
+    /// the sheet finishes -- either with `#finish(Object)` carrying a chosen value,
     /// or with `null` when the sheet is dismissed via back/swipe.
     ///
     /// Lets sheets be used as inline confirmation dialogs / pickers without
@@ -750,7 +750,7 @@ public class Sheet extends Container {
     /// ```
     ///
     /// The result type is supplied at the call site; use `Sheet#finish(Object)`
-    /// internally to complete it. The cast is unchecked at runtime — pick a type
+    /// internally to complete it. The cast is unchecked at runtime -- pick a type
     /// you control inside the sheet.
     ///
     /// #### Since 8.0
@@ -763,7 +763,7 @@ public class Sheet extends Container {
     /// #### Since 8.0
     @SuppressWarnings("unchecked")
     public <T> AsyncResource<T> showForResult(int duration) {
-        // Always create a fresh resource per show — re-showing a Sheet via
+        // Always create a fresh resource per show -- re-showing a Sheet via
         // showForResult is a new transaction.
         pendingResult = new AsyncResource<Object>();
         show(duration);

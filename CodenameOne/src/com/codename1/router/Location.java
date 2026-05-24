@@ -23,7 +23,7 @@
  */
 package com.codename1.router;
 
-/// An entry on the Router's navigation stack — analogous to a browser history
+/// An entry on the Router's navigation stack -- analogous to a browser history
 /// entry. Holds the path the user navigated to plus the matched pattern so
 /// listeners can reason about routes without re-parsing.
 ///
@@ -64,8 +64,8 @@ public final class Location {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Location)) return false;
+        if (this == o) { return true; }
+        if (!(o instanceof Location)) { return false; }
         Location other = (Location) o;
         return stackIndex == other.stackIndex && path.equals(other.path);
     }

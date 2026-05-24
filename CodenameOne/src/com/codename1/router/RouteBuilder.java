@@ -27,7 +27,7 @@ import com.codename1.ui.Form;
 
 /// Builds the `Form` for a matched route. Registered via `Router#route`.
 ///
-/// Builders must be idempotent given the same `RouteContext` — the Router may call
+/// Builders must be idempotent given the same `RouteContext` -- the Router may call
 /// them more than once across a session (e.g., on warm restore). They run on the
 /// EDT; long work should be kicked off in #build and rendered into a placeholder.
 ///
