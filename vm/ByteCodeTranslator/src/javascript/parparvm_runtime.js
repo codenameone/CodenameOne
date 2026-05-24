@@ -3083,21 +3083,28 @@ function cn1_ivResolve(target, mid) {
       }
     }
     // Recovery: if the receiver is a literal {} (no __class, no __jsValue,
-    // no __cn1HostRef, no own props at all) -- almost certainly a broken
-    // Canvas2DContext wrapper from the residual canvasContextWipe path
-    // (the cached __cn1CachedDocWrapper fix at 5dce6a24a covered the
-    // createElement-via-cached-document arm; this guard covers the
+    // no __cn1HostRef, no own props at all) AND the method is a known
+    // Canvas2DContext void method, route the call to a no-op generator
+    // and keep the suite advancing. This guards against the residual
+    // canvasContextWipe path -- the cached __cn1CachedDocWrapper fix at
+    // 5dce6a24a covered createElement-via-cached-document but the
     // ``outputCanvas.getContext('2d')`` chain in drainPendingDisplayFrame
-    // where the context still occasionally arrives as {} for reasons
-    // captured in the NULL_RECEIVER call-trace diag). Route the call to
-    // a no-op generator that returns null. The suite keeps advancing;
-    // the affected drain produces a partial frame, but that's strictly
-    // better than the worker busy-looping on cn1_s_save / cn1_s_setTransform
-    // until the suite-level timeout hangs us at exit-5.
+    // still occasionally returns {} for unidentified reasons. Without
+    // this guard, cn1_s_save loops indefinitely and stalls the suite.
+    // The guard is opt-in by method name so we only mask known-safe
+    // canvas void ops; any other receiver-null path still routes through
+    // the normal resolveVirtual error.
     if (target && target.__class == null && !target.__jsValue
             && target.__cn1HostRef == null
             && Object.getOwnPropertyNames(target).length === 0) {
-      return function*() { return null; };
+      const canvasVoidMethods = {
+        cn1_s_save: 1, cn1_s_restore: 1, cn1_s_beginPath: 1,
+        cn1_s_closePath: 1, cn1_s_stroke: 1, cn1_s_fill: 1,
+        cn1_s_clip: 1, cn1_s_resetTransform: 1
+      };
+      if (canvasVoidMethods[mid]) {
+        return function*() { /* no-op for {} receiver */ };
+      }
     }
     method = jvm.resolveVirtual(target.__class, mid);
   }
