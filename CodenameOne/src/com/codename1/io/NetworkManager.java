@@ -98,8 +98,26 @@ public final class NetworkManager {
     /// Indicates a corporate routing server access point type (e.g. BIS etc.)
     public static final int ACCESS_POINT_TYPE_CORPORATE = 6;
 
+    /// Active network type reported by `getCurrentNetworkType()` /
+    /// `NetworkTypeListener`: no usable connectivity.
+    public static final int NETWORK_TYPE_NONE = 0;
+    /// Active network type: WiFi / 802.11 / WLAN.
+    public static final int NETWORK_TYPE_WIFI = 1;
+    /// Active network type: cellular data (2G/3G/4G/5G).
+    public static final int NETWORK_TYPE_CELLULAR = 2;
+    /// Active network type: wired Ethernet.
+    public static final int NETWORK_TYPE_ETHERNET = 3;
+    /// Active network type: short-range Bluetooth PAN.
+    public static final int NETWORK_TYPE_BLUETOOTH = 4;
+    /// Active network type reported by the platform but not classified into
+    /// one of the named buckets above.
+    public static final int NETWORK_TYPE_OTHER = 5;
+
     private static final Object LOCK = new Object();
     private static final NetworkManager INSTANCE = new NetworkManager();
+    private EventDispatcher networkTypeListeners;
+    private int lastNetworkType = -1;
+    private boolean lastVpnActive;
     private static String autoDetectURL = "https://www.google.com/";
     private final Vector pending = new Vector();
     private final Hashtable threadAssignements = new Hashtable();
@@ -843,6 +861,104 @@ public final class NetworkManager {
     /// `true` if a VPN appears to be active on the current connection.
     public boolean isVPNActive() {
         return Util.getImplementation().isVPNActive();
+    }
+
+    /// Returns the device's currently active network type, one of the
+    /// `NETWORK_TYPE_*` constants. Returns `NETWORK_TYPE_NONE` when there is
+    /// no connectivity. Distinct from `getAPType` which describes a configured
+    /// access point rather than the active data path.
+    public int getCurrentNetworkType() {
+        return Display.getInstance()
+                .getNetworkTypePlatform().getCurrentNetworkType();
+    }
+
+    /// Fast best-effort connectivity check. Returns `false` only when the
+    /// platform reports `NETWORK_TYPE_NONE`; all other states (WiFi,
+    /// cellular, ethernet, VPN-only, or "other") return `true`. Avoids the
+    /// HTTP probe that `getInstance().assignToThread(...)` performs against
+    /// `autoDetectURL` so the check is suitable to call from the EDT.
+    ///
+    /// Apps that need a stronger "can I reach my server" guarantee should
+    /// still fire a real `ConnectionRequest`; this method only reports
+    /// whether the device has *any* usable network interface up.
+    public boolean isConnected() {
+        return getCurrentNetworkType() != NETWORK_TYPE_NONE;
+    }
+
+    /// Registers `l` to be notified when the device's active network type
+    /// changes (WiFi <-> Cellular <-> None <-> ...). The listener is invoked
+    /// on the EDT. Safe to call multiple times with the same listener; only
+    /// the first registration takes effect.
+    ///
+    /// On platforms where network change events are unavailable the listener
+    /// is still installed but never fires; `getCurrentNetworkType()` should
+    /// be polled instead.
+    public void addNetworkTypeListener(NetworkTypeListener l) {
+        synchronized (LOCK) {
+            if (networkTypeListeners == null) {
+                networkTypeListeners = new EventDispatcher();
+                networkTypeListeners.setBlocking(false);
+                Display.getInstance()
+                        .getNetworkTypePlatform().install(this);
+                lastNetworkType = getCurrentNetworkType();
+                lastVpnActive = isVPNActive();
+            }
+            if (!containsListener(networkTypeListeners, l)) {
+                networkTypeListeners.addListener(l);
+            }
+        }
+    }
+
+    /// Removes a listener previously registered with
+    /// `addNetworkTypeListener(NetworkTypeListener)`. If the last listener is
+    /// removed the platform watcher is torn down too.
+    public void removeNetworkTypeListener(NetworkTypeListener l) {
+        synchronized (LOCK) {
+            if (networkTypeListeners == null) {
+                return;
+            }
+            networkTypeListeners.removeListener(l);
+            Collection v = networkTypeListeners.getListenerCollection();
+            if (v == null || v.isEmpty()) {
+                Display.getInstance()
+                        .getNetworkTypePlatform().uninstall(this);
+                networkTypeListeners = null;
+            }
+        }
+    }
+
+    private boolean containsListener(EventDispatcher d, Object l) {
+        Collection v = d.getListenerCollection();
+        return v != null && v.contains(l);
+    }
+
+    /// Internal: invoked by platform implementations to deliver a network
+    /// type change event. Public so platform code in other packages can call
+    /// it; not intended for application use.
+    public void fireNetworkTypeChange(int newType, boolean vpnActive) {
+        EventDispatcher d;
+        int oldType;
+        boolean fire;
+        synchronized (LOCK) {
+            d = networkTypeListeners;
+            oldType = lastNetworkType;
+            fire = d != null && (oldType != newType || lastVpnActive != vpnActive);
+            lastNetworkType = newType;
+            lastVpnActive = vpnActive;
+        }
+        if (fire) {
+            Collection listeners = d.getListenerCollection();
+            if (listeners == null) {
+                return;
+            }
+            Object[] arr = listeners.toArray();
+            for (Object o : arr) {
+                if (o instanceof NetworkTypeListener) {
+                    ((NetworkTypeListener) o)
+                            .onNetworkTypeChanged(oldType, newType, vpnActive);
+                }
+            }
+        }
     }
 
     class NetworkThread implements Runnable {

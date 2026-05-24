@@ -37,9 +37,14 @@ import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.NetworkTypePlatform;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.bonjour.BonjourPlatform;
+import com.codename1.io.usb.UsbPlatform;
+import com.codename1.io.wifi.WifiDirectPlatform;
+import com.codename1.io.wifi.WifiPlatform;
 import com.codename1.io.tar.TarEntry;
 import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
@@ -6374,6 +6379,104 @@ public abstract class CodenameOneImplementation {
     /// `true` if the platform believes a VPN may be active.
     public boolean isVPNActive() {
         return false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Deeper-network connectivity platform accessors.
+    //
+    // Each create*Platform() factory returns a narrow abstract class that
+    // the public-facing APIs in com.codename1.io.{wifi,bonjour,usb} ask for
+    // via Display.getInstance().getXxxPlatform(). Platform ports override
+    // the factory they care about; everything else falls through to the
+    // default no-op implementations. Keeping these as small factories
+    // (instead of dozens of methods on this class) lets each port ship its
+    // platform-specific code in a dedicated class and keeps this base
+    // implementation modular.
+    // ---------------------------------------------------------------------
+
+    private WifiPlatform wifiPlatform;
+    private WifiDirectPlatform wifiDirectPlatform;
+    private BonjourPlatform bonjourPlatform;
+    private UsbPlatform usbPlatform;
+    private NetworkTypePlatform networkTypePlatform;
+
+    public final WifiPlatform getWifiPlatform() {
+        if (wifiPlatform == null) {
+            WifiPlatform p = createWifiPlatform();
+            wifiPlatform = p != null ? p : new WifiPlatform();
+        }
+        return wifiPlatform;
+    }
+
+    /// Platform ports override to return their WiFi implementation. The
+    /// default returns `null`, which the caller turns into the
+    /// unsupported stub built into `WifiPlatform`.
+    protected WifiPlatform createWifiPlatform() {
+        return null;
+    }
+
+    public final WifiDirectPlatform getWifiDirectPlatform() {
+        if (wifiDirectPlatform == null) {
+            WifiDirectPlatform p = createWifiDirectPlatform();
+            wifiDirectPlatform = p != null ? p : new WifiDirectPlatform();
+        }
+        return wifiDirectPlatform;
+    }
+
+    protected WifiDirectPlatform createWifiDirectPlatform() {
+        return null;
+    }
+
+    public final BonjourPlatform getBonjourPlatform() {
+        if (bonjourPlatform == null) {
+            BonjourPlatform p = createBonjourPlatform();
+            bonjourPlatform = p != null ? p : new BonjourPlatform();
+        }
+        return bonjourPlatform;
+    }
+
+    protected BonjourPlatform createBonjourPlatform() {
+        return null;
+    }
+
+    public final UsbPlatform getUsbPlatform() {
+        if (usbPlatform == null) {
+            UsbPlatform p = createUsbPlatform();
+            usbPlatform = p != null ? p : new UsbPlatform();
+        }
+        return usbPlatform;
+    }
+
+    protected UsbPlatform createUsbPlatform() {
+        return null;
+    }
+
+    public final NetworkTypePlatform getNetworkTypePlatform() {
+        if (networkTypePlatform == null) {
+            NetworkTypePlatform p = createNetworkTypePlatform();
+            networkTypePlatform = p != null ? p : new LegacyAccessPointNetworkType(this);
+        }
+        return networkTypePlatform;
+    }
+
+    protected NetworkTypePlatform createNetworkTypePlatform() {
+        return null;
+    }
+
+    /// Fallback `NetworkTypePlatform` for ports that haven't been updated
+    /// to provide their own. Bridges to the legacy access-point API so
+    /// `NetworkManager.getCurrentNetworkType()` still distinguishes
+    /// "online" from "offline" when an AP is configured.
+    private static final class LegacyAccessPointNetworkType extends NetworkTypePlatform {
+        private final CodenameOneImplementation impl;
+        LegacyAccessPointNetworkType(CodenameOneImplementation impl) {
+            this.impl = impl;
+        }
+        @Override public int getCurrentNetworkType() {
+            return impl.isAPSupported() && impl.getCurrentAccessPoint() != null
+                    ? NetworkManager.NETWORK_TYPE_OTHER
+                    : NetworkManager.NETWORK_TYPE_NONE;
+        }
     }
 
     /// For some reason the standard code for writing UTF8 output in a server request

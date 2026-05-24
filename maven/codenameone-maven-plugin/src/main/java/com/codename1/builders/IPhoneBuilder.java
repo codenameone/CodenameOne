@@ -90,6 +90,15 @@ public class IPhoneBuilder extends Executor {
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesNfcHce;
+
+    // Deeper-network connectivity flags. Set by the classpath scanner when
+    // the app references com.codename1.io.wifi.* / com.codename1.io.bonjour.*
+    // The build pipeline injects the matching entitlements / Info.plist
+    // strings further down. Apps that never touch the APIs see no change.
+    private boolean usesWifiInfo;
+    private boolean usesWifiHotspotConfig;
+    private boolean usesBonjour;
+    private String firstBonjourType;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
     // so leaving it commented out.
@@ -690,11 +699,30 @@ public class IPhoneBuilder extends Executor {
                             && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
                         usesAppleSignIn = true;
                     }
+                    if (cls.indexOf("com/codename1/io/wifi/WiFi") == 0
+                            && !cls.equals("com/codename1/io/wifi/WiFiDirect")) {
+                        // WiFi info or scan/connect. iOS has no scan API so
+                        // the WiFi entitlement we inject is hotspot config +
+                        // wifi-info; we treat any use as info-capable and
+                        // upgrade to hotspot config only when scan/connect
+                        // is referenced (detected via method scan below).
+                        usesWifiInfo = true;
+                    }
+                    if (cls.indexOf("com/codename1/io/bonjour/") == 0) {
+                        usesBonjour = true;
+                    }
+                    // WiFi Direct / USB on iOS: not supported. We
+                    // intentionally do not inject entitlements -- the runtime
+                    // stub returns "unsupported" at call time.
                 }
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
-
+                    if (cls.equals("com/codename1/io/wifi/WiFi")
+                            && (method.indexOf("connect") > -1
+                                || method.indexOf("disconnect") > -1)) {
+                        usesWifiHotspotConfig = true;
+                    }
                 }
             });
         } catch (Exception ex) {
@@ -1759,6 +1787,99 @@ public class IPhoneBuilder extends Executor {
                     request.putArgument(
                             "ios.entitlements.com.apple.developer.applesignin",
                             "Default");
+                }
+            }
+
+            // Deeper-network connectivity (WiFi info / NEHotspotConfiguration
+            // / Bonjour). Each block is gated on a scanner flag so apps that
+            // never touch the API see no entitlement or plist changes -- this
+            // keeps the App Store review process clean. Developers can
+            // override any value via the matching ios.* / ios.entitlements.*
+            // build hint.
+            if (usesWifiInfo) {
+                // Reading SSID/BSSID on iOS 13+ requires the wifi-info
+                // entitlement AND a granted CoreLocation authorization.
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.networking.wifi-info",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.networking.wifi-info",
+                            "true");
+                }
+                // CoreLocation is what iOS checks behind the scenes for
+                // CNCopyCurrentNetworkInfo. Default the description if the
+                // developer did not set one; the user-facing prompt comes
+                // from this string.
+                if (request.getArg("ios.locationUsageDescription", null) == null
+                        && request.getArg("ios.NSLocationWhenInUseUsageDescription", null) == null) {
+                    request.putArgument("ios.locationUsageDescription",
+                            "Allow access to your location to read the current Wi-Fi network name.");
+                }
+                // Light up the CaptiveNetwork SSID/BSSID code path. Apps
+                // that don't reference com.codename1.io.wifi.WiFi ship
+                // without any CaptiveNetwork symbols.
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_INCLUDE_WIFI_INFO",
+                            "#define CN1_INCLUDE_WIFI_INFO");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_WIFI_INFO", ex);
+                }
+            }
+            if (usesWifiHotspotConfig) {
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.networking.HotspotConfiguration",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.entitlements.com.apple.developer.networking.HotspotConfiguration",
+                            "true");
+                }
+                // Light up NetworkExtension.framework only when the app uses
+                // hotspot config. The conditional #define keeps stock apps
+                // free of NetworkExtension symbols so the App Store API-usage
+                // scanner does not flag it.
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "IOSNative.m"),
+                            "//#define CN1_INCLUDE_HOTSPOT",
+                            "#define CN1_INCLUDE_HOTSPOT");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_HOTSPOT", ex);
+                }
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "NetworkExtension.framework";
+                } else if (!addLibs.contains("NetworkExtension")) {
+                    addLibs += ";NetworkExtension.framework";
+                }
+            }
+            if (usesBonjour) {
+                // iOS 14 requires NSLocalNetworkUsageDescription before any
+                // mDNS traffic can flow; without it discovery silently
+                // returns nothing.
+                if (request.getArg("ios.NSLocalNetworkUsageDescription", null) == null) {
+                    request.putArgument("ios.NSLocalNetworkUsageDescription",
+                            "Allow access to devices on your local network to discover services advertised via Bonjour.");
+                }
+                // The NSBonjourServices array enumerates the service types
+                // the app expects to discover. We seed it with HTTP since
+                // that's the most common; developers should add specific
+                // types via ios.NSBonjourServices = "_myapp._tcp.,_http._tcp."
+                if (request.getArg("ios.NSBonjourServices", null) == null) {
+                    request.putArgument("ios.NSBonjourServices", "_http._tcp.");
+                }
+                // Light up the NSNetServiceBrowser/NSNetService code path.
+                // Apps that never call BonjourBrowser/BonjourPublisher
+                // ship without the delegate, so the iOS 14 local-network
+                // privacy prompt is not triggered for them.
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_INCLUDE_BONJOUR",
+                            "#define CN1_INCLUDE_BONJOUR");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_BONJOUR", ex);
                 }
             }
 
@@ -3153,6 +3274,25 @@ public class IPhoneBuilder extends Executor {
                 }
             }
         }
+        // NSBonjourServices is an Array<String> in Info.plist, not a String,
+        // so the generic NS*UsageDescription injector above does not handle
+        // it. We expand a comma- or semicolon-separated build-hint value
+        // into the required <array><string>...</string></array> fragment.
+        String bonjourServices = request.getArg("ios.NSBonjourServices", null);
+        if (bonjourServices != null && bonjourServices.length() > 0
+                && !inject.contains("NSBonjourServices")) {
+            StringBuilder arr = new StringBuilder();
+            arr.append("\n<key>NSBonjourServices</key><array>");
+            for (String s : bonjourServices.split("[,;]")) {
+                s = s.trim();
+                if (s.length() == 0) continue;
+                if (!s.endsWith(".")) s = s + ".";
+                arr.append("<string>").append(s).append("</string>");
+            }
+            arr.append("</array>");
+            inject += arr.toString();
+        }
+
         String backgroundModesStr = request.getArg("ios.background_modes", null);
         if (includePush || "true".equals(request.getArg("ios.delayPushCompletion", "false")) ||
                 "true".equals(request.getArg("delayPushCompletion", "false"))) {

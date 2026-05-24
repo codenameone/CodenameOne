@@ -88,6 +88,8 @@ include::Authentication-And-Identity.asciidoc[]
 
 include::Near-Field-Communication.asciidoc[]
 
+include::Network-Connectivity.asciidoc[]
+
 include::signing.asciidoc[]
 
 include::Working-With-iOS.asciidoc[]

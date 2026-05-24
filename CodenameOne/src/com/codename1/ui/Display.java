@@ -498,6 +498,34 @@ public final class Display extends CN1Constants {
         return impl;
     }
 
+    /// Returns the platform's WiFi implementation. Used by
+    /// `com.codename1.io.wifi.WiFi`; applications normally talk to that
+    /// static facade rather than calling this directly.
+    public com.codename1.io.wifi.WifiPlatform getWifiPlatform() {
+        return impl.getWifiPlatform();
+    }
+
+    /// Returns the platform's WiFi-Direct implementation.
+    public com.codename1.io.wifi.WifiDirectPlatform getWifiDirectPlatform() {
+        return impl.getWifiDirectPlatform();
+    }
+
+    /// Returns the platform's Bonjour / mDNS implementation.
+    public com.codename1.io.bonjour.BonjourPlatform getBonjourPlatform() {
+        return impl.getBonjourPlatform();
+    }
+
+    /// Returns the platform's USB host implementation.
+    public com.codename1.io.usb.UsbPlatform getUsbPlatform() {
+        return impl.getUsbPlatform();
+    }
+
+    /// Returns the platform's network-type tracker used by
+    /// `NetworkManager.addNetworkTypeListener(...)`.
+    public com.codename1.io.NetworkTypePlatform getNetworkTypePlatform() {
+        return impl.getNetworkTypePlatform();
+    }
+
     /// Returns the SIMD API instance bound to the current implementation.
     public Simd getSimd() {
         if (simd == null) {

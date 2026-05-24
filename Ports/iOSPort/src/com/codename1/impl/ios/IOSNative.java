@@ -310,6 +310,39 @@ public final class IOSNative {
     native boolean isDarkModeDetectionSupported();
     native boolean isVPNActive();
 
+    // Active-network type queries used by NetworkManager.getCurrentNetworkType
+    // and addNetworkTypeListener. Returns one of
+    // NetworkManager.NETWORK_TYPE_* constants. Implementation uses
+    // SCNetworkReachability (always available) and an interface-name probe to
+    // distinguish WiFi from cellular.
+    native int wifiNetworkType();
+    native void wifiInstallTypeListener(Object instance);
+    native void wifiUninstallTypeListener();
+
+    // WiFi info; SSID/BSSID require the wifi-info entitlement and (since iOS
+    // 13) a granted CoreLocation authorization. The build pipeline injects
+    // both automatically when WiFi.getCurrentSSID/getBSSID is on the
+    // classpath. Returns null when permission denied or not on WiFi.
+    native String wifiCurrentSSID();
+    native String wifiCurrentBSSID();
+    native String wifiGateway();
+    native String wifiIpAddress();
+
+    // NEHotspotConfiguration-backed join. Requires the
+    // com.apple.developer.networking.HotspotConfiguration entitlement
+    // (injected by IPhoneBuilder when com.codename1.io.wifi.WiFi.connect is
+    // referenced). The result is delivered via
+    // com.codename1.impl.ios.IOSConnectivity.wifiConnectResult.
+    native void wifiConnect(String ssid, String password, int security);
+    native void wifiDisconnect(String ssid);
+
+    // NSNetServiceBrowser-backed Bonjour discovery. Callbacks land in
+    // com.codename1.impl.ios.IOSConnectivity.bonjour* static dispatchers.
+    native long bonjourBrowseStart(String type);
+    native void bonjourBrowseStop(long handle);
+    native long bonjourPublishStart(String name, String type, int port, String[] txtKeys, String[] txtVals);
+    native void bonjourPublishStop(long handle);
+
     native int fileCountInDir(String dir);
     native void listFilesInDir(String dir, String[] files);
     native void createDirectory(String dir);

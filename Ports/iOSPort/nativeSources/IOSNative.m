@@ -49,6 +49,7 @@
 #include "com_codename1_impl_ios_IOSBiometrics.h"
 #include "com_codename1_impl_ios_IOSSecureStorage.h"
 #include "com_codename1_impl_ios_IOSNfc.h"
+#include "com_codename1_impl_ios_IOSConnectivity.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
@@ -65,6 +66,10 @@
 #import <Foundation/Foundation.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <SystemConfiguration/SystemConfiguration.h>
+#include <SystemConfiguration/SCNetworkReachability.h>
 #import <MessageUI/MFMailComposeViewController.h>
 #import <AddressBookUI/AddressBookUI.h>
 #import <MessageUI/MFMessageComposeViewController.h>
@@ -4496,6 +4501,426 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD
     }
     freeifaddrs(interfaces);
     return found;
+}
+
+// ====================================================================
+// Deeper network connectivity: WiFi info, NEHotspotConfiguration,
+// NSNetService Bonjour, SCNetworkReachability-based type tracking.
+// The build pipeline injects the wifi-info / HotspotConfiguration /
+// NSLocalNetworkUsageDescription / NSBonjourServices entries only when
+// the relevant Java classes are referenced -- this keeps stock apps free
+// of dangling entitlements that block App Store approval.
+// ====================================================================
+
+// CN1_INCLUDE_HOTSPOT toggles NetworkExtension.framework import. Gated by
+// IPhoneBuilder when com.codename1.io.wifi.WiFi.connect is on the
+// classpath. Apps that never call WiFi.connect ship without any
+// NetworkExtension symbols so Apple's API-usage scanner does not flag
+// them.
+//#define CN1_INCLUDE_HOTSPOT
+#ifdef CN1_INCLUDE_HOTSPOT
+#import <NetworkExtension/NetworkExtension.h>
+#endif
+
+// CN1_INCLUDE_WIFI_INFO toggles the CaptiveNetwork SSID/BSSID readout.
+// CaptiveNetwork's CNCopyCurrentNetworkInfo is still the only way to get
+// SSID/BSSID on a NEHotspotConfiguration-joined network. It is deprecated
+// in iOS 14 but Apple kept it working for apps holding the wifi-info
+// entitlement -- which we inject only when the WiFi info API is used.
+// IPhoneBuilder uncomments the define when com.codename1.io.wifi.WiFi is
+// on the classpath; stock apps see no CaptiveNetwork symbols and need no
+// wifi-info entitlement.
+//#define CN1_INCLUDE_WIFI_INFO
+#ifdef CN1_INCLUDE_WIFI_INFO
+#import <SystemConfiguration/CaptiveNetwork.h>
+#endif
+
+// CN1_INCLUDE_BONJOUR toggles the NSNetServiceBrowser / NSNetService
+// bridge. Foundation is always linked so there is no framework cost when
+// off, but the runtime hooks (the delegate, the dispatcher tables) only
+// instantiate when this define is on -- which avoids dangling
+// NSLocalNetworkUsageDescription requirements and surprises during the
+// App Store review process.
+//#define CN1_INCLUDE_BONJOUR
+
+static SCNetworkReachabilityRef cn1ReachabilityRef = NULL;
+
+static int cn1NetworkTypeFromFlags(SCNetworkReachabilityFlags flags) {
+    if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
+        return 0; // NETWORK_TYPE_NONE
+    }
+    if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
+        return 2; // NETWORK_TYPE_CELLULAR
+    }
+    return 1; // NETWORK_TYPE_WIFI -- iOS treats everything non-WWAN as wifi
+}
+
+static int cn1ReadNetworkType() {
+    struct sockaddr_in zero;
+    bzero(&zero, sizeof(zero));
+    zero.sin_len = sizeof(zero);
+    zero.sin_family = AF_INET;
+    SCNetworkReachabilityRef r = SCNetworkReachabilityCreateWithAddress(
+            kCFAllocatorDefault, (const struct sockaddr*) &zero);
+    if (r == NULL) return 0;
+    SCNetworkReachabilityFlags flags;
+    int t = 0;
+    if (SCNetworkReachabilityGetFlags(r, &flags)) {
+        t = cn1NetworkTypeFromFlags(flags);
+    }
+    CFRelease(r);
+    return t;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_wifiNetworkType___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return cn1ReadNetworkType();
+}
+
+static void cn1ReachabilityCallback(SCNetworkReachabilityRef target,
+                                    SCNetworkReachabilityFlags flags,
+                                    void *info) {
+    int t = cn1NetworkTypeFromFlags(flags);
+    // Reuse the existing VPN detector so the listener parity with
+    // NetworkManager.isVPNActive() stays consistent.
+    JAVA_BOOLEAN vpn = com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
+    com_codename1_impl_ios_IOSConnectivity_networkTypeChangedDispatch___int_boolean(
+            CN1_THREAD_GET_STATE_PASS_ARG t, vpn);
+}
+
+void com_codename1_impl_ios_IOSNative_wifiInstallTypeListener___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT clsObj) {
+    if (cn1ReachabilityRef != NULL) return;
+    struct sockaddr_in zero;
+    bzero(&zero, sizeof(zero));
+    zero.sin_len = sizeof(zero);
+    zero.sin_family = AF_INET;
+    cn1ReachabilityRef = SCNetworkReachabilityCreateWithAddress(
+            kCFAllocatorDefault, (const struct sockaddr*) &zero);
+    if (cn1ReachabilityRef == NULL) return;
+    SCNetworkReachabilityContext ctx = {0, NULL, NULL, NULL, NULL};
+    if (!SCNetworkReachabilitySetCallback(cn1ReachabilityRef,
+            cn1ReachabilityCallback, &ctx)) {
+        CFRelease(cn1ReachabilityRef);
+        cn1ReachabilityRef = NULL;
+        return;
+    }
+    SCNetworkReachabilityScheduleWithRunLoop(cn1ReachabilityRef,
+            CFRunLoopGetMain(), kCFRunLoopCommonModes);
+}
+
+void com_codename1_impl_ios_IOSNative_wifiUninstallTypeListener__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (cn1ReachabilityRef == NULL) return;
+    SCNetworkReachabilityUnscheduleFromRunLoop(cn1ReachabilityRef,
+            CFRunLoopGetMain(), kCFRunLoopCommonModes);
+    CFRelease(cn1ReachabilityRef);
+    cn1ReachabilityRef = NULL;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wifiCurrentSSID___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_INCLUDE_WIFI_INFO
+    CFArrayRef interfaces = CNCopySupportedInterfaces();
+    if (interfaces == NULL) return JAVA_NULL;
+    JAVA_OBJECT result = JAVA_NULL;
+    CFIndex count = CFArrayGetCount(interfaces);
+    for (CFIndex i = 0; i < count; i++) {
+        CFStringRef iface = (CFStringRef) CFArrayGetValueAtIndex(interfaces, i);
+        CFDictionaryRef info = CNCopyCurrentNetworkInfo(iface);
+        if (info != NULL) {
+            CFStringRef ssid = (CFStringRef) CFDictionaryGetValue(info,
+                    kCNNetworkInfoKeySSID);
+            if (ssid != NULL) {
+                result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (NSString*) ssid);
+            }
+            CFRelease(info);
+            if (result != JAVA_NULL) break;
+        }
+    }
+    CFRelease(interfaces);
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wifiCurrentBSSID___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_INCLUDE_WIFI_INFO
+    CFArrayRef interfaces = CNCopySupportedInterfaces();
+    if (interfaces == NULL) return JAVA_NULL;
+    JAVA_OBJECT result = JAVA_NULL;
+    CFIndex count = CFArrayGetCount(interfaces);
+    for (CFIndex i = 0; i < count; i++) {
+        CFStringRef iface = (CFStringRef) CFArrayGetValueAtIndex(interfaces, i);
+        CFDictionaryRef info = CNCopyCurrentNetworkInfo(iface);
+        if (info != NULL) {
+            CFStringRef bssid = (CFStringRef) CFDictionaryGetValue(info,
+                    kCNNetworkInfoKeyBSSID);
+            if (bssid != NULL) {
+                result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                        [(NSString*) bssid lowercaseString]);
+            }
+            CFRelease(info);
+            if (result != JAVA_NULL) break;
+        }
+    }
+    CFRelease(interfaces);
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wifiIpAddress___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    struct ifaddrs *interfaces = NULL;
+    if (getifaddrs(&interfaces) != 0) return JAVA_NULL;
+    JAVA_OBJECT result = JAVA_NULL;
+    for (struct ifaddrs *ifa = interfaces; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET) continue;
+        if (!(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK)) continue;
+        // en0 is the standard WiFi interface name on iOS devices.
+        if (ifa->ifa_name == NULL || strncmp(ifa->ifa_name, "en", 2) != 0) continue;
+        char addr[INET_ADDRSTRLEN];
+        struct sockaddr_in *sin = (struct sockaddr_in*) ifa->ifa_addr;
+        if (inet_ntop(AF_INET, &sin->sin_addr, addr, sizeof(addr)) != NULL) {
+            result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                    [NSString stringWithUTF8String:addr]);
+            break;
+        }
+    }
+    freeifaddrs(interfaces);
+    return result;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wifiGateway___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // iOS does not expose the route table to apps. Best-effort: derive from
+    // the en0 address by assuming the gateway lives at the network's .1
+    // address. This matches the most common home/SOHO topology and is
+    // documented as best-effort in the Java contract.
+    struct ifaddrs *interfaces = NULL;
+    if (getifaddrs(&interfaces) != 0) return JAVA_NULL;
+    JAVA_OBJECT result = JAVA_NULL;
+    for (struct ifaddrs *ifa = interfaces; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET) continue;
+        if (!(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK)) continue;
+        if (ifa->ifa_name == NULL || strncmp(ifa->ifa_name, "en", 2) != 0) continue;
+        struct sockaddr_in *sin = (struct sockaddr_in*) ifa->ifa_addr;
+        struct sockaddr_in *mask = (struct sockaddr_in*) ifa->ifa_netmask;
+        if (mask == NULL) continue;
+        uint32_t net = sin->sin_addr.s_addr & mask->sin_addr.s_addr;
+        uint32_t gw = net | htonl(1);
+        struct in_addr g;
+        g.s_addr = gw;
+        char buf[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &g, buf, sizeof(buf)) != NULL) {
+            result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                    [NSString stringWithUTF8String:buf]);
+            break;
+        }
+    }
+    freeifaddrs(interfaces);
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_wifiConnect___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT ssidObj, JAVA_OBJECT pwObj, JAVA_INT security) {
+#ifdef CN1_INCLUDE_HOTSPOT
+    if (@available(iOS 11.0, *)) {
+        NSString *ssid = toNSString(CN1_THREAD_GET_STATE_PASS_ARG ssidObj);
+        NSString *pw = pwObj == JAVA_NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG pwObj);
+        NEHotspotConfiguration *cfg;
+        if (pw == nil || pw.length == 0) {
+            cfg = [[NEHotspotConfiguration alloc] initWithSSID:ssid];
+        } else {
+            // security==4 -> WPA3_SAE, others -> WPA2 PSK
+            BOOL isWep = security == 1;
+            cfg = [[NEHotspotConfiguration alloc] initWithSSID:ssid
+                                                    passphrase:pw
+                                                          isWEP:isWep];
+        }
+        [[NEHotspotConfigurationManager sharedManager]
+                applyConfiguration:cfg
+                completionHandler:^(NSError * _Nullable err) {
+                    BOOL ok = (err == nil
+                            || err.code == NEHotspotConfigurationErrorAlreadyAssociated);
+                    NSString *msg = err == nil ? @"ok" : err.localizedDescription;
+                    com_codename1_impl_ios_IOSConnectivity_wifiConnectResult___boolean_java_lang_String(
+                            CN1_THREAD_GET_STATE_PASS_ARG
+                            ok ? JAVA_TRUE : JAVA_FALSE,
+                            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG msg));
+                }];
+        [cfg release];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSConnectivity_wifiConnectResult___boolean_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG JAVA_FALSE,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                    @"NEHotspotConfiguration not linked. Reference com.codename1.io.wifi.WiFi.connect from your app to make the iOS builder inject the entitlement and link NetworkExtension.framework."));
+}
+
+void com_codename1_impl_ios_IOSNative_wifiDisconnect___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT ssidObj) {
+#ifdef CN1_INCLUDE_HOTSPOT
+    if (@available(iOS 11.0, *)) {
+        NSString *ssid = toNSString(CN1_THREAD_GET_STATE_PASS_ARG ssidObj);
+        [[NEHotspotConfigurationManager sharedManager] removeConfigurationForSSID:ssid];
+    }
+#endif
+}
+
+// ---------------- Bonjour ----------------
+// Gated on CN1_INCLUDE_BONJOUR; IPhoneBuilder uncomments the define above
+// when com.codename1.io.bonjour is on the classpath. Apps that never use
+// Bonjour neither register the NSNetServiceBrowser delegate nor declare
+// NSLocalNetworkUsageDescription / NSBonjourServices in Info.plist, so the
+// iOS 14 local-network privacy prompt is suppressed for them. The C entry
+// points still link (ParparVM requires the symbol for every `native`
+// method) but they short-circuit to JAVA_NULL / 0 when the define is off.
+
+#ifdef CN1_INCLUDE_BONJOUR
+@interface CN1BonjourBrowser : NSObject<NSNetServiceBrowserDelegate, NSNetServiceDelegate>
+@property (nonatomic, retain) NSNetServiceBrowser *browser;
+@property (nonatomic, retain) NSMutableArray *resolving;
+@property (nonatomic, assign) JAVA_LONG handle;
+@end
+
+@implementation CN1BonjourBrowser
+- (void)dealloc {
+    [_browser release];
+    [_resolving release];
+    [super dealloc];
+}
+- (void)netServiceBrowser:(NSNetServiceBrowser *)b
+            didFindService:(NSNetService *)svc
+                moreComing:(BOOL)more {
+    [self.resolving addObject:svc];
+    svc.delegate = self;
+    [svc resolveWithTimeout:5.0];
+}
+- (void)netServiceBrowser:(NSNetServiceBrowser *)b
+          didRemoveService:(NSNetService *)svc
+                moreComing:(BOOL)more {
+    JAVA_OBJECT name = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG svc.name);
+    JAVA_OBJECT type = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG svc.type);
+    com_codename1_impl_ios_IOSConnectivity_bonjourLostDispatch___long_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG self.handle, name, type);
+}
+- (void)netServiceDidResolveAddress:(NSNetService *)svc {
+    NSString *host = svc.hostName;
+    NSDictionary *txt = nil;
+    NSData *raw = [svc TXTRecordData];
+    if (raw != nil) {
+        txt = [NSNetService dictionaryFromTXTRecordData:raw];
+    }
+    JAVA_OBJECT name = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG svc.name);
+    JAVA_OBJECT type = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG svc.type);
+    JAVA_OBJECT hostObj = host == nil ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG host);
+    JAVA_OBJECT keys = JAVA_NULL, vals = JAVA_NULL;
+    if (txt != nil && txt.count > 0) {
+        keys = __NEW_ARRAY_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT) txt.count);
+        vals = __NEW_ARRAY_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT) txt.count);
+        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) keys)->data;
+        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) vals)->data;
+        int i = 0;
+        for (NSString *k in txt.allKeys) {
+            kArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG k);
+            id v = [txt objectForKey:k];
+            NSString *s = nil;
+            if ([v isKindOfClass:[NSData class]]) {
+                s = [[[NSString alloc] initWithData:(NSData*) v
+                                            encoding:NSUTF8StringEncoding] autorelease];
+            } else if ([v isKindOfClass:[NSString class]]) {
+                s = (NSString*) v;
+            }
+            vArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (s == nil ? @"" : s));
+            i++;
+        }
+    }
+    com_codename1_impl_ios_IOSConnectivity_bonjourResolveDispatch___long_java_lang_String_java_lang_String_java_lang_String_int_java_lang_String_1ARRAY_java_lang_String_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG self.handle, name, type, hostObj,
+            (JAVA_INT) svc.port, keys, vals);
+}
+- (void)netService:(NSNetService *)svc didNotResolve:(NSDictionary *)errorDict {
+}
+@end
+
+static NSMutableDictionary *cn1BonjourBrowsers = nil;
+static NSMutableDictionary *cn1BonjourPublishers = nil;
+static int64_t cn1BonjourHandleSeq = 1;
+#endif // CN1_INCLUDE_BONJOUR
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_bonjourBrowseStart___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT typeObj) {
+#ifdef CN1_INCLUDE_BONJOUR
+    if (typeObj == JAVA_NULL) return 0;
+    if (cn1BonjourBrowsers == nil) cn1BonjourBrowsers = [[NSMutableDictionary alloc] init];
+    NSString *type = toNSString(CN1_THREAD_GET_STATE_PASS_ARG typeObj);
+    if (![type hasSuffix:@"."]) type = [type stringByAppendingString:@"."];
+    int64_t handle = cn1BonjourHandleSeq++;
+    CN1BonjourBrowser *bb = [[CN1BonjourBrowser alloc] init];
+    bb.handle = handle;
+    bb.browser = [[[NSNetServiceBrowser alloc] init] autorelease];
+    bb.resolving = [NSMutableArray array];
+    bb.browser.delegate = bb;
+    [bb.browser searchForServicesOfType:type inDomain:@"local."];
+    [cn1BonjourBrowsers setObject:bb forKey:[NSNumber numberWithLongLong:handle]];
+    [bb release];
+    return (JAVA_LONG) handle;
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_bonjourBrowseStop___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+#ifdef CN1_INCLUDE_BONJOUR
+    if (cn1BonjourBrowsers == nil) return;
+    NSNumber *k = [NSNumber numberWithLongLong:(int64_t) handle];
+    CN1BonjourBrowser *bb = [cn1BonjourBrowsers objectForKey:k];
+    if (bb != nil) {
+        [bb.browser stop];
+        [cn1BonjourBrowsers removeObjectForKey:k];
+    }
+#endif
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_bonjourPublishStart___java_lang_String_java_lang_String_int_java_lang_String_1ARRAY_java_lang_String_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT nameObj, JAVA_OBJECT typeObj, JAVA_INT port, JAVA_OBJECT keysObj, JAVA_OBJECT valsObj) {
+#ifdef CN1_INCLUDE_BONJOUR
+    if (cn1BonjourPublishers == nil) cn1BonjourPublishers = [[NSMutableDictionary alloc] init];
+    NSString *name = toNSString(CN1_THREAD_GET_STATE_PASS_ARG nameObj);
+    NSString *type = toNSString(CN1_THREAD_GET_STATE_PASS_ARG typeObj);
+    if (![type hasSuffix:@"."]) type = [type stringByAppendingString:@"."];
+    NSNetService *svc = [[NSNetService alloc]
+            initWithDomain:@"local." type:type name:name port:(int) port];
+    if (keysObj != JAVA_NULL && valsObj != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) keysObj)->data;
+        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) valsObj)->data;
+        int n = (int) ((JAVA_ARRAY) keysObj)->length;
+        NSMutableDictionary *d = [NSMutableDictionary dictionary];
+        for (int i = 0; i < n; i++) {
+            NSString *k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG kArr[i]);
+            NSString *v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG vArr[i]);
+            if (k != nil && v != nil) {
+                [d setObject:[v dataUsingEncoding:NSUTF8StringEncoding] forKey:k];
+            }
+        }
+        [svc setTXTRecordData:[NSNetService dataFromTXTRecordDictionary:d]];
+    }
+    [svc publish];
+    int64_t handle = cn1BonjourHandleSeq++;
+    [cn1BonjourPublishers setObject:svc forKey:[NSNumber numberWithLongLong:handle]];
+    [svc release];
+    return (JAVA_LONG) handle;
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_bonjourPublishStop___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+#ifdef CN1_INCLUDE_BONJOUR
+    if (cn1BonjourPublishers == nil) return;
+    NSNumber *k = [NSNumber numberWithLongLong:(int64_t) handle];
+    NSNetService *svc = [cn1BonjourPublishers objectForKey:k];
+    if (svc != nil) {
+        [svc stop];
+        [cn1BonjourPublishers removeObjectForKey:k];
+    }
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

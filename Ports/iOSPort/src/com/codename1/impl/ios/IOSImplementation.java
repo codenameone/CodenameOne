@@ -1352,6 +1352,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new IOSWifiPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new IOSBonjourPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new IOSNetworkTypePlatform();
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return nativeInstance.isLargerTextEnabled();
     }
