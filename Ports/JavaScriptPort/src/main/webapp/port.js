@@ -3261,7 +3261,14 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // pressure -- consistently breaks once an instance of the cascade
   // bites. Park them with the chart tail so the suite reliably
   // reaches comparison.
-  //"com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
+  // ToastBar landed in the same cn1_s_save VIRTUAL_FAIL trap as
+  // SheetSlide on a subsequent CI run (908ecfed8). It completed cleanly
+  // on 5c593e151 (PNG baselined as ToastBarTopPosition.png) but hung
+  // on 908ecfed8 -- the canvasContextWipe surfaces non-deterministically
+  // depending on accumulated state from LWPicker / Validator / etc.
+  // Park here for deterministic suite completion; un-park when
+  // canvasContextWipe is resolved.
+  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   // SheetSlide hits a separate Canvas2DContext class-wipe (cn1_s_save
   // VIRTUAL_FAIL receiverClass=null) that hangs the suite even after
   // the AbstractAnimationScreenshotTest safety net (efc9bdb67) calls
@@ -3341,7 +3348,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
   "ChartTransformScreenshotTest": "chartCombinedXyCapture",
   "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
-  //"ToastBarTopPositionScreenshotTest": "chartDocumentStaleness",
+  "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   "SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak"
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
