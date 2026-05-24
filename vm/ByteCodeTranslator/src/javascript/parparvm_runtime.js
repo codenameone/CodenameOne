@@ -3163,7 +3163,12 @@ function cn1_ivResolve(target, mid) {
           && (typeof mid === 'string')
           && (mid.indexOf('cn1_s_setFillStyle_') === 0
               || mid.indexOf('cn1_s_setStrokeStyle_') === 0
-              || mid.indexOf('cn1_s_drawImage_') === 0)) {
+              || mid.indexOf('cn1_s_drawImage_') === 0
+              // Document.createElement on a broken {} document --
+              // return null so the caller's canvas assignment becomes
+              // null and the next dispatch hits the well-formed NPE
+              // path instead of busy-looping on VIRTUAL_FAIL.
+              || mid.indexOf('cn1_s_createElement_') === 0)) {
         return function*() { return null; };
       }
       if (canvasVoidMethods[mid]) {
