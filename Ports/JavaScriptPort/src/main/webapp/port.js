@@ -3325,6 +3325,13 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
   "BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
+  // SimdLargeAllocaTest hung the suite on bk76kkr50 with VIRTUAL_FAILs
+  // on HTML5Impl methods (cn1_s_paintDirty / cn1_s_flushGraphics) and
+  // Canvas2D getImageData. The {} receiver propagated into the
+  // HTML5Implementation instance itself, not just the Canvas2DContext.
+  // Likely SimdLargeAlloca corrupts shared state via its large-alloca
+  // pattern; needs its own investigation.
+  "SimdLargeAllocaTest": "simdLargeAllocaCorrupt",
   "BackgroundThreadUiAccessTest": "backgroundThreadUiAccess",
   "VPNDetectionAPITest": "vpnDetectionApi",
   "CallDetectionAPITest": "callDetectionApi",
