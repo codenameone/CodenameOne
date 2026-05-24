@@ -868,7 +868,7 @@ public final class NetworkManager {
     /// no connectivity. Distinct from `getAPType` which describes a configured
     /// access point rather than the active data path.
     public int getCurrentNetworkType() {
-        return com.codename1.ui.Display.getInstance()
+        return Display.getInstance()
                 .getNetworkTypePlatform().getCurrentNetworkType();
     }
 
@@ -898,7 +898,7 @@ public final class NetworkManager {
             if (networkTypeListeners == null) {
                 networkTypeListeners = new EventDispatcher();
                 networkTypeListeners.setBlocking(false);
-                com.codename1.ui.Display.getInstance()
+                Display.getInstance()
                         .getNetworkTypePlatform().install(this);
                 lastNetworkType = getCurrentNetworkType();
                 lastVpnActive = isVPNActive();
@@ -920,7 +920,7 @@ public final class NetworkManager {
             networkTypeListeners.removeListener(l);
             Collection v = networkTypeListeners.getListenerCollection();
             if (v == null || v.isEmpty()) {
-                com.codename1.ui.Display.getInstance()
+                Display.getInstance()
                         .getNetworkTypePlatform().uninstall(this);
                 networkTypeListeners = null;
             }
