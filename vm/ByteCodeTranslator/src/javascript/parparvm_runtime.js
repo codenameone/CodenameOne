@@ -3058,18 +3058,27 @@ function cn1_ivResolve(target, mid) {
     // which JSO produced the null receiver. Rate-limited.
     if (target && target.__class == null) {
       if (!jvm._dispatchNullClassLogged) jvm._dispatchNullClassLogged = 0;
-      if (jvm._dispatchNullClassLogged < 30) {
+      if (jvm._dispatchNullClassLogged < 5) {
         jvm._dispatchNullClassLogged++;
         try {
           const hasJsValue = target.__jsValue !== undefined ? 'yes' : 'no';
           const hostCls = target.__cn1HostClass != null ? String(target.__cn1HostClass) : 'none';
           const hostRef = target.__cn1HostRef != null ? String(target.__cn1HostRef) : 'none';
           const keys = Object.keys(target).slice(0, 12).join(',');
+          const allProps = Object.getOwnPropertyNames(target).slice(0, 12).join(',');
           vmDiag('NULL_RECEIVER', 'mid', String(mid));
           vmDiag('NULL_RECEIVER', 'hasJsValue', hasJsValue);
           vmDiag('NULL_RECEIVER', 'hostClass', hostCls);
           vmDiag('NULL_RECEIVER', 'hostRef', hostRef);
           vmDiag('NULL_RECEIVER', 'keys', keys);
+          vmDiag('NULL_RECEIVER', 'allProps', allProps);
+          // Stack trace at call site -- gives us the cn1_iv* caller and
+          // therefore the translated method that's passing {} as receiver.
+          try {
+            const stack = new Error('null-receiver-trace').stack || '';
+            const frames = String(stack).split('\n').slice(0, 8).join(' | ');
+            vmDiag('NULL_RECEIVER', 'callerFrames', frames.substring(0, 500));
+          } catch (_es) {}
         } catch (_e) {}
       }
     }
