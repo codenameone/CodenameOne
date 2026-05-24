@@ -81,12 +81,21 @@ APP_DIR="scripts/hellocodenameone"
 # --- Build Android gradle project ---
 ba_log "Building Android gradle project using Codename One port"
 cd $APP_DIR
-xvfb-run -a ./mvnw package \
-  -DskipTests \
-  -Dcodename1.platform=android \
-  -Dcodename1.buildTarget=android-source \
-  -Dopen=false \
-  -U -e
+(
+  # hellocodenameone targets Java 17, so both the maven-compiler-plugin
+  # and any forked tooling need a 17 JDK. Mirrors what build-ios-app.sh
+  # does for the iOS pipeline.
+  export JAVA_HOME="$JAVA17_HOME"
+  export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+  xvfb-run -a ./mvnw package \
+    -DskipTests \
+    -Dcodename1.platform=android \
+    -Dcodename1.buildTarget=android-source \
+    -Dmaven.compiler.fork=true \
+    -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
+    -Dopen=false \
+    -U -e
+)
 cd ../..
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
