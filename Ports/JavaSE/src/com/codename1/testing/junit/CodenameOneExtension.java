@@ -34,7 +34,9 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
+import org.opentest4j.TestAbortedException;
 
+import java.awt.GraphicsEnvironment;
 import java.lang.reflect.Method;
 import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicReference;
@@ -75,6 +77,19 @@ public class CodenameOneExtension
 
     @Override
     public void beforeAll(ExtensionContext context) {
+        // The simulator's Display.init eventually constructs a JFrame to host
+        // the canvas, so a true-headless JVM (no DISPLAY, no Xvfb) will throw
+        // HeadlessException the moment we touch it. Abort the whole class
+        // instead so the headless CI run reports it as a skip rather than
+        // a failure -- and crucially, before we leave Display half-init'd
+        // and risk poisoning later tests in the same JVM.
+        if (GraphicsEnvironment.isHeadless()) {
+            throw new TestAbortedException(
+                    "Codename One simulator tests require a graphical display; "
+                            + "skipping " + context.getRequiredTestClass().getName()
+                            + " because GraphicsEnvironment.isHeadless() is true. "
+                            + "Run with Xvfb (or remove java.awt.headless=true) to enable.");
+        }
         Class<?> testClass = context.getRequiredTestClass();
         applyProperties(testClass.getAnnotation(SimulatorProperty.class),
                 testClass.getAnnotation(SimulatorProperties.class),

@@ -36,10 +36,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Sanity tests for {@link CodenameOneExtension}. The Codename One simulator
- * needs a real AWT environment (it creates a {@code JFrame} during init);
- * on a true headless CI runner these tests would throw
- * {@code HeadlessException}, so the class is disabled when
- * {@code java.awt.headless=true} is set explicitly.
+ * needs a real AWT environment (it constructs a {@code JFrame} during init);
+ * on a true-headless JVM the extension itself aborts the class via
+ * {@code TestAbortedException} (see {@link CodenameOneExtension#beforeAll}),
+ * which JUnit reports as "skipped" rather than "failed". This local
+ * annotation only catches the case where {@code java.awt.headless=true}
+ * is explicitly set; the AWT auto-detected headless case is handled by
+ * the extension.
  */
 @CodenameOneTest
 @SimulatorProperty(name = "cn1.test.classLevel", value = "yes")
