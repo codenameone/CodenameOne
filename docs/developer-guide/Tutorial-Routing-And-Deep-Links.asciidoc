@@ -6,7 +6,7 @@ deep-linkable app with three Forms, route guards, a per-tab navigation
 shell, and `@Route` annotations validated at build time. It is meant to be
 read end-to-end the first time you reach for the router; once you have the
 shape in your head, the reference page at
-link:Routing-And-Deep-Links.asciidoc[Routing & Deep Links] is the working
+the *Routing & Deep Links* reference chapter is the working
 document.
 
 By the end of this tutorial you will have:
@@ -20,9 +20,9 @@ By the end of this tutorial you will have:
   (no source-text regex, no reflection at runtime).
 
 NOTE: This tutorial assumes a Maven Codename One project created from
-the `cn1app-archetype` archetype (see
-link:Maven-Getting-Started.adoc[Maven Getting Started]). Snippets are
-self-contained — paste them into your own project as you go.
+the `cn1app-archetype` archetype (see the **Maven Getting Started** chapter
+elsewhere in this guide). Snippets are self-contained — paste them into
+your own project as you go.
 
 === Step 1 — Add the router to your `init()`
 
@@ -321,7 +321,7 @@ case — they are both `Router.start(path)`.
 
 === Where to next
 
-* Reference page: link:Routing-And-Deep-Links.asciidoc[Routing & Deep Links].
+* Reference page: the *Routing & Deep Links* reference chapter.
 * `PopGuard` (analogous to Flutter's `PopScope`) for confirm-before-leaving
   patterns: see the "Pop guards" section of the reference page.
 * `Sheet.showForResult()` for inline pickers/confirms that return a value.
