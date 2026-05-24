@@ -52,11 +52,20 @@
     <profiles>
         <profile>
             <id>local-dev-javase</id>
+            <!--
+              Activate whenever cn1.binaries is in play, mirroring the
+              maven/android compile-android profile. The old activation only
+              fired on -Dcodename1.platform=javase, which scripts/setup-workspace.sh
+              passes to its first mvn invocation but not to the second (the
+              codenameone-maven-plugin -am build). That second pass would then
+              rebuild javase without jcef / jfxrt on the classpath and break on
+              the simulator's CEF / JavaFX sources whenever any earlier change
+              tripped incremental compilation into a full rebuild, e.g. the
+              new com/codename1/testing/junit/ sources in this PR.
+            -->
             <activation>
-                <property>
-                    <name>codename1.platform</name>
-                    <value>javase</value>
-                </property>
+                <file><exists>${cn1.binaries}</exists></file>
+                <property><name>cn1.binaries</name></property>
             </activation>
             <dependencies>
                 <dependency>
