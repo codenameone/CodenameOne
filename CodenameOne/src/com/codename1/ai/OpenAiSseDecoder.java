@@ -83,7 +83,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
         Map delta = JsonHelper.asMap(choice.get("delta"));
         if (delta == null) {
             // Non-streaming response shape can appear at the very end
-            // for some servers — `message` instead of `delta`.
+            // for some servers -- `message` instead of `delta`.
             delta = JsonHelper.asMap(choice.get("message"));
             if (delta == null) {
                 return;

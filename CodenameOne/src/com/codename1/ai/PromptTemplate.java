@@ -63,7 +63,7 @@ public final class PromptTemplate {
 
     /// Renders the final string. Unknown placeholders are left
     /// intact (`{like_this}`) so they're easy to spot in test
-    /// output — silently dropping them tends to hide bugs.
+    /// output -- silently dropping them tends to hide bugs.
     public String build() {
         StringBuilder out = new StringBuilder(template.length() + 32);
         int i = 0;

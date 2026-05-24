@@ -33,7 +33,7 @@ import java.util.Map;
 /// [#builder()]; immutable once constructed so the same request can be
 /// re-used across retries.
 ///
-/// Numeric tuning fields are boxed so a `null` means "don't send" —
+/// Numeric tuning fields are boxed so a `null` means "don't send" --
 /// the provider's own default is used instead of one we picked.
 public final class ChatRequest {
     private final String model;

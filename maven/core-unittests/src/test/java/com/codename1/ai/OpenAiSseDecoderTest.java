@@ -93,7 +93,7 @@ class OpenAiSseDecoderTest {
     @Test
     void mapErrorRecognizesContextLengthSubtype() {
         // 400 with an "context_length_exceeded" code/type is one of
-        // the cases we want callers to handle specially — they
+        // the cases we want callers to handle specially -- they
         // typically respond by truncating older messages.
         LlmException e = OpenAiSseDecoder.mapErrorStatic(400,
                 "{\"error\":{\"message\":\"too long\",\"type\":\"invalid_request_error\",\"code\":\"context_length_exceeded\"}}");

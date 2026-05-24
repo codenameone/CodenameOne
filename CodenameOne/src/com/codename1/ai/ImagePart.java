@@ -24,7 +24,7 @@ package com.codename1.ai;
 
 /// An image attachment for a multi-modal [ChatMessage]. Construct from
 /// raw bytes (the provider encodes them as base64 inline data) or from
-/// a publicly-reachable URL — both modes are accepted by OpenAI,
+/// a publicly-reachable URL -- both modes are accepted by OpenAI,
 /// Anthropic, and Gemini.
 public final class ImagePart extends MessagePart {
     private final byte[] data;

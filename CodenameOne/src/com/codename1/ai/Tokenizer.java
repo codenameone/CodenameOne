@@ -29,7 +29,7 @@ import java.util.List;
 /// shipping the full BPE table (cl100k_base is ~1.7 MB which is
 /// substantial for a mobile binary).
 ///
-/// The rule of thumb is **1 token ≈ 4 characters** of English text,
+/// The rule of thumb is **1 token ~= 4 characters** of English text,
 /// which holds within ~10-15% for typical chat traffic. For non-Latin
 /// scripts the ratio is closer to 1:1, so we clamp the lower bound at
 /// the rough number of words. Apps that need exact accounting should

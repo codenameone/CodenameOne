@@ -65,7 +65,7 @@ public class ChatInput extends Container {
         attach = new Button("+");
         attach.setUIID("ChatAttachButton");
         attach.setVisible(false);
-        voice = new Button("🎙");
+        voice = new Button("Mic");
         voice.setUIID("ChatVoiceButton");
         voice.setVisible(false);
 

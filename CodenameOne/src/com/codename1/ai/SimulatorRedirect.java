@@ -45,22 +45,29 @@ final class SimulatorRedirect {
         if (!isSimulator()) {
             return real;
         }
-        String mode = System.getProperty("cn1.ai.simulatorRedirect", "auto");
+        // CN1 core's java.lang.System exposes only the single-arg
+        // getProperty; default-value handling is done by hand.
+        String mode = readProperty("cn1.ai.simulatorRedirect", "auto");
         boolean force = "ollama".equalsIgnoreCase(mode);
         boolean auto = "auto".equalsIgnoreCase(mode);
         if (!force && !auto) {
             return real;
         }
-        if (auto && !"true".equals(System.getProperty("cn1.ai.ollamaDetected", "false"))) {
+        if (auto && !"true".equals(readProperty("cn1.ai.ollamaDetected", "false"))) {
             return real;
         }
         // Build a fresh Ollama-pointed OpenAI-compatible client. We
         // intentionally lose the original baseUrl/key here; the user
         // opted into local mode and the simulator banner already
         // disclosed that.
-        String localUrl = System.getProperty("cn1.ai.ollamaUrl", "http://localhost:11434/v1");
-        String model = System.getProperty("cn1.ai.ollamaModel", "llama3.2");
+        String localUrl = readProperty("cn1.ai.ollamaUrl", "http://localhost:11434/v1");
+        String model = readProperty("cn1.ai.ollamaModel", "llama3.2");
         return LlmClient.localOpenAiCompatible(localUrl, "", model);
+    }
+
+    private static String readProperty(String key, String defaultValue) {
+        String v = System.getProperty(key);
+        return v != null ? v : defaultValue;
     }
 
     private static boolean isSimulator() {

@@ -77,7 +77,7 @@ class OpenAiClient extends LlmClient {
 
             @Override
             protected void handleErrorResponseCode(int code, String message) {
-                // Suppress framework's default dialog — we'll deliver
+                // Suppress framework's default dialog -- we'll deliver
                 // an exception through the AsyncResource instead.
             }
 
@@ -92,7 +92,8 @@ class OpenAiClient extends LlmClient {
                             result.complete(cr2);
                         }
                     });
-                } catch (Exception ex) {
+                } catch (Exception exc) {
+                    final Exception ex = exc;
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             result.error(new LlmException("Failed to parse response", ex));
@@ -102,7 +103,8 @@ class OpenAiClient extends LlmClient {
             }
 
             @Override
-            protected void handleException(Exception err) {
+            protected void handleException(Exception errIn) {
+                final Exception err = errIn;
                 final int sc;
                 try {
                     sc = getResponseCode();
@@ -249,7 +251,8 @@ class OpenAiClient extends LlmClient {
             }
 
             @Override
-            protected void handleException(Exception err) {
+            protected void handleException(Exception errIn) {
+                final Exception err = errIn;
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         result.error(new LlmNetworkException(err.getMessage(), err));

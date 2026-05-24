@@ -149,7 +149,7 @@ One core repo for the full table.
 
 ## Releases
 
-Push to \`master\` with a \`-SNAPSHOT\` version → workflow strips the
+Push to \`master\` with a \`-SNAPSHOT\` version -> workflow strips the
 suffix, publishes to Maven Central, tags \`v<release>\`, and bumps
 \`pom.xml\` to the next patch \`-SNAPSHOT\`. Required GitHub secrets:
 

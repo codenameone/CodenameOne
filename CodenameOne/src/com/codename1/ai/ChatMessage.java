@@ -69,7 +69,7 @@ public final class ChatMessage {
         return single(Role.ASSISTANT, new TextPart(text));
     }
 
-    /// Builds a USER message containing both a text and image part —
+    /// Builds a USER message containing both a text and image part --
     /// the common multi-modal pattern.
     public static ChatMessage userWithImage(String text, ImagePart image) {
         List<MessagePart> parts = new ArrayList<MessagePart>(2);

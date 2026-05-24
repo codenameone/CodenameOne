@@ -650,8 +650,8 @@ public class IPhoneBuilder extends Executor {
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry — appending pods,
-        // SPM specs, plist defaults and Android perms — so the user
+        // every matched AiDependencyTable.Entry -- appending pods,
+        // SPM specs, plist defaults and Android perms -- so the user
         // doesn't have to declare them by hand.
         final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
 
@@ -730,7 +730,7 @@ public class IPhoneBuilder extends Executor {
         if (!aiAcc.hits().isEmpty()) {
             // Prefer SPM when the project already uses SPM and the
             // entry exposes an SPM spec; otherwise pods. A handful
-            // of ML Kit libs are pods-only — those force pods on
+            // of ML Kit libs are pods-only -- those force pods on
             // regardless of project preference (the resolver will
             // upgrade the effective mode to BOTH below).
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
@@ -748,7 +748,7 @@ public class IPhoneBuilder extends Executor {
                             if (i > 0) products.append(',');
                             products.append(spm.products.get(i));
                         }
-                        // Honor any user-declared products — append, don't overwrite.
+                        // Honor any user-declared products -- append, don't overwrite.
                         String existingProducts = request.getArg("ios.spm.products." + spm.identity, "");
                         if (existingProducts != null && existingProducts.length() > 0) {
                             products.insert(0, existingProducts + ",");
@@ -882,7 +882,7 @@ public class IPhoneBuilder extends Executor {
             new File(buildinRes, "CodenameOne_METALViewController.xib").delete();
             // The .metal shader file isn't guarded by an #ifdef like the
             // companion .m files, so leaving it in the project forces Xcode
-            // to invoke the Metal toolchain — which Xcode 26 ships as a
+            // to invoke the Metal toolchain -- which Xcode 26 ships as a
             // separately-downloaded component that build servers don't have.
             new File(buildinRes, "CN1MetalShaders.metal").delete();
         }

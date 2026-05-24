@@ -26,7 +26,7 @@ package com.codename1.ai;
  * Test-only bridge that re-exposes the package-private
  * {@code JsonHelper} surface from inside the core artifact.
  *
- * <p>This class lives in {@code com.codename1.ai} purposely — Java
+ * <p>This class lives in {@code com.codename1.ai} purposely -- Java
  * package-private access requires the *same package, same module*
  * in JPMS-aware builds, but plain javac compilation is satisfied by
  * the package match alone. The core artifact ships without

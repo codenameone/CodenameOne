@@ -500,7 +500,7 @@ public class AndroidGradleBuilder extends Executor {
     private static boolean currentJvmIsJava17OrLater() {
         String spec = System.getProperty("java.specification.version", "");
         if (spec.startsWith("1.")) {
-            // 1.5 .. 1.8 era — definitely older than 17.
+            // 1.5 .. 1.8 era -- definitely older than 17.
             return false;
         }
         try {
@@ -555,9 +555,9 @@ public class AndroidGradleBuilder extends Executor {
         // On-device debugging: when set, mark the APK debuggable so Dalvik/ART exposes
         // a JDWP socket the cn1:android-on-device-debugging Mojo can forward through adb.
         // Forcing debuggable also flips off R8 and ProGuard so symbols, method names,
-        // and line numbers survive the build — we may be invoked from the android-device
+        // and line numbers survive the build -- we may be invoked from the android-device
         // cloud target which would otherwise run full optimisation. Also force the build
-        // down to debug-only — Android otherwise produces both a release and a debug
+        // down to debug-only -- Android otherwise produces both a release and a debug
         // APK from the same manifest, so without this a stray hint could ship a
         // release-signed, debuggable APK. Release builds and projects that don't opt
         // in see no change.
@@ -1226,7 +1226,7 @@ public class AndroidGradleBuilder extends Executor {
         mediaPlaybackPermission = false;
 
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry — appending Gradle
+        // every matched AiDependencyTable.Entry -- appending Gradle
         // deps to additionalDependencies (later) and permissions/
         // features to xPermissions right now.
         final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();

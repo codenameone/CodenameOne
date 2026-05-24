@@ -31,7 +31,7 @@ public final class ToolResultPart extends MessagePart {
 
     /// `resultJson` is the literal JSON string the tool produced. If
     /// the tool result isn't valid JSON, wrap it like
-    /// `"{\"text\":\"…\"}"` — the providers expect JSON-shaped values.
+    /// `"{\"text\":\"...\"}"` -- the providers expect JSON-shaped values.
     public ToolResultPart(String toolCallId, String resultJson) {
         this.toolCallId = toolCallId;
         this.resultJson = resultJson == null ? "" : resultJson;

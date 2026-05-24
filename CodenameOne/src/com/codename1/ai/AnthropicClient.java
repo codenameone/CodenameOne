@@ -30,7 +30,7 @@ import com.codename1.util.AsyncResource;
 /// {type:"base64", media_type, data}}`; tool calls stream argument
 /// JSON via `input_json_delta` events.
 ///
-/// This is currently a scaffold — the full request/response mapping
+/// This is currently a scaffold -- the full request/response mapping
 /// is tracked as a follow-up. The class compiles and registers under
 /// `LlmClient.anthropic(...)` so app code using the API can be built;
 /// runtime calls throw a clear `UnsupportedOperationException`.

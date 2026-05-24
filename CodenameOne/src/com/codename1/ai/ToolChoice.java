@@ -29,7 +29,7 @@ public final class ToolChoice {
     /// Model picks freely between calling tools and replying with text.
     public static final ToolChoice AUTO = new ToolChoice("auto", null);
 
-    /// Model must not call any tool — it must reply with text.
+    /// Model must not call any tool -- it must reply with text.
     public static final ToolChoice NONE = new ToolChoice("none", null);
 
     /// Model must call exactly one tool (any tool). Useful for forcing

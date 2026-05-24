@@ -25,7 +25,7 @@ package com.codename1.ai;
 /// A tool/function invocation produced by the model. The `id` round-
 /// trips the call back to a [ToolResultPart] so the provider can
 /// match the result to the original request. `argumentsJson` is the
-/// raw JSON string the model produced — parse it with
+/// raw JSON string the model produced -- parse it with
 /// `com.codename1.io.JSONParser` if you need the structured fields.
 public final class ToolCall {
     private final String id;

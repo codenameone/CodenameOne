@@ -28,6 +28,6 @@ package com.codename1.ai;
 /// content arrays; Gemini uses `parts` with `inline_data` / `text`).
 public abstract class MessagePart {
     MessagePart() {
-        // package-private — instantiate via concrete subclass
+        // package-private -- instantiate via concrete subclass
     }
 }

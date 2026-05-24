@@ -36,7 +36,7 @@ import java.util.Map;
 /// Stores [ChatMessage] lists in [Storage] under a caller-chosen key
 /// so apps can rehydrate a `ChatView` after process restart.
 /// Multimodal parts ([ImagePart], [ToolResultPart]) are serialized
-/// to a lossy text fallback — image data is not round-tripped (apps
+/// to a lossy text fallback -- image data is not round-tripped (apps
 /// that need full multimodal persistence should encode the bytes
 /// themselves and keep them in [com.codename1.io.FileSystemStorage]).
 public final class ConversationStore {

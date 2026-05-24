@@ -46,7 +46,7 @@ import com.codename1.util.AsyncResource;
 /// When running in the JavaSE simulator with `cn1.ai.simulatorRedirect`
 /// set to `ollama` (or `auto` with Ollama detected on the loopback),
 /// the static factories transparently route through a local Ollama
-/// endpoint instead of the public provider — so unchanged production
+/// endpoint instead of the public provider -- so unchanged production
 /// code can be debugged offline without API charges.
 public abstract class LlmClient {
     private String baseUrl;
@@ -100,7 +100,7 @@ public abstract class LlmClient {
     }
 
     /// Non-streaming chat. Equivalent to `chatStream` with a no-op
-    /// listener but optimized — the provider skips the SSE response
+    /// listener but optimized -- the provider skips the SSE response
     /// and returns a single JSON object.
     public abstract AsyncResource<ChatResponse> chat(ChatRequest req);
 

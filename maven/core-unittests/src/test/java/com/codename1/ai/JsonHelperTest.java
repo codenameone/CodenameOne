@@ -42,7 +42,7 @@ class JsonHelperTest {
     @Test
     void escapesStringsCorrectly() {
         // Newlines, quotes and backslashes in a user prompt should
-        // come back as the JSON-escaped equivalents — providers
+        // come back as the JSON-escaped equivalents -- providers
         // reject unescaped control chars in string values.
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("prompt", "line one\nline \"two\"\\");
@@ -75,7 +75,7 @@ class JsonHelperTest {
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("parameters", JsonHelperBridge.rawJson(rawSchema));
         String json = JsonHelperBridge.serialize(m);
-        // The raw schema must appear unwrapped — no surrounding "..."
+        // The raw schema must appear unwrapped -- no surrounding "..."
         // and no \"-style escaping.
         assertTrue(json.contains("\"parameters\":{\"type\":\"object\""),
                 "raw JSON should be inlined; got: " + json);

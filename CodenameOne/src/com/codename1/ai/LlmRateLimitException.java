@@ -23,7 +23,7 @@
 package com.codename1.ai;
 
 /// 429: rate limit hit. `retryAfterSeconds` is `-1` when the provider
-/// didn't send a `Retry-After` header — pick your own backoff in that
+/// didn't send a `Retry-After` header -- pick your own backoff in that
 /// case (`RetryPolicy.exponentialBackoff()` is the default).
 public class LlmRateLimitException extends LlmException {
     private final int retryAfterSeconds;

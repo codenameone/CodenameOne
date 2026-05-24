@@ -66,7 +66,7 @@ class AiDependencyTableTest {
         AiDependencyTable.Entry e = hits.get(0);
         assertTrue(e.iosFrameworks().contains("AVFAudio"));
         assertTrue(e.androidPermissions().isEmpty(),
-                "TTS is built-in on every supported OS — no permission needed");
+                "TTS is built-in on every supported OS -- no permission needed");
         assertTrue(e.iosPlistEntries().isEmpty(),
                 "TTS has no Apple-reviewed restricted entitlement");
     }
@@ -91,7 +91,7 @@ class AiDependencyTableTest {
         AiDependencyTable.Accumulator acc = new AiDependencyTable.Accumulator();
         acc.consume("com/codename1/ai/imagegen/StableDiffusion");
         assertTrue(acc.anyRequiresBigUpload(),
-                "On-device SD ships a 1-2 GB Core ML model — cloud builds must abort with a friendly message");
+                "On-device SD ships a 1-2 GB Core ML model -- cloud builds must abort with a friendly message");
     }
 
     @Test
@@ -101,7 +101,7 @@ class AiDependencyTableTest {
         acc.consume("com/codename1/ai/mlkit/barcode/BarcodeScanner");
         acc.consume("com/codename1/ai/whisper/WhisperRecognizer");
         assertFalse(acc.anyRequiresBigUpload(),
-                "ML Kit models stream lazily, Whisper bundles a small static lib — neither exceeds the 2 GB cap");
+                "ML Kit models stream lazily, Whisper bundles a small static lib -- neither exceeds the 2 GB cap");
     }
 
     @Test
@@ -132,7 +132,7 @@ class AiDependencyTableTest {
     @Test
     void accumulatorDeduplicates() {
         // Same class twice in the same scan shouldn't add the entry
-        // twice — otherwise we'd inject duplicate Gradle / pod
+        // twice -- otherwise we'd inject duplicate Gradle / pod
         // lines on the wire.
         AiDependencyTable.Accumulator acc = new AiDependencyTable.Accumulator();
         acc.consume("com/codename1/ai/mlkit/text/TextRecognizer");

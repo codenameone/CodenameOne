@@ -119,7 +119,7 @@ public class ChatBubble extends Container {
     /// text has been set; override to swap in a different child
     /// component.
     protected void renderBody() {
-        // Default: nothing to do — the wrapper already adds the
+        // Default: nothing to do -- the wrapper already adds the
         // TextArea in the constructor.
     }
 

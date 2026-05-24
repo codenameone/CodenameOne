@@ -39,7 +39,7 @@ class TokenizerTest {
     @Test
     void englishApproximatesOneTokenPerFourChars() {
         // The 4-chars-per-token rule of thumb. Aim for within 25%
-        // — we're not promising precision, just usefulness.
+        // -- we're not promising precision, just usefulness.
         String text = "This is a reasonably short sentence for token counting.";
         int estimate = Tokenizer.estimate(text);
         // Real cl100k_base BPE counts this at ~11 tokens. Our

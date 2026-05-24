@@ -35,7 +35,7 @@ class PromptTemplateTest {
 
     @Test
     void leavesUnknownPlaceholdersIntactForVisibility() {
-        // We deliberately don't silently drop {missing} — that
+        // We deliberately don't silently drop {missing} -- that
         // tends to hide bugs in production. Surface the gap by
         // leaving the marker visible in the output.
         assertEquals("Hello world from {city}",

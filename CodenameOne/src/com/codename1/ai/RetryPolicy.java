@@ -64,7 +64,7 @@ public final class RetryPolicy {
         return new RetryPolicy(4, 500L, 30000L, 2.0, true);
     }
 
-    /// No retries — failures are returned to the caller as-is.
+    /// No retries -- failures are returned to the caller as-is.
     public static RetryPolicy none() {
         return new RetryPolicy(1, 0L, 0L, 1.0, false);
     }

@@ -118,7 +118,7 @@ final class JsonHelper {
 
     /// Serializes a `Map`/`List`/`String`/`Number`/`Boolean`/`null`
     /// tree to JSON. Keys must be `String`s. Raw `String` values that
-    /// already contain JSON are NOT detected — wrap them in a marker
+    /// already contain JSON are NOT detected -- wrap them in a marker
     /// (see [RawJson]) to inline pre-built fragments like tool
     /// parameter schemas.
     static String serialize(Object o) {
@@ -169,7 +169,7 @@ final class JsonHelper {
                 Object v = m.get(kObj);
                 if (v == null) {
                     // Skip nulls so "don't send" fields don't appear
-                    // as `"field":null` on the wire — many providers
+                    // as `"field":null` on the wire -- many providers
                     // reject that.
                     continue;
                 }

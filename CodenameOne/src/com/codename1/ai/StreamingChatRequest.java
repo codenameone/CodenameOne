@@ -131,7 +131,7 @@ abstract class StreamingChatRequest extends ConnectionRequest {
 
     private void dispatchEvent(String payload) {
         if ("[DONE]".equals(payload)) {
-            // OpenAI / Ollama sentinel — the next call to finish()
+            // OpenAI / Ollama sentinel -- the next call to finish()
             // will assemble whatever the decoder accumulated.
             return;
         }

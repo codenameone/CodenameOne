@@ -82,7 +82,7 @@ public class ChatView extends Container {
         messages = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         messages.setUIID("ChatViewMessages");
         messages.setScrollableY(true);
-        typing = new Label("…");
+        typing = new Label("...");
         typing.setUIID("ChatTypingIndicator");
         typing.setVisible(false);
         input = new ChatInput();
@@ -204,7 +204,7 @@ public class ChatView extends Container {
 
                             public void onToolCallDelta(int index, String id, String name, String argumentsFragment) {
                                 // Default binding doesn't surface
-                                // tool calls — apps that use tools
+                                // tool calls -- apps that use tools
                                 // should wire up their own handler.
                             }
 
@@ -227,7 +227,7 @@ public class ChatView extends Container {
     private List<ChatMessage> buildOutgoingMessages(ChatRequest baseRequest) {
         // Prefer the live history (which now includes the just-added
         // user message). Fall back to whatever was in the base
-        // request if the view has nothing yet — useful when the
+        // request if the view has nothing yet -- useful when the
         // app pre-loads a system prompt via baseRequest.
         if (history.isEmpty()) {
             return baseRequest.getMessages();

@@ -53,7 +53,7 @@ class ChatRequestBuilderTest {
     @Test
     void rejectsEmptyMessageList() {
         // A request with no messages is meaningless and every
-        // provider rejects it with a 400 — fail fast on the client
+        // provider rejects it with a 400 -- fail fast on the client
         // instead so the user gets a stack trace pointing at the
         // builder rather than a network round-trip.
         assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {

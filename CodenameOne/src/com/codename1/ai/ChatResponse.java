@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 
 /// The terminal response from a chat call. For streaming requests, the
-/// `ChatResponse` carries the *aggregated* final assistant message —
+/// `ChatResponse` carries the *aggregated* final assistant message --
 /// the individual deltas were delivered through [StreamingListener]
 /// before this object was produced.
 ///
