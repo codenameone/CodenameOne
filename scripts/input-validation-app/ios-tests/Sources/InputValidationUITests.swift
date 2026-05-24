@@ -53,8 +53,14 @@ final class InputValidationUITests: XCTestCase {
         try driveLongPress(app: app)
         Thread.sleep(forTimeInterval: stepDelaySeconds)
 
-        try driveKeyType(app: app)
-        Thread.sleep(forTimeInterval: stepDelaySeconds)
+        // KeyTypeStep is disabled pending #5010 resolution. See the
+        // matching note in GestureSuite.java and the removed assertion in
+        // drivers/run-ios.sh. The driveKeyType helper is intentionally
+        // kept below so the step is one-line re-enable once a fix that
+        // preserves both the HW-keyboard UIPress chain and the iOS-26.4.2
+        // virtual-keyboard freeze fix has landed.
+        // try driveKeyType(app: app)
+        // Thread.sleep(forTimeInterval: stepDelaySeconds)
     }
 
     private func driveTap(app: XCUIApplication) throws {

@@ -538,7 +538,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
     }
-    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
+    // #5010 diagnostic: bounded one-line marker so device logs can correlate
+    // "edit session started" against the press / text-input traces.
+    CN1Log(@"[#5010] editStringAtImpl ENTRY isSingleLine=%d maxSize=%d constraint=%d initialLen=%d existingEditing=%p",
+           isSingleLine, maxSize, constraint, len, editingComponent);
     currentlyEditingMaxLength = maxSize;
     // Honored by the UITextView shouldChangeTextInRange: delegate (EAGLView/METALView) to
     // intercept Return on multi-line text areas when the iosReturnExitsEditing client
@@ -2703,19 +2706,25 @@ bool lockDrawing;
 // responder chain falls back to the existing UITextField editing path.
 //
 // While a native text editor is up (editingComponent != nil) we must not
-// consume any UIPress -- UIKit's text-input pipeline needs every press
-// (including printable characters, which cn1MapUIKeyToKeyCode returns as
-// their unicode codepoint) to reach the focused CN1UITextField /
-// CN1UITextView for insertion. The original implementation swallowed
-// every press that mapped to a non-zero CN1 keycode, which on iOS 13.4+
-// broke hardware-keyboard typing outright and on iOS 26.x devices, where
-// some on-screen keyboard interactions also surface as UIPress events,
-// broke virtual-keyboard typing too -- see #5010.
+// touch the press at all -- not even forward to [super pressesBegan:].
+// The CN1UITextField is the first responder and handles every printable
+// key via its own pressesBegan: / insertText: pipeline before the event
+// walks up to us. Forwarding to [super pressesBegan:] re-enters
+// UIViewController's default chain walk, which on iPhone / iOS 26.4.2
+// hangs the next inbound key delivery (the user sees a focused field
+// where typing does nothing and the rest of the app freezes -- see
+// #5010). Returning early keeps the override fully transparent while
+// editing and preserves HW-keyboard support (#3498) for non-editing
+// state. The keyboard NSLog calls are intentionally left in for #5010
+// diagnostics; volume is bounded because pressesBegan only fires on
+// physical key events.
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
     if (editingComponent != nil) {
-        [super pressesBegan:presses withEvent:event];
+        CN1Log(@"[#5010] pressesBegan SKIPPED while editing (count=%lu editingComponent=%p)",
+               (unsigned long)presses.count, editingComponent);
         return;
     }
+    CN1Log(@"[#5010] pressesBegan handling (count=%lu)", (unsigned long)presses.count);
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -2747,9 +2756,11 @@ bool lockDrawing;
 
 - (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
     if (editingComponent != nil) {
-        [super pressesEnded:presses withEvent:event];
+        CN1Log(@"[#5010] pressesEnded SKIPPED while editing (count=%lu editingComponent=%p)",
+               (unsigned long)presses.count, editingComponent);
         return;
     }
+    CN1Log(@"[#5010] pressesEnded handling (count=%lu)", (unsigned long)presses.count);
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -2781,9 +2792,11 @@ bool lockDrawing;
 
 - (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
     if (editingComponent != nil) {
-        [super pressesCancelled:presses withEvent:event];
+        CN1Log(@"[#5010] pressesCancelled SKIPPED while editing (count=%lu editingComponent=%p)",
+               (unsigned long)presses.count, editingComponent);
         return;
     }
+    CN1Log(@"[#5010] pressesCancelled handling (count=%lu)", (unsigned long)presses.count);
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
