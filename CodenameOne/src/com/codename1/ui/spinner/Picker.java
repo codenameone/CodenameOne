@@ -192,18 +192,33 @@ public class Picker extends Button {
 
     /// Listener fired when a custom popup button is pressed. Static (rather than an anonymous
     /// inner class) so it does not retain a reference to the enclosing `Picker`; the only
-    /// state it needs is the matching `LightweightPopupButton` whose `action` it invokes.
+    /// state it needs is the matching `LightweightPopupButton` whose `action` it invokes
+    /// and the spinner `Component` to refresh after the action runs. The spinner reference
+    /// is dropped along with the popup dialog so it does not outlive the editing session.
     private static final class PopupButtonActionListener implements ActionListener {
         private final LightweightPopupButton popupButton;
+        private final Container spinnerContainer;
 
-        private PopupButtonActionListener(LightweightPopupButton popupButton) {
+        private PopupButtonActionListener(LightweightPopupButton popupButton, Container spinnerContainer) {
             this.popupButton = popupButton;
+            this.spinnerContainer = spinnerContainer;
         }
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (popupButton.action != null) {
-                popupButton.action.run();
+            if (popupButton.action == null) {
+                return;
+            }
+            popupButton.action.run();
+            // Force a layout + repaint of the spinner so a setDate / setTime /
+            // setSelectedString / setDuration call inside the action propagates
+            // to the visible wheels. Spinner3D.setModel only flags the scroller
+            // as needing a new preferred size; on Android nothing else triggers
+            // the relayout, so the wheels stay stale until the user touches
+            // them. Issue #5019.
+            if (spinnerContainer != null) {
+                spinnerContainer.revalidate();
+                spinnerContainer.repaint();
             }
         }
     }
@@ -727,8 +742,9 @@ public class Picker extends Button {
                         .setBgTransparency(0)
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
-                Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet);
-                Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet);
+                final Container spinnerContainer = spinnerC instanceof Container ? (Container) spinnerC : null;
+                Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet, spinnerContainer);
+                Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet, spinnerContainer);
                 if (topCustomButtons != null || bottomCustomButtons != null) {
                     Container spinnerSection = new Container(new BorderLayout());
                     spinnerSection.add(BorderLayout.CENTER, wrapper);
@@ -824,7 +840,7 @@ public class Picker extends Button {
                     west.add(nextButton);
                 }
 
-                Container centerButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet);
+                Container centerButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BETWEEN_CANCEL_AND_DONE, isTablet, spinnerContainer);
                 Container buttonBar = BorderLayout.centerEastWest(centerButtons, doneButton, west);
                 buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
@@ -898,7 +914,7 @@ public class Picker extends Button {
         updateValue();
     }
 
-    private Container createLightweightPopupButtonRow(int placement, boolean isTablet) {
+    private Container createLightweightPopupButtonRow(int placement, boolean isTablet, Container spinnerContainer) {
         Container left = null;
         Container center = null;
         Container right = null;
@@ -907,7 +923,7 @@ public class Picker extends Button {
                 continue;
             }
             Button button = new Button(entry.text, isTablet ? "PickerButtonTablet" : "PickerButton");
-            button.addActionListener(new PopupButtonActionListener(entry));
+            button.addActionListener(new PopupButtonActionListener(entry, spinnerContainer));
             switch (entry.alignment) {
                 case Component.CENTER:
                     if (center == null) {
