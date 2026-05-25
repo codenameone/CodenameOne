@@ -339,7 +339,10 @@ if ("HTML5".equals(Display.getInstance().getPlatformName())) {
 }
 ----
 
-Include the bundled JS shim alongside the parparvm runtime in the host page:
+The JS shim that pairs with `JsRouterBootstrap` ships at
+`Ports/JavaScriptPort/src/main/webapp/cn1-router-history.js` and is served
+alongside the JavaScript port's `port.js`, `sw.js`, and friends. Include it
+in your host `index.html` after the parparvm runtime:
 
 [source,html]
 ----

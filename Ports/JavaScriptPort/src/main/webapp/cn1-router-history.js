@@ -24,7 +24,7 @@
  * cn1-router-history.js
  *
  * Browser-history bridge for the Codename One Router on the JavaScript port.
- * Pairs with com.codename1.router.web.JsRouterBootstrap.
+ * Pairs with com.codename1.router.JsRouterBootstrap.
  *
  * Usage: include this script in the HTML page that hosts the CN1 app, AFTER
  * the parparvm runtime. Ensure `window.cn1OutboxDispatch` (the CN1 outbox)
@@ -47,18 +47,6 @@
  */
 (function (global) {
   "use strict";
-
-  // The Codename One JavaScript port runs the translated bytecode inside a Web
-  // Worker, and its bundler imports every .js file that lands in the build
-  // output (including this one) via `importScripts`. The worker context has no
-  // `document` or page-level history API, so accessing them here would crash
-  // the worker before the app boots. Bail out cleanly when this shim is
-  // imported anywhere other than the main browser page.
-  if (typeof document === "undefined"
-      || typeof global.addEventListener !== "function"
-      || typeof global.history === "undefined") {
-    return;
-  }
 
   var CODE = 0x43524831; // "CRH1"
 

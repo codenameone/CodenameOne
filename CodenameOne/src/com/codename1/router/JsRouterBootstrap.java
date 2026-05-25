@@ -20,22 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.router.web;
+package com.codename1.router;
 
-import com.codename1.router.BrowserHistoryBridge;
-import com.codename1.router.Location;
-import com.codename1.router.LocationListener;
-import com.codename1.router.Router;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 
 /// Wires `Router` to the browser's `window.history` on the JavaScript port.
 ///
-/// Pair this class with the small JS shim `cn1-router-history.js` that ships
-/// alongside it. All messages between app and shim flow through CN1's
-/// `MessageEvent` mechanism using the integer code `#MESSAGE_CODE` and a
-/// message payload of the form `verb:path`:
+/// Pair this class with the JS shim that ships at
+/// `Ports/JavaScriptPort/src/main/webapp/cn1-router-history.js`; include it in
+/// the host page after `parparvm_runtime.js`. All messages between app and
+/// shim flow through CN1's `MessageEvent` mechanism using the integer code
+/// `#MESSAGE_CODE` and a message payload of the form `verb:path`:
 ///
 /// ```text
 ///   push:/path     // app -> shim: history.pushState(/path)
