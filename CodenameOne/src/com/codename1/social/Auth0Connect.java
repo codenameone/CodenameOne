@@ -119,7 +119,7 @@ public final class Auth0Connect extends Login {
     /// Requires the Auth0 tenant to have *Passkeys* enabled and the
     /// application to have the *WebAuthn* grant type allowed. The user must
     /// already have at least one passkey enrolled (use the standard `signIn`
-    /// flow first and have the user enrol via Auth0's hosted page, or call
+    /// flow first and have the user enroll via Auth0's hosted page, or call
     /// [#registerPasskey(String, String, String, String, String...)] for a
     /// new account).
     ///
@@ -163,7 +163,7 @@ public final class Auth0Connect extends Login {
         return out;
     }
 
-    /// Enrols a brand-new passkey credential for the given Auth0 user. The
+    /// Enrolls a brand-new passkey credential for the given Auth0 user. The
     /// account is created on first registration (if the connection allows
     /// signup), or attached to an existing passwordless account by email.
     ///

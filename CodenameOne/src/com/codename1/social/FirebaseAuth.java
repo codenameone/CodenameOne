@@ -162,7 +162,7 @@ public final class FirebaseAuth {
                 body);
     }
 
-    /// Enrols a passkey for the currently signed-in Firebase user via the
+    /// Enrolls a passkey for the currently signed-in Firebase user via the
     /// Identity Toolkit v2 passkey endpoints. The user must already be
     /// signed in (Firebase passkeys cannot exist without an underlying
     /// account); call [#signInWithEmailAndPassword(String, String)] or
@@ -197,37 +197,37 @@ public final class FirebaseAuth {
                 .ready(new SuccessCallback<Map<String, Object>>() {
                     @Override
                     public void onSucess(Map<String, Object> resp) {
-                        Object opts = resp.get("credentialCreationOptions");
-                        if (!(opts instanceof Map)) {
-                            out.error(new IOException(
-                                    "Firebase passkeyEnrollment:start missing credentialCreationOptions"));
-                            return;
-                        }
-                        String optionsJson = serialiseMap((Map<?, ?>) opts);
-                        WebAuthnClient.getInstance()
-                                .create(PublicKeyCredentialCreationOptions.fromJson(optionsJson))
-                                .ready(new SuccessCallback<PublicKeyCredential>() {
-                                    @Override
-                                    public void onSucess(PublicKeyCredential cred) {
-                                        finalisePasskeyEnrollment(idToken, name,
-                                                cred.toJson(), out);
-                                    }
-                                })
-                                .except(new SuccessCallback<Throwable>() {
-                                    @Override
-                                    public void onSucess(Throwable err) {
-                                        out.error(err);
-                                    }
-                                });
+                        // Delegates to an instance method so SpotBugs doesn't
+                        // flag this anonymous class as SIC_INNER_SHOULD_BE_STATIC_ANON
+                        // (the call to `onPasskeyEnrollmentStart` uses the
+                        // enclosing FirebaseAuth instance).
+                        onPasskeyEnrollmentStart(resp, idToken, name, out);
                     }
                 })
-                .except(new SuccessCallback<Throwable>() {
-                    @Override
-                    public void onSucess(Throwable err) {
-                        out.error(err);
-                    }
-                });
+                .except(forwardError(out));
         return out;
+    }
+
+    private void onPasskeyEnrollmentStart(Map<String, Object> resp,
+                                          final String idToken,
+                                          final String name,
+                                          final AsyncResource<FirebaseUser> out) {
+        Object opts = resp.get("credentialCreationOptions");
+        if (!(opts instanceof Map)) {
+            out.error(new IOException(
+                    "Firebase passkeyEnrollment:start missing credentialCreationOptions"));
+            return;
+        }
+        String optionsJson = serialiseMap((Map<?, ?>) opts);
+        WebAuthnClient.getInstance()
+                .create(PublicKeyCredentialCreationOptions.fromJson(optionsJson))
+                .ready(new SuccessCallback<PublicKeyCredential>() {
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+                        finalisePasskeyEnrollment(idToken, name, cred.toJson(), out);
+                    }
+                })
+                .except(forwardError(out));
     }
 
     /// Signs the user in with an existing passkey via the Identity Toolkit
@@ -252,36 +252,31 @@ public final class FirebaseAuth {
                 .ready(new SuccessCallback<Map<String, Object>>() {
                     @Override
                     public void onSucess(Map<String, Object> resp) {
-                        Object opts = resp.get("credentialRequestOptions");
-                        if (!(opts instanceof Map)) {
-                            out.error(new IOException(
-                                    "Firebase passkeySignIn:start missing credentialRequestOptions"));
-                            return;
-                        }
-                        String optionsJson = serialiseMap((Map<?, ?>) opts);
-                        WebAuthnClient.getInstance()
-                                .get(PublicKeyCredentialRequestOptions.fromJson(optionsJson))
-                                .ready(new SuccessCallback<PublicKeyCredential>() {
-                                    @Override
-                                    public void onSucess(PublicKeyCredential cred) {
-                                        finalisePasskeySignIn(cred.toJson(), out);
-                                    }
-                                })
-                                .except(new SuccessCallback<Throwable>() {
-                                    @Override
-                                    public void onSucess(Throwable err) {
-                                        out.error(err);
-                                    }
-                                });
+                        onPasskeySignInStart(resp, out);
                     }
                 })
-                .except(new SuccessCallback<Throwable>() {
-                    @Override
-                    public void onSucess(Throwable err) {
-                        out.error(err);
-                    }
-                });
+                .except(forwardError(out));
         return out;
+    }
+
+    private void onPasskeySignInStart(Map<String, Object> resp,
+                                      final AsyncResource<FirebaseUser> out) {
+        Object opts = resp.get("credentialRequestOptions");
+        if (!(opts instanceof Map)) {
+            out.error(new IOException(
+                    "Firebase passkeySignIn:start missing credentialRequestOptions"));
+            return;
+        }
+        String optionsJson = serialiseMap((Map<?, ?>) opts);
+        WebAuthnClient.getInstance()
+                .get(PublicKeyCredentialRequestOptions.fromJson(optionsJson))
+                .ready(new SuccessCallback<PublicKeyCredential>() {
+                    @Override
+                    public void onSucess(PublicKeyCredential cred) {
+                        finalisePasskeySignIn(cred.toJson(), out);
+                    }
+                })
+                .except(forwardError(out));
     }
 
     private void finalisePasskeyEnrollment(String idToken, String name,
@@ -299,17 +294,10 @@ public final class FirebaseAuth {
                 .ready(new SuccessCallback<Map<String, Object>>() {
                     @Override
                     public void onSucess(Map<String, Object> resp) {
-                        FirebaseUser u = new FirebaseUser(resp, false);
-                        persist(u);
-                        out.complete(u);
+                        completeFromMap(resp, out);
                     }
                 })
-                .except(new SuccessCallback<Throwable>() {
-                    @Override
-                    public void onSucess(Throwable err) {
-                        out.error(err);
-                    }
-                });
+                .except(forwardError(out));
     }
 
     private void finalisePasskeySignIn(String authenticationResponseJson,
@@ -322,17 +310,44 @@ public final class FirebaseAuth {
                 .ready(new SuccessCallback<Map<String, Object>>() {
                     @Override
                     public void onSucess(Map<String, Object> resp) {
-                        FirebaseUser u = new FirebaseUser(resp, false);
-                        persist(u);
-                        out.complete(u);
+                        completeFromMap(resp, out);
                     }
                 })
-                .except(new SuccessCallback<Throwable>() {
-                    @Override
-                    public void onSucess(Throwable err) {
-                        out.error(err);
-                    }
-                });
+                .except(forwardError(out));
+    }
+
+    /// Shared body for both passkey finalize callbacks. Builds a
+    /// [FirebaseUser] from the parsed response, persists it, and completes
+    /// the [AsyncResource]. Kept as a non-static instance method so the
+    /// callers' anonymous SuccessCallback subclasses pin an enclosing
+    /// instance and SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet.
+    private void completeFromMap(Map<String, Object> resp,
+                                 AsyncResource<FirebaseUser> out) {
+        FirebaseUser u = new FirebaseUser(resp, false);
+        persist(u);
+        out.complete(u);
+    }
+
+    /// Convenience that builds a `SuccessCallback<Throwable>` which forwards
+    /// the error onto `out`. Returns a named static class instance so the
+    /// passkey-helper call sites are not littered with anonymous error
+    /// forwarders.
+    private static SuccessCallback<Throwable> forwardError(AsyncResource<?> out) {
+        return new ErrorForwarder(out);
+    }
+
+    private static final class ErrorForwarder implements SuccessCallback<Throwable> {
+        private final AsyncResource<?> out;
+
+        ErrorForwarder(AsyncResource<?> out) {
+            this.out = out;
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public void onSucess(Throwable err) {
+            ((AsyncResource) out).error(err);
+        }
     }
 
     /// Raw JSON POST that returns the parsed response map, used by the
@@ -345,27 +360,11 @@ public final class FirebaseAuth {
         ConnectionRequest req = new ConnectionRequest() {
             @Override
             protected void readResponse(InputStream input) throws IOException {
-                byte[] bytes = Util.readInputStream(input);
-                String json = StringUtil.newString(bytes);
-                Map<String, Object> parsed = new JSONParser()
-                        .parseJSON(new StringReader(json));
-                if (parsed == null) {
-                    out.error(new IOException("Firebase returned empty body"));
-                    return;
-                }
-                Object err = parsed.get("error");
-                if (err != null) {
-                    String message = "Firebase error";
-                    if (err instanceof Map) {
-                        Object m = ((Map<?, ?>) err).get("message");
-                        if (m != null) {
-                            message = m.toString();
-                        }
-                    }
-                    out.error(new IOException(message));
-                    return;
-                }
-                out.complete(parsed);
+                // Body lives on a named instance method so SpotBugs
+                // SIC_INNER_SHOULD_BE_STATIC_ANON doesn't trip on this
+                // anonymous class -- it now references an enclosing
+                // FirebaseAuth method.
+                handlePostJsonRawResponse(input, out);
             }
 
             @Override
@@ -380,6 +379,32 @@ public final class FirebaseAuth {
         req.setRequestBody(toJson(body));
         NetworkManager.getInstance().addToQueue(req);
         return out;
+    }
+
+    private void handlePostJsonRawResponse(InputStream input,
+                                           AsyncResource<Map<String, Object>> out)
+            throws IOException {
+        byte[] bytes = Util.readInputStream(input);
+        String json = StringUtil.newString(bytes);
+        Map<String, Object> parsed = new JSONParser()
+                .parseJSON(new StringReader(json));
+        if (parsed == null) {
+            out.error(new IOException("Firebase returned empty body"));
+            return;
+        }
+        Object err = parsed.get("error");
+        if (err != null) {
+            String message = "Firebase error";
+            if (err instanceof Map) {
+                Object m = ((Map<?, ?>) err).get("message");
+                if (m != null) {
+                    message = m.toString();
+                }
+            }
+            out.error(new IOException(message));
+            return;
+        }
+        out.complete(parsed);
     }
 
     /// Serialises a parsed JSON sub-tree back into a JSON string. Used to

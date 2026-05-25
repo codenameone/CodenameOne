@@ -301,7 +301,7 @@ Codename One ships a portable WebAuthn client at `com.codename1.io.webauthn.WebA
 
 ==== When you actually need this class
 
-If you sign users in via `OidcClient` against Google, Apple, Microsoft Entra ID, Auth0 or Firebase, the *identity provider already supports passkeys*. The user's web browser at the IdP shows the passkey sheet, and OIDC just hands you the resulting ID / access tokens. You don't have to call `WebAuthnClient` at all -- everything in the rest of this chapter that signs users in via `OidcClient` already gets passkeys for free.
+If you sign users in via `OidcClient` against Google, Apple, Microsoft Entra ID, Auth0 or Firebase, the *identity provider already supports passkeys*. The user's web browser at the IdP shows the passkey sheet, and OIDC just hands you the resulting ID / access tokens. You don't have to call `WebAuthnClient` at all -- everything in the rest of this chapter that signs users in via `OidcClient` already gets passkey-backed sign-in transparently, with no additional code on your side.
 
 Reach for `WebAuthnClient` when:
 
@@ -322,7 +322,7 @@ import com.codename1.io.webauthn.WebAuthnClient;
 import com.codename1.io.webauthn.WebAuthnException;
 import com.codename1.util.SuccessCallback;
 
-// Registration -- enrol a new passkey
+// Registration -- enroll a new passkey
 String challengeJson = myServer.startPasskeyRegistration(currentUserId); // PublicKeyCredentialCreationOptionsJSON
 PublicKeyCredentialCreationOptions opts =
         PublicKeyCredentialCreationOptions.fromJson(challengeJson);
@@ -371,10 +371,10 @@ Do *not* try to verify the attestation or assertion on the device. The relying-p
 | Platform | Notes
 
 | iOS
-| iOS 16+. The `AuthenticationServices.framework` library is auto-linked when your app references `com.codename1.io.webauthn.*`. Add an *Associated Domains* entitlement with `webcredentials:<rp.id>` and host an `apple-app-site-association` file at `https://<rp.id>/.well-known/apple-app-site-association` describing your bundle's `webcredentials` app IDs.
+| iOS 16+. The `AuthenticationServices.framework` library is linked automatically when your app references `com.codename1.io.webauthn.*`. Add an *Associated Domains* entitlement with `webcredentials:<rp.id>` and host an `apple-app-site-association` file at `https://<rp.id>/.well-known/apple-app-site-association` describing your bundle's `webcredentials` app IDs.
 
 | Android
-| API 28+ via `androidx.credentials:credentials` (auto-injected; override version with build hint `android.credentialsVersion=1.x.y`). Publish a Digital Asset Links file at `https://<rp.id>/.well-known/assetlinks.json` declaring your app's SHA-256 certificate fingerprint.
+| API 28+ via `androidx.credentials:credentials` (added to your Gradle build automatically; override the version with build hint `android.credentialsVersion=1.x.y`). Publish a Digital Asset Links file at `https://<rp.id>/.well-known/assetlinks.json` declaring your app's SHA-256 certificate fingerprint.
 
 | JavaSE / desktop, Web port
 | `WebAuthnClient.isSupported()` returns `false`. Calls fail with `WebAuthnException.NOT_IMPLEMENTED`. Use this to gate the UI -- present a fallback (password sign-in, email magic link) when passkeys are unavailable.
@@ -388,7 +388,7 @@ iOS:
 ios.entitlements.com.apple.developer.associated-domains=<array>\n  <string>webcredentials:example.com</string>\n</array>
 ----
 
-Android: nothing beyond the auto-injected dependency. The asset-links file lives on your server -- the build does not touch it.
+Android: nothing beyond the dependency that gets injected automatically. The asset-links file lives on your server; the build doesn't touch it.
 
 [[auth0-passkeys]]
 ==== Auth0 passkeys
@@ -410,7 +410,7 @@ Auth0Connect.getInstance()
         }
     });
 
-// Enrol a brand-new passkey for a new account
+// Enroll a brand-new passkey for a new account
 Auth0Connect.getInstance()
     .withDomain("dev-xyz.us.auth0.com")
     .registerPasskey(
@@ -426,12 +426,12 @@ Auth0Connect.getInstance()
     });
 ----
 
-Enable *Passkeys* in the Auth0 dashboard (Authentication -&gt; Database -&gt; your connection -&gt; Authentication Methods -&gt; Passkey), and add *WebAuthn* to the application's *Grant Types*.
+Enable *Passkeys* in the Auth0 dashboard (Authentication &#8594; Database &#8594; your connection &#8594; Authentication Methods &#8594; Passkey), and add *WebAuthn* to the application's *Grant Types*.
 
 [[firebase-passkeys]]
 ==== Firebase passkeys
 
-`FirebaseAuth` exposes `registerPasskey` (enrol a passkey for the signed-in user) and `signInWithPasskey` (sign in with an existing passkey). Both use Firebase Identity Platform's v2 passkey REST endpoints (`accounts/passkeyEnrollment:start|finalize`, `accounts/passkeySignIn:start|finalize`).
+`FirebaseAuth` exposes `registerPasskey` (enroll a passkey for the signed-in user) and `signInWithPasskey` (sign in with an existing passkey). Both use Firebase Identity Platform's v2 passkey REST endpoints (`accounts/passkeyEnrollment:start|finalize`, `accounts/passkeySignIn:start|finalize`).
 
 [source,java]
 ----
@@ -445,7 +445,7 @@ fa.signInWithPasskey().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
     }
 });
 
-// Enrol a new passkey for the currently signed-in user
+// Enroll a new passkey for the currently signed-in user
 fa.signInWithEmailAndPassword(email, password)
     .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
         public void onSucess(FirebaseAuth.FirebaseUser u) {
@@ -459,7 +459,7 @@ fa.signInWithEmailAndPassword(email, password)
     });
 ----
 
-Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgraded plan). The free Firebase Auth tier does not expose the passkey endpoints; the calls will fail with an HTTP 403. Check your project plan in the Firebase console under Build -&gt; Authentication -&gt; Settings -&gt; User account linking.
+Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgraded plan). The free Firebase Auth tier doesn't expose the passkey endpoints; the calls will fail with an HTTP 403. Check your project plan in the Firebase console under Build &#8594; Authentication &#8594; Settings &#8594; User account linking.
 
 ==== Mapping WebAuthn errors
 
@@ -477,8 +477,8 @@ Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgr
 | `ConstraintError`  | A constraint (resident key, user verification) couldn't be satisfied.
 | `not_supported`    | The platform has no native WebAuthn implementation at all. Caller should fall back to password sign-in.
 | `transport_error`  | Network failure while POSTing to your relying-party server.
-| `invalid_options`  | The options JSON received from the relying party could not be parsed.
-| `invalid_response` | The response returned by the authenticator could not be parsed.
+| `invalid_options`  | The options JSON received from the relying party couldn't be parsed.
+| `invalid_response` | The response returned by the authenticator couldn't be parsed.
 |===
 
 [[migrating-from-oauth2]]
