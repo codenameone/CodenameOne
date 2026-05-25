@@ -120,9 +120,12 @@ public final class Navigation {
         if (entry == null) {
             return false;
         }
+        // NavigationEntry doesn't override equals, so entry.equals(other) is
+        // reference equality -- which is what we want here. Two navigations to
+        // the same path are independent stack frames.
         int idx = -1;
         for (int i = 0; i < stack.size(); i++) {
-            if (stack.get(i) == entry) {
+            if (entry.equals(stack.get(i))) {
                 idx = i;
                 break;
             }

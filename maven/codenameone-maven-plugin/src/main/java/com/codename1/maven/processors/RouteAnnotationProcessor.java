@@ -40,8 +40,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -263,7 +263,7 @@ public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor 
         // Emit branches most-specific first so a literal route wins over a
         // catch-all that also matches.
         List<Entry> ordered = new ArrayList<Entry>(routes);
-        java.util.Collections.sort(ordered, new java.util.Comparator<Entry>() {
+        Collections.sort(ordered, new Comparator<Entry>() {
             @Override
             public int compare(Entry a, Entry b) {
                 int diff = specificity(b.pattern) - specificity(a.pattern);
@@ -285,12 +285,6 @@ public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor 
 
     private static void emitRouteBranch(StringBuilder sb, Entry e) {
         String[] segs = patternSegments(e.pattern);
-        int literalCount = 0;
-        for (String s : segs) {
-            if (!s.startsWith(":") && !"*".equals(s) && !"**".equals(s)) {
-                literalCount++;
-            }
-        }
         boolean catchAll = segs.length > 0 && "**".equals(segs[segs.length - 1]);
         sb.append("        // ").append(e.pattern).append(" -> ").append(e.targetDescription()).append('\n');
         // Length check
