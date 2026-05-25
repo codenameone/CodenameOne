@@ -3,6 +3,7 @@ package com.codename1.svg;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
+import com.codename1.util.MathUtil;
 
 /// Base class for SVG images emitted by the build-time transcoder.
 ///
@@ -378,7 +379,8 @@ public abstract class GeneratedSVGImage extends Image {
         if (cos > 1.0) {
             cos = 1.0;
         }
-        double a = Math.acos(cos);
+        // CLDC's java.lang.Math has no acos; use the CN1 helper which works on every port.
+        double a = MathUtil.acos(cos);
         if ((ux * vy - uy * vx) < 0.0) {
             a = -a;
         }
