@@ -542,6 +542,13 @@ public final class IOSNative {
     public native boolean appleSignInIsLoggedIn();
     public native void appleSignInSignOut();
 
+    // WebAuthn / passkeys --
+    // ASAuthorizationPlatformPublicKeyCredentialProvider (iOS 16+).
+    // See nativeSources/CN1WebAuthn.m for the Obj-C side.
+    public native boolean webauthnSupported();
+    public native String webauthnCreate(String optionsJson);
+    public native String webauthnGet(String optionsJson);
+
 
     
     public native boolean isAsyncEditMode();

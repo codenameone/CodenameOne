@@ -504,3 +504,12 @@ pidof
 Keycloak
 Cognito
 Authentik
+
+# WebAuthn / passkey terminology used in the Authentication & Identity chapter.
+# IdP is the standard W3C abbreviation for "identity provider"; the
+# server-library names below appear verbatim in the recommended-libraries
+# table.
+IdP
+webauthn
+[Pp]asskey
+[Pp]asskeys
