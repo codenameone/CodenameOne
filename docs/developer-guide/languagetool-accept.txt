@@ -491,6 +491,11 @@ jdb
 loopback
 rethrow
 rethrows
+rethrown
+Throwable
+Throwables
+javase
+Xvfb
 
 # -----------------------------------------------------------------------------
 # Android tooling — names from the Android SDK / platform-tools that the
