@@ -118,12 +118,11 @@ public class Resources {
     private static boolean runtimeMultiImages;
     private static boolean failOnMissingTruetype = true;
 
-    /// Global image registry populated by the build-time SVG transcoder. Keyed by
-    /// the source filename ("home.svg") and also under the filename stem ("home")
-    /// so CSS-style `url(home.svg)` references and direct `getImage("home")` calls
-    /// both resolve. Lazily probed via [#ensureGeneratedSVGsInstalled].
+    /// Global image registry populated by the build-time SVG transcoder. Keyed
+    /// by the source filename ("home.svg") and also under the filename stem
+    /// ("home") so CSS-style `url(home.svg)` references and direct
+    /// `getImage("home")` calls both resolve to the same instance.
     private static final Map<String, Image> generatedImages = new HashMap<String, Image>();
-    private static volatile boolean generatedSVGProbed;
     /// Hashtable containing the mapping between element types and their names in the
     /// resource hashtable
     private final HashMap<String, Byte> resourceTypes = new HashMap<String, Byte>();
@@ -889,7 +888,6 @@ public class Resources {
     public Image getImage(String id) {
         Image local = (Image) resources.get(id);
         if (local != null) return local;
-        ensureGeneratedSVGsInstalled();
         Image gen;
         synchronized (generatedImages) {
             gen = generatedImages.get(id);
@@ -917,32 +915,25 @@ public class Resources {
     /// `.svg`) under the bare filename stem so a CSS reference like
     /// `url(home.svg)` and a code reference like `getImage("home")` both
     /// resolve to the same instance.
+    ///
+    /// To wire up the generated SVGs in a Codename One app, invoke the
+    /// generated registry once during startup — typically right after the
+    /// theme is loaded:
+    /// ```
+    /// com.codename1.generated.svg.SVGRegistry.install(theme);
+    /// ```
+    /// This call also populates the global registry so any other
+    /// [Resources] instance opened later will resolve the same SVGs by name.
+    /// The two-step (explicit install + global fallback) design is what lets
+    /// the transcoder coexist with ParparVM's static-reachability analysis on
+    /// iOS, which cannot tolerate the reflective probe a fully transparent
+    /// hook would require.
     public static void registerGeneratedImage(String id, Image image) {
         if (id == null || image == null) return;
         synchronized (generatedImages) {
             generatedImages.put(id, image);
             if (id.endsWith(".svg")) {
                 generatedImages.put(id.substring(0, id.length() - 4), image);
-            }
-        }
-    }
-
-    /// Lazily probe for `com.codename1.generated.svg.SVGRegistry` and ask it
-    /// to populate the global registry. If the application has no transcoded
-    /// SVGs, the class will not exist and the probe is silently skipped.
-    /// Marked package-private so {@link com.codename1.svg} tests can re-probe.
-    static void ensureGeneratedSVGsInstalled() {
-        if (generatedSVGProbed) return;
-        synchronized (generatedImages) {
-            if (generatedSVGProbed) return;
-            generatedSVGProbed = true;
-            try {
-                Class<?> registry = Class.forName("com.codename1.generated.svg.SVGRegistry");
-                registry.getMethod("installGlobal").invoke(null);
-            } catch (ClassNotFoundException notPresent) {
-                // No SVGs — nothing to install.
-            } catch (Throwable t) {
-                Log.e(t);
             }
         }
     }
