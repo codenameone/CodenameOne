@@ -3135,6 +3135,8 @@ function cn1_ivResolve(target, mid) {
               ? proto.constructor.name : 'unknown';
             vmDiag('NULL_RECEIVER', 'isLiteral', isLiteral ? 'yes' : 'no');
             vmDiag('NULL_RECEIVER', 'protoName', String(protoName));
+            vmDiag('NULL_RECEIVER', 'typeof', typeof target);
+            vmDiag('NULL_RECEIVER', 'value', String(target).substring(0, 60));
           } catch (_e) {}
           // Stack trace at call site -- gives us the cn1_iv* caller and
           // therefore the translated method that's passing {} as receiver.
