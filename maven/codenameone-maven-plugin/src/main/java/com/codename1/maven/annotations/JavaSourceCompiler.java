@@ -89,10 +89,9 @@ public final class JavaSourceCompiler {
             if (loader instanceof java.net.URLClassLoader) {
                 for (java.net.URL u : ((java.net.URLClassLoader) loader).getURLs()) {
                     if ("file".equals(u.getProtocol())) {
-                        try {
-                            cp.add(new File(u.toURI()));
-                        } catch (Exception ignored) {
-                            // best-effort
+                        File f = urlToFile(u);
+                        if (f != null) {
+                            cp.add(f);
                         }
                     }
                 }
@@ -120,6 +119,19 @@ public final class JavaSourceCompiler {
             }
         } finally {
             fm.close();
+        }
+    }
+
+    /// Convert a `file:` URL to a `File`. Returns null when the URL can't be
+    /// turned into a path (non-hierarchical URI, opaque URL, etc.) so callers
+    /// can simply skip the entry instead of failing the build.
+    private static File urlToFile(java.net.URL u) {
+        try {
+            return new File(u.toURI());
+        } catch (java.net.URISyntaxException e) {
+            return null;
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
