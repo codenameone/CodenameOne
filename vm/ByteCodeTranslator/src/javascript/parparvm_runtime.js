@@ -3184,9 +3184,16 @@ function cn1_ivResolve(target, mid) {
     // The guard is opt-in by method name so we only mask known-safe
     // canvas void ops; any other receiver-null path still routes through
     // the normal resolveVirtual error.
-    if (target && target.__class == null && !target.__jsValue
+    // Defensive recovery extended: also handle Number receivers. The
+    // canvasContextWipe diag (NULL_RECEIVER value=667 typeof=number)
+    // revealed the receiver is sometimes a JS Number (the viewport
+    // height), not a literal {}. Need to no-op Canvas2D methods on
+    // these too -- otherwise cn1_iv* falls through to resolveVirtual
+    // which spins on VIRTUAL_FAIL.
+    if (typeof target === 'number'
+        || (target && target.__class == null && !target.__jsValue
             && target.__cn1HostRef == null
-            && Object.getOwnPropertyNames(target).length === 0) {
+            && Object.getOwnPropertyNames(target).length === 0)) {
       const canvasVoidMethods = {
         cn1_s_save: 1, cn1_s_restore: 1, cn1_s_beginPath: 1,
         cn1_s_closePath: 1, cn1_s_stroke: 1, cn1_s_fill: 1,
