@@ -46,13 +46,13 @@ public class PathDataParserTest {
     public void horizontalVerticalLines() {
         List<PathCommand> cmds = PathDataParser.parse("M 0 0 H 50 V 60 h 10 v 10");
         assertEquals(5, cmds.size());
-        // H 50 → LINE (50, 0)
+        // H 50 -> LINE (50, 0)
         assertArrayEquals(new float[]{50f, 0f}, cmds.get(1).getArgs(), 0f);
-        // V 60 → LINE (50, 60)
+        // V 60 -> LINE (50, 60)
         assertArrayEquals(new float[]{50f, 60f}, cmds.get(2).getArgs(), 0f);
-        // h 10 → LINE (60, 60)
+        // h 10 -> LINE (60, 60)
         assertArrayEquals(new float[]{60f, 60f}, cmds.get(3).getArgs(), 0f);
-        // v 10 → LINE (60, 70)
+        // v 10 -> LINE (60, 70)
         assertArrayEquals(new float[]{60f, 70f}, cmds.get(4).getArgs(), 0f);
     }
 

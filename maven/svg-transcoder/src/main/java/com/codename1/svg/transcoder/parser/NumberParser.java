@@ -44,7 +44,7 @@ public final class NumberParser {
         return Float.parseFloat(tok);
     }
 
-    /** Read a binary flag (0 or 1) — used by SVG arc commands. */
+    /** Read a binary flag (0 or 1) -- used by SVG arc commands. */
     public int nextFlag() {
         skipWsAndCommas();
         if (pos >= s.length()) {

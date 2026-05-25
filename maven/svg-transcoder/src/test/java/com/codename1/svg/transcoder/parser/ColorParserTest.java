@@ -18,7 +18,7 @@ public class ColorParserTest {
 
     @Test
     public void hex8WithAlpha() {
-        // SVG-style #RRGGBBAA — alpha is last
+        // SVG-style #RRGGBBAA -- alpha is last
         int v = ColorParser.parse("#11223380");
         assertEquals(0x80, (v >>> 24) & 0xFF);
         assertEquals(0x11, (v >>> 16) & 0xFF);

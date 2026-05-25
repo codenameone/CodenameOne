@@ -178,7 +178,7 @@ public abstract class GeneratedSVGImage extends Image {
     }
 
     // ---------------------------------------------------------------------
-    // SMIL helpers — referenced by generated code; keep signatures stable.
+    // SMIL helpers -- referenced by generated code; keep signatures stable.
     // ---------------------------------------------------------------------
 
     /// Compute the active progress through an animation cycle, in the range
@@ -264,7 +264,7 @@ public abstract class GeneratedSVGImage extends Image {
     /// endpoint parameterization defined by the SVG 1.1 spec (appendix F.6).
     /// The current point of `p` is treated as the arc's start; on return the
     /// current point is the end of the arc. Decomposes into up to four
-    /// cubic Beziers — a single quadrant per Bezier — for accuracy.
+    /// cubic Beziers -- a single quadrant per Bezier -- for accuracy.
     public static void svgArc(com.codename1.ui.geom.GeneralPath p,
                               float x1, float y1,
                               float rx, float ry,
@@ -281,13 +281,13 @@ public abstract class GeneratedSVGImage extends Image {
         double cosPhi = Math.cos(phi);
         double sinPhi = Math.sin(phi);
 
-        // F.6.5.1 — compute (x1', y1')
+        // F.6.5.1 -- compute (x1', y1')
         double dx2 = (x1 - x2) / 2.0;
         double dy2 = (y1 - y2) / 2.0;
         double x1p =  cosPhi * dx2 + sinPhi * dy2;
         double y1p = -sinPhi * dx2 + cosPhi * dy2;
 
-        // F.6.6.2 — ensure radii are large enough
+        // F.6.6.2 -- ensure radii are large enough
         double rx2 = arx * arx;
         double ry2 = ary * ary;
         double x1p2 = x1p * x1p;
@@ -301,7 +301,7 @@ public abstract class GeneratedSVGImage extends Image {
             ry2 = ary * ary;
         }
 
-        // F.6.5.2 — compute (cx', cy')
+        // F.6.5.2 -- compute (cx', cy')
         double sign = (largeArc == sweep) ? -1.0 : 1.0;
         double sq = (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / (rx2 * y1p2 + ry2 * x1p2);
         if (sq < 0.0) {
@@ -311,13 +311,13 @@ public abstract class GeneratedSVGImage extends Image {
         double cxp = coef * (arx * y1p / ary);
         double cyp = coef * -(ary * x1p / arx);
 
-        // F.6.5.3 — compute (cx, cy)
+        // F.6.5.3 -- compute (cx, cy)
         double sx2 = (x1 + x2) / 2.0;
         double sy2 = (y1 + y2) / 2.0;
         double cx = sx2 + (cosPhi * cxp - sinPhi * cyp);
         double cy = sy2 + (sinPhi * cxp + cosPhi * cyp);
 
-        // F.6.5.4 — start angle and sweep
+        // F.6.5.4 -- start angle and sweep
         double ux = (x1p - cxp) / arx;
         double uy = (y1p - cyp) / ary;
         double vx = (-x1p - cxp) / arx;

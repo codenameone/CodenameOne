@@ -15,8 +15,8 @@ import java.util.Locale;
  * node become inline calls to the animation helpers on the runtime base
  * class so the emitted code stays self-contained.
  *
- * <p>The generator is intentionally direct — one shape per inline block,
- * no method extraction — both to keep the emitted code readable and to
+ * <p>The generator is intentionally direct -- one shape per inline block,
+ * no method extraction -- both to keep the emitted code readable and to
  * avoid surprising the bytecode translator with large method counts.</p>
  */
 public final class JavaCodeGenerator {
@@ -70,7 +70,7 @@ public final class JavaCodeGenerator {
     }
 
     private void emitPaintBody(SVGGroup root) {
-        // Shared scratch slots — reassigned per shape; not redeclared inside
+        // Shared scratch slots -- reassigned per shape; not redeclared inside
         // nested blocks since Java forbids local-variable shadowing.
         line("GeneralPath __p = null;");
         line("Stroke __s = null;");
@@ -384,7 +384,7 @@ public final class JavaCodeGenerator {
                     + "MultipleGradientPaint.ColorSpaceType.SRGB, "
                     + "Transform.makeIdentity()));");
         } else {
-            // objectBoundingBox — map [0..1] to path bounds
+            // objectBoundingBox -- map [0..1] to path bounds
             line("{");
             indent++;
             line("float[] __b = new float[4];");

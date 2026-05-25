@@ -7,7 +7,7 @@ import java.util.Map;
  * Parses CSS-style color values used by SVG: #RGB, #RRGGBB, rgb(r,g,b),
  * rgba(r,g,b,a), or one of the named CSS colors. Returns an ARGB int.
  *
- * "none" and "currentColor" do not return a color — callers must check for
+ * "none" and "currentColor" do not return a color -- callers must check for
  * them up front via {@link #isNone(String)} and {@link #isCurrentColor(String)}.
  */
 public final class ColorParser {

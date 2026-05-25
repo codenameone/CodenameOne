@@ -1,6 +1,6 @@
 package com.codename1.svg.transcoder.model;
 
-/** &lt;polyline&gt; — an open polyline. */
+/** &lt;polyline&gt; -- an open polyline. */
 public class SVGPolyline extends SVGShape {
     private float[] points = new float[0];
 

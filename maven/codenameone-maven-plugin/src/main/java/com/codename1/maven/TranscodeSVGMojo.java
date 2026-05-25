@@ -33,7 +33,7 @@ import java.util.Set;
  * sources directory is automatically added to the project's compile source roots
  * so the resulting Java classes participate in the normal compilation pass.</p>
  *
- * <p>This mojo intentionally does not require a network or any external tool —
+ * <p>This mojo intentionally does not require a network or any external tool --
  * SVG parsing is done in-process by {@code codenameone-svg-transcoder} using
  * the JDK's StAX implementation.</p>
  */
@@ -48,7 +48,7 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
     /** Default package for generated SVG image classes. */
     private static final String DEFAULT_PACKAGE = "com.codename1.generated.svg";
 
-    /** Class name used for the auto-generated registry — must match the
+    /** Class name used for the auto-generated registry -- must match the
      *  class looked up reflectively by {@code Resources.ensureGeneratedSVGsInstalled}. */
     private static final String REGISTRY_CLASS_NAME = "SVGRegistry";
 
@@ -66,7 +66,7 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File srcDir = svgSourceDir != null ? svgSourceDir : new File(project.getBasedir(), DEFAULT_SVG_DIR);
         if (!srcDir.isDirectory()) {
-            getLog().debug("No SVG source directory at " + srcDir + " — skipping SVG transcoding.");
+            getLog().debug("No SVG source directory at " + srcDir + " -- skipping SVG transcoding.");
             registerSourceRoot();
             return;
         }
@@ -98,7 +98,7 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
             if (outFile.exists() && outFile.lastModified() >= svg.lastModified()) {
                 getLog().debug("SVG transcoder up-to-date for " + svg.getName());
             } else {
-                getLog().info("Transcoding SVG " + svg.getName() + " → " + className + ".java");
+                getLog().info("Transcoding SVG " + svg.getName() + " -> " + className + ".java");
                 try {
                     SVGTranscoder.transcode(svg, svgPackage, className, outFile);
                 } catch (IOException ex) {

@@ -1,7 +1,7 @@
 package com.codename1.svg.transcoder.parser;
 
 /**
- * Resolved style block for a node — everything the renderer needs to fill /
+ * Resolved style block for a node -- everything the renderer needs to fill /
  * stroke this shape. Field "null" means "inherit from parent / leave unchanged".
  */
 public final class SVGStyle {
@@ -50,7 +50,7 @@ public final class SVGStyle {
         if (stroke == null) stroke = parent.stroke;
         if (fillOpacity == null) fillOpacity = parent.fillOpacity;
         if (strokeOpacity == null) strokeOpacity = parent.strokeOpacity;
-        // opacity does NOT inherit per SVG spec — leave alone.
+        // opacity does NOT inherit per SVG spec -- leave alone.
         if (strokeWidth == null) strokeWidth = parent.strokeWidth;
         if (strokeLineCap == null) strokeLineCap = parent.strokeLineCap;
         if (strokeLineJoin == null) strokeLineJoin = parent.strokeLineJoin;

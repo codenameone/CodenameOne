@@ -36,7 +36,7 @@ public class JavaCodeGeneratorTest {
         assertTrue(out.contains("lineTo"));
         assertTrue(out.contains("closePath"));
         assertTrue(out.contains("g.fillShape(__p)"));
-        // fill="red" → 0xFF0000
+        // fill="red" -> 0xFF0000
         assertTrue(out.contains("g.setColor(0xFF0000)"));
     }
 

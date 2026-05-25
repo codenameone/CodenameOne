@@ -12,7 +12,7 @@ import com.codename1.ui.plaf.Style;
  * framework can verify shapes, gradients, paths and stroke styling all
  * compose correctly on every platform.
  *
- * <p>The generated classes live in {@code com.codename1.generated.svg.*} —
+ * <p>The generated classes live in {@code com.codename1.generated.svg.*} --
  * they are emitted by the {@code transcode-svg} goal in this module's pom
  * based on the SVG files under {@code src/main/svg}.</p>
  */

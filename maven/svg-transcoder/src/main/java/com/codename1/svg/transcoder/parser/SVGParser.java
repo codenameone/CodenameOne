@@ -24,7 +24,7 @@ import java.util.Map;
  *   animate, animateTransform, set, title, desc (last two ignored).
  *
  * Anything else is skipped silently so an unfamiliar element won't fail the
- * whole build — the transcoder errs on the side of "render what we can".
+ * whole build -- the transcoder errs on the side of "render what we can".
  */
 public final class SVGParser {
 
@@ -323,7 +323,7 @@ public final class SVGParser {
         for (String k : keys) {
             if (attrs.containsKey(k)) out.put(k.startsWith("stop-") ? "fill" : k, attrs.get(k));
         }
-        // map stop-color → fill, stop-opacity → fill-opacity for reuse with StyleParser
+        // map stop-color -> fill, stop-opacity -> fill-opacity for reuse with StyleParser
         if (attrs.containsKey("stop-color")) out.put("fill", attrs.get("stop-color"));
         if (attrs.containsKey("stop-opacity")) out.put("fill-opacity", attrs.get("stop-opacity"));
         return out;
@@ -386,7 +386,7 @@ public final class SVGParser {
         return m;
     }
 
-    /** Read child elements of a shape — currently only animation children matter. */
+    /** Read child elements of a shape -- currently only animation children matter. */
     private void readNestedAnimations(XMLStreamReader r, SVGNode shape) throws XMLStreamException {
         while (r.hasNext()) {
             int ev = r.next();

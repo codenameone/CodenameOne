@@ -51,7 +51,7 @@ public final class PathDataParser {
                 else cmd = lastCmd;
             }
 
-            // Find the end of this command's numeric arguments — the next command letter.
+            // Find the end of this command's numeric arguments -- the next command letter.
             int argStart = i;
             while (i < len && !isCmdLetter(cs[i])) i++;
             String argStr = new String(cs, argStart, i - argStart);

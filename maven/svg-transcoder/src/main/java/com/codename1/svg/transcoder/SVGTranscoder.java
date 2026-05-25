@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public final class SVGTranscoder {
 
-    /** Per-image entry — used both by the per-file transcode and the registry emitter. */
+    /** Per-image entry -- used both by the per-file transcode and the registry emitter. */
     public static final class GeneratedClass {
         public final String packageName;
         public final String className;
@@ -97,7 +97,7 @@ public final class SVGTranscoder {
         }
         out.write("        }\n");
         out.write("    }\n\n");
-        out.write("    /** Called via reflection by Resources lazily — see Resources#getImage. */\n");
+        out.write("    /** Called via reflection by Resources lazily -- see Resources#getImage. */\n");
         out.write("    public static void installGlobal() {\n");
         out.write("        if (__installed) return;\n");
         out.write("        synchronized (" + className + ".class) {\n");
@@ -111,7 +111,7 @@ public final class SVGTranscoder {
         out.write("}\n");
     }
 
-    /** "home.svg" → "HomeSvg". Used to derive a class name from a filename. */
+    /** "home.svg" -> "HomeSvg". Used to derive a class name from a filename. */
     public static String classNameFor(String fileName) {
         String stem = fileName;
         int dot = stem.lastIndexOf('.');

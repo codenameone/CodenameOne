@@ -912,7 +912,7 @@ public class Resources {
     /// Add an [Image] to the global registry consulted by every
     /// [#getImage(String)] call as a fallback. Intended for the
     /// auto-generated `com.codename1.generated.svg.SVGRegistry` produced by
-    /// the SVG transcoder mojo — application code should not normally call
+    /// the SVG transcoder mojo -- application code should not normally call
     /// this directly.
     ///
     /// Registers the image both under the supplied `id` and (if `id` ends with
@@ -921,7 +921,7 @@ public class Resources {
     /// resolve to the same instance.
     ///
     /// To wire up the generated SVGs in a Codename One app, invoke the
-    /// generated registry once during startup — typically right after the
+    /// generated registry once during startup -- typically right after the
     /// theme is loaded:
     /// ```
     /// com.codename1.generated.svg.SVGRegistry.install(theme);

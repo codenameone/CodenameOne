@@ -37,7 +37,7 @@ public final class SVGPaint {
         return r == null ? null : ofReference(r);
     }
 
-    /** "url(#foo)" → "foo"; returns null otherwise. */
+    /** "url(#foo)" -> "foo"; returns null otherwise. */
     public static String stripUrl(String s) {
         if (s == null) return null;
         String t = s.trim();
