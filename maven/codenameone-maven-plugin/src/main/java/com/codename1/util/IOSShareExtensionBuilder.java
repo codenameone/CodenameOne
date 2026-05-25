@@ -81,8 +81,6 @@ import java.util.zip.ZipOutputStream;
  *
  * <p>This class produces ASCII-only output; the generated Swift, plist
  * and entitlements files are deterministic given the same inputs.</p>
- *
- * @since 9.0
  */
 public final class IOSShareExtensionBuilder {
 

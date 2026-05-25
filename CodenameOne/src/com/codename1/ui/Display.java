@@ -5178,10 +5178,6 @@ public final class Display extends CN1Constants {
     /// - `sourceRect`: source rectangle hint for the share popover. May be null.
     ///
     /// - `listener`: callback for the share outcome. May be null.
-    ///
-    /// #### Since
-    ///
-    /// 9.0
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
         if (listener == null) {
             impl.share(textOrPath, image, mimeType, sourceRect);

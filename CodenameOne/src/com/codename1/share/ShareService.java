@@ -120,10 +120,6 @@ public abstract class ShareService extends Command {
     ///
     /// Set by [com.codename1.components.ShareButton] before the service
     /// is invoked. Subclasses normally do not call this directly.
-    ///
-    /// #### Since
-    ///
-    /// 9.0
     public void setShareResultListener(ShareResultListener listener) {
         this.shareResultListener = listener;
         this.resultDelivered = false;
@@ -139,10 +135,6 @@ public abstract class ShareService extends Command {
     /// Subclasses can call this to report a `DISMISSED` (user cancelled)
     /// or `FAILED` outcome. [#finish] already reports a default
     /// `SHARED_TO(commandName)` if no explicit result was delivered.
-    ///
-    /// #### Since
-    ///
-    /// 9.0
     protected void deliverResult(ShareResult result) {
         if (resultDelivered) {
             return;

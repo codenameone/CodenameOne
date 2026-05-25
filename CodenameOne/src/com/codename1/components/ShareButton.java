@@ -143,10 +143,6 @@ public class ShareButton extends Button implements ActionListener {
     /// On platforms that cannot observe the chosen target the listener
     /// still fires with [ShareResult#sharedTo] passing a `null` package
     /// name, so the app can resume its flow.
-    ///
-    /// #### Since
-    ///
-    /// 9.0
     public void setShareResultListener(ShareResultListener listener) {
         this.shareResultListener = listener;
     }

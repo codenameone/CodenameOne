@@ -2280,7 +2280,7 @@ IMPORTANT: The `ShareButton` features some share service classes to allow pluggi
 
 ==== Share Result Callback
 
-Since version 9.0 the share API can report what the user did with the share sheet. Register a `ShareResultListener` on either `ShareButton` or directly with `Display.share(...)` and you receive a single `ShareResult` describing the outcome:
+The share API can report what the user did with the share sheet. Register a `ShareResultListener` on either `ShareButton` or directly with `Display.share(...)` and you receive a single `ShareResult` describing the outcome:
 
 * `SHARED_TO(packageName)` -- the user picked a destination. `packageName` is the chosen target's identifier: an Android package name (for example, `com.whatsapp`) or, on iOS, a `UIActivityType` such as `com.apple.UIKit.activity.PostToTwitter`. It may be `null` when the platform doesn't expose the selection (for example, older Android, Web Share API).
 * `DISMISSED` -- the user cancelled without picking a target. iOS reports this reliably; Android's chooser has no public dismissal signal, so on Android the listener simply doesn't fire on cancel.
@@ -2320,7 +2320,7 @@ When the share is dispatched through the non-native fallback dialog (platforms w
 
 An iOS *share extension* is a separate app target that the system shows inside `UIActivityViewController` when the user shares from another app (Safari, Photos, etc.). It runs in a sandboxed process and persists payloads to the host app via an *App Group* shared `NSUserDefaults` suite.
 
-Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project (see `IPhoneBuilder.extractAppExtensions`). The `IOSShareExtensionBuilder` helper, added in version 9.0, generates that archive for you so you don't have to create the extension target in Xcode first.
+Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project (see `IPhoneBuilder.extractAppExtensions`). The `IOSShareExtensionBuilder` helper generates that archive for you so you don't have to create the extension target in Xcode first.
 
 ==== What the helper produces
 
