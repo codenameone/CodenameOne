@@ -32,7 +32,6 @@ import javax.tools.ToolProvider;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +55,7 @@ public final class JavaSourceCompiler {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             throw new IllegalStateException(
-                    "No JavaCompiler available — JSR 199 requires a JDK, not a JRE");
+                    "No JavaCompiler available -- JSR 199 requires a JDK, not a JRE");
         }
         DiagnosticCollector<JavaFileObject> diags = new DiagnosticCollector<JavaFileObject>();
         StandardJavaFileManager fm = compiler.getStandardFileManager(

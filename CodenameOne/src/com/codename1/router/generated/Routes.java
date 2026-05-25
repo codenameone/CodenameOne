@@ -20,11 +20,28 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.router;
+package com.codename1.router.generated;
 
-public final class RouteContext {
-    public final String matchedPattern;
-    public RouteContext(String matchedPattern) {
-        this.matchedPattern = matchedPattern;
+/// Stub overwritten by the Codename One Maven plugin's route processor when an
+/// application declares one or more `com.codename1.annotations.Route` targets.
+///
+/// `com.codename1.ui.Display` calls `#bootstrap` once during startup. With this
+/// stub on the classpath the call is a no-op and the application sees no
+/// deep-link routing -- the framework keeps working exactly as before. When
+/// the maven plugin runs against a project that declares routes, the plugin
+/// emits a new `Routes.class` in the project's target directory; that file
+/// shadows this stub at runtime and its real `bootstrap` installs the
+/// generated `RouteDispatcher`.
+///
+/// Application code should not call this class directly.
+public final class Routes {
+
+    private Routes() {
+    }
+
+    /// Invoked once by the framework during initialization. The stub does
+    /// nothing; the generated replacement installs the project's route
+    /// dispatcher.
+    public static void bootstrap() {
     }
 }

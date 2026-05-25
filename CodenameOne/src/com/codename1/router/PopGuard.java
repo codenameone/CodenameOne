@@ -26,8 +26,8 @@ import com.codename1.ui.Form;
 
 /// Intercept back/pop attempts on a `Form`. Install with `Form#setPopGuard(PopGuard)`.
 ///
-/// Modeled after Flutter's `PopScope`. Typical use is to confirm before leaving a
-/// half-filled form, or to override hardware back to show a custom dialog.
+/// Typical use is to confirm before leaving a half-filled form, or to override
+/// hardware back to show a custom dialog.
 ///
 /// #### Example
 ///

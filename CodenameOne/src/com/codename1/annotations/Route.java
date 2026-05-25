@@ -27,57 +27,61 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Declares a `com.codename1.router.Router` route on a `Form` class.
+/// Binds a `Form` class -- or a static method that returns a `Form` -- to a
+/// URL path so the framework can show it in response to a deep link.
 ///
-/// At build time the Codename One Maven plugin scans `.class` files for `@Route`
-/// annotations and generates a single `RoutesIndex` class that registers every
-/// annotated form with the Router. App startup calls `RoutesIndex.register()`
-/// once, before showing the first form:
+/// `@Route` is the only annotation an application needs in order to make a
+/// form reachable from a Universal Link, an Android App Link, a custom-scheme
+/// URL, a push-notification payload, or any other URL the platform delivers
+/// to the app. Path variables flow into constructor or method parameters
+/// through `RouteParam`.
 ///
 /// ```java
-/// @Route("/profile/:id")
+/// @Route("/users/:id")
 /// public class ProfileForm extends Form {
-///     public ProfileForm() { setTitle("Profile"); /* ... */ }
+///     public ProfileForm(@RouteParam("id") String id) { ... }
+/// }
 ///
-///     // Optional: builder-aware constructor. The generated RoutesIndex
-///     // prefers this constructor over the no-arg one when both exist.
-///     public ProfileForm(RouteContext ctx) {
-///         this();
-///         setTitle("Profile of " + ctx.param("id"));
+/// public class Routes {
+///     @Route("/home")
+///     public static Form home() {
+///         return new HomeForm();
+///     }
+///
+///     @Route("/users/:id")
+///     public static Form profile(@RouteParam("id") String id) {
+///         return new ProfileForm(id);
 ///     }
 /// }
 /// ```
 ///
-/// `@Route` is a build-time hint only -- there is no reflection at runtime. Pure
-/// Java code generation keeps the contract portable across iOS (ParparVM),
-/// Android, JavaSE, and the JavaScript port without changes.
-///
-/// Multiple paths can be assigned to a single Form by stacking annotations using
-/// `@Route.Routes` or by repeating the annotation when the project targets a
-/// language version that supports `@Repeatable`.
+/// **At build time** the Codename One Maven plugin scans the project's
+/// compiled bytecode, validates every `@Route` (extends `Form`, accessible
+/// constructor or static factory, no duplicate patterns, every parameter
+/// bound), then generates an internal dispatch class that the framework wires
+/// to the platform's deep-link plumbing under the hood. There is no
+/// reflection at runtime and no router API for the application to call --
+/// `new MyForm().show()` is still the way to navigate inside the app; URL
+/// routing only handles links coming from outside.
 ///
 /// #### Path syntax
 ///
 /// - **Literal segments** -- `/about`
-/// - **Named parameters** -- `/users/:id`, accessible as `ctx.param("id")`
+/// - **Named parameters** -- `/users/:id`, bound via `@RouteParam("id")`
 /// - **Single-segment wildcard** -- `/files/*`
 /// - **Catch-all wildcard** -- `/files/**`
 @Retention(RetentionPolicy.CLASS)
-@Target(ElementType.TYPE)
+@Target({ ElementType.TYPE, ElementType.METHOD })
 public @interface Route {
 
-    /// The route pattern (always starts with `/`). Required.
+    /// The path pattern. Always starts with `/`. Required.
     String value();
 
-    /// Optional name used by reverse-routing utilities (`Router.named("home")`).
-    /// Defaults to the empty string, which means "unnamed".
-    String name() default "";
-
-    /// Container annotation for multiple routes on the same class. Pre-Java-8
-    /// classes can express `@Route.Routes({@Route("/a"), @Route("/b")})` until
-    /// the surrounding project moves to a JDK that supports `@Repeatable`.
+    /// Container annotation for binding several path patterns to the same
+    /// target. Use it when a single Form should be reachable from multiple
+    /// URLs without repeating the body.
     @Retention(RetentionPolicy.CLASS)
-    @Target(ElementType.TYPE)
+    @Target({ ElementType.TYPE, ElementType.METHOD })
     @interface Routes {
         Route[] value();
     }

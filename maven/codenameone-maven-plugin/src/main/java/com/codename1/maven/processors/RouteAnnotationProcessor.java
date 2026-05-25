@@ -25,104 +25,78 @@ package com.codename1.maven.processors;
 import com.codename1.maven.annotations.AbstractAnnotationProcessor;
 import com.codename1.maven.annotations.AnnotatedClass;
 import com.codename1.maven.annotations.AnnotationValues;
+import com.codename1.maven.annotations.JavaSourceCompiler;
 import com.codename1.maven.annotations.MethodInfo;
 import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
 
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-/// Build-time `@com.codename1.annotations.Route` processor.
+/// Bytecode-driven `@Route` processor.
 ///
-/// Scans the project's compiled `.class` files for `@Route`-annotated classes,
-/// validates them (extends `Form`; pattern is non-empty and starts with `/`;
-/// has an accessible constructor; no duplicate patterns), then emits a
-/// `com.codename1.router.generated.RoutesIndex` class via ASM that:
+/// Scans the project's compiled classes for `@Route` annotations on Form
+/// subclasses or static factory methods, validates each declaration fail-fast,
+/// then generates `com.codename1.router.generated.Routes` as a Java source
+/// file and compiles it on the spot via JSR 199 so the resulting `.class`
+/// lands in the project's output directory and shadows the framework stub at
+/// runtime.
 ///
-/// 1. Calls `Router.getInstance().route(pattern, builder)` for every accepted
-///    route, prefering a `(RouteContext)` constructor over a no-arg one.
-/// 2. Uses a single inner `RoutesIndex$Builder` class with a tableswitch over
-///    a route index — keeps the per-route class explosion bounded at 2
-///    regardless of route count.
+/// The generated `Routes` class implements `com.codename1.router.RouteDispatcher`,
+/// registers itself with `Display` from its static `bootstrap()` method, and
+/// dispatches incoming URLs by matching against the recognised patterns,
+/// extracting path variables, and invoking the matching constructor / factory.
 ///
-/// **Fail-fast.** Errors are reported via `ProcessorContext#error` and abort
-/// the build (the orchestrator never writes generated classes when errors are
-/// pending), so an invalid `@Route` declaration cannot ship.
+/// Validation surfaces every offending class in a single build run via
+/// `ProcessorContext#error`. No bytecode is written when any error is pending.
 public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor {
 
     public static final String ROUTE_DESC = "Lcom/codename1/annotations/Route;";
     public static final String ROUTES_DESC = "Lcom/codename1/annotations/Route$Routes;";
+    public static final String ROUTE_PARAM_DESC = "Lcom/codename1/annotations/RouteParam;";
 
     static final String FORM_INTERNAL = "com/codename1/ui/Form";
-    static final String CONTEXT_INTERNAL = "com/codename1/router/RouteContext";
-    static final String BUILDER_INTERNAL = "com/codename1/router/RouteBuilder";
-    static final String ROUTER_INTERNAL = "com/codename1/router/Router";
-    static final String INDEX_INTERNAL = "com/codename1/router/generated/RoutesIndex";
-    static final String DISPATCH_INTERNAL = INDEX_INTERNAL + "$Builder";
+    static final String FORM_BINARY = "com.codename1.ui.Form";
+    static final String STRING_BINARY = "java.lang.String";
 
-    private static final String NO_ARG_CTOR_DESC = "()V";
-    private static final String CTX_CTOR_DESC = "(L" + CONTEXT_INTERNAL + ";)V";
+    /// Internal name of the generated class. Application code never references
+    /// it directly; the framework loads it via `Display.init()`.
+    static final String ROUTES_INTERNAL = "com/codename1/router/generated/Routes";
+    static final String ROUTES_PACKAGE = "com.codename1.router.generated";
+    static final String ROUTES_SIMPLE = "Routes";
 
-    /// Single source of truth for the set of descriptors this processor handles.
     private static final Set<String> DESCRIPTORS;
     static {
-        Set<String> s = new java.util.LinkedHashSet<String>();
+        Set<String> s = new LinkedHashSet<String>();
         s.add(ROUTE_DESC);
         s.add(ROUTES_DESC);
         DESCRIPTORS = Collections.unmodifiableSet(s);
     }
 
-    // ------------------------------------------------------------------------
-    // State (reset on each #start)
-    // ------------------------------------------------------------------------
-
-    /// Routes accepted by the processor, keyed by pattern. TreeMap so the
-    /// generated bytecode is deterministic regardless of class-scan order
-    /// (helps reproducibility of binary output / cache invalidation).
+    /// Accepted routes keyed by path pattern. TreeMap so the emitted source is
+    /// deterministic regardless of class-scan order.
     private final TreeMap<String, Entry> accepted = new TreeMap<String, Entry>();
-
-    // ------------------------------------------------------------------------
-    // SPI
-    // ------------------------------------------------------------------------
 
     @Override
     public Set<String> getAnnotationDescriptors() {
         return DESCRIPTORS;
-    }
-
-    @Override
-    public void emitStubs(ProcessorContext ctx) throws ProcessingException {
-        // Compile-time stub. Apps reference RoutesIndex.register() in their
-        // init() method; this source makes that resolvable before
-        // process-annotations runs (and the resulting .class will be
-        // overwritten with the real bytecode after compile).
-        String stub =
-                "// Auto-generated stub — overwritten by cn1:process-annotations.\n" +
-                "package com.codename1.router.generated;\n" +
-                "\n" +
-                "/**\n" +
-                " * Stub generated by the Codename One Maven plugin. The\n" +
-                " * {@code cn1:process-annotations} goal overwrites this class with\n" +
-                " * the actual route registrations after compile. If you see this\n" +
-                " * file unchanged in target/classes after a build, the\n" +
-                " * process-annotations goal did not run.\n" +
-                " */\n" +
-                "public final class RoutesIndex {\n" +
-                "    private RoutesIndex() { }\n" +
-                "    public static void register() { }\n" +
-                "}\n";
-        ctx.emitStubSource(INDEX_INTERNAL, stub);
     }
 
     @Override
@@ -132,331 +106,699 @@ public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor 
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
-        if (cls.isInterface() || cls.isAbstract() || cls.isSynthetic()) {
-            // Annotations on these aren't actionable; report only if a Route
-            // annotation is actually present (otherwise the dispatch wouldn't
-            // have brought us here at all).
-            if (cls.getClassAnnotation(ROUTE_DESC) != null
-                    || cls.getClassAnnotation(ROUTES_DESC) != null) {
-                ctx.error(cls, "@Route is not allowed on abstract / interface / synthetic classes; "
-                        + "only concrete Form subclasses can be route targets");
-            }
+        if (cls.isSynthetic()) {
             return;
         }
+        // Two paths: class-level @Route (constructor target) and method-level
+        // @Route (static-factory target). A single class can hold both kinds.
+        if (cls.getClassAnnotation(ROUTE_DESC) != null
+                || cls.getClassAnnotation(ROUTES_DESC) != null) {
+            processClassLevel(cls, ctx);
+        }
+        for (MethodInfo m : cls.getMethods()) {
+            if (m.getAnnotation(ROUTE_DESC) != null || m.getAnnotation(ROUTES_DESC) != null) {
+                processMethodLevel(cls, m, ctx);
+            }
+        }
+    }
 
-        List<AnnotationValues> annotations = collectRouteAnnotations(cls);
-        if (annotations.isEmpty()) return;
-
-        // Validate base: must extend Form.
+    private void processClassLevel(AnnotatedClass cls, ProcessorContext ctx) {
+        if (cls.isAbstract() || cls.isInterface()) {
+            ctx.error(cls, "@Route on a class requires a concrete Form subclass; "
+                    + cls.getBinaryName() + " is abstract or an interface");
+            return;
+        }
         if (!extendsForm(cls, ctx)) {
             ctx.error(cls, "@Route classes must extend com.codename1.ui.Form (transitively); "
                     + cls.getBinaryName() + " extends " + dot(cls.getSuperInternalName()));
             return;
         }
+        List<AnnotationValues> annotations = collectAnnotations(
+                cls.getClassAnnotation(ROUTE_DESC),
+                cls.getClassAnnotation(ROUTES_DESC));
 
-        // Determine constructor kind. We accept either a public (RouteContext)
-        // ctor or a public no-arg one; the (RouteContext) form wins when both
-        // exist because it gives access to path params.
-        ConstructorKind kind = pickConstructor(cls);
-        if (kind == ConstructorKind.NONE) {
-            ctx.error(cls, "@Route class needs either a public no-arg constructor or "
-                    + "a public constructor taking com.codename1.router.RouteContext");
-            return;
-        }
-
-        for (int i = 0; i < annotations.size(); i++) {
-            AnnotationValues av = annotations.get(i);
-            String pattern = av.getString("value");
-            // `@Route#name()` is captured by the scanner but not consumed yet —
-            // it's reserved for a future reverse-routing API. Leaving the
-            // attribute in the annotation but unread here keeps existing user
-            // code valid while a downstream feature picks it up.
-            if (pattern == null || pattern.length() == 0) {
-                ctx.error(cls, "@Route value is required and must be a non-empty path");
+        // Pick a constructor: prefer one whose parameters cover every path
+        // variable in the pattern via @RouteParam.
+        for (AnnotationValues av : annotations) {
+            String pattern = patternOf(av, cls, ctx);
+            if (pattern == null) {
                 continue;
             }
-            if (pattern.charAt(0) != '/') {
-                ctx.error(cls, "@Route value must start with '/'; got: \"" + pattern + "\"");
-                continue;
+            List<String> required = pathVarsOf(pattern);
+            ConstructorBinding binding = pickConstructor(cls, required, ctx);
+            if (binding == null) {
+                return;
             }
-
-            Entry prev = accepted.get(pattern);
-            if (prev != null && !prev.targetInternal.equals(cls.getInternalName())) {
-                ctx.error(cls, "duplicate @Route pattern \"" + pattern
-                        + "\": already declared on " + dot(prev.targetInternal));
-                continue;
-            }
-
-            accepted.put(pattern, new Entry(pattern, cls.getInternalName(), kind));
+            register(pattern, Entry.forClass(pattern, cls.getBinaryName(), binding), cls, ctx);
         }
     }
 
+    private void processMethodLevel(AnnotatedClass cls, MethodInfo method, ProcessorContext ctx) {
+        if (!method.isStatic() || !method.isPublic()) {
+            ctx.error(cls, "@Route methods must be public static; "
+                    + cls.getBinaryName() + "#" + method.getName() + " is not");
+            return;
+        }
+        if (!returnsForm(method)) {
+            ctx.error(cls, "@Route methods must return a Form (or a Form subtype); "
+                    + cls.getBinaryName() + "#" + method.getName() + " returns "
+                    + returnTypeBinary(method.getDescriptor()));
+            return;
+        }
+        List<AnnotationValues> annotations = collectAnnotations(
+                method.getAnnotation(ROUTE_DESC), method.getAnnotation(ROUTES_DESC));
+        for (AnnotationValues av : annotations) {
+            String pattern = patternOf(av, cls, ctx);
+            if (pattern == null) {
+                continue;
+            }
+            List<String> required = pathVarsOf(pattern);
+            MethodBinding binding = bindMethod(cls, method, required, ctx);
+            if (binding == null) {
+                return;
+            }
+            register(pattern, Entry.forMethod(pattern, cls.getBinaryName(), method.getName(), binding),
+                    cls, ctx);
+        }
+    }
+
+    private void register(String pattern, Entry entry, AnnotatedClass cls, ProcessorContext ctx) {
+        Entry prev = accepted.get(pattern);
+        if (prev != null) {
+            ctx.error(cls, "duplicate @Route pattern \"" + pattern + "\": already declared on "
+                    + prev.targetDescription());
+            return;
+        }
+        accepted.put(pattern, entry);
+    }
+
+    // ------------------------------------------------------------------------
+    // Output
+    // ------------------------------------------------------------------------
+
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
-        // Never write output when validation has already failed — the
-        // orchestrator would refuse to flush, but generating the bytecode
-        // for invalid input is wasted work too.
-        if (ctx.hasErrors()) return;
+        if (ctx.hasErrors()) {
+            return;
+        }
+        if (accepted.isEmpty()) {
+            // No project-declared routes: leave the framework stub alone.
+            return;
+        }
+        String source = generateRoutesSource(new ArrayList<Entry>(accepted.values()));
+        File outDir = ctx.getOutputClassDir();
+        // Find the classpath for compilation (framework jar provides Display +
+        // RouteDispatcher; the project's own classes provide @Route targets).
+        List<File> classpath = buildCompileClasspath(outDir);
+        try {
+            Map<String, String> srcs = JavaSourceCompiler.singleSource(
+                    ROUTES_PACKAGE + "." + ROUTES_SIMPLE, source);
+            JavaSourceCompiler.compile(srcs, outDir, classpath);
+        } catch (IOException e) {
+            throw new ProcessingException(
+                    "Failed to compile generated " + ROUTES_PACKAGE + "." + ROUTES_SIMPLE
+                            + ": " + e.getMessage(), e);
+        }
+        ctx.getLog().info("cn1: generated " + ROUTES_PACKAGE + "." + ROUTES_SIMPLE
+                + " with " + accepted.size() + " route(s)");
+    }
 
-        List<Entry> ordered = new ArrayList<Entry>(accepted.values());
-        ctx.emitClass(INDEX_INTERNAL, generateIndex(ordered));
-        ctx.emitClass(DISPATCH_INTERNAL, generateDispatcher(ordered));
-        ctx.getLog().info("cn1: routed " + ordered.size() + " @Route classes into "
-                + dot(INDEX_INTERNAL));
+    private List<File> buildCompileClasspath(File outDir) {
+        List<File> cp = new ArrayList<File>();
+        // The project's own compiled classes — needed for @Route target types.
+        cp.add(outDir);
+        // Inherit whatever javac defaults to; the surrounding plugin invocation
+        // already supplies the project's compile classpath via java.class.path,
+        // which JavaSourceCompiler picks up.
+        return cp;
+    }
+
+    // ------------------------------------------------------------------------
+    // Source generation
+    // ------------------------------------------------------------------------
+
+    private static String generateRoutesSource(List<Entry> routes) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("// Generated by the Codename One Maven plugin from @Route annotations.\n");
+        sb.append("// Do not edit -- regenerated on every build.\n");
+        sb.append("package ").append(ROUTES_PACKAGE).append(";\n\n");
+        sb.append("import com.codename1.router.RouteDispatcher;\n");
+        sb.append("import com.codename1.ui.Display;\n");
+        sb.append("import com.codename1.ui.Form;\n\n");
+        sb.append("public final class ").append(ROUTES_SIMPLE)
+                .append(" implements RouteDispatcher {\n\n");
+        sb.append("    public static void bootstrap() {\n");
+        sb.append("        Display.getInstance().installRouteDispatcher(new ")
+                .append(ROUTES_SIMPLE).append("());\n");
+        sb.append("    }\n\n");
+        sb.append("    private Routes() { }\n\n");
+        sb.append("    @Override\n");
+        sb.append("    public boolean dispatch(String url) {\n");
+        sb.append("        if (url == null || url.length() == 0) {\n");
+        sb.append("            return false;\n");
+        sb.append("        }\n");
+        sb.append("        String path = extractPath(url);\n");
+        sb.append("        String[] segs = splitPath(path);\n");
+        sb.append("        Form built = null;\n");
+        for (Entry e : routes) {
+            emitRouteBranch(sb, e);
+        }
+        sb.append("        if (built != null) {\n");
+        sb.append("            built.show();\n");
+        sb.append("            return true;\n");
+        sb.append("        }\n");
+        sb.append("        return false;\n");
+        sb.append("    }\n\n");
+        emitHelpers(sb);
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    private static void emitRouteBranch(StringBuilder sb, Entry e) {
+        String[] segs = patternSegments(e.pattern);
+        int literalCount = 0;
+        for (String s : segs) {
+            if (!s.startsWith(":") && !"*".equals(s) && !"**".equals(s)) {
+                literalCount++;
+            }
+        }
+        boolean catchAll = segs.length > 0 && "**".equals(segs[segs.length - 1]);
+        sb.append("        // ").append(e.pattern).append(" -> ").append(e.targetDescription()).append('\n');
+        // Length check
+        if (catchAll) {
+            sb.append("        if (segs.length >= ").append(segs.length - 1).append(") {\n");
+        } else {
+            sb.append("        if (segs.length == ").append(segs.length).append(") {\n");
+        }
+        // Per-segment matching
+        sb.append("            boolean match = true;\n");
+        for (int i = 0; i < segs.length; i++) {
+            String s = segs[i];
+            if (s.startsWith(":") || "*".equals(s) || "**".equals(s)) {
+                continue;
+            }
+            sb.append("            match = match && \"").append(escape(s)).append("\".equals(segs[")
+                    .append(i).append("]);\n");
+        }
+        sb.append("            if (match) {\n");
+        // Bind path vars
+        Map<String, String> varToExpr = new LinkedHashMap<String, String>();
+        for (int i = 0; i < segs.length; i++) {
+            String s = segs[i];
+            if (s.startsWith(":")) {
+                varToExpr.put(s.substring(1), "segs[" + i + "]");
+            } else if ("*".equals(s)) {
+                varToExpr.put("*", "segs[" + i + "]");
+            } else if ("**".equals(s)) {
+                varToExpr.put("*", "joinFrom(segs, " + i + ")");
+            }
+        }
+        // Pull query map for non-path bindings.
+        sb.append("                java.util.Map<String,String> q = parseQuery(url);\n");
+        // Build constructor / static factory call.
+        sb.append("                built = ").append(e.buildExpression(varToExpr)).append(";\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+    }
+
+    private static void emitHelpers(StringBuilder sb) {
+        sb.append("    private static String extractPath(String url) {\n");
+        sb.append("        int h = url.indexOf('#');\n");
+        sb.append("        if (h >= 0) { url = url.substring(0, h); }\n");
+        sb.append("        int q = url.indexOf('?');\n");
+        sb.append("        if (q >= 0) { url = url.substring(0, q); }\n");
+        sb.append("        int s = url.indexOf(\"://\");\n");
+        sb.append("        if (s >= 0) {\n");
+        sb.append("            int slash = url.indexOf('/', s + 3);\n");
+        sb.append("            return slash < 0 ? \"/\" : url.substring(slash);\n");
+        sb.append("        }\n");
+        sb.append("        int colon = url.indexOf(':');\n");
+        sb.append("        if (colon > 0) {\n");
+        sb.append("            String tail = url.substring(colon + 1);\n");
+        sb.append("            return tail.length() == 0 ? \"/\"\n");
+        sb.append("                    : (tail.charAt(0) == '/' ? tail : \"/\" + tail);\n");
+        sb.append("        }\n");
+        sb.append("        return url.length() == 0 || url.charAt(0) != '/' ? \"/\" + url : url;\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String[] splitPath(String path) {\n");
+        sb.append("        if (path == null || path.length() == 0 || \"/\".equals(path)) {\n");
+        sb.append("            return new String[0];\n");
+        sb.append("        }\n");
+        sb.append("        String p = path.charAt(0) == '/' ? path.substring(1) : path;\n");
+        sb.append("        if (p.length() > 0 && p.charAt(p.length() - 1) == '/') {\n");
+        sb.append("            p = p.substring(0, p.length() - 1);\n");
+        sb.append("        }\n");
+        sb.append("        if (p.length() == 0) { return new String[0]; }\n");
+        sb.append("        java.util.ArrayList<String> out = new java.util.ArrayList<String>();\n");
+        sb.append("        int start = 0;\n");
+        sb.append("        for (int i = 0; i < p.length(); i++) {\n");
+        sb.append("            if (p.charAt(i) == '/') {\n");
+        sb.append("                out.add(decode(p.substring(start, i)));\n");
+        sb.append("                start = i + 1;\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        out.add(decode(p.substring(start)));\n");
+        sb.append("        return out.toArray(new String[out.size()]);\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String joinFrom(String[] segs, int from) {\n");
+        sb.append("        if (from >= segs.length) { return \"\"; }\n");
+        sb.append("        StringBuilder sb = new StringBuilder();\n");
+        sb.append("        for (int i = from; i < segs.length; i++) {\n");
+        sb.append("            if (i > from) { sb.append('/'); }\n");
+        sb.append("            sb.append(segs[i]);\n");
+        sb.append("        }\n");
+        sb.append("        return sb.toString();\n");
+        sb.append("    }\n\n");
+        sb.append("    private static java.util.Map<String,String> parseQuery(String url) {\n");
+        sb.append("        java.util.LinkedHashMap<String,String> out = new java.util.LinkedHashMap<String,String>();\n");
+        sb.append("        int q = url.indexOf('?');\n");
+        sb.append("        if (q < 0) { return out; }\n");
+        sb.append("        int hash = url.indexOf('#', q);\n");
+        sb.append("        String query = hash < 0 ? url.substring(q + 1) : url.substring(q + 1, hash);\n");
+        sb.append("        int start = 0;\n");
+        sb.append("        for (int i = 0; i <= query.length(); i++) {\n");
+        sb.append("            if (i == query.length() || query.charAt(i) == '&') {\n");
+        sb.append("                if (i > start) {\n");
+        sb.append("                    String pair = query.substring(start, i);\n");
+        sb.append("                    int eq = pair.indexOf('=');\n");
+        sb.append("                    if (eq < 0) {\n");
+        sb.append("                        out.put(decode(pair), \"\");\n");
+        sb.append("                    } else {\n");
+        sb.append("                        out.put(decode(pair.substring(0, eq)), decode(pair.substring(eq + 1)));\n");
+        sb.append("                    }\n");
+        sb.append("                }\n");
+        sb.append("                start = i + 1;\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        return out;\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String decode(String s) {\n");
+        sb.append("        try { return com.codename1.io.Util.decode(s, \"UTF-8\", false); }\n");
+        sb.append("        catch (Throwable t) { return s; }\n");
+        sb.append("    }\n\n");
+        sb.append("    private static String throwMissing(String name) {\n");
+        sb.append("        throw new IllegalArgumentException(\n");
+        sb.append("                \"deep link is missing required @RouteParam \\\"\" + name + \"\\\"\");\n");
+        sb.append("    }\n");
+    }
+
+    private static String[] patternSegments(String pattern) {
+        if (pattern == null || pattern.length() == 0 || "/".equals(pattern)) {
+            return new String[0];
+        }
+        String p = pattern.charAt(0) == '/' ? pattern.substring(1) : pattern;
+        if (p.length() > 0 && p.charAt(p.length() - 1) == '/') {
+            p = p.substring(0, p.length() - 1);
+        }
+        return p.length() == 0 ? new String[0] : p.split("/");
     }
 
     // ------------------------------------------------------------------------
     // Validation helpers
     // ------------------------------------------------------------------------
 
-    private static List<AnnotationValues> collectRouteAnnotations(AnnotatedClass cls) {
+    private static List<AnnotationValues> collectAnnotations(AnnotationValues single, AnnotationValues container) {
         List<AnnotationValues> out = new ArrayList<AnnotationValues>();
-        AnnotationValues single = cls.getClassAnnotation(ROUTE_DESC);
-        if (single != null) out.add(single);
-        AnnotationValues container = cls.getClassAnnotation(ROUTES_DESC);
+        if (single != null) {
+            out.add(single);
+        }
         if (container != null) {
             Object value = container.get("value");
             if (value instanceof List<?>) {
-                List<?> items = (List<?>) value;
-                for (int i = 0; i < items.size(); i++) {
-                    Object it = items.get(i);
-                    if (it instanceof AnnotationValues) out.add((AnnotationValues) it);
+                for (Object item : (List<?>) value) {
+                    if (item instanceof AnnotationValues) {
+                        out.add((AnnotationValues) item);
+                    }
                 }
             }
         }
         return out;
     }
 
+    private static String patternOf(AnnotationValues av, AnnotatedClass cls, ProcessorContext ctx) {
+        String pattern = av.getString("value");
+        if (pattern == null || pattern.length() == 0) {
+            ctx.error(cls, "@Route value is required and must be a non-empty path");
+            return null;
+        }
+        if (pattern.charAt(0) != '/') {
+            ctx.error(cls, "@Route value must start with '/'; got: \"" + pattern + "\"");
+            return null;
+        }
+        return pattern;
+    }
+
+    private static List<String> pathVarsOf(String pattern) {
+        List<String> out = new ArrayList<String>();
+        for (String s : patternSegments(pattern)) {
+            if (s.startsWith(":")) {
+                out.add(s.substring(1));
+            } else if ("*".equals(s) || "**".equals(s)) {
+                out.add("*");
+            }
+        }
+        return out;
+    }
+
     private static boolean extendsForm(AnnotatedClass cls, ProcessorContext ctx) {
-        if (cls == null) return false;
-        if (FORM_INTERNAL.equals(cls.getInternalName())) return true;
+        if (cls == null) {
+            return false;
+        }
+        if (FORM_INTERNAL.equals(cls.getInternalName())) {
+            return true;
+        }
         String parent = cls.getSuperInternalName();
         while (parent != null) {
-            if (FORM_INTERNAL.equals(parent)) return true;
+            if (FORM_INTERNAL.equals(parent)) {
+                return true;
+            }
             AnnotatedClass parentCls = ctx.lookup(parent);
             if (parentCls == null) {
-                // Left the project — heuristically also accept any class whose
-                // super-name lives in the codename1.ui package since the
-                // project's compiled classpath doesn't include the cn1 core
-                // JAR. Form itself lives in com/codename1/ui/Form, so:
-                return parent.startsWith("com/codename1/ui/") && parent.endsWith("Form")
-                        || parent.equals("com/codename1/ui/Dialog");
+                // Left the project (cn1-core, JDK, etc.). Be permissive for
+                // anything in com/codename1/ui that ends in Form/Dialog.
+                return parent.startsWith("com/codename1/ui/")
+                        && (parent.endsWith("Form") || parent.endsWith("Dialog"));
             }
             parent = parentCls.getSuperInternalName();
         }
         return false;
     }
 
-    private static ConstructorKind pickConstructor(AnnotatedClass cls) {
-        boolean hasNoArg = false;
-        boolean hasCtx = false;
-        for (int i = 0; i < cls.getMethods().size(); i++) {
-            MethodInfo m = cls.getMethods().get(i);
-            if (!m.isConstructor() || !m.isPublic()) continue;
-            String d = m.getDescriptor();
-            if (NO_ARG_CTOR_DESC.equals(d)) hasNoArg = true;
-            else if (CTX_CTOR_DESC.equals(d)) hasCtx = true;
+    private static boolean returnsForm(MethodInfo method) {
+        String desc = method.getDescriptor();
+        int close = desc.lastIndexOf(')');
+        if (close < 0 || close + 1 >= desc.length()) {
+            return false;
         }
-        if (hasCtx) return ConstructorKind.ROUTE_CONTEXT;
-        if (hasNoArg) return ConstructorKind.NO_ARG;
-        return ConstructorKind.NONE;
+        String ret = desc.substring(close + 1);
+        if (!ret.startsWith("L") || !ret.endsWith(";")) {
+            return false;
+        }
+        String internal = ret.substring(1, ret.length() - 1);
+        // Permissive: any class whose internal name ends with Form is accepted.
+        // The compiled call site verifies type-correctness at javac time.
+        return internal.equals(FORM_INTERNAL) || internal.endsWith("Form")
+                || internal.endsWith("Dialog");
+    }
+
+    private static String returnTypeBinary(String desc) {
+        int close = desc.lastIndexOf(')');
+        if (close < 0 || close + 1 >= desc.length()) {
+            return "?";
+        }
+        String ret = desc.substring(close + 1);
+        if (ret.startsWith("L") && ret.endsWith(";")) {
+            return ret.substring(1, ret.length() - 1).replace('/', '.');
+        }
+        return ret;
+    }
+
+    // ------------------------------------------------------------------------
+    // Parameter binding: read @RouteParam from constructor / method parameters
+    // ------------------------------------------------------------------------
+
+    private ConstructorBinding pickConstructor(AnnotatedClass cls, List<String> requiredPathVars,
+                                                ProcessorContext ctx) {
+        ConstructorBinding best = null;
+        int bestScore = -1;
+        for (MethodInfo m : cls.getMethods()) {
+            if (!m.isConstructor() || !m.isPublic()) {
+                continue;
+            }
+            ParamBinding[] params = parameterBindings(cls, m, ctx);
+            if (params == null) {
+                continue;
+            }
+            // Score: covers all required path vars + parameter count proximity.
+            if (!covers(params, requiredPathVars)) {
+                continue;
+            }
+            int score = params.length * 10 + coverageScore(params, requiredPathVars);
+            if (score > bestScore) {
+                bestScore = score;
+                best = new ConstructorBinding(m.getDescriptor(), params);
+            }
+        }
+        if (best == null) {
+            ctx.error(cls, "@Route class " + cls.getBinaryName()
+                    + " has no public constructor that binds every path variable via @RouteParam");
+        }
+        return best;
+    }
+
+    private MethodBinding bindMethod(AnnotatedClass cls, MethodInfo method,
+                                      List<String> requiredPathVars, ProcessorContext ctx) {
+        ParamBinding[] params = parameterBindings(cls, method, ctx);
+        if (params == null) {
+            return null;
+        }
+        if (!covers(params, requiredPathVars)) {
+            ctx.error(cls, "@Route method " + cls.getBinaryName() + "#" + method.getName()
+                    + " does not declare a @RouteParam for every path variable in its pattern");
+            return null;
+        }
+        return new MethodBinding(method.getName(), method.getDescriptor(), params);
+    }
+
+    /// Reads the byte-code parameter annotations for `method`, mapping each
+    /// parameter to its `@RouteParam` value when present. Returns null if any
+    /// parameter is missing the annotation (so the caller knows to error).
+    private ParamBinding[] parameterBindings(AnnotatedClass owningClass, MethodInfo method,
+                                              ProcessorContext ctx) {
+        String desc = method.getDescriptor();
+        List<String> paramTypes = paramTypesOf(desc);
+        // Re-parse the class file to extract per-parameter annotations -- we
+        // don't keep them in the lightweight MethodInfo.
+        Map<Integer, ParamMeta> meta;
+        try {
+            meta = readParameterAnnotations(owningClass, method);
+        } catch (IOException e) {
+            ctx.error(owningClass, "could not read parameter annotations: " + e.getMessage());
+            return null;
+        }
+        boolean anyMissing = false;
+        ParamBinding[] out = new ParamBinding[paramTypes.size()];
+        for (int i = 0; i < out.length; i++) {
+            ParamMeta m = meta.get(i);
+            if (m == null) {
+                ctx.error(owningClass, "@Route target " + owningClass.getBinaryName() + "#"
+                        + method.getName() + " parameter #" + i
+                        + " has no @RouteParam binding; every parameter must be annotated");
+                anyMissing = true;
+                continue;
+            }
+            if (!STRING_BINARY.equals(paramTypes.get(i))) {
+                ctx.error(owningClass, "@RouteParam(\"" + m.name + "\") on "
+                        + owningClass.getBinaryName() + "#" + method.getName()
+                        + " parameter #" + i + " must be of type java.lang.String (was "
+                        + paramTypes.get(i) + ")");
+                anyMissing = true;
+                continue;
+            }
+            out[i] = new ParamBinding(m.name, m.required);
+        }
+        return anyMissing ? null : out;
+    }
+
+    private static List<String> paramTypesOf(String desc) {
+        List<String> out = new ArrayList<String>();
+        int i = desc.indexOf('(') + 1;
+        int end = desc.indexOf(')');
+        while (i < end) {
+            char c = desc.charAt(i);
+            if (c == 'L') {
+                int semi = desc.indexOf(';', i);
+                out.add(desc.substring(i + 1, semi).replace('/', '.'));
+                i = semi + 1;
+            } else if (c == '[') {
+                int j = i;
+                while (desc.charAt(j) == '[') {
+                    j++;
+                }
+                if (desc.charAt(j) == 'L') {
+                    j = desc.indexOf(';', j);
+                }
+                out.add(desc.substring(i, j + 1));
+                i = j + 1;
+            } else {
+                out.add(String.valueOf(c));
+                i++;
+            }
+        }
+        return out;
+    }
+
+    private Map<Integer, ParamMeta> readParameterAnnotations(AnnotatedClass cls, MethodInfo method)
+            throws IOException {
+        final Map<Integer, ParamMeta> out = new HashMap<Integer, ParamMeta>();
+        File file = cls.getClassFile();
+        if (file == null) {
+            return out;
+        }
+        InputStream in = Files.newInputStream(file.toPath());
+        try {
+            ClassReader reader = new ClassReader(in);
+            reader.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                                  String signature, String[] exceptions) {
+                    if (!name.equals(method.getName()) || !descriptor.equals(method.getDescriptor())) {
+                        return null;
+                    }
+                    return new MethodVisitor(Opcodes.ASM9) {
+                        @Override
+                        public org.objectweb.asm.AnnotationVisitor visitParameterAnnotation(
+                                final int parameter, String desc, boolean visible) {
+                            if (!ROUTE_PARAM_DESC.equals(desc)) {
+                                return null;
+                            }
+                            final ParamMeta meta = new ParamMeta();
+                            out.put(parameter, meta);
+                            return new org.objectweb.asm.AnnotationVisitor(Opcodes.ASM9) {
+                                @Override
+                                public void visit(String n, Object v) {
+                                    if ("value".equals(n) && v instanceof String) {
+                                        meta.name = (String) v;
+                                    } else if ("required".equals(n) && v instanceof Boolean) {
+                                        meta.required = (Boolean) v;
+                                    }
+                                }
+                            };
+                        }
+                    };
+                }
+            }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        } finally {
+            in.close();
+        }
+        return out;
+    }
+
+    private static boolean covers(ParamBinding[] params, List<String> requiredPathVars) {
+        Set<String> bound = new LinkedHashSet<String>();
+        for (ParamBinding p : params) {
+            bound.add(p.name);
+        }
+        for (String v : requiredPathVars) {
+            if (!bound.contains(v)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int coverageScore(ParamBinding[] params, List<String> requiredPathVars) {
+        int score = 0;
+        for (ParamBinding p : params) {
+            if (requiredPathVars.contains(p.name)) {
+                score++;
+            }
+        }
+        return score;
     }
 
     private static String dot(String internalName) {
         return internalName == null ? "null" : internalName.replace('/', '.');
     }
 
-    // ------------------------------------------------------------------------
-    // Bytecode generation
-    // ------------------------------------------------------------------------
-
-    /// Generates:
-    /// ```
-    /// public final class com.codename1.router.generated.RoutesIndex {
-    ///   private RoutesIndex() {}
-    ///   public static void register() {
-    ///     Router r = Router.getInstance();
-    ///     r.route("/a", new RoutesIndex$Builder(0));
-    ///     r.route("/b", new RoutesIndex$Builder(1));
-    ///     // ...
-    ///   }
-    /// }
-    /// ```
-    static byte[] generateIndex(List<Entry> routes) {
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
-                INDEX_INTERNAL, null, "java/lang/Object", null);
-        cw.visitSource("RoutesIndex.java", null);
-
-        // private RoutesIndex() { super(); }
-        MethodVisitor init = cw.visitMethod(Opcodes.ACC_PRIVATE, "<init>", "()V", null, null);
-        init.visitCode();
-        init.visitVarInsn(Opcodes.ALOAD, 0);
-        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        init.visitInsn(Opcodes.RETURN);
-        init.visitMaxs(1, 1);
-        init.visitEnd();
-
-        // public static void register() { ... }
-        MethodVisitor reg = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                "register", "()V", null, null);
-        reg.visitCode();
-        reg.visitMethodInsn(Opcodes.INVOKESTATIC, ROUTER_INTERNAL, "getInstance",
-                "()L" + ROUTER_INTERNAL + ";", false);
-        reg.visitVarInsn(Opcodes.ASTORE, 0);
-
-        for (int i = 0; i < routes.size(); i++) {
-            reg.visitVarInsn(Opcodes.ALOAD, 0);
-            reg.visitLdcInsn(routes.get(i).pattern);
-            reg.visitTypeInsn(Opcodes.NEW, DISPATCH_INTERNAL);
-            reg.visitInsn(Opcodes.DUP);
-            pushInt(reg, i);
-            reg.visitMethodInsn(Opcodes.INVOKESPECIAL, DISPATCH_INTERNAL, "<init>", "(I)V", false);
-            reg.visitMethodInsn(Opcodes.INVOKEVIRTUAL, ROUTER_INTERNAL, "route",
-                    "(Ljava/lang/String;L" + BUILDER_INTERNAL + ";)L" + ROUTER_INTERNAL + ";",
-                    false);
-            reg.visitInsn(Opcodes.POP);
-        }
-
-        reg.visitInsn(Opcodes.RETURN);
-        reg.visitMaxs(0, 0); // COMPUTE_MAXS
-        reg.visitEnd();
-
-        cw.visitEnd();
-        return cw.toByteArray();
+    private static String escape(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    /// Generates the dispatcher inner class:
-    /// ```
-    /// final class com.codename1.router.generated.RoutesIndex$Builder
-    ///         implements com.codename1.router.RouteBuilder {
-    ///   private final int idx;
-    ///   Builder(int idx) { this.idx = idx; }
-    ///   public com.codename1.ui.Form build(com.codename1.router.RouteContext ctx) {
-    ///     switch (idx) {
-    ///       case 0: return new com.example.HomeForm();
-    ///       case 1: return new com.example.ProfileForm(ctx);
-    ///       // ...
-    ///     }
-    ///     throw new AssertionError("bad route index");
-    ///   }
-    /// }
-    /// ```
-    static byte[] generateDispatcher(List<Entry> routes) {
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        cw.visit(Opcodes.V1_8, Opcodes.ACC_FINAL | Opcodes.ACC_SUPER,
-                DISPATCH_INTERNAL, null, "java/lang/Object",
-                new String[] { BUILDER_INTERNAL });
-        cw.visitInnerClass(DISPATCH_INTERNAL, INDEX_INTERNAL, "Builder",
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL);
+    // ------------------------------------------------------------------------
+    // Model
+    // ------------------------------------------------------------------------
 
-        cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "idx", "I", null, null).visitEnd();
+    private static final class ParamMeta {
+        String name;
+        boolean required = true;
+    }
 
-        MethodVisitor init = cw.visitMethod(0, "<init>", "(I)V", null, null);
-        init.visitCode();
-        init.visitVarInsn(Opcodes.ALOAD, 0);
-        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        init.visitVarInsn(Opcodes.ALOAD, 0);
-        init.visitVarInsn(Opcodes.ILOAD, 1);
-        init.visitFieldInsn(Opcodes.PUTFIELD, DISPATCH_INTERNAL, "idx", "I");
-        init.visitInsn(Opcodes.RETURN);
-        init.visitMaxs(0, 0);
-        init.visitEnd();
-
-        // public Form build(RouteContext ctx)
-        MethodVisitor build = cw.visitMethod(Opcodes.ACC_PUBLIC,
-                "build", "(L" + CONTEXT_INTERNAL + ";)L" + FORM_INTERNAL + ";", null, null);
-        build.visitCode();
-        build.visitVarInsn(Opcodes.ALOAD, 0);
-        build.visitFieldInsn(Opcodes.GETFIELD, DISPATCH_INTERNAL, "idx", "I");
-
-        if (routes.isEmpty()) {
-            // Defensive: empty routes — throw straight away.
-            emitAssertionThrow(build, "no @Route classes configured");
-            build.visitInsn(Opcodes.POP); // pop the idx we loaded
-        } else {
-            Label[] caseLabels = new Label[routes.size()];
-            for (int i = 0; i < routes.size(); i++) caseLabels[i] = new Label();
-            Label defaultLabel = new Label();
-            build.visitTableSwitchInsn(0, routes.size() - 1, defaultLabel, caseLabels);
-
-            for (int i = 0; i < routes.size(); i++) {
-                build.visitLabel(caseLabels[i]);
-                Entry e = routes.get(i);
-                build.visitTypeInsn(Opcodes.NEW, e.targetInternal);
-                build.visitInsn(Opcodes.DUP);
-                if (e.kind == ConstructorKind.ROUTE_CONTEXT) {
-                    build.visitVarInsn(Opcodes.ALOAD, 1);
-                    build.visitMethodInsn(Opcodes.INVOKESPECIAL, e.targetInternal,
-                            "<init>", CTX_CTOR_DESC, false);
-                } else {
-                    build.visitMethodInsn(Opcodes.INVOKESPECIAL, e.targetInternal,
-                            "<init>", NO_ARG_CTOR_DESC, false);
-                }
-                build.visitInsn(Opcodes.ARETURN);
+    static final class ParamBinding {
+        final String name;
+        final boolean required;
+        ParamBinding(String name, boolean required) {
+            this.name = name;
+            this.required = required;
+        }
+        String paramExpression(Map<String, String> pathExpressions) {
+            String fromPath = pathExpressions.get(name);
+            if (fromPath != null) {
+                return fromPath;
             }
-
-            build.visitLabel(defaultLabel);
-            emitAssertionThrow(build, "bad route index");
-        }
-
-        build.visitMaxs(0, 0);
-        build.visitEnd();
-
-        cw.visitEnd();
-        return cw.toByteArray();
-    }
-
-    private static void pushInt(MethodVisitor mv, int v) {
-        if (v >= -1 && v <= 5) {
-            mv.visitInsn(Opcodes.ICONST_0 + v);
-        } else if (v >= Byte.MIN_VALUE && v <= Byte.MAX_VALUE) {
-            mv.visitIntInsn(Opcodes.BIPUSH, v);
-        } else if (v >= Short.MIN_VALUE && v <= Short.MAX_VALUE) {
-            mv.visitIntInsn(Opcodes.SIPUSH, v);
-        } else {
-            mv.visitLdcInsn(Integer.valueOf(v));
+            // Fall back to query string.
+            String def = required
+                    ? "throwMissing(\"" + name + "\")"
+                    : "null";
+            return "q.containsKey(\"" + name + "\") ? q.get(\"" + name + "\") : " + def;
         }
     }
 
-    private static void emitAssertionThrow(MethodVisitor mv, String message) {
-        mv.visitTypeInsn(Opcodes.NEW, "java/lang/AssertionError");
-        mv.visitInsn(Opcodes.DUP);
-        mv.visitLdcInsn(message);
-        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/AssertionError",
-                "<init>", "(Ljava/lang/Object;)V", false);
-        mv.visitInsn(Opcodes.ATHROW);
+    static final class ConstructorBinding {
+        final String descriptor;
+        final ParamBinding[] params;
+        ConstructorBinding(String descriptor, ParamBinding[] params) {
+            this.descriptor = descriptor;
+            this.params = params;
+        }
     }
 
-    // ------------------------------------------------------------------------
-    // Data carriers
-    // ------------------------------------------------------------------------
+    static final class MethodBinding {
+        final String name;
+        final String descriptor;
+        final ParamBinding[] params;
+        MethodBinding(String name, String descriptor, ParamBinding[] params) {
+            this.name = name;
+            this.descriptor = descriptor;
+            this.params = params;
+        }
+    }
 
-    /// Visible for unit tests.
-    public enum ConstructorKind { NO_ARG, ROUTE_CONTEXT, NONE }
+    static final class Entry {
+        final String pattern;
+        final String targetClassBinary;
+        final String methodName; // null for class-level
+        final Object binding;
 
-    /// Visible for unit tests.
-    public static final class Entry {
-        public final String pattern;
-        public final String targetInternal;
-        public final ConstructorKind kind;
-
-        public Entry(String pattern, String targetInternal, ConstructorKind kind) {
+        private Entry(String pattern, String targetClassBinary, String methodName, Object binding) {
             this.pattern = pattern;
-            this.targetInternal = targetInternal;
-            this.kind = kind;
+            this.targetClassBinary = targetClassBinary;
+            this.methodName = methodName;
+            this.binding = binding;
         }
-    }
 
-    /// Test hook: returns the accepted entries in deterministic order (pattern
-    /// sort). Cleared on every `#start`.
-    public Map<String, Entry> getAccepted() {
-        return new LinkedHashMap<String, Entry>(accepted);
-    }
+        static Entry forClass(String pattern, String targetClassBinary, ConstructorBinding binding) {
+            return new Entry(pattern, targetClassBinary, null, binding);
+        }
 
-    /// Test hook: clear state between runs in unit tests that don't go through
-    /// the Mojo orchestrator.
-    public void resetForTesting() {
-        accepted.clear();
+        static Entry forMethod(String pattern, String targetClassBinary, String methodName,
+                                MethodBinding binding) {
+            return new Entry(pattern, targetClassBinary, methodName, binding);
+        }
+
+        String targetDescription() {
+            return methodName == null ? targetClassBinary
+                    : targetClassBinary + "#" + methodName;
+        }
+
+        String buildExpression(Map<String, String> pathExpressions) {
+            ParamBinding[] params;
+            if (binding instanceof ConstructorBinding) {
+                params = ((ConstructorBinding) binding).params;
+            } else {
+                params = ((MethodBinding) binding).params;
+            }
+            StringBuilder args = new StringBuilder();
+            for (int i = 0; i < params.length; i++) {
+                if (i > 0) {
+                    args.append(", ");
+                }
+                args.append(params[i].paramExpression(pathExpressions));
+            }
+            if (methodName == null) {
+                return "new " + targetClassBinary + "(" + args + ")";
+            }
+            return targetClassBinary + "." + methodName + "(" + args + ")";
+        }
     }
 }

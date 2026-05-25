@@ -86,9 +86,7 @@ include::Biometric-Authentication.asciidoc[]
 
 include::Authentication-And-Identity.asciidoc[]
 
-include::Routing-And-Deep-Links.asciidoc[]
-
-include::Tutorial-Routing-And-Deep-Links.asciidoc[]
+include::Deep-Links-Routing.asciidoc[]
 
 include::Near-Field-Communication.asciidoc[]
 

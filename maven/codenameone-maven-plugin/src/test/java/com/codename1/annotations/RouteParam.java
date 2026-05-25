@@ -1,5 +1,5 @@
 /*
- * Test stub of com.codename1.annotations.Route mirroring the runtime
+ * Test stub of com.codename1.annotations.RouteParam mirroring the runtime
  * annotation so JavaCompiler under test can compile fixtures.
  */
 package com.codename1.annotations;
@@ -10,13 +10,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.CLASS)
-@Target({ ElementType.TYPE, ElementType.METHOD })
-public @interface Route {
+@Target(ElementType.PARAMETER)
+public @interface RouteParam {
     String value();
-
-    @Retention(RetentionPolicy.CLASS)
-    @Target({ ElementType.TYPE, ElementType.METHOD })
-    @interface Routes {
-        Route[] value();
-    }
+    boolean required() default true;
 }

@@ -1,0 +1,208 @@
+== Deep-Link Routing
+
+[[deep-link-routing-section,Deep-Link Routing Section]]
+Codename One can dispatch a deep link -- an iOS Universal Link, an Android
+App Link, a custom-scheme URL, a push-notification payload, or anything
+else the platform delivers as a URL -- to a specific `Form` by class or by
+static factory method, without any runtime router API to wire up.
+
+The application surface is just two annotations.
+
+=== Declare a route
+
+Annotate the target `Form` class:
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.Route;
+import com.codename1.annotations.RouteParam;
+import com.codename1.ui.Form;
+
+@Route("/users/:id")
+public class ProfileForm extends Form {
+    public ProfileForm(@RouteParam("id") String id) {
+        setTitle("Profile " + id);
+        // ...
+    }
+}
+----
+
+Or annotate a static factory method:
+
+[source,java]
+----
+public class Routes {
+    @Route("/home")
+    public static Form home() {
+        return new HomeForm();
+    }
+
+    @Route("/users/:id")
+    public static Form profile(@RouteParam("id") String id) {
+        return new ProfileForm(id);
+    }
+}
+----
+
+Both forms are supported and a project can mix them. Path variables in
+the pattern (`:id`, `*`, `**`) are matched by name against parameters
+annotated with `@RouteParam`. Missing `@RouteParam` on a path-variable
+parameter fails the build.
+
+=== Path syntax
+
+|===
+|Pattern              |Matches                              |Bound
+
+|`/about`             |`/about`                             |--
+|`/users/:id`         |`/users/42`                          |`id = "42"`
+|`/files/*`           |`/files/photo.png` (one segment)     |`* = "photo.png"`
+|`/files/**`          |`/files/a/b/c` (catch-all)           |`* = "a/b/c"`
+|===
+
+Query string parameters are bound the same way as path variables. The
+build prefers a path-variable match for a given name and falls back to
+the query string when the pattern doesn't include that name.
+
+=== Wire the build
+
+Two goals on the Codename One Maven plugin do the work. Configure them in
+the project's `pom.xml`:
+
+[source,xml]
+----
+<plugin>
+  <groupId>com.codenameone</groupId>
+  <artifactId>codenameone-maven-plugin</artifactId>
+  <executions>
+    <execution>
+      <id>cn1-annotation-stubs</id>
+      <phase>generate-sources</phase>
+      <goals><goal>generate-annotation-stubs</goal></goals>
+    </execution>
+    <execution>
+      <id>cn1-process-annotations</id>
+      <phase>process-classes</phase>
+      <goals><goal>process-annotations</goal></goals>
+    </execution>
+  </executions>
+</plugin>
+----
+
+* `generate-annotation-stubs` emits the compile-time stubs the framework
+  needs to resolve any reference to the build-generated routing class.
+* `process-annotations` scans the project's compiled bytecode, validates
+  every `@Route` declaration fail-fast, and generates an internal
+  dispatcher class that the framework wires into `Display` under the
+  hood. There is no router API for application code to call.
+
+The validation gate catches every problem in a single build run:
+
+* `@Route` declared on a class that doesn't extend `Form`
+* Pattern with no leading `/` or empty value
+* Path variable with no matching `@RouteParam` on the constructor /
+  factory
+* Duplicate pattern declared on two different targets
+* `@Route` on an abstract class or non-`public static` method
+
+=== iOS Universal Links
+
+Host an `apple-app-site-association` JSON file at
+`https://your.domain/.well-known/apple-app-site-association` over HTTPS
+without redirects. The plugin's `AasaBuilder` produces the payload:
+
+[source,java]
+----
+String json = new com.codename1.maven.routing.AasaBuilder()
+    .appId("ABCD1234.com.example.app")
+    .addRouterPattern("/users/:id")
+    .addRouterPattern("/share/**")
+    .addPath("NOT /admin/*")
+    .build();
+// Write `json` to https://example.com/.well-known/apple-app-site-association
+----
+
+Enable the **Associated Domains** capability in Xcode with the entry
+`applinks:example.com`.
+
+=== Android App Links
+
+Host an `assetlinks.json` file at
+`https://your.domain/.well-known/assetlinks.json`. The plugin's
+`AssetLinksBuilder` produces the payload:
+
+[source,java]
+----
+String json = new com.codename1.maven.routing.AssetLinksBuilder()
+    .addApp("com.example.app",
+            "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5")
+    .addFingerprint("AB:CD:..." /* Play App Signing upload cert */)
+    .build();
+----
+
+Add the verified intent filter to the manifest via the
+`android.xintent_filter` build hint:
+
+[source,xml]
+----
+<intent-filter android:autoVerify="true">
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="https" android:host="example.com" />
+</intent-filter>
+----
+
+The SHA-256 fingerprint comes from `keytool -list -v -keystore ...`, or
+from the Play Console under **Setup > App integrity** when using Play
+App Signing.
+
+=== Testing
+
+==== iOS Simulator
+
+[source,sh]
+----
+xcrun simctl openurl booted "https://example.com/users/42"
+----
+
+==== Android Emulator
+
+[source,sh]
+----
+adb shell am start -a android.intent.action.VIEW \
+    -d "https://example.com/users/42" com.example.app
+----
+
+==== Desktop Simulator
+
+Pass `--cn1-arg=https://example.com/users/42` on the run command, or use
+the simulator's URL-injection helper.
+
+=== Back-press guard
+
+Independent of deep linking, individual forms can intercept back / pop
+attempts so they can confirm before discarding unsaved work:
+
+[source,java]
+----
+import com.codename1.router.PopGuard;
+import com.codename1.router.PopReason;
+
+editForm.setPopGuard(new PopGuard() {
+    public boolean canPop(Form form, PopReason reason) {
+        if (!isDirty()) {
+            return true;
+        }
+        Dialog.show("Discard changes?", "You have unsaved edits.",
+                    "Stay", "Discard");
+        return false;
+    }
+});
+----
+
+The guard fires for the toolbar back button, the Android hardware back
+key, the iOS edge-swipe gesture, and any programmatic back navigation.
+`PopReason` distinguishes the trigger so a guard can be selective.

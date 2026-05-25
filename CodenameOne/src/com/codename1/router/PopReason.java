@@ -23,8 +23,8 @@
 package com.codename1.router;
 
 /// Why a back/pop attempt is happening. Passed to `PopGuard#canPop` so guards
-/// can make different decisions for different triggers (e.g. allow programmatic
-/// `Router.pop()` but warn on hardware back).
+/// can make different decisions for different triggers (allow programmatic
+/// dismissal but warn on hardware back, for example).
 public final class PopReason {
     /// The Android hardware back button, the iOS edge-swipe gesture, or the
     /// browser back button on the JavaScript port.
@@ -33,16 +33,8 @@ public final class PopReason {
     /// The Form's back command was invoked (toolbar back button, etc.).
     public static final PopReason BACK_COMMAND = new PopReason("BACK_COMMAND");
 
-    /// `Router.pop()` was called from application code.
+    /// Application code invoked a back/pop programmatically.
     public static final PopReason PROGRAMMATIC = new PopReason("PROGRAMMATIC");
-
-    /// `Router.replace()` was called: the current Form is being replaced, not
-    /// popped, but the previous Form is being discarded.
-    public static final PopReason REPLACE = new PopReason("REPLACE");
-
-    /// A new deep link is being routed and would unwind the stack to a different
-    /// position.
-    public static final PopReason DEEP_LINK = new PopReason("DEEP_LINK");
 
     private final String name;
 

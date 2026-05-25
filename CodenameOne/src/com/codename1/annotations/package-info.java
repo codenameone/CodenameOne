@@ -20,10 +20,5 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.router;
-
-import com.codename1.ui.Form;
-
-public interface RouteBuilder {
-    Form build(RouteContext ctx);
-}
+/// Build-time annotations consumed by the Codename One Maven plugin.
+package com.codename1.annotations;

@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.router.tools;
+package com.codename1.maven.routing;
 
 import org.junit.jupiter.api.Test;
 
