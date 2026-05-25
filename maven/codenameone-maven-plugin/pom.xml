@@ -50,6 +50,11 @@
             <classifier>jar-with-dependencies</classifier>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-svg-transcoder</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
         </dependency>

@@ -117,6 +117,13 @@ public class Resources {
     private static int lastLoadedDPI;
     private static boolean runtimeMultiImages;
     private static boolean failOnMissingTruetype = true;
+
+    /// Global image registry populated by the build-time SVG transcoder. Keyed by
+    /// the source filename ("home.svg") and also under the filename stem ("home")
+    /// so CSS-style `url(home.svg)` references and direct `getImage("home")` calls
+    /// both resolve. Lazily probed via [#ensureGeneratedSVGsInstalled].
+    private static final Map<String, Image> generatedImages = new HashMap<String, Image>();
+    private static volatile boolean generatedSVGProbed;
     /// Hashtable containing the mapping between element types and their names in the
     /// resource hashtable
     private final HashMap<String, Byte> resourceTypes = new HashMap<String, Byte>();
@@ -880,7 +887,64 @@ public class Resources {
     ///
     /// cached image instance
     public Image getImage(String id) {
-        return (Image) resources.get(id);
+        Image local = (Image) resources.get(id);
+        if (local != null) return local;
+        ensureGeneratedSVGsInstalled();
+        Image gen;
+        synchronized (generatedImages) {
+            gen = generatedImages.get(id);
+        }
+        return gen;
+    }
+
+    /// Install an [Image] into this resources bundle under the given name so a
+    /// subsequent [#getImage(String)] returns it. Used by the build-time SVG
+    /// transcoder registry to inject generated images alongside the resources
+    /// loaded from the `.res` file.
+    public void setImage(String id, Image image) {
+        if (id == null || image == null) return;
+        resources.put(id, image);
+        resourceTypes.put(id, Byte.valueOf(MAGIC_IMAGE));
+    }
+
+    /// Add an [Image] to the global registry consulted by every
+    /// [#getImage(String)] call as a fallback. Intended for the
+    /// auto-generated `com.codename1.generated.svg.SVGRegistry` produced by
+    /// the SVG transcoder mojo — application code should not normally call
+    /// this directly.
+    ///
+    /// Registers the image both under the supplied `id` and (if `id` ends with
+    /// `.svg`) under the bare filename stem so a CSS reference like
+    /// `url(home.svg)` and a code reference like `getImage("home")` both
+    /// resolve to the same instance.
+    public static void registerGeneratedImage(String id, Image image) {
+        if (id == null || image == null) return;
+        synchronized (generatedImages) {
+            generatedImages.put(id, image);
+            if (id.endsWith(".svg")) {
+                generatedImages.put(id.substring(0, id.length() - 4), image);
+            }
+        }
+    }
+
+    /// Lazily probe for `com.codename1.generated.svg.SVGRegistry` and ask it
+    /// to populate the global registry. If the application has no transcoded
+    /// SVGs, the class will not exist and the probe is silently skipped.
+    /// Marked package-private so {@link com.codename1.svg} tests can re-probe.
+    static void ensureGeneratedSVGsInstalled() {
+        if (generatedSVGProbed) return;
+        synchronized (generatedImages) {
+            if (generatedSVGProbed) return;
+            generatedSVGProbed = true;
+            try {
+                Class<?> registry = Class.forName("com.codename1.generated.svg.SVGRegistry");
+                registry.getMethod("installGlobal").invoke(null);
+            } catch (ClassNotFoundException notPresent) {
+                // No SVGs — nothing to install.
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
     }
 
     /// Returns the data resource from the file
