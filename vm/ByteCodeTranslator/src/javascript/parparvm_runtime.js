@@ -1758,7 +1758,12 @@ const jvm = {
     if (result && typeof result === 'object' && !Array.isArray(result)
         && value && value !== result
         && result.__cn1HostRef == null && result.__classDef == null
-        && Object.getOwnPropertyNames(result).length === 0) {
+        && Object.getOwnPropertyNames(result).length === 0
+        // Critical filter: real native objects (XMLHttpRequest, ArrayBuffer,
+        // typed arrays, DOM nodes, etc.) have a NON-Object.prototype
+        // prototype. Only literal {} has Object.prototype, which is the
+        // shape that the cn1_iv* receiver-{} bug shows.
+        && Object.getPrototypeOf(result) === Object.prototype) {
       if (!jvm._emptyUnwrapLogged) jvm._emptyUnwrapLogged = 0;
       if (jvm._emptyUnwrapLogged < 8) {
         jvm._emptyUnwrapLogged++;
