@@ -3,6 +3,8 @@
  */
 package com.codename1.router;
 
+import com.codename1.ui.Form;
+
 public interface RouteDispatcher {
-    boolean dispatch(String url);
+    Form dispatch(String url);
 }

@@ -4,9 +4,13 @@
 Codename One can dispatch a deep link -- an iOS Universal Link, an Android
 App Link, a custom-scheme URL, a push-notification payload, or anything
 else the platform delivers as a URL -- to a specific `Form` by class or by
-static factory method, without any runtime router API to wire up.
+static factory method. The same route table powers in-app navigation
+through `Navigation.navigate("/path")`, so the application chooses
+declarative or imperative per call site without maintaining two parallel
+maps.
 
-The application surface is just two annotations.
+The application surface is two annotations plus a tiny `Navigation`
+class -- five static methods and one value type.
 
 === Declare a route
 
@@ -65,6 +69,36 @@ parameter fails the build.
 Query string parameters are bound the same way as path variables. The
 build prefers a path-variable match for a given name and falls back to
 the query string when the pattern doesn't include that name.
+
+=== Navigate from app code
+
+The `Navigation` class is the imperative counterpart to `@Route`.
+Calling `Navigation.navigate("/users/42")` from anywhere in the app
+resolves the URL through the same generated route table that handles
+incoming deep links, builds the matching `Form`, pushes it onto the
+navigation stack, and shows it.
+
+[source,java]
+----
+Navigation.navigate("/users/42");
+
+// Go back one step:
+Navigation.back();
+
+// Inspect the stack for a breadcrumb UI:
+Container breadcrumbs = new Container(BoxLayout.x());
+for (final NavigationEntry e : Navigation.getStack()) {
+    Button crumb = new Button(e.getTitle());
+    crumb.addActionListener(evt -> Navigation.popTo(e));
+    breadcrumbs.add(crumb);
+}
+----
+
+The five-method surface (`navigate`, `back`, `getCurrent`, `getStack`,
+`popTo`) is everything the application sees -- the rest of the URL-to-
+form machinery is generated. Applications that prefer raw
+`new MyForm().show()` keep working unchanged; only URL-driven calls
+update the `Navigation` stack.
 
 === Wire the build
 
