@@ -1749,7 +1749,29 @@ const jvm = {
     return value;
   },
   unwrapJsValue(value) {
-    return value && value.__jsValue !== undefined ? value.__jsValue : value;
+    const result = value && value.__jsValue !== undefined ? value.__jsValue : value;
+    // DIAG: when the unwrapped value is literal {} (no own props, no
+    // __cn1HostRef, no __classDef) AND the input was a wrapper (had
+    // __jsValue), log the leak source. This catches the canvasContextWipe
+    // upstream: someone is passing a wrapper whose __jsValue is {}, and
+    // the unwrap path leaks the {} forward as a JSO receiver.
+    if (result && typeof result === 'object' && !Array.isArray(result)
+        && value && value !== result
+        && result.__cn1HostRef == null && result.__classDef == null
+        && Object.getOwnPropertyNames(result).length === 0) {
+      if (!jvm._emptyUnwrapLogged) jvm._emptyUnwrapLogged = 0;
+      if (jvm._emptyUnwrapLogged < 8) {
+        jvm._emptyUnwrapLogged++;
+        try {
+          vmDiag('EMPTY_UNWRAP', 'inputClass', String(value.__class));
+          vmDiag('EMPTY_UNWRAP', 'inputClassDef', String(value.__classDef && value.__classDef.name));
+          vmDiag('EMPTY_UNWRAP', 'inputId', String(value.__id));
+          const stack = new Error('empty-unwrap-trace').stack || '';
+          vmDiag('EMPTY_UNWRAP', 'stack', String(stack).split('\n').slice(0, 6).join(' | ').substring(0, 500));
+        } catch (_e) {}
+      }
+    }
+    return result;
   },
   wrapJsResult(value, expectedClass) {
     if (value == null) {
