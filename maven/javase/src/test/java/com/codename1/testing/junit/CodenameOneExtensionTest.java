@@ -164,12 +164,29 @@ public class CodenameOneExtensionTest {
 
     @Test
     @Theme("/iOSModernTheme.res")
-    public void themeLoaded() {
-        // Verifies the annotation runs end-to-end against a real .res bundled
-        // into the simulator jar. Asserting on individual theme keys would
-        // bind this test to theme internals, so we only check that the
-        // UIManager now reports an installed theme by name.
+    public void themeLoadedByResourcePath() {
+        // Verifies the path-based form of @Theme runs end-to-end against a
+        // real .res bundled into the simulator jar. Asserting on individual
+        // theme keys would bind this test to theme internals, so we only
+        // check that the UIManager now reports an installed theme by name.
         assertNotNull(UIManager.getInstance().getThemeName(),
                 "@Theme must leave a named theme installed on UIManager");
+    }
+
+    @Test
+    @Theme(nativeTheme = NativeTheme.ANDROID_MATERIAL)
+    public void themeLoadedByNativeThemeEnum() {
+        // Verifies the enum-based form of @Theme resolves to the correct
+        // bundled .res. ANDROID_MATERIAL is deliberately different from the
+        // path-based test above so a stale theme leaking across tests would
+        // be caught by the name check below.
+        assertNotNull(UIManager.getInstance().getThemeName(),
+                "@Theme(nativeTheme=...) must leave a named theme installed on UIManager");
+        assertEquals("/AndroidMaterialTheme.res",
+                NativeTheme.ANDROID_MATERIAL.resourcePath(),
+                "NativeTheme.ANDROID_MATERIAL.resourcePath() must point at the bundled .res");
+        assertEquals("Android Material",
+                NativeTheme.ANDROID_MATERIAL.displayName(),
+                "NativeTheme.ANDROID_MATERIAL.displayName() must mirror the simulator menu label");
     }
 }

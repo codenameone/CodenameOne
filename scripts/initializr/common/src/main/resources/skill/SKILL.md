@@ -226,13 +226,13 @@ class GreetingFormTest {
 }
 ```
 
-Run with `mvn -pl common cn1:test` (legacy runner) or `mvn test` (both runners). The cn1app archetype already wires up Surefire + JUnit Jupiter in the generated POMs.
+Run with `mvn -pl common cn1:test` (cn1:test runner only) or `mvn test` (both runners). The cn1app archetype already wires up Surefire + JUnit Jupiter in the generated POMs.
 
 `screenshotTest(name)` captures the current form, compares against a stored baseline under `Storage`, and returns `true` if within tolerance. First run records the baseline. See `references/testing-and-screenshots.md` for the tolerance algorithm and how to validate UI you just wrote.
 
 > Important: a "screenshot matches baseline" only proves consistency, **not** correctness. If you just generated the baseline yourself, you have not validated the screen — visually inspect at least once before treating that baseline as ground truth.
 
-> Headless caveat: any simulator-driven test (both flavors) needs an X server / Xvfb to construct the simulator's `JFrame`. The `@CodenameOneTest` extension auto-aborts the class on a headless JVM so you get "skipped" instead of "errored"; the legacy runner needs you to skip with `-DskipTests` or run under `xvfb-run`.
+> Headless caveat: any simulator-driven test (both flavors) needs an X server / Xvfb to construct the simulator's `JFrame`. The `@CodenameOneTest` extension auto-aborts the class on a headless JVM so you get "skipped" instead of "errored"; the `cn1:test` runner needs you to skip with `-DskipTests` or run under `xvfb-run`.
 
 ## Build and run commands
 

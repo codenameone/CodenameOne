@@ -414,11 +414,33 @@ public class CodenameOneExtension
             Orientation o = pickOrientation(testClass, method);
             RTL rtl = pickRtl(testClass, method);
             return new ResolvedVisualConfig(
-                    theme == null ? null : theme.value(),
+                    resolveThemePath(theme),
                     dark == null ? null : Boolean.valueOf(dark.enabled()),
                     lt == null ? null : Float.valueOf(lt.scale()),
                     o == null ? null : Boolean.valueOf(o.value() == Orientation.Value.PORTRAIT),
                     rtl == null ? null : Boolean.valueOf(rtl.enabled()));
+        }
+
+        /**
+         * Reduces a {@link Theme} annotation to the .res path the extension
+         * should install. The {@link Theme#nativeTheme()} enum wins over the
+         * {@link Theme#value()} path because it is the more specific signal;
+         * a non-empty path is used only when the enum is left at its
+         * {@code NONE} default. Returns null when the annotation is absent
+         * or carries neither input, so {@link ResolvedVisualConfig#hasAny()}
+         * treats it as "nothing to apply" and the extension leaves the
+         * current theme alone.
+         */
+        private static String resolveThemePath(Theme theme) {
+            if (theme == null) {
+                return null;
+            }
+            NativeTheme nt = theme.nativeTheme();
+            if (nt != null && nt != NativeTheme.NONE) {
+                return nt.resourcePath();
+            }
+            String value = theme.value();
+            return (value == null || value.isEmpty()) ? null : value;
         }
 
         private static Theme pickTheme(Class<?> c, Method m) {

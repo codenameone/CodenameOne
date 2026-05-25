@@ -1,6 +1,6 @@
 == Testing with JUnit 5
 
-Codename One has historically shipped its own test framework — `com.codename1.testing.AbstractTest` driven by the `cn1:test` Maven goal. That framework is still fully supported and remains the only way to run tests on a physical iOS or Android device. Starting with Codename One 8, the JavaSE simulator also exposes a standard **JUnit 5** integration so you can write tests that run through Surefire and your IDE's native test runner.
+Codename One ships two compatible test frameworks. `com.codename1.testing.AbstractTest`, driven by the `cn1:test` Maven goal, is the only way to run tests on a physical iOS or Android device — JUnit Jupiter isn't available on ParparVM. The JavaSE simulator also exposes a standard **JUnit 5** integration so you can write tests that run through Surefire and your IDE's native test runner; those tests run only in the simulator JVM but in exchange give you reflection, mocking libraries, and the rest of the standard Java testing ecosystem.
 
 Both styles coexist in the same project under `common/src/test/java`. You pick per test class. This chapter explains when to reach for which, walks through the JUnit annotations, and shows how the two frameworks compare side by side.
 
@@ -11,19 +11,19 @@ Both styles coexist in the same project under `common/src/test/java`. You pick p
 |Framework |Use it for |Don't use it for
 
 |`AbstractTest` + `cn1:test`
-|Tests that must execute on a real device (`mvn cn1:test -Dtarget=ios` / `-Dtarget=android`). Legacy code that already extends `AbstractTest`. Tests that must compile under the strict Codename One device subset (no reflection, no `java.net.http.*`, no `java.nio.file.*`).
+|Tests that must execute on a real device (`mvn cn1:test -Dtarget=ios` / `-Dtarget=android`). Tests that must compile under the strict Codename One device subset (no reflection, no `java.net.http.*`, no `java.nio.file.*`).
 |Tests that need reflection, Mockito, AssertJ, parameterized data sets, `assertThrows`, or anything else that lives outside the device subset.
 
 |`@CodenameOneTest` (JUnit 5)
 |Simulator-only tests. Anything that wants a full JVM at test time — reflection, mocking libraries, parameterized tests, IDE green-bar integration, `mvn test -Dtest=Foo#bar` filtering, `@BeforeEach`/`@AfterEach` lifecycle methods.
-|Anything that must also run on a device — JUnit Jupiter doesn't exist on ParparVM.
+|Anything that must also run on a device — JUnit Jupiter isn't available on ParparVM.
 |===
 
 The two runners discover disjoint sets of test classes (cn1:test looks for `com.codename1.testing.UnitTest` implementers; Surefire looks for `@Test`-annotated methods), so a project can mix both. `mvn install` runs Surefire during the `test` phase and `cn1:test` from the javase module's `test` profile in the same phase — you don't lose either test pass.
 
 === Dependencies
 
-The cn1app archetype (releases ≥ 8.0) generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If you are upgrading an older project, add these dependency blocks yourself:
+The cn1app archetype generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If your project predates that wiring, add these dependency blocks yourself:
 
 [source,xml,title='common/pom.xml']
 ----
@@ -164,16 +164,30 @@ The JavaSE port compiles at source 1.7, which predates `@Repeatable`. To set mor
 
 === `@Theme`
 
-Loads a `.res` resource and installs its first theme through `UIManager.setThemeProps`, then triggers a refresh.
+Loads a base theme resource and installs it through `UIManager.setThemeProps`, then triggers a refresh. The annotation accepts either of two mutually exclusive inputs.
+
+*By native theme.* Use the `NativeTheme` enum for the themes bundled into the simulator jar -- the same set the simulator's *Simulate > Native Theme* menu offers:
 
 [source,java]
 ----
-@Test @Theme("/iOSModernTheme.res")        void rendersUnderIos()       { /* ... */ }
-@Test @Theme("/AndroidMaterialTheme.res")  void rendersUnderAndroid()   { /* ... */ }
-@Test @Theme("/iPhoneTheme.res")           void rendersUnderLegacyIos() { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IOS_MODERN)        void rendersUnderIosModern()    { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IOS_FLAT)          void rendersUnderIosFlat()      { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IPHONE_PRE_FLAT)   void rendersUnderClassicIos()   { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_MATERIAL)  void rendersUnderAndroid()      { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_HOLO_LIGHT) void rendersUnderHoloLight()   { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_LEGACY)    void rendersUnderAndroidLegacy(){ /* ... */ }
 ----
 
-The simulator jar bundles `iOSModernTheme.res`, `AndroidMaterialTheme.res`, `iPhoneTheme.res`, `iOS7Theme.res`, `androidTheme.res`, and `android_holo_light.res`. App themes work too — ship the `.res` under `src/main/resources` or `src/test/resources` and reference it with a leading slash.
+The enum carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` returns `/iOSModernTheme.res`) and the simulator-menu label (`displayName()`), so test reports can render the same name a user sees in the simulator UI.
+
+*By resource path.* For app themes shipped under `src/main/resources` or `src/test/resources`, point `value` at the `.res` file with a leading slash:
+
+[source,java]
+----
+@Test @Theme("/MyAppTheme.res")  void rendersAppTheme()  { /* ... */ }
+----
+
+If both `nativeTheme` and `value` are set, `nativeTheme` wins. If neither is set, the annotation is a no-op.
 
 === `@DarkMode`
 
@@ -330,5 +344,5 @@ The UI driving (`TestUtils.*`) is identical -- `TestUtils` is independent of the
 
 === Cross-reference
 
-* For the legacy framework's full API surface (`TestUtils` helpers, `screenshotTest` tolerance algorithm, baseline management), see <<screenshot-testing,Screenshot Testing>> in the performance chapter.
+* For the `AbstractTest` framework's full API surface (`TestUtils` helpers, `screenshotTest` tolerance algorithm, baseline management), see <<screenshot-testing,Screenshot Testing>> in the performance chapter.
 * For the `cn1:test` Maven goal, see <<appendix-goal-test,the test goal appendix>>.

@@ -28,24 +28,34 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Applies a base theme resource before the test runs &mdash; equivalent to
- * the simulator's "Native Theme" menu, but scoped to a single test (or to a
+ * Applies a base theme before the test runs &mdash; the same effect as the
+ * simulator's "Native Theme" menu, but scoped to a single test (or to a
  * class when placed at the class level).
  *
- * <p>The {@link #value()} is the classpath name of a {@code .res} file
- * containing a theme. The native themes bundled into the JavaSE simulator
- * jar can be used directly:
+ * <p>Pick the theme one of two ways:
  *
- * <pre>
- * &#64;Test &#64;Theme("/iOSModernTheme.res")   void looksRightOnIos()       { ... }
- * &#64;Test &#64;Theme("/AndroidMaterialTheme.res") void looksRightOnAndroid() { ... }
- * &#64;Test &#64;Theme("/iPhoneTheme.res")     void looksRightOnLegacyIos() { ... }
- * </pre>
+ * <ul>
+ *   <li>{@link #nativeTheme()} &mdash; one of the {@link NativeTheme}
+ *       constants, which map to the .res files bundled into the simulator
+ *       jar. This is the recommended form for cross-platform look-and-feel
+ *       coverage:
+ *       <pre>
+ * &#64;Test &#64;Theme(nativeTheme = NativeTheme.IOS_MODERN)        void rendersUnderIosModern()    { ... }
+ * &#64;Test &#64;Theme(nativeTheme = NativeTheme.ANDROID_MATERIAL)  void rendersUnderAndroid()      { ... }
+ * &#64;Test &#64;Theme(nativeTheme = NativeTheme.IOS_FLAT)          void rendersUnderIosFlat()      { ... }
+ * </pre></li>
+ *   <li>{@link #value()} &mdash; a classpath path to any {@code .res} file
+ *       containing a theme. Use this for app themes shipped under
+ *       {@code src/main/resources} or {@code src/test/resources}:
+ *       <pre>
+ * &#64;Test &#64;Theme("/MyAppTheme.res")  void rendersAppTheme() { ... }
+ * </pre></li>
+ * </ul>
  *
- * <p>Custom app themes work too &mdash; ship the {@code .res} file under
- * {@code src/main/resources} or {@code src/test/resources} and reference it
- * with a leading slash. The theme is loaded via
- * {@code Resources.open(value)} and the first theme inside the resource is
+ * <p>When both are set the {@link #nativeTheme()} wins and {@link #value()}
+ * is ignored. When neither is set the annotation is a no-op &mdash; the
+ * same as not annotating at all. The selected resource is loaded via
+ * {@code Resources.open(...)} and the first theme inside the resource is
  * installed via {@code UIManager.setThemeProps(...)} on the EDT, after
  * which the active form is refreshed.
  */
@@ -54,6 +64,14 @@ import java.lang.annotation.Target;
 public @interface Theme {
     /**
      * Classpath path to a {@code .res} file (must start with {@code /}).
+     * Defaults to the empty string, which means "use {@link #nativeTheme()}
+     * if set, otherwise treat this annotation as a no-op".
      */
-    String value();
+    String value() default "";
+
+    /**
+     * One of the native themes bundled into the simulator jar. Defaults to
+     * {@link NativeTheme#NONE}, which means "fall back to {@link #value()}".
+     */
+    NativeTheme nativeTheme() default NativeTheme.NONE;
 }

@@ -4,8 +4,8 @@ Codename One ships two compatible ways to write tests:
 
 | Framework | Runs through | When to reach for it |
 | --- | --- | --- |
-| `com.codename1.testing.AbstractTest` + `cn1:test` | The Codename One Maven plugin's own runner | Tests that must also execute **on a real device** (`mvn cn1:test -Dtarget=ios`), legacy code that already extends `AbstractTest`, or anything that must compile under the CN1 device subset (no reflection, no JavaSE APIs). |
-| `@CodenameOneTest` (JUnit 5) + Surefire | Standard `mvn test` via the JUnit Jupiter engine | Tests that run only in the simulator JVM. You get a real JVM, so you can use **reflection**, **Mockito**, **AssertJ**, parameterized tests, and any other library that would fail under ParparVM. Faster startup than `cn1:test`, integrates with your IDE's standard JUnit runner, plays nicely with `mvn -pl common test -Dtest=MyTest#oneMethod` filtering. |
+| `com.codename1.testing.AbstractTest` + `cn1:test` | The Codename One Maven plugin's own runner | Tests that must also execute **on a real device** (`mvn cn1:test -Dtarget=ios`), and anything that must compile under the CN1 device subset (no reflection, no JavaSE APIs). |
+| `@CodenameOneTest` (JUnit 5) + Surefire | Standard `mvn test` via the JUnit Jupiter engine | Simulator-only tests. You get a real JVM, so you can use **reflection**, **Mockito**, **AssertJ**, parameterized tests, and any other library that would fail under ParparVM. Faster startup than `cn1:test`, integrates with your IDE's standard JUnit runner, plays nicely with `mvn -pl common test -Dtest=MyTest#oneMethod` filtering. |
 
 Pick per test class. Both run in the same project from the same `common/src/test/java` directory; the runners don't interfere with each other (`cn1:test` discovers classes that implement `com.codename1.testing.UnitTest`, Surefire discovers `@Test`-annotated methods).
 
@@ -13,7 +13,7 @@ See `references/testing-and-screenshots.md` for the AbstractTest path, including
 
 ## Project setup
 
-The cn1app archetype (releases ≥ 8.0) generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If you are upgrading an older project, add these two blocks yourself:
+The cn1app archetype generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If your project predates that wiring, add these two blocks yourself:
 
 ```xml
 <!-- common/pom.xml -->
@@ -137,15 +137,28 @@ The `scope` field controls where it lands:
 
 ### `@Theme`
 
-Loads a `.res` resource and installs its first theme via `UIManager.setThemeProps`, then triggers a refresh. The native themes bundled into the simulator jar can be used directly:
+Loads a base theme and installs it via `UIManager.setThemeProps`, then triggers a refresh. Two mutually exclusive inputs:
+
+**By native theme** — the recommended form for cross-platform look-and-feel coverage. The `NativeTheme` enum mirrors the simulator's *Simulate → Native Theme* menu:
 
 ```java
-@Test @Theme("/iOSModernTheme.res")        void looksRightOnIos()       { /* ... */ }
-@Test @Theme("/AndroidMaterialTheme.res")  void looksRightOnAndroid()   { /* ... */ }
-@Test @Theme("/iPhoneTheme.res")           void looksRightOnLegacyIos() { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IOS_MODERN)         void looksRightOnIosModern()    { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IOS_FLAT)           void looksRightOnIosFlat()      { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.IPHONE_PRE_FLAT)    void looksRightOnClassicIos()   { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_MATERIAL)   void looksRightOnAndroid()      { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_HOLO_LIGHT) void looksRightOnHoloLight()    { /* ... */ }
+@Test @Theme(nativeTheme = NativeTheme.ANDROID_LEGACY)     void looksRightOnAndroidLegacy(){ /* ... */ }
 ```
 
-For app themes, ship the `.res` under `src/main/resources` or `src/test/resources` and reference it with a leading slash.
+Each enum constant carries the resource path (`NativeTheme.IOS_MODERN.resourcePath()` returns `/iOSModernTheme.res`) and the simulator-menu label (`displayName()` returns `"iOS Modern (Liquid Glass)"`).
+
+**By resource path** — for app themes shipped under `src/main/resources` or `src/test/resources`:
+
+```java
+@Test @Theme("/MyAppTheme.res")  void looksRightWithAppTheme()  { /* ... */ }
+```
+
+If both are set, `nativeTheme` wins. If neither is set, the annotation is a no-op.
 
 ### `@DarkMode`
 
