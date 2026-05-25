@@ -1,0 +1,334 @@
+== Testing with JUnit 5
+
+Codename One has historically shipped its own test framework — `com.codename1.testing.AbstractTest` driven by the `cn1:test` Maven goal. That framework is still fully supported and remains the only way to run tests on a physical iOS or Android device. Starting with Codename One 8, the JavaSE simulator also exposes a standard **JUnit 5** integration so you can write tests that run through Surefire and your IDE's native test runner.
+
+Both styles coexist in the same project under `common/src/test/java`. You pick per test class. This chapter explains when to reach for which, walks through the JUnit annotations, and shows how the two frameworks compare side by side.
+
+=== When to use JUnit vs. AbstractTest
+
+[cols="1,3,3", options="header"]
+|===
+|Framework |Use it for |Don't use it for
+
+|`AbstractTest` + `cn1:test`
+|Tests that must execute on a real device (`mvn cn1:test -Dtarget=ios` / `-Dtarget=android`). Legacy code that already extends `AbstractTest`. Tests that must compile under the strict Codename One device subset (no reflection, no `java.net.http.*`, no `java.nio.file.*`).
+|Tests that need reflection, Mockito, AssertJ, parameterized data sets, `assertThrows`, or anything else that lives outside the device subset.
+
+|`@CodenameOneTest` (JUnit 5)
+|Simulator-only tests. Anything that wants a full JVM at test time — reflection, mocking libraries, parameterized tests, IDE green-bar integration, `mvn test -Dtest=Foo#bar` filtering, `@BeforeEach`/`@AfterEach` lifecycle methods.
+|Anything that must also run on a device — JUnit Jupiter doesn't exist on ParparVM.
+|===
+
+The two runners discover disjoint sets of test classes (cn1:test looks for `com.codename1.testing.UnitTest` implementers; Surefire looks for `@Test`-annotated methods), so a project can mix both freely. `mvn install` runs Surefire during the `test` phase and `cn1:test` from the javase module's `test` profile in the same phase — you don't lose either test pass.
+
+=== Dependencies
+
+The cn1app archetype (releases ≥ 8.0) generates a `common/pom.xml` and `javase/pom.xml` that already pull in `junit-jupiter` and `codenameone-javase` at test scope. If you are upgrading an older project, add these dependency blocks yourself:
+
+[source,xml,title='common/pom.xml']
+----
+<dependencies>
+    <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javase</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.9.3</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+----
+
+[source,xml,title='javase/pom.xml']
+----
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.9.3</version>
+    <scope>test</scope>
+</dependency>
+----
+
+Tests live in `common/src/test/java`. Surefire only runs from the `javase` module — the `common` module keeps Surefire skipped (`<skipTests>true</skipTests>`) to avoid running each test twice, since `javase/pom.xml` mounts the same sources via `<testSourceDirectory>${project.basedir}/../common/src/test/java</testSourceDirectory>`.
+
+=== A minimal JUnit test
+
+[source,java]
+----
+package com.example.myapp;
+
+import com.codename1.testing.junit.CodenameOneTest;
+import com.codename1.testing.junit.RunOnEdt;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@CodenameOneTest
+class GreetingFormTest {
+
+    @Test
+    @RunOnEdt
+    void formShowsExpectedTitle() {
+        new Form("Hello").show();
+        assertEquals("Hello", Display.getInstance().getCurrent().getTitle());
+        assertTrue(CN.isEdt(), "@RunOnEdt method runs on the Codename One EDT");
+    }
+}
+----
+
+Run with:
+
+[source,bash]
+----
+mvn -pl javase test                                     # all JUnit + cn1:test
+mvn -pl javase test -Dtest=GreetingFormTest             # one class
+mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle   # one method
+----
+
+=== `@CodenameOneTest`
+
+A class-level meta-annotation equivalent to `@ExtendWith(CodenameOneExtension.class)`. The extension does four things:
+
+. If `GraphicsEnvironment.isHeadless()` is true, throw `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped* rather than failed, and the Display singleton is never partially initialized — so subsequent test classes in the same JVM are not poisoned. This makes JUnit-style Codename One tests safe to run on a headless CI runner; they simply skip.
+. Boot `Display` once per JVM via `Display.init(null)`. The call is idempotent, so multiple `@CodenameOneTest` classes share one Display instance for the rest of the test run.
+. Apply any visual-config annotations (`@Theme`, `@DarkMode`, `@LargerText`, `@Orientation`, `@RTL`, `@SimulatorProperty`) on the EDT in one batch before each test, followed by a single theme refresh.
+. Dispatch `@RunOnEdt` test methods through `CN.callSerially` and rethrow their exceptions on the JUnit thread so stack traces stay clickable in IDEs.
+
+=== `@RunOnEdt`
+
+Place on a method (or on the class for all tests) when the body mutates UI state.
+
+[source,java]
+----
+@Test
+@RunOnEdt                           // body runs on the EDT
+void canMutateUiSafely() {
+    Form f = new Form("X");
+    f.add(new com.codename1.ui.Button("Tap"));
+    f.show();                       // safe -- we are on the EDT
+}
+
+@Test
+@RunOnEdt(timeoutMillis = 60000)    // default 30s; override for slow form builds
+void slowFormBuild() { /* ... */ }
+----
+
+Class-level `@RunOnEdt` also routes `@BeforeEach`/`@AfterEach` methods through the EDT. Method-level `@RunOnEdt` is scoped to that one `@Test`.
+
+Tests that only exercise pure model or utility code can omit `@RunOnEdt` and run on the JUnit worker thread — they are faster because nothing pumps the EDT.
+
+=== `@SimulatorProperty` / `@SimulatorProperties`
+
+Set a property visible to the simulator before the test runs.
+
+[source,java]
+----
+@Test
+@SimulatorProperty(name = "feature.flag", value = "on")
+void appReadsFlagFromDisplayProperty() {
+    assertEquals("on", Display.getInstance().getProperty("feature.flag", null));
+}
+
+@Test
+@SimulatorProperties({
+    @SimulatorProperty(name = "user.tier",   value = "pro"),
+    @SimulatorProperty(name = "user.region", value = "eu")
+})
+void multipleAppProperties() { /* ... */ }
+----
+
+The `scope` field selects where the value lands:
+
+[cols="1,3,3", options="header"]
+|===
+|Scope |Where |When applied
+
+|`DISPLAY` (default)
+|`Display.getInstance().setProperty(name, value)`
+|After Display init. Use for properties your app reads via `Display.getProperty(...)`.
+
+|`SYSTEM`
+|`System.setProperty(name, value)`
+|Before Display init (class-level only). Use for things the simulator reads at startup -- e.g. `java.awt.headless`. Method-level SYSTEM properties are ignored since Display is already up by the time `@BeforeEach` runs.
+|===
+
+The JavaSE port compiles at source 1.7, which predates `@Repeatable`. To set more than one property on the same target, wrap multiple `@SimulatorProperty` entries inside `@SimulatorProperties({...})` rather than repeating the annotation directly.
+
+=== `@Theme`
+
+Loads a `.res` resource and installs its first theme through `UIManager.setThemeProps`, then triggers a refresh.
+
+[source,java]
+----
+@Test @Theme("/iOSModernTheme.res")        void rendersUnderIos()       { /* ... */ }
+@Test @Theme("/AndroidMaterialTheme.res")  void rendersUnderAndroid()   { /* ... */ }
+@Test @Theme("/iPhoneTheme.res")           void rendersUnderLegacyIos() { /* ... */ }
+----
+
+The simulator jar bundles `iOSModernTheme.res`, `AndroidMaterialTheme.res`, `iPhoneTheme.res`, `iOS7Theme.res`, `androidTheme.res`, and `android_holo_light.res`. App themes work too — ship the `.res` under `src/main/resources` or `src/test/resources` and reference it with a leading slash.
+
+=== `@DarkMode`
+
+Toggles dark/light mode via `Display.setDarkMode(Boolean)` and refreshes the active form.
+
+[source,java]
+----
+@Test @DarkMode                     void mainFormIsLegibleInDark()  { /* ... */ }
+@Test @DarkMode(enabled = false)    void mainFormIsLegibleInLight() { /* ... */ }
+----
+
+=== `@LargerText`
+
+Sets the accessibility text-scale multiplier — the same knob exposed by the simulator's *Simulate → Larger Text* submenu. Useful for catching layout regressions at accessibility font sizes.
+
+[source,java]
+----
+@CodenameOneTest
+@LargerText                 // class-level: every test at 1.3x (AX2)
+class AccessibilityTest {
+
+    @Test void buttonsStillFit() { /* ... */ }
+
+    @Test
+    @LargerText(scale = 2.0f)    // method-level override: AX5
+    void buttonsAtExtremeScale() { /* ... */ }
+}
+----
+
+`scale = 1.0f` restores the default size; common values mirror the menu's `1.3f` / `1.6f` / `2.0f` presets.
+
+=== `@Orientation`
+
+Forces the simulator into portrait or landscape for the test.
+
+[source,java]
+----
+@Test
+@Orientation(Orientation.Value.LANDSCAPE)
+void formStillFitsInLandscape() {
+    assertFalse(Display.getInstance().isPortrait());
+    // ... layout assertions ...
+}
+----
+
+This calls a non-persisting setter on `JavaSEPort` and sets an explicit-portrait flag honored by `Display.isPortrait()` — so unit-test JVMs (where the canvas inherits the host window's full size and would otherwise read landscape on every wide screen) get the expected orientation back.
+
+=== `@RTL`
+
+Flips the look-and-feel into right-to-left mode (Arabic, Hebrew) via `UIManager.getInstance().getLookAndFeel().setRTL(...)`. The active form is revalidated so existing layouts reflow before the test body asserts.
+
+[source,java]
+----
+@Test @RTL                          void mirrorsCorrectly()    { /* ... */ }
+@Test @RTL(enabled = false)         void restoresLtrLayout()   { /* ... */ }
+----
+
+=== Annotation resolution
+
+When the same annotation appears at both the class and the method level, *method wins*. Annotations the method doesn't override are inherited from the class. Annotations that appear on neither leave Display state alone — the extension never resets a knob the caller didn't ask for. Use `@AfterEach` for cross-test cleanup if a class must leave the simulator pristine for the next one.
+
+[source,java]
+----
+@CodenameOneTest
+@LargerText(scale = 1.3f)        // class default
+@DarkMode                         // class default
+class LayoutTest {
+
+    @Test
+    @LargerText(scale = 2.0f)     // overrides class -> 2.0x for this test
+    void extremeScale() { /* runs at 2.0x scale + dark mode */ }
+
+    @Test
+    void defaultScale() { /* runs at 1.3x scale + dark mode */ }
+}
+----
+
+=== EDT semantics
+
+`@RunOnEdt` dispatches the test body through `CN.callSerially(...)` and uses a latch with `wait/notify` to block the JUnit worker thread until the EDT-side runnable finishes or `timeoutMillis` elapses. Throwables from inside the EDT runnable are captured and rethrown on the JUnit thread so the assertion stack trace lands in the IDE as if the test had been invoked directly.
+
+Without `@RunOnEdt`, the test body runs on the Surefire worker thread — fine for pure model assertions, broken for UI mutation. Forms, components, and `UIManager` are EDT-confined; touch them off the EDT and you get sporadic deadlocks and rendering glitches.
+
+=== Headless behavior
+
+`Display.init(null)` eventually calls `JavaSEPort.init(null)`, which constructs a `javax.swing.JFrame` to host the simulator canvas. JFrame construction in a headless JVM throws `HeadlessException` immediately. Therefore:
+
+* *Local dev (macOS / Windows / Linux desktop)*: works out of the box.
+* *CI with an X server or Xvfb*: works -- wrap your build with `xvfb-run mvn test` if the runner is otherwise headless.
+* *CI without DISPLAY, or with explicit `-Djava.awt.headless=true`*: every `@CodenameOneTest` class auto-aborts via `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped*, not *failed*, and crucially the Display singleton is never partially initialized -- so subsequent test classes in the same JVM are not poisoned.
+
+This is why our own internal `CodenameOneExtensionTest` (in the Codename One sources) carries `@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")`. The extension catches auto-detected headless (Linux without DISPLAY); the annotation catches the explicit `-Djava.awt.headless=true` case. Together they let the test class skip cleanly on a headless runner.
+
+Pure-logic tests (no UI, no `@CodenameOneTest`) can run on any headless runner without configuration.
+
+=== Coexistence with `cn1:test`
+
+The two runners discover disjoint sets of classes:
+
+* `cn1:test` looks for classes that `implements com.codename1.testing.UnitTest` (which `AbstractTest` extends).
+* Surefire (JUnit Jupiter) looks for `@Test`-annotated methods.
+
+They don't trip over each other. `mvn install` runs Surefire during the `test` phase, then the `cn1:test` execution bound in the `javase/pom.xml` `test` profile runs in the same phase. To target just one runner:
+
+[source,bash]
+----
+mvn -pl javase test                            # both runners
+mvn -pl javase test -DskipTests                # skip Surefire, cn1:test still runs
+mvn -pl javase test -Dtest=NoMatch             # filter Surefire to nothing,
+                                               # cn1:test still runs
+----
+
+=== Side-by-side example
+
+The same "sign in, assert we land on Home" check, written both ways:
+
+.AbstractTest / `cn1:test`
+[source,java]
+----
+public class LoginNavTest extends com.codename1.testing.AbstractTest {
+    @Override public boolean shouldExecuteOnEDT() { return true; }
+
+    @Override public boolean runTest() throws Exception {
+        new MyApp().runApp();
+        TestUtils.waitForFormTitle("Login");
+        TestUtils.setText("usernameField", "alice");
+        TestUtils.clickButtonByLabel("Sign In");
+        TestUtils.waitForFormTitle("Home");
+        return TestUtils.screenshotTest("home-screen");
+    }
+}
+----
+
+.JUnit 5 / Surefire
+[source,java]
+----
+@CodenameOneTest
+class LoginNavTest {
+
+    @Test
+    @RunOnEdt
+    void signingInLandsOnHome() throws Exception {
+        new MyApp().runApp();
+        TestUtils.waitForFormTitle("Login");
+        TestUtils.setText("usernameField", "alice");
+        TestUtils.clickButtonByLabel("Sign In");
+        TestUtils.waitForFormTitle("Home");
+        assertTrue(TestUtils.screenshotTest("home-screen"), "home screenshot regressed");
+    }
+}
+----
+
+The UI driving (`TestUtils.*`) is identical -- `TestUtils` is independent of the runner. What changes is the lifecycle plumbing: `shouldExecuteOnEDT()` + `runTest() returns boolean` becomes `@RunOnEdt` + `@Test void` + a standard assertion library.
+
+=== Cross-reference
+
+* For the legacy framework's full API surface (`TestUtils` helpers, `screenshotTest` tolerance algorithm, baseline management), see <<screenshot-testing,Screenshot Testing>> in the performance chapter.
+* For the `cn1:test` Maven goal, see <<appendix-goal-test,the test goal appendix>>.
