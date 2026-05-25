@@ -67,12 +67,34 @@ public final class JavaSourceCompiler {
             fm.setLocation(StandardLocation.CLASS_OUTPUT,
                     Collections.singletonList(outputClassDir));
 
-            // Build the classpath: pre-existing classpath + extras.
-            String existing = System.getProperty("java.class.path", "");
+            // Build the classpath: pre-existing classpath + extras. Surefire
+            // sets `surefire.test.class.path` to the resolved test classpath
+            // when it forks the JVM; under newer surefire releases
+            // `java.class.path` only carries the surefire-booter jar, not the
+            // project's deps. Prefer the surefire-provided value when set so
+            // generated-source compilation can see test-scoped jars (e.g.
+            // codenameone-core for @Route fixtures). Also walk the current
+            // classloader's URL list as a last-resort fallback.
+            String surefireCp = System.getProperty("surefire.test.class.path");
+            String existing = (surefireCp != null && surefireCp.length() > 0)
+                    ? surefireCp
+                    : System.getProperty("java.class.path", "");
             List<File> cp = new ArrayList<File>();
             if (existing.length() > 0) {
                 for (String s : existing.split(File.pathSeparator)) {
                     cp.add(new File(s));
+                }
+            }
+            ClassLoader loader = JavaSourceCompiler.class.getClassLoader();
+            if (loader instanceof java.net.URLClassLoader) {
+                for (java.net.URL u : ((java.net.URLClassLoader) loader).getURLs()) {
+                    if ("file".equals(u.getProtocol())) {
+                        try {
+                            cp.add(new File(u.toURI()));
+                        } catch (Exception ignored) {
+                            // best-effort
+                        }
+                    }
                 }
             }
             if (extraClasspath != null) cp.addAll(extraClasspath);

@@ -55,6 +55,18 @@
             <version>${junit.jupiter.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- RouteAnnotationProcessorTest compiles @Route-annotated fixtures
+             with the in-test JavaSourceCompiler; the fixtures reference the
+             real com.codename1.annotations.Route + com.codename1.ui.Form
+             types from cn1-core. Pull it in directly so the test classpath
+             (and therefore JavaSourceCompiler's resolved classpath) has the
+             package layout. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-designer</artifactId>
