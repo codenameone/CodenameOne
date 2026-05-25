@@ -1329,6 +1329,31 @@ const jvm = {
           member: bridge.member,
           args: transferableArgs
         }]);
+        // Diagnostic: when hostResult is a literal {} (no own props at
+        // all), it indicates an upstream bug where the host bridge
+        // returned an opaque value that lost its host-ref marker on
+        // round-trip. This is the source of canvasContextWipe (#44).
+        // Rate-limited globally to keep logs sane.
+        if (hostResult && typeof hostResult === 'object'
+            && !Array.isArray(hostResult)
+            && hostResult.__cn1HostRef == null
+            && Object.getOwnPropertyNames(hostResult).length === 0) {
+          if (!jvm._emptyHostResultLogged) jvm._emptyHostResultLogged = 0;
+          if (jvm._emptyHostResultLogged < 5) {
+            jvm._emptyHostResultLogged++;
+            try {
+              vmDiag('EMPTY_HOST_RESULT', 'methodId', String(methodId));
+              vmDiag('EMPTY_HOST_RESULT', 'className', String(className));
+              vmDiag('EMPTY_HOST_RESULT', 'member', String(bridge.member));
+              vmDiag('EMPTY_HOST_RESULT', 'kind', String(bridge.kind));
+              vmDiag('EMPTY_HOST_RESULT', 'returnClass', String(bridge.returnClass));
+              vmDiag('EMPTY_HOST_RESULT', 'receiverHostClass', String(receiver && receiver.__cn1HostClass));
+              vmDiag('EMPTY_HOST_RESULT', 'receiverHostRef', String(receiver && receiver.__cn1HostRef));
+              const stack = new Error('empty-host-result-trace').stack || '';
+              vmDiag('EMPTY_HOST_RESULT', 'stack', String(stack).split('\n').slice(0, 6).join(' | ').substring(0, 500));
+            } catch (_e) {}
+          }
+        }
         return self.wrapJsResult(hostResult, bridge.returnClass);
       }
       let result;
