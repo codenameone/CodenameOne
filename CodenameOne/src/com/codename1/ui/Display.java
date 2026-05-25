@@ -39,6 +39,8 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
@@ -5263,7 +5265,46 @@ public final class Display extends CN1Constants {
     /// some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
     /// on the iPad with iOS 8 and higher.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect) {
-        impl.share(textOrPath, image, mimeType, sourceRect);
+        share(textOrPath, image, mimeType, sourceRect, null);
+    }
+
+    /// Like [#share(String,String,String,Rectangle)] but reports the
+    /// outcome through `listener` on the EDT.
+    ///
+    /// `listener` may be `null`. If the underlying platform cannot report
+    /// the outcome (older Android, Web Share API), the listener is still
+    /// invoked with [ShareResult#sharedTo] passing a `null` package name
+    /// so the app can resume its flow.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textOrPath`: String to share, or path to file to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or file. null if just sharing text
+    ///
+    /// - `sourceRect`: source rectangle hint for the share popover. May be null.
+    ///
+    /// - `listener`: callback for the share outcome. May be null.
+    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        if (listener == null) {
+            impl.share(textOrPath, image, mimeType, sourceRect);
+            return;
+        }
+        final ShareResultListener finalListener = listener;
+        impl.share(textOrPath, image, mimeType, sourceRect, new ShareResultListener() {
+            @Override
+            public void onResult(final ShareResult result) {
+                final ShareResult r = result != null ? result : ShareResult.sharedTo(null);
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        finalListener.onResult(r);
+                    }
+                });
+            }
+        });
     }
 
     /// The localization manager allows adapting values for display in different locales thru parsing and formatting

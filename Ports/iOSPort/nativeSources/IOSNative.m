@@ -8771,6 +8771,99 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     });
 }
 
+// Same as socialShare but installs a completionWithItemsHandler block on
+// the UIActivityViewController that calls back into Java with the chosen
+// activity type (UIActivityType*), cancellation, or error. Status codes
+// mirror com.codename1.share.ShareResult: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
+void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String_long_com_codename1_ui_geom_Rectangle_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle, JAVA_INT callbackId) {
+    NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    BOOL useRect = rectangle ? YES:NO;
+    __block CGRect cgrect = CGRectMake(0,0,0,0);
+    if (useRect){
+        cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+        cgrect.origin.x = cgrect.origin.x / scaleValue;
+        cgrect.origin.y = cgrect.origin.y / scaleValue;
+        cgrect.size.width = cgrect.size.width / scaleValue;
+        cgrect.size.height = cgrect.size.height / scaleValue;
+    }
+    int cbId = (int)callbackId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSArray* dataToShare;
+        if(imagePeer != 0) {
+            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
+            UIImage* i = [glll getImage];
+            if(someText != nil) {
+                dataToShare = [NSArray arrayWithObjects:someText, i, nil];
+            } else {
+                dataToShare = [NSArray arrayWithObjects:i, nil];
+            }
+        } else {
+            BOOL shareFile = NO;
+            if (someText != nil && [someText hasPrefix:@"file:"]) {
+                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+                    shareFile = YES;
+                    dataToShare = [NSArray arrayWithObjects:fileURL, nil];
+                }
+            }
+            if (!shareFile) {
+                dataToShare = [NSArray arrayWithObjects:someText, nil];
+            }
+        }
+
+        UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare
+                                                                                             applicationActivities:nil];
+#ifdef NEW_CODENAME_ONE_VM
+        if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
+            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
+            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
+            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            if ( useRect ){
+                if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
+                    cgrect = CGRectMake(
+                                        cgrect.origin.x,
+                                        cgrect.origin.y+cgrect.size.height/2-10,
+                                        cgrect.size.width,
+                                        10
+                                        );
+                }
+                activityViewController.popoverPresentationController.sourceRect = cgrect;
+            } else {
+                CGRect cgrect = CGRectMake(0, 0, SCREEN_WIDTH, 60);
+                activityViewController.popoverPresentationController.sourceRect = cgrect;
+            }
+
+        }
+#endif
+        // UIActivityType is an NSString* typedef introduced in iOS 10;
+        // use NSString* directly so the source compiles against older
+        // SDKs while remaining ABI-compatible on iOS 10+.
+        activityViewController.completionWithItemsHandler = ^(NSString *activityType, BOOL completed, NSArray *returnedItems, NSError *activityError) {
+            JAVA_INT status;
+            NSString* activityTypeStr = nil;
+            NSString* errMsg = nil;
+            if (activityError != nil) {
+                status = 3;
+                errMsg = [activityError localizedDescription];
+            } else if (completed) {
+                status = 1;
+                if (activityType != nil) {
+                    activityTypeStr = activityType;
+                }
+            } else {
+                status = 2;
+            }
+            JAVA_OBJECT jActivityType = activityTypeStr != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG activityTypeStr) : JAVA_NULL;
+            JAVA_OBJECT jErrMsg = errMsg != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errMsg) : JAVA_NULL;
+            com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_int_java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jActivityType, jErrMsg);
+        };
+        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        POOL_END();
+        repaintUI();
+    });
+}
+
 
 extern BOOL isVKBAlwaysOpen();
 extern BOOL vkbAlwaysOpen;
