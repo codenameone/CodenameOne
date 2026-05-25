@@ -55,7 +55,7 @@ import java.util.Map;
 /// fields. To synthesise options client-side (rare -- usually only useful in
 /// tests) use [#newBuilder()].
 ///
-/// @since 7.0.246
+/// @since 7.0.245
 public final class PublicKeyCredentialCreationOptions {
 
     /// The full options JSON, preserved verbatim so the authenticator sees

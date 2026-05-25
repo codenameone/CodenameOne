@@ -175,7 +175,7 @@ public final class FirebaseAuth {
     /// passkeys enabled in the console. The classic Firebase Auth tier does
     /// not expose passkey endpoints.
     ///
-    /// @since 7.0.246
+    /// @since 7.0.245
     public AsyncResource<FirebaseUser> registerPasskey(final String name) {
         final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
         if (apiKey == null) {
@@ -237,7 +237,7 @@ public final class FirebaseAuth {
     ///
     /// Available wherever [WebAuthnClient#isSupported()] returns `true`.
     ///
-    /// @since 7.0.246
+    /// @since 7.0.245
     public AsyncResource<FirebaseUser> signInWithPasskey() {
         final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
         if (apiKey == null) {

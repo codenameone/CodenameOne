@@ -131,7 +131,7 @@ public final class Auth0Connect extends Login {
     /// [com.codename1.io.webauthn.WebAuthnException#NOT_IMPLEMENTED] on
     /// platforms that don't have a WebAuthn implementation.
     ///
-    /// @since 7.0.246
+    /// @since 7.0.245
     public AsyncResource<OidcTokens> signInWithPasskey(final String clientId,
                                                        final String realm,
                                                        final String... scopes) {
@@ -173,7 +173,7 @@ public final class Auth0Connect extends Login {
     /// 2. Run [WebAuthnClient#create] with those options.
     /// 3. POST `/oauth/token` to swap the authenticator response for tokens.
     ///
-    /// @since 7.0.246
+    /// @since 7.0.245
     public AsyncResource<OidcTokens> registerPasskey(final String clientId,
                                                      final String realm,
                                                      final String email,

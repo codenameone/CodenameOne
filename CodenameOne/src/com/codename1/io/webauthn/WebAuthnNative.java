@@ -43,7 +43,7 @@ package com.codename1.io.webauthn;
 /// and lets the implementation forward the JSON straight to the OS API (both
 /// platforms accept JSON-shaped inputs in their modern APIs).
 ///
-/// @since 7.0.246
+/// @since 7.0.245
 public interface WebAuthnNative {
 
     /// `true` if this implementation can actually call the OS authenticator

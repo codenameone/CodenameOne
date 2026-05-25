@@ -34,7 +34,7 @@ import java.io.IOException;
 /// (`"invalid_options"`, `"invalid_response"`) and the platform not
 /// implementing public-key credentials at all (`"not_supported"`).
 ///
-/// @since 7.0.246
+/// @since 7.0.245
 public class WebAuthnException extends IOException {
 
     /// User dismissed the OS passkey sheet, or the OS denied the request
