@@ -1329,6 +1329,30 @@ const jvm = {
           member: bridge.member,
           args: transferableArgs
         }]);
+        // Diagnostic: when hostResult is a NUMBER but the expected
+        // return class is an object type, it points at the
+        // canvasContextWipe pattern (where save/setTransform receive a
+        // Number receiver -- the 667 viewport height observed in CI).
+        if (typeof hostResult === 'number' && bridge.returnClass
+            && bridge.returnClass !== 'int' && bridge.returnClass !== 'byte'
+            && bridge.returnClass !== 'short' && bridge.returnClass !== 'char'
+            && bridge.returnClass !== 'long' && bridge.returnClass !== 'float'
+            && bridge.returnClass !== 'double' && bridge.returnClass !== 'boolean') {
+          if (!jvm._numberForObjLogged) jvm._numberForObjLogged = 0;
+          if (jvm._numberForObjLogged < 5) {
+            jvm._numberForObjLogged++;
+            try {
+              vmDiag('NUMBER_FOR_OBJECT', 'methodId', String(methodId));
+              vmDiag('NUMBER_FOR_OBJECT', 'className', String(className));
+              vmDiag('NUMBER_FOR_OBJECT', 'member', String(bridge.member));
+              vmDiag('NUMBER_FOR_OBJECT', 'kind', String(bridge.kind));
+              vmDiag('NUMBER_FOR_OBJECT', 'returnClass', String(bridge.returnClass));
+              vmDiag('NUMBER_FOR_OBJECT', 'value', String(hostResult));
+              const stack = new Error('number-for-object-trace').stack || '';
+              vmDiag('NUMBER_FOR_OBJECT', 'stack', String(stack).split('\n').slice(0, 6).join(' | ').substring(0, 500));
+            } catch (_e) {}
+          }
+        }
         // Diagnostic: when hostResult is a literal {} (no own props at
         // all), it indicates an upstream bug where the host bridge
         // returned an opaque value that lost its host-ref marker on
