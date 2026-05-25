@@ -179,7 +179,7 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 }
                 String type = JSONParser.getString(err, "type");
                 if ("context_length_exceeded".equals(code) || "context_length_exceeded".equals(type)) {
-                    return new LlmContextLengthException(message, code, body);
+                    return new LlmException(message, 400, code, body, null, LlmException.ErrorType.CONTEXT_LENGTH);
                 }
             }
         } catch (java.io.IOException ignored) {
@@ -188,21 +188,21 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
             // Cast / NPE while walking the error map; same fallback.
         }
         if (httpStatus == 401 || httpStatus == 403) {
-            return new LlmAuthException(message, httpStatus, code, body);
+            return new LlmException(message, httpStatus, code, body, null, LlmException.ErrorType.AUTH);
         }
         if (httpStatus == 429) {
-            return new LlmRateLimitException(message, -1, code, body);
+            return new LlmException(message, 429, code, body, null, LlmException.ErrorType.RATE_LIMIT, -1);
         }
         if (httpStatus == 503 || httpStatus == 529) {
-            return new LlmModelOverloadedException(message, httpStatus, code, body);
+            return new LlmException(message, httpStatus, code, body, null, LlmException.ErrorType.MODEL_OVERLOADED);
         }
         if (httpStatus >= 400 && httpStatus < 500) {
-            return new LlmInvalidRequestException(message, httpStatus, code, body);
+            return new LlmException(message, httpStatus, code, body, null, LlmException.ErrorType.INVALID_REQUEST);
         }
         if (httpStatus >= 500) {
-            return new LlmServerException(message, httpStatus, code, body);
+            return new LlmException(message, httpStatus, code, body, null, LlmException.ErrorType.SERVER);
         }
-        return new LlmException(message, httpStatus, code, body, null);
+        return new LlmException(message, httpStatus, code, body, null, LlmException.ErrorType.UNKNOWN);
     }
 
     /// Parses a single non-streaming response body into a

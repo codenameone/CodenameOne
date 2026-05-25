@@ -62,8 +62,8 @@ class OpenAiClient extends LlmClient {
         final AsyncResource<ChatResponse> result = new AsyncResource<ChatResponse>();
         String reject = runSafetyFilter(req);
         if (reject != null) {
-            result.error(new LlmInvalidRequestException("Blocked by safety filter: " + reject,
-                    400, "safety_filter", null));
+            result.error(new LlmException("Blocked by safety filter: " + reject,
+                    400, "safety_filter", null, null, LlmException.ErrorType.INVALID_REQUEST));
             return result;
         }
         final byte[] body;
@@ -114,7 +114,7 @@ class OpenAiClient extends LlmClient {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            result.error(new LlmNetworkException(err.getMessage(), err));
+                            result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));
                         }
                     });
                     return;
@@ -130,7 +130,7 @@ class OpenAiClient extends LlmClient {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            result.error(new LlmNetworkException(err.getMessage(), err));
+                            result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));
                         }
                     });
                     return;
@@ -154,8 +154,8 @@ class OpenAiClient extends LlmClient {
         final AsyncResource<ChatResponse> result = new AsyncResource<ChatResponse>();
         String reject = runSafetyFilter(req);
         if (reject != null) {
-            result.error(new LlmInvalidRequestException("Blocked by safety filter: " + reject,
-                    400, "safety_filter", null));
+            result.error(new LlmException("Blocked by safety filter: " + reject,
+                    400, "safety_filter", null, null, LlmException.ErrorType.INVALID_REQUEST));
             return result;
         }
         final byte[] body;
@@ -266,7 +266,7 @@ class OpenAiClient extends LlmClient {
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        result.error(new LlmNetworkException(err.getMessage(), err));
+                        result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));
                     }
                 });
             }

@@ -20,12 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.smartreply;
 
-/// 503 / 529: the model is temporarily overloaded. Treat the same as
-/// rate-limiting and back off.
-public class LlmModelOverloadedException extends LlmException {
-    public LlmModelOverloadedException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null, ErrorType.MODEL_OVERLOADED);
-    }
+import com.codename1.system.NativeInterface;
+
+/// Platform-native bridge for [SmartReply]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeSmartReply extends NativeInterface {
+    String[] suggest(String[] recentMessages);
 }

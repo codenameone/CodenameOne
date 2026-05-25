@@ -134,15 +134,15 @@ public abstract class ImageGenerator {
                         Map root = JSONParser.parseJSON(getResponseData());
                         List<Object> data = JSONParser.asList(root.get("data"));
                         if (data == null || data.isEmpty()) {
-                            failOnEdt(result, new LlmInvalidRequestException(
-                                    "Empty data[] in image generation response", 200, null, null));
+                            failOnEdt(result, new LlmException(
+                                    "Empty data[] in image generation response", 200, null, null, null, LlmException.ErrorType.INVALID_REQUEST));
                             return;
                         }
                         Map first = JSONParser.asMap(data.get(0));
                         String b64 = JSONParser.getString(first, "b64_json");
                         if (b64 == null) {
-                            failOnEdt(result, new LlmInvalidRequestException(
-                                    "Missing b64_json in image generation response", 200, null, null));
+                            failOnEdt(result, new LlmException(
+                                    "Missing b64_json in image generation response", 200, null, null, null, LlmException.ErrorType.INVALID_REQUEST));
                             return;
                         }
                         byte[] bytes = Base64.decode(b64.getBytes("UTF-8"));

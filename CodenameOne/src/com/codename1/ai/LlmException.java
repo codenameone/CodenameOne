@@ -24,16 +24,10 @@ package com.codename1.ai;
 
 import java.io.IOException;
 
-/// Base type for every checked error raised by [LlmClient]. Extends
-/// [IOException] so callers' existing network catch blocks pick it up.
-/// `httpStatus`, `providerErrorCode`, and `rawBody` are populated when
-/// available.
-///
-/// #### Two ways to react to errors
-///
-/// The recommended pattern is to switch on [#getType()] -- a single
-/// `catch` and a `switch` over the [ErrorType] enum covers every
-/// possible failure cleanly:
+/// The single checked-error type raised by [LlmClient]. Extends
+/// [IOException] so callers' existing network catch blocks pick it
+/// up. Inspect [#getType()] for the failure category and switch on
+/// the [ErrorType] enum -- no separate exception subclass per error.
 ///
 /// ```
 /// try {
@@ -43,10 +37,10 @@ import java.io.IOException;
 ///     if (ae.getCause() instanceof LlmException) {
 ///         LlmException e = (LlmException) ae.getCause();
 ///         switch (e.getType()) {
-///             case RATE_LIMIT:        scheduleRetry(e); break;
+///             case RATE_LIMIT:        scheduleRetry(e.getRetryAfterSeconds()); break;
 ///             case AUTH:              showLoginScreen(); break;
 ///             case CONTEXT_LENGTH:    trimHistory();    break;
-///             case MODEL_OVERLOADED:  scheduleRetry(e); break;
+///             case MODEL_OVERLOADED:  scheduleRetry(60); break;
 ///             case INVALID_REQUEST:   showError(e);     break;
 ///             case NETWORK:           showOfflineUi();  break;
 ///             default:                showError(e);
@@ -55,13 +49,11 @@ import java.io.IOException;
 /// }
 /// ```
 ///
-/// The subclasses ([LlmAuthException], [LlmRateLimitException], etc.)
-/// are still useful when an `instanceof` is more ergonomic in context
-/// -- e.g. when only one branch of error handling matters or when a
-/// subclass carries extra typed state ([LlmRateLimitException#getRetryAfterSeconds]
-/// is the only place to read the `Retry-After` header). For
-/// most call sites the enum-switch form is both clearer and easier
-/// to extend exhaustively when new error types ship.
+/// `httpStatus`, `providerErrorCode`, `rawBody`, and (for rate-limit
+/// errors) `retryAfterSeconds` are populated when the provider
+/// returned them. `getRetryAfterSeconds()` returns `-1` for every
+/// non-rate-limit error and for rate-limit errors where the provider
+/// didn't send a `Retry-After` header.
 public class LlmException extends IOException {
 
     /// Coarse-grained classification of every failure path the
@@ -72,9 +64,8 @@ public class LlmException extends IOException {
         /// the requested model.
         AUTH,
 
-        /// 429 -- rate limit hit. Pair with
-        /// [LlmRateLimitException#getRetryAfterSeconds] to honour
-        /// the provider's backoff hint when available.
+        /// 429 -- rate limit hit. Pair with [#getRetryAfterSeconds]
+        /// to honour the provider's backoff hint when available.
         RATE_LIMIT,
 
         /// 400 / 422 -- malformed request, unsupported parameter,
@@ -99,7 +90,7 @@ public class LlmException extends IOException {
 
         /// Any failure that doesn't fit the categories above (e.g.
         /// JSON parsing of the response failed). Treat as a generic
-        /// programming error and log the [#getRawBody].
+        /// programming error and log [#getRawBody].
         UNKNOWN
     }
 
@@ -107,22 +98,24 @@ public class LlmException extends IOException {
     private final String providerErrorCode;
     private final String rawBody;
     private final ErrorType type;
+    private final int retryAfterSeconds;
 
     public LlmException(String message) {
-        this(message, -1, null, null, null, ErrorType.UNKNOWN);
+        this(message, -1, null, null, null, ErrorType.UNKNOWN, -1);
     }
 
     public LlmException(String message, Throwable cause) {
-        this(message, -1, null, null, cause, ErrorType.UNKNOWN);
-    }
-
-    public LlmException(String message, int httpStatus, String providerErrorCode,
-                        String rawBody, Throwable cause) {
-        this(message, httpStatus, providerErrorCode, rawBody, cause, ErrorType.UNKNOWN);
+        this(message, -1, null, null, cause, ErrorType.UNKNOWN, -1);
     }
 
     public LlmException(String message, int httpStatus, String providerErrorCode,
                         String rawBody, Throwable cause, ErrorType type) {
+        this(message, httpStatus, providerErrorCode, rawBody, cause, type, -1);
+    }
+
+    public LlmException(String message, int httpStatus, String providerErrorCode,
+                        String rawBody, Throwable cause, ErrorType type,
+                        int retryAfterSeconds) {
         super(message);
         if (cause != null) {
             initCause(cause);
@@ -131,11 +124,12 @@ public class LlmException extends IOException {
         this.providerErrorCode = providerErrorCode;
         this.rawBody = rawBody;
         this.type = type == null ? ErrorType.UNKNOWN : type;
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 
     /// Coarse-grained category -- the recommended switching point
     /// for error handling. See the class javadoc for the full
-    /// switch pattern.
+    /// pattern.
     public ErrorType getType() {
         return type;
     }
@@ -150,5 +144,13 @@ public class LlmException extends IOException {
 
     public String getRawBody() {
         return rawBody;
+    }
+
+    /// Seconds the provider asked us to wait before retrying, parsed
+    /// from a `Retry-After` header. `-1` when not applicable (the
+    /// usual case for non-`RATE_LIMIT` errors) or when the provider
+    /// did not send the header.
+    public int getRetryAfterSeconds() {
+        return retryAfterSeconds;
     }
 }

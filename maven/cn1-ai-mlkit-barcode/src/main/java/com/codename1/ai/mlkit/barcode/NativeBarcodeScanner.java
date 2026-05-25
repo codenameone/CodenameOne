@@ -20,11 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.barcode;
 
-/// 5xx other than 503/529: provider had an internal error.
-public class LlmServerException extends LlmException {
-    public LlmServerException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null, ErrorType.SERVER);
-    }
+import com.codename1.system.NativeInterface;
+
+/// Platform-native bridge for [BarcodeScanner]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeBarcodeScanner extends NativeInterface {
+    String[] scan(byte[] imageBytes);
 }

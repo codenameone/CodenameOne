@@ -81,24 +81,25 @@ public final class RetryPolicy {
         if (attemptsSoFar >= maxAttempts) {
             return false;
         }
-        if (t instanceof LlmRateLimitException) {
+        if ((t instanceof LlmException && ((LlmException) t).getType() == LlmException.ErrorType.RATE_LIMIT)) {
             return true;
         }
-        if (t instanceof LlmModelOverloadedException) {
+        if ((t instanceof LlmException && ((LlmException) t).getType() == LlmException.ErrorType.MODEL_OVERLOADED)) {
             return true;
         }
-        if (t instanceof LlmServerException) {
+        if ((t instanceof LlmException && ((LlmException) t).getType() == LlmException.ErrorType.SERVER)) {
             // 5xx server errors typically reflect transient state.
             return true;
         }
-        return t instanceof LlmNetworkException;
+        return (t instanceof LlmException && ((LlmException) t).getType() == LlmException.ErrorType.NETWORK);
     }
 
     /// Returns the delay to wait before the next attempt, honouring
     /// `Retry-After` from rate-limit exceptions when present.
     public long computeDelayMs(Throwable t, int attemptIndex /* 0-based */) {
-        if (t instanceof LlmRateLimitException) {
-            int retryAfter = ((LlmRateLimitException) t).getRetryAfterSeconds();
+        if (t instanceof LlmException
+                && ((LlmException) t).getType() == LlmException.ErrorType.RATE_LIMIT) {
+            int retryAfter = ((LlmException) t).getRetryAfterSeconds();
             if (retryAfter > 0) {
                 return retryAfter * 1000L;
             }

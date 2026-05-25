@@ -181,7 +181,7 @@ abstract class StreamingChatRequest extends ConnectionRequest {
     /// path. Convert to an `LlmNetworkException` and surface.
     @Override
     protected void handleException(Exception err) {
-        failWith(new LlmNetworkException(err.getMessage(), err));
+        failWith(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));
     }
 
     /// Provider-specific SSE event decoder. Implementations are

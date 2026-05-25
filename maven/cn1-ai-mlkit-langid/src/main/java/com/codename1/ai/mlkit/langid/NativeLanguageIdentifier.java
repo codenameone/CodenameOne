@@ -20,12 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.langid;
 
-/// 401/403: invalid or revoked API key, or insufficient permissions
-/// for the requested model.
-public class LlmAuthException extends LlmException {
-    public LlmAuthException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null, ErrorType.AUTH);
-    }
+import com.codename1.system.NativeInterface;
+
+/// Platform-native bridge for [LanguageIdentifier]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeLanguageIdentifier extends NativeInterface {
+    String identify(String text);
 }

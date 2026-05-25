@@ -20,20 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.labeling;
 
-/// 429: rate limit hit. `retryAfterSeconds` is `-1` when the provider
-/// didn't send a `Retry-After` header -- pick your own backoff in that
-/// case (`RetryPolicy.exponentialBackoff()` is the default).
-public class LlmRateLimitException extends LlmException {
-    private final int retryAfterSeconds;
+import com.codename1.system.NativeInterface;
 
-    public LlmRateLimitException(String message, int retryAfterSeconds, String code, String rawBody) {
-        super(message, 429, code, rawBody, null, ErrorType.RATE_LIMIT);
-        this.retryAfterSeconds = retryAfterSeconds;
-    }
-
-    public int getRetryAfterSeconds() {
-        return retryAfterSeconds;
-    }
+/// Platform-native bridge for [ImageLabeler]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeImageLabeler extends NativeInterface {
+    String[] label(byte[] imageBytes);
 }

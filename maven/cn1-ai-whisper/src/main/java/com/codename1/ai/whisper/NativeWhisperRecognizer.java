@@ -20,13 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.whisper;
 
-/// A specific 400 subtype: the conversation exceeded the model's
-/// context window. Drop older messages and retry, or switch to a
-/// larger-context model.
-public class LlmContextLengthException extends LlmInvalidRequestException {
-    public LlmContextLengthException(String message, String code, String rawBody) {
-        super(message, 400, code, rawBody, ErrorType.CONTEXT_LENGTH);
-    }
+import com.codename1.system.NativeInterface;
+
+/// Platform-native bridge for [WhisperRecognizer]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeWhisperRecognizer extends NativeInterface {
+    String transcribe(String audioFilePath, String modelPath);
 }

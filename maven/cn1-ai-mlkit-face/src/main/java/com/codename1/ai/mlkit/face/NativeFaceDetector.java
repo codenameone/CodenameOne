@@ -20,12 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.face;
 
-/// Wraps a lower-level transport failure (DNS, TLS, read timeout,
-/// connection reset). Carries no HTTP status by definition.
-public class LlmNetworkException extends LlmException {
-    public LlmNetworkException(String message, Throwable cause) {
-        super(message, -1, null, null, cause, ErrorType.NETWORK);
-    }
+import com.codename1.system.NativeInterface;
+
+/// Platform-native bridge for [FaceDetector]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeFaceDetector extends NativeInterface {
+    int[][] detect(byte[] imageBytes);
 }

@@ -20,18 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.ai.mlkit.translate;
 
-/// 400/422: malformed request payload, unsupported parameter, image
-/// too large, etc.
-public class LlmInvalidRequestException extends LlmException {
-    public LlmInvalidRequestException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null, ErrorType.INVALID_REQUEST);
-    }
+import com.codename1.system.NativeInterface;
 
-    /// Subclass constructor so [LlmContextLengthException] can pass its own [ErrorType].
-    protected LlmInvalidRequestException(String message, int httpStatus, String code,
-                                         String rawBody, ErrorType type) {
-        super(message, httpStatus, code, rawBody, null, type);
-    }
+/// Platform-native bridge for [Translator]. Implemented per
+/// platform (iOS Obj-C / Android Java) in a follow-up commit
+/// once device-testable bindings against the underlying SDK
+/// land. The facade resolves this via
+/// [com.codename1.system.NativeLookup#create] and returns a
+/// graceful error when no platform implementation is registered.
+public interface NativeTranslator extends NativeInterface {
+    String translate(String text, String sourceLang, String targetLang);
 }

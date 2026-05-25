@@ -4,16 +4,23 @@ Codename One AI cn1lib -- **ML Kit Smart Reply**.
 
 ## Status
 
-Scaffold. The public Java surface is in place so apps can compile
-against it today, but every method currently completes with
-`UnsupportedOperationException("not yet implemented")` until the
-per-platform native bridges land.
+- Public Java facade: complete (`com.codename1.ai.mlkit.smartreply.SmartReply`)
+- `NativeSmartReply` platform interface: defined
+- iOS / Android native bridges: **pending follow-up commits**
+  (need device-testable bindings against the underlying SDK)
 
-## Build-time wiring
+Apps can reference `SmartReply.*` today; every call returns
+an `AsyncResource` that completes with a clear `LlmException`
+until the platform bridges land. The build server's
+`AiDependencyTable` already injects the right CocoaPod / Swift
+Package / Android Gradle dep / `Info.plist` strings / Android
+permissions on `import`.
 
-The Codename One build server's `AiDependencyTable` recognises
-references to `com.codename1.ai.mlkit.smartreply.*` and automatically injects the right
-iOS Pod / Swift Package, Android Gradle dependency, and any
-required `Info.plist` usage descriptions or Android permissions.
-See `AiDependencyTable.java` in the core repo for the full
-mapping.
+## Versioning and release
+
+This module inherits its version (`${cn1.version}`) from the
+Codename One parent pom. It's part of the Codename One reactor
+and ships to Maven Central alongside every Codename One
+release; the dependency on `codenameone-core` is `provided`
+scope so consuming apps see the cn1lib pull in core at the
+version the app already declares via `cn1.version`.

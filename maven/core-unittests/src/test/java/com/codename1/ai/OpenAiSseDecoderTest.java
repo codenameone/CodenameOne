@@ -86,7 +86,7 @@ class OpenAiSseDecoderTest {
     void mapErrorRecognizes429AsRateLimit() {
         LlmException e = OpenAiSseDecoder.mapErrorStatic(429,
                 "{\"error\":{\"message\":\"slow down\",\"type\":\"rate_limit\",\"code\":\"rate_limited\"}}");
-        assertTrue(e instanceof LlmRateLimitException);
+        assertTrue((e instanceof LlmException && ((LlmException) e).getType() == LlmException.ErrorType.RATE_LIMIT));
         assertEquals(429, e.getHttpStatus());
     }
 
@@ -97,14 +97,16 @@ class OpenAiSseDecoderTest {
         // typically respond by truncating older messages.
         LlmException e = OpenAiSseDecoder.mapErrorStatic(400,
                 "{\"error\":{\"message\":\"too long\",\"type\":\"invalid_request_error\",\"code\":\"context_length_exceeded\"}}");
-        assertTrue(e instanceof LlmContextLengthException,
+        assertTrue((e instanceof LlmException && ((LlmException) e).getType() == LlmException.ErrorType.CONTEXT_LENGTH),
                 "expected LlmContextLengthException, got " + e.getClass().getSimpleName());
     }
 
     @Test
     void mapErrorRoutes401To403ToAuth() {
-        assertTrue(OpenAiSseDecoder.mapErrorStatic(401, "{}") instanceof LlmAuthException);
-        assertTrue(OpenAiSseDecoder.mapErrorStatic(403, "{}") instanceof LlmAuthException);
+        assertEquals(LlmException.ErrorType.AUTH,
+                OpenAiSseDecoder.mapErrorStatic(401, "{}").getType());
+        assertEquals(LlmException.ErrorType.AUTH,
+                OpenAiSseDecoder.mapErrorStatic(403, "{}").getType());
     }
 
     private static final class RecordingListener implements StreamingListener {
