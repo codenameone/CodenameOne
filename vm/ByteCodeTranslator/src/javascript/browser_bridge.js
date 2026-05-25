@@ -713,6 +713,39 @@
       global.__cn1LastDrawCanvas = receiver;
       global.__cn1LastDrawMember = 'getContext';
     }
+    // SMOKING GUN DIAG: when a getter returns a number for document/getContext
+    // (the canvasContextWipe leak path), log the receiver shape so we can
+    // identify whether the receiver is the actual Window/Canvas or has been
+    // corrupted/wrong.
+    if (typeof value === 'number'
+        && (member === 'document' || member === 'getContext')) {
+      if (!global.__cn1NumberLeakLogged) global.__cn1NumberLeakLogged = 0;
+      if (global.__cn1NumberLeakLogged < 5) {
+        global.__cn1NumberLeakLogged++;
+        try {
+          var protoName = '<none>';
+          try {
+            var proto = Object.getPrototypeOf(receiver);
+            protoName = proto && proto.constructor && proto.constructor.name || '<unknown>';
+          } catch (_e1) {}
+          var receiverDesc = 'unknown';
+          try {
+            if (receiver === global.window) receiverDesc = 'global.window';
+            else if (global.window && receiver === global.window.document) receiverDesc = 'global.window.document';
+            else if (typeof receiver === 'object' && receiver && typeof receiver.tagName === 'string') receiverDesc = 'element:' + receiver.tagName;
+            else receiverDesc = String(receiver).slice(0, 60);
+          } catch (_e2) {}
+          diag('NUMBER_LEAK', 'member', String(member));
+          diag('NUMBER_LEAK', 'kind', String(kind));
+          diag('NUMBER_LEAK', 'value', String(value));
+          diag('NUMBER_LEAK', 'receiverTypeof', typeof receiver);
+          diag('NUMBER_LEAK', 'receiverProto', protoName);
+          diag('NUMBER_LEAK', 'receiverDesc', receiverDesc);
+          diag('NUMBER_LEAK', 'receiverHasDocument', String(receiver && typeof receiver.document));
+          diag('NUMBER_LEAK', 'receiverHasGetContext', String(receiver && typeof receiver.getContext));
+        } catch (_e) {}
+      }
+    }
     return hostResult(value);
   });
 
