@@ -3279,13 +3279,10 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a
   // (defensive __cn1CachedDocWrapper invalidation in getDocument).
   "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
-  // SheetSlide hits a separate Canvas2DContext class-wipe (cn1_s_save
-  // VIRTUAL_FAIL receiverClass=null) that hangs the suite even after
-  // the AbstractAnimationScreenshotTest safety net (efc9bdb67) calls
-  // done() -- the worker continues running paint code that hits the
-  // VIRTUAL_FAIL loop. Distinct bug from chartDocumentStaleness; needs
-  // separate Canvas2DContext wrapper investigation.
-  "com_codenameone_examples_hellocodenameone_tests_SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
+  // Un-parked: canvasContextWipe no-op recovery for save/restore/
+  // setTransform/etc at d696fb682 + AbstractAnimationScreenshotTest
+  // safety net (efc9bdb67) should now keep this from hanging.
+  //"com_codenameone_examples_hellocodenameone_tests_SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   // TextAreaAlignmentStates' form renders correctly, but the screenshot
   // captures it underneath a leftover Sheet overlay from
   // SheetScreenshotTest (which ran ~7 tests earlier). On JS port the
@@ -3368,7 +3365,7 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "ChartTransformScreenshotTest": "chartCombinedXyCapture",
   "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
-  "SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
+  //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
   //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
