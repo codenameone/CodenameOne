@@ -145,19 +145,28 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
 
     private static void collect(File dir, List<File> out) {
         File[] entries = dir.listFiles();
-        if (entries == null) return;
+        if (entries == null) {
+            return;
+        }
         Arrays.sort(entries, new Comparator<File>() {
             @Override public int compare(File a, File b) { return a.getName().compareTo(b.getName()); }
         });
         for (File f : entries) {
-            if (f.isDirectory()) collect(f, out);
-            else if (f.getName().toLowerCase().endsWith(".svg")) out.add(f);
+            if (f.isDirectory()) {
+                collect(f, out);
+            } else if (f.getName().toLowerCase().endsWith(".svg")) {
+                out.add(f);
+            }
         }
     }
 
     private static long lastModified(List<File> files) {
         long max = 0;
-        for (File f : files) if (f.lastModified() > max) max = f.lastModified();
+        for (File f : files) {
+            if (f.lastModified() > max) {
+                max = f.lastModified();
+            }
+        }
         return max;
     }
 }

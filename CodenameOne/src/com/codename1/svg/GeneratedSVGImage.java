@@ -185,9 +185,13 @@ public abstract class GeneratedSVGImage extends Image {
     /// behavior. Generated code calls this per animated attribute per paint.
     public static float progress(long elapsedMs, long beginMs, long durMs,
                                  int repeatCount, boolean freeze) {
-        if (durMs <= 0L) return freeze ? 1f : 0f;
+        if (durMs <= 0L) {
+            return freeze ? 1f : 0f;
+        }
         long t = elapsedMs - beginMs;
-        if (t < 0L) return 0f;
+        if (t < 0L) {
+            return 0f;
+        }
         if (repeatCount == REPEAT_INDEFINITE) {
             long cycle = t % durMs;
             return (float) cycle / (float) durMs;
@@ -223,21 +227,35 @@ public abstract class GeneratedSVGImage extends Image {
 
     /// Multi-stop floating point lerp. Stops are evenly spaced in `[0, 1]`.
     public static float lerpValues(float[] values, float t) {
-        if (values == null || values.length == 0) return 0f;
-        if (values.length == 1) return values[0];
-        if (t <= 0f) return values[0];
-        if (t >= 1f) return values[values.length - 1];
+        if (values == null || values.length == 0) {
+            return 0f;
+        }
+        if (values.length == 1) {
+            return values[0];
+        }
+        if (t <= 0f) {
+            return values[0];
+        }
+        if (t >= 1f) {
+            return values[values.length - 1];
+        }
         float seg = 1f / (values.length - 1);
         int i = (int) Math.floor(t / seg);
-        if (i >= values.length - 1) i = values.length - 2;
+        if (i >= values.length - 1) {
+            i = values.length - 2;
+        }
         float local = (t - i * seg) / seg;
         return values[i] + (values[i + 1] - values[i]) * local;
     }
 
     private static int round(float v) {
         int r = (int) (v + 0.5f);
-        if (r < 0) return 0;
-        if (r > 255) return 255;
+        if (r < 0) {
+            return 0;
+        }
+        if (r > 255) {
+            return 255;
+        }
         return r;
     }
 
@@ -285,7 +303,9 @@ public abstract class GeneratedSVGImage extends Image {
         // F.6.5.2 — compute (cx', cy')
         double sign = (largeArc == sweep) ? -1.0 : 1.0;
         double sq = (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / (rx2 * y1p2 + ry2 * x1p2);
-        if (sq < 0.0) sq = 0.0;
+        if (sq < 0.0) {
+            sq = 0.0;
+        }
         double coef = sign * Math.sqrt(sq);
         double cxp = coef * (arx * y1p / ary);
         double cyp = coef * -(ary * x1p / arx);
@@ -303,18 +323,24 @@ public abstract class GeneratedSVGImage extends Image {
         double vy = (-y1p - cyp) / ary;
         double theta1 = vectorAngle(1.0, 0.0, ux, uy);
         double deltaTheta = vectorAngle(ux, uy, vx, vy);
-        if (!sweep && deltaTheta > 0.0) deltaTheta -= 2.0 * Math.PI;
-        else if (sweep && deltaTheta < 0.0) deltaTheta += 2.0 * Math.PI;
+        if (!sweep && deltaTheta > 0.0) {
+            deltaTheta -= 2.0 * Math.PI;
+        } else if (sweep && deltaTheta < 0.0) {
+            deltaTheta += 2.0 * Math.PI;
+        }
 
         // Split into segments small enough that the cubic approximation stays accurate.
         int segments = (int) Math.ceil(Math.abs(deltaTheta) / (Math.PI / 2.0));
-        if (segments < 1) segments = 1;
+        if (segments < 1) {
+            segments = 1;
+        }
         double dt = deltaTheta / segments;
         double t = (4.0 / 3.0) * Math.tan(dt / 4.0);
 
         double cosTheta1 = Math.cos(theta1);
         double sinTheta1 = Math.sin(theta1);
-        double px = x1, py = y1;
+        double px = x1;
+        double py = y1;
         for (int i = 0; i < segments; i++) {
             double theta2 = theta1 + dt;
             double cosTheta2 = Math.cos(theta2);
@@ -346,10 +372,16 @@ public abstract class GeneratedSVGImage extends Image {
         double dot = ux * vx + uy * vy;
         double len = Math.sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
         double cos = dot / len;
-        if (cos < -1.0) cos = -1.0;
-        if (cos > 1.0) cos = 1.0;
+        if (cos < -1.0) {
+            cos = -1.0;
+        }
+        if (cos > 1.0) {
+            cos = 1.0;
+        }
         double a = Math.acos(cos);
-        if ((ux * vy - uy * vx) < 0.0) a = -a;
+        if ((ux * vy - uy * vx) < 0.0) {
+            a = -a;
+        }
         return a;
     }
 }

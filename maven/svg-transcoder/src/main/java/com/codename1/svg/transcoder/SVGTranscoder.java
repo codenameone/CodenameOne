@@ -43,7 +43,9 @@ public final class SVGTranscoder {
     }
 
     public static void transcode(File svgFile, String packageName, String className, File outFile) throws IOException {
-        if (outFile.getParentFile() != null) outFile.getParentFile().mkdirs();
+        if (outFile.getParentFile() != null) {
+            outFile.getParentFile().mkdirs();
+        }
         InputStream in = new BufferedInputStream(new FileInputStream(svgFile));
         try {
             Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile), "UTF-8"));
@@ -68,7 +70,9 @@ public final class SVGTranscoder {
     public static void writeRegistry(String packageName, String className, java.util.List<GeneratedClass> classes, Writer out) throws IOException {
         // dedupe by resource name; last wins
         Map<String, GeneratedClass> unique = new LinkedHashMap<String, GeneratedClass>();
-        for (GeneratedClass c : classes) unique.put(c.resourceName, c);
+        for (GeneratedClass c : classes) {
+            unique.put(c.resourceName, c);
+        }
 
         if (packageName != null && !packageName.isEmpty()) {
             out.write("package " + packageName + ";\n\n");
@@ -111,7 +115,9 @@ public final class SVGTranscoder {
     public static String classNameFor(String fileName) {
         String stem = fileName;
         int dot = stem.lastIndexOf('.');
-        if (dot > 0) stem = stem.substring(0, dot);
+        if (dot > 0) {
+            stem = stem.substring(0, dot);
+        }
         StringBuilder sb = new StringBuilder();
         boolean upper = true;
         for (int i = 0; i < stem.length(); i++) {
@@ -126,7 +132,9 @@ public final class SVGTranscoder {
             sb.append(upper ? Character.toUpperCase(c) : c);
             upper = false;
         }
-        if (sb.length() == 0) sb.append("Svg");
+        if (sb.length() == 0) {
+            sb.append("Svg");
+        }
         return sb.toString();
     }
 

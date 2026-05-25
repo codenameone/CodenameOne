@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd LaunchAgent for the Codename One blog syndication runner.
+  Fires daily at 14:00 local time (after the daily blog-syndication.yml
+  GitHub Action commits any new queue entries at 13:00 UTC) and runs
+  scripts/website/run-syndication.sh.
+
+  Install:
+    cp scripts/website/com.codenameone.syndication.plist \
+       ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.codenameone.syndication.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.codenameone.syndication.plist
+    rm ~/Library/LaunchAgents/com.codenameone.syndication.plist
+
+  Run once now (manual trigger):
+    launchctl start com.codenameone.syndication
+
+  Logs:
+    scripts/website/logs/syndication-YYYY-MM-DD.log     (per-day, full output)
+    scripts/website/logs/launchd.out / launchd.err     (launchd's own stdio)
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.codenameone.syndication</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/shai/dev/cn3/CodenameOne/scripts/website/run-syndication.sh</string>
+    </array>
+
+    <!-- Daily at 14:00 local time. Adjust as preferred. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>14</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!--
+      Don't run on every plist load — only when the calendar interval
+      fires. (Set RunAtLoad to true if you also want a run as soon as
+      the LaunchAgent is loaded, e.g. on each login.)
+    -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- launchd's own stdio (the wrapper additionally appends to its
+         own per-day log file under scripts/website/logs/). -->
+    <key>StandardOutPath</key>
+    <string>/Users/shai/dev/cn3/CodenameOne/scripts/website/logs/launchd.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/shai/dev/cn3/CodenameOne/scripts/website/logs/launchd.err</string>
+
+    <!-- Keep the user's normal PATH so git, python, etc. resolve. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

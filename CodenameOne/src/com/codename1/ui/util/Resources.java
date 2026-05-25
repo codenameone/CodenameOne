@@ -887,7 +887,9 @@ public class Resources {
     /// cached image instance
     public Image getImage(String id) {
         Image local = (Image) resources.get(id);
-        if (local != null) return local;
+        if (local != null) {
+            return local;
+        }
         Image gen;
         synchronized (generatedImages) {
             gen = generatedImages.get(id);
@@ -900,7 +902,9 @@ public class Resources {
     /// transcoder registry to inject generated images alongside the resources
     /// loaded from the `.res` file.
     public void setImage(String id, Image image) {
-        if (id == null || image == null) return;
+        if (id == null || image == null) {
+            return;
+        }
         resources.put(id, image);
         resourceTypes.put(id, Byte.valueOf(MAGIC_IMAGE));
     }
@@ -929,7 +933,9 @@ public class Resources {
     /// iOS, which cannot tolerate the reflective probe a fully transparent
     /// hook would require.
     public static void registerGeneratedImage(String id, Image image) {
-        if (id == null || image == null) return;
+        if (id == null || image == null) {
+            return;
+        }
         synchronized (generatedImages) {
             generatedImages.put(id, image);
             if (id.endsWith(".svg")) {
