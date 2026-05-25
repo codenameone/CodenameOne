@@ -295,6 +295,192 @@ if (!fa.isSignedIn()) {
 }
 ----
 
+=== Passkeys / WebAuthn
+
+Codename One ships a portable WebAuthn client at `com.codename1.io.webauthn.WebAuthnClient`. It wraps the OS public-key credential APIs (`ASAuthorizationPlatformPublicKeyCredentialProvider` on iOS 16+, `androidx.credentials.CredentialManager` on Android API 28+) behind a JSON-friendly Java surface so you can talk to any relying-party server with the same code on every supported platform.
+
+==== When you actually need this class
+
+If you sign users in via `OidcClient` against Google, Apple, Microsoft Entra ID, Auth0 or Firebase, the *identity provider already supports passkeys*. The user's web browser at the IdP shows the passkey sheet, and OIDC just hands you the resulting ID / access tokens. You don't have to call `WebAuthnClient` at all -- everything in the rest of this chapter that signs users in via `OidcClient` already gets passkey-backed sign-in transparently, with no additional code on your side.
+
+Reach for `WebAuthnClient` when:
+
+* Your app talks to *your own* relying-party server and you want passwordless sign-in / step-up auth backed by a passkey.
+* You wire up a direct Auth0 or Firebase passkey ceremony (see <<auth0-passkeys>> and <<firebase-passkeys>>).
+* You drive a third-party SDK that emits a WebAuthn challenge.
+
+==== Quick start -- own backend
+
+Pseudo-code (the actual HTTP calls depend on your server library):
+
+[source,java]
+----
+import com.codename1.io.webauthn.PublicKeyCredential;
+import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
+import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
+import com.codename1.io.webauthn.WebAuthnClient;
+import com.codename1.io.webauthn.WebAuthnException;
+import com.codename1.util.SuccessCallback;
+
+// Registration -- enroll a new passkey
+String challengeJson = myServer.startPasskeyRegistration(currentUserId); // PublicKeyCredentialCreationOptionsJSON
+PublicKeyCredentialCreationOptions opts =
+        PublicKeyCredentialCreationOptions.fromJson(challengeJson);
+
+WebAuthnClient.getInstance().create(opts)
+        .ready(new SuccessCallback<PublicKeyCredential>() {
+            public void onSucess(PublicKeyCredential cred) {
+                myServer.finishPasskeyRegistration(cred.toJson()); // server verifies + persists
+            }
+        })
+        .except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable err) {
+                if (err instanceof WebAuthnException) {
+                    String code = ((WebAuthnException) err).getError();
+                    // "NotAllowedError" -- user dismissed the sheet
+                    // "not_supported"   -- platform lacks a passkey impl
+                    // ... etc.
+                }
+            }
+        });
+
+// Sign-in -- assert with an existing passkey
+String requestJson = myServer.startPasskeySignIn(); // PublicKeyCredentialRequestOptionsJSON
+WebAuthnClient.getInstance()
+        .get(PublicKeyCredentialRequestOptions.fromJson(requestJson))
+        .ready(new SuccessCallback<PublicKeyCredential>() {
+            public void onSucess(PublicKeyCredential cred) {
+                myServer.finishPasskeySignIn(cred.toJson()); // server verifies signature
+            }
+        });
+----
+
+`PublicKeyCredential#toJson()` is in the W3C `RegistrationResponseJSON` / `AuthenticationResponseJSON` format, which every WebAuthn server library accepts as-is. On the server, verify the response with one of:
+
+* Java -- https://webauthn4j.github.io/webauthn4j/en/[webauthn4j]
+* Node -- https://simplewebauthn.dev/[@simplewebauthn/server]
+* Rust -- https://github.com/kanidm/webauthn-rs[webauthn-rs]
+* Python -- https://github.com/duo-labs/py_webauthn[py_webauthn]
+
+Do *not* try to verify the attestation or assertion on the device. The relying-party server holds the credential record and the signature counter; only it can detect cloned authenticators.
+
+==== Platform requirements
+
+[cols="1,3"]
+|===
+| Platform | Notes
+
+| iOS
+| iOS 16+. The `AuthenticationServices.framework` library is linked automatically when your app references `com.codename1.io.webauthn.*`. Add an *Associated Domains* entitlement with `webcredentials:<rp.id>` and host an `apple-app-site-association` file at `https://<rp.id>/.well-known/apple-app-site-association` describing your bundle's `webcredentials` app IDs.
+
+| Android
+| API 28+ via `androidx.credentials:credentials` (added to your Gradle build automatically; override the version with build hint `android.credentialsVersion=1.x.y`). Publish a Digital Asset Links file at `https://<rp.id>/.well-known/assetlinks.json` declaring your app's SHA-256 certificate fingerprint.
+
+| JavaSE / desktop, Web port
+| `WebAuthnClient.isSupported()` returns `false`. Calls fail with `WebAuthnException.NOT_IMPLEMENTED`. Use this to gate the UI -- present a fallback (password sign-in, email magic link) when passkeys are unavailable.
+|===
+
+==== Build hints
+
+iOS:
+
+----
+ios.entitlements.com.apple.developer.associated-domains=<array>\n  <string>webcredentials:example.com</string>\n</array>
+----
+
+Android: nothing beyond the dependency that gets injected automatically. The asset-links file lives on your server; the build doesn't touch it.
+
+[[auth0-passkeys]]
+==== Auth0 passkeys
+
+`Auth0Connect` exposes two passkey helpers driven by Auth0's WebAuthn grant (`urn:okta:params:oauth:grant-type:webauthn`). They drive `WebAuthnClient` under the hood, so the same iOS / Android platform requirements apply.
+
+[source,java]
+----
+// Sign in with an existing passkey
+Auth0Connect.getInstance()
+    .withDomain("dev-xyz.us.auth0.com")
+    .signInWithPasskey(
+        "YOUR_AUTH0_CLIENT_ID",
+        "Username-Password-Authentication",   // connection / realm
+        "openid", "email", "profile", "offline_access")
+    .ready(new SuccessCallback<OidcTokens>() {
+        public void onSucess(OidcTokens t) {
+            String idToken = t.getIdToken();
+        }
+    });
+
+// Enroll a brand-new passkey for a new account
+Auth0Connect.getInstance()
+    .withDomain("dev-xyz.us.auth0.com")
+    .registerPasskey(
+        "YOUR_AUTH0_CLIENT_ID",
+        "Username-Password-Authentication",
+        "alice@example.com",
+        "Alice",
+        "openid", "email", "profile")
+    .ready(new SuccessCallback<OidcTokens>() {
+        public void onSucess(OidcTokens tokens) {
+            // user is signed in; passkey is enrolled for next time
+        }
+    });
+----
+
+Enable *Passkeys* in the Auth0 dashboard (Authentication &#8594; Database &#8594; your connection &#8594; Authentication Methods &#8594; Passkey), and add *WebAuthn* to the application's *Grant Types*.
+
+[[firebase-passkeys]]
+==== Firebase passkeys
+
+`FirebaseAuth` exposes `registerPasskey` (enroll a passkey for the signed-in user) and `signInWithPasskey` (sign in with an existing passkey). Both use Firebase Identity Platform's v2 passkey REST endpoints (`accounts/passkeyEnrollment:start|finalize`, `accounts/passkeySignIn:start|finalize`).
+
+[source,java]
+----
+FirebaseAuth fa = FirebaseAuth.getInstance().withApiKey("YOUR_FIREBASE_WEB_API_KEY");
+
+// Sign in with a passkey already on this device
+fa.signInWithPasskey().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+    public void onSucess(FirebaseAuth.FirebaseUser u) {
+        String uid = u.getUid();
+        String firebaseIdToken = u.getIdToken();
+    }
+});
+
+// Enroll a new passkey for the currently signed-in user
+fa.signInWithEmailAndPassword(email, password)
+    .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+        public void onSucess(FirebaseAuth.FirebaseUser u) {
+            fa.registerPasskey("Alice's iPhone")
+                .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+                    public void onSucess(FirebaseAuth.FirebaseUser enrolled) {
+                        // Next launch can sign in with signInWithPasskey() alone
+                    }
+                });
+        }
+    });
+----
+
+Passkey support requires the *Identity Platform* tier of Firebase Auth (the upgraded plan). The free Firebase Auth tier doesn't expose the passkey endpoints; the calls will fail with an HTTP 403. Check your project plan in the Firebase console under Build &#8594; Authentication &#8594; Settings &#8594; User account linking.
+
+==== Mapping WebAuthn errors
+
+`WebAuthnException.getError()` returns one of the W3C-defined error names:
+
+[cols="1,3"]
+|===
+| Code | Meaning
+
+| `NotAllowedError`  | User dismissed the OS sheet, no matching credential, or the authenticator denied the request.
+| `InvalidStateError`| The credential being created already exists on the authenticator.
+| `NotSupportedError`| Platform doesn't support the requested algorithm / transport combo.
+| `SecurityError`    | Origin / RP-ID validation failed. Most often an Associated Domain (iOS) or asset-links (Android) misconfiguration.
+| `AbortError`       | Caller cancelled the ceremony.
+| `ConstraintError`  | A constraint (resident key, user verification) couldn't be satisfied.
+| `not_supported`    | The platform has no native WebAuthn implementation at all. Caller should fall back to password sign-in.
+| `transport_error`  | Network failure while POSTing to your relying-party server.
+| `invalid_options`  | The options JSON received from the relying party couldn't be parsed.
+| `invalid_response` | The response returned by the authenticator couldn't be parsed.
+|===
+
 [[migrating-from-oauth2]]
 === Migrating from `Oauth2`
 

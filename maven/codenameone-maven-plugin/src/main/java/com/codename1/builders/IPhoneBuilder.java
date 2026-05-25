@@ -89,6 +89,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNfc;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
+    private boolean usesWebauthn;
     private boolean usesNfcHce;
 
     // Deeper-network connectivity flags. Set by the classpath scanner when
@@ -699,6 +700,14 @@ public class IPhoneBuilder extends Executor {
                             && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
                         usesAppleSignIn = true;
                     }
+                    // WebAuthn / passkeys (ASAuthorizationPlatformPublicKeyCredentialProvider)
+                    // also lives in AuthenticationServices.framework. Same gate
+                    // strategy: only enable the native bridge when the app
+                    // references com.codename1.io.webauthn.*
+                    if (!usesWebauthn
+                            && cls.indexOf("com/codename1/io/webauthn/") == 0) {
+                        usesWebauthn = true;
+                    }
                     if (cls.indexOf("com/codename1/io/wifi/WiFi") == 0
                             && !cls.equals("com/codename1/io/wifi/WiFiDirect")) {
                         // WiFi info or scan/connect. iOS has no scan API so
@@ -919,6 +928,12 @@ public class IPhoneBuilder extends Executor {
         if (usesAppleSignIn) {
             integrateAppleSignIn =
                 "        com.codename1.social.AppleSignInNativeImpl.init();\n";
+        }
+        // WebAuthn bootstrap -- same mechanism, separate gate.
+        String integrateWebauthn = "";
+        if (usesWebauthn) {
+            integrateWebauthn =
+                "        com.codename1.io.webauthn.WebAuthnNativeImpl.init();\n";
         }
 
         String integrateGoogleConnect = "";
@@ -1150,6 +1165,7 @@ public class IPhoneBuilder extends Executor {
                     + integrateGoogleConnect
                     + integrateOidcBrowser
                     + integrateAppleSignIn
+                    + integrateWebauthn
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
@@ -1701,7 +1717,7 @@ public class IPhoneBuilder extends Executor {
             // in -- otherwise the .m files would reference framework symbols
             // without the framework being linked, breaking the link step
             // for apps that never use the API.
-            if (usesOidc || usesAppleSignIn) {
+            if (usesOidc || usesAppleSignIn || usesWebauthn) {
                 String authSvc = "AuthenticationServices.framework";
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = authSvc;
@@ -1729,6 +1745,17 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_APPLESIGNIN", ex);
+                }
+            }
+            if (usesWebauthn) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_WEBAUTHN",
+                            "#define CN1_INCLUDE_WEBAUTHN");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_WEBAUTHN", ex);
                 }
             }
 
