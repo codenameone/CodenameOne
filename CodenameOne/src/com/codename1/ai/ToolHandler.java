@@ -22,26 +22,18 @@
  */
 package com.codename1.ai;
 
-/**
- * Test-only bridge that re-exposes the package-private
- * {@code JsonHelper} surface from inside the core artifact.
- *
- * <p>This class lives in {@code com.codename1.ai} purposely -- Java
- * package-private access requires the *same package, same module*
- * in JPMS-aware builds, but plain javac compilation is satisfied by
- * the package match alone. The core artifact ships without
- * {@code module-info.java}, so this works.</p>
- */
-final class JsonHelperBridge {
-
-    private JsonHelperBridge() {
-    }
-
-    static String serialize(Object o) {
-        return JsonHelper.serialize(o);
-    }
-
-    static Object rawJson(String s) {
-        return new JsonHelper.RawJson(s);
-    }
+/// Executor backing a [Tool]. The handler receives the raw JSON
+/// argument string the model produced and returns the JSON result
+/// to send back to the model in a [ToolResultPart]. Implementations
+/// are responsible for parsing `argumentsJson` (typically with
+/// [com.codename1.io.JSONParser]) and for serializing the result.
+///
+/// Pair with [Tool] via the four-argument constructor, then call
+/// [ToolCall#execute(java.util.List)] to dispatch.
+public interface ToolHandler {
+    /// Invokes the tool. Throw any exception to propagate it back
+    /// through [ToolCall#execute] -- the calling code can decide
+    /// whether to surface the error to the model as a tool result
+    /// or to abort the chat.
+    String invoke(String argumentsJson) throws Exception;
 }

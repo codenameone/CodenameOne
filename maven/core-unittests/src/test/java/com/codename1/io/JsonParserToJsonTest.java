@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai;
+package com.codename1.io;
 
 import org.junit.jupiter.api.Test;
 
@@ -30,14 +30,11 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * JsonHelper is package-private so this test deliberately lives in
- * the same package. We test through a tiny `JsonHelperBridge` shim
- * (also in this package) because the source class is package-private
- * in the *core* artifact, and tests in core-unittests run in the
- * test classpath but still need to reach into the package.
- */
-class JsonHelperTest {
+/// Exercises the toJson + parseJSON serializer additions on
+/// JSONParser. The serializer is shared between the AI client and
+/// any other code that needs to build JSON request bodies without
+/// pulling in a third-party library.
+class JsonParserToJsonTest {
 
     @Test
     void escapesStringsCorrectly() {
@@ -46,21 +43,20 @@ class JsonHelperTest {
         // reject unescaped control chars in string values.
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("prompt", "line one\nline \"two\"\\");
-        String json = JsonHelperBridge.serialize(m);
+        String json = JSONParser.toJson(m);
         assertTrue(json.contains("line one\\nline \\\"two\\\"\\\\"),
                 "expected escaped form, got: " + json);
     }
 
     @Test
     void omitsNullValuesFromMaps() {
-        // Whenever ChatRequest.maxTokens is null, the builder maps
-        // it to a Java null in the Map<String,Object>; the wire
-        // format must omit the key entirely (some providers reject
-        // "max_tokens":null).
+        // Whenever a builder field (like ChatRequest.maxTokens) is
+        // null, toJson must omit the key entirely -- some providers
+        // reject "field":null on the wire.
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("model", "gpt-4o-mini");
         m.put("max_tokens", null);
-        String json = JsonHelperBridge.serialize(m);
+        String json = JSONParser.toJson(m);
         assertFalse(json.contains("max_tokens"),
                 "null-valued field must not appear in the body");
         assertTrue(json.contains("\"model\""));
@@ -73,22 +69,18 @@ class JsonHelperTest {
         // rather than wrapping the whole string in quotes.
         String rawSchema = "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"}}}";
         Map<String, Object> m = new HashMap<String, Object>();
-        m.put("parameters", JsonHelperBridge.rawJson(rawSchema));
-        String json = JsonHelperBridge.serialize(m);
-        // The raw schema must appear unwrapped -- no surrounding "..."
-        // and no \"-style escaping.
+        m.put("parameters", JSONParser.rawJson(rawSchema));
+        String json = JSONParser.toJson(m);
         assertTrue(json.contains("\"parameters\":{\"type\":\"object\""),
                 "raw JSON should be inlined; got: " + json);
     }
 
     @Test
     void emitsIntegersWithoutFloatNotation() {
-        // Integers must serialize as `5`, never `5.0` or `5E0`,
-        // because some providers' JSON validators are pedantic.
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("n", Integer.valueOf(5));
         m.put("seed", Long.valueOf(42L));
-        String json = JsonHelperBridge.serialize(m);
+        String json = JSONParser.toJson(m);
         assertTrue(json.contains("\"n\":5"));
         assertTrue(json.contains("\"seed\":42"));
         assertFalse(json.contains("5.0"));
@@ -98,7 +90,30 @@ class JsonHelperTest {
     void roundTripsListOfPrimitives() {
         Map<String, Object> m = new HashMap<String, Object>();
         m.put("stop", Arrays.asList("A", "B", "C"));
-        String json = JsonHelperBridge.serialize(m);
+        String json = JSONParser.toJson(m);
         assertEquals("{\"stop\":[\"A\",\"B\",\"C\"]}", json);
+    }
+
+    @Test
+    void parsesByteArrayDirectly() throws Exception {
+        // parseJSON(byte[]) is the convenience helper used by every
+        // HTTP response code path; round-trip a small object.
+        byte[] body = "{\"x\":1,\"y\":\"hi\"}".getBytes("UTF-8");
+        Map<String, Object> root = JSONParser.parseJSON(body);
+        // Numeric values default to Double on the way out; pull them
+        // via getInt so we don't depend on the parser's default
+        // numeric type.
+        assertEquals(1, JSONParser.getInt(root, "x", -1));
+        assertEquals("hi", JSONParser.getString(root, "y"));
+    }
+
+    @Test
+    void getIntFallsBackOnMissingOrUnparseable() {
+        Map<String, Object> m = new HashMap<String, Object>();
+        m.put("count", Integer.valueOf(7));
+        m.put("text", "not a number");
+        assertEquals(7, JSONParser.getInt(m, "count", -1));
+        assertEquals(-1, JSONParser.getInt(m, "absent", -1));
+        assertEquals(-1, JSONParser.getInt(m, "text", -1));
     }
 }

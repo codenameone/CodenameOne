@@ -86,7 +86,7 @@ class ChatRequestBuilderTest {
     void nullNumericFieldsMeansDontSend() {
         // The wire-format contract is: don't emit a field when its
         // boxed value is null, so providers fall back to their own
-        // defaults instead of one we picked. JsonHelper.serialize()
+        // defaults instead of one we picked. JSONParser.toJson()
         // is responsible for the omission; ChatRequest just has to
         // preserve nullness.
         ChatRequest req = ChatRequest.builder()

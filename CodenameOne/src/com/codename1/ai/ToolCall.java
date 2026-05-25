@@ -22,11 +22,17 @@
  */
 package com.codename1.ai;
 
+import java.util.List;
+
 /// A tool/function invocation produced by the model. The `id` round-
 /// trips the call back to a [ToolResultPart] so the provider can
 /// match the result to the original request. `argumentsJson` is the
 /// raw JSON string the model produced -- parse it with
-/// `com.codename1.io.JSONParser` if you need the structured fields.
+/// [com.codename1.io.JSONParser] if you need the structured fields.
+///
+/// Use [#execute(List)] to dispatch to the matching [Tool] handler
+/// from the request's tool list. See the [Tool] class javadoc for
+/// the full pattern.
 public final class ToolCall {
     private final String id;
     private final String name;
@@ -48,5 +54,40 @@ public final class ToolCall {
 
     public String getArgumentsJson() {
         return argumentsJson;
+    }
+
+    /// Finds the [Tool] whose name matches this call and invokes its
+    /// [ToolHandler] with this call's `argumentsJson`. Returns the
+    /// JSON result the handler produced. Apps typically wrap that in
+    /// a [ChatMessage#toolResult] and append it to the conversation
+    /// before the next chat turn.
+    ///
+    /// Throws `IllegalArgumentException` when no tool in `tools`
+    /// has a matching name, or `IllegalStateException` when the
+    /// matching tool has no handler registered.
+    public String execute(List<Tool> tools) throws Exception {
+        Tool match = findTool(tools);
+        if (match == null) {
+            throw new IllegalArgumentException(
+                    "No tool registered with name '" + name + "'. "
+                  + "Add it to the request's tool list, or dispatch by hand "
+                  + "via getName() / getArgumentsJson().");
+        }
+        return match.invoke(argumentsJson);
+    }
+
+    /// Looks up the matching [Tool] without invoking it. Useful when
+    /// the caller wants to dispatch by hand but still benefit from
+    /// the name-matching plumbing.
+    public Tool findTool(List<Tool> tools) {
+        if (tools == null) {
+            return null;
+        }
+        for (Tool t : tools) {
+            if (t.getName().equals(name)) {
+                return t;
+            }
+        }
+        return null;
     }
 }

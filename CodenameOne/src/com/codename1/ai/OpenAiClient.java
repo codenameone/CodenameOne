@@ -23,6 +23,7 @@
 package com.codename1.ai;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
@@ -88,7 +89,7 @@ class OpenAiClient extends LlmClient {
             protected void postResponse() {
                 final byte[] data = getResponseData();
                 try {
-                    Map root = JsonHelper.parseObject(data);
+                    Map root = JSONParser.parseJSON(data);
                     final ChatResponse cr2 = OpenAiSseDecoder.parseNonStreaming(root);
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
@@ -204,7 +205,7 @@ class OpenAiClient extends LlmClient {
             if (req.getDimensions() != null) {
                 root.put("dimensions", req.getDimensions());
             }
-            body = JsonHelper.serialize(root).getBytes("UTF-8");
+            body = JSONParser.toJson(root).getBytes("UTF-8");
         } catch (IOException ioe) {
             result.error(ioe);
             return result;
@@ -222,30 +223,30 @@ class OpenAiClient extends LlmClient {
             @Override
             protected void postResponse() {
                 try {
-                    Map root = JsonHelper.parseObject(getResponseData());
-                    List<Object> dataArr = JsonHelper.asList(root.get("data"));
+                    Map root = JSONParser.parseJSON(getResponseData());
+                    List<Object> dataArr = JSONParser.asList(root.get("data"));
                     List<Embedding> out = new ArrayList<Embedding>(dataArr == null ? 0 : dataArr.size());
                     if (dataArr != null) {
                         for (int i = 0; i < dataArr.size(); i++) {
-                            Map e = JsonHelper.asMap(dataArr.get(i));
-                            List<Object> v = JsonHelper.asList(e.get("embedding"));
+                            Map e = JSONParser.asMap(dataArr.get(i));
+                            List<Object> v = JSONParser.asList(e.get("embedding"));
                             float[] vec = new float[v == null ? 0 : v.size()];
                             for (int j = 0; j < vec.length; j++) {
                                 Object n = v.get(j);
                                 vec[j] = n instanceof Number ? ((Number) n).floatValue()
                                         : Float.parseFloat(n.toString());
                             }
-                            out.add(new Embedding(vec, JsonHelper.intValue(e, "index", i)));
+                            out.add(new Embedding(vec, JSONParser.getInt(e, "index", i)));
                         }
                     }
-                    Map usageMap = JsonHelper.asMap(root.get("usage"));
+                    Map usageMap = JSONParser.asMap(root.get("usage"));
                     Usage u = usageMap == null ? null
                             : new Usage(
-                                JsonHelper.intValue(usageMap, "prompt_tokens", -1),
+                                JSONParser.getInt(usageMap, "prompt_tokens", -1),
                                 -1,
-                                JsonHelper.intValue(usageMap, "total_tokens", -1));
+                                JSONParser.getInt(usageMap, "total_tokens", -1));
                     final EmbeddingResponse er = new EmbeddingResponse(out, u,
-                            JsonHelper.string(root, "model"));
+                            JSONParser.getString(root, "model"));
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
@@ -345,7 +346,7 @@ class OpenAiClient extends LlmClient {
         if (!req.getMetadata().isEmpty()) {
             root.put("metadata", req.getMetadata());
         }
-        return JsonHelper.serialize(root).getBytes("UTF-8");
+        return JSONParser.toJson(root).getBytes("UTF-8");
     }
 
     private List<Object> encodeMessages(ChatRequest req) {
@@ -437,7 +438,7 @@ class OpenAiClient extends LlmClient {
             Map<String, Object> fn = new HashMap<String, Object>();
             fn.put("name", t.getName());
             fn.put("description", t.getDescription());
-            fn.put("parameters", new JsonHelper.RawJson(t.getParametersJsonSchema()));
+            fn.put("parameters", JSONParser.rawJson(t.getParametersJsonSchema()));
             jt.put("function", fn);
             out.add(jt);
         }

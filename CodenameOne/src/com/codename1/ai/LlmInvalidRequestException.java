@@ -26,6 +26,12 @@ package com.codename1.ai;
 /// too large, etc.
 public class LlmInvalidRequestException extends LlmException {
     public LlmInvalidRequestException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null);
+        super(message, httpStatus, code, rawBody, null, ErrorType.INVALID_REQUEST);
+    }
+
+    /// Subclass constructor so [LlmContextLengthException] can pass its own [ErrorType].
+    protected LlmInvalidRequestException(String message, int httpStatus, String code,
+                                         String rawBody, ErrorType type) {
+        super(message, httpStatus, code, rawBody, null, type);
     }
 }

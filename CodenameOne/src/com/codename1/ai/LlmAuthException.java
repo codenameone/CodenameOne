@@ -26,6 +26,6 @@ package com.codename1.ai;
 /// for the requested model.
 public class LlmAuthException extends LlmException {
     public LlmAuthException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null);
+        super(message, httpStatus, code, rawBody, null, ErrorType.AUTH);
     }
 }

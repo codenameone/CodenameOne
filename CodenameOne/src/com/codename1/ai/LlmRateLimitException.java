@@ -29,7 +29,7 @@ public class LlmRateLimitException extends LlmException {
     private final int retryAfterSeconds;
 
     public LlmRateLimitException(String message, int retryAfterSeconds, String code, String rawBody) {
-        super(message, 429, code, rawBody, null);
+        super(message, 429, code, rawBody, null, ErrorType.RATE_LIMIT);
         this.retryAfterSeconds = retryAfterSeconds;
     }
 

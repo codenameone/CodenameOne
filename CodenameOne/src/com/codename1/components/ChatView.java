@@ -23,45 +23,55 @@
 package com.codename1.components;
 
 import com.codename1.ai.ChatMessage;
-import com.codename1.ai.ChatRequest;
-import com.codename1.ai.ChatResponse;
-import com.codename1.ai.LlmClient;
+import com.codename1.ai.MessagePart;
 import com.codename1.ai.Role;
-import com.codename1.ai.StreamingListener;
-import com.codename1.ai.Usage;
+import com.codename1.ai.TextPart;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
-import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.util.AsyncResource;
-import com.codename1.util.SuccessCallback;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /// A scrollable, theme-aware chat surface.
 ///
-/// `ChatView` holds a vertical stack of [ChatBubble]s rendered from
-/// [ChatMessage]s plus a [ChatInput] strip at the bottom. The stack
-/// auto-scrolls to the latest message when one is added.
-///
-/// #### Streaming
-///
-/// During an LLM streaming call, the typical pattern is:
+/// `ChatView` is a **pure UI component** -- it has no knowledge of
+/// LLMs or any specific chat backend. It accepts [ChatMessage]
+/// instances (the same data envelope the AI client uses, but
+/// equally usable for peer-to-peer messaging) and renders them as
+/// styled bubbles. Routing the user's input to a backend and
+/// piping responses back into the view is the caller's job. For
+/// LLM use there's a ready-made binding -- see
+/// `com.codename1.ai.LlmChatBinding` -- but the same surface
+/// trivially supports a WhatsApp-style peer chat:
 ///
 /// ```
-/// chatView.addMessage(ChatMessage.user(userText));
-/// ChatBubble assistant = chatView.beginAssistantStream();
-/// client.chatStream(req, new StreamingListener.Adapter() {
-///     public void onContentDelta(String d) { assistant.appendText(d); }
+/// ChatView view = new ChatView();
+/// view.setOnSend(evt -> {
+///     String text = view.getInput().getText();
+///     view.getInput().clear();
+///     view.addMessage(ChatMessage.user(text));          // outgoing
+///     chatService.send(text, peerReply -> {
+///         // peer responses render as "assistant" bubbles
+///         view.addMessage(ChatMessage.assistant(peerReply));
+///     });
 /// });
+/// // System / "X joined the chat" notices use ChatMessage.system.
 /// ```
 ///
-/// Use [#bindToLlm(LlmClient, ChatRequest)] to wire the entire
-/// flow in one call when the surrounding logic is straightforward.
+/// The `USER` / `ASSISTANT` / `SYSTEM` roles map naturally to
+/// self / peer / system-notice in a peer chat; rename via CSS
+/// (the bubble UIIDs are `ChatBubbleUser`, `ChatBubbleAssistant`,
+/// `ChatBubbleSystem`) if the visual treatment needs to differ.
+/// Apps that need a totally different message data type can
+/// subclass and override [#createBubble(ChatMessage)] to render
+/// however they like while still using `ChatMessage` as the
+/// transport.
 ///
 /// #### Default UIIDs
 ///
@@ -115,22 +125,20 @@ public class ChatView extends Container {
             r.run();
         } else {
             // Wait for the EDT to insert so we can return the bubble
-            // synchronously to the caller. The caller is on a worker
-            // thread by definition (we just checked); blocking here
-            // is fine.
+            // synchronously to the caller.
             Display.getInstance().callSeriallyAndWait(r);
         }
         return out[0];
     }
 
-    /// Convenience that appends an empty assistant bubble for an
-    /// upcoming streaming response. Returns the bubble so the
-    /// caller's `StreamingListener` can [ChatBubble#appendText] into
-    /// it.
+    /// Appends an empty assistant/peer bubble that subsequent
+    /// [ChatBubble#appendText] calls (or [#appendToLastMessage]) can
+    /// stream tokens into. Returns the bubble so the caller can
+    /// retain the reference -- the typical pattern is to capture it
+    /// before opening a streaming network call.
     public ChatBubble beginAssistantStream() {
         return addMessage(new ChatMessage(Role.ASSISTANT,
-                java.util.Arrays.<com.codename1.ai.MessagePart>asList(
-                        new com.codename1.ai.TextPart(""))));
+                Arrays.<MessagePart>asList(new TextPart(""))));
     }
 
     /// Append a streaming token delta to the most recently added
@@ -175,76 +183,13 @@ public class ChatView extends Container {
     }
 
     public List<ChatMessage> getHistory() {
-        return java.util.Collections.unmodifiableList(history);
-    }
-
-    /// Wires this view to an [LlmClient] so the user can type in the
-    /// input bar and see streamed responses appear automatically.
-    /// `baseRequest` carries model, temperature, tools, etc.; the
-    /// view's accumulated history is substituted for `messages` on
-    /// every turn so [#addMessage(ChatMessage)] calls (and any
-    /// initial system message you've already supplied) participate.
-    public void bindToLlm(final LlmClient client, final ChatRequest baseRequest) {
-        setOnSend(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                final String text = input.getText();
-                if (text == null || text.length() == 0) {
-                    return;
-                }
-                input.clear();
-                addMessage(ChatMessage.user(text));
-                setTypingIndicatorVisible(true);
-                final ChatBubble assistant = beginAssistantStream();
-                ChatRequest replay = baseRequest.toBuilder()
-                        .messages(buildOutgoingMessages(baseRequest))
-                        .build();
-                AsyncResource<ChatResponse> result = client.chatStream(replay,
-                        new StreamingListener() {
-                            @Override
-                            public void onContentDelta(String textDelta) {
-                                assistant.appendText(textDelta);
-                            }
-
-                            @Override
-                            public void onToolCallDelta(int index, String id, String name, String argumentsFragment) {
-                                // Default binding doesn't surface
-                                // tool calls -- apps that use tools
-                                // should wire up their own handler.
-                            }
-
-                            @Override
-                            public void onUsage(Usage usage) {
-                            }
-
-                            @Override
-                            public void onError(Throwable t) {
-                                assistant.appendText("\n\n[error: " + t.getMessage() + "]");
-                            }
-                        });
-                result.ready(new SuccessCallback<ChatResponse>() {
-                    @Override
-                    public void onSucess(ChatResponse arg) {
-                        setTypingIndicatorVisible(false);
-                    }
-                });
-            }
-        });
-    }
-
-    private List<ChatMessage> buildOutgoingMessages(ChatRequest baseRequest) {
-        // Prefer the live history (which now includes the just-added
-        // user message). Fall back to whatever was in the base
-        // request if the view has nothing yet -- useful when the
-        // app pre-loads a system prompt via baseRequest.
-        if (history.isEmpty()) {
-            return baseRequest.getMessages();
-        }
-        return new ArrayList<ChatMessage>(history);
+        return Collections.unmodifiableList(history);
     }
 
     /// Override to swap in a custom bubble renderer (e.g. one that
-    /// understands markdown). Default delegates to [ChatBubble].
+    /// understands markdown, shows avatars, or formats peer
+    /// messages differently from LLM responses). Default delegates
+    /// to [ChatBubble].
     protected ChatBubble createBubble(ChatMessage message) {
         return new ChatBubble(message);
     }

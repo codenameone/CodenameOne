@@ -23,6 +23,7 @@
 package com.codename1.ai;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
@@ -112,7 +113,7 @@ public abstract class ImageGenerator {
                 // alternative `url` requires a second fetch and
                 // expires after an hour, which is hostile to caching.
                 root.put("response_format", "b64_json");
-                body = JsonHelper.serialize(root).getBytes("UTF-8");
+                body = JSONParser.toJson(root).getBytes("UTF-8");
             } catch (IOException ioe) {
                 result.error(ioe);
                 return result;
@@ -130,15 +131,15 @@ public abstract class ImageGenerator {
                 @Override
                 protected void postResponse() {
                     try {
-                        Map root = JsonHelper.parseObject(getResponseData());
-                        List<Object> data = JsonHelper.asList(root.get("data"));
+                        Map root = JSONParser.parseJSON(getResponseData());
+                        List<Object> data = JSONParser.asList(root.get("data"));
                         if (data == null || data.isEmpty()) {
                             failOnEdt(result, new LlmInvalidRequestException(
                                     "Empty data[] in image generation response", 200, null, null));
                             return;
                         }
-                        Map first = JsonHelper.asMap(data.get(0));
-                        String b64 = JsonHelper.string(first, "b64_json");
+                        Map first = JSONParser.asMap(data.get(0));
+                        String b64 = JSONParser.getString(first, "b64_json");
                         if (b64 == null) {
                             failOnEdt(result, new LlmInvalidRequestException(
                                     "Missing b64_json in image generation response", 200, null, null));

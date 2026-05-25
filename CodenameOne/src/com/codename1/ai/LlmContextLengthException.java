@@ -27,6 +27,6 @@ package com.codename1.ai;
 /// larger-context model.
 public class LlmContextLengthException extends LlmInvalidRequestException {
     public LlmContextLengthException(String message, String code, String rawBody) {
-        super(message, 400, code, rawBody);
+        super(message, 400, code, rawBody, ErrorType.CONTEXT_LENGTH);
     }
 }

@@ -22,6 +22,7 @@
  */
 package com.codename1.ai;
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.Storage;
 
 import java.io.IOException;
@@ -85,7 +86,7 @@ public final class ConversationStore {
         }
         Map<String, Object> root = new HashMap<String, Object>();
         root.put("messages", serialized);
-        byte[] payload = JsonHelper.serialize(root).getBytes("UTF-8");
+        byte[] payload = JSONParser.toJson(root).getBytes("UTF-8");
         Storage.getInstance().writeObject(storageKey, payload);
     }
 
@@ -99,32 +100,32 @@ public final class ConversationStore {
             // rather than crashing.
             return new ArrayList<ChatMessage>();
         }
-        Map root = JsonHelper.parseObject((byte[]) raw);
-        List<Object> serialized = JsonHelper.asList(root.get("messages"));
+        Map root = JSONParser.parseJSON((byte[]) raw);
+        List<Object> serialized = JSONParser.asList(root.get("messages"));
         if (serialized == null) {
             return new ArrayList<ChatMessage>();
         }
         List<ChatMessage> out = new ArrayList<ChatMessage>(serialized.size());
         for (Object rawJm : serialized) {
-            Map jm = JsonHelper.asMap(rawJm);
-            Role role = parseRole(JsonHelper.string(jm, "role"));
+            Map jm = JSONParser.asMap(rawJm);
+            Role role = parseRole(JSONParser.getString(jm, "role"));
             List<MessagePart> parts = new ArrayList<MessagePart>();
-            List<Object> jparts = JsonHelper.asList(jm.get("parts"));
+            List<Object> jparts = JSONParser.asList(jm.get("parts"));
             if (jparts != null) {
                 for (Object rawJp : jparts) {
-                    Map jp = JsonHelper.asMap(rawJp);
-                    String kind = JsonHelper.string(jp, "kind");
+                    Map jp = JSONParser.asMap(rawJp);
+                    String kind = JSONParser.getString(jp, "kind");
                     if (KIND_TOOL_RESULT.equals(kind)) {
                         parts.add(new ToolResultPart(
-                                JsonHelper.string(jp, "toolCallId"),
-                                JsonHelper.string(jp, "resultJson")));
+                                JSONParser.getString(jp, "toolCallId"),
+                                JSONParser.getString(jp, "resultJson")));
                     } else {
-                        parts.add(new TextPart(JsonHelper.string(jp, "text")));
+                        parts.add(new TextPart(JSONParser.getString(jp, "text")));
                     }
                 }
             }
             out.add(new ChatMessage(role, parts,
-                    null, null, JsonHelper.string(jm, "toolCallId")));
+                    null, null, JSONParser.getString(jm, "toolCallId")));
         }
         return out;
     }

@@ -22,6 +22,7 @@
  */
 package com.codename1.ai;
 
+import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
@@ -55,20 +56,20 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
 
     @Override
     public void consume(String dataPayload, final StreamingListener listener) throws Exception {
-        Map root = JsonHelper.parseObject(dataPayload);
+        Map root = JSONParser.parseJSON(dataPayload);
         if (root == null) {
             return;
         }
-        String modelInChunk = JsonHelper.string(root, "model");
+        String modelInChunk = JSONParser.getString(root, "model");
         if (modelInChunk != null) {
             modelUsed = modelInChunk;
         }
-        Map u = JsonHelper.asMap(root.get("usage"));
+        Map u = JSONParser.asMap(root.get("usage"));
         if (u != null) {
             usage = new Usage(
-                    JsonHelper.intValue(u, "prompt_tokens", -1),
-                    JsonHelper.intValue(u, "completion_tokens", -1),
-                    JsonHelper.intValue(u, "total_tokens", -1));
+                    JSONParser.getInt(u, "prompt_tokens", -1),
+                    JSONParser.getInt(u, "completion_tokens", -1),
+                    JSONParser.getInt(u, "total_tokens", -1));
             final Usage emit = usage;
             Display.getInstance().callSerially(new Runnable() {
                 @Override
@@ -77,25 +78,25 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 }
             });
         }
-        List<Object> choices = JsonHelper.asList(root.get("choices"));
+        List<Object> choices = JSONParser.asList(root.get("choices"));
         if (choices == null || choices.isEmpty()) {
             return;
         }
-        Map choice = JsonHelper.asMap(choices.get(0));
-        String fr = JsonHelper.string(choice, "finish_reason");
+        Map choice = JSONParser.asMap(choices.get(0));
+        String fr = JSONParser.getString(choice, "finish_reason");
         if (fr != null) {
             finishReason = fr;
         }
-        Map delta = JsonHelper.asMap(choice.get("delta"));
+        Map delta = JSONParser.asMap(choice.get("delta"));
         if (delta == null) {
             // Non-streaming response shape can appear at the very end
             // for some servers -- `message` instead of `delta`.
-            delta = JsonHelper.asMap(choice.get("message"));
+            delta = JSONParser.asMap(choice.get("message"));
             if (delta == null) {
                 return;
             }
         }
-        String contentDelta = JsonHelper.string(delta, "content");
+        String contentDelta = JSONParser.getString(delta, "content");
         if (contentDelta != null && contentDelta.length() > 0) {
             content.append(contentDelta);
             final String emit = contentDelta;
@@ -106,26 +107,26 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
                 }
             });
         }
-        List<Object> tcs = JsonHelper.asList(delta.get("tool_calls"));
+        List<Object> tcs = JSONParser.asList(delta.get("tool_calls"));
         if (tcs != null) {
             int i = 0;
             for (Object rawTc : tcs) {
-                Map tc = JsonHelper.asMap(rawTc);
-                final int idx = JsonHelper.intValue(tc, "index", i);
+                Map tc = JSONParser.asMap(rawTc);
+                final int idx = JSONParser.getInt(tc, "index", i);
                 while (toolCalls.size() <= idx) {
                     toolCalls.add(new StreamingToolCall());
                 }
                 StreamingToolCall acc = toolCalls.get(idx);
-                String id = JsonHelper.string(tc, "id");
+                String id = JSONParser.getString(tc, "id");
                 if (id != null) {
                     acc.id = id;
                 }
-                Map fn = JsonHelper.asMap(tc.get("function"));
-                String name = fn == null ? null : JsonHelper.string(fn, "name");
+                Map fn = JSONParser.asMap(tc.get("function"));
+                String name = fn == null ? null : JSONParser.getString(fn, "name");
                 if (name != null) {
                     acc.name = name;
                 }
-                String argsFrag = fn == null ? null : JsonHelper.string(fn, "arguments");
+                String argsFrag = fn == null ? null : JSONParser.getString(fn, "arguments");
                 if (argsFrag != null) {
                     acc.arguments.append(argsFrag);
                 }
@@ -168,15 +169,15 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
         String code = null;
         String message = body;
         try {
-            Map root = JsonHelper.parseObject(body);
-            Map err = JsonHelper.asMap(root.get("error"));
+            Map root = JSONParser.parseJSON(body);
+            Map err = JSONParser.asMap(root.get("error"));
             if (err != null) {
-                code = JsonHelper.string(err, "code");
-                String em = JsonHelper.string(err, "message");
+                code = JSONParser.getString(err, "code");
+                String em = JSONParser.getString(err, "message");
                 if (em != null) {
                     message = em;
                 }
-                String type = JsonHelper.string(err, "type");
+                String type = JSONParser.getString(err, "type");
                 if ("context_length_exceeded".equals(code) || "context_length_exceeded".equals(type)) {
                     return new LlmContextLengthException(message, code, body);
                 }
@@ -211,43 +212,43 @@ final class OpenAiSseDecoder implements StreamingChatRequest.SseDecoder {
         List<ToolCall> toolCalls = new ArrayList<ToolCall>();
         String finishReason = "stop";
 
-        List<Object> choices = JsonHelper.asList(root.get("choices"));
+        List<Object> choices = JSONParser.asList(root.get("choices"));
         if (choices != null && !choices.isEmpty()) {
-            Map choice = JsonHelper.asMap(choices.get(0));
-            String fr = JsonHelper.string(choice, "finish_reason");
+            Map choice = JSONParser.asMap(choices.get(0));
+            String fr = JSONParser.getString(choice, "finish_reason");
             if (fr != null) {
                 finishReason = fr;
             }
-            Map msg = JsonHelper.asMap(choice.get("message"));
+            Map msg = JSONParser.asMap(choice.get("message"));
             if (msg != null) {
-                String c = JsonHelper.string(msg, "content");
+                String c = JSONParser.getString(msg, "content");
                 if (c != null) {
                     content.append(c);
                 }
-                List<Object> tcs = JsonHelper.asList(msg.get("tool_calls"));
+                List<Object> tcs = JSONParser.asList(msg.get("tool_calls"));
                 if (tcs != null) {
                     for (Object rawTc : tcs) {
-                        Map tc = JsonHelper.asMap(rawTc);
-                        Map fn = JsonHelper.asMap(tc.get("function"));
+                        Map tc = JSONParser.asMap(rawTc);
+                        Map fn = JSONParser.asMap(tc.get("function"));
                         toolCalls.add(new ToolCall(
-                                JsonHelper.string(tc, "id"),
-                                fn == null ? null : JsonHelper.string(fn, "name"),
-                                fn == null ? null : JsonHelper.string(fn, "arguments")));
+                                JSONParser.getString(tc, "id"),
+                                fn == null ? null : JSONParser.getString(fn, "name"),
+                                fn == null ? null : JSONParser.getString(fn, "arguments")));
                     }
                 }
             }
         }
-        Map u = JsonHelper.asMap(root.get("usage"));
+        Map u = JSONParser.asMap(root.get("usage"));
         Usage usage = u == null ? null : new Usage(
-                JsonHelper.intValue(u, "prompt_tokens", -1),
-                JsonHelper.intValue(u, "completion_tokens", -1),
-                JsonHelper.intValue(u, "total_tokens", -1));
+                JSONParser.getInt(u, "prompt_tokens", -1),
+                JSONParser.getInt(u, "completion_tokens", -1),
+                JSONParser.getInt(u, "total_tokens", -1));
 
         ChatMessage assistant = new ChatMessage(Role.ASSISTANT,
                 Arrays.<MessagePart>asList(new TextPart(content.toString())),
                 toolCalls, null, null);
         return new ChatResponse(assistant, toolCalls, finishReason, usage,
-                JsonHelper.string(root, "model"));
+                JSONParser.getString(root, "model"));
     }
 
     private static final class StreamingToolCall {

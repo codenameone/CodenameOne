@@ -26,6 +26,6 @@ package com.codename1.ai;
 /// rate-limiting and back off.
 public class LlmModelOverloadedException extends LlmException {
     public LlmModelOverloadedException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null);
+        super(message, httpStatus, code, rawBody, null, ErrorType.MODEL_OVERLOADED);
     }
 }

@@ -26,6 +26,6 @@ package com.codename1.ai;
 /// connection reset). Carries no HTTP status by definition.
 public class LlmNetworkException extends LlmException {
     public LlmNetworkException(String message, Throwable cause) {
-        super(message, -1, null, null, cause);
+        super(message, -1, null, null, cause, ErrorType.NETWORK);
     }
 }

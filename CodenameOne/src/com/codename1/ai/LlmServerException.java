@@ -25,6 +25,6 @@ package com.codename1.ai;
 /// 5xx other than 503/529: provider had an internal error.
 public class LlmServerException extends LlmException {
     public LlmServerException(String message, int httpStatus, String code, String rawBody) {
-        super(message, httpStatus, code, rawBody, null);
+        super(message, httpStatus, code, rawBody, null, ErrorType.SERVER);
     }
 }

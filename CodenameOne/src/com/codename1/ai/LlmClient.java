@@ -49,6 +49,26 @@ import com.codename1.util.AsyncResource;
 /// endpoint instead of the public provider -- so unchanged production
 /// code can be debugged offline without API charges.
 public abstract class LlmClient {
+    // Centralised endpoint defaults. Override with setBaseUrl(...)
+    // for self-hosted gateways, regional endpoints, or to pin a
+    // specific API version. The provider's v1 / v1beta / v2 path
+    // segment is part of these URLs intentionally so a caller who
+    // points setBaseUrl at "https://my-proxy.example.com/openai/v2"
+    // does not need to remember which suffix the official endpoint
+    // uses.
+    //
+    // Versions reflect the providers' production REST shapes as of
+    // mid-2026:
+    //   - OpenAI Chat Completions    -- /v1            (stable)
+    //   - Anthropic Messages         -- /v1            (stable)
+    //   - Google Gemini (native)     -- /v1beta        (only path
+    //     that exposes streaming generateContent and tool calls today)
+    //   - Ollama OpenAI-compat shim  -- /v1
+    public static final String DEFAULT_OPENAI_URL    = "https://api.openai.com/v1";
+    public static final String DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com/v1";
+    public static final String DEFAULT_GEMINI_URL    = "https://generativelanguage.googleapis.com/v1beta";
+    public static final String DEFAULT_OLLAMA_URL    = "http://localhost:11434/v1";
+
     private String baseUrl;
     private int httpTimeoutMs = 60000;
 
@@ -60,18 +80,15 @@ public abstract class LlmClient {
     /// Ollama, etc.). Uses the public endpoint by default; override
     /// with [#setBaseUrl(String)].
     public static LlmClient openai(String apiKey) {
-        return SimulatorRedirect.maybeWrap(new OpenAiClient(apiKey,
-                "https://api.openai.com/v1"));
+        return SimulatorRedirect.maybeWrap(new OpenAiClient(apiKey, DEFAULT_OPENAI_URL));
     }
 
     public static LlmClient anthropic(String apiKey) {
-        return SimulatorRedirect.maybeWrap(new AnthropicClient(apiKey,
-                "https://api.anthropic.com/v1"));
+        return SimulatorRedirect.maybeWrap(new AnthropicClient(apiKey, DEFAULT_ANTHROPIC_URL));
     }
 
     public static LlmClient gemini(String apiKey) {
-        return SimulatorRedirect.maybeWrap(new GeminiClient(apiKey,
-                "https://generativelanguage.googleapis.com/v1beta"));
+        return SimulatorRedirect.maybeWrap(new GeminiClient(apiKey, DEFAULT_GEMINI_URL));
     }
 
     /// Default Ollama install: `http://localhost:11434/v1`, model
@@ -81,7 +98,7 @@ public abstract class LlmClient {
     }
 
     public static LlmClient ollama(String defaultModel) {
-        return ollama("http://localhost:11434/v1", defaultModel);
+        return ollama(DEFAULT_OLLAMA_URL, defaultModel);
     }
 
     public static LlmClient ollama(String baseUrl, String defaultModel) {
