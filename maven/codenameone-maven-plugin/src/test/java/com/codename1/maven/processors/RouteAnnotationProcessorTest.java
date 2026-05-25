@@ -217,7 +217,20 @@ public class RouteAnnotationProcessorTest {
             });
             Class<?> routes = Class.forName(
                     "com.codename1.router.generated.Routes", true, cl);
+            System.out.println("[test] Routes class loader=" + routes.getClassLoader());
+            Class<?> displayInRoutes;
+            try {
+                displayInRoutes = Class.forName("com.codename1.ui.Display", false, cl);
+            } catch (Throwable t) {
+                displayInRoutes = null;
+            }
+            System.out.println("[test] Display seen by cl="
+                    + (displayInRoutes == null ? "null" : displayInRoutes.getClassLoader())
+                    + ", Display in test loader=" + Display.class.getClassLoader());
             routes.getDeclaredMethod("bootstrap").invoke(null);
+            System.out.println("[test] after bootstrap: installCalls="
+                    + Display.getInstance().installCalls
+                    + ", dispatcher=" + Display.getInstance().dispatcher);
         } finally {
             cl.close();
         }
