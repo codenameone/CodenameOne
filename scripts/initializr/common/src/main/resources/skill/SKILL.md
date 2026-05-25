@@ -29,6 +29,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/html-css-cheatsheet.md` — Converting common HTML/CSS snippets to CN1 components + CSS.
 - `references/android-to-cn1.md` — Porting Android (XML + Kotlin/Java) screens to Codename One.
 - `references/testing-and-screenshots.md` — `AbstractTest`, `TestUtils`, `screenshotTest`, the `cn1:test` Maven goal, the screenshot tolerance algorithm.
+- `references/junit-testing.md` — Standard JUnit 5 tests against the simulator via `@CodenameOneTest`. Annotations (`@RunOnEdt`, `@Theme`, `@DarkMode`, `@LargerText`, `@Orientation`, `@RTL`, `@SimulatorProperty`), how it coexists with `cn1:test`, and why a headless CI runner has to be configured with Xvfb (or accepts that JUnit test classes will be skipped).
 - `references/mobile-adaptability.md` — Density-independent units (mm), `convertToPixels`, `LayeredLayout` for responsive design, `Display.isTablet()`, font scaling.
 - `references/native-interfaces.md` — Authoring native interfaces for iOS/Android/JavaScript/Desktop with `cn1:generate-native-interfaces` and platform callbacks.
 - `references/cn1libs.md` — Creating, packaging, and consuming Codename One libraries (Maven and legacy `.cn1lib`).
@@ -192,15 +193,18 @@ See `references/mobile-adaptability.md` for patterns: phone-vs-tablet master-det
 
 ## Testing
 
-CN1 has its own test runner (`cn1:test`), not surefire. Tests extend `com.codename1.testing.AbstractTest`:
+CN1 supports two compatible test styles in the same project:
+
+1. **Legacy `AbstractTest` + `cn1:test`.** Required for tests that must also run on a device (`mvn cn1:test -Dtarget=ios`). Compiles under the device subset (no reflection, no JavaSE APIs). See `references/testing-and-screenshots.md`.
+2. **Standard JUnit 5 + `@CodenameOneTest`.** Runs only in the simulator JVM via Surefire, so you get reflection, Mockito, AssertJ, IDE green-bar integration, `-Dtest=Foo#bar` filtering. Faster startup. See `references/junit-testing.md`.
+
+Both runners coexist — `cn1:test` discovers `UnitTest` implementers, Surefire discovers `@Test` methods, they don't trip over each other. Pick per test class.
 
 ```java
+// Legacy AbstractTest -- compiles under the device subset, runs via `cn1:test`.
 public class LoginFormTest extends AbstractTest {
-    @Override
-    public boolean shouldExecuteOnEDT() { return true; }
-
-    @Override
-    public boolean runTest() throws Exception {
+    @Override public boolean shouldExecuteOnEDT() { return true; }
+    @Override public boolean runTest() throws Exception {
         new MyAppName().runApp();
         TestUtils.waitForFormTitle("Login");
         TestUtils.setText("usernameField", "alice");
@@ -209,13 +213,26 @@ public class LoginFormTest extends AbstractTest {
         return screenshotTest("home-screen-baseline");
     }
 }
+
+// JUnit 5 -- simulator-only, runs via `mvn test` / Surefire.
+@CodenameOneTest
+class GreetingFormTest {
+    @Test
+    @RunOnEdt
+    void formShowsExpectedTitle() {
+        new Form("Hello").show();
+        assertEquals("Hello", Display.getInstance().getCurrent().getTitle());
+    }
+}
 ```
 
-Run with `mvn -pl common cn1:test` or `mvn test`.
+Run with `mvn -pl common cn1:test` (cn1:test runner only) or `mvn test` (both runners). The cn1app archetype already wires up Surefire + JUnit Jupiter in the generated POMs.
 
 `screenshotTest(name)` captures the current form, compares against a stored baseline under `Storage`, and returns `true` if within tolerance. First run records the baseline. See `references/testing-and-screenshots.md` for the tolerance algorithm and how to validate UI you just wrote.
 
 > Important: a "screenshot matches baseline" only proves consistency, **not** correctness. If you just generated the baseline yourself, you have not validated the screen — visually inspect at least once before treating that baseline as ground truth.
+
+> Headless caveat: any simulator-driven test (both flavors) needs an X server / Xvfb to construct the simulator's `JFrame`. The `@CodenameOneTest` extension auto-aborts the class on a headless JVM so you get "skipped" instead of "errored"; the `cn1:test` runner needs you to skip with `-DskipTests` or run under `xvfb-run`.
 
 ## Build and run commands
 
