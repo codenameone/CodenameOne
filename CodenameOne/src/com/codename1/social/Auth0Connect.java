@@ -195,7 +195,9 @@ public final class Auth0Connect extends Login {
             first = false;
         }
         if (displayName != null) {
-            if (!first) userProfile.append(',');
+            if (!first) {
+                userProfile.append(',');
+            }
             userProfile.append("\"name\":").append(jsonString(displayName));
         }
         userProfile.append('}');
@@ -384,7 +386,9 @@ public final class Auth0Connect extends Login {
     private static String joinScopes(String[] scopes) {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < scopes.length; i++) {
-            if (i > 0) b.append(' ');
+            if (i > 0) {
+                b.append(' ');
+            }
             b.append(scopes[i]);
         }
         return b.toString();
@@ -397,7 +401,9 @@ public final class Auth0Connect extends Login {
         StringBuilder b = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<?, ?> e : map.entrySet()) {
-            if (!first) b.append(',');
+            if (!first) {
+                b.append(',');
+            }
             first = false;
             b.append(jsonString(e.getKey().toString())).append(':');
             appendValue(b, e.getValue());
@@ -414,7 +420,9 @@ public final class Auth0Connect extends Login {
             b.append('[');
             boolean first = true;
             for (Object item : (java.util.Collection<?>) v) {
-                if (!first) b.append(',');
+                if (!first) {
+                    b.append(',');
+                }
                 first = false;
                 appendValue(b, item);
             }
@@ -433,7 +441,9 @@ public final class Auth0Connect extends Login {
         StringBuilder b = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<String, String> e : map.entrySet()) {
-            if (!first) b.append(',');
+            if (!first) {
+                b.append(',');
+            }
             first = false;
             b.append(jsonString(e.getKey())).append(':');
             String val = e.getValue();

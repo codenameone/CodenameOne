@@ -414,7 +414,9 @@ public final class FirebaseAuth {
         StringBuilder b = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<?, ?> e : map.entrySet()) {
-            if (!first) b.append(',');
+            if (!first) {
+                b.append(',');
+            }
             first = false;
             b.append('"').append(escape(e.getKey().toString())).append("\":");
             appendValue(b, e.getValue());
@@ -431,7 +433,9 @@ public final class FirebaseAuth {
             b.append('[');
             boolean first = true;
             for (Object item : (java.util.Collection<?>) v) {
-                if (!first) b.append(',');
+                if (!first) {
+                    b.append(',');
+                }
                 first = false;
                 appendValue(b, item);
             }

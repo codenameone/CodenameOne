@@ -178,6 +178,7 @@ public final class WebAuthnClient {
             this.out = out;
         }
 
+        @Override
         public void run() {
             try {
                 String responseJson = provider.createPasskey(optionsJson);
@@ -208,6 +209,7 @@ public final class WebAuthnClient {
             this.out = out;
         }
 
+        @Override
         public void run() {
             try {
                 String responseJson = provider.getPasskey(optionsJson);
