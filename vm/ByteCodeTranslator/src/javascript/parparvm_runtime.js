@@ -3124,6 +3124,18 @@ function cn1_ivResolve(target, mid) {
           vmDiag('NULL_RECEIVER', 'hostRef', hostRef);
           vmDiag('NULL_RECEIVER', 'keys', keys);
           vmDiag('NULL_RECEIVER', 'allProps', allProps);
+          // Identify whether the receiver is a literal {} (Object.prototype)
+          // or a native object whose methods live on a non-Object prototype
+          // (XMLHttpRequest, ArrayBuffer, DOM node, etc.). If it's NOT
+          // literal {} we're chasing the wrong bug entirely.
+          try {
+            const proto = Object.getPrototypeOf(target);
+            const isLiteral = proto === Object.prototype;
+            const protoName = proto && proto.constructor && proto.constructor.name
+              ? proto.constructor.name : 'unknown';
+            vmDiag('NULL_RECEIVER', 'isLiteral', isLiteral ? 'yes' : 'no');
+            vmDiag('NULL_RECEIVER', 'protoName', String(protoName));
+          } catch (_e) {}
           // Stack trace at call site -- gives us the cn1_iv* caller and
           // therefore the translated method that's passing {} as receiver.
           try {
