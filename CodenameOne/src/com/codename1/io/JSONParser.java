@@ -25,7 +25,9 @@ package com.codename1.io;
 
 import com.codename1.processing.Result;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -740,25 +742,25 @@ public class JSONParser implements JSONParseCallback {
     /// `parseJSON(Reader)` overload is the canonical entry point but
     /// callers that already have bytes in hand don't need to wire up
     /// a `ByteArrayInputStream` + `InputStreamReader` themselves.
-    public static Map<String, Object> parseJSON(byte[] bytes) throws java.io.IOException {
+    public static Map<String, Object> parseJSON(byte[] bytes) throws IOException {
         if (bytes == null || bytes.length == 0) {
             return null;
         }
-        java.io.InputStreamReader r = new java.io.InputStreamReader(
-                new java.io.ByteArrayInputStream(bytes), "UTF-8");
+        InputStreamReader r = new InputStreamReader(
+                new ByteArrayInputStream(bytes), "UTF-8");
         try {
             return new JSONParser().parseJSON(r);
         } finally {
             try {
                 r.close();
-            } catch (java.io.IOException ignored) {
+            } catch (IOException ignored) {
                 Log.e(ignored);
             }
         }
     }
 
     /// Convenience: parse a JSON object from an in-memory String.
-    public static Map<String, Object> parseJSON(String json) throws java.io.IOException {
+    public static Map<String, Object> parseJSON(String json) throws IOException {
         if (json == null || json.length() == 0) {
             return null;
         }
