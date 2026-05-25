@@ -26,19 +26,25 @@ on:
     branches: [ master ]
     paths:
       - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
       - 'CodenameOne/src/com/codename1/io/AccessToken.java'
       - 'CodenameOne/src/com/codename1/social/**'
       - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
       - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
       - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
       - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
       - 'Ports/Android/src/com/codename1/io/oidc/**'
+      - 'Ports/Android/src/com/codename1/io/webauthn/**'
       - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
       - 'maven/core-unittests/src/test/java/com/codename1/io/Oauth2*'
       - 'maven/core-unittests/src/test/java/com/codename1/social/**'
       - 'Samples/samples/UniversalSignInDemo/**'
@@ -48,18 +54,23 @@ on:
     branches: [ master ]
     paths:
       - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
       - 'CodenameOne/src/com/codename1/social/**'
       - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
       - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
       - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
       - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
       - 'Ports/Android/src/com/codename1/io/oidc/**'
+      - 'Ports/Android/src/com/codename1/io/webauthn/**'
       - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
       - 'Samples/samples/UniversalSignInDemo/**'
       - '.github/workflows/identity-stack.yml'
 
@@ -120,7 +131,7 @@ jobs:
               -P unittests \
               -pl core-unittests -am \
               test \
-              -Dtest='OidcCoreTest,Oauth2Test,Oauth2RefreshTokenRequestTest,GoogleConnectTest,FacebookConnectTest,LoginTest,Login1Test,LoginExtrasTest' \
+              -Dtest='OidcCoreTest,WebAuthnCoreTest,Oauth2Test,Oauth2RefreshTokenRequestTest,GoogleConnectTest,FacebookConnectTest,LoginTest,Login1Test,LoginExtrasTest' \
               -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: Compile Maven plugin (verifies IPhoneBuilder + AndroidGradleBuilder scanner edits)
@@ -162,11 +173,12 @@ jobs:
           LISTING="$(unzip -l "${BUNDLE}")"
           for required in \
               com/codename1/io/oidc/OidcBrowserNativeImpl.java \
+              com/codename1/io/webauthn/WebAuthnNativeImpl.java \
               com/codename1/social/AppleSignInNativeImpl.java; do
             if ! grep -qF "${required}" <<<"${LISTING}"; then
               echo "::error::${required} missing from android_port_sources.jar"
-              echo "Bundle listing (oidc / social entries):"
-              grep -E "oidc|social" <<<"${LISTING}" || true
+              echo "Bundle listing (oidc / webauthn / social entries):"
+              grep -E "oidc|webauthn|social" <<<"${LISTING}" || true
               exit 1
             fi
           done
@@ -213,6 +225,7 @@ jobs:
             CodenameOne/src/com/codename1/social/Auth0Connect.java
             CodenameOne/src/com/codename1/social/FirebaseAuth.java
             CodenameOne/src/com/codename1/social/MicrosoftConnect.java
+            CodenameOne/src/com/codename1/io/webauthn
           )
           # `|| true` is intentional: grep -E exits 1 when there are zero
           # matches, which is the success case.
@@ -281,7 +294,7 @@ jobs:
           for label in stubs full; do
             extra=""
             if [ "$label" = full ]; then
-              extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN"
+              extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN -DCN1_INCLUDE_WEBAUTHN"
             fi
             echo "::group::clang $label"
             xcrun --sdk iphoneos clang \
@@ -295,6 +308,7 @@ jobs:
                 -DNEW_CODENAME_ONE_VM=1 \
                 $extra \
                 CN1OidcBrowser.m \
-                CN1AppleSignIn.m
+                CN1AppleSignIn.m \
+                CN1WebAuthn.m
             echo "::endgroup::"
           done

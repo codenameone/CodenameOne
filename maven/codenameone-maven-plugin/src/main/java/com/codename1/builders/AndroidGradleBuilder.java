@@ -286,6 +286,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesNfcHce;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
+    private boolean usesWebauthn;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1303,6 +1304,13 @@ public class AndroidGradleBuilder extends Executor {
                     if (!usesAppleSignIn
                             && cls.indexOf("com/codename1/social/AppleSignIn") == 0) {
                         usesAppleSignIn = true;
+                    }
+                    // WebAuthn / passkeys -- drives the OS through
+                    // androidx.credentials.CredentialManager. Mark so the
+                    // gradle dep gets injected further below.
+                    if (!usesWebauthn
+                            && cls.indexOf("com/codename1/io/webauthn/") == 0) {
+                        usesWebauthn = true;
                     }
                     // Deeper-network connectivity: each subpackage maps to a
                     // distinct permission set. The scanner sets booleans; the
@@ -3889,6 +3897,27 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // WebAuthn / passkeys drive androidx.credentials.CredentialManager.
+        // Passkey support on devices without a system-level provider also
+        // requires credentials-play-services-auth, so we inject both here.
+        // The versions can be overridden by the user via build hints.
+        if (usesWebauthn && useAndroidX) {
+            String credentialsVersion = request.getArg(
+                    "android.credentialsVersion", "1.3.0");
+            String credentialsPlayVersion = request.getArg(
+                    "android.credentialsPlayServicesVersion", credentialsVersion);
+            if (!additionalDependencies.contains("androidx.credentials:credentials")
+                    && !request.getArg("android.gradleDep", "")
+                            .contains("androidx.credentials:credentials")) {
+                additionalDependencies +=
+                        " implementation 'androidx.credentials:credentials:"
+                                + credentialsVersion + "'\n";
+                additionalDependencies +=
+                        " implementation 'androidx.credentials:credentials-play-services-auth:"
+                                + credentialsPlayVersion + "'\n";
+            }
+        }
+
         String useLegacyApache = "";
         if (request.getArg("android.apacheLegacy", "false").equals("true")) {
             useLegacyApache = " useLibrary 'org.apache.http.legacy'\n";
@@ -4449,6 +4478,12 @@ public class AndroidGradleBuilder extends Executor {
         // deterministic rather than relying on Class.forName.
         if (usesAppleSignIn) {
             retVal += "com.codename1.social.AppleSignInNativeImpl.init();\n";
+        }
+        // WebAuthn / passkeys bootstrap. Wires the CredentialManager-backed
+        // native impl so WebAuthnClient.isSupported() works without any
+        // user-side setup.
+        if (usesWebauthn) {
+            retVal += "com.codename1.io.webauthn.WebAuthnNativeImpl.init();\n";
         }
 
         if (request.getArg("android.web_loading_hidden", "false").equalsIgnoreCase("true")) {

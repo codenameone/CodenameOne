@@ -98,6 +98,13 @@
 // entitlement.
 //#define CN1_INCLUDE_APPLESIGNIN
 
+// CN1_INCLUDE_WEBAUTHN gates the com.codename1.io.webauthn native bridge
+// (ASAuthorizationPlatformPublicKeyCredentialProvider code in CN1WebAuthn.m,
+// iOS 16+). IPhoneBuilder uncomments this only when the scanner saw
+// com.codename1.io.webauthn.*; apps that never use passkeys ship without
+// any passkey symbols.
+//#define CN1_INCLUDE_WEBAUTHN
+
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 //#define USE_FACEBOOK_CONNECT_PODS

@@ -29,8 +29,13 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
 import com.codename1.io.oidc.OidcTokens;
+import com.codename1.io.webauthn.PublicKeyCredential;
+import com.codename1.io.webauthn.PublicKeyCredentialCreationOptions;
+import com.codename1.io.webauthn.PublicKeyCredentialRequestOptions;
+import com.codename1.io.webauthn.WebAuthnClient;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import com.codename1.util.regex.StringReader;
 
 import java.io.IOException;
@@ -155,6 +160,262 @@ public final class FirebaseAuth {
         return postJson(
                 "https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp",
                 body);
+    }
+
+    /// Enrols a passkey for the currently signed-in Firebase user via the
+    /// Identity Toolkit v2 passkey endpoints. The user must already be
+    /// signed in (Firebase passkeys cannot exist without an underlying
+    /// account); call [#signInWithEmailAndPassword(String, String)] or
+    /// [#signInWithIdpIdToken(String, String)] first.
+    ///
+    /// `name` is the human-friendly label shown on the OS passkey sheet
+    /// (e.g. `"Alice's iPhone"`); pass `null` to let the OS pick one.
+    ///
+    /// Requires *Identity Platform* (the upgraded Firebase Auth tier) with
+    /// passkeys enabled in the console. The classic Firebase Auth tier does
+    /// not expose passkey endpoints.
+    ///
+    /// @since 7.0.246
+    public AsyncResource<FirebaseUser> registerPasskey(final String name) {
+        final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
+        if (apiKey == null) {
+            out.error(new IllegalStateException(
+                    "FirebaseAuth.withApiKey(\"...\") must be called first"));
+            return out;
+        }
+        final String idToken = getIdToken();
+        if (idToken == null) {
+            out.error(new IllegalStateException(
+                    "registerPasskey requires the user to be signed in first"));
+            return out;
+        }
+        Map<String, String> body = new HashMap<String, String>();
+        body.put("idToken", idToken);
+        postJsonRaw(
+                "https://identitytoolkit.googleapis.com/v2/accounts/passkeyEnrollment:start",
+                body)
+                .ready(new SuccessCallback<Map<String, Object>>() {
+                    @Override
+                    public void onSucess(Map<String, Object> resp) {
+                        Object opts = resp.get("credentialCreationOptions");
+                        if (!(opts instanceof Map)) {
+                            out.error(new IOException(
+                                    "Firebase passkeyEnrollment:start missing credentialCreationOptions"));
+                            return;
+                        }
+                        String optionsJson = serialiseMap((Map<?, ?>) opts);
+                        WebAuthnClient.getInstance()
+                                .create(PublicKeyCredentialCreationOptions.fromJson(optionsJson))
+                                .ready(new SuccessCallback<PublicKeyCredential>() {
+                                    @Override
+                                    public void onSucess(PublicKeyCredential cred) {
+                                        finalisePasskeyEnrollment(idToken, name,
+                                                cred.toJson(), out);
+                                    }
+                                })
+                                .except(new SuccessCallback<Throwable>() {
+                                    @Override
+                                    public void onSucess(Throwable err) {
+                                        out.error(err);
+                                    }
+                                });
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+        return out;
+    }
+
+    /// Signs the user in with an existing passkey via the Identity Toolkit
+    /// v2 passkey sign-in endpoints. Returns a [FirebaseUser] with fresh
+    /// ID + refresh tokens, persisted via the same store as the other
+    /// sign-in methods.
+    ///
+    /// Available wherever [WebAuthnClient#isSupported()] returns `true`.
+    ///
+    /// @since 7.0.246
+    public AsyncResource<FirebaseUser> signInWithPasskey() {
+        final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
+        if (apiKey == null) {
+            out.error(new IllegalStateException(
+                    "FirebaseAuth.withApiKey(\"...\") must be called first"));
+            return out;
+        }
+        Map<String, String> body = new HashMap<String, String>();
+        postJsonRaw(
+                "https://identitytoolkit.googleapis.com/v2/accounts/passkeySignIn:start",
+                body)
+                .ready(new SuccessCallback<Map<String, Object>>() {
+                    @Override
+                    public void onSucess(Map<String, Object> resp) {
+                        Object opts = resp.get("credentialRequestOptions");
+                        if (!(opts instanceof Map)) {
+                            out.error(new IOException(
+                                    "Firebase passkeySignIn:start missing credentialRequestOptions"));
+                            return;
+                        }
+                        String optionsJson = serialiseMap((Map<?, ?>) opts);
+                        WebAuthnClient.getInstance()
+                                .get(PublicKeyCredentialRequestOptions.fromJson(optionsJson))
+                                .ready(new SuccessCallback<PublicKeyCredential>() {
+                                    @Override
+                                    public void onSucess(PublicKeyCredential cred) {
+                                        finalisePasskeySignIn(cred.toJson(), out);
+                                    }
+                                })
+                                .except(new SuccessCallback<Throwable>() {
+                                    @Override
+                                    public void onSucess(Throwable err) {
+                                        out.error(err);
+                                    }
+                                });
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+        return out;
+    }
+
+    private void finalisePasskeyEnrollment(String idToken, String name,
+                                           String registrationResponseJson,
+                                           final AsyncResource<FirebaseUser> out) {
+        Map<String, String> body = new HashMap<String, String>();
+        body.put("idToken", idToken);
+        if (name != null) {
+            body.put("name", name);
+        }
+        body.put("registrationResponseJson", registrationResponseJson);
+        postJsonRaw(
+                "https://identitytoolkit.googleapis.com/v2/accounts/passkeyEnrollment:finalize",
+                body)
+                .ready(new SuccessCallback<Map<String, Object>>() {
+                    @Override
+                    public void onSucess(Map<String, Object> resp) {
+                        FirebaseUser u = new FirebaseUser(resp, false);
+                        persist(u);
+                        out.complete(u);
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+    }
+
+    private void finalisePasskeySignIn(String authenticationResponseJson,
+                                       final AsyncResource<FirebaseUser> out) {
+        Map<String, String> body = new HashMap<String, String>();
+        body.put("authenticationResponseJson", authenticationResponseJson);
+        postJsonRaw(
+                "https://identitytoolkit.googleapis.com/v2/accounts/passkeySignIn:finalize",
+                body)
+                .ready(new SuccessCallback<Map<String, Object>>() {
+                    @Override
+                    public void onSucess(Map<String, Object> resp) {
+                        FirebaseUser u = new FirebaseUser(resp, false);
+                        persist(u);
+                        out.complete(u);
+                    }
+                })
+                .except(new SuccessCallback<Throwable>() {
+                    @Override
+                    public void onSucess(Throwable err) {
+                        out.error(err);
+                    }
+                });
+    }
+
+    /// Raw JSON POST that returns the parsed response map, used by the
+    /// passkey endpoints. Distinct from [#enqueue] because the v2 passkey
+    /// endpoints return a passkey-options payload, not a [FirebaseUser]
+    /// payload.
+    private AsyncResource<Map<String, Object>> postJsonRaw(final String urlBase,
+                                                           final Map<String, String> body) {
+        final AsyncResource<Map<String, Object>> out = new AsyncResource<Map<String, Object>>();
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                byte[] bytes = Util.readInputStream(input);
+                String json = StringUtil.newString(bytes);
+                Map<String, Object> parsed = new JSONParser()
+                        .parseJSON(new StringReader(json));
+                if (parsed == null) {
+                    out.error(new IOException("Firebase returned empty body"));
+                    return;
+                }
+                Object err = parsed.get("error");
+                if (err != null) {
+                    String message = "Firebase error";
+                    if (err instanceof Map) {
+                        Object m = ((Map<?, ?>) err).get("message");
+                        if (m != null) {
+                            message = m.toString();
+                        }
+                    }
+                    out.error(new IOException(message));
+                    return;
+                }
+                out.complete(parsed);
+            }
+
+            @Override
+            protected void handleException(Exception err) {
+                out.error(err);
+            }
+        };
+        req.setUrl(urlBase + "?key=" + apiKey);
+        req.setPost(true);
+        req.setReadResponseForErrors(true);
+        req.addRequestHeader("Content-Type", "application/json");
+        req.setRequestBody(toJson(body));
+        NetworkManager.getInstance().addToQueue(req);
+        return out;
+    }
+
+    /// Serialises a parsed JSON sub-tree back into a JSON string. Used to
+    /// hand `credentialCreationOptions` / `credentialRequestOptions` to
+    /// the WebAuthn client, which takes a raw JSON document.
+    private static String serialiseMap(Map<?, ?> map) {
+        StringBuilder b = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<?, ?> e : map.entrySet()) {
+            if (!first) b.append(',');
+            first = false;
+            b.append('"').append(escape(e.getKey().toString())).append("\":");
+            appendValue(b, e.getValue());
+        }
+        return b.append('}').toString();
+    }
+
+    private static void appendValue(StringBuilder b, Object v) {
+        if (v == null) {
+            b.append("null");
+        } else if (v instanceof Map) {
+            b.append(serialiseMap((Map<?, ?>) v));
+        } else if (v instanceof java.util.Collection) {
+            b.append('[');
+            boolean first = true;
+            for (Object item : (java.util.Collection<?>) v) {
+                if (!first) b.append(',');
+                first = false;
+                appendValue(b, item);
+            }
+            b.append(']');
+        } else if (v instanceof Number || v instanceof Boolean) {
+            b.append(v.toString());
+        } else {
+            b.append('"').append(escape(v.toString())).append('"');
+        }
     }
 
     /// Refreshes the stored session using the saved refresh token. Falls
