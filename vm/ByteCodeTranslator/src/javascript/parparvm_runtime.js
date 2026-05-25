@@ -1329,10 +1329,17 @@ const jvm = {
           member: bridge.member,
           args: transferableArgs
         }]);
-        // Diagnostic: when hostResult is a NUMBER but the expected
-        // return class is an object type, it points at the
-        // canvasContextWipe pattern (where save/setTransform receive a
-        // Number receiver -- the 667 viewport height observed in CI).
+        // canvasContextWipe RECOVERY: when hostResult is a NUMBER but
+        // the expected return class is an object type, substitute null.
+        // The downstream code would otherwise treat the number as a
+        // receiver and busy-loop on VIRTUAL_FAIL / NULL_RECEIVER.
+        // Returning null lets the caller's standard null-check path
+        // throw a clean NPE instead.
+        //
+        // Host-side root cause TBD (browser_bridge.js:670
+        // ``receiver[member]`` returning a number when it shouldn't).
+        // The NUMBER_LEAK diag captures it at the bridge boundary.
+        let workingHostResult = hostResult;
         if (typeof hostResult === 'number' && bridge.returnClass
             && bridge.returnClass !== 'int' && bridge.returnClass !== 'byte'
             && bridge.returnClass !== 'short' && bridge.returnClass !== 'char'
@@ -1348,10 +1355,10 @@ const jvm = {
               vmDiag('NUMBER_FOR_OBJECT', 'kind', String(bridge.kind));
               vmDiag('NUMBER_FOR_OBJECT', 'returnClass', String(bridge.returnClass));
               vmDiag('NUMBER_FOR_OBJECT', 'value', String(hostResult));
-              const stack = new Error('number-for-object-trace').stack || '';
-              vmDiag('NUMBER_FOR_OBJECT', 'stack', String(stack).split('\n').slice(0, 6).join(' | ').substring(0, 500));
+              vmDiag('NUMBER_FOR_OBJECT', 'recovery', 'substituted-null');
             } catch (_e) {}
           }
+          workingHostResult = null;
         }
         // Diagnostic: when hostResult is a literal {} (no own props at
         // all), it indicates an upstream bug where the host bridge
@@ -1378,7 +1385,7 @@ const jvm = {
             } catch (_e) {}
           }
         }
-        return self.wrapJsResult(hostResult, bridge.returnClass);
+        return self.wrapJsResult(workingHostResult, bridge.returnClass);
       }
       let result;
       if (bridge.kind === "getter") {
