@@ -2320,7 +2320,7 @@ When the share is dispatched through the non-native fallback dialog (platforms w
 
 An iOS *share extension* is a separate app target that the system shows inside `UIActivityViewController` when the user shares from another app (Safari, Photos, etc.). It runs in a sandboxed process and persists payloads to the host app via an *App Group* shared `NSUserDefaults` suite.
 
-Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project (see `IPhoneBuilder.extractAppExtensions`). The `IOSShareExtensionBuilder` helper generates that archive for you so you don't have to create the extension target in Xcode first.
+Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project. The `IOSShareExtensionBuilder` helper generates that archive for you so you don't have to create the extension target in Xcode first.
 
 ==== What the helper produces
 
@@ -2329,7 +2329,7 @@ For a single call the helper writes four files at the root of the extension bund
 * `Info.plist` -- declares the `NSExtension` dictionary, activation rules (`SupportsText` / `SupportsWebURL` / `SupportsImage`), and the principal class (`ShareViewController`).
 * `<ExtensionName>.entitlements` -- declares `com.apple.security.application-groups` with the configured App Group identifier.
 * `ShareViewController.swift` -- a `SLComposeServiceViewController` subclass that extracts text / URL / image attachments from `extensionContext`, packs them into a dictionary, and writes that dictionary to `UserDefaults(suiteName: appGroupId)` under the key `cn1.shareExtension.payload`.
-* `buildSettings.properties` -- Xcode build setting overrides (deployment target, Swift version, entitlements path, plist path) picked up by `IPhoneBuilder`.
+* `buildSettings.properties` -- Xcode build setting overrides (deployment target, Swift version, entitlements path, plist path) picked up by the iOS build pipeline.
 
 ==== Generating the bundle
 
@@ -2378,7 +2378,7 @@ Expose this to your CN1 code via a small native interface and clear the key once
 
 The builder validates its inputs before writing anything:
 
-* `extensionName` must be a non-empty identifier (letters, digits, `_`, `-`). It becomes the Xcode target name and the `.appex` bundle name. The extension's bundle id is set to `<hostBundleId>.<extensionName>` by `IPhoneBuilder`.
+* `extensionName` must be a non-empty identifier (letters, digits, `_`, `-`). It becomes the Xcode target name and the `.appex` bundle name. The extension's bundle id is set to `<hostBundleId>.<extensionName>` by the iOS build pipeline.
 * `appGroupId` must start with `group.` (an Apple requirement). Create the matching App Group in your Apple Developer account and add it to both the host app's and the extension's provisioning profile.
 * At least one of `acceptText`, `acceptURLs`, `acceptImages` must be enabled, otherwise iOS will never present your extension.
 
