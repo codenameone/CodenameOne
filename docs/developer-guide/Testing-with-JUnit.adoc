@@ -4,7 +4,7 @@ Codename One has historically shipped its own test framework — `com.codename1.
 
 Both styles coexist in the same project under `common/src/test/java`. You pick per test class. This chapter explains when to reach for which, walks through the JUnit annotations, and shows how the two frameworks compare side by side.
 
-=== When to use JUnit vs. AbstractTest
+=== When to use JUnit versus AbstractTest
 
 [cols="1,3,3", options="header"]
 |===
@@ -19,7 +19,7 @@ Both styles coexist in the same project under `common/src/test/java`. You pick p
 |Anything that must also run on a device — JUnit Jupiter doesn't exist on ParparVM.
 |===
 
-The two runners discover disjoint sets of test classes (cn1:test looks for `com.codename1.testing.UnitTest` implementers; Surefire looks for `@Test`-annotated methods), so a project can mix both freely. `mvn install` runs Surefire during the `test` phase and `cn1:test` from the javase module's `test` profile in the same phase — you don't lose either test pass.
+The two runners discover disjoint sets of test classes (cn1:test looks for `com.codename1.testing.UnitTest` implementers; Surefire looks for `@Test`-annotated methods), so a project can mix both. `mvn install` runs Surefire during the `test` phase and `cn1:test` from the javase module's `test` profile in the same phase — you don't lose either test pass.
 
 === Dependencies
 
@@ -97,7 +97,7 @@ mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle   # one metho
 
 A class-level meta-annotation equivalent to `@ExtendWith(CodenameOneExtension.class)`. The extension does four things:
 
-. If `GraphicsEnvironment.isHeadless()` is true, throw `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped* rather than failed, and the Display singleton is never partially initialized — so subsequent test classes in the same JVM are not poisoned. This makes JUnit-style Codename One tests safe to run on a headless CI runner; they simply skip.
+. If `GraphicsEnvironment.isHeadless()` is true, throw `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped* rather than failed, and the Display singleton is never left half-initialized -- so subsequent test classes in the same JVM aren't poisoned. This makes JUnit-style Codename One tests safe to run on a headless CI runner; they simply skip.
 . Boot `Display` once per JVM via `Display.init(null)`. The call is idempotent, so multiple `@CodenameOneTest` classes share one Display instance for the rest of the test run.
 . Apply any visual-config annotations (`@Theme`, `@DarkMode`, `@LargerText`, `@Orientation`, `@RTL`, `@SimulatorProperty`) on the EDT in one batch before each test, followed by a single theme refresh.
 . Dispatch `@RunOnEdt` test methods through `CN.callSerially` and rethrow their exceptions on the JUnit thread so stack traces stay clickable in IDEs.
@@ -157,7 +157,7 @@ The `scope` field selects where the value lands:
 
 |`SYSTEM`
 |`System.setProperty(name, value)`
-|Before Display init (class-level only). Use for things the simulator reads at startup -- e.g. `java.awt.headless`. Method-level SYSTEM properties are ignored since Display is already up by the time `@BeforeEach` runs.
+|Before Display init (class-level only). Use for things the simulator reads at startup, for example `java.awt.headless`. Method-level SYSTEM properties are ignored since Display is already up by the time `@BeforeEach` runs.
 |===
 
 The JavaSE port compiles at source 1.7, which predates `@Repeatable`. To set more than one property on the same target, wrap multiple `@SimulatorProperty` entries inside `@SimulatorProperties({...})` rather than repeating the annotation directly.
@@ -263,9 +263,9 @@ Without `@RunOnEdt`, the test body runs on the Surefire worker thread — fine f
 
 * *Local dev (macOS / Windows / Linux desktop)*: works out of the box.
 * *CI with an X server or Xvfb*: works -- wrap your build with `xvfb-run mvn test` if the runner is otherwise headless.
-* *CI without DISPLAY, or with explicit `-Djava.awt.headless=true`*: every `@CodenameOneTest` class auto-aborts via `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped*, not *failed*, and crucially the Display singleton is never partially initialized -- so subsequent test classes in the same JVM are not poisoned.
+* *CI without DISPLAY, or with explicit `-Djava.awt.headless=true`*: every `@CodenameOneTest` class aborts via `TestAbortedException` from `@BeforeAll`. JUnit reports the class as *skipped*, not *failed*, and crucially the Display singleton is never left half-initialized -- so subsequent test classes in the same JVM aren't poisoned.
 
-This is why our own internal `CodenameOneExtensionTest` (in the Codename One sources) carries `@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")`. The extension catches auto-detected headless (Linux without DISPLAY); the annotation catches the explicit `-Djava.awt.headless=true` case. Together they let the test class skip cleanly on a headless runner.
+This is why the framework's internal `CodenameOneExtensionTest` (in the Codename One sources) carries `@DisabledIfSystemProperty(named = "java.awt.headless", matches = "true")`. The extension catches the headless case AWT detects automatically (Linux without DISPLAY); the annotation catches the explicit `-Djava.awt.headless=true` case. Together they let the test class skip cleanly on a headless runner.
 
 Pure-logic tests (no UI, no `@CodenameOneTest`) can run on any headless runner without configuration.
 
