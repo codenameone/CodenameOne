@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
+ * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
  *
@@ -17,9 +17,8 @@
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
- * CA 94065 USA or visit www.oracle.com if you need additional information or
- * have any questions.
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.router;
 
@@ -78,8 +77,6 @@ import java.util.Map;
 ///
 /// All Router methods must be called on the EDT. The Router itself never calls
 /// builders off-thread.
-///
-/// #### Since 8.0
 public final class Router {
 
     private static final Router INSTANCE = new Router();
@@ -255,8 +252,6 @@ public final class Router {
     /// Installs a `BrowserHistoryBridge` (typically only used by the JavaScript
     /// port). When set, every push/pop/replace is reflected in the bridge so the
     /// host's URL bar and history stack stay in sync.
-    ///
-    /// #### Since 8.0
     public Router setBrowserHistoryBridge(BrowserHistoryBridge bridge) {
         this.historyBridge = bridge;
         return this;
@@ -274,8 +269,6 @@ public final class Router {
     /// `kind` corresponds to the kind of host event (`PUSH` for a forward
     /// navigation triggered from outside, `POP` for browser back, `REPLACE` for
     /// a replaceState call).
-    ///
-    /// #### Since 8.0
     public boolean onBrowserNavigated(String path, LocationListener.Kind kind) {
         suppressBridgeOnce = true;
         try {
