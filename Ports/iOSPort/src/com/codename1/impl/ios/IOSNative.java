@@ -521,6 +521,11 @@ public final class IOSNative {
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
     
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
+
+    // Same as socialShare but reports the outcome via
+    // IOSImplementation.socialShareCallback(int, String, String) using
+    // the supplied callbackId. Status: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
+    native void socialShareWithCallback(String text, long imagePeer, Rectangle sourceRect, int callbackId);
     
     // facebook connect
     public native void facebookLogin(Object callback);
