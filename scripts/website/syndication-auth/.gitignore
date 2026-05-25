@@ -1,5 +1,0 @@
-# Everything in this directory is local-machine state captured by
-# syndicate_login.py — Firefox profiles with session cookies (Medium /
-# DZone logins, Cloudflare cf_clearance). Never commit.
-*
-!.gitignore
