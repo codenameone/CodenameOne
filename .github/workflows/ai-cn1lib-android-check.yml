@@ -1,0 +1,89 @@
+name: AI cn1lib Android native check
+
+# Parses the Android Java sources bundled in every cn1-ai-* cn1lib
+# against android.jar so missing symbols / typos surface in PR review.
+# A full Android emulator integration run (which would also exercise the
+# bridges against fixture images via espresso) lands separately -- this
+# workflow is a fast static gate.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+      - '.github/workflows/ai-cn1lib-android-check.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+
+jobs:
+  android-native-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android platform & ML Kit deps
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+          mkdir -p /tmp/cn1-ai-android/probe/src/main/java /tmp/cn1-ai-android/probe/libs
+      - name: Compile every cn1-ai-* Android source against android.jar
+        run: |
+          set -euxo pipefail
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          # Pull ML Kit + GMS jars from Google Maven so the symbols referenced
+          # in the bundled sources resolve. We don't ship these jars -- they
+          # only need to exist on the lint classpath.
+          mkdir -p /tmp/m2
+          cat > /tmp/build.gradle <<'EOF'
+          plugins { id 'java' }
+          repositories { google(); mavenCentral() }
+          configurations { lint }
+          dependencies {
+              lint 'com.google.mlkit:text-recognition:16.0.0'
+              lint 'com.google.mlkit:barcode-scanning:17.2.0'
+              lint 'com.google.mlkit:face-detection:16.1.5'
+              lint 'com.google.mlkit:image-labeling:17.0.7'
+              lint 'com.google.mlkit:translate:17.0.3'
+              lint 'com.google.mlkit:smart-reply:17.0.4'
+              lint 'com.google.mlkit:language-id:17.0.6'
+              lint 'com.google.mlkit:pose-detection:18.0.0-beta3'
+              lint 'com.google.mlkit:segmentation-selfie:16.0.0-beta5'
+              lint 'org.tensorflow:tensorflow-lite:2.14.0'
+              lint 'com.microsoft.onnxruntime:onnxruntime-android:1.16.3@aar'
+              lint 'com.google.android.gms:play-services-tasks:18.1.0'
+          }
+          task printClasspath { doLast { println configurations.lint.asPath } }
+          EOF
+          mkdir -p /tmp/gradle-probe && cp /tmp/build.gradle /tmp/gradle-probe/
+          cd /tmp/gradle-probe
+          gradle --no-daemon -q printClasspath > /tmp/lint-cp.txt 2>&1 || {
+              cat /tmp/lint-cp.txt; exit 1; }
+          LINT_CP=$(tail -1 /tmp/lint-cp.txt)
+          cd "$GITHUB_WORKSPACE"
+          fail=0
+          for d in maven/cn1-ai-*/android/src/main/java; do
+              # javac with -d /dev/null doesn't write classes -- we just want
+              # syntax + symbol resolution. -Xlint:-options suppresses 1.8
+              # source/target deprecation noise.
+              sources=$(find "$d" -name '*.java')
+              [ -z "$sources" ] && continue
+              if ! javac -d /tmp/out -classpath "$ANDROID_JAR:$LINT_CP" \
+                      -source 1.8 -target 1.8 \
+                      -Xlint:-options \
+                      $sources 2>&1 | tee /tmp/last-javac.log; then
+                  echo "::error::Android Java compile failed for $d"
+                  fail=1
+              fi
+          done
+          exit $fail

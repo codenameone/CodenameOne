@@ -1,0 +1,206 @@
+name: AI cn1lib native source check
+
+# Lint-compiles the native iOS Obj-C and Android Java sources bundled in
+# every cn1-ai-* cn1lib. Catches syntax errors and missing SDK symbols
+# before they reach the build server. End-to-end behavioural tests on a
+# real iOS simulator / Android emulator land separately -- see
+# ai-cn1lib-ios-simulator.yml and ai-cn1lib-android-emulator.yml (both
+# still TODO).
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+      - '.github/workflows/ai-cn1lib-native-check.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+
+jobs:
+  ios-native-check:
+    name: iOS Obj-C bridges compile
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: List bundled iOS Obj-C
+        run: find maven/cn1-ai-*/ios/src/main/objectivec -name '*.m' | sort
+      - name: Syntax-check Obj-C with clang
+        # Real ML Kit / TFLite headers aren't on the simulator runner without
+        # provisioning CocoaPods first, so we run clang in -fsyntax-only mode
+        # against a stub headers tree. This catches non-import syntax errors
+        # and most semantic mistakes (typos, wrong method signatures).
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/stub-headers/MLKitTextRecognition \
+                  /tmp/stub-headers/MLKitVision \
+                  /tmp/stub-headers/MLKitBarcodeScanning \
+                  /tmp/stub-headers/MLKitFaceDetection \
+                  /tmp/stub-headers/MLKitImageLabeling \
+                  /tmp/stub-headers/MLKitTranslate \
+                  /tmp/stub-headers/MLKitCommon \
+                  /tmp/stub-headers/MLKitSmartReply \
+                  /tmp/stub-headers/MLKitLanguageID \
+                  /tmp/stub-headers/MLKitPoseDetection \
+                  /tmp/stub-headers/MLKitSegmentationSelfie \
+                  /tmp/stub-headers/MLKitSegmentationCommon \
+                  /tmp/stub-headers/TensorFlowLiteObjC \
+                  /tmp/cn1-stubs
+          cat > /tmp/cn1-stubs/CodenameOne_GLViewController.h <<'EOF'
+          #import <UIKit/UIKit.h>
+          EOF
+          # Write a single sweeping stub header that exposes the symbols every
+          # ML Kit / TFLite native bridge uses. Each lib's #import resolves
+          # back to this file via clang's -I search path overrides below.
+          stub_h() {
+              cat > "$1" <<'EOF'
+          #import <UIKit/UIKit.h>
+          #import <Foundation/Foundation.h>
+          @interface MLKVisionImage : NSObject
+          - (instancetype)initWithImage:(UIImage *)image;
+          @end
+          @interface MLKText : NSObject @property (nonatomic) NSString *text; @end
+          @interface MLKCommonTextRecognizerOptions : NSObject @end
+          @interface MLKTextRecognizer : NSObject
+          + (instancetype)textRecognizerWithOptions:(id)opts;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(MLKText *, NSError *))h;
+          @end
+          @interface MLKBarcode : NSObject @property (nonatomic) NSString *rawValue; @end
+          @interface MLKBarcodeScannerOptions : NSObject @end
+          @interface MLKBarcodeScanner : NSObject
+          + (instancetype)barcodeScannerWithOptions:(id)opts;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKBarcode *> *, NSError *))h;
+          @end
+          @interface MLKFace : NSObject @property (nonatomic) CGRect frame; @end
+          @interface MLKFaceDetectorOptions : NSObject @end
+          @interface MLKFaceDetector : NSObject
+          + (instancetype)faceDetectorWithOptions:(id)opts;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKFace *> *, NSError *))h;
+          @end
+          @interface MLKImageLabel : NSObject @property (nonatomic) NSString *text; @end
+          @interface MLKImageLabelerOptions : NSObject @end
+          @interface MLKImageLabeler : NSObject
+          + (instancetype)imageLabelerWithOptions:(id)opts;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKImageLabel *> *, NSError *))h;
+          @end
+          @interface MLKTranslatorOptions : NSObject
+          - (instancetype)initWithSourceLanguage:(NSString *)s targetLanguage:(NSString *)t;
+          @end
+          @interface MLKModelDownloadConditions : NSObject
+          - (instancetype)initWithAllowsCellularAccess:(BOOL)c allowsBackgroundDownloading:(BOOL)b;
+          @end
+          @interface MLKTranslator : NSObject
+          + (instancetype)translatorWithOptions:(id)o;
+          - (void)downloadModelIfNeededWithConditions:(MLKModelDownloadConditions *)c completion:(void(^)(NSError *))h;
+          - (void)translateText:(NSString *)t completion:(void(^)(NSString *, NSError *))h;
+          @end
+          @interface MLKTextMessage : NSObject
+          - (instancetype)initWithText:(NSString *)t timestamp:(double)ts userID:(NSString *)u isLocalUser:(BOOL)l;
+          @end
+          @interface MLKSmartReplySuggestion : NSObject @property (nonatomic) NSString *text; @end
+          @interface MLKSmartReplySuggestionResult : NSObject @property (nonatomic) NSArray<MLKSmartReplySuggestion *> *suggestions; @end
+          @interface MLKSmartReply : NSObject
+          + (instancetype)smartReply;
+          - (void)suggestRepliesForMessages:(NSArray<MLKTextMessage *> *)m completion:(void(^)(MLKSmartReplySuggestionResult *, NSError *))h;
+          @end
+          @interface MLKLanguageIdentification : NSObject
+          + (instancetype)languageIdentification;
+          - (void)identifyLanguageForText:(NSString *)t completion:(void(^)(NSString *, NSError *))h;
+          @end
+          @interface MLKPoseLandmark : NSObject
+          @property (nonatomic) CGPoint position;
+          @property (nonatomic) float inFrameLikelihood;
+          @end
+          @interface MLKPose : NSObject
+          @property (nonatomic) NSArray<MLKPoseLandmark *> *landmarks;
+          @end
+          @interface MLKPoseDetectorOptions : NSObject @end
+          @interface MLKPoseDetector : NSObject
+          + (instancetype)poseDetectorWithOptions:(id)o;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKPose *> *, NSError *))h;
+          @end
+          typedef NS_ENUM(NSInteger, MLKSegmenterMode) {
+              MLKSegmenterModeSingleImage = 1
+          };
+          @interface MLKSelfieSegmenterOptions : NSObject
+          @property (nonatomic) MLKSegmenterMode segmenterMode;
+          @end
+          @interface MLKSegmentationMask : NSObject
+          @property (nonatomic) size_t width, height;
+          @property (nonatomic) CVPixelBufferRef buffer;
+          @end
+          @interface MLKSegmenter : NSObject
+          + (instancetype)segmenterWithOptions:(id)o;
+          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(MLKSegmentationMask *, NSError *))h;
+          @end
+          @class TFLTensor;
+          @interface TFLInterpreter : NSObject
+          - (instancetype)initWithModelPath:(NSString *)p error:(NSError **)e;
+          - (void)allocateTensorsWithError:(NSError **)e;
+          - (TFLTensor *)inputTensorAtIndex:(NSUInteger)i error:(NSError **)e;
+          - (TFLTensor *)outputTensorAtIndex:(NSUInteger)i error:(NSError **)e;
+          - (void)invokeWithError:(NSError **)e;
+          @end
+          @interface TFLTensor : NSObject
+          - (void)copyData:(NSData *)d error:(NSError **)e;
+          - (NSData *)dataWithError:(NSError **)e;
+          @end
+          EOF
+          }
+          # Each ML Kit / TFLite import path resolves to its own stub directory;
+          # the file content is identical. Symlinking keeps the headers single-source.
+          for sdk in MLKitTextRecognition MLKitVision MLKitBarcodeScanning \
+                     MLKitFaceDetection MLKitImageLabeling MLKitTranslate \
+                     MLKitCommon MLKitSmartReply MLKitLanguageID \
+                     MLKitPoseDetection MLKitSegmentationSelfie \
+                     MLKitSegmentationCommon TensorFlowLiteObjC; do
+              stub_h "/tmp/stub-headers/${sdk}/${sdk}.h"
+              ln -sf "${sdk}.h" "/tmp/stub-headers/${sdk}/MLKVisionImage.h" 2>/dev/null || true
+              for h in MLKTextRecognizer.h MLKTextRecognizerOptions.h MLKText.h \
+                       MLKBarcodeScanner.h MLKBarcodeScannerOptions.h MLKBarcode.h \
+                       MLKFaceDetector.h MLKFaceDetectorOptions.h MLKFace.h \
+                       MLKImageLabeler.h MLKImageLabelerOptions.h MLKImageLabel.h \
+                       MLKTranslator.h MLKTranslatorOptions.h MLKModelDownloadConditions.h \
+                       MLKSmartReply.h MLKTextMessage.h MLKSmartReplySuggestion.h \
+                       MLKSmartReplySuggestionResult.h \
+                       MLKLanguageIdentification.h \
+                       MLKPoseDetector.h MLKPoseDetectorOptions.h MLKPose.h MLKPoseLandmark.h \
+                       MLKSelfieSegmenterOptions.h MLKSegmenter.h MLKSegmentationMask.h \
+                       TFLTensorFlowLite.h; do
+                  ln -sf "${sdk}.h" "/tmp/stub-headers/${sdk}/${h}" 2>/dev/null || true
+              done
+          done
+          fail=0
+          for m in $(find maven/cn1-ai-*/ios/src/main/objectivec -name '*.m'); do
+              # Some bridges declare extern C symbols (whisper, sd) we don't link
+              # in this lint pass.
+              if ! xcrun clang -fsyntax-only -fobjc-arc -fmodules \
+                      -I/tmp/cn1-stubs \
+                      -I/tmp/stub-headers \
+                      -I/tmp/stub-headers/MLKitTextRecognition \
+                      -I/tmp/stub-headers/MLKitVision \
+                      -I/tmp/stub-headers/MLKitBarcodeScanning \
+                      -I/tmp/stub-headers/MLKitFaceDetection \
+                      -I/tmp/stub-headers/MLKitImageLabeling \
+                      -I/tmp/stub-headers/MLKitTranslate \
+                      -I/tmp/stub-headers/MLKitCommon \
+                      -I/tmp/stub-headers/MLKitSmartReply \
+                      -I/tmp/stub-headers/MLKitLanguageID \
+                      -I/tmp/stub-headers/MLKitPoseDetection \
+                      -I/tmp/stub-headers/MLKitSegmentationSelfie \
+                      -I/tmp/stub-headers/MLKitSegmentationCommon \
+                      -I/tmp/stub-headers/TensorFlowLiteObjC \
+                      -Wno-incomplete-implementation \
+                      -Wno-objc-method-access \
+                      -Wno-implicit-function-declaration \
+                      -isysroot "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+                      "$m" 2>&1 | tee "/tmp/$(basename "$m").log"; then
+                  echo "::error::Obj-C syntax check failed for $m"
+                  fail=1
+              fi
+          done
+          exit $fail
