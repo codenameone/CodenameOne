@@ -624,5 +624,19 @@
                 <module>core-unittests</module>
             </modules>
         </profile>
+        <!--
+            The errorprone-checks module builds the custom BugCheckers that
+            ban patterns we never want in framework code (currently
+            Class.forName). Error Prone requires JDK 11+, so this module is
+            skipped on the primary JDK 8 build and is opt-in via the
+            `errorprone` profile (which also wires the checker into core).
+            CI runs the check via `mvn -Perrorprone install` on a JDK 17 job.
+            -->
+        <profile>
+            <id>errorprone</id>
+            <modules>
+                <module>errorprone-checks</module>
+            </modules>
+        </profile>
     </profiles>
 </project>

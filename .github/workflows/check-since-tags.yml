@@ -1,0 +1,41 @@
+name: Check @since tags
+
+# Fails the build if any Java source under CodenameOne/src carries an @since
+# javadoc tag whose version does not correspond to an existing git tag in
+# this repository. Without this gate, prose can advertise APIs as available
+# in versions that never shipped (e.g. "@since 9.0").
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/**/*.java'
+      - 'scripts/check-since-tags.sh'
+      - '.github/workflows/check-since-tags.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/**/*.java'
+      - 'scripts/check-since-tags.sh'
+      - '.github/workflows/check-since-tags.yml'
+
+jobs:
+  check-since-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history including all tags so `git tag --list` returns
+          # the complete set of released versions.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate @since references against git tags
+        shell: bash
+        run: scripts/check-since-tags.sh
