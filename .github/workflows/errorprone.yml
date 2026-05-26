@@ -1,0 +1,50 @@
+name: Error Prone checks
+
+# Runs the framework's custom Error Prone BugCheckers (currently just
+# BanClassForName) over CodenameOne/src. The check fails the build when
+# someone adds a Class.forName(...) call, which silently breaks on
+# ParparVM (iOS) because the iOS port cannot resolve classes by string
+# name at runtime.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/**/*.java'
+      - 'maven/errorprone-checks/**'
+      - 'maven/core/pom.xml'
+      - 'maven/pom.xml'
+      - '.github/workflows/errorprone.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/**/*.java'
+      - 'maven/errorprone-checks/**'
+      - 'maven/core/pom.xml'
+      - 'maven/pom.xml'
+      - '.github/workflows/errorprone.yml'
+
+jobs:
+  errorprone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          # Error Prone requires JDK 11+; we pick 17 to match the
+          # framework's Android-port JAVA17_HOME requirement.
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Run Error Prone over the core module
+        working-directory: maven
+        run: mvn -B -Perrorprone -pl core -am install -DskipTests
