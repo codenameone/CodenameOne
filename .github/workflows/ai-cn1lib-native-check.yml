@@ -57,8 +57,14 @@ jobs:
           # ML Kit / TFLite native bridge uses. Each lib's #import resolves
           # back to this file via clang's -I search path overrides below.
           stub_h() {
+              # Traditional include guard (NOT #pragma once) so the same
+              # stub content imported via multiple symlinked SDK paths
+              # ("#import <MLKitVision/MLKText.h>" + "#import <MLKitText
+              # Recognition/MLKTextRecognizer.h>" both resolve to the
+              # same shared declarations).
               cat > "$1" <<'EOF'
-          #pragma once
+          #ifndef CN1_AI_STUB_HEADERS_INCLUDED
+          #define CN1_AI_STUB_HEADERS_INCLUDED
           #import <UIKit/UIKit.h>
           #import <Foundation/Foundation.h>
           @interface MLKVisionImage : NSObject
@@ -150,6 +156,7 @@ jobs:
           - (void)copyData:(NSData *)d error:(NSError **)e;
           - (NSData *)dataWithError:(NSError **)e;
           @end
+          #endif
           EOF
           }
           # Each ML Kit / TFLite import path resolves to its own stub directory;
