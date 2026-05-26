@@ -176,21 +176,29 @@ jobs:
 
       - name: xcodebuild
         run: |
-          set -euxo pipefail
+          # No `set -u`: an empty XCCONFIG_ARG array under `set -u` would
+          # SIGABRT the expansion on cn1libs that ship without a pod
+          # (whisper / stablediffusion / docscan).
+          set -exo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
           cd "$PROBE"
-          XCCONFIG_ARG=()
+          XCCONFIG_ARG=""
           if [ -d "Pods" ]; then
-              POD_CONFIG=$(find "Pods/Target Support Files" -name '*.debug.xcconfig' | head -1)
+              # CocoaPods generates one xcconfig per pod + an aggregator
+              # xcconfig for the consumer target. We want the aggregator
+              # (`Pods-CN1AIProbe/Pods-CN1AIProbe.debug.xcconfig`) -- that
+              # one carries the HEADER_SEARCH_PATHS / FRAMEWORK_SEARCH_PATHS
+              # that resolve every transitive `#import <Pod/Header.h>`.
+              POD_CONFIG=$(ls Pods/Target\ Support\ Files/Pods-CN1AIProbe/Pods-CN1AIProbe.debug.xcconfig 2>/dev/null || true)
               if [ -n "$POD_CONFIG" ]; then
                   echo "Using pod xcconfig: $POD_CONFIG"
-                  XCCONFIG_ARG=(-xcconfig "$POD_CONFIG")
+                  XCCONFIG_ARG="-xcconfig $POD_CONFIG"
               fi
           fi
           xcodebuild -project CN1AIProbe.xcodeproj \
                      -target CN1AIProbe \
                      -configuration Debug \
                      -sdk iphonesimulator \
-                     "${XCCONFIG_ARG[@]}" \
+                     $XCCONFIG_ARG \
                      CODE_SIGNING_ALLOWED=NO \
                      build
