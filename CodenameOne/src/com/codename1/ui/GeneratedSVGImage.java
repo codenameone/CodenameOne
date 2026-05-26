@@ -8,6 +8,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.animations.AnimationTime;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.util.MathUtil;
 
 /// Base class for SVG images emitted by the build-time transcoder
@@ -57,6 +58,24 @@ public abstract class GeneratedSVGImage extends Image {
     private final float viewBoxHeight;
     private final boolean animated;
     private long animationStartMs = -1L;
+
+    // SVG -> screen mapping captured at paint time so the per-element
+    // helpers below (drawSvgText, fillSvgGradient) can render in
+    // parent-transform space. iOS Metal does not reliably honor the active
+    // Graphics transform for drawString or for setClip(non-rect shape), so
+    // text and gradients have to bypass it entirely.
+    private Transform paintSavedTransform;
+    private float paintScaleX = 1f;
+    private float paintScaleY = 1f;
+    private float paintOffsetX = 0f;
+    private float paintOffsetY = 0f;
+
+    /// `text-anchor: start` -- emit text starting at the given x.
+    public static final int TEXT_ANCHOR_START = 0;
+    /// `text-anchor: middle` -- center text on the given x.
+    public static final int TEXT_ANCHOR_MIDDLE = 1;
+    /// `text-anchor: end` -- right-align text to the given x.
+    public static final int TEXT_ANCHOR_END = 2;
 
     /// Construct with intrinsic SVG dimensions and viewBox metadata. The
     /// rendered size defaults to the intrinsic dimensions scaled by the
@@ -246,6 +265,11 @@ public abstract class GeneratedSVGImage extends Image {
             g.setAntiAliased(true);
             float sx = (float) w / viewBoxWidth;
             float sy = (float) h / viewBoxHeight;
+            paintScaleX = sx;
+            paintScaleY = sy;
+            paintOffsetX = x - viewBoxX * sx;
+            paintOffsetY = y - viewBoxY * sy;
+            paintSavedTransform = saved;
             Transform t;
             if (saved != null) {
                 t = saved.copy();
@@ -344,6 +368,170 @@ public abstract class GeneratedSVGImage extends Image {
         return scaled < 1 ? 1 : scaled;
     }
 
+    /// Draw an SVG `<text>` element. Renders in parent-transform space
+    /// rather than under the active SVG transform: iOS Metal does not pick
+    /// up `g.setTransform(...)` for drawString reliably, so we restore the
+    /// pre-SVG transform, derive a screen-pixel-sized font and translate
+    /// the SVG `(x, y)` baseline coordinates to where the SVG transform
+    /// would have placed them. The result is crisp text on every port.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context with the SVG transform currently applied
+    /// - `text`: text to render -- empty or null strings are no-ops
+    /// - `svgX`: anchor x in SVG user-space
+    /// - `svgY`: baseline y in SVG user-space
+    /// - `svgFontSize`: font size in SVG user-units (will be scaled)
+    /// - `styleBits`: `Font.STYLE_*` bitmask (BOLD | ITALIC)
+    /// - `rgb`: text color in 0xRRGGBB form
+    /// - `alpha`: 0-255 alpha; multiplied into the draw operation
+    /// - `anchor`: one of [#TEXT_ANCHOR_START], [#TEXT_ANCHOR_MIDDLE], [#TEXT_ANCHOR_END]
+    protected final void drawSvgText(Graphics g, String text,
+                                     float svgX, float svgY,
+                                     float svgFontSize, int styleBits,
+                                     int rgb, int alpha, int anchor) {
+        if (text == null || text.length() == 0) {
+            return;
+        }
+        float screenSize = paintScaleY * svgFontSize;
+        if (screenSize < 0.5f) {
+            return;
+        }
+        Font f = svgTextFont(screenSize, styleBits);
+        int screenX = (int) (paintScaleX * svgX + paintOffsetX);
+        int screenBaselineY = (int) (paintScaleY * svgY + paintOffsetY);
+        Font oldFont = g.getFont();
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        Transform svgT = null;
+        try {
+            svgT = g.getTransform();
+        } catch (Throwable ignored) {
+            svgT = null;
+        }
+        try {
+            if (paintSavedTransform != null) {
+                g.setTransform(paintSavedTransform);
+            } else {
+                g.setTransform(Transform.makeIdentity());
+            }
+            g.setFont(f);
+            g.setColor(rgb & 0xFFFFFF);
+            g.setAlpha(alpha);
+            int tx = screenX;
+            int strW = f.stringWidth(text);
+            if (anchor == TEXT_ANCHOR_MIDDLE) {
+                tx -= strW / 2;
+            } else if (anchor == TEXT_ANCHOR_END) {
+                tx -= strW;
+            }
+            int ascent = f.getAscent();
+            if (ascent <= 0) {
+                ascent = f.getHeight();
+            }
+            g.drawString(text, tx, screenBaselineY - ascent);
+        } finally {
+            if (svgT != null) {
+                g.setTransform(svgT);
+            }
+            g.setFont(oldFont);
+            g.setColor(oldColor);
+            g.setAlpha(oldAlpha);
+        }
+    }
+
+    /// Fill `path` with a linear gradient via Image masking. The standard
+    /// `setClip(path) + LinearGradientPaint.paint` recipe relies on
+    /// `setClip(Shape)` being honored for non-rectangular shapes -- iOS
+    /// Metal substitutes a degenerate polygon clip for arc-decomposed paths
+    /// and the gradient renders as a triangle. This helper renders the
+    /// gradient and an alpha mask of the path to off-screen images at
+    /// screen-pixel resolution, masks the gradient by the path, and blits
+    /// it back in parent-transform space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: graphics context with the SVG transform currently applied
+    /// - `path`: shape to fill (SVG coords)
+    /// - `gradStartX`/`gradStartY`/`gradEndX`/`gradEndY`: gradient axis
+    ///   endpoints in SVG coords
+    /// - `fractions`/`colors`: linear-gradient stops, must be same length
+    /// - `alpha`: 0-255 alpha; multiplied into the drawImage at blit time
+    protected final void fillSvgGradient(Graphics g, GeneralPath path,
+                                         float gradStartX, float gradStartY,
+                                         float gradEndX, float gradEndY,
+                                         float[] fractions, int[] colors,
+                                         int alpha) {
+        float[] b = new float[4];
+        path.getBounds2D(b);
+        if (b[2] <= 0f || b[3] <= 0f) {
+            return;
+        }
+        float leftScreen = paintScaleX * b[0] + paintOffsetX;
+        float topScreen = paintScaleY * b[1] + paintOffsetY;
+        float rightScreen = paintScaleX * (b[0] + b[2]) + paintOffsetX;
+        float bottomScreen = paintScaleY * (b[1] + b[3]) + paintOffsetY;
+        int screenX = (int) Math.floor(leftScreen);
+        int screenY = (int) Math.floor(topScreen);
+        int screenW = (int) Math.ceil(rightScreen) - screenX;
+        int screenH = (int) Math.ceil(bottomScreen) - screenY;
+        if (screenW <= 0 || screenH <= 0) {
+            return;
+        }
+
+        // 1) Render the path as a white-on-black mask in screen-pixel space.
+        Image maskImg = createImage(screenW, screenH, 0xFF000000);
+        Graphics mg = maskImg.getGraphics();
+        mg.setAntiAliased(true);
+        Transform mt = Transform.makeIdentity();
+        mt.translate(paintOffsetX - screenX, paintOffsetY - screenY);
+        mt.scale(paintScaleX, paintScaleY);
+        mg.setTransform(mt);
+        mg.setColor(0xFFFFFF);
+        mg.fillShape(path);
+        Object mask = maskImg.createMask();
+
+        // 2) Render the gradient over the same screen-pixel rectangle.
+        Image gradImg = createImage(screenW, screenH, 0xFFFFFFFF);
+        Graphics gg = gradImg.getGraphics();
+        gg.setAntiAliased(true);
+        float lsx = paintScaleX * gradStartX + paintOffsetX - screenX;
+        float lsy = paintScaleY * gradStartY + paintOffsetY - screenY;
+        float lex = paintScaleX * gradEndX + paintOffsetX - screenX;
+        float ley = paintScaleY * gradEndY + paintOffsetY - screenY;
+        LinearGradientPaint lp = new LinearGradientPaint(
+                lsx, lsy, lex, ley,
+                fractions, colors,
+                MultipleGradientPaint.CycleMethod.NO_CYCLE,
+                MultipleGradientPaint.ColorSpaceType.SRGB,
+                Transform.makeIdentity());
+        lp.paint(gg, 0, 0, screenW, screenH);
+        Image masked = gradImg.applyMask(mask);
+
+        // 3) Blit the masked image in parent-transform space.
+        Transform svgT = null;
+        try {
+            svgT = g.getTransform();
+        } catch (Throwable ignored) {
+            svgT = null;
+        }
+        int oldAlpha = g.getAlpha();
+        try {
+            if (paintSavedTransform != null) {
+                g.setTransform(paintSavedTransform);
+            } else {
+                g.setTransform(Transform.makeIdentity());
+            }
+            g.setAlpha(alpha);
+            g.drawImage(masked, screenX, screenY);
+        } finally {
+            g.setAlpha(oldAlpha);
+            if (svgT != null) {
+                g.setTransform(svgT);
+            }
+        }
+    }
+
     // ---------------------------------------------------------------------
     // SMIL helpers -- referenced by generated code; keep signatures stable.
     // ---------------------------------------------------------------------
@@ -416,6 +604,33 @@ public abstract class GeneratedSVGImage extends Image {
         return values[i] + (values[i + 1] - values[i]) * local;
     }
 
+    /// Build a font for a generated SVG `<text>` element. Always loads a
+    /// `native:` TrueType face (HelveticaNeue on iOS, Roboto on Android,
+    /// the platform default elsewhere) so the size argument is honored at
+    /// arbitrary pixel resolutions. Weight / style maps to the matching
+    /// face name because some platforms ignore the derive weight argument.
+    public static Font svgTextFont(float sizePixels, int styleBits) {
+        boolean bold = (styleBits & Font.STYLE_BOLD) != 0;
+        boolean italic = (styleBits & Font.STYLE_ITALIC) != 0;
+        String face;
+        if (italic && bold) {
+            face = "native:ItalicBold";
+        } else if (italic) {
+            face = "native:ItalicRegular";
+        } else if (bold) {
+            face = "native:MainBold";
+        } else {
+            face = "native:MainRegular";
+        }
+        Font f = Font.createTrueTypeFont(face, face);
+        if (f == null) {
+            throw new IllegalStateException(
+                    "SVG text rendering requires the native: font scheme;"
+                            + " platform reported no TrueType support for " + face);
+        }
+        return f.derive(sizePixels, styleBits);
+    }
+
     private static int round(float v) {
         int r = (int) (v + 0.5f);
         if (r < 0) {
@@ -432,7 +647,7 @@ public abstract class GeneratedSVGImage extends Image {
     /// The current point of `p` is treated as the arc's start; on return the
     /// current point is the end of the arc. Decomposes into up to four
     /// cubic Beziers -- a single quadrant per Bezier -- for accuracy.
-    public static void svgArc(com.codename1.ui.geom.GeneralPath p,
+    public static void svgArc(GeneralPath p,
                               float x1, float y1,
                               float rx, float ry,
                               float xAxisRotationDeg,

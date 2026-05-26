@@ -42,11 +42,8 @@ public final class JavaCodeGenerator {
         if (packageName != null && !packageName.isEmpty()) {
             src.append("package ").append(packageName).append(";\n\n");
         }
-        src.append("import com.codename1.ui.Font;\n");
         src.append("import com.codename1.ui.GeneratedSVGImage;\n");
         src.append("import com.codename1.ui.Graphics;\n");
-        src.append("import com.codename1.ui.LinearGradientPaint;\n");
-        src.append("import com.codename1.ui.MultipleGradientPaint;\n");
         src.append("import com.codename1.ui.Stroke;\n");
         src.append("import com.codename1.ui.Transform;\n");
         src.append("import com.codename1.ui.geom.GeneralPath;\n\n");
@@ -444,37 +441,27 @@ public final class JavaCodeGenerator {
         int styleConst = (text.isBold() ? 1 : 0) | (text.isItalic() ? 2 : 0);
         // Font.STYLE_PLAIN = 0, STYLE_BOLD = 1, STYLE_ITALIC = 2
 
-        line("{");
-        indent++;
-        line("Font __font = Font.getDefaultFont().derive(" + floatLit(size) + ", " + styleConst + ");");
-        line("Font __oldFont = g.getFont();");
-        line("g.setFont(__font);");
-        emitPaintSet(fill, fillOpacity, elementOpacity);
         String content = "\"" + escapeJavaString(text.getContent()) + "\"";
+        int anchorConst;
         switch (text.getAnchor()) {
-            case MIDDLE:
-                line("int __tx = (int)" + floatLit(text.getX()) + " - __font.stringWidth(" + content + ") / 2;");
-                break;
-            case END:
-                line("int __tx = (int)" + floatLit(text.getX()) + " - __font.stringWidth(" + content + ");");
-                break;
+            case MIDDLE: anchorConst = 1; break;
+            case END:    anchorConst = 2; break;
             case START:
-            default:
-                line("int __tx = (int)" + floatLit(text.getX()) + ";");
-                break;
+            default:     anchorConst = 0; break;
         }
-        // Use Graphics.drawString rather than drawStringBaseline because the
-        // baseline-positioned variant misrenders under a non-identity
-        // transform on the iOS Metal port (the logo text was invisible).
-        // SVG text.y is the baseline; drawString takes the top-left, so
-        // subtract the font ascent. Falls back to height-ish when ascent
-        // is unavailable.
-        line("int __ascent = __font.getAscent();");
-        line("if (__ascent <= 0) { __ascent = __font.getHeight(); }");
-        line("g.drawString(" + content + ", __tx, (int)" + floatLit(text.getY()) + " - __ascent);");
-        line("g.setFont(__oldFont);");
-        indent--;
-        line("}");
+        // Text rendering bypasses the active SVG transform because the iOS
+        // Metal port does not honor it for drawString. drawSvgText restores
+        // the parent transform, scales the font by the SVG->screen factor
+        // and translates the SVG coords to screen pixels itself.
+        int argb = fill.isReference() ? 0xFF000000 : fill.getColor();
+        int colorAlpha = (argb >>> 24) & 0xFF;
+        String alphaExpr = alphaExpression(fillOpacity, elementOpacity, colorAlpha);
+        line("drawSvgText(g, " + content + ", "
+                + floatLit(text.getX()) + ", " + floatLit(text.getY()) + ", "
+                + floatLit(size) + ", " + styleConst + ", "
+                + "0x" + hex(argb & 0xFFFFFF) + ", "
+                + alphaExpr + ", "
+                + anchorConst + ");");
     }
 
     private static String escapeJavaString(String s) {
@@ -613,6 +600,12 @@ public final class JavaCodeGenerator {
         fracs.append("}");
         cols.append("}");
 
+        // Gradient fills go through fillSvgGradient because the standard
+        // setClip(path) + LinearGradientPaint.paint recipe relies on
+        // setClip(non-rect Shape) being honored -- which iOS Metal does not
+        // do for arc-decomposed paths. The helper renders the gradient and
+        // an alpha mask of the path to off-screen images and blits the
+        // masked image in parent-transform space, sidestepping the clip.
         line("{");
         indent++;
         line("float[] __b = new float[4];");
@@ -631,24 +624,11 @@ public final class JavaCodeGenerator {
             endX = "__bx + " + floatLit(lg.getX2()) + " * __bw";
             endY = "__by + " + floatLit(lg.getY2()) + " * __bh";
         }
-        line("LinearGradientPaint __paint = new LinearGradientPaint("
-                + startX + ", " + startY + ", " + endX + ", " + endY + ", "
+        line("fillSvgGradient(g, __p, "
+                + startX + ", " + startY + ", "
+                + endX + ", " + endY + ", "
                 + fracs + ", " + cols + ", "
-                + "MultipleGradientPaint.CycleMethod.NO_CYCLE, "
-                + "MultipleGradientPaint.ColorSpaceType.SRGB, "
-                + "Transform.makeIdentity());");
-        line("g.setAlpha(" + alphaExpression(opacity, elementOpacity, 0xFF) + ");");
-        line("g.pushClip();");
-        line("try {");
-        indent++;
-        line("g.setClip(__p);");
-        line("__paint.paint(g, __bx, __by, __bw, __bh);");
-        indent--;
-        line("} finally {");
-        indent++;
-        line("g.popClip();");
-        indent--;
-        line("}");
+                + alphaExpression(opacity, elementOpacity, 0xFF) + ");");
         indent--;
         line("}");
     }
