@@ -25,6 +25,16 @@ emitted as a Java class that subclasses `com.codename1.ui.GeneratedSVGImage`,
 and rendered through the standard `Graphics` shape API. The same vector
 source produces pixel-perfect output at any size on every port.
 
+[NOTE]
+====
+A captured screenshot of the hellocodenameone screenshot suite's
+`SVGStaticScreenshotTest` (a column of transcoded SVGs rendered from
+`Resources.getGlobalResources().getImage(name)`) is published as a CI
+artifact on every PR; the live grid lives under
+`scripts/hellocodenameone/common/src/main/css/` if you want to inspect
+the source fixtures.
+====
+
 == Quick start
 
 . Drop your SVG next to `theme.css` in `src/main/css/`:

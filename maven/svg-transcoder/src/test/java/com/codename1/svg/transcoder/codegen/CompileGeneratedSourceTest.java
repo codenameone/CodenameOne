@@ -83,6 +83,53 @@ public class CompileGeneratedSourceTest {
     }
 
     @Test
+    public void multiStopGradientCompiles() throws Exception {
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<defs><linearGradient id='g4' x1='0' y1='0' x2='1' y2='0'>"
+                + "<stop offset='0' stop-color='red'/>"
+                + "<stop offset='0.25' stop-color='yellow'/>"
+                + "<stop offset='0.5' stop-color='lime'/>"
+                + "<stop offset='0.75' stop-color='aqua'/>"
+                + "<stop offset='1' stop-color='blue'/>"
+                + "</linearGradient></defs>"
+                + "<rect x='0' y='0' width='100' height='100' fill='url(#g4)'/>"
+                + "</svg>", "MultiStopGradient");
+    }
+
+    @Test
+    public void deeplyNestedGroupsCompile() throws Exception {
+        // Five-deep nesting with transforms at each level; each transform
+        // block introduces fresh local vars so Java's no-shadowing rule
+        // doesn't trip the compile.
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<g transform='translate(10,10)'>"
+                + "<g transform='rotate(15)'>"
+                + "<g transform='scale(1.2)'>"
+                + "<g transform='translate(5,5)'>"
+                + "<g transform='rotate(-10)'>"
+                + "<rect x='0' y='0' width='10' height='10' fill='red'/>"
+                + "</g></g></g></g></g>"
+                + "</svg>", "Nested");
+    }
+
+    @Test
+    public void skewTransformsCompile() throws Exception {
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<g transform='skewX(20)'><rect x='10' y='10' width='30' height='30' fill='red'/></g>"
+                + "<g transform='skewY(15) translate(40, 40)'><rect x='0' y='0' width='30' height='30' fill='blue'/></g>"
+                + "</svg>", "Skewed");
+    }
+
+    @Test
+    public void valuesAnimationCompiles() throws Exception {
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<circle cx='50' cy='50' r='10' fill='red'>"
+                + "<animate attributeName='r' values='10;30;5;25;10' dur='3s' repeatCount='indefinite'/>"
+                + "<animate attributeName='opacity' values='1;0.3;1' dur='3s' repeatCount='indefinite'/>"
+                + "</circle></svg>", "ValuesAnim");
+    }
+
+    @Test
     public void clipPathCompiles() throws Exception {
         compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
                 + "<defs><clipPath id='c'><rect x='10' y='10' width='40' height='40' rx='5'/></clipPath>"
