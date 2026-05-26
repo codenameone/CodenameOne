@@ -11,16 +11,16 @@ function windows_desktop {
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=windows-desktop" "-U" "-e"
 }
 function javascript {
-  # Build the browser bundle locally using the new ParparVM-backed JavaScript
-  # port (Ports/JavaScriptPort) and the BytecodeTranslator, replacing the
-  # previous TeaVM-based cloud build.
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
+}
+function javascript_parparvm {
+  # Experimental local build via the ParparVM-backed JavaScript port. The
+  # branch that originally moved initializr to this path didn't ship -- the
+  # canvasContextWipe Heisenbug (see Ports/JavaScriptPort/STATUS.md) keeps
+  # the cascade tests flake-prone. Kept as an opt-in alias so the wiring
+  # stays alive while the bug is chased in smaller PRs.
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   "$SCRIPT_DIR/../build-javascript-port-initializr.sh"
-}
-function javascript_cloud {
-  # Legacy TeaVM-based cloud build. Kept as a fallback while the local
-  # ParparVM path stabilises.
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
 }
 function android {
   
@@ -64,9 +64,6 @@ function help {
   "echo" "-e" "  ios_source"
   "echo" "-e" "    Generates an Xcode Project that you can open and build using Apple's development tools"
   "echo" "-e" "    *Requires a Mac with Xcode installed"
-  "echo" "-e" "  javascript"
-  "echo" "-e" "    Builds as a web app locally using the ParparVM-backed JavaScript port."
-  "echo" "-e" "    *Requires a JDK with javac/jar and a Maven 3.6+ checkout of the Codename One repo."
   "echo" "-e" ""
   "echo" "-e" "Build Server Commands:"
   "echo" "-e" "  The following commands will build the app using the Codename One build server, and require"
@@ -85,11 +82,11 @@ function help {
   "echo" "-e" "    Builds Windows desktop app."
   "echo" "-e" "    *Windows Desktop builds are a Pro user feature."
   "echo" "-e" "  javascript"
-  "echo" "-e" "    Builds as a web app locally using the ParparVM-backed JavaScript port."
-  "echo" "-e" "    *Requires a JDK with javac/jar and a Maven 3.6+ checkout of the Codename One repo."
-  "echo" "-e" "  javascript_cloud"
-  "echo" "-e" "    Legacy TeaVM-based web app build via the Codename One build server."
+  "echo" "-e" "    Builds as a web app."
   "echo" "-e" "    *Javascript builds are an Enterprise user feature"
+  "echo" "-e" "  javascript_parparvm"
+  "echo" "-e" "    Experimental: builds locally via the ParparVM-backed JavaScript port"
+  "echo" "-e" "    (see Ports/JavaScriptPort/STATUS.md for known issues)."
 }
 function settings {
   

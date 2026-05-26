@@ -564,9 +564,13 @@ build_initializr_for_site() {
 
   echo "Building Initializr JavaScript bundle for website..." >&2
 
-  # Install the ZipSupport cn1lib's attached classifier artifact into the local
-  # Maven repo so the common module can resolve it when the bundled build
-  # script later runs its own `mvnw package` on common.
+  # Build the TeaVM-based JS bundle via the Codename One cloud build server.
+  # The original branch (75803715d, see Ports/JavaScriptPort/STATUS.md) moved
+  # this to a local ParparVM build, but the canvasContextWipe Heisenbug kept
+  # the cascade tests flake-prone, so initializr is back on TeaVM while the
+  # bug is chased in smaller follow-up PRs. The build script and bundle
+  # infrastructure remain in tree (scripts/build-javascript-port-initializr.sh,
+  # build.sh's javascript_parparvm function) for the next attempt.
   (
     cd "${REPO_ROOT}/scripts/initializr"
 
@@ -583,25 +587,24 @@ build_initializr_for_site() {
       export PATH="${JAVA_HOME}/bin:${PATH}"
     fi
 
+    # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
+    # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
     run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
       -DskipTests \
+      -Dcodename1.platform=javascript \
       install
-  )
 
-  # Build the browser bundle locally via the ParparVM-backed JavaScript port.
-  # This replaces the previous TeaVM cloud build (`mvn package` under the
-  # javascript module), which required CN1_USER / CN1_TOKEN credentials and a
-  # reachable Codename One build server.
-  (
-    if [ -n "${JAVA_HOME_8_X64:-}" ]; then
-      export JAVA_HOME="${JAVA_HOME_8_X64}"
-      export PATH="${JAVA_HOME}/bin:${PATH}"
-    fi
-    "${REPO_ROOT}/scripts/build-javascript-port-initializr.sh"
+    set_cn1_user_token "Initializr"
+
+    run_initializr_mvn -q -U -pl javascript -am \
+      -DskipTests \
+      -Dautomated=true \
+      -Dcodename1.platform=javascript \
+      package
   )
 
   local output_dir="${WEBSITE_DIR}/static/initializr-app"
-  local result_zip="${REPO_ROOT}/scripts/initializr/javascript/target/initializr-javascript-port.zip"
+  local result_zip="${REPO_ROOT}/scripts/initializr/javascript/target/result.zip"
   if [ ! -f "${result_zip}" ]; then
     result_zip="$(ls -1 "${REPO_ROOT}"/scripts/initializr/javascript/target/initializr-javascript-*.zip 2>/dev/null | head -n1 || true)"
   fi
@@ -614,18 +617,6 @@ build_initializr_for_site() {
   rm -rf "${output_dir}"
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
-
-  # The script bundles the dist under an Initializr-js/ top-level directory.
-  # Hoist its contents up to the output_dir root so the website iframe can
-  # reference `/initializr-app/index.html` directly, matching the previous
-  # TeaVM layout.
-  if [ -d "${output_dir}/Initializr-js" ]; then
-    (
-      cd "${output_dir}/Initializr-js"
-      find . -mindepth 1 -maxdepth 1 -exec mv {} "${output_dir}/" \;
-    )
-    rmdir "${output_dir}/Initializr-js"
-  fi
 
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Initializr website bundle is missing index.html after extraction." >&2
