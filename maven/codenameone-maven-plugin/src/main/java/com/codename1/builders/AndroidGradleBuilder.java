@@ -2844,8 +2844,13 @@ public class AndroidGradleBuilder extends Executor {
         // Class.forName) so obfuscation rewrites the call site together with
         // the class. The reinit branches do *not* repeat the binding because
         // the dispatcher is held in a static field on Navigation that
-        // survives a Display reinit.
-        String installRoutes = "        new com.codename1.router.generated.Routes();\n";
+        // survives a Display reinit. Only emit the binding when the project
+        // actually has a Routes class on its classpath -- legacy CN1 apps
+        // that don't wire up the annotation Mojo skip it.
+        String installRoutes = new File(dummyClassesDir,
+                "com/codename1/router/generated/Routes.class").isFile()
+                ? "        new com.codename1.router.generated.Routes();\n"
+                : "";
 
         String reinitCode0 = "Display.init(this);\n";
 

@@ -1211,11 +1211,11 @@ public class IPhoneBuilder extends Executor {
                     // Display.init so deep links delivered during launch see
                     // the route table. Direct symbol reference (no
                     // Class.forName) -- ParparVM obfuscation rewrites the call
-                    // site and the Routes class together. The Maven plugin's
-                    // generate-annotation-stubs Mojo guarantees Routes always
-                    // exists (no-op constructor when the project has no
-                    // @Route, real dispatcher otherwise).
-                    + "        new com.codename1.router.generated.Routes();\n"
+                    // site and the Routes class together. Only emitted when
+                    // the project actually has a Routes class on its
+                    // classpath; legacy CN1 projects that don't wire up the
+                    // annotation Mojo skip the binding entirely.
+                    + routesInstall(classesDir)
                     + "        Display.init(stub);\n"
 
                     + "    }\n"
@@ -4110,7 +4110,16 @@ public class IPhoneBuilder extends Executor {
         return out.toString();
     }
 
+    /// Emit the per-build `new com.codename1.router.generated.Routes()` call
+    /// for the application stub, or an empty string when the project's
+    /// classes directory has no Routes class (legacy projects that don't
+    /// wire up the Codename One annotation Mojo).
+    private static String routesInstall(File classesDir) {
+        if (classesDir != null
+                && new File(classesDir, "com/codename1/router/generated/Routes.class").isFile()) {
+            return "        new com.codename1.router.generated.Routes();\n";
+        }
+        return "";
+    }
 
-
-            
 }
