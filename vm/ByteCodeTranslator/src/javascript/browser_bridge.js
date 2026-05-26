@@ -728,11 +728,14 @@
             var proto = Object.getPrototypeOf(receiver);
             protoName = proto && proto.constructor && proto.constructor.name || '<unknown>';
           } catch (_e1) {}
+          // receiver is guaranteed non-null here -- the earlier null-check
+          // at the top of the bridge handler throws "Missing host receiver
+          // for JSO bridge" before we ever reach this diag block.
           var receiverDesc = 'unknown';
           try {
             if (receiver === global.window) receiverDesc = 'global.window';
             else if (global.window && receiver === global.window.document) receiverDesc = 'global.window.document';
-            else if (typeof receiver === 'object' && receiver && typeof receiver.tagName === 'string') receiverDesc = 'element:' + receiver.tagName;
+            else if (typeof receiver === 'object' && typeof receiver.tagName === 'string') receiverDesc = 'element:' + receiver.tagName;
             else receiverDesc = String(receiver).slice(0, 60);
           } catch (_e2) {}
           diag('NUMBER_LEAK', 'member', String(member));
@@ -741,8 +744,8 @@
           diag('NUMBER_LEAK', 'receiverTypeof', typeof receiver);
           diag('NUMBER_LEAK', 'receiverProto', protoName);
           diag('NUMBER_LEAK', 'receiverDesc', receiverDesc);
-          diag('NUMBER_LEAK', 'receiverHasDocument', String(receiver && typeof receiver.document));
-          diag('NUMBER_LEAK', 'receiverHasGetContext', String(receiver && typeof receiver.getContext));
+          diag('NUMBER_LEAK', 'receiverHasDocument', String(typeof receiver.document));
+          diag('NUMBER_LEAK', 'receiverHasGetContext', String(typeof receiver.getContext));
         } catch (_e) {}
       }
     }
