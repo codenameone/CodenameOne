@@ -152,7 +152,12 @@ public abstract class GeneratedSVGImage extends Image {
         }
         int savedColor = g.getColor();
         int savedAlpha = g.getAlpha();
+        boolean savedAA = g.isAntiAliased();
         try {
+            // Anti-alias every SVG render. Vector shapes drawn without AA
+            // look stair-stepped on every port we ship, and the perf cost
+            // on modern hardware is negligible.
+            g.setAntiAliased(true);
             float sx = (float) w / viewBoxWidth;
             float sy = (float) h / viewBoxHeight;
             Transform t;
@@ -174,6 +179,7 @@ public abstract class GeneratedSVGImage extends Image {
             }
             g.setColor(savedColor);
             g.setAlpha(savedAlpha);
+            g.setAntiAliased(savedAA);
         }
     }
 

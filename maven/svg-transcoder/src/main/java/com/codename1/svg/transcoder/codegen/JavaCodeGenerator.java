@@ -282,14 +282,18 @@ public final class JavaCodeGenerator {
         SVGPaint stroke = style.getStroke();
         // default: fill black unless explicitly set
         if (fill == null) fill = SVGPaint.BLACK;
+        // Element opacity is animatable (`<animate attributeName="opacity"/>`)
+        // and applies to both fill and stroke; resolve it once.
+        AnimatedFloat elementOpacity = animFloat("opacity",
+                style.getOpacity() == null ? 1f : style.getOpacity(), anims);
 
         if (!fill.isNone()) {
             AnimatedFloat fillOpacity = animFloat("fill-opacity",
                     style.getFillOpacity() == null ? 1f : style.getFillOpacity(), anims);
             if (fill.isReference()) {
-                emitGradientFill(fill, fillOpacity, style.getOpacity());
+                emitGradientFill(fill, fillOpacity, elementOpacity);
             } else {
-                emitPaintSet(fill, fillOpacity, style.getOpacity());
+                emitPaintSet(fill, fillOpacity, elementOpacity);
                 line("g.fillShape(__p);");
             }
         }
@@ -301,7 +305,7 @@ public final class JavaCodeGenerator {
             float miter = style.getStrokeMiterLimit() == null ? 4f : style.getStrokeMiterLimit();
             emitPaintSet(stroke, animFloat("stroke-opacity",
                     style.getStrokeOpacity() == null ? 1f : style.getStrokeOpacity(), anims),
-                    style.getOpacity());
+                    elementOpacity);
             line("__s = new Stroke(" + floatLit(widthVal)
                     + ", " + capConst(cap) + ", " + joinConst(join)
                     + ", " + floatLit(miter) + ");");
@@ -309,9 +313,9 @@ public final class JavaCodeGenerator {
         }
     }
 
-    private void emitPaintSet(SVGPaint paint, AnimatedFloat opacity, Float groupOpacity) {
-        // group opacity multiplies attribute opacity
-        String alphaExpr = alphaExpression(opacity, groupOpacity, 0xFF);
+    private void emitPaintSet(SVGPaint paint, AnimatedFloat opacity, AnimatedFloat elementOpacity) {
+        // element opacity multiplies attribute opacity (both animatable)
+        String alphaExpr = alphaExpression(opacity, elementOpacity, 0xFF);
         if (paint.isReference()) {
             // Gradient paths are handled by emitGradientFill; this is for the
             // solid-color stroke path or the radial-fallback case.
@@ -330,15 +334,11 @@ public final class JavaCodeGenerator {
         int argb = paint.getColor();
         line("g.setColor(0x" + hex(argb & 0xFFFFFF) + ");");
         int colorAlpha = (argb >>> 24) & 0xFF;
-        line("g.setAlpha(" + alphaExpression(opacity, groupOpacity, colorAlpha) + ");");
+        line("g.setAlpha(" + alphaExpression(opacity, elementOpacity, colorAlpha) + ");");
     }
 
-    private static String alphaExpression(AnimatedFloat opacity, Float groupOpacity, int baseAlpha) {
-        String mult = "Math.max(0f, Math.min(1f, " + opacity.expr;
-        if (groupOpacity != null) {
-            mult += " * " + floatLit(groupOpacity);
-        }
-        mult += "))";
+    private static String alphaExpression(AnimatedFloat opacity, AnimatedFloat elementOpacity, int baseAlpha) {
+        String mult = "Math.max(0f, Math.min(1f, " + opacity.expr + " * " + elementOpacity.expr + "))";
         if (baseAlpha >= 0xFF) {
             return "(int)(255f * " + mult + ")";
         }
@@ -348,14 +348,17 @@ public final class JavaCodeGenerator {
     /// Gradient fills require shape clipping: CN1's [LinearGradientPaint#paint]
     /// fills its bounding rectangle, not the path -- a `fillShape(p)` after
     /// `setColor(paint)` ends up painting the gradient through any space inside
-    /// the shape's bounding box. Pushing the path itself as the clip masks the
-    /// gradient to the actual outline.
-    private void emitGradientFill(SVGPaint fill, AnimatedFloat opacity, Float groupOpacity) {
+    /// the shape's bounding box on some ports. Push the path as the clip *and*
+    /// call setColor(paint)+fillShape so platforms that respect the paint on
+    /// fillShape (which produces a higher-quality result than clip+paint.paint)
+    /// still get the proper outline, while the clip is a safety net for the
+    /// ports that don't.
+    private void emitGradientFill(SVGPaint fill, AnimatedFloat opacity, AnimatedFloat elementOpacity) {
         SVGNode def = doc.getDefinitions().get(fill.getReference());
         if (!(def instanceof SVGLinearGradient)) {
             // Radial / unresolved: fall back to first stop or black via the
             // solid-color path so we always render something.
-            emitPaintSet(fill, opacity, groupOpacity);
+            emitPaintSet(fill, opacity, elementOpacity);
             line("g.fillShape(__p);");
             return;
         }
@@ -369,7 +372,7 @@ public final class JavaCodeGenerator {
         }
         List<SVGGradientStop> stops = effective.getStops();
         if (stops.isEmpty()) {
-            emitPaintSet(SVGPaint.BLACK, opacity, groupOpacity);
+            emitPaintSet(SVGPaint.BLACK, opacity, elementOpacity);
             line("g.fillShape(__p);");
             return;
         }
@@ -411,7 +414,7 @@ public final class JavaCodeGenerator {
                 + "MultipleGradientPaint.CycleMethod.NO_CYCLE, "
                 + "MultipleGradientPaint.ColorSpaceType.SRGB, "
                 + "Transform.makeIdentity());");
-        line("g.setAlpha(" + alphaExpression(opacity, groupOpacity, 0xFF) + ");");
+        line("g.setAlpha(" + alphaExpression(opacity, elementOpacity, 0xFF) + ");");
         line("g.pushClip();");
         line("try {");
         indent++;
