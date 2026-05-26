@@ -32,6 +32,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -107,15 +108,25 @@ public class ChatView extends Container {
 
     /// Renders `message` as a new [ChatBubble] at the bottom of the
     /// list and scrolls into view. Safe to call from any thread.
+    ///
+    /// The bubble itself is laid out inside a single-row FlowLayout
+    /// container whose alignment is driven by the message role:
+    /// USER -> right, ASSISTANT -> left, SYSTEM -> centre. That keeps
+    /// the bubble's *visible width* anchored to its text content
+    /// rather than stretching across the full chat surface, which is
+    /// what makes a chat bubble actually look like a bubble.
     public ChatBubble addMessage(final ChatMessage message) {
         final ChatBubble[] out = new ChatBubble[1];
         Runnable r = new Runnable() {
             @Override
             public void run() {
                 ChatBubble b = createBubble(message);
+                Container row = new Container(new FlowLayout(alignmentFor(message.getRole())));
+                row.setUIID("ChatBubbleRow");
+                row.add(b);
                 history.add(message);
                 bubbles.add(b);
-                messages.add(b);
+                messages.add(row);
                 messages.revalidateLater();
                 messages.scrollComponentToVisible(b);
                 out[0] = b;
@@ -192,5 +203,15 @@ public class ChatView extends Container {
     /// to [ChatBubble].
     protected ChatBubble createBubble(ChatMessage message) {
         return new ChatBubble(message);
+    }
+
+    private static int alignmentFor(Role role) {
+        if (role == Role.USER) {
+            return com.codename1.ui.Component.RIGHT;
+        }
+        if (role == Role.SYSTEM) {
+            return com.codename1.ui.Component.CENTER;
+        }
+        return com.codename1.ui.Component.LEFT;
     }
 }

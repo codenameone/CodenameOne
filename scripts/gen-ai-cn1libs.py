@@ -87,11 +87,16 @@ class Lib:
     build_hints: dict[str, str]
     test_mock_methods: str  # mock bridge method overrides
     ios_pre_impl: str = ""  # C/Obj-C source emitted BEFORE @implementation
-    win_decls: str = ""  # C# method overrides for the win/ module stub. When
-    # empty, a `return null/false/0` body is synthesised per declared method.
-    js_method_keys: tuple = ()  # JS-encoded method names, e.g.
-    # ("recognize__byte_1ARRAY",). Matches the encoding `generate-native-
-    # interfaces` uses for the JS port.
+    win_decls: str = ""  # (Removed; UWP is not a runtime target. Kept on
+    # the dataclass for backward-compat with old call sites; ignored.)
+    js_method_keys: tuple = ()  # JS-encoded method names + param counts, e.g.
+    # `(("recognize__byte_1ARRAY", 1),)`. Matches the encoding
+    # `generate-native-interfaces` uses for the JS port.
+    simulator_hints: tuple = ()  # `(key, default_value)` pairs for build
+    # hints the JavaSE impl injects when running in the simulator. Used for
+    # iOS Info.plist usage strings (`ios.NSCameraUsageDescription` etc.) so
+    # the developer never has to hand-edit the description out of the docs
+    # but can still customise the wording in codenameone_settings.properties.
 
 
 def ni_class(facade: str) -> str:
@@ -143,7 +148,6 @@ def root_pom(artifact: str, short_desc: str) -> str:
                 <module>android</module>
                 <module>javase</module>
                 <module>javascript</module>
-                <module>win</module>
                 <module>lib</module>
             </modules>
         </project>
@@ -503,19 +507,6 @@ def lib_pom(artifact: str) -> str:
                         </dependency>
                     </dependencies>
                 </profile>
-                <profile>
-                    <id>win</id>
-                    <activation>
-                        <property><name>codename1.platform</name><value>win</value></property>
-                    </activation>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.codenameone</groupId>
-                            <artifactId>{artifact}-win</artifactId>
-                            <version>${{project.version}}</version>
-                        </dependency>
-                    </dependencies>
-                </profile>
             </profiles>
         </project>
         """)
@@ -654,35 +645,57 @@ def android_native_java(pkg: str, facade: str, extra_imports: str, body: str) ->
     )
 
 
-def javase_native_java(pkg: str, facade: str, body: str) -> str:
+def javase_native_java(pkg: str, facade: str, body: str,
+                        simulator_hints: tuple = ()) -> str:
     """JavaSE impl is the one platform where the impl MUST `implements`
     the NativeInterface -- NativeLookup on JavaSE resolves the impl via
     plain Java class loading and casts to the interface.
+
+    When `simulator_hints` is non-empty, the impl ensures each
+    `(key, default)` pair is present in the user's
+    `codenameone_settings.properties` the first time the bridge is
+    instantiated under the simulator. `getProjectBuildHints` returns null
+    outside the simulator, so on real devices this is a no-op. The
+    developer can override the value later -- we only set the default
+    when the key is entirely absent, never overwrite.
     """
+    hints_block = ""
+    if simulator_hints:
+        ensure_lines = []
+        for key, default in simulator_hints:
+            esc_default = default.replace("\\", "\\\\").replace("\"", "\\\"")
+            ensure_lines.append(
+                f"            if (!hints.containsKey(\"{key}\")) {{\n"
+                f"                com.codename1.ui.Display.getInstance()\n"
+                f"                    .setProjectBuildHint(\"{key}\", \"{esc_default}\");\n"
+                "            }"
+            )
+        ensure_body = "\n".join(ensure_lines)
+        hints_block = (
+            "\n"
+            "    private static boolean hintsEnsured;\n"
+            "    private static synchronized void ensureSimulatorHints() {\n"
+            "        if (hintsEnsured) return;\n"
+            "        hintsEnsured = true;\n"
+            "        java.util.Map<String, String> hints =\n"
+            "            com.codename1.ui.Display.getInstance().getProjectBuildHints();\n"
+            "        if (hints == null) return;  // not running in the simulator\n"
+            + ensure_body
+            + "\n"
+            "    }\n"
+            "\n"
+            f"    public {ni_class(facade)}Impl() {{\n"
+            "        ensureSimulatorHints();\n"
+            "    }\n"
+        )
+
     return (
         f"package {java_pkg(pkg)};\n"
         + "\n"
         + f"public class {ni_class(facade)}Impl implements {ni_class(facade)} {{\n"
+        + hints_block
         + textwrap.indent(body.rstrip(), "    ")
         + "\n\n    public boolean isSupported() {\n        return true;\n    }\n}\n"
-    )
-
-
-def win_native_cs(pkg: str, facade: str, decls: str) -> str:
-    """C# stub for the `win/` module. Methods return defaults -- the win
-    port is not a runtime target for ML Kit / TFLite / whisper.
-    """
-    ns = "com." + pkg.replace(".", "_") + "_" + facade  # placeholder; unused
-    return (
-        "// Stub: the cn1lib has no Windows UWP backend. Methods return\n"
-        "// default values so the cn1lib package layout is complete.\n"
-        f"namespace {java_pkg(pkg)} {{\n"
-        f"public class {ni_class(facade)}Impl : I{ni_class(facade)}Impl {{\n"
-        + textwrap.indent(decls.rstrip(), "    ")
-        + "\n"
-        "    public bool isSupported() { return false; }\n"
-        "}\n"
-        "}\n"
     )
 
 
@@ -921,12 +934,13 @@ def lib_mlkit_text() -> Lib:
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
         js_method_keys=(("recognize__byte_1ARRAY", 1),),
-        win_decls="public string recognize(byte[] param) { return null; }",
+        simulator_hints=(
+            ("ios.NSCameraUsageDescription",
+             "This app uses the camera to recognise text."),
+        ),
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/TextRecognition",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:text-recognition:16.0.0'",
-            "codename1.arg.ios.plistInject":
-                "<key>NSCameraUsageDescription</key><string>This app uses the camera to recognise text.</string>",
         },
     )
 
@@ -1093,12 +1107,13 @@ def lib_mlkit_barcode() -> Lib:
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
         js_method_keys=(("scan__byte_1ARRAY", 1),),
-        win_decls="public string[] scan(byte[] param) { return null; }",
+        simulator_hints=(
+            ("ios.NSCameraUsageDescription",
+             "This app uses the camera to scan barcodes."),
+        ),
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/BarcodeScanning",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:barcode-scanning:17.2.0'",
-            "codename1.arg.ios.plistInject":
-                "<key>NSCameraUsageDescription</key><string>This app uses the camera to scan barcodes.</string>",
             "codename1.arg.android.xpermissions": "<uses-permission android:name=\"android.permission.CAMERA\"/>",
         },
     )
@@ -1246,12 +1261,13 @@ def lib_mlkit_face() -> Lib:
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
         js_method_keys=(("detect__byte_1ARRAY", 1),),
-        win_decls="public int[] detect(byte[] param) { return null; }",
+        simulator_hints=(
+            ("ios.NSCameraUsageDescription",
+             "This app uses the camera to detect faces."),
+        ),
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/FaceDetection",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:face-detection:16.1.5'",
-            "codename1.arg.ios.plistInject":
-                "<key>NSCameraUsageDescription</key><string>This app uses the camera to detect faces.</string>",
         },
     )
 
@@ -2616,7 +2632,6 @@ def generate(lib: Lib) -> None:
     write(base / "javase" / "pom.xml", platform_pom(lib.artifact, "javase"))
     write(base / "javascript" / "pom.xml",
           resource_only_pom(lib.artifact, "javascript", "javascript"))
-    write(base / "win" / "pom.xml", resource_only_pom(lib.artifact, "win", "csharp"))
     write(base / "lib" / "pom.xml", lib_pom(lib.artifact))
 
     # Common Java sources.
@@ -2658,7 +2673,8 @@ def generate(lib: Lib) -> None:
     # JavaSE sources.
     javase_pkg_root = base / "javase" / "src" / "main" / "java" / pkg_path
     write(javase_pkg_root / f"{ni_class(lib.facade)}Impl.java",
-          javase_native_java(lib.pkg, lib.facade, lib.javase_impl))
+          javase_native_java(lib.pkg, lib.facade, lib.javase_impl,
+                              lib.simulator_hints))
 
     # JavaScript stub (no ML Kit / TFLite equivalent on the JS port; methods
     # call the supplied callback with an Error so apps that incorrectly
@@ -2667,11 +2683,7 @@ def generate(lib: Lib) -> None:
     write(js_root / f"com_codename1_ai_{lib.pkg.replace('.', '_')}_{ni_class(lib.facade)}.js",
           js_native(lib.pkg, lib.facade, lib.js_method_keys))
 
-    # Win C# stub (same rationale as JS: no UWP target for ML Kit native
-    # SDKs; methods return default values).
-    win_root = base / "win" / "src" / "main" / "csharp" / pkg_path
-    write(win_root / f"{ni_class(lib.facade)}Impl.cs",
-          win_native_cs(lib.pkg, lib.facade, lib.win_decls))
+    # win/ module intentionally absent -- UWP is not a runtime target.
 
 
 def main() -> None:
