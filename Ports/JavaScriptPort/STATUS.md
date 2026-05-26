@@ -303,6 +303,14 @@ the parking decisions. Reasons:
 - `simdLargeAllocaCorrupt` — `SimdLargeAllocaTest`: corrupts shared
   HTML5Implementation state (VIRTUAL_FAIL on `paintDirty` / `flushGraphics`)
   late in the suite. Separate bug.
+- `synchronizedBlocksAdmitContendedEntrantsInFifoOrder` —
+  `JavascriptRuntimeSemanticsTest` in `vm/tests`: `@Disabled` on this
+  branch. All 11 CompilerConfig variants report `order=[0,...,0]`
+  (entrants reported done via `join()` but never enter the synchronized
+  block). The other six monitor tests in the same file still pass, so
+  the monitorEnter/Exit implementation isn't broken — this is FIFO
+  ordering specifically. Needs scheduler tracing rather than another
+  ad-hoc edit; see `project_jsport_monitor_fifo_investigation` memory.
 - Native-API timeouts (`mediaPlayback`, `browserComponentLoadEvent`,
   `vpnDetectionApi`, `callDetectionApi`, `localNotificationOverride`,
   `base64NativePerformance`, `accessibility`,
