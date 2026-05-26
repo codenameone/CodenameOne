@@ -1,11 +1,10 @@
-        #import "com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitLanguageID/MLKLanguageIdentification.h>
+#import "com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitLanguageID/MLKLanguageIdentification.h>
 
+@implementation com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl
 
-        @implementation com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl
-
-        - (NSString *)identify:(NSString *)input {
+- (NSString *)identify:(NSString *)input {
     MLKLanguageIdentification *id = [MLKLanguageIdentification languageIdentification];
     __block NSString *result = @"und";
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
@@ -17,9 +16,8 @@
     return result;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

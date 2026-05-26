@@ -1,19 +1,11 @@
-        #import "com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h"
-        #import <UIKit/UIKit.h>
+#import "com_codename1_ai_whisper_NativeWhisperRecognizerImpl.h"
+#import <UIKit/UIKit.h>
 
+// whisper.cpp's C API. The cn1lib bundles the prebuilt static
+// library; linking against `libwhisper.a` is handled by the build
+// server (see codenameone_library_required.properties).
+struct whisper_context;
 
-        @implementation com_codename1_ai_whisper_NativeWhisperRecognizerImpl
-
-        // whisper.cpp ships a thin Obj-C wrapper around the C API. The cn1lib
-// bundles the prebuilt static library; this bridge invokes its C entry
-// points. Linking against `libwhisper.a` is handled by the build server.
-extern struct whisper_context *whisper_init_from_file(const char *path);
-extern int whisper_full(struct whisper_context *ctx,
-                        struct whisper_full_params params,
-                        const float *samples, int n_samples);
-extern int whisper_full_n_segments(struct whisper_context *ctx);
-extern const char *whisper_full_get_segment_text(struct whisper_context *ctx, int i);
-extern void whisper_free(struct whisper_context *ctx);
 struct whisper_full_params {
     int strategy;
     int n_threads;
@@ -28,6 +20,16 @@ struct whisper_full_params {
     int print_realtime;
     int print_timestamps;
 };
+
+extern struct whisper_context *whisper_init_from_file(const char *path);
+extern int whisper_full(struct whisper_context *ctx,
+                        struct whisper_full_params params,
+                        const float *samples, int n_samples);
+extern int whisper_full_n_segments(struct whisper_context *ctx);
+extern const char *whisper_full_get_segment_text(struct whisper_context *ctx, int i);
+extern void whisper_free(struct whisper_context *ctx);
+
+@implementation com_codename1_ai_whisper_NativeWhisperRecognizerImpl
 
 - (NSString *)transcribe:(NSString *)modelPath :(NSString *)audioPath {
     // Decode 16kHz mono PCM samples from a WAV file.
@@ -54,9 +56,8 @@ struct whisper_full_params {
     return out;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

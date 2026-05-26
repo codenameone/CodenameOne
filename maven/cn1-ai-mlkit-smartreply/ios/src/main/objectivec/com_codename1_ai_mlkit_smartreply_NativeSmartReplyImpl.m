@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitSmartReply/MLKSmartReply.h>
+#import "com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitSmartReply/MLKSmartReply.h>
 #import <MLKitSmartReply/MLKTextMessage.h>
 #import <MLKitSmartReply/MLKSmartReplySuggestion.h>
 #import <MLKitSmartReply/MLKSmartReplySuggestionResult.h>
 #import <arpa/inet.h>
 
+@implementation com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl
 
-        @implementation com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl
-
-        - (NSData *)suggest:(NSString *)conversationJson {
+- (NSData *)suggest:(NSString *)conversationJson {
     // conversationJson is an array of {role,message,timestamp,userId}.
     NSError *err = nil;
     NSArray *items = [NSJSONSerialization JSONObjectWithData:
@@ -58,9 +57,8 @@
     return out;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

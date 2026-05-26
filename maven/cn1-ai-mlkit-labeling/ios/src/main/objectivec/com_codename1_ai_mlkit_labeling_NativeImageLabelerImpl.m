@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitImageLabeling/MLKImageLabeler.h>
+#import "com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitImageLabeling/MLKImageLabeler.h>
 #import <MLKitImageLabeling/MLKImageLabelerOptions.h>
 #import <MLKitImageLabeling/MLKImageLabel.h>
 #import <MLKitVision/MLKVisionImage.h>
 #import <arpa/inet.h>
 
+@implementation com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl
 
-        @implementation com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl
-
-        - (NSData *)label:(NSData *)imageBytes {
+- (NSData *)label:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return [self packStrings:@[]];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -40,9 +39,8 @@
     return out;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

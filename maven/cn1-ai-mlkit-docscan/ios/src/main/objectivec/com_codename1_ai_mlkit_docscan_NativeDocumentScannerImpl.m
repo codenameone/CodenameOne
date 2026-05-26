@@ -1,11 +1,10 @@
-        #import "com_codename1_ai_mlkit_docscan_NativeDocumentScannerImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <CoreImage/CoreImage.h>
+#import "com_codename1_ai_mlkit_docscan_NativeDocumentScannerImpl.h"
+#import <UIKit/UIKit.h>
+#import <CoreImage/CoreImage.h>
 
+@implementation com_codename1_ai_mlkit_docscan_NativeDocumentScannerImpl
 
-        @implementation com_codename1_ai_mlkit_docscan_NativeDocumentScannerImpl
-
-        // VisionKit-based fallback: Apple's VNDocumentCameraViewController is
+// VisionKit-based fallback: Apple's VNDocumentCameraViewController is
 // interactive; this bridge accepts a pre-captured image and returns its
 // cropped JPEG path. On iOS 13+ VisionKit handles the live UI flow; the
 // sample app drives that flow and feeds the bytes into the cn1lib.
@@ -36,9 +35,8 @@
     return path;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

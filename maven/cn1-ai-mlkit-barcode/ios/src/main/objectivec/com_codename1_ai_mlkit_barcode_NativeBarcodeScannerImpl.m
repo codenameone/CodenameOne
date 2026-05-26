@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitBarcodeScanning/MLKBarcodeScanner.h>
+#import "com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitBarcodeScanning/MLKBarcodeScanner.h>
 #import <MLKitBarcodeScanning/MLKBarcodeScannerOptions.h>
 #import <MLKitBarcodeScanning/MLKBarcode.h>
 #import <MLKitVision/MLKVisionImage.h>
 #import <arpa/inet.h>
 
+@implementation com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl
 
-        @implementation com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl
-
-        - (NSData *)scan:(NSData *)imageBytes {
+- (NSData *)scan:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return [self packStrings:@[]];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -44,9 +43,8 @@
     return out;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

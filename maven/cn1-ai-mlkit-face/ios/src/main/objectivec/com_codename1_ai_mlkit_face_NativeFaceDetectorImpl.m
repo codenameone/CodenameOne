@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_face_NativeFaceDetectorImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitFaceDetection/MLKFaceDetector.h>
+#import "com_codename1_ai_mlkit_face_NativeFaceDetectorImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitFaceDetection/MLKFaceDetector.h>
 #import <MLKitFaceDetection/MLKFaceDetectorOptions.h>
 #import <MLKitFaceDetection/MLKFace.h>
 #import <MLKitVision/MLKVisionImage.h>
 #import <arpa/inet.h>
 
+@implementation com_codename1_ai_mlkit_face_NativeFaceDetectorImpl
 
-        @implementation com_codename1_ai_mlkit_face_NativeFaceDetectorImpl
-
-        - (NSData *)detect:(NSData *)imageBytes {
+- (NSData *)detect:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -32,9 +31,8 @@
     return out;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

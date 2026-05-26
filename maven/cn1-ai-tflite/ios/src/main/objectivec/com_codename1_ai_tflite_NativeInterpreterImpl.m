@@ -1,11 +1,10 @@
-        #import "com_codename1_ai_tflite_NativeInterpreterImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <TensorFlowLiteObjC/TFLTensorFlowLite.h>
+#import "com_codename1_ai_tflite_NativeInterpreterImpl.h"
+#import <UIKit/UIKit.h>
+#import <TensorFlowLiteObjC/TFLTensorFlowLite.h>
 
+@implementation com_codename1_ai_tflite_NativeInterpreterImpl
 
-        @implementation com_codename1_ai_tflite_NativeInterpreterImpl
-
-        - (NSData *)run:(NSData *)modelBytes :(NSData *)input :(int)outputLength {
+- (NSData *)run:(NSData *)modelBytes :(NSData *)input :(int)outputLength {
     NSError *err = nil;
     NSString *modelPath = [NSString stringWithFormat:@"%@/tflite-%@.tflite",
                            NSTemporaryDirectory(), [[NSUUID UUID] UUIDString]];
@@ -22,9 +21,8 @@
     return outBytes ?: [NSData data];
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

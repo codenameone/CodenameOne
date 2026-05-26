@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitSegmentationSelfie/MLKSelfieSegmenterOptions.h>
+#import "com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitSegmentationSelfie/MLKSelfieSegmenterOptions.h>
 #import <MLKitSegmentationCommon/MLKSegmenter.h>
 #import <MLKitSegmentationCommon/MLKSegmentationMask.h>
 #import <MLKitVision/MLKVisionImage.h>
 #import <CoreVideo/CoreVideo.h>
 
+@implementation com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl
 
-        @implementation com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl
-
-        - (NSData *)segment:(NSData *)imageBytes {
+- (NSData *)segment:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -39,9 +38,8 @@
     return result;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

@@ -82,6 +82,7 @@ class Lib:
     test_methods: str  # test method bodies; placeholder named MockBridge available
     build_hints: dict[str, str]
     test_mock_methods: str  # mock bridge method overrides
+    ios_pre_impl: str = ""  # C/Obj-C source emitted BEFORE @implementation
 
 
 def ni_class(facade: str) -> str:
@@ -499,23 +500,37 @@ def ios_native_h(pkg: str, facade: str) -> str:
         """)
 
 
-def ios_native_m(pkg: str, facade: str, extra_imports: str, body: str) -> str:
+def ios_native_m(pkg: str, facade: str, extra_imports: str, body: str,
+                  pre_impl: str = "") -> str:
+    """Build the Obj-C .m source for a NativeInterface bridge.
+
+    `pre_impl` is C/Obj-C source that must sit OUTSIDE the @implementation
+    block -- typically extern declarations and supporting struct definitions
+    for cn1libs that link to a native C library (whisper.cpp, Stable
+    Diffusion runner). They cannot live inside @implementation because Obj-C
+    only allows method definitions there.
+    """
     cls = "com_codename1_ai_" + pkg.replace(".", "_") + "_" + ni_class(facade) + "Impl"
-    return textwrap.dedent(f"""\
-        #import "{cls}.h"
-        #import <UIKit/UIKit.h>
-        {extra_imports}
-
-        @implementation {cls}
-
-        {body}
-
-        -(BOOL)isSupported {{
-            return YES;
-        }}
-
-        @end
-        """)
+    out = []
+    out.append(f"#import \"{cls}.h\"")
+    out.append("#import <UIKit/UIKit.h>")
+    if extra_imports.strip():
+        out.append(extra_imports.rstrip())
+    if pre_impl.strip():
+        out.append("")
+        out.append(pre_impl.rstrip())
+    out.append("")
+    out.append(f"@implementation {cls}")
+    out.append("")
+    out.append(body.rstrip())
+    out.append("")
+    out.append("- (BOOL)isSupported {")
+    out.append("    return YES;")
+    out.append("}")
+    out.append("")
+    out.append("@end")
+    out.append("")
+    return "\n".join(out)
 
 
 def android_native_java(pkg: str, facade: str, extra_imports: str, body: str) -> str:
@@ -2129,17 +2144,12 @@ def lib_whisper() -> Lib:
         }
         """)
     ni_methods = "String transcribe(String modelPath, String audioPath);\n"
-    ios_impl = textwrap.dedent("""\
-        // whisper.cpp ships a thin Obj-C wrapper around the C API. The cn1lib
-        // bundles the prebuilt static library; this bridge invokes its C entry
-        // points. Linking against `libwhisper.a` is handled by the build server.
-        extern struct whisper_context *whisper_init_from_file(const char *path);
-        extern int whisper_full(struct whisper_context *ctx,
-                                struct whisper_full_params params,
-                                const float *samples, int n_samples);
-        extern int whisper_full_n_segments(struct whisper_context *ctx);
-        extern const char *whisper_full_get_segment_text(struct whisper_context *ctx, int i);
-        extern void whisper_free(struct whisper_context *ctx);
+    ios_pre_impl = textwrap.dedent("""\
+        // whisper.cpp's C API. The cn1lib bundles the prebuilt static
+        // library; linking against `libwhisper.a` is handled by the build
+        // server (see codenameone_library_required.properties).
+        struct whisper_context;
+
         struct whisper_full_params {
             int strategy;
             int n_threads;
@@ -2155,6 +2165,15 @@ def lib_whisper() -> Lib:
             int print_timestamps;
         };
 
+        extern struct whisper_context *whisper_init_from_file(const char *path);
+        extern int whisper_full(struct whisper_context *ctx,
+                                struct whisper_full_params params,
+                                const float *samples, int n_samples);
+        extern int whisper_full_n_segments(struct whisper_context *ctx);
+        extern const char *whisper_full_get_segment_text(struct whisper_context *ctx, int i);
+        extern void whisper_free(struct whisper_context *ctx);
+        """)
+    ios_impl = textwrap.dedent("""\
         - (NSString *)transcribe:(NSString *)modelPath :(NSString *)audioPath {
             // Decode 16kHz mono PCM samples from a WAV file.
             NSData *wav = [NSData dataWithContentsOfFile:audioPath];
@@ -2223,6 +2242,7 @@ def lib_whisper() -> Lib:
         ni_methods=ni_methods,
         ios_impl=ios_impl,
         ios_imports=ios_imports,
+        ios_pre_impl=ios_pre_impl,
         android_imports="",
         android_impl=android_impl,
         javase_impl=javase_impl,
@@ -2274,12 +2294,14 @@ def lib_stablediffusion() -> Lib:
         }
         """)
     ni_methods = "byte[] generate(String prompt, int width, int height, int steps);\n"
-    ios_impl = textwrap.dedent("""\
+    ios_pre_impl = textwrap.dedent("""\
         // Apple's StableDiffusion swift package compiled into the app as
-        // `CN1StableDiffusionRunner.swift` (shipped via the cn1lib). The Obj-C
-        // bridge invokes a thin C-callable wrapper around the Swift runner.
+        // `CN1StableDiffusionRunner.swift` (shipped via the cn1lib). The
+        // Obj-C bridge invokes a thin C-callable wrapper around the Swift
+        // runner.
         extern NSData *cn1_sd_generate(const char *prompt, int w, int h, int steps);
-
+        """)
+    ios_impl = textwrap.dedent("""\
         - (NSData *)generate:(NSString *)prompt :(int)width :(int)height :(int)steps {
             return cn1_sd_generate([prompt UTF8String], width, height, steps);
         }
@@ -2334,6 +2356,7 @@ def lib_stablediffusion() -> Lib:
         ni_methods=ni_methods,
         ios_impl=ios_impl,
         ios_imports=ios_imports,
+        ios_pre_impl=ios_pre_impl,
         android_imports="",
         android_impl=android_impl,
         javase_impl=javase_impl,
@@ -2412,7 +2435,8 @@ def generate(lib: Lib) -> None:
     cls_basename = "com_codename1_ai_" + lib.pkg.replace(".", "_") + "_" + ni_class(lib.facade) + "Impl"
     write(ios_native / f"{cls_basename}.h", ios_native_h(lib.pkg, lib.facade))
     write(ios_native / f"{cls_basename}.m",
-          ios_native_m(lib.pkg, lib.facade, lib.ios_imports, lib.ios_impl))
+          ios_native_m(lib.pkg, lib.facade, lib.ios_imports, lib.ios_impl,
+                       lib.ios_pre_impl))
 
     # Android sources.
     android_pkg_root = base / "android" / "src" / "main" / "java" / pkg_path

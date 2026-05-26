@@ -1,15 +1,14 @@
-        #import "com_codename1_ai_mlkit_pose_NativePoseDetectorImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitPoseDetection/MLKPoseDetector.h>
+#import "com_codename1_ai_mlkit_pose_NativePoseDetectorImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitPoseDetection/MLKPoseDetector.h>
 #import <MLKitPoseDetection/MLKPoseDetectorOptions.h>
 #import <MLKitPoseDetection/MLKPose.h>
 #import <MLKitPoseDetection/MLKPoseLandmark.h>
 #import <MLKitVision/MLKVisionImage.h>
 
+@implementation com_codename1_ai_mlkit_pose_NativePoseDetectorImpl
 
-        @implementation com_codename1_ai_mlkit_pose_NativePoseDetectorImpl
-
-        - (NSData *)detect:(NSData *)imageBytes {
+- (NSData *)detect:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -35,9 +34,8 @@
     return [NSData dataWithBytes:buf length:sizeof(buf)];
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

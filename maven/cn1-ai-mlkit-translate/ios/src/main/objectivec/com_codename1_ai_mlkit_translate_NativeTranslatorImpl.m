@@ -1,13 +1,12 @@
-        #import "com_codename1_ai_mlkit_translate_NativeTranslatorImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitTranslate/MLKTranslator.h>
+#import "com_codename1_ai_mlkit_translate_NativeTranslatorImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitTranslate/MLKTranslator.h>
 #import <MLKitTranslate/MLKTranslatorOptions.h>
 #import <MLKitCommon/MLKModelDownloadConditions.h>
 
+@implementation com_codename1_ai_mlkit_translate_NativeTranslatorImpl
 
-        @implementation com_codename1_ai_mlkit_translate_NativeTranslatorImpl
-
-        - (NSString *)translate:(NSString *)text :(NSString *)sourceLang :(NSString *)targetLang {
+- (NSString *)translate:(NSString *)text :(NSString *)sourceLang :(NSString *)targetLang {
     MLKTranslatorOptions *opts = [[MLKTranslatorOptions alloc]
                                   initWithSourceLanguage:sourceLang
                                   targetLanguage:targetLang];
@@ -28,9 +27,8 @@
     return result;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end

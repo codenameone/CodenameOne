@@ -1,14 +1,13 @@
-        #import "com_codename1_ai_mlkit_text_NativeTextRecognizerImpl.h"
-        #import <UIKit/UIKit.h>
-        #import <MLKitTextRecognition/MLKTextRecognizer.h>
+#import "com_codename1_ai_mlkit_text_NativeTextRecognizerImpl.h"
+#import <UIKit/UIKit.h>
+#import <MLKitTextRecognition/MLKTextRecognizer.h>
 #import <MLKitTextRecognition/MLKTextRecognizerOptions.h>
 #import <MLKitVision/MLKVisionImage.h>
 #import <MLKitVision/MLKText.h>
 
+@implementation com_codename1_ai_mlkit_text_NativeTextRecognizerImpl
 
-        @implementation com_codename1_ai_mlkit_text_NativeTextRecognizerImpl
-
-        - (NSString *)recognize:(NSData *)imageBytes {
+- (NSString *)recognize:(NSData *)imageBytes {
     UIImage *image = [UIImage imageWithData:imageBytes];
     if (!image) return @"";
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
@@ -28,9 +27,8 @@
     return result;
 }
 
+- (BOOL)isSupported {
+    return YES;
+}
 
-        -(BOOL)isSupported {
-            return YES;
-        }
-
-        @end
+@end
