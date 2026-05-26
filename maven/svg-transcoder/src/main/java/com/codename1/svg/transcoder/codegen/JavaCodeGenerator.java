@@ -463,7 +463,15 @@ public final class JavaCodeGenerator {
                 line("int __tx = (int)" + floatLit(text.getX()) + ";");
                 break;
         }
-        line("g.drawStringBaseline(" + content + ", __tx, (int)" + floatLit(text.getY()) + ");");
+        // Use Graphics.drawString rather than drawStringBaseline because the
+        // baseline-positioned variant misrenders under a non-identity
+        // transform on the iOS Metal port (the logo text was invisible).
+        // SVG text.y is the baseline; drawString takes the top-left, so
+        // subtract the font ascent. Falls back to height-ish when ascent
+        // is unavailable.
+        line("int __ascent = __font.getAscent();");
+        line("if (__ascent <= 0) { __ascent = __font.getHeight(); }");
+        line("g.drawString(" + content + ", __tx, (int)" + floatLit(text.getY()) + " - __ascent);");
         line("g.setFont(__oldFont);");
         indent--;
         line("}");

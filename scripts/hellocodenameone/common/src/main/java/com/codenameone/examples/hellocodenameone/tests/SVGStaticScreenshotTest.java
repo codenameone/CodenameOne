@@ -4,7 +4,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.Resources;
 
@@ -46,7 +46,10 @@ public class SVGStaticScreenshotTest extends BaseTest {
     public boolean runTest() throws Exception {
         Resources res = resolveGlobalResources();
 
-        Form form = createForm("Static SVG (theme.getImage)", BoxLayout.y(), "SVGStatic");
+        // 2x3 grid so every transcoded SVG fits in a single screenshot
+        // capture -- a BoxLayout.y stacked the entries off the bottom of
+        // the iOS / Android viewport and the user only saw the first three.
+        Form form = createForm("Static SVG (theme.getImage)", new GridLayout(3, 2), "SVGStatic");
         form.add(label("star.svg", res == null ? null : res.getImage("star.svg")));
         form.add(label("gradient_circle.svg", res == null ? null : res.getImage("gradient_circle.svg")));
         form.add(label("path_arrow.svg", res == null ? null : res.getImage("path_arrow.svg")));
