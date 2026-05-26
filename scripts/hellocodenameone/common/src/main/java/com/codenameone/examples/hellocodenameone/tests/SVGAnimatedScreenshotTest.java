@@ -28,30 +28,33 @@ public class SVGAnimatedScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
         long pinned = 1_000_000L;
-        try {
-            // Pin the clock before constructing the images so their first paint
-            // sees the start timestamp == pinned. The actual frame is captured
-            // at pinned + FRAME_OFFSET_MS (set just before form.show()).
-            AnimationTime.setTime(pinned);
-            GeneratedSVGImage spinner = new com.codename1.generated.svg.SpinnerAnimated();
-            GeneratedSVGImage pulse = new com.codename1.generated.svg.PulsingCircle();
+        // Pin the clock before constructing the images so their first paint
+        // sees the start timestamp == pinned. The actual frame is captured at
+        // pinned + FRAME_OFFSET_MS (set just before form.show()).
+        AnimationTime.setTime(pinned);
+        GeneratedSVGImage spinner = new com.codename1.generated.svg.SpinnerAnimated();
+        GeneratedSVGImage pulse = new com.codename1.generated.svg.PulsingCircle();
 
-            Form form = createForm("Animated SVG", BoxLayout.y(), "SVGAnimated");
-            form.add(label("Spinner @ " + FRAME_OFFSET_MS + " ms", spinner));
-            form.add(label("Pulse @ " + FRAME_OFFSET_MS + " ms", pulse));
+        Form form = createForm("Animated SVG", BoxLayout.y(), "SVGAnimated");
+        form.add(label("Spinner @ " + FRAME_OFFSET_MS + " ms", spinner));
+        form.add(label("Pulse @ " + FRAME_OFFSET_MS + " ms", pulse));
 
-            // Advance so progress() returns the desired fraction during paint.
-            AnimationTime.setTime(pinned + FRAME_OFFSET_MS);
-            form.show();
-        } catch (RuntimeException ex) {
-            AnimationTime.reset();
-            throw ex;
-        }
-        // BaseTest.createForm registers an async screenshot callback that fires
-        // ~1.5s after show. The clock stays pinned through that window; the
-        // next test (or any production code) can call AnimationTime.reset()
-        // when they need wall-clock semantics back.
+        // Advance so progress() returns the desired fraction during paint.
+        // The pinned clock stays in place for ~1.5s while the screenshot
+        // framework captures the form; cleanup() releases it afterwards so
+        // subsequent tests get wall-clock semantics back.
+        AnimationTime.setTime(pinned + FRAME_OFFSET_MS);
+        form.show();
         return true;
+    }
+
+    @Override
+    public void cleanup() {
+        try {
+            AnimationTime.reset();
+        } finally {
+            super.cleanup();
+        }
     }
 
     private Label label(String text, GeneratedSVGImage img) {

@@ -204,6 +204,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // Build-time SVG transcoder coverage: the static test renders
+            // shapes / gradients / paths, the animated test pins
+            // AnimationTime so the captured frame is deterministic.
+            new SVGStaticScreenshotTest(),
+            new SVGAnimatedScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
