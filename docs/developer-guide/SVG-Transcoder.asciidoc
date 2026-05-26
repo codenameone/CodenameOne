@@ -1,25 +1,29 @@
 = Build-Time SVG Images
 :source-highlighter: highlight.js
 
-This chapter documents the build-time SVG transcoder introduced in
-Codename One 8.0. It lets you author UI icons / illustrations as SVG and
-have them rendered as native Codename One `Image` instances on every
-platform (iOS, Android, JavaSE simulator, JavaScript) without ever
-shipping a runtime SVG parser.
+The build-time SVG transcoder lets you author UI icons and
+illustrations as SVG and have them rendered as native Codename One
+`Image` instances on every platform (iOS, Android, JavaSE simulator,
+JavaScript) without shipping a runtime SVG parser.
 
 == Motivation
 
-Codename One has historically supported SVG only on platforms with a
-native SVG implementation (Android via SVG support, iOS via
-`createSVGImage` on a few backends). PNG raster assets are the universal
-fallback, which forces you to ship multiple density buckets for every
-icon and gives up the resolution-independence that SVG was designed for.
+Codename One's older `Image.createSVG()` API depends on a per-platform
+native SVG renderer that ships only on a couple of backends (J2ME and
+the JavaSE simulator); iOS and Android applications fall back to PNG
+multi-image buckets, giving up the resolution-independence that SVG was
+designed for. The
+https://github.com/codenameone/flamingo-svg-transcoder[legacy Flamingo
+SVG transcoder] was a precursor to this work -- a build-time tool that
+emitted Java drawing code from an SVG -- but it pre-dated CN1's affine
+transform pipeline and was missing a Maven hook, CSS integration,
+animations, and most of the SVG spec.
 
-The build-time transcoder closes the gap: each SVG file is parsed at
-build time, converted into a Java class that subclasses
-`com.codename1.ui.GeneratedSVGImage`, and rendered through the standard
-`Graphics` shape API. The same vector source produces pixel-perfect
-output at any size on every port.
+This transcoder is its successor and covers each of those gaps. Every
+SVG you drop into `src/main/css/` is parsed by `codenameone-svg-transcoder`,
+emitted as a Java class that subclasses `com.codename1.ui.GeneratedSVGImage`,
+and rendered through the standard `Graphics` shape API. The same vector
+source produces pixel-perfect output at any size on every port.
 
 == Quick start
 
@@ -204,7 +208,10 @@ SMIL animation subset:
 | `<animate>` (numeric attributes) | Full
 | `<animateTransform type="translate \| scale \| rotate">` | Full
 | `<set>` (instant value snap) | Full
-| Text, masks, clip-path, filters | Not supported in v1
+| `<text>` / `<tspan>` (single-style fills, transforms) | Supported
+| `<clipPath>` referenced via `clip-path="url(#id)"` | Supported (rect/circle/path); nested clip refs ignored
+| `<mask>` | Treated as clip -- alpha masking falls back to opaque
+| SVG `filter` primitives | Not supported
 | CSS-keyframe animations | Not supported (SMIL only)
 |===
 

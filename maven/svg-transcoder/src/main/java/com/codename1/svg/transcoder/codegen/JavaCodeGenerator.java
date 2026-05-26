@@ -42,6 +42,7 @@ public final class JavaCodeGenerator {
         if (packageName != null && !packageName.isEmpty()) {
             src.append("package ").append(packageName).append(";\n\n");
         }
+        src.append("import com.codename1.ui.Font;\n");
         src.append("import com.codename1.ui.GeneratedSVGImage;\n");
         src.append("import com.codename1.ui.Graphics;\n");
         src.append("import com.codename1.ui.LinearGradientPaint;\n");
@@ -147,6 +148,8 @@ public final class JavaCodeGenerator {
                 emitPolyline((SVGPolyline) n, inherited, anims);
             } else if (n instanceof SVGPath) {
                 emitPath((SVGPath) n, inherited, anims);
+            } else if (n instanceof SVGText) {
+                emitText((SVGText) n, inherited, anims);
             }
         } finally {
             if (needsTransform) {
@@ -290,6 +293,69 @@ public final class JavaCodeGenerator {
             }
         }
         emitFillAndStroke(style, anims);
+    }
+
+    private void emitText(SVGText text, SVGStyle style, List<SVGAnimation> anims) {
+        if (text.getContent() == null || text.getContent().isEmpty()) {
+            return;
+        }
+        SVGPaint fill = style.getFill() != null ? style.getFill() : SVGPaint.BLACK;
+        if (fill.isNone()) {
+            return;
+        }
+        AnimatedFloat fillOpacity = animFloat("fill-opacity",
+                style.getFillOpacity() == null ? 1f : style.getFillOpacity(), anims);
+        AnimatedFloat elementOpacity = animFloat("opacity",
+                style.getOpacity() == null ? 1f : style.getOpacity(), anims);
+
+        float size = text.getFontSize() > 0 ? text.getFontSize() : 12f;
+        int styleConst = (text.isBold() ? 1 : 0) | (text.isItalic() ? 2 : 0);
+        // Font.STYLE_PLAIN = 0, STYLE_BOLD = 1, STYLE_ITALIC = 2
+
+        line("{");
+        indent++;
+        line("Font __font = Font.getDefaultFont().derive(" + floatLit(size) + ", " + styleConst + ");");
+        line("Font __oldFont = g.getFont();");
+        line("g.setFont(__font);");
+        emitPaintSet(fill, fillOpacity, elementOpacity);
+        String content = "\"" + escapeJavaString(text.getContent()) + "\"";
+        switch (text.getAnchor()) {
+            case MIDDLE:
+                line("int __tx = (int)" + floatLit(text.getX()) + " - __font.stringWidth(" + content + ") / 2;");
+                break;
+            case END:
+                line("int __tx = (int)" + floatLit(text.getX()) + " - __font.stringWidth(" + content + ");");
+                break;
+            case START:
+            default:
+                line("int __tx = (int)" + floatLit(text.getX()) + ";");
+                break;
+        }
+        line("g.drawStringBaseline(" + content + ", __tx, (int)" + floatLit(text.getY()) + ");");
+        line("g.setFont(__oldFont);");
+        indent--;
+        line("}");
+    }
+
+    private static String escapeJavaString(String s) {
+        StringBuilder out = new StringBuilder(s.length() + 4);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': out.append("\\\\"); break;
+                case '"':  out.append("\\\""); break;
+                case '\n': out.append("\\n"); break;
+                case '\r': out.append("\\r"); break;
+                case '\t': out.append("\\t"); break;
+                default:
+                    if (c < 0x20 || c > 0x7E) {
+                        out.append(String.format("\\u%04X", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+        return out.toString();
     }
 
     // ---- fill / stroke -----------------------------------------------------

@@ -6,44 +6,41 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
 
 /**
- * Exercises the full build-time SVG transcoder stack end-to-end as a
- * developer would use it:
+ * End-to-end test for the build-time SVG transcoder. Demonstrates the
+ * full developer-facing flow:
  *
  * <ol>
  *   <li>{@code theme.css} declares
  *       {@code background: url(star.svg); cn1-source-dpi: very-high;} on
  *       several styles -- standard CSS authoring, no Java-side hardcoding.</li>
- *   <li>The {@code transcode-svg} mojo (auto-bound to {@code generate-sources}
- *       in the cn1app archetype) emits one {@code GeneratedSVGImage} subclass
- *       per .svg file plus a {@code SVGRegistry} that records the CSS
- *       density hint per image.</li>
+ *   <li>The {@code transcode-svg} mojo (auto-bound in the cn1app archetype)
+ *       emits one {@code GeneratedSVGImage} subclass per .svg file plus a
+ *       {@code SVGRegistry} that records the CSS density / mm hint per
+ *       image.</li>
  *   <li>The {@code css} goal lays down a 1x1 transparent PNG placeholder so
  *       the CSS compiler can complete; the theme stores the SVG name in the
  *       resource bundle.</li>
- *   <li>At runtime this test calls {@code SVGRegistry.install(globalRes)}
- *       which replaces every placeholder with the transcoded SVG, then it
- *       asks {@code Resources.getGlobalResources().getImage("star.svg")} --
- *       the same call any user code in this app would make.</li>
+ *   <li>The framework picks up the registry automatically:
+ *       {@code Resources.open} does a {@code Class.forName} on
+ *       {@code com.codename1.generated.svg.SVGRegistry}; the registry's
+ *       static initializer registers an open hook with {@code Resources}
+ *       and the hook runs on the same load, replacing every PNG
+ *       placeholder with the transcoded SVG. No glue code is required
+ *       in app land.</li>
+ *   <li>This test then does what any user code in this app would do:
+ *       {@code Resources.getGlobalResources().getImage("star.svg")}.</li>
  * </ol>
  *
- * <p>Anything other than {@code Resources.getImage(name)} on the production
- * resource bundle here would defeat the point of the test: the value of the
- * transcoder is that CSS-referenced SVGs are interchangeable with PNGs from
- * the developer's perspective.</p>
+ * <p>If this test calls {@code SVGRegistry.install(...)} explicitly it
+ * has failed the point of the test: the registry is supposed to be
+ * seamless to the developer.</p>
  */
 public class SVGStaticScreenshotTest extends BaseTest {
-
-    @Override
-    public void prepare() {
-        super.prepare();
-        installSVGRegistry();
-    }
 
     @Override
     public boolean runTest() throws Exception {
@@ -70,9 +67,9 @@ public class SVGStaticScreenshotTest extends BaseTest {
     }
 
     /** Locate the project's global Resources bundle. The framework normally
-     *  loads the default theme into the global slot at app init; for the test
-     *  harness we fall back to opening the bundled theme.res by class-relative
-     *  path and remembering it as the global. */
+     *  loads the default theme into the global slot at app init; if it
+     *  hasn't (or this test is run in isolation), open the bundled
+     *  theme.res by class-relative path and remember it. */
     static Resources resolveGlobalResources() {
         Resources r = Resources.getGlobalResources();
         if (r != null) {
@@ -94,18 +91,6 @@ public class SVGStaticScreenshotTest extends BaseTest {
         } finally {
             try { if (in != null) in.close(); } catch (Throwable ignored) { /* no-op */ }
         }
-        // Last resort -- give up; the caller has to handle null. The
-        // SVGRegistry's global fallback still resolves direct
-        // Resources.registerGeneratedImage lookups, so user code that
-        // doesn't pre-load a theme still gets the SVGs.
         return null;
-    }
-
-    /** Install all transcoded SVGs into the global Resources by calling the
-     *  build-generated registry directly. This is the same call user code
-     *  is expected to make once at app init -- see the developer guide. */
-    static void installSVGRegistry() {
-        Resources r = resolveGlobalResources();
-        com.codename1.generated.svg.SVGRegistry.install(r);
     }
 }

@@ -19,9 +19,14 @@ final class SVGScaledView extends Image {
 
     SVGScaledView(GeneratedSVGImage source, int width, int height) {
         super(null);
+        if (width < 1 || height < 1) {
+            throw new IllegalArgumentException(
+                    "scaled() requires positive dimensions; got width=" + width
+                            + " height=" + height);
+        }
         this.source = source;
-        this.width = width < 1 ? 1 : width;
-        this.height = height < 1 ? 1 : height;
+        this.width = width;
+        this.height = height;
     }
 
     @Override

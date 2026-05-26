@@ -99,6 +99,32 @@ public class SVGParserTest {
     }
 
     @Test
+    public void textElementParsed() throws Exception {
+        SVGDocument d = parse("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 50'>"
+                + "<text x='10' y='40' font-size='24' font-weight='bold' "
+                + "text-anchor='middle' font-family='Arial' fill='blue'>Hi <tspan>world</tspan></text>"
+                + "</svg>");
+        assertEquals(1, d.getChildren().size());
+        SVGText t = (SVGText) d.getChildren().get(0);
+        assertEquals(10f, t.getX(), 0f);
+        assertEquals(40f, t.getY(), 0f);
+        assertEquals(24f, t.getFontSize(), 0f);
+        assertEquals(SVGText.Anchor.MIDDLE, t.getAnchor());
+        assertTrue("font-weight=bold should set bold", t.isBold());
+        assertEquals("Arial", t.getFontFamily());
+        assertEquals("tspan content is flattened into parent text", "Hi world", t.getContent());
+        assertEquals(0xFF0000FF, t.getStyle().getFill().getColor());
+    }
+
+    @Test
+    public void textWithNumericFontWeight() throws Exception {
+        SVGDocument d = parse("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'>"
+                + "<text x='0' y='10' font-weight='700'>x</text></svg>");
+        SVGText t = (SVGText) d.getChildren().get(0);
+        assertTrue("font-weight=700 is bold", t.isBold());
+    }
+
+    @Test
     public void styleAttributeParsed() throws Exception {
         SVGDocument d = parse("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'>"
                 + "<rect x='0' y='0' width='10' height='10' style='fill:#ABCDEF;stroke:none;opacity:0.5'/></svg>");

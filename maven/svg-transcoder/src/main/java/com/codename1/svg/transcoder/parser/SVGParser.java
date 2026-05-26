@@ -123,6 +123,9 @@ public final class SVGParser {
                 SVGPath path = readPath(r);
                 parent.addChild(path);
                 readNestedAnimations(r, path);
+            } else if ("text".equals(name)) {
+                SVGText text = readText(r);
+                parent.addChild(text);
             } else if ("linearGradient".equals(name)) {
                 SVGLinearGradient lg = readLinearGradient(r);
                 if (lg.getId() != null) doc.getDefinitions().put(lg.getId(), lg);
@@ -220,6 +223,66 @@ public final class SVGParser {
             s.setPoints(arr);
         }
         return s;
+    }
+
+    private SVGText readText(XMLStreamReader r) throws XMLStreamException {
+        SVGText t = new SVGText();
+        Map<String, String> a = attrs(r);
+        applyCommon(t, a);
+        t.setX(NumberParser.parseFloat(a.get("x")));
+        t.setY(NumberParser.parseFloat(a.get("y")));
+        String anchor = mergedValue(a, "text-anchor");
+        if (anchor != null) {
+            String norm = anchor.trim().toLowerCase();
+            if ("middle".equals(norm)) t.setAnchor(SVGText.Anchor.MIDDLE);
+            else if ("end".equals(norm)) t.setAnchor(SVGText.Anchor.END);
+        }
+        String family = mergedValue(a, "font-family");
+        if (family != null) {
+            t.setFontFamily(family.trim());
+        }
+        String size = mergedValue(a, "font-size");
+        if (size != null) {
+            try { t.setFontSize(NumberParser.parseFloat(size)); } catch (RuntimeException ignored) { /* default 0 */ }
+        }
+        String weight = mergedValue(a, "font-weight");
+        if (weight != null) {
+            String w = weight.trim().toLowerCase();
+            t.setBold("bold".equals(w) || "bolder".equals(w) || isNumericGte(w, 600));
+        }
+        String style = mergedValue(a, "font-style");
+        if (style != null) {
+            String s = style.trim().toLowerCase();
+            t.setItalic("italic".equals(s) || "oblique".equals(s));
+        }
+        // Collect character data; flatten any <tspan> by recursing into its text.
+        StringBuilder content = new StringBuilder();
+        readTextContent(r, content);
+        t.setContent(content.toString());
+        return t;
+    }
+
+    private void readTextContent(XMLStreamReader r, StringBuilder out) throws XMLStreamException {
+        while (r.hasNext()) {
+            int ev = r.next();
+            if (ev == XMLStreamConstants.END_ELEMENT) {
+                return;
+            }
+            if (ev == XMLStreamConstants.CHARACTERS || ev == XMLStreamConstants.CDATA) {
+                out.append(r.getText());
+            } else if (ev == XMLStreamConstants.START_ELEMENT) {
+                // tspan / textPath / etc. -- flatten the textual content.
+                readTextContent(r, out);
+            }
+        }
+    }
+
+    private static boolean isNumericGte(String s, int threshold) {
+        try {
+            return Integer.parseInt(s) >= threshold;
+        } catch (NumberFormatException nfe) {
+            return false;
+        }
     }
 
     private SVGPath readPath(XMLStreamReader r) {

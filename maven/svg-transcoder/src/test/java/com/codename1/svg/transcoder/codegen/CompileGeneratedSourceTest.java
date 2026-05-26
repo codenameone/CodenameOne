@@ -83,6 +83,15 @@ public class CompileGeneratedSourceTest {
     }
 
     @Test
+    public void textCompiles() throws Exception {
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80'>"
+                + "<text x='10' y='40' font-size='24' fill='red'>Hello</text>"
+                + "<text x='100' y='40' font-size='18' font-weight='bold' text-anchor='middle'>Logo</text>"
+                + "<text x='190' y='70' font-size='12' font-style='italic' text-anchor='end' fill='#005599'>v1.0</text>"
+                + "</svg>", "Texty");
+    }
+
+    @Test
     public void animationCompiles() throws Exception {
         compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
                 + "<circle cx='50' cy='50' r='10' fill='red'>"

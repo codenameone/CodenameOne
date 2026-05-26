@@ -25,12 +25,6 @@ public class SVGAnimatedScreenshotTest extends AbstractAnimationScreenshotTest {
     private Image pulse;
 
     @Override
-    public void prepare() {
-        super.prepare();
-        SVGStaticScreenshotTest.installSVGRegistry();
-    }
-
-    @Override
     protected int getAnimationDurationMillis() {
         return ANIM_DURATION_MS;
     }

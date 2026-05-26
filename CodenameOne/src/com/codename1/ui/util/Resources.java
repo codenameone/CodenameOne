@@ -123,6 +123,19 @@ public class Resources {
     /// ("home") so CSS-style `url(home.svg)` references and direct
     /// `getImage("home")` calls both resolve to the same instance.
     private static final Map<String, Image> generatedImages = new HashMap<String, Image>();
+
+    /// Hooks invoked on every Resources instance after it finishes loading.
+    /// Used by the build-time SVG transcoder so its generated registry can
+    /// install transcoded images into freshly-loaded theme bundles without
+    /// the developer writing any glue code.
+    private static final List<OpenHook> openHooks = new ArrayList<OpenHook>();
+
+    /// Whether the optional SVG registry has been probed. Resources tries to
+    /// load `com.codename1.generated.svg.SVGRegistry` via `Class.forName` the
+    /// first time a Resources bundle opens; ParparVM treats the literal-class
+    /// reference as a reachability root, so the generated class is included
+    /// in iOS builds without any reflective method calls.
+    private static volatile boolean svgRegistryProbed;
     /// Hashtable containing the mapping between element types and their names in the
     /// resource hashtable
     private final HashMap<String, Byte> resourceTypes = new HashMap<String, Byte>();
@@ -143,6 +156,66 @@ public class Resources {
     Resources(InputStream input, int dpi) throws IOException {
         this.dpi = dpi;
         openFile(input);
+        probeSVGRegistry();
+        fireOpenHooks();
+    }
+
+    /// Callback fired by [Resources] every time a bundle finishes loading.
+    /// Used by the build-time SVG transcoder to install transcoded images
+    /// into the freshly-opened bundle. Hooks are invoked in registration
+    /// order; throwing is permitted but the loaded Resources is still
+    /// returned to the caller.
+    public interface OpenHook {
+        void onResourcesLoaded(Resources r);
+    }
+
+    /// Register a hook to be invoked on every [Resources] bundle that opens
+    /// after this call. Calling this from a class's static initializer is
+    /// the intended pattern -- the build-generated `SVGRegistry` does exactly
+    /// that, so the moment the class is loaded its hook starts firing on
+    /// every Resources.open.
+    public static void registerOpenHook(OpenHook hook) {
+        if (hook == null) {
+            return;
+        }
+        synchronized (openHooks) {
+            openHooks.add(hook);
+        }
+    }
+
+    private void fireOpenHooks() {
+        OpenHook[] snapshot;
+        synchronized (openHooks) {
+            if (openHooks.isEmpty()) {
+                return;
+            }
+            snapshot = openHooks.toArray(new OpenHook[0]);
+        }
+        for (OpenHook h : snapshot) {
+            try {
+                h.onResourcesLoaded(this);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+    }
+
+    /// Force-load the optional SVG registry once. ParparVM tracks Class.forName
+    /// string-literal references, so naming the registry here keeps the
+    /// generated class alive in the iOS binary even though no other code in
+    /// the framework references it directly. We deliberately avoid
+    /// getMethod/invoke -- the registry's static initializer does all the
+    /// wiring via [#registerOpenHook] and [#registerGeneratedImage].
+    private static void probeSVGRegistry() {
+        if (svgRegistryProbed) {
+            return;
+        }
+        svgRegistryProbed = true;
+        try {
+            Class.forName("com.codename1.generated.svg.SVGRegistry");
+        } catch (Throwable noRegistry) {
+            // App has no transcoded SVGs -- nothing to install.
+        }
     }
 
     /// #### Returns

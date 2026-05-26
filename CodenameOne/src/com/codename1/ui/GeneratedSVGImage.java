@@ -135,11 +135,18 @@ public abstract class GeneratedSVGImage extends Image {
                                 boolean animated,
                                 int explicitWidth, int explicitHeight) {
         super(null);
+        if (explicitWidth < 1 || explicitHeight < 1) {
+            throw new IllegalArgumentException(
+                    "SVG dimensions must be >= 1 pixel; got width=" + explicitWidth
+                            + " height=" + explicitHeight
+                            + ". Check the cn1-svg-width / cn1-svg-height CSS hint --"
+                            + " a 0.something mm value rounds down to 0 pixels.");
+        }
         this.intrinsicWidth = intrinsicWidth;
         this.intrinsicHeight = intrinsicHeight;
         this.sourceDensity = 0;
-        this.width = Math.max(1, explicitWidth);
-        this.height = Math.max(1, explicitHeight);
+        this.width = explicitWidth;
+        this.height = explicitHeight;
         this.viewBoxX = viewBoxX;
         this.viewBoxY = viewBoxY;
         this.viewBoxWidth = viewBoxWidth <= 0 ? intrinsicWidth : viewBoxWidth;
@@ -149,16 +156,28 @@ public abstract class GeneratedSVGImage extends Image {
 
     /// Convert a length in millimeters to device pixels using the current
     /// [Display] DPI. Provided as a static helper for the generated subclass
-    /// constructors that accept mm-typed dimensions. Falls back to treating
+    /// constructors that accept mm-typed dimensions. Throws
+    /// [IllegalArgumentException] for `mm <= 0` -- callers should never pin
+    /// an SVG to a zero-or-negative physical size. Falls back to treating
     /// the input as a literal pixel count when [Display] is not initialized
     /// (e.g. during unit tests that construct an image before
     /// `Display.init()` has run).
     public static int mmToPixels(float mm) {
-        try {
-            return Math.max(1, Display.getInstance().convertToPixels(mm));
-        } catch (Throwable t) {
-            return Math.max(1, (int) Math.round(mm));
+        if (!(mm > 0f)) {
+            throw new IllegalArgumentException("SVG dimension must be > 0mm; got " + mm);
         }
+        int pixels;
+        try {
+            pixels = Display.getInstance().convertToPixels(mm);
+        } catch (Throwable t) {
+            pixels = (int) Math.round(mm);
+        }
+        if (pixels < 1) {
+            throw new IllegalArgumentException("SVG dimension " + mm
+                    + "mm resolves to " + pixels + " px on this device --"
+                    + " pick a larger cn1-svg-width / cn1-svg-height value.");
+        }
+        return pixels;
     }
 
     @Override
