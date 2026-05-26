@@ -154,10 +154,14 @@ jobs:
             git -C .. --no-pager diff -- 'maven/cn1-ai-*' || true
             exit 1
           fi
-          # The common modules pull codenameone-javase transitively via
-          # the parent. javase needs -Plocal-dev-javase to find the
-          # bundled CEF stubs, matching the earlier `Run JavaSE port
-          # unit tests` step.
+          # The cn1lib mojo is part of codenameone-maven-plugin and isn't
+          # in m2 from prior CI steps (those run the plugin's tests but
+          # don't install it). Install it once, then run package on each
+          # cn1lib's common module.
+          mvn -B -Dmaven.javadoc.skip=true \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -Plocal-dev-javase \
+            -pl codenameone-maven-plugin -DskipTests install
           mvn -B -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Plocal-dev-javase \
