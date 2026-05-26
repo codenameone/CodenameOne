@@ -2845,10 +2845,11 @@ public class AndroidGradleBuilder extends Executor {
         // the class. The reinit branches do *not* repeat the binding because
         // the dispatcher is held in a static field on Navigation that
         // survives a Display reinit. Only emit the binding when the project
-        // actually has a Routes class on its classpath -- legacy CN1 apps
-        // that don't wire up the annotation Mojo skip it.
-        String installRoutes = new File(dummyClassesDir,
-                "com/codename1/router/generated/Routes.class").isFile()
+        // actually shipped a Routes class -- legacy CN1 apps that don't wire
+        // up the annotation Mojo skip it. Inspect sourceZip rather than
+        // dummyClassesDir to avoid false positives from CN1 framework jars
+        // that get unzipped in alongside the app's own classes.
+        String installRoutes = zipHasRoutes(sourceZip)
                 ? "        new com.codename1.router.generated.Routes();\n"
                 : "";
 
@@ -5285,6 +5286,19 @@ public class AndroidGradleBuilder extends Executor {
                 log("Deleting directory " + directory);
                 delTree(directory, true);
             }
+        }
+    }
+
+    /// Returns true when the project jar-with-deps contains the build-time
+    /// generated `com.codename1.router.generated.Routes` class. Used to gate
+    /// the per-stub install-routes line so legacy projects without the
+    /// annotation Mojo still compile.
+    private static boolean zipHasRoutes(File zip) {
+        if (zip == null || !zip.isFile()) return false;
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip)) {
+            return zf.getEntry("com/codename1/router/generated/Routes.class") != null;
+        } catch (IOException e) {
+            return false;
         }
     }
 }

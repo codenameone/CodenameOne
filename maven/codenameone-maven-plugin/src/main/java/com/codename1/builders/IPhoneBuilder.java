@@ -273,6 +273,13 @@ public class IPhoneBuilder extends Executor {
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         Stopwatch stopwatch = new Stopwatch();
+        // Decide whether to emit the @Route dispatcher install line into the
+        // generated stub. Inspect the project's jar-with-dependencies
+        // directly -- classesDir pollution from later unzip steps would give
+        // false positives. cn1-core itself ships no Routes class, so a hit
+        // in sourceZip means the project's annotation Mojo ran.
+        final boolean hasRoutes = zipHasEntry(sourceZip,
+                "com/codename1/router/generated/Routes.class");
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
@@ -1215,7 +1222,7 @@ public class IPhoneBuilder extends Executor {
                     // the project actually has a Routes class on its
                     // classpath; legacy CN1 projects that don't wire up the
                     // annotation Mojo skip the binding entirely.
-                    + routesInstall(classesDir)
+                    + (hasRoutes ? "        new com.codename1.router.generated.Routes();\n" : "")
                     + "        Display.init(stub);\n"
 
                     + "    }\n"
@@ -4110,16 +4117,18 @@ public class IPhoneBuilder extends Executor {
         return out.toString();
     }
 
-    /// Emit the per-build `new com.codename1.router.generated.Routes()` call
-    /// for the application stub, or an empty string when the project's
-    /// classes directory has no Routes class (legacy projects that don't
-    /// wire up the Codename One annotation Mojo).
-    private static String routesInstall(File classesDir) {
-        if (classesDir != null
-                && new File(classesDir, "com/codename1/router/generated/Routes.class").isFile()) {
-            return "        new com.codename1.router.generated.Routes();\n";
+    /// Returns true when the given jar/zip contains the named entry. Used to
+    /// detect whether the project shipped a com.codename1.router.generated
+    /// .Routes class -- the per-platform stub references that class directly,
+    /// so legacy projects that never wired up the Codename One annotation
+    /// Mojo must skip the install line to keep the stub compilable.
+    private static boolean zipHasEntry(File zip, String entryName) {
+        if (zip == null || !zip.isFile()) return false;
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip)) {
+            return zf.getEntry(entryName) != null;
+        } catch (IOException e) {
+            return false;
         }
-        return "";
     }
 
 }
