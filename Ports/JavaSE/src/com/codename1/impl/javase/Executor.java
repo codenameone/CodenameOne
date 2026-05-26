@@ -24,7 +24,6 @@ package com.codename1.impl.javase;
 
 import com.codename1.components.ToastBar;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
 import com.codename1.impl.javase.util.MavenUtils;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -271,24 +270,6 @@ public class Executor {
                             }
                             if(app instanceof PurchaseCallback) {
                                 CodenameOneImplementation.setPurchaseCallback((PurchaseCallback)app);
-                            }
-                            // Install the per-project @Route dispatcher before
-                            // Display init. The simulator is the special case
-                            // for dynamic loading: it runs unobfuscated and
-                            // it already spins its own ClassPathLoader, so
-                            // Class.forName works reliably here -- ParparVM
-                            // and Android use the application-stub direct
-                            // reference instead. The generated Routes class
-                            // self-registers via Navigation#setDispatcher in
-                            // its constructor.
-                            try {
-                                Class<?> rc = Class.forName(
-                                        "com.codename1.router.generated.Routes");
-                                rc.newInstance();
-                            } catch (ClassNotFoundException ignored) {
-                                // Project has no @Route at all.
-                            } catch (Throwable t) {
-                                Log.e(t);
                             }
                             Display.init(null);
                             if (CSSWatcher.isSupported()) {

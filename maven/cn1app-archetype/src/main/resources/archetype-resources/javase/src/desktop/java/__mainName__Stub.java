@@ -102,12 +102,6 @@ public class ${mainName}Stub implements Runnable, WindowListener {
         frm = new JFrame(APP_TITLE);
         Toolkit tk = Toolkit.getDefaultToolkit();
         JavaSEPort.setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * JavaSEPort.getRetinaScale());
-        // Install the build-time-generated @Route dispatcher before Display
-        // init. The Codename One Maven plugin generates the Routes class
-        // (no-op constructor when the project has no @Route, real dispatcher
-        // otherwise); referencing it directly survives obfuscation in
-        // shipped builds.
-        new com.codename1.router.generated.Routes();
         Display.init(frm.getContentPane());
         Display.getInstance().setProperty("build_key", BUILD_KEY);
         Display.getInstance().setProperty("package_name", PACKAGE_NAME);

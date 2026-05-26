@@ -398,14 +398,6 @@ public final class Display extends CN1Constants {
             }
             impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
-
-            // Note: the per-project route dispatcher (Navigation
-            // setDispatcher(...)) is installed by the application stub the
-            // builders generate at build time, before this point. cn1-core
-            // does not reference it directly -- a built-in stub here would
-            // shadow the generated class on platforms that translate
-            // bytecode, and a reflective lookup would break under
-            // obfuscation. See Deep-Links-Routing.asciidoc for the wiring.
         } else {
             impl.confirmControlView();
         }

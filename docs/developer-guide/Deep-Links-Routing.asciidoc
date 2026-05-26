@@ -100,52 +100,14 @@ form machinery is generated. Applications that prefer raw
 `new MyForm().show()` keep working unchanged; only URL-driven calls
 update the `Navigation` stack.
 
-=== Wire the build
+=== How it works
 
-Two goals on the Codename One Maven plugin do the work. Configure them in
-the project's `pom.xml`:
-
-[source,xml]
-----
-<plugin>
-  <groupId>com.codenameone</groupId>
-  <artifactId>codenameone-maven-plugin</artifactId>
-  <executions>
-    <execution>
-      <id>cn1-annotation-stubs</id>
-      <phase>generate-sources</phase>
-      <goals><goal>generate-annotation-stubs</goal></goals>
-    </execution>
-    <execution>
-      <id>cn1-process-annotations</id>
-      <phase>process-classes</phase>
-      <goals><goal>process-annotations</goal></goals>
-    </execution>
-  </executions>
-</plugin>
-----
-
-* `generate-annotation-stubs` emits the compile-time stubs the framework
-  needs to resolve any reference to the build-generated routing class.
-* `process-annotations` scans the project's compiled bytecode, validates
-  every `@Route` declaration fail-fast, and generates an internal
-  dispatcher class that the framework wires into `Display` under the
-  hood. There is no router API for application code to call.
-
-The generated dispatcher class is written to the project's own
-`target/classes` -- it's never shipped in `cn1-core`. A built-in stub
-would shadow the per-project class on platforms that translate bytecode
-(parparvm, Android). The application stub the builders write for each
-target platform calls `new com.codename1.router.generated.Routes()`
-directly before `Display.init(...)`. Direct symbol references are
-preserved under obfuscation; reflective lookups aren't. The Maven plugin's
-`generate-annotation-stubs` goal always emits a no-op `Routes` source
-at `target/generated-sources/cn1-annotations`, so projects with no
-`@Route` annotations still compile and run -- the no-op constructor
-doesn't install a dispatcher, and `Navigation.navigate(...)` calls
-become no-ops.
-
-The validation gate catches every problem in a single build run:
+Codename One scans the project's compiled bytecode at build time and
+generates an internal dispatcher class from every `@Route` declaration.
+The dispatcher is bound into the per-platform application stub before
+`Display.init(...)`, so deep links delivered during launch see the route
+table immediately. The validation gate catches every problem in a single
+build run:
 
 * `@Route` declared on a class that doesn't extend `Form`
 * Pattern with no leading `/` or empty value
@@ -171,8 +133,16 @@ String json = new com.codename1.maven.routing.AasaBuilder()
 // Write `json` to https://example.com/.well-known/apple-app-site-association
 ----
 
-Enable the **Associated Domains** capability in Xcode with the entry
-`applinks:example.com`.
+Tell iOS which domains your app claims by setting the
+`ios.associatedDomains` build hint -- a comma-separated list of
+`applinks:` entries. The iOS builder writes the Associated Domains
+entitlement so the resulting `.ipa` is signed for those domains
+automatically.
+
+[source,properties]
+----
+codename1.arg.ios.associatedDomains=applinks:example.com,applinks:www.example.com
+----
 
 === Android App Links
 
@@ -189,18 +159,9 @@ String json = new com.codename1.maven.routing.AssetLinksBuilder()
     .build();
 ----
 
-Add the verified intent filter to the manifest via the
-`android.xintent_filter` build hint:
-
-[source,xml]
-----
-<intent-filter android:autoVerify="true">
-  <action android:name="android.intent.action.VIEW" />
-  <category android:name="android.intent.category.DEFAULT" />
-  <category android:name="android.intent.category.BROWSABLE" />
-  <data android:scheme="https" android:host="example.com" />
-</intent-filter>
-----
+Tell Android which URLs to intercept by setting the
+`android.xintent_filter` build hint with a verified intent filter for
+your domain. The Android builder injects the filter into the manifest.
 
 The SHA-256 fingerprint comes from `keytool -list -v -keystore ...`, or
 from the Play Console under **Setup > App integrity** when using Play

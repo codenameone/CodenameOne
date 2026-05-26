@@ -7009,10 +7009,30 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (m instanceof Runnable) {
             Display.getInstance().callSerially((Runnable) m);
         }
-        
+
         inInit = false;
     }
-    
+
+    @Override
+    public void postInit() {
+        super.postInit();
+        // Install the build-time-generated @Route dispatcher, if the project
+        // emitted one. JavaSE is the legitimate place for dynamic loading --
+        // it runs unobfuscated and spins its own ClassPathLoader, so
+        // Class.forName resolves reliably across both the simulator
+        // (Executor-driven entry) and desktop production runs (entry through
+        // the application stub). ParparVM iOS and Android use the per-build
+        // application-stub direct symbol reference instead. Routes' no-arg
+        // constructor self-registers via Navigation#setDispatcher.
+        try {
+            Class.forName("com.codename1.router.generated.Routes").newInstance();
+        } catch (ClassNotFoundException ignored) {
+            // No @Route in this project.
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
     protected void sizeChanged(int w, int h) {
         try{
             super.sizeChanged(w, h);
