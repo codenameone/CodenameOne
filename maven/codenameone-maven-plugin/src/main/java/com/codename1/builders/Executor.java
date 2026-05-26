@@ -1984,4 +1984,35 @@ public abstract class Executor {
         return localBuilderProperties;
 
     }
+
+    /// Returns true when the project's `jar-with-dependencies` (the
+    /// `sourceZip` passed to `build(...)`) contains the build-time
+    /// generated `com.codename1.router.generated.Routes` class.
+    protected static boolean projectHasRouteDispatcher(File sourceZip) {
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
+            return zf.getEntry("com/codename1/router/generated/Routes.class") != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /// Stub-source fragment to splice into a generated application stub
+    /// right before `Display.init(...)` to install the build-time
+    /// generated `@Route` dispatcher. Empty when the project ships no
+    /// Routes class, so legacy apps without the annotation Mojo still
+    /// produce a clean stub. The dispatcher's no-arg constructor self-
+    /// registers via `Navigation#setDispatcher` -- direct symbol
+    /// reference, not `Class.forName`, so ParparVM / R8 obfuscation
+    /// rewrites the call site and the generated class together and the
+    /// binding survives in shipped builds. `indent` is the leading
+    /// whitespace that matches the surrounding stub source.
+    protected static String routeDispatcherInstallSource(File sourceZip, String indent) {
+        if (!projectHasRouteDispatcher(sourceZip)) {
+            return "";
+        }
+        return indent + "new com.codename1.router.generated.Routes();\n";
+    }
 }

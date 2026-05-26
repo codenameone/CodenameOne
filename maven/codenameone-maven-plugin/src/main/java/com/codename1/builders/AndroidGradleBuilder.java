@@ -2837,25 +2837,15 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n";
 
 
-        // The Routes class is generated per-project by the Maven plugin --
-        // emitStubs writes a no-op stub at generate-sources, and
-        // process-annotations overwrites it with the real dispatcher when
-        // @Route is present. The stub here references it by symbol (no
-        // Class.forName) so obfuscation rewrites the call site together with
-        // the class. The reinit branches do *not* repeat the binding because
-        // the dispatcher is held in a static field on Navigation that
-        // survives a Display reinit. Only emit the binding when the project
-        // actually shipped a Routes class -- legacy CN1 apps that don't wire
-        // up the annotation Mojo skip it. Inspect sourceZip rather than
-        // dummyClassesDir to avoid false positives from CN1 framework jars
-        // that get unzipped in alongside the app's own classes.
-        String installRoutes = zipHasRoutes(sourceZip)
-                ? "        new com.codename1.router.generated.Routes();\n"
-                : "";
+        // Install the build-time-generated @Route dispatcher before the
+        // first Display init. The reinit branch doesn't repeat the call
+        // because Navigation#setDispatcher writes a static field that
+        // survives a Display reinit. See Executor#routeDispatcher
+        // InstallSource for the conditional emission and obfuscation
+        // reasoning.
+        String installRoutes = routeDispatcherInstallSource(sourceZip, "        ");
 
-        String reinitCode0 = "Display.init(this);\n";
-
-        reinitCode0 = installRoutes + "        AndroidImplementation.startContext(this);\n";
+        String reinitCode0 = installRoutes + "        AndroidImplementation.startContext(this);\n";
 
         String reinitCode = "Display.init(this);\n";
 
@@ -5289,16 +5279,4 @@ public class AndroidGradleBuilder extends Executor {
         }
     }
 
-    /// Returns true when the project jar-with-deps contains the build-time
-    /// generated `com.codename1.router.generated.Routes` class. Used to gate
-    /// the per-stub install-routes line so legacy projects without the
-    /// annotation Mojo still compile.
-    private static boolean zipHasRoutes(File zip) {
-        if (zip == null || !zip.isFile()) return false;
-        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip)) {
-            return zf.getEntry("com/codename1/router/generated/Routes.class") != null;
-        } catch (IOException e) {
-            return false;
-        }
-    }
 }
