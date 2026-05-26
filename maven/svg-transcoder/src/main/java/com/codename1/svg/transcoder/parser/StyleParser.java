@@ -52,6 +52,13 @@ public final class StyleParser {
             else out.setStrokeLineJoin(SVGStyle.LINEJOIN_MITER);
         }
         out.setStrokeMiterLimit(toFloat(merged.get("stroke-miterlimit")));
+        String clipPath = merged.get("clip-path");
+        if (clipPath != null) {
+            String ref = SVGPaint.stripUrl(clipPath);
+            if (ref != null) {
+                out.setClipPathRef(ref);
+            }
+        }
         return out;
     }
 

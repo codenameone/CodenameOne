@@ -23,6 +23,10 @@ public final class SVGStyle {
     private Integer strokeLineCap;
     private Integer strokeLineJoin;
     private Float strokeMiterLimit;
+    /** Element id referenced by `clip-path: url(#id)`, or {@code null} when
+     *  no clip is set. The id resolves to an [com.codename1.svg.transcoder.model.SVGClipPath]
+     *  registered in the document's definitions map. */
+    private String clipPathRef;
 
     public SVGPaint getFill() { return fill; }
     public void setFill(SVGPaint fill) { this.fill = fill; }
@@ -42,6 +46,8 @@ public final class SVGStyle {
     public void setStrokeLineJoin(Integer v) { this.strokeLineJoin = v; }
     public Float getStrokeMiterLimit() { return strokeMiterLimit; }
     public void setStrokeMiterLimit(Float v) { this.strokeMiterLimit = v; }
+    public String getClipPathRef() { return clipPathRef; }
+    public void setClipPathRef(String clipPathRef) { this.clipPathRef = clipPathRef; }
 
     /** Overlay other's set fields on top of this. */
     public SVGStyle inherit(SVGStyle parent) {
@@ -55,6 +61,7 @@ public final class SVGStyle {
         if (strokeLineCap == null) strokeLineCap = parent.strokeLineCap;
         if (strokeLineJoin == null) strokeLineJoin = parent.strokeLineJoin;
         if (strokeMiterLimit == null) strokeMiterLimit = parent.strokeMiterLimit;
+        // clip-path does NOT inherit per SVG spec.
         return this;
     }
 }

@@ -130,6 +130,22 @@ public final class JavaCodeGenerator {
             indent++;
         }
 
+        String clipRef = inherited.getClipPathRef();
+        SVGClipPath clip = null;
+        String clipVar = null;
+        if (clipRef != null) {
+            SVGNode def = doc.getDefinitions().get(clipRef);
+            if (def instanceof SVGClipPath) {
+                clip = (SVGClipPath) def;
+                clipVar = "__clip" + (idSeq++);
+                emitClipShape(clip, clipVar);
+                line("g.pushClip();");
+                line("try {");
+                indent++;
+                line("g.setClip(" + clipVar + ");");
+            }
+        }
+
         try {
             if (n instanceof SVGGroup) {
                 SVGGroup g = (SVGGroup) n;
@@ -152,6 +168,14 @@ public final class JavaCodeGenerator {
                 emitText((SVGText) n, inherited, anims);
             }
         } finally {
+            if (clip != null) {
+                indent--;
+                line("} finally {");
+                indent++;
+                line("g.popClip();");
+                indent--;
+                line("}");
+            }
             if (needsTransform) {
                 indent--;
                 line("} finally {");
@@ -161,6 +185,114 @@ public final class JavaCodeGenerator {
                 line("}");
                 indent--;
                 line("}");
+            }
+        }
+    }
+
+    /// Build a GeneralPath that captures the outline of the first shape child
+    /// of a `<clipPath>`. The supported subset matches what most icon
+    /// authoring tools emit -- rect / circle / ellipse / polygon / polyline /
+    /// path. Multi-shape clipPaths and nested clip refs inside the clipPath
+    /// are flattened to the first child for simplicity.
+    private void emitClipShape(SVGClipPath cp, String varName) {
+        SVGShape shape = null;
+        for (SVGNode c : cp.getChildren()) {
+            if (c instanceof SVGShape) {
+                shape = (SVGShape) c;
+                break;
+            }
+            if (c instanceof SVGGroup) {
+                for (SVGNode cc : ((SVGGroup) c).getChildren()) {
+                    if (cc instanceof SVGShape) {
+                        shape = (SVGShape) cc;
+                        break;
+                    }
+                }
+                if (shape != null) break;
+            }
+        }
+        line("GeneralPath " + varName + " = new GeneralPath();");
+        if (shape == null) {
+            // Empty clipPath -- the spec says elements with a clip-path that
+            // points at an empty clipPath are not rendered, but our caller
+            // will still try to fillShape(...). Emit a degenerate path so the
+            // resulting clip clips everything out.
+            return;
+        }
+        if (shape instanceof SVGRect) {
+            SVGRect r = (SVGRect) shape;
+            float rx = r.getRx();
+            float ry = r.getRy();
+            if (rx == 0 && ry > 0) rx = ry;
+            if (ry == 0 && rx > 0) ry = rx;
+            if (rx <= 0f && ry <= 0f) {
+                line(varName + ".moveTo(" + floatLit(r.getX()) + ", " + floatLit(r.getY()) + ");");
+                line(varName + ".lineTo(" + floatLit(r.getX() + r.getWidth()) + ", " + floatLit(r.getY()) + ");");
+                line(varName + ".lineTo(" + floatLit(r.getX() + r.getWidth()) + ", " + floatLit(r.getY() + r.getHeight()) + ");");
+                line(varName + ".lineTo(" + floatLit(r.getX()) + ", " + floatLit(r.getY() + r.getHeight()) + ");");
+                line(varName + ".closePath();");
+            } else {
+                // Rounded rect outline.
+                String x = floatLit(r.getX());
+                String y = floatLit(r.getY());
+                String w = floatLit(r.getWidth());
+                String h = floatLit(r.getHeight());
+                String rxs = floatLit(rx);
+                String rys = floatLit(ry);
+                line(varName + ".moveTo(" + r.getX() + "f + " + rxs + ", " + y + ");");
+                line(varName + ".lineTo(" + r.getX() + "f + " + w + " - " + rxs + ", " + y + ");");
+                line(varName + ".quadTo(" + r.getX() + "f + " + w + ", " + y + ", " + r.getX() + "f + " + w + ", " + r.getY() + "f + " + rys + ");");
+                line(varName + ".lineTo(" + r.getX() + "f + " + w + ", " + r.getY() + "f + " + h + " - " + rys + ");");
+                line(varName + ".quadTo(" + r.getX() + "f + " + w + ", " + r.getY() + "f + " + h + ", " + r.getX() + "f + " + w + " - " + rxs + ", " + r.getY() + "f + " + h + ");");
+                line(varName + ".lineTo(" + r.getX() + "f + " + rxs + ", " + r.getY() + "f + " + h + ");");
+                line(varName + ".quadTo(" + x + ", " + r.getY() + "f + " + h + ", " + x + ", " + r.getY() + "f + " + h + " - " + rys + ");");
+                line(varName + ".lineTo(" + x + ", " + r.getY() + "f + " + rys + ");");
+                line(varName + ".quadTo(" + x + ", " + y + ", " + r.getX() + "f + " + rxs + ", " + y + ");");
+                line(varName + ".closePath();");
+            }
+        } else if (shape instanceof SVGCircle) {
+            SVGCircle c = (SVGCircle) shape;
+            line(varName + ".arc(" + floatLit(c.getCx() - c.getR()) + ", "
+                    + floatLit(c.getCy() - c.getR()) + ", "
+                    + floatLit(2 * c.getR()) + ", " + floatLit(2 * c.getR())
+                    + ", 0f, 6.2831855f);");
+        } else if (shape instanceof SVGEllipse) {
+            SVGEllipse e = (SVGEllipse) shape;
+            line(varName + ".arc(" + floatLit(e.getCx() - e.getRx()) + ", "
+                    + floatLit(e.getCy() - e.getRy()) + ", "
+                    + floatLit(2 * e.getRx()) + ", " + floatLit(2 * e.getRy())
+                    + ", 0f, 6.2831855f);");
+        } else if (shape instanceof SVGPolyline) {
+            float[] pts = ((SVGPolyline) shape).getPoints();
+            if (pts.length >= 4) {
+                line(varName + ".moveTo(" + floatLit(pts[0]) + ", " + floatLit(pts[1]) + ");");
+                for (int i = 2; i + 1 < pts.length; i += 2) {
+                    line(varName + ".lineTo(" + floatLit(pts[i]) + ", " + floatLit(pts[i + 1]) + ");");
+                }
+                if (((SVGPolyline) shape).isClosed()) {
+                    line(varName + ".closePath();");
+                }
+            }
+        } else if (shape instanceof SVGPath) {
+            // Re-emit path commands into varName.
+            for (PathCommand pc : ((SVGPath) shape).getCommands()) {
+                float[] a = pc.getArgs();
+                switch (pc.getType()) {
+                    case MOVE:  line(varName + ".moveTo(" + floatLit(a[0]) + ", " + floatLit(a[1]) + ");"); break;
+                    case LINE:  line(varName + ".lineTo(" + floatLit(a[0]) + ", " + floatLit(a[1]) + ");"); break;
+                    case CUBIC: line(varName + ".curveTo(" + floatLit(a[0]) + ", " + floatLit(a[1]) + ", "
+                            + floatLit(a[2]) + ", " + floatLit(a[3]) + ", "
+                            + floatLit(a[4]) + ", " + floatLit(a[5]) + ");"); break;
+                    case QUAD:  line(varName + ".quadTo(" + floatLit(a[0]) + ", " + floatLit(a[1]) + ", "
+                            + floatLit(a[2]) + ", " + floatLit(a[3]) + ");"); break;
+                    case ARC:   line("GeneratedSVGImage.svgArc(" + varName + ", "
+                            + floatLit(a[0]) + ", " + floatLit(a[1]) + ", "
+                            + floatLit(a[2]) + ", " + floatLit(a[3]) + ", "
+                            + floatLit(a[4]) + ", " + (a[5] != 0f) + ", " + (a[6] != 0f) + ", "
+                            + floatLit(a[7]) + ", " + floatLit(a[8]) + ");"); break;
+                    case CLOSE: line(varName + ".closePath();"); break;
+                    default: break;
+                }
             }
         }
     }

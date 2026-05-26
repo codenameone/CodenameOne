@@ -283,3 +283,12 @@ SVGColorMorphStyle {
     bg-type: image_scaled_fit;
     padding: 2mm;
 }
+
+/* Exercises <clipPath> + gradient fill + clipped text. */
+SVGClippedBadgeStyle {
+    background: url(clipped_badge.svg);
+    cn1-svg-width: 16mm;
+    cn1-svg-height: 16mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}

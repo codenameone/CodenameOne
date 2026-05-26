@@ -132,6 +132,12 @@ public final class SVGParser {
             } else if ("radialGradient".equals(name)) {
                 SVGRadialGradient rg = readRadialGradient(r);
                 if (rg.getId() != null) doc.getDefinitions().put(rg.getId(), rg);
+            } else if ("clipPath".equals(name) || "mask".equals(name)) {
+                // Many SVGs declare clipPath outside <defs>. Accept both --
+                // we don't render the clipPath inline, just register it as
+                // a definition for later clip-path="url(#id)" lookup.
+                SVGClipPath cp = readClipPath(r, doc);
+                if (cp.getId() != null) doc.getDefinitions().put(cp.getId(), cp);
             } else if ("animate".equals(name) || "animateTransform".equals(name) || "set".equals(name)) {
                 SVGAnimation an = readAnimation(r, name);
                 // SVG semantics: <animate*> as a sibling of shapes inside a <g>
@@ -158,10 +164,22 @@ public final class SVGParser {
             } else if ("radialGradient".equals(name)) {
                 SVGRadialGradient rg = readRadialGradient(r);
                 if (rg.getId() != null) doc.getDefinitions().put(rg.getId(), rg);
+            } else if ("clipPath".equals(name) || "mask".equals(name)) {
+                // Mask treated as clip -- alpha masking falls back to opaque.
+                SVGClipPath cp = readClipPath(r, doc);
+                if (cp.getId() != null) doc.getDefinitions().put(cp.getId(), cp);
             } else {
                 skip(r);
             }
         }
+    }
+
+    private SVGClipPath readClipPath(XMLStreamReader r, SVGDocument doc) throws XMLStreamException {
+        SVGClipPath cp = new SVGClipPath();
+        Map<String, String> a = attrs(r);
+        cp.setId(a.get("id"));
+        readChildren(r, cp, doc);
+        return cp;
     }
 
     private SVGRect readRect(XMLStreamReader r) {

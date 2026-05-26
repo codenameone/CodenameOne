@@ -54,6 +54,8 @@ public class SVGStaticScreenshotTest extends BaseTest {
         form.add(label("logo_text.svg", res == null ? null : res.getImage("logo_text.svg")));
         // S/T smooth curves + dashed strokes:
         form.add(label("wave_path.svg", res == null ? null : res.getImage("wave_path.svg")));
+        // clip-path: rounded-rect outline gating a gradient-filled rect + text:
+        form.add(label("clipped_badge.svg", res == null ? null : res.getImage("clipped_badge.svg")));
         form.show();
         return true;
     }

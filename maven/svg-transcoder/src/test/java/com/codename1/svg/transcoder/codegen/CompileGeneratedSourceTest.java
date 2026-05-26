@@ -83,6 +83,16 @@ public class CompileGeneratedSourceTest {
     }
 
     @Test
+    public void clipPathCompiles() throws Exception {
+        compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<defs><clipPath id='c'><rect x='10' y='10' width='40' height='40' rx='5'/></clipPath>"
+                + "<clipPath id='c2'><circle cx='80' cy='30' r='15'/></clipPath></defs>"
+                + "<rect x='0' y='0' width='100' height='100' fill='red' clip-path='url(#c)'/>"
+                + "<rect x='0' y='0' width='100' height='100' fill='blue' clip-path='url(#c2)'/>"
+                + "</svg>", "Clipped");
+    }
+
+    @Test
     public void textCompiles() throws Exception {
         compileSvg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80'>"
                 + "<text x='10' y='40' font-size='24' fill='red'>Hello</text>"
