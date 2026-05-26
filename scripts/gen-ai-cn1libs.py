@@ -1989,9 +1989,9 @@ def lib_mlkit_segmentation() -> Lib:
             dispatch_semaphore_t sem = dispatch_semaphore_create(0);
             [seg processImage:vision completion:^(MLKSegmentationMask * _Nullable mask, NSError * _Nullable e) {
                 if (mask) {
-                    // MLKSegmentationMask exposes only `pixelBuffer`; the
-                    // dimensions come from the CVPixelBuffer API.
-                    CVPixelBufferRef buf = mask.pixelBuffer;
+                    // MLKSegmentationMask exposes only `buffer` (a
+                    // CVPixelBuffer); dimensions come from CVPixelBufferGet*.
+                    CVPixelBufferRef buf = mask.buffer;
                     size_t w = CVPixelBufferGetWidth(buf);
                     size_t h = CVPixelBufferGetHeight(buf);
                     CVPixelBufferLockBaseAddress(buf, kCVPixelBufferLock_ReadOnly);
