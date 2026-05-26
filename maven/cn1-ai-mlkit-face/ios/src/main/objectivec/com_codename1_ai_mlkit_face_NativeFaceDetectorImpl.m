@@ -8,8 +8,8 @@
 
 @implementation com_codename1_ai_mlkit_face_NativeFaceDetectorImpl
 
-- (NSData *)detect:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSData*)detect:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKFaceDetectorOptions *opts = [[MLKFaceDetectorOptions alloc] init];
@@ -31,7 +31,7 @@
     return out;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

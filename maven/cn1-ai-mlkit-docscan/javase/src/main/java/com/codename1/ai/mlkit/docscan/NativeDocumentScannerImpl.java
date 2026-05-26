@@ -1,6 +1,6 @@
 package com.codename1.ai.mlkit.docscan;
 
-public class NativeDocumentScannerImpl {
+public class NativeDocumentScannerImpl implements NativeDocumentScanner {
     public String scanToFile(byte[] imageBytes) {
         try {
             java.io.File f = java.io.File.createTempFile("docscan-stub-", ".jpg");

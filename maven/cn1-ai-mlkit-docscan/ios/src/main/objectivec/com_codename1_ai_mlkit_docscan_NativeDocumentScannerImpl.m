@@ -8,8 +8,8 @@
 // interactive; this bridge accepts a pre-captured image and returns its
 // cropped JPEG path. On iOS 13+ VisionKit handles the live UI flow; the
 // sample app drives that flow and feeds the bytes into the cn1lib.
-- (NSString *)scanToFile:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSString*)scanToFile:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return @"";
     CIImage *ci = [CIImage imageWithCGImage:image.CGImage];
     CIContext *ctx = [CIContext context];
@@ -35,7 +35,7 @@
     return path;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

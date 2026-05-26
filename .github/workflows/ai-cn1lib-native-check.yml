@@ -1,11 +1,11 @@
-name: AI cn1lib native source check
+name: AI cn1lib iOS xcodebuild check
 
-# Lint-compiles the native iOS Obj-C and Android Java sources bundled in
-# every cn1-ai-* cn1lib. Catches syntax errors and missing SDK symbols
-# before they reach the build server. End-to-end behavioural tests on a
-# real iOS simulator / Android emulator land separately -- see
-# ai-cn1lib-ios-simulator.yml and ai-cn1lib-android-emulator.yml (both
-# still TODO).
+# Per cn1lib: synthesise a tiny Xcode project that links the bundled
+# `nativeios/*.m` against the real `GoogleMLKit/*` (or TFLite / whisper)
+# pod, run `pod install`, then `xcodebuild build`. Catches API drift,
+# missing imports, and missing pod hints early -- on the same macOS
+# runners we already use for build-ios. Replaces the earlier clang-
+# fsyntax-only-against-stub-headers approach.
 
 on:
   workflow_dispatch:
@@ -22,193 +22,168 @@ on:
       - 'scripts/gen-ai-cn1libs.py'
 
 jobs:
-  ios-native-check:
-    name: iOS Obj-C bridges compile
+  xcodebuild-cn1libs:
+    name: xcodebuild ${{ matrix.lib }}
     runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        # One job per cn1lib, parallel. Each entry maps the cn1lib's
+        # artifact directory to the iOS dependency it pulls (pod spec or
+        # `--` for cn1libs that link a bundled static lib instead of a
+        # CocoaPod -- those still get xcodebuild'd to catch syntax
+        # errors, just without the pod step).
+        include:
+          - { lib: cn1-ai-mlkit-text,         pod: 'GoogleMLKit/TextRecognition'    }
+          - { lib: cn1-ai-mlkit-barcode,      pod: 'GoogleMLKit/BarcodeScanning'    }
+          - { lib: cn1-ai-mlkit-face,         pod: 'GoogleMLKit/FaceDetection'      }
+          - { lib: cn1-ai-mlkit-labeling,     pod: 'GoogleMLKit/ImageLabeling'      }
+          - { lib: cn1-ai-mlkit-translate,    pod: 'GoogleMLKit/Translate'          }
+          - { lib: cn1-ai-mlkit-smartreply,   pod: 'GoogleMLKit/SmartReply'         }
+          - { lib: cn1-ai-mlkit-langid,       pod: 'GoogleMLKit/LanguageID'         }
+          - { lib: cn1-ai-mlkit-pose,         pod: 'GoogleMLKit/PoseDetection'      }
+          - { lib: cn1-ai-mlkit-segmentation, pod: 'GoogleMLKit/SegmentationSelfie' }
+          - { lib: cn1-ai-mlkit-docscan,      pod: ''                               }   # VisionKit/CoreImage only
+          - { lib: cn1-ai-tflite,             pod: 'TensorFlowLiteObjC'             }
+          - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
+          - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
     steps:
       - uses: actions/checkout@v4
-      - name: List bundled iOS Obj-C
-        run: find maven/cn1-ai-*/ios/src/main/objectivec -name '*.m' | sort
-      - name: Syntax-check Obj-C with clang
-        # Real ML Kit / TFLite headers aren't on the simulator runner without
-        # provisioning CocoaPods first, so we run clang in -fsyntax-only mode
-        # against a stub headers tree. This catches non-import syntax errors
-        # and most semantic mistakes (typos, wrong method signatures).
+
+      - name: List iOS sources
+        run: ls -la maven/${{ matrix.lib }}/ios/src/main/objectivec/
+
+      - name: Synthesise Xcode static-library project
+        # Build a tiny xcodeproj wrapping every .m the cn1lib ships. We
+        # only need the compile step to succeed; nothing runs.
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/stub-headers/MLKitTextRecognition \
-                  /tmp/stub-headers/MLKitVision \
-                  /tmp/stub-headers/MLKitBarcodeScanning \
-                  /tmp/stub-headers/MLKitFaceDetection \
-                  /tmp/stub-headers/MLKitImageLabeling \
-                  /tmp/stub-headers/MLKitTranslate \
-                  /tmp/stub-headers/MLKitCommon \
-                  /tmp/stub-headers/MLKitSmartReply \
-                  /tmp/stub-headers/MLKitLanguageID \
-                  /tmp/stub-headers/MLKitPoseDetection \
-                  /tmp/stub-headers/MLKitSegmentationSelfie \
-                  /tmp/stub-headers/MLKitSegmentationCommon \
-                  /tmp/stub-headers/TensorFlowLiteObjC \
-                  /tmp/cn1-stubs
-          cat > /tmp/cn1-stubs/CodenameOne_GLViewController.h <<'EOF'
-          #import <UIKit/UIKit.h>
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          mkdir -p "$PROBE/CN1AIProbe"
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AIProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/"
+          ls -la "$PROBE/CN1AIProbe/"
+
+          python3 - "$PROBE" "${{ matrix.lib }}" <<'PY'
+          import os, sys, uuid
+          probe_dir, lib_name = sys.argv[1], sys.argv[2]
+          src_dir = os.path.join(probe_dir, "CN1AIProbe")
+          sources = sorted(f for f in os.listdir(src_dir) if f.endswith(".m"))
+          headers = sorted(f for f in os.listdir(src_dir) if f.endswith(".h"))
+
+          def oid():
+              return uuid.uuid4().hex[:24].upper()
+
+          file_refs = {}
+          build_files = {}
+          for src in sources + headers:
+              file_refs[src] = oid()
+              build_files[src] = oid()
+
+          src_group = oid()
+          main_group = oid()
+          products_group = oid()
+          target = oid()
+          target_product = oid()
+          build_phase_sources = oid()
+          build_phase_headers = oid()
+          build_phase_frameworks = oid()
+          configurations_list_proj = oid()
+          configurations_list_target = oid()
+          conf_debug_proj = oid()
+          conf_debug_target = oid()
+          project_obj = oid()
+
+          lines = [
+              "// !$*UTF8*$!",
+              "{",
+              "    archiveVersion = 1;",
+              "    classes = {};",
+              "    objectVersion = 56;",
+              "    objects = {",
+              "/* Begin PBXBuildFile section */",
+          ]
+          for fn, fr in file_refs.items():
+              bf = build_files[fn]
+              ftype = "Sources" if fn.endswith(".m") else "Headers"
+              lines.append(f"        {bf} /* {fn} in {ftype} */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fn} */; }};")
+          lines += ["/* End PBXBuildFile section */", "/* Begin PBXFileReference section */"]
+          for fn, fr in file_refs.items():
+              ftype = "sourcecode.c.objc" if fn.endswith(".m") else "sourcecode.c.h"
+              lines.append(f"        {fr} /* {fn} */ = {{isa = PBXFileReference; lastKnownFileType = {ftype}; path = {fn}; sourceTree = \"<group>\"; }};")
+          lines.append(f"        {target_product} /* libCN1AIProbe.a */ = {{isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCN1AIProbe.a; sourceTree = BUILT_PRODUCTS_DIR; }};")
+          lines += ["/* End PBXFileReference section */", "/* Begin PBXGroup section */"]
+          # main group
+          lines.append(f"        {main_group} = {{isa = PBXGroup; children = ({src_group} /* CN1AIProbe */, {products_group} /* Products */, ); sourceTree = \"<group>\"; }};")
+          lines.append(f"        {src_group} /* CN1AIProbe */ = {{isa = PBXGroup; children = (")
+          for fn in sources + headers:
+              lines.append(f"            {file_refs[fn]} /* {fn} */,")
+          lines.append("        ); path = CN1AIProbe; sourceTree = \"<group>\"; };")
+          lines.append(f"        {products_group} /* Products */ = {{isa = PBXGroup; children = ({target_product} /* libCN1AIProbe.a */,); name = Products; sourceTree = \"<group>\"; }};")
+          lines += ["/* End PBXGroup section */", "/* Begin PBXHeadersBuildPhase section */"]
+          lines.append(f"        {build_phase_headers} /* Headers */ = {{isa = PBXHeadersBuildPhase; buildActionMask = 2147483647; files = (")
+          for fn in headers:
+              lines.append(f"            {build_files[fn]} /* {fn} in Headers */,")
+          lines += ["        ); runOnlyForDeploymentPostprocessing = 0; };", "/* End PBXHeadersBuildPhase section */", "/* Begin PBXFrameworksBuildPhase section */"]
+          lines.append(f"        {build_phase_frameworks} /* Frameworks */ = {{isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; }};")
+          lines += ["/* End PBXFrameworksBuildPhase section */", "/* Begin PBXSourcesBuildPhase section */"]
+          lines.append(f"        {build_phase_sources} /* Sources */ = {{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (")
+          for fn in sources:
+              lines.append(f"            {build_files[fn]} /* {fn} in Sources */,")
+          lines += ["        ); runOnlyForDeploymentPostprocessing = 0; };", "/* End PBXSourcesBuildPhase section */", "/* Begin PBXNativeTarget section */"]
+          lines.append(f"        {target} /* CN1AIProbe */ = {{isa = PBXNativeTarget; buildConfigurationList = {configurations_list_target} /* Build configuration list for PBXNativeTarget \"CN1AIProbe\" */; buildPhases = ({build_phase_headers}, {build_phase_sources}, {build_phase_frameworks}, ); buildRules = (); dependencies = (); name = CN1AIProbe; productName = CN1AIProbe; productReference = {target_product} /* libCN1AIProbe.a */; productType = \"com.apple.product-type.library.static\"; }};")
+          lines += ["/* End PBXNativeTarget section */", "/* Begin PBXProject section */"]
+          lines.append(f"        {project_obj} /* Project object */ = {{isa = PBXProject; attributes = {{LastUpgradeCheck = 1530; }}; buildConfigurationList = {configurations_list_proj} /* Build configuration list for PBXProject \"CN1AIProbe\" */; compatibilityVersion = \"Xcode 14.0\"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = {main_group}; productRefGroup = {products_group} /* Products */; projectDirPath = \"\"; projectRoot = \"\"; targets = ({target} /* CN1AIProbe */, ); }};")
+          lines += ["/* End PBXProject section */", "/* Begin XCBuildConfiguration section */"]
+          lines.append(f"        {conf_debug_proj} /* Debug */ = {{isa = XCBuildConfiguration; buildSettings = {{ARCHS = \"$(ARCHS_STANDARD)\"; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_MODULES = YES; SDKROOT = iphonesimulator; IPHONEOS_DEPLOYMENT_TARGET = 14.0; GCC_PREPROCESSOR_DEFINITIONS = (\"DEBUG=1\", \"$(inherited)\"); }}; name = Debug; }};")
+          lines.append(f"        {conf_debug_target} /* Debug */ = {{isa = XCBuildConfiguration; buildSettings = {{PRODUCT_NAME = \"$(TARGET_NAME)\"; HEADER_SEARCH_PATHS = (\"$(inherited)\", \"$(SRCROOT)/CN1AIProbe\", ); }}; name = Debug; }};")
+          lines += ["/* End XCBuildConfiguration section */", "/* Begin XCConfigurationList section */"]
+          lines.append(f"        {configurations_list_proj} /* PBXProject */ = {{isa = XCConfigurationList; buildConfigurations = ({conf_debug_proj} /* Debug */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; }};")
+          lines.append(f"        {configurations_list_target} /* PBXNativeTarget */ = {{isa = XCConfigurationList; buildConfigurations = ({conf_debug_target} /* Debug */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; }};")
+          lines += ["/* End XCConfigurationList section */", "    };", f"    rootObject = {project_obj} /* Project object */;", "}", ""]
+
+          proj_dir = os.path.join(probe_dir, "CN1AIProbe.xcodeproj")
+          os.makedirs(proj_dir, exist_ok=True)
+          with open(os.path.join(proj_dir, "project.pbxproj"), "w") as fp:
+              fp.write("\n".join(lines))
+          print("Wrote", os.path.join(proj_dir, "project.pbxproj"))
+          PY
+          ls -la "$PROBE/CN1AIProbe.xcodeproj/"
+
+      - name: pod install (or skip when no pod)
+        if: ${{ matrix.pod != '' }}
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          cd "$PROBE"
+          cat > Podfile <<EOF
+          platform :ios, '14.0'
+          install! 'cocoapods', :integrate_targets => true
+          target 'CN1AIProbe' do
+            use_frameworks!
+            pod '${{ matrix.pod }}'
+          end
           EOF
-          # Write a single sweeping stub header that exposes the symbols every
-          # ML Kit / TFLite native bridge uses. Each lib's #import resolves
-          # back to this file via clang's -I search path overrides below.
-          stub_h() {
-              # Traditional include guard (NOT #pragma once) so the same
-              # stub content imported via multiple symlinked SDK paths
-              # ("#import <MLKitVision/MLKText.h>" + "#import <MLKitText
-              # Recognition/MLKTextRecognizer.h>" both resolve to the
-              # same shared declarations).
-              cat > "$1" <<'EOF'
-          #ifndef CN1_AI_STUB_HEADERS_INCLUDED
-          #define CN1_AI_STUB_HEADERS_INCLUDED
-          #import <UIKit/UIKit.h>
-          #import <Foundation/Foundation.h>
-          @interface MLKVisionImage : NSObject
-          - (instancetype)initWithImage:(UIImage *)image;
-          @end
-          @interface MLKText : NSObject @property (nonatomic) NSString *text; @end
-          @interface MLKCommonTextRecognizerOptions : NSObject @end
-          @interface MLKTextRecognizer : NSObject
-          + (instancetype)textRecognizerWithOptions:(id)opts;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(MLKText *, NSError *))h;
-          @end
-          @interface MLKBarcode : NSObject @property (nonatomic) NSString *rawValue; @end
-          @interface MLKBarcodeScannerOptions : NSObject @end
-          @interface MLKBarcodeScanner : NSObject
-          + (instancetype)barcodeScannerWithOptions:(id)opts;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKBarcode *> *, NSError *))h;
-          @end
-          @interface MLKFace : NSObject @property (nonatomic) CGRect frame; @end
-          @interface MLKFaceDetectorOptions : NSObject @end
-          @interface MLKFaceDetector : NSObject
-          + (instancetype)faceDetectorWithOptions:(id)opts;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKFace *> *, NSError *))h;
-          @end
-          @interface MLKImageLabel : NSObject @property (nonatomic) NSString *text; @end
-          @interface MLKImageLabelerOptions : NSObject @end
-          @interface MLKImageLabeler : NSObject
-          + (instancetype)imageLabelerWithOptions:(id)opts;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKImageLabel *> *, NSError *))h;
-          @end
-          @interface MLKTranslatorOptions : NSObject
-          - (instancetype)initWithSourceLanguage:(NSString *)s targetLanguage:(NSString *)t;
-          @end
-          @interface MLKModelDownloadConditions : NSObject
-          - (instancetype)initWithAllowsCellularAccess:(BOOL)c allowsBackgroundDownloading:(BOOL)b;
-          @end
-          @interface MLKTranslator : NSObject
-          + (instancetype)translatorWithOptions:(id)o;
-          - (void)downloadModelIfNeededWithConditions:(MLKModelDownloadConditions *)c completion:(void(^)(NSError *))h;
-          - (void)translateText:(NSString *)t completion:(void(^)(NSString *, NSError *))h;
-          @end
-          @interface MLKTextMessage : NSObject
-          - (instancetype)initWithText:(NSString *)t timestamp:(double)ts userID:(NSString *)u isLocalUser:(BOOL)l;
-          @end
-          @interface MLKSmartReplySuggestion : NSObject @property (nonatomic) NSString *text; @end
-          @interface MLKSmartReplySuggestionResult : NSObject @property (nonatomic) NSArray<MLKSmartReplySuggestion *> *suggestions; @end
-          @interface MLKSmartReply : NSObject
-          + (instancetype)smartReply;
-          - (void)suggestRepliesForMessages:(NSArray<MLKTextMessage *> *)m completion:(void(^)(MLKSmartReplySuggestionResult *, NSError *))h;
-          @end
-          @interface MLKLanguageIdentification : NSObject
-          + (instancetype)languageIdentification;
-          - (void)identifyLanguageForText:(NSString *)t completion:(void(^)(NSString *, NSError *))h;
-          @end
-          @interface MLKPoseLandmark : NSObject
-          @property (nonatomic) CGPoint position;
-          @property (nonatomic) float inFrameLikelihood;
-          @end
-          @interface MLKPose : NSObject
-          @property (nonatomic) NSArray<MLKPoseLandmark *> *landmarks;
-          @end
-          @interface MLKPoseDetectorOptions : NSObject @end
-          @interface MLKPoseDetector : NSObject
-          + (instancetype)poseDetectorWithOptions:(id)o;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(NSArray<MLKPose *> *, NSError *))h;
-          @end
-          typedef NS_ENUM(NSInteger, MLKSegmenterMode) {
-              MLKSegmenterModeSingleImage = 1
-          };
-          @interface MLKSelfieSegmenterOptions : NSObject
-          @property (nonatomic) MLKSegmenterMode segmenterMode;
-          @end
-          @interface MLKSegmentationMask : NSObject
-          @property (nonatomic) size_t width, height;
-          @property (nonatomic) CVPixelBufferRef buffer;
-          @end
-          @interface MLKSegmenter : NSObject
-          + (instancetype)segmenterWithOptions:(id)o;
-          - (void)processImage:(MLKVisionImage *)img completion:(void(^)(MLKSegmentationMask *, NSError *))h;
-          @end
-          @class TFLTensor;
-          @interface TFLInterpreter : NSObject
-          - (instancetype)initWithModelPath:(NSString *)p error:(NSError **)e;
-          - (void)allocateTensorsWithError:(NSError **)e;
-          - (TFLTensor *)inputTensorAtIndex:(NSUInteger)i error:(NSError **)e;
-          - (TFLTensor *)outputTensorAtIndex:(NSUInteger)i error:(NSError **)e;
-          - (void)invokeWithError:(NSError **)e;
-          @end
-          @interface TFLTensor : NSObject
-          - (void)copyData:(NSData *)d error:(NSError **)e;
-          - (NSData *)dataWithError:(NSError **)e;
-          @end
-          #endif
-          EOF
-          }
-          # Each ML Kit / TFLite import path resolves to its own stub directory;
-          # the file content is identical. Symlinking keeps the headers single-source.
-          for sdk in MLKitTextRecognition MLKitVision MLKitBarcodeScanning \
-                     MLKitFaceDetection MLKitImageLabeling MLKitTranslate \
-                     MLKitCommon MLKitSmartReply MLKitLanguageID \
-                     MLKitPoseDetection MLKitSegmentationSelfie \
-                     MLKitSegmentationCommon TensorFlowLiteObjC; do
-              stub_h "/tmp/stub-headers/${sdk}/${sdk}.h"
-              ln -sf "${sdk}.h" "/tmp/stub-headers/${sdk}/MLKVisionImage.h" 2>/dev/null || true
-              for h in MLKTextRecognizer.h MLKTextRecognizerOptions.h MLKText.h \
-                       MLKBarcodeScanner.h MLKBarcodeScannerOptions.h MLKBarcode.h \
-                       MLKFaceDetector.h MLKFaceDetectorOptions.h MLKFace.h \
-                       MLKImageLabeler.h MLKImageLabelerOptions.h MLKImageLabel.h \
-                       MLKTranslator.h MLKTranslatorOptions.h MLKModelDownloadConditions.h \
-                       MLKSmartReply.h MLKTextMessage.h MLKSmartReplySuggestion.h \
-                       MLKSmartReplySuggestionResult.h \
-                       MLKLanguageIdentification.h \
-                       MLKPoseDetector.h MLKPoseDetectorOptions.h MLKPose.h MLKPoseLandmark.h \
-                       MLKSelfieSegmenterOptions.h MLKSegmenter.h MLKSegmentationMask.h \
-                       TFLTensorFlowLite.h; do
-                  ln -sf "${sdk}.h" "/tmp/stub-headers/${sdk}/${h}" 2>/dev/null || true
-              done
-          done
-          fail=0
-          for m in $(find maven/cn1-ai-*/ios/src/main/objectivec -name '*.m'); do
-              # Some bridges declare extern C symbols (whisper, sd) we don't link
-              # in this lint pass.
-              if ! xcrun clang -fsyntax-only -fobjc-arc -fmodules \
-                      -I/tmp/cn1-stubs \
-                      -I/tmp/stub-headers \
-                      -I/tmp/stub-headers/MLKitTextRecognition \
-                      -I/tmp/stub-headers/MLKitVision \
-                      -I/tmp/stub-headers/MLKitBarcodeScanning \
-                      -I/tmp/stub-headers/MLKitFaceDetection \
-                      -I/tmp/stub-headers/MLKitImageLabeling \
-                      -I/tmp/stub-headers/MLKitTranslate \
-                      -I/tmp/stub-headers/MLKitCommon \
-                      -I/tmp/stub-headers/MLKitSmartReply \
-                      -I/tmp/stub-headers/MLKitLanguageID \
-                      -I/tmp/stub-headers/MLKitPoseDetection \
-                      -I/tmp/stub-headers/MLKitSegmentationSelfie \
-                      -I/tmp/stub-headers/MLKitSegmentationCommon \
-                      -I/tmp/stub-headers/TensorFlowLiteObjC \
-                      -Wno-incomplete-implementation \
-                      -Wno-objc-method-access \
-                      -Wno-implicit-function-declaration \
-                      -isysroot "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-                      "$m" 2>&1 | tee "/tmp/$(basename "$m").log"; then
-                  echo "::error::Obj-C syntax check failed for $m"
-                  fail=1
-              fi
-          done
-          exit $fail
+          pod install --repo-update
+
+      - name: xcodebuild (workspace if pod-installed, project otherwise)
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          cd "$PROBE"
+          if [ -d "CN1AIProbe.xcworkspace" ]; then
+              xcodebuild -workspace CN1AIProbe.xcworkspace \
+                         -scheme CN1AIProbe \
+                         -configuration Debug \
+                         -destination 'generic/platform=iOS Simulator' \
+                         -sdk iphonesimulator \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
+          else
+              xcodebuild -project CN1AIProbe.xcodeproj \
+                         -target CN1AIProbe \
+                         -configuration Debug \
+                         -sdk iphonesimulator \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
+          fi

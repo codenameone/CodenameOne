@@ -8,8 +8,8 @@
 
 @implementation com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl
 
-- (NSData *)scan:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSData*)scan:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return [self packStrings:@[]];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKBarcodeScannerOptions *opts = [[MLKBarcodeScannerOptions alloc] init];
@@ -29,7 +29,7 @@
     return [self packStrings:values];
 }
 
-- (NSData *)packStrings:(NSArray<NSString *> *)strings {
+-(NSData*)packStrings:(NSArray<NSString *> *)strings {
     // Encode as length-prefixed UTF-8 (network byte order int + bytes).
     NSMutableData *out = [NSMutableData data];
     uint32_t count = htonl((uint32_t)strings.count);
@@ -43,7 +43,7 @@
     return out;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

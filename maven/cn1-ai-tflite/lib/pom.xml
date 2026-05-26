@@ -61,5 +61,31 @@
                 </dependency>
             </dependencies>
         </profile>
+        <profile>
+            <id>javascript</id>
+            <activation>
+                <property><name>codename1.platform</name><value>javascript</value></property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-ai-tflite-javascript</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>win</id>
+            <activation>
+                <property><name>codename1.platform</name><value>win</value></property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>cn1-ai-tflite-win</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 </project>

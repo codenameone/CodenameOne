@@ -6,10 +6,10 @@
 
 @implementation com_codename1_ai_mlkit_translate_NativeTranslatorImpl
 
-- (NSString *)translate:(NSString *)text :(NSString *)sourceLang :(NSString *)targetLang {
+-(NSString*)translate:(NSString*)param param1:(NSString*)param1 param2:(NSString*)param2 {
     MLKTranslatorOptions *opts = [[MLKTranslatorOptions alloc]
-                                  initWithSourceLanguage:sourceLang
-                                  targetLanguage:targetLang];
+                                  initWithSourceLanguage:param1
+                                  targetLanguage:param2];
     MLKTranslator *t = [MLKTranslator translatorWithOptions:opts];
     MLKModelDownloadConditions *cond = [[MLKModelDownloadConditions alloc]
                                         initWithAllowsCellularAccess:YES
@@ -18,7 +18,7 @@
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     [t downloadModelIfNeededWithConditions:cond completion:^(NSError * _Nullable err) {
         if (err) { dispatch_semaphore_signal(sem); return; }
-        [t translateText:text completion:^(NSString * _Nullable r, NSError * _Nullable e) {
+        [t translateText:param completion:^(NSString * _Nullable r, NSError * _Nullable e) {
             if (r && !e) result = r;
             dispatch_semaphore_signal(sem);
         }];
@@ -27,7 +27,7 @@
     return result;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

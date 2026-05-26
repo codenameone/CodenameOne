@@ -74,7 +74,11 @@ class Lib:
     long_desc: str
     facade_methods: str  # rendered Java method bodies
     ni_methods: str  # rendered Java interface methods
-    ios_impl: str  # body of the .m (no @implementation wrapper)
+    ios_h_decls: str  # canonical method declarations for the .h, one per line,
+    # e.g. `- (NSString*)recognize:(NSData*)param;`. Must match what
+    # `mvn cn1:generate-native-interfaces` would emit (param/param1/...).
+    ios_impl: str  # body of the .m (no @implementation wrapper), using
+    # canonical `param`/`param1`/... names so the impl matches the .h.
     ios_imports: str  # extra #imports
     android_imports: str
     android_impl: str  # body of the impl class (no class wrapper)
@@ -83,6 +87,11 @@ class Lib:
     build_hints: dict[str, str]
     test_mock_methods: str  # mock bridge method overrides
     ios_pre_impl: str = ""  # C/Obj-C source emitted BEFORE @implementation
+    win_decls: str = ""  # C# method overrides for the win/ module stub. When
+    # empty, a `return null/false/0` body is synthesised per declared method.
+    js_method_keys: tuple = ()  # JS-encoded method names, e.g.
+    # ("recognize__byte_1ARRAY",). Matches the encoding `generate-native-
+    # interfaces` uses for the JS port.
 
 
 def ni_class(facade: str) -> str:
@@ -133,6 +142,8 @@ def root_pom(artifact: str, short_desc: str) -> str:
                 <module>ios</module>
                 <module>android</module>
                 <module>javase</module>
+                <module>javascript</module>
+                <module>win</module>
                 <module>lib</module>
             </modules>
         </project>
@@ -293,6 +304,69 @@ def platform_pom(parent_artifact: str, suffix: str, extra_deps: str = "", extra_
         """)
 
 
+def resource_only_pom(parent_artifact: str, suffix: str, source_dir: str) -> str:
+    """Resource-only module (ios objectivec / javascript / win csharp).
+
+    Mirrors the cn1lib-archetype pattern: the source dir gets shipped as a
+    classpath resource, so the build server can later unpack it into the
+    real native build (Xcode for ios, npm for javascript, MSBuild for win).
+    """
+    return textwrap.dedent(f"""\
+        <?xml version="1.0" encoding="UTF-8"?>
+        <project xmlns="http://maven.apache.org/POM/4.0.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+
+            <parent>
+                <groupId>com.codenameone</groupId>
+                <artifactId>{parent_artifact}</artifactId>
+                <version>8.0-SNAPSHOT</version>
+            </parent>
+
+            <artifactId>{parent_artifact}-{suffix}</artifactId>
+            <packaging>jar</packaging>
+
+            <build>
+                <sourceDirectory>src/main/dummy</sourceDirectory>
+                <resources>
+                    <resource><directory>src/main/{source_dir}</directory></resource>
+                </resources>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <configuration>
+                                    <target>
+                                        <delete file="${{project.build.directory}}/${{project.build.finalName}}.jar" />
+                                        <mkdir dir="${{basedir}}/src/main/{source_dir}"/>
+                                        <jar destfile="${{project.build.directory}}/${{project.build.finalName}}.jar" compress="true">
+                                            <fileset dir="${{basedir}}/src/main/{source_dir}" erroronmissingdir="false" />
+                                        </jar>
+                                    </target>
+                                </configuration>
+                                <goals><goal>run</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>{parent_artifact}-common</artifactId>
+                    <version>${{project.version}}</version>
+                </dependency>
+            </dependencies>
+        </project>
+        """)
+
+
 def ios_pom(artifact: str) -> str:
     """iOS module pom uses src/main/objectivec for native sources."""
     return textwrap.dedent(f"""\
@@ -416,6 +490,32 @@ def lib_pom(artifact: str) -> str:
                         </dependency>
                     </dependencies>
                 </profile>
+                <profile>
+                    <id>javascript</id>
+                    <activation>
+                        <property><name>codename1.platform</name><value>javascript</value></property>
+                    </activation>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.codenameone</groupId>
+                            <artifactId>{artifact}-javascript</artifactId>
+                            <version>${{project.version}}</version>
+                        </dependency>
+                    </dependencies>
+                </profile>
+                <profile>
+                    <id>win</id>
+                    <activation>
+                        <property><name>codename1.platform</name><value>win</value></property>
+                    </activation>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.codenameone</groupId>
+                            <artifactId>{artifact}-win</artifactId>
+                            <version>${{project.version}}</version>
+                        </dependency>
+                    </dependencies>
+                </profile>
             </profiles>
         </project>
         """)
@@ -488,16 +588,25 @@ def ni_java(pkg: str, facade: str, ni_methods: str) -> str:
     )
 
 
-def ios_native_h(pkg: str, facade: str) -> str:
-    cls = "com_codename1_ai_" + pkg.replace(".", "_") + "_" + ni_class(facade) + "Impl"
-    return textwrap.dedent(f"""\
-        #import <Foundation/Foundation.h>
-        #import "CodenameOne_GLViewController.h"
+def ios_native_h(pkg: str, facade: str, decls: str) -> str:
+    """Canonical CN1 native-interface .h header.
 
-        @interface {cls} : NSObject {{
-        }}
-        @end
-        """)
+    `decls` carries the method declarations (one per line, with trailing
+    semicolons) matching what `mvn cn1:generate-native-interfaces` would
+    emit. `isSupported` is always declared in addition to those.
+    """
+    cls = "com_codename1_ai_" + pkg.replace(".", "_") + "_" + ni_class(facade) + "Impl"
+    decls_block = textwrap.indent(decls.rstrip(), "")
+    return (
+        "#import <Foundation/Foundation.h>\n"
+        "\n"
+        f"@interface {cls} : NSObject {{\n"
+        "}\n"
+        "\n"
+        f"{decls_block}\n"
+        "-(BOOL)isSupported;\n"
+        "@end\n"
+    )
 
 
 def ios_native_m(pkg: str, facade: str, extra_imports: str, body: str,
@@ -524,7 +633,7 @@ def ios_native_m(pkg: str, facade: str, extra_imports: str, body: str,
     out.append("")
     out.append(body.rstrip())
     out.append("")
-    out.append("- (BOOL)isSupported {")
+    out.append("-(BOOL)isSupported{")
     out.append("    return YES;")
     out.append("}")
     out.append("")
@@ -546,12 +655,72 @@ def android_native_java(pkg: str, facade: str, extra_imports: str, body: str) ->
 
 
 def javase_native_java(pkg: str, facade: str, body: str) -> str:
+    """JavaSE impl is the one platform where the impl MUST `implements`
+    the NativeInterface -- NativeLookup on JavaSE resolves the impl via
+    plain Java class loading and casts to the interface.
+    """
     return (
         f"package {java_pkg(pkg)};\n"
         + "\n"
-        + f"public class {ni_class(facade)}Impl {{\n"
+        + f"public class {ni_class(facade)}Impl implements {ni_class(facade)} {{\n"
         + textwrap.indent(body.rstrip(), "    ")
         + "\n\n    public boolean isSupported() {\n        return true;\n    }\n}\n"
+    )
+
+
+def win_native_cs(pkg: str, facade: str, decls: str) -> str:
+    """C# stub for the `win/` module. Methods return defaults -- the win
+    port is not a runtime target for ML Kit / TFLite / whisper.
+    """
+    ns = "com." + pkg.replace(".", "_") + "_" + facade  # placeholder; unused
+    return (
+        "// Stub: the cn1lib has no Windows UWP backend. Methods return\n"
+        "// default values so the cn1lib package layout is complete.\n"
+        f"namespace {java_pkg(pkg)} {{\n"
+        f"public class {ni_class(facade)}Impl : I{ni_class(facade)}Impl {{\n"
+        + textwrap.indent(decls.rstrip(), "    ")
+        + "\n"
+        "    public bool isSupported() { return false; }\n"
+        "}\n"
+        "}\n"
+    )
+
+
+def js_native(pkg: str, facade: str, methods: tuple) -> str:
+    """JS stub matching `mvn cn1:generate-native-interfaces` output verbatim.
+
+    `methods` is a tuple of `(key, param_count)` pairs, e.g.
+    `(("recognize__byte_1ARRAY", 1),)`. The JS function signature uses
+    `param1, ..., paramN, callback` to match canonical output.
+    """
+    interface_var = "com_codename1_ai_" + pkg.replace(".", "_") + "_" + ni_class(facade)
+    blocks = []
+    for key, count in methods:
+        if count == 0:
+            sig = "callback"
+        else:
+            sig = ", ".join(f"param{i + 1}" for i in range(count)) + ", callback"
+        blocks.append(
+            f"    o.{key} = function({sig}) {{\n"
+            "        callback.error(new Error(\"Not implemented yet\"));\n"
+            "    };\n"
+        )
+    blocks.append(
+        "    o.isSupported_ = function(callback) {\n"
+        "        callback.complete(false);\n"
+        "    };\n"
+    )
+    body = "\n".join(blocks)
+    return (
+        "(function(exports){\n"
+        "\n"
+        "var o = {};\n"
+        "\n"
+        + body
+        + "\n"
+        f"exports.{interface_var}= o;\n"
+        "\n"
+        "})(cn1_get_native_interfaces());\n"
     )
 
 
@@ -638,9 +807,10 @@ def lib_mlkit_text() -> Lib:
         """)
     ni_methods = "String recognize(byte[] imageBytes);\n"
 
+    ios_h_decls = "-(NSString*)recognize:(NSData*)param;\n"
     ios_impl = textwrap.dedent("""\
-        - (NSString *)recognize:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSString*)recognize:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return @"";
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:
@@ -742,6 +912,7 @@ def lib_mlkit_text() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls=ios_h_decls,
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports=android_imports,
@@ -749,6 +920,8 @@ def lib_mlkit_text() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("recognize__byte_1ARRAY", 1),),
+        win_decls="public string recognize(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/TextRecognition",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:text-recognition:16.0.0'",
@@ -800,8 +973,8 @@ def lib_mlkit_barcode() -> Lib:
     ni_methods = "String[] scan(byte[] imageBytes);\n"
 
     ios_impl = textwrap.dedent("""\
-        - (NSData *)scan:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSData*)scan:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return [self packStrings:@[]];
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKBarcodeScannerOptions *opts = [[MLKBarcodeScannerOptions alloc] init];
@@ -821,7 +994,7 @@ def lib_mlkit_barcode() -> Lib:
             return [self packStrings:values];
         }
 
-        - (NSData *)packStrings:(NSArray<NSString *> *)strings {
+        -(NSData*)packStrings:(NSArray<NSString *> *)strings {
             // Encode as length-prefixed UTF-8 (network byte order int + bytes).
             NSMutableData *out = [NSMutableData data];
             uint32_t count = htonl((uint32_t)strings.count);
@@ -911,6 +1084,7 @@ def lib_mlkit_barcode() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)scan:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -918,6 +1092,8 @@ def lib_mlkit_barcode() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("scan__byte_1ARRAY", 1),),
+        win_decls="public string[] scan(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/BarcodeScanning",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:barcode-scanning:17.2.0'",
@@ -966,8 +1142,8 @@ def lib_mlkit_face() -> Lib:
     ni_methods = "int[] detect(byte[] imageBytes);\n"
 
     ios_impl = textwrap.dedent("""\
-        - (NSData *)detect:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSData*)detect:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return [NSData data];
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKFaceDetectorOptions *opts = [[MLKFaceDetectorOptions alloc] init];
@@ -1061,6 +1237,7 @@ def lib_mlkit_face() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)detect:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1068,6 +1245,8 @@ def lib_mlkit_face() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("detect__byte_1ARRAY", 1),),
+        win_decls="public int[] detect(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/FaceDetection",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:face-detection:16.1.5'",
@@ -1154,8 +1333,8 @@ def _strings_facade_methods(facade: str, ni: str, method: str, arg_kind: str = "
 def lib_mlkit_labeling() -> Lib:
     facade_methods = _strings_facade_methods("ImageLabeler", "NativeImageLabeler", "label")
     ios_impl = textwrap.dedent("""\
-        - (NSData *)label:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSData*)label:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return [self packStrings:@[]];
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKImageLabelerOptions *opts = [[MLKImageLabelerOptions alloc] init];
@@ -1172,7 +1351,7 @@ def lib_mlkit_labeling() -> Lib:
             return [self packStrings:m];
         }
 
-        - (NSData *)packStrings:(NSArray<NSString *> *)strings {
+        -(NSData*)packStrings:(NSArray<NSString *> *)strings {
             NSMutableData *out = [NSMutableData data];
             uint32_t count = htonl((uint32_t)strings.count);
             [out appendBytes:&count length:sizeof(count)];
@@ -1247,6 +1426,7 @@ def lib_mlkit_labeling() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods="String[] label(byte[] imageBytes);\n",
+        ios_h_decls="-(NSData*)label:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1254,6 +1434,8 @@ def lib_mlkit_labeling() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("label__byte_1ARRAY", 1),),
+        win_decls="public string[] label(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/ImageLabeling",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:image-labeling:17.0.7'",
@@ -1295,10 +1477,10 @@ def lib_mlkit_translate() -> Lib:
         """)
     ni_methods = "String translate(String text, String sourceLang, String targetLang);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSString *)translate:(NSString *)text :(NSString *)sourceLang :(NSString *)targetLang {
+        -(NSString*)translate:(NSString*)param param1:(NSString*)param1 param2:(NSString*)param2 {
             MLKTranslatorOptions *opts = [[MLKTranslatorOptions alloc]
-                                          initWithSourceLanguage:sourceLang
-                                          targetLanguage:targetLang];
+                                          initWithSourceLanguage:param1
+                                          targetLanguage:param2];
             MLKTranslator *t = [MLKTranslator translatorWithOptions:opts];
             MLKModelDownloadConditions *cond = [[MLKModelDownloadConditions alloc]
                                                 initWithAllowsCellularAccess:YES
@@ -1307,7 +1489,7 @@ def lib_mlkit_translate() -> Lib:
             dispatch_semaphore_t sem = dispatch_semaphore_create(0);
             [t downloadModelIfNeededWithConditions:cond completion:^(NSError * _Nullable err) {
                 if (err) { dispatch_semaphore_signal(sem); return; }
-                [t translateText:text completion:^(NSString * _Nullable r, NSError * _Nullable e) {
+                [t translateText:param completion:^(NSString * _Nullable r, NSError * _Nullable e) {
                     if (r && !e) result = r;
                     dispatch_semaphore_signal(sem);
                 }];
@@ -1378,6 +1560,7 @@ def lib_mlkit_translate() -> Lib:
         long_desc="Translates short text between language pairs entirely on-device.",
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSString*)translate:(NSString*)param param1:(NSString*)param1 param2:(NSString*)param2;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1385,6 +1568,8 @@ def lib_mlkit_translate() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("translate__java_lang_String_java_lang_String_java_lang_String", 3),),
+        win_decls="public string translate(string param, string param1, string param2) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/Translate",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:translate:17.0.3'",
@@ -1396,11 +1581,11 @@ def lib_mlkit_smartreply() -> Lib:
     facade_methods = _strings_facade_methods("SmartReply", "NativeSmartReply", "suggest", arg_kind="text")
     ni_methods = "String[] suggest(String conversationJson);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSData *)suggest:(NSString *)conversationJson {
-            // conversationJson is an array of {role,message,timestamp,userId}.
+        -(NSData*)suggest:(NSString*)param {
+            // param is a JSON array of {role,message,timestamp,userId}.
             NSError *err = nil;
             NSArray *items = [NSJSONSerialization JSONObjectWithData:
-                              [conversationJson dataUsingEncoding:NSUTF8StringEncoding]
+                              [param dataUsingEncoding:NSUTF8StringEncoding]
                               options:0 error:&err];
             NSMutableArray *messages = [NSMutableArray array];
             if ([items isKindOfClass:[NSArray class]]) {
@@ -1432,7 +1617,7 @@ def lib_mlkit_smartreply() -> Lib:
             return [self packStrings:out];
         }
 
-        - (NSData *)packStrings:(NSArray<NSString *> *)strings {
+        -(NSData*)packStrings:(NSArray<NSString *> *)strings {
             NSMutableData *out = [NSMutableData data];
             uint32_t count = htonl((uint32_t)strings.count);
             [out appendBytes:&count length:sizeof(count)];
@@ -1515,6 +1700,7 @@ def lib_mlkit_smartreply() -> Lib:
         long_desc="Generates short reply suggestions for chat conversations on-device.",
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)suggest:(NSString*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1522,6 +1708,8 @@ def lib_mlkit_smartreply() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("suggest__java_lang_String", 1),),
+        win_decls="public string[] suggest(string param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/SmartReply",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:smart-reply:17.0.4'",
@@ -1534,11 +1722,11 @@ def lib_mlkit_langid() -> Lib:
                                             arg_kind="text")
     ni_methods = "String identify(String input);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSString *)identify:(NSString *)input {
+        -(NSString*)identify:(NSString*)param {
             MLKLanguageIdentification *id = [MLKLanguageIdentification languageIdentification];
             __block NSString *result = @"und";
             dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-            [id identifyLanguageForText:input completion:^(NSString * _Nullable lang, NSError * _Nullable e) {
+            [id identifyLanguageForText:param completion:^(NSString * _Nullable lang, NSError * _Nullable e) {
                 if (lang) result = lang;
                 dispatch_semaphore_signal(sem);
             }];
@@ -1588,6 +1776,7 @@ def lib_mlkit_langid() -> Lib:
         long_desc="Identifies the language of a given text string.",
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSString*)identify:(NSString*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1595,6 +1784,8 @@ def lib_mlkit_langid() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("identify__java_lang_String", 1),),
+        win_decls="public string identify(string param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/LanguageID",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:language-id:17.0.6'",
@@ -1636,8 +1827,8 @@ def lib_mlkit_pose() -> Lib:
         """)
     ni_methods = "float[] detect(byte[] imageBytes);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSData *)detect:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSData*)detect:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return [NSData data];
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKPoseDetectorOptions *opts = [[MLKPoseDetectorOptions alloc] init];
@@ -1725,6 +1916,7 @@ def lib_mlkit_pose() -> Lib:
         long_desc="Returns skeletal landmarks for human bodies detected in an image.",
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)detect:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1732,6 +1924,8 @@ def lib_mlkit_pose() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("detect__byte_1ARRAY", 1),),
+        win_decls="public float[] detect(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/PoseDetection",
             "codename1.arg.android.gradleDep": "implementation 'com.google.mlkit:pose-detection:18.0.0-beta3'",
@@ -1773,8 +1967,8 @@ def lib_mlkit_segmentation() -> Lib:
         """)
     ni_methods = "byte[] segment(byte[] imageBytes);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSData *)segment:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSData*)segment:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return [NSData data];
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
             MLKSelfieSegmenterOptions *opts = [[MLKSelfieSegmenterOptions alloc] init];
@@ -1873,6 +2067,7 @@ def lib_mlkit_segmentation() -> Lib:
         long_desc="Returns a per-pixel mask separating a person in the foreground from the background.",
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)segment:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1880,6 +2075,8 @@ def lib_mlkit_segmentation() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("segment__byte_1ARRAY", 1),),
+        win_decls="public byte[] segment(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "GoogleMLKit/SegmentationSelfie",
             "codename1.arg.android.gradleDep":
@@ -1897,8 +2094,8 @@ def lib_mlkit_docscan() -> Lib:
         // interactive; this bridge accepts a pre-captured image and returns its
         // cropped JPEG path. On iOS 13+ VisionKit handles the live UI flow; the
         // sample app drives that flow and feeds the bytes into the cn1lib.
-        - (NSString *)scanToFile:(NSData *)imageBytes {
-            UIImage *image = [UIImage imageWithData:imageBytes];
+        -(NSString*)scanToFile:(NSData*)param {
+            UIImage *image = [UIImage imageWithData:param];
             if (!image) return @"";
             CIImage *ci = [CIImage imageWithCGImage:image.CGImage];
             CIContext *ctx = [CIContext context];
@@ -1971,6 +2168,7 @@ def lib_mlkit_docscan() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSString*)scanToFile:(NSData*)param;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -1978,6 +2176,8 @@ def lib_mlkit_docscan() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("scanToFile__byte_1ARRAY", 1),),
+        win_decls="public string scanToFile(byte[] param) { return null; }",
         build_hints={
             "codename1.arg.ios.add_frameworks": "VisionKit",
             "codename1.arg.android.gradleDep":
@@ -2025,17 +2225,17 @@ def lib_tflite() -> Lib:
         """)
     ni_methods = "float[] run(byte[] modelBytes, float[] input, int outputLength);\n"
     ios_impl = textwrap.dedent("""\
-        - (NSData *)run:(NSData *)modelBytes :(NSData *)input :(int)outputLength {
+        -(NSData*)run:(NSData*)param param1:(NSData*)param1 param2:(int)param2 {
             NSError *err = nil;
             NSString *modelPath = [NSString stringWithFormat:@"%@/tflite-%@.tflite",
                                    NSTemporaryDirectory(), [[NSUUID UUID] UUIDString]];
-            [modelBytes writeToFile:modelPath atomically:YES];
+            [param writeToFile:modelPath atomically:YES];
             TFLInterpreter *interp = [[TFLInterpreter alloc] initWithModelPath:modelPath error:&err];
             if (err) return [NSData data];
             [interp allocateTensorsWithError:&err];
             if (err) return [NSData data];
             TFLTensor *in0 = [interp inputTensorAtIndex:0 error:&err];
-            [in0 copyData:input error:&err];
+            [in0 copyData:param1 error:&err];
             [interp invokeWithError:&err];
             TFLTensor *out0 = [interp outputTensorAtIndex:0 error:&err];
             NSData *outBytes = [out0 dataWithError:&err];
@@ -2094,6 +2294,7 @@ def lib_tflite() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)run:(NSData*)param param1:(NSData*)param1 param2:(int)param2;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         android_imports="",
@@ -2101,6 +2302,8 @@ def lib_tflite() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("run__byte_1ARRAY_float_1ARRAY_int", 3),),
+        win_decls="public float[] run(byte[] param, float[] param1, int param2) { return null; }",
         build_hints={
             "codename1.arg.ios.pods": "TensorFlowLiteObjC",
             "codename1.arg.android.gradleDep": "implementation 'org.tensorflow:tensorflow-lite:2.14.0'",
@@ -2174,16 +2377,16 @@ def lib_whisper() -> Lib:
         extern void whisper_free(struct whisper_context *ctx);
         """)
     ios_impl = textwrap.dedent("""\
-        - (NSString *)transcribe:(NSString *)modelPath :(NSString *)audioPath {
+        -(NSString*)transcribe:(NSString*)param param1:(NSString*)param1 {
             // Decode 16kHz mono PCM samples from a WAV file.
-            NSData *wav = [NSData dataWithContentsOfFile:audioPath];
+            NSData *wav = [NSData dataWithContentsOfFile:param1];
             if (wav.length < 44) return @"";
             const uint8_t *bytes = wav.bytes;
             const int16_t *samples16 = (const int16_t *)(bytes + 44);
             NSInteger nSamples = (wav.length - 44) / 2;
             float *samples = (float *)malloc(sizeof(float) * nSamples);
             for (NSInteger i = 0; i < nSamples; i++) samples[i] = samples16[i] / 32768.0f;
-            struct whisper_context *ctx = whisper_init_from_file([modelPath UTF8String]);
+            struct whisper_context *ctx = whisper_init_from_file([param UTF8String]);
             if (!ctx) { free(samples); return @""; }
             struct whisper_full_params p = {0};
             p.n_threads = 4;
@@ -2240,6 +2443,7 @@ def lib_whisper() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSString*)transcribe:(NSString*)param param1:(NSString*)param1;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         ios_pre_impl=ios_pre_impl,
@@ -2248,6 +2452,8 @@ def lib_whisper() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("transcribe__java_lang_String_java_lang_String", 2),),
+        win_decls="public string transcribe(string param, string param1) { return null; }",
         build_hints={
             "codename1.arg.ios.add_libs": "libwhisper.a",
             "codename1.arg.ios.add_frameworks": "Accelerate",
@@ -2302,8 +2508,8 @@ def lib_stablediffusion() -> Lib:
         extern NSData *cn1_sd_generate(const char *prompt, int w, int h, int steps);
         """)
     ios_impl = textwrap.dedent("""\
-        - (NSData *)generate:(NSString *)prompt :(int)width :(int)height :(int)steps {
-            return cn1_sd_generate([prompt UTF8String], width, height, steps);
+        -(NSData*)generate:(NSString*)param param1:(int)param1 param2:(int)param2 param3:(int)param3 {
+            return cn1_sd_generate([param UTF8String], param1, param2, param3);
         }
         """)
     ios_imports = ""
@@ -2354,6 +2560,7 @@ def lib_stablediffusion() -> Lib:
         ),
         facade_methods=facade_methods,
         ni_methods=ni_methods,
+        ios_h_decls="-(NSData*)generate:(NSString*)param param1:(int)param1 param2:(int)param2 param3:(int)param3;\n",
         ios_impl=ios_impl,
         ios_imports=ios_imports,
         ios_pre_impl=ios_pre_impl,
@@ -2362,6 +2569,8 @@ def lib_stablediffusion() -> Lib:
         javase_impl=javase_impl,
         test_methods=test_methods,
         test_mock_methods=test_mock_methods,
+        js_method_keys=(("generate__java_lang_String_int_int_int", 4),),
+        win_decls="public byte[] generate(string param, int param1, int param2, int param3) { return null; }",
         build_hints={
             "codename1.arg.android.gradleDep": "implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.16.3'",
             "codename1.arg.ios.requiresBigUpload": "true",
@@ -2402,9 +2611,12 @@ def generate(lib: Lib) -> None:
     # Root pom + per-module poms.
     write(base / "pom.xml", root_pom(lib.artifact, lib.short_desc))
     write(base / "common" / "pom.xml", common_pom(lib.artifact))
-    write(base / "ios" / "pom.xml", ios_pom(lib.artifact))
+    write(base / "ios" / "pom.xml", resource_only_pom(lib.artifact, "ios", "objectivec"))
     write(base / "android" / "pom.xml", platform_pom(lib.artifact, "android"))
     write(base / "javase" / "pom.xml", platform_pom(lib.artifact, "javase"))
+    write(base / "javascript" / "pom.xml",
+          resource_only_pom(lib.artifact, "javascript", "javascript"))
+    write(base / "win" / "pom.xml", resource_only_pom(lib.artifact, "win", "csharp"))
     write(base / "lib" / "pom.xml", lib_pom(lib.artifact))
 
     # Common Java sources.
@@ -2433,7 +2645,7 @@ def generate(lib: Lib) -> None:
     # iOS sources.
     ios_native = base / "ios" / "src" / "main" / "objectivec"
     cls_basename = "com_codename1_ai_" + lib.pkg.replace(".", "_") + "_" + ni_class(lib.facade) + "Impl"
-    write(ios_native / f"{cls_basename}.h", ios_native_h(lib.pkg, lib.facade))
+    write(ios_native / f"{cls_basename}.h", ios_native_h(lib.pkg, lib.facade, lib.ios_h_decls))
     write(ios_native / f"{cls_basename}.m",
           ios_native_m(lib.pkg, lib.facade, lib.ios_imports, lib.ios_impl,
                        lib.ios_pre_impl))
@@ -2447,6 +2659,19 @@ def generate(lib: Lib) -> None:
     javase_pkg_root = base / "javase" / "src" / "main" / "java" / pkg_path
     write(javase_pkg_root / f"{ni_class(lib.facade)}Impl.java",
           javase_native_java(lib.pkg, lib.facade, lib.javase_impl))
+
+    # JavaScript stub (no ML Kit / TFLite equivalent on the JS port; methods
+    # call the supplied callback with an Error so apps that incorrectly
+    # target JS surface a clear runtime error instead of silent breakage).
+    js_root = base / "javascript" / "src" / "main" / "javascript"
+    write(js_root / f"com_codename1_ai_{lib.pkg.replace('.', '_')}_{ni_class(lib.facade)}.js",
+          js_native(lib.pkg, lib.facade, lib.js_method_keys))
+
+    # Win C# stub (same rationale as JS: no UWP target for ML Kit native
+    # SDKs; methods return default values).
+    win_root = base / "win" / "src" / "main" / "csharp" / pkg_path
+    write(win_root / f"{ni_class(lib.facade)}Impl.cs",
+          win_native_cs(lib.pkg, lib.facade, lib.win_decls))
 
 
 def main() -> None:

@@ -4,11 +4,11 @@
 
 @implementation com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl
 
-- (NSString *)identify:(NSString *)input {
+-(NSString*)identify:(NSString*)param {
     MLKLanguageIdentification *id = [MLKLanguageIdentification languageIdentification];
     __block NSString *result = @"und";
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-    [id identifyLanguageForText:input completion:^(NSString * _Nullable lang, NSError * _Nullable e) {
+    [id identifyLanguageForText:param completion:^(NSString * _Nullable lang, NSError * _Nullable e) {
         if (lang) result = lang;
         dispatch_semaphore_signal(sem);
     }];
@@ -16,7 +16,7 @@
     return result;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

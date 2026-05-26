@@ -9,11 +9,11 @@ extern NSData *cn1_sd_generate(const char *prompt, int w, int h, int steps);
 
 @implementation com_codename1_ai_imagegen_NativeStableDiffusionImpl
 
-- (NSData *)generate:(NSString *)prompt :(int)width :(int)height :(int)steps {
-    return cn1_sd_generate([prompt UTF8String], width, height, steps);
+-(NSData*)generate:(NSString*)param param1:(int)param1 param2:(int)param2 param3:(int)param3 {
+    return cn1_sd_generate([param UTF8String], param1, param2, param3);
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

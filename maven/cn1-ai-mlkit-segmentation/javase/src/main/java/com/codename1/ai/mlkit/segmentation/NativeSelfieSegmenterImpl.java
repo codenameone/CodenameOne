@@ -1,6 +1,6 @@
 package com.codename1.ai.mlkit.segmentation;
 
-public class NativeSelfieSegmenterImpl {
+public class NativeSelfieSegmenterImpl implements NativeSelfieSegmenter {
     public byte[] segment(byte[] imageBytes) {
         // 8x8 checkerboard stub.
         byte[] out = new byte[64];

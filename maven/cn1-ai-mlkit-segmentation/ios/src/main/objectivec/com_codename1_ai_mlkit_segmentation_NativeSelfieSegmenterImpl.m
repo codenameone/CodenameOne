@@ -8,8 +8,8 @@
 
 @implementation com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl
 
-- (NSData *)segment:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSData*)segment:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKSelfieSegmenterOptions *opts = [[MLKSelfieSegmenterOptions alloc] init];
@@ -38,7 +38,7 @@
     return result;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

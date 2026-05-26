@@ -8,8 +8,8 @@
 
 @implementation com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl
 
-- (NSData *)label:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSData*)label:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return [self packStrings:@[]];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKImageLabelerOptions *opts = [[MLKImageLabelerOptions alloc] init];
@@ -26,7 +26,7 @@
     return [self packStrings:m];
 }
 
-- (NSData *)packStrings:(NSArray<NSString *> *)strings {
+-(NSData*)packStrings:(NSArray<NSString *> *)strings {
     NSMutableData *out = [NSMutableData data];
     uint32_t count = htonl((uint32_t)strings.count);
     [out appendBytes:&count length:sizeof(count)];
@@ -39,7 +39,7 @@
     return out;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

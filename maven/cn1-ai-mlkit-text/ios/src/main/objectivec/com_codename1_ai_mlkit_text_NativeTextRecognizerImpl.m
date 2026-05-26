@@ -7,8 +7,8 @@
 
 @implementation com_codename1_ai_mlkit_text_NativeTextRecognizerImpl
 
-- (NSString *)recognize:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSString*)recognize:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return @"";
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:
@@ -27,7 +27,7 @@
     return result;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

@@ -8,8 +8,8 @@
 
 @implementation com_codename1_ai_mlkit_pose_NativePoseDetectorImpl
 
-- (NSData *)detect:(NSData *)imageBytes {
-    UIImage *image = [UIImage imageWithData:imageBytes];
+-(NSData*)detect:(NSData*)param {
+    UIImage *image = [UIImage imageWithData:param];
     if (!image) return [NSData data];
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     MLKPoseDetectorOptions *opts = [[MLKPoseDetectorOptions alloc] init];
@@ -34,7 +34,7 @@
     return [NSData dataWithBytes:buf length:sizeof(buf)];
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

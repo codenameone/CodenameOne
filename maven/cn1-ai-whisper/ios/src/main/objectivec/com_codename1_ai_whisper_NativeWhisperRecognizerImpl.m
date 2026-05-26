@@ -31,16 +31,16 @@ extern void whisper_free(struct whisper_context *ctx);
 
 @implementation com_codename1_ai_whisper_NativeWhisperRecognizerImpl
 
-- (NSString *)transcribe:(NSString *)modelPath :(NSString *)audioPath {
+-(NSString*)transcribe:(NSString*)param param1:(NSString*)param1 {
     // Decode 16kHz mono PCM samples from a WAV file.
-    NSData *wav = [NSData dataWithContentsOfFile:audioPath];
+    NSData *wav = [NSData dataWithContentsOfFile:param1];
     if (wav.length < 44) return @"";
     const uint8_t *bytes = wav.bytes;
     const int16_t *samples16 = (const int16_t *)(bytes + 44);
     NSInteger nSamples = (wav.length - 44) / 2;
     float *samples = (float *)malloc(sizeof(float) * nSamples);
     for (NSInteger i = 0; i < nSamples; i++) samples[i] = samples16[i] / 32768.0f;
-    struct whisper_context *ctx = whisper_init_from_file([modelPath UTF8String]);
+    struct whisper_context *ctx = whisper_init_from_file([param UTF8String]);
     if (!ctx) { free(samples); return @""; }
     struct whisper_full_params p = {0};
     p.n_threads = 4;
@@ -56,7 +56,7 @@ extern void whisper_free(struct whisper_context *ctx);
     return out;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

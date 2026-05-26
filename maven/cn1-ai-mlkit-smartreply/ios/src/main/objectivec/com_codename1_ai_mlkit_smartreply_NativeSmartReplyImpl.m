@@ -8,11 +8,11 @@
 
 @implementation com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl
 
-- (NSData *)suggest:(NSString *)conversationJson {
-    // conversationJson is an array of {role,message,timestamp,userId}.
+-(NSData*)suggest:(NSString*)param {
+    // param is a JSON array of {role,message,timestamp,userId}.
     NSError *err = nil;
     NSArray *items = [NSJSONSerialization JSONObjectWithData:
-                      [conversationJson dataUsingEncoding:NSUTF8StringEncoding]
+                      [param dataUsingEncoding:NSUTF8StringEncoding]
                       options:0 error:&err];
     NSMutableArray *messages = [NSMutableArray array];
     if ([items isKindOfClass:[NSArray class]]) {
@@ -44,7 +44,7 @@
     return [self packStrings:out];
 }
 
-- (NSData *)packStrings:(NSArray<NSString *> *)strings {
+-(NSData*)packStrings:(NSArray<NSString *> *)strings {
     NSMutableData *out = [NSMutableData data];
     uint32_t count = htonl((uint32_t)strings.count);
     [out appendBytes:&count length:sizeof(count)];
@@ -57,7 +57,7 @@
     return out;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 

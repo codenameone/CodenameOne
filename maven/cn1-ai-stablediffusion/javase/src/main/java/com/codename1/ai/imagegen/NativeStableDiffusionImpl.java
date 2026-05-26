@@ -1,6 +1,6 @@
 package com.codename1.ai.imagegen;
 
-public class NativeStableDiffusionImpl {
+public class NativeStableDiffusionImpl implements NativeStableDiffusion {
     public byte[] generate(String prompt, int width, int height, int steps) {
         // Simulator stub: returns a 1x1 PNG so callers can exercise pipelines.
         return new byte[]{
