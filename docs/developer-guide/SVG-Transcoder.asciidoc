@@ -265,6 +265,25 @@ Image small = img.scaled(48, 48);  // any explicit size still works
 requested dimensions from `getWidth()`/`getHeight()` and shares the
 animation clock with its source.
 
+== Known iOS Metal limitations
+
+The iOS Metal renderer has two SVG-relevant bugs that this transcoder
+does not work around -- the goldens capture the current behavior and a
+Metal-focused PR will fix the rendering path:
+
+`<text>` elements may misrender::
+  `Graphics.drawString` under a non-identity transform does not always
+  pick up the active transform on the Metal port. Transcoded SVG text
+  may render at the wrong screen position or not at all (logo
+  background paints correctly, the text on top of it does not). Solid
+  shapes and stroked paths render correctly.
+
+Gradient fills clipped by a non-rectangular path render as triangles::
+  `setClip(GeneralPath)` substitutes a degenerate polygon for an
+  arc-decomposed path on Metal, so a `<circle fill="url(#grad)"/>`
+  ends up shaped like a triangle. The OpenGL ES port (`build-ios`,
+  the default before Metal) renders both correctly.
+
 == Limitations and notes
 
 * The transcoder uses the JDK's StAX parser at build time. There is no

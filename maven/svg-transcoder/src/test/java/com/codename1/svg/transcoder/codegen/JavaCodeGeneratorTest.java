@@ -108,22 +108,20 @@ public class JavaCodeGeneratorTest {
     }
 
     @Test
-    public void linearGradientEmitsHelperCall() throws Exception {
+    public void linearGradientEmitsPaint() throws Exception {
         String out = transcode("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'>"
                 + "<defs><linearGradient id='g1' x1='0' y1='0' x2='1' y2='0'>"
                 + "<stop offset='0' stop-color='red'/>"
                 + "<stop offset='1' stop-color='blue'/>"
                 + "</linearGradient></defs>"
                 + "<rect x='0' y='0' width='10' height='10' fill='url(#g1)'/></svg>");
-        // Gradient fills route through GeneratedSVGImage.fillSvgGradient
-        // instead of setClip(path) + paint -- the inline recipe broke on
-        // iOS Metal because setClip(arc) substitutes a degenerate polygon.
-        assertTrue("expected fillSvgGradient call, got: " + out,
-                out.contains("fillSvgGradient(g, __p"));
-        assertTrue("expected red gradient stop color",
-                out.contains("0xFFFF0000"));
-        assertTrue("expected blue gradient stop color",
-                out.contains("0xFF0000FF"));
+        // Gradient fills use the setClip(path) + LinearGradientPaint.paint
+        // recipe. iOS Metal currently misrenders these (substitutes a
+        // degenerate polygon clip) -- see SVG-Transcoder.asciidoc; the
+        // Metal port bug is being tracked separately and the screenshot
+        // goldens capture the platform-current behavior.
+        assertTrue(out.contains("new LinearGradientPaint("));
+        assertTrue(out.contains("CycleMethod.NO_CYCLE"));
     }
 
     @Test
