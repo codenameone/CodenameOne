@@ -356,13 +356,6 @@
 
                 <executions>
                     <execution>
-                        <id>cn1-annotation-stubs</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>generate-annotation-stubs</goal>
-                        </goals>
-                    </execution>
-                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -375,7 +368,6 @@
                         <goals>
                             <goal>compliance-check</goal>
                             <goal>css</goal>
-                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>

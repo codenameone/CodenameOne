@@ -334,17 +334,6 @@
 
                 <executions>
                     <execution>
-                        <id>cn1-annotation-stubs</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <!-- Always emits a no-op com.codename1.router.generated.Routes
-                                 so the per-platform application stub can reference it
-                                 by symbol; process-annotations overwrites it with the
-                                 real dispatcher when @Route declarations are present. -->
-                            <goal>generate-annotation-stubs</goal>
-                        </goals>
-                    </execution>
-                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -357,6 +346,11 @@
                         <goals>
                             <goal>compliance-check</goal>
                             <goal>css</goal>
+                            <!-- Scans the project's compiled bytecode for
+                                 @Route declarations and generates the
+                                 dispatcher class consumed by the per-platform
+                                 application stub. No-op for projects with no
+                                 @Route. -->
                             <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
