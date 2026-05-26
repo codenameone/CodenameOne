@@ -826,8 +826,8 @@ def lib_mlkit_text() -> Lib:
             UIImage *image = [UIImage imageWithData:param];
             if (!image) return @"";
             MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
-            MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:
-                                              [[MLKCommonTextRecognizerOptions alloc] init]];
+            MLKTextRecognizerOptions *opts = [[MLKTextRecognizerOptions alloc] init];
+            MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:opts];
             __block NSString *result = @"";
             dispatch_semaphore_t sem = dispatch_semaphore_create(0);
             [recognizer processImage:vision completion:^(MLKText * _Nullable text, NSError * _Nullable err) {
@@ -846,8 +846,12 @@ def lib_mlkit_text() -> Lib:
     # framework itself, e.g. MLKitTextRecognition.h). Importing the
     # umbrella pulls every public class -- the per-class header paths
     # we previously used aren't actually exported.
+    # MLKText (the result type) lives in MLKitTextRecognitionCommon,
+    # which the recognizer's main framework re-exports but clang's
+    # modules system still requires the explicit import.
     ios_imports = textwrap.dedent("""\
         #import <MLKitTextRecognition/MLKitTextRecognition.h>
+        #import <MLKitTextRecognitionCommon/MLKitTextRecognitionCommon.h>
         #import <MLKitVision/MLKitVision.h>
         """)
 
@@ -1380,6 +1384,7 @@ def lib_mlkit_labeling() -> Lib:
         """)
     ios_imports = textwrap.dedent("""\
         #import <MLKitImageLabeling/MLKitImageLabeling.h>
+        #import <MLKitImageLabelingCommon/MLKitImageLabelingCommon.h>
         #import <MLKitVision/MLKitVision.h>
         #import <arpa/inet.h>
         """)
@@ -1863,6 +1868,7 @@ def lib_mlkit_pose() -> Lib:
         """)
     ios_imports = textwrap.dedent("""\
         #import <MLKitPoseDetection/MLKitPoseDetection.h>
+        #import <MLKitPoseDetectionCommon/MLKitPoseDetectionCommon.h>
         #import <MLKitVision/MLKitVision.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -2004,6 +2010,7 @@ def lib_mlkit_segmentation() -> Lib:
         """)
     ios_imports = textwrap.dedent("""\
         #import <MLKitSegmentationSelfie/MLKitSegmentationSelfie.h>
+        #import <MLKitSegmentationCommon/MLKitSegmentationCommon.h>
         #import <MLKitVision/MLKitVision.h>
         #import <CoreVideo/CoreVideo.h>
         """)
