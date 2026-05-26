@@ -60,12 +60,17 @@ public final class SVGTranscoder {
     }
 
     /**
-     * Emit a {@code SVGRegistry} class with a single public static method
-     * {@code install(Resources)}, which instantiates each generated SVG image
-     * and registers it under its source filename. The runtime
-     * {@code Resources} class also looks up this same registry class via
-     * reflection so generated SVGs appear under {@code getImage(name)} for
-     * any resources bundle that has been opened in this VM.
+     * Emit a {@code SVGRegistry} class with a public static
+     * {@code install(Resources)} method that instantiates each generated SVG
+     * image and registers it under its source filename. {@code install} also
+     * pushes the same set into a global registry so other {@code Resources}
+     * instances opened later in the VM resolve the SVGs by name through
+     * {@link com.codename1.ui.util.Resources#getImage(String)} too.
+     *
+     * <p>App code is expected to call {@code SVGRegistry.install(theme)} once
+     * at startup -- this explicit call (rather than a reflective auto-probe)
+     * keeps the runtime compatible with ParparVM's static reachability
+     * analysis on iOS.</p>
      */
     public static void writeRegistry(String packageName, String className, java.util.List<GeneratedClass> classes, Writer out) throws IOException {
         // dedupe by resource name; last wins
@@ -97,7 +102,8 @@ public final class SVGTranscoder {
         }
         out.write("        }\n");
         out.write("    }\n\n");
-        out.write("    /** Called via reflection by Resources lazily -- see Resources#getImage. */\n");
+        out.write("    /** Populate only the global fallback registry on Resources.\n");
+        out.write("     *  install(Resources) calls this transparently. */\n");
         out.write("    public static void installGlobal() {\n");
         out.write("        if (__installed) return;\n");
         out.write("        synchronized (" + className + ".class) {\n");

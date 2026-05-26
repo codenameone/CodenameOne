@@ -10,7 +10,7 @@ import java.util.Locale;
 
 /**
  * Walks a parsed {@link SVGDocument} and emits a Java source file that
- * extends {@code com.codename1.svg.GeneratedSVGImage} and renders the SVG
+ * extends {@code com.codename1.ui.GeneratedSVGImage} and renders the SVG
  * using the Codename One {@code Graphics} shape API. SMIL animations on a
  * node become inline calls to the animation helpers on the runtime base
  * class so the emitted code stays self-contained.
@@ -42,7 +42,7 @@ public final class JavaCodeGenerator {
         if (packageName != null && !packageName.isEmpty()) {
             src.append("package ").append(packageName).append(";\n\n");
         }
-        src.append("import com.codename1.svg.GeneratedSVGImage;\n");
+        src.append("import com.codename1.ui.GeneratedSVGImage;\n");
         src.append("import com.codename1.ui.Graphics;\n");
         src.append("import com.codename1.ui.LinearGradientPaint;\n");
         src.append("import com.codename1.ui.MultipleGradientPaint;\n");

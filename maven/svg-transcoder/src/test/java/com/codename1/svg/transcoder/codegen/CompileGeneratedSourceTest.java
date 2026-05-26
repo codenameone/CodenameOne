@@ -25,7 +25,7 @@ import static org.junit.Assert.*;
 /**
  * Hands-on end-to-end test: transcode each fixture SVG, hand the resulting
  * Java source to the in-process JDK compiler, and fail if the result doesn't
- * compile against the real {@code com.codename1.svg.GeneratedSVGImage} +
+ * compile against the real {@code com.codename1.ui.GeneratedSVGImage} +
  * graphics API. This is the test that catches sloppy code emission in the
  * generator, where a syntactic check would not be enough.
  */

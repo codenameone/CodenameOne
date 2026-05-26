@@ -1,22 +1,44 @@
-package com.codename1.svg;
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.
+ */
+package com.codename1.ui;
 
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import com.codename1.ui.Transform;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.util.MathUtil;
 
-/// Base class for SVG images emitted by the build-time transcoder.
+/// Base class for SVG images emitted by the build-time transcoder
+/// (`maven/svg-transcoder`).
 ///
 /// A subclass is generated per source SVG file. The subclass overrides
 /// [#paintSVG(Graphics, long)] to issue the actual drawing commands and
-/// passes its intrinsic size and viewBox to the constructor. This class
-/// handles viewport mapping (scaling the viewBox into the requested
-/// destination rectangle) and animation time tracking so generated code
-/// stays declarative.
+/// passes its intrinsic dimensions and viewBox to the constructor. This class
+/// handles three concerns the generated code should not have to think about:
 ///
-/// The generated classes are normally registered with a [com.codename1.ui.util.Resources]
-/// object via the auto-generated `com.codename1.generated.svg.SVGRegistry`
-/// so they appear under their original filename when calling
+/// 1. **Viewport mapping** -- the viewBox is scaled into the destination
+///    rectangle on every paint, so the same generated class can render at any
+///    requested width/height without re-emitting code.
+///
+/// 2. **DPI-aware default sizing** -- the SVG's declared `width`/`height` are
+///    interpreted as design pixels at [com.codename1.ui.CN1Constants#DENSITY_MEDIUM]
+///    (the same convention CN1 uses for its multi-image density buckets) and
+///    scaled to the device density so an icon that looks "right" on a desktop
+///    simulator also looks right on a high-DPI handset. Override with
+///    [#scaled(int, int)] or by passing explicit dimensions on construction.
+///
+/// 3. **Deterministic animation time** -- animation progress is read from
+///    [AnimationTime#now()], so tests that pin the clock with
+///    [AnimationTime#setTime(long)] capture predictable frames. The "first
+///    paint" timestamp is captured the first time [#paintSVG] is invoked,
+///    making animations start at `t = 0` from the user's perspective
+///    regardless of when the image instance was constructed.
+///
+/// Generated SVGs are normally registered with a [com.codename1.ui.util.Resources]
+/// object via the auto-generated `com.codename1.generated.svg.SVGRegistry` so
+/// they appear under their original filename when calling
 /// [com.codename1.ui.util.Resources#getImage(String)].
 public abstract class GeneratedSVGImage extends Image {
 
@@ -24,6 +46,8 @@ public abstract class GeneratedSVGImage extends Image {
     /// `repeatCount="indefinite"`.
     public static final int REPEAT_INDEFINITE = -1;
 
+    private final int intrinsicWidth;
+    private final int intrinsicHeight;
     private final int width;
     private final int height;
     private final float viewBoxX;
@@ -32,66 +56,72 @@ public abstract class GeneratedSVGImage extends Image {
     private final float viewBoxHeight;
     private final boolean animated;
     private long animationStartMs = -1L;
-    private long animationOverrideMs = -1L;
 
-    /// Construct a generated SVG image with intrinsic size and viewBox metadata.
+    /// Construct with intrinsic SVG dimensions and viewBox metadata. The
+    /// rendered size defaults to the intrinsic dimensions scaled by the
+    /// device's density (so SVGs designed at standard mdpi look correct on
+    /// every screen). Use [#scaled(int, int)] for explicit pixel sizing.
     ///
     /// #### Parameters
     ///
-    /// - `width`: intrinsic pixel width (defaults to the viewBox width)
+    /// - `intrinsicWidth`: SVG-declared width in design pixels
     ///
-    /// - `height`: intrinsic pixel height
+    /// - `intrinsicHeight`: SVG-declared height in design pixels
     ///
     /// - `viewBoxX`: x origin of the viewBox in SVG user units
     ///
     /// - `viewBoxY`: y origin of the viewBox in SVG user units
     ///
-    /// - `viewBoxWidth`: width of the viewBox; falls back to `width` if `<= 0`
+    /// - `viewBoxWidth`: width of the viewBox; falls back to `intrinsicWidth` if `<= 0`
     ///
-    /// - `viewBoxHeight`: height of the viewBox; falls back to `height` if `<= 0`
+    /// - `viewBoxHeight`: height of the viewBox; falls back to `intrinsicHeight` if `<= 0`
     ///
     /// - `animated`: true if any SMIL animation was found inside the SVG
-    protected GeneratedSVGImage(int width, int height,
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
                                 float viewBoxX, float viewBoxY,
                                 float viewBoxWidth, float viewBoxHeight,
                                 boolean animated) {
         super(null);
-        this.width = width;
-        this.height = height;
+        this.intrinsicWidth = intrinsicWidth;
+        this.intrinsicHeight = intrinsicHeight;
+        int density = readDeviceDensitySafely();
+        this.width = scaleForDensity(intrinsicWidth, density);
+        this.height = scaleForDensity(intrinsicHeight, density);
         this.viewBoxX = viewBoxX;
         this.viewBoxY = viewBoxY;
-        this.viewBoxWidth = viewBoxWidth <= 0 ? width : viewBoxWidth;
-        this.viewBoxHeight = viewBoxHeight <= 0 ? height : viewBoxHeight;
+        this.viewBoxWidth = viewBoxWidth <= 0 ? intrinsicWidth : viewBoxWidth;
+        this.viewBoxHeight = viewBoxHeight <= 0 ? intrinsicHeight : viewBoxHeight;
         this.animated = animated;
     }
 
     @Override
-    public int getWidth() {
+    public final int getWidth() {
         return width;
     }
 
     @Override
-    public int getHeight() {
+    public final int getHeight() {
         return height;
     }
 
     @Override
-    public boolean isAnimation() {
+    public final boolean isAnimation() {
         return animated;
     }
 
-    /// Always returns whether this image is animated; the animation state is
-    /// re-derived from wall-clock time on each paint, so there is nothing to
-    /// advance here. Returning `true` requests that the embedding component
-    /// be repainted.
+    /// Returning `true` requests a repaint on the next animation tick so the
+    /// embedding component re-reads the SMIL clock. The animation state itself
+    /// is re-derived from [AnimationTime#now()] on each paint, so there is
+    /// nothing to advance imperatively.
     @Override
-    public boolean animate() {
+    public final boolean animate() {
         return animated;
     }
 
     /// Generated implementations render the SVG content using the supplied
     /// graphics context. `elapsedMs` is the number of milliseconds since the
-    /// first paint of this image (or since the most recent [#resetAnimation]).
+    /// first paint of this image instance, measured against
+    /// [AnimationTime#now()] so test code can pin the clock.
     ///
     /// #### Parameters
     ///
@@ -102,26 +132,17 @@ public abstract class GeneratedSVGImage extends Image {
     protected abstract void paintSVG(Graphics g, long elapsedMs);
 
     @Override
-    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+    protected final void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         drawImage(g, nativeGraphics, x, y, width, height);
     }
 
     @Override
-    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+    protected final void drawImage(Graphics g, Object nativeGraphics,
+                                   int x, int y, int w, int h) {
         if (!g.isShapeSupported()) {
             return;
         }
-        long elapsed = 0L;
-        if (animated) {
-            if (animationOverrideMs >= 0L) {
-                elapsed = animationOverrideMs;
-            } else {
-                if (animationStartMs < 0L) {
-                    animationStartMs = System.currentTimeMillis();
-                }
-                elapsed = System.currentTimeMillis() - animationStartMs;
-            }
-        }
+        long elapsed = currentAnimationOffsetMs();
 
         Transform saved = null;
         try {
@@ -156,25 +177,72 @@ public abstract class GeneratedSVGImage extends Image {
         }
     }
 
-    /// We render to any requested size on the fly, so a "scaled" instance is
-    /// the same instance. Returning `this` avoids allocating a wrapper for
-    /// every layout pass.
+    /// Returns a lightweight view onto this image that reports `width` /
+    /// `height` from [#getWidth] / [#getHeight] but reuses the underlying
+    /// rendering. The returned image's animation clock is shared with the
+    /// source so progress is consistent across both views.
     @Override
-    public Image scaled(int width, int height) {
-        return this;
+    public final Image scaled(int width, int height) {
+        return new SVGScaledView(this, width, height);
     }
 
-    /// Reset the animation clock so the next paint begins at `t = 0`. Useful
-    /// for screenshot tests that want a deterministic frame.
-    public void resetAnimation() {
+    /// Reset the per-instance animation start so the next paint begins at
+    /// `t = 0`. Tests typically prefer [AnimationTime#setTime(long)] instead,
+    /// which controls every animation in the VM at once.
+    public final void resetAnimation() {
         animationStartMs = -1L;
     }
 
-    /// Pin the animation clock to a fixed elapsed time. Pass `-1` to release
-    /// the override and resume wall-clock time. Used by screenshot tests to
-    /// capture specific frames.
-    public void setAnimationTimeMillis(long elapsedMs) {
-        this.animationOverrideMs = elapsedMs;
+    /// The intrinsic SVG width before DPI scaling -- useful for tests or
+    /// callers that want to apply a different sizing heuristic.
+    public final int getIntrinsicWidth() {
+        return intrinsicWidth;
+    }
+
+    /// The intrinsic SVG height before DPI scaling.
+    public final int getIntrinsicHeight() {
+        return intrinsicHeight;
+    }
+
+    /// Compute the animation offset that the next [#paintSVG] call would see,
+    /// capturing the per-instance start timestamp from [AnimationTime#now()]
+    /// on first call. Package-visible so tests can exercise the clock without
+    /// needing a Graphics context with shape support; production code reaches
+    /// this through [#drawImage(Graphics, Object, int, int, int, int)].
+    long currentAnimationOffsetMs() {
+        if (!animated) {
+            return 0L;
+        }
+        long now = AnimationTime.now();
+        if (animationStartMs < 0L) {
+            animationStartMs = now;
+        }
+        long elapsed = now - animationStartMs;
+        return elapsed < 0L ? 0L : elapsed;
+    }
+
+    private static int readDeviceDensitySafely() {
+        // Display may not be fully initialized when the image is constructed
+        // (e.g. during static-init of an SVGRegistry that's loaded before
+        // Display.init in a unit test). Fall back to DENSITY_MEDIUM, which is
+        // the design-time default and produces 1:1 pixels for the intrinsic
+        // dimensions.
+        try {
+            return Display.getInstance().getDeviceDensity();
+        } catch (Throwable t) {
+            return CN1Constants.DENSITY_MEDIUM;
+        }
+    }
+
+    private static int scaleForDensity(int designPixels, int density) {
+        if (designPixels <= 0) {
+            return 1;
+        }
+        if (density <= 0 || density == CN1Constants.DENSITY_MEDIUM) {
+            return designPixels;
+        }
+        int scaled = (int) Math.floor(((double) designPixels * density) / CN1Constants.DENSITY_MEDIUM + 0.5);
+        return scaled < 1 ? 1 : scaled;
     }
 
     // ---------------------------------------------------------------------
@@ -346,10 +414,8 @@ public abstract class GeneratedSVGImage extends Image {
             double theta2 = theta1 + dt;
             double cosTheta2 = Math.cos(theta2);
             double sinTheta2 = Math.sin(theta2);
-            // end of this segment in (cx, cy, arx, ary, phi) frame
             double ex = cx + arx * (cosPhi * cosTheta2 - sinPhi * sinTheta2);
             double ey = cy + ary * (sinPhi * cosTheta2 + cosPhi * sinTheta2);
-            // control point offsets in ellipse-local frame, then rotate
             double dx1L = -arx * sinTheta1;
             double dy1L =  ary * cosTheta1;
             double dx2L = -arx * sinTheta2;
@@ -379,7 +445,7 @@ public abstract class GeneratedSVGImage extends Image {
         if (cos > 1.0) {
             cos = 1.0;
         }
-        // CLDC's java.lang.Math has no acos; use the CN1 helper which works on every port.
+        // CLDC's java.lang.Math has no acos; use the CN1 helper.
         double a = MathUtil.acos(cos);
         if ((ux * vy - uy * vx) < 0.0) {
             a = -a;

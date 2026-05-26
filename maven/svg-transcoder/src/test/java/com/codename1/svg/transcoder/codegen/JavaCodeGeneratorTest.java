@@ -22,7 +22,7 @@ public class JavaCodeGeneratorTest {
         String out = transcode("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'/>");
         assertTrue(out.contains("package com.example;"));
         assertTrue(out.contains("public final class TestIcon extends GeneratedSVGImage"));
-        assertTrue(out.contains("import com.codename1.svg.GeneratedSVGImage;"));
+        assertTrue(out.contains("import com.codename1.ui.GeneratedSVGImage;"));
         assertTrue(out.contains("import com.codename1.ui.geom.GeneralPath;"));
         assertTrue(out.contains("protected void paintSVG(Graphics g, long __t)"));
     }

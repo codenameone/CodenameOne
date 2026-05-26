@@ -48,8 +48,9 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
     /** Default package for generated SVG image classes. */
     private static final String DEFAULT_PACKAGE = "com.codename1.generated.svg";
 
-    /** Class name used for the auto-generated registry -- must match the
-     *  class looked up reflectively by {@code Resources.ensureGeneratedSVGsInstalled}. */
+    /** Class name used for the auto-generated registry. App code wires
+     *  transcoded SVGs into a Resources instance by calling its
+     *  {@code install(Resources)} method once at startup. */
     private static final String REGISTRY_CLASS_NAME = "SVGRegistry";
 
     @Parameter(property = "cn1.svg.sourceDir")
