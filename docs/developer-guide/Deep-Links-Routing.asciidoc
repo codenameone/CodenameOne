@@ -132,6 +132,13 @@ the project's `pom.xml`:
   dispatcher class that the framework wires into `Display` under the
   hood. There is no router API for application code to call.
 
+The generated dispatcher class is written to the project's own
+`target/classes` -- it is never shipped in `cn1-core`. A built-in stub
+would shadow the per-project class on platforms that translate bytecode
+(parparvm, Android), so `Display` looks the generated class up
+reflectively at startup and silently no-ops when no project declares
+any `@Route`.
+
 The validation gate catches every problem in a single build run:
 
 * `@Route` declared on a class that doesn't extend `Form`

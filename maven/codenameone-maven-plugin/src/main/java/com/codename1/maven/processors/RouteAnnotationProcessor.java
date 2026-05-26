@@ -202,7 +202,9 @@ public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor 
             return;
         }
         if (accepted.isEmpty()) {
-            // No project-declared routes: leave the framework stub alone.
+            // No project-declared routes: do not emit Routes at all. Display
+            // init() looks the class up reflectively and silently no-ops when
+            // it's absent.
             return;
         }
         String source = generateRoutesSource(new ArrayList<Entry>(accepted.values()));

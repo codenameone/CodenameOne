@@ -399,13 +399,20 @@ public final class Display extends CN1Constants {
             impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
 
-            // Trigger loading of the build-time-generated route table. With the
-            // framework stub on the classpath this is a no-op; in a project
-            // that declares @Route targets the maven plugin overwrites Routes
-            // in target/classes and bootstrap() installs the real dispatcher
-            // on Navigation.
+            // The build-time-generated route table is bound here. The Routes
+            // class is generated per-project by the Codename One Maven plugin
+            // (or the equivalent step in the server-side builders) and is not
+            // shipped in cn1-core -- shipping a stub here would shadow the
+            // real generated class on platforms that translate bytecode
+            // (parparvm, Android). Reflection lets us call into the generated
+            // class when it's present and silently no-op when no project
+            // declares @Route targets.
             try {
-                com.codename1.router.generated.Routes.bootstrap();
+                Class.forName("com.codename1.router.generated.Routes")
+                        .getMethod("bootstrap")
+                        .invoke(null);
+            } catch (ClassNotFoundException ignored) {
+                // No @Route in this project: nothing to install.
             } catch (Throwable t) {
                 Log.e(t);
             }
