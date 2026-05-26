@@ -4,8 +4,7 @@ name: AI cn1lib iOS xcodebuild check
 # `nativeios/*.m` against the real `GoogleMLKit/*` (or TFLite / whisper)
 # pod, run `pod install`, then `xcodebuild build`. Catches API drift,
 # missing imports, and missing pod hints early -- on the same macOS
-# runners we already use for build-ios. Replaces the earlier clang-
-# fsyntax-only-against-stub-headers approach.
+# runners we already use for build-ios.
 
 on:
   workflow_dispatch:
@@ -28,11 +27,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # One job per cn1lib, parallel. Each entry maps the cn1lib's
-        # artifact directory to the iOS dependency it pulls (pod spec or
-        # `--` for cn1libs that link a bundled static lib instead of a
-        # CocoaPod -- those still get xcodebuild'd to catch syntax
-        # errors, just without the pod step).
         include:
           - { lib: cn1-ai-mlkit-text,         pod: 'GoogleMLKit/TextRecognition'    }
           - { lib: cn1-ai-mlkit-barcode,      pod: 'GoogleMLKit/BarcodeScanning'    }
@@ -50,12 +44,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: List iOS sources
-        run: ls -la maven/${{ matrix.lib }}/ios/src/main/objectivec/
+      - name: Install xcodegen
+        # xcodegen produces a full-featured pbxproj from a YAML spec. We need
+        # a real Xcode project (not a hand-rolled minimal pbxproj) so the
+        # CocoaPods integration step can inject baseConfigurationReference
+        # entries and the xcframework -> framework extraction script phase.
+        run: brew install xcodegen
 
-      - name: Synthesise Xcode static-library project
-        # Build a tiny xcodeproj wrapping every .m the cn1lib ships. We
-        # only need the compile step to succeed; nothing runs.
+      - name: Synthesise Xcode project via xcodegen
         run: |
           set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
@@ -64,142 +60,68 @@ jobs:
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/"
           ls -la "$PROBE/CN1AIProbe/"
 
-          python3 - "$PROBE" "${{ matrix.lib }}" <<'PY'
-          import os, sys, uuid
-          probe_dir, lib_name = sys.argv[1], sys.argv[2]
-          src_dir = os.path.join(probe_dir, "CN1AIProbe")
-          sources = sorted(f for f in os.listdir(src_dir) if f.endswith(".m"))
-          headers = sorted(f for f in os.listdir(src_dir) if f.endswith(".h"))
+          cat > "$PROBE/project.yml" <<'YAML'
+          name: CN1AIProbe
+          options:
+            bundleIdPrefix: com.codenameone.cn1ai
+            deploymentTarget:
+              iOS: "14.0"
+          targets:
+            CN1AIProbe:
+              type: framework
+              platform: iOS
+              sources:
+                - path: CN1AIProbe
+              settings:
+                base:
+                  CLANG_ENABLE_MODULES: YES
+                  CLANG_ENABLE_OBJC_ARC: YES
+                  CODE_SIGNING_ALLOWED: NO
+                  GENERATE_INFOPLIST_FILE: YES
+                  DEFINES_MODULE: YES
+                  PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.cn1ai.probe
+          YAML
+          cd "$PROBE"
+          xcodegen generate --spec project.yml
 
-          def oid():
-              return uuid.uuid4().hex[:24].upper()
-
-          file_refs = {}
-          build_files = {}
-          for src in sources + headers:
-              file_refs[src] = oid()
-              build_files[src] = oid()
-
-          src_group = oid()
-          main_group = oid()
-          products_group = oid()
-          target = oid()
-          target_product = oid()
-          build_phase_sources = oid()
-          build_phase_headers = oid()
-          build_phase_frameworks = oid()
-          configurations_list_proj = oid()
-          configurations_list_target = oid()
-          conf_debug_proj = oid()
-          conf_debug_target = oid()
-          project_obj = oid()
-
-          lines = [
-              "// !$*UTF8*$!",
-              "{",
-              "    archiveVersion = 1;",
-              "    classes = {};",
-              "    objectVersion = 56;",
-              "    objects = {",
-              "/* Begin PBXBuildFile section */",
-          ]
-          for fn, fr in file_refs.items():
-              bf = build_files[fn]
-              ftype = "Sources" if fn.endswith(".m") else "Headers"
-              lines.append(f"        {bf} /* {fn} in {ftype} */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fn} */; }};")
-          lines += ["/* End PBXBuildFile section */", "/* Begin PBXFileReference section */"]
-          for fn, fr in file_refs.items():
-              ftype = "sourcecode.c.objc" if fn.endswith(".m") else "sourcecode.c.h"
-              lines.append(f"        {fr} /* {fn} */ = {{isa = PBXFileReference; lastKnownFileType = {ftype}; path = {fn}; sourceTree = \"<group>\"; }};")
-          lines.append(f"        {target_product} /* libCN1AIProbe.a */ = {{isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCN1AIProbe.a; sourceTree = BUILT_PRODUCTS_DIR; }};")
-          lines += ["/* End PBXFileReference section */", "/* Begin PBXGroup section */"]
-          # main group
-          lines.append(f"        {main_group} = {{isa = PBXGroup; children = ({src_group} /* CN1AIProbe */, {products_group} /* Products */, ); sourceTree = \"<group>\"; }};")
-          lines.append(f"        {src_group} /* CN1AIProbe */ = {{isa = PBXGroup; children = (")
-          for fn in sources + headers:
-              lines.append(f"            {file_refs[fn]} /* {fn} */,")
-          lines.append("        ); path = CN1AIProbe; sourceTree = \"<group>\"; };")
-          lines.append(f"        {products_group} /* Products */ = {{isa = PBXGroup; children = ({target_product} /* libCN1AIProbe.a */,); name = Products; sourceTree = \"<group>\"; }};")
-          lines += ["/* End PBXGroup section */", "/* Begin PBXHeadersBuildPhase section */"]
-          lines.append(f"        {build_phase_headers} /* Headers */ = {{isa = PBXHeadersBuildPhase; buildActionMask = 2147483647; files = (")
-          for fn in headers:
-              lines.append(f"            {build_files[fn]} /* {fn} in Headers */,")
-          lines += ["        ); runOnlyForDeploymentPostprocessing = 0; };", "/* End PBXHeadersBuildPhase section */", "/* Begin PBXFrameworksBuildPhase section */"]
-          lines.append(f"        {build_phase_frameworks} /* Frameworks */ = {{isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; }};")
-          lines += ["/* End PBXFrameworksBuildPhase section */", "/* Begin PBXSourcesBuildPhase section */"]
-          lines.append(f"        {build_phase_sources} /* Sources */ = {{isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (")
-          for fn in sources:
-              lines.append(f"            {build_files[fn]} /* {fn} in Sources */,")
-          lines += ["        ); runOnlyForDeploymentPostprocessing = 0; };", "/* End PBXSourcesBuildPhase section */", "/* Begin PBXNativeTarget section */"]
-          lines.append(f"        {target} /* CN1AIProbe */ = {{isa = PBXNativeTarget; buildConfigurationList = {configurations_list_target} /* Build configuration list for PBXNativeTarget \"CN1AIProbe\" */; buildPhases = ({build_phase_headers}, {build_phase_sources}, {build_phase_frameworks}, ); buildRules = (); dependencies = (); name = CN1AIProbe; productName = CN1AIProbe; productReference = {target_product} /* libCN1AIProbe.a */; productType = \"com.apple.product-type.library.static\"; }};")
-          lines += ["/* End PBXNativeTarget section */", "/* Begin PBXProject section */"]
-          lines.append(f"        {project_obj} /* Project object */ = {{isa = PBXProject; attributes = {{LastUpgradeCheck = 1530; }}; buildConfigurationList = {configurations_list_proj} /* Build configuration list for PBXProject \"CN1AIProbe\" */; compatibilityVersion = \"Xcode 14.0\"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = {main_group}; productRefGroup = {products_group} /* Products */; projectDirPath = \"\"; projectRoot = \"\"; targets = ({target} /* CN1AIProbe */, ); }};")
-          lines += ["/* End PBXProject section */", "/* Begin XCBuildConfiguration section */"]
-          lines.append(f"        {conf_debug_proj} /* Debug */ = {{isa = XCBuildConfiguration; buildSettings = {{ARCHS = \"$(ARCHS_STANDARD)\"; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_MODULES = YES; SDKROOT = iphonesimulator; IPHONEOS_DEPLOYMENT_TARGET = 14.0; GCC_PREPROCESSOR_DEFINITIONS = (\"DEBUG=1\", \"$(inherited)\"); }}; name = Debug; }};")
-          lines.append(f"        {conf_debug_target} /* Debug */ = {{isa = XCBuildConfiguration; buildSettings = {{PRODUCT_NAME = \"$(TARGET_NAME)\"; HEADER_SEARCH_PATHS = (\"$(inherited)\", \"$(SRCROOT)/CN1AIProbe\", ); }}; name = Debug; }};")
-          lines += ["/* End XCBuildConfiguration section */", "/* Begin XCConfigurationList section */"]
-          lines.append(f"        {configurations_list_proj} /* PBXProject */ = {{isa = XCConfigurationList; buildConfigurations = ({conf_debug_proj} /* Debug */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; }};")
-          lines.append(f"        {configurations_list_target} /* PBXNativeTarget */ = {{isa = XCConfigurationList; buildConfigurations = ({conf_debug_target} /* Debug */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; }};")
-          lines += ["/* End XCConfigurationList section */", "    };", f"    rootObject = {project_obj} /* Project object */;", "}", ""]
-
-          proj_dir = os.path.join(probe_dir, "CN1AIProbe.xcodeproj")
-          os.makedirs(proj_dir, exist_ok=True)
-          with open(os.path.join(proj_dir, "project.pbxproj"), "w") as fp:
-              fp.write("\n".join(lines))
-          print("Wrote", os.path.join(proj_dir, "project.pbxproj"))
-          PY
-          ls -la "$PROBE/CN1AIProbe.xcodeproj/"
-
-      - name: pod install (no project integration)
+      - name: pod install (with integration)
         if: ${{ matrix.pod != '' }}
-        # Skip pbxproj integration -- our synth project doesn't have the
-        # config-section fields CocoaPods expects to inject into. We only
-        # need the pod headers + xcframeworks on disk plus the generated
-        # xcconfig; xcodebuild will load that xcconfig via -xcconfig below.
+        # With a proper xcodegen-generated pbxproj, CocoaPods can integrate
+        # normally -- it injects the baseConfigurationReference, sets up the
+        # framework-extraction script phase, and produces a workspace that
+        # xcodebuild can build directly.
         run: |
           set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
           cd "$PROBE"
           cat > Podfile <<EOF
           platform :ios, '14.0'
-          install! 'cocoapods', :integrate_targets => false
           target 'CN1AIProbe' do
             use_frameworks!
             pod '${{ matrix.pod }}'
           end
           EOF
           pod install --repo-update
-          # CocoaPods drops the per-target xcconfig under Target Support Files.
-          # With integrate_targets=false the directory is named after the
-          # target without a `Pods-` prefix.
-          find "Pods/Target Support Files" -name '*.debug.xcconfig' | head -5
 
       - name: xcodebuild
         run: |
-          # No `set -u`: an empty XCCONFIG_ARG array under `set -u` errors.
-          # The pod xcconfig path contains a space ("Target Support Files")
-          # so we MUST use a bash array + quoted expansion -- otherwise
-          # xcodebuild parses "Support" as a build action and exits 65.
-          set -exo pipefail
+          set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
           cd "$PROBE"
-          XCCONFIG_ARG=()
-          if [ -d "Pods" ]; then
-              # CocoaPods generates one xcconfig per pod + an aggregator
-              # xcconfig for the consumer target. We want the aggregator
-              # (`Pods-CN1AIProbe/Pods-CN1AIProbe.debug.xcconfig`) -- that
-              # one carries the HEADER_SEARCH_PATHS / FRAMEWORK_SEARCH_PATHS
-              # that resolve every transitive `#import <Pod/Header.h>`.
-              POD_CONFIG="Pods/Target Support Files/Pods-CN1AIProbe/Pods-CN1AIProbe.debug.xcconfig"
-              if [ -f "$POD_CONFIG" ]; then
-                  echo "Using pod xcconfig: $POD_CONFIG"
-                  XCCONFIG_ARG=(-xcconfig "$POD_CONFIG")
-              fi
+          if [ -d "CN1AIProbe.xcworkspace" ]; then
+              xcodebuild -workspace CN1AIProbe.xcworkspace \
+                         -scheme CN1AIProbe \
+                         -configuration Debug \
+                         -sdk iphonesimulator \
+                         -destination 'generic/platform=iOS Simulator' \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
+          else
+              xcodebuild -project CN1AIProbe.xcodeproj \
+                         -scheme CN1AIProbe \
+                         -configuration Debug \
+                         -sdk iphonesimulator \
+                         -destination 'generic/platform=iOS Simulator' \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
           fi
-          xcodebuild -project CN1AIProbe.xcodeproj \
-                     -target CN1AIProbe \
-                     -configuration Debug \
-                     -sdk iphonesimulator \
-                     "${XCCONFIG_ARG[@]}" \
-                     CODE_SIGNING_ALLOWED=NO \
-                     build
