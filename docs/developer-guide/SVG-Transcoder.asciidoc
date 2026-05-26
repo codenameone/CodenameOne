@@ -1,0 +1,254 @@
+= Build-Time SVG Images
+:source-highlighter: highlight.js
+
+This chapter documents the build-time SVG transcoder introduced in
+Codename One 8.0. It lets you author UI icons / illustrations as SVG and
+have them rendered as native Codename One `Image` instances on every
+platform (iOS, Android, JavaSE simulator, JavaScript) without ever
+shipping a runtime SVG parser.
+
+== Motivation
+
+Codename One has historically supported SVG only on platforms with a
+native SVG implementation (Android via SVG support, iOS via
+`createSVGImage` on a few backends). PNG raster assets are the universal
+fallback, which forces you to ship multiple density buckets for every
+icon and gives up the resolution-independence that SVG was designed for.
+
+The build-time transcoder closes the gap: each SVG file is parsed at
+build time, converted into a Java class that subclasses
+`com.codename1.ui.GeneratedSVGImage`, and rendered through the standard
+`Graphics` shape API. The same vector source produces pixel-perfect
+output at any size on every port.
+
+== Quick start
+
+. Drop your SVG next to `theme.css` in `src/main/css/`:
++
+[source]
+----
+src/main/css/
+  theme.css
+  spinner.svg
+  home.svg
+----
+
+. Reference it from CSS the same way you would a PNG:
++
+[source,css]
+----
+HomeIcon {
+    background: url(home.svg);
+    cn1-source-dpi: very-high;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+----
+
+. Build the project as usual:
++
+[source,bash]
+----
+mvn package
+----
+
+. In your app's `init(Object)` method, wire the generated registry into
+  the theme:
++
+[source,java]
+----
+@Override
+public void init(Object context) {
+    theme = UIManager.initFirstTheme("/theme");
+    com.codename1.generated.svg.SVGRegistry.install(theme);
+}
+----
+
+That's it. `theme.getImage("home.svg")` now returns the transcoded
+image; CSS rules that reference the SVG by URL pick it up via the same
+lookup.
+
+== How the build flow works
+
+The `cn1app` archetype binds the `transcode-svg` goal to the
+`generate-sources` phase:
+
+[source,xml]
+----
+<execution>
+    <id>transcode-svg</id>
+    <phase>generate-sources</phase>
+    <goals>
+        <goal>transcode-svg</goal>
+    </goals>
+</execution>
+----
+
+When Maven runs the mojo:
+
+. It scans `src/main/css/` and `src/main/svg/` for `*.svg` files.
+. It parses each SVG (built-in StAX, no Batik dependency) and emits
+  `target/generated-sources/svg/com/codename1/generated/svg/<Name>.java`
+  -- one class per SVG, plus a `SVGRegistry`.
+. It scans `src/main/css/**/*.css` for `url(*.svg)` occurrences and the
+  enclosing rule's `cn1-source-dpi`; that density is baked into the
+  registry's `install()` call for each image.
+. It drops a 1x1 transparent PNG placeholder into
+  `target/css-resources/` so the standalone CSS compiler can finish
+  even though the file extension on the URL is `.svg`. The placeholder
+  is overwritten in the theme by the runtime registry call.
+
+Subsequent steps in the standard CN1 build (`generate-gui-sources`,
+`css`, the simulator launcher, the cloud build for iOS/Android, the
+JavaScript port pipeline) all consume the generated classes -- nothing
+else needs configuration. The transcoder runs **for every target**, so
+the generated `SVGRegistry` and `*.java` files are part of the shared
+compile output that flows into every port.
+
+== Sizing rules
+
+The transcoder treats the SVG's declared `width`/`height` (or, if those
+are absent, the `viewBox`) as **design pixels at the source density
+declared in CSS**:
+
+* No `cn1-source-dpi` -> the SVG is treated as designed for
+  `DENSITY_MEDIUM` (~160dpi). On every other device the rendered
+  width/height scale linearly with `Display.getDeviceDensity() /
+  DENSITY_MEDIUM`.
+* `cn1-source-dpi: very-high` (or any keyword the CSS compiler accepts
+  for multi-images -- `low`, `medium`, `high`, `very-high`, `hd`,
+  `560`, `2hd`, `4k`) tells the transcoder to size the image as if it
+  were authored at that density. The same SVG drawn on a `medium`
+  device renders smaller; on a `4k` device it renders larger.
+
+The convention is intentionally identical to the multi-image
+`cn1-source-dpi` declaration: a `24x24` SVG with
+`cn1-source-dpi: very-high` is interchangeable, from a layout
+perspective, with a `24x24` `_very-high` density bucket of a multi-image
+PNG.
+
+== CSS coverage
+
+Any CSS property that resolves to an image URL is supported:
+
+[source,css]
+----
+.Star {
+    background: url(star.svg);
+    cn1-source-dpi: very-high;
+}
+
+.Border {
+    border-image: url(divider.svg);
+    cn1-source-dpi: high;
+}
+----
+
+The CSS compiler installs a 1-byte placeholder entry for the SVG name
+in the compiled `theme.res`. At runtime, `SVGRegistry.install(theme)`
+replaces the placeholder with the transcoded image, so every code
+path that calls `theme.getImage(name)` returns the SVG.
+
+== SVG feature coverage
+
+The transcoder targets the SVG 1.1 static-shape vocabulary plus the
+SMIL animation subset:
+
+|===
+| Feature | Status
+
+| `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>` | Full
+| `<path>` (M/L/H/V/C/S/Q/T/A/Z, relative + smooth-curve reflection) | Full
+| `<g>` with `transform="translate \| scale \| rotate \| skew \| matrix"` | Full
+| `fill`, `stroke`, `stroke-width`, `stroke-linecap/linejoin/miterlimit` | Full
+| `opacity`, `fill-opacity`, `stroke-opacity` | Full (animatable)
+| `<linearGradient>` | Full (shape-clipped fill on every port)
+| `<radialGradient>` | First-stop fallback for v1
+| `<animate>` (numeric attributes) | Full
+| `<animateTransform type="translate \| scale \| rotate">` | Full
+| `<set>` (instant value snap) | Full
+| Text, masks, clip-path, filters | Not supported in v1
+| CSS-keyframe animations | Not supported (SMIL only)
+|===
+
+SMIL animations read the current time from
+`com.codename1.ui.animations.AnimationTime`, so tests can pin the
+clock with `AnimationTime.setTime(t)` to capture a deterministic
+frame.
+
+== Calling the registry yourself
+
+If you don't use `theme.css` but still want to use transcoded SVGs,
+construct the generated classes directly:
+
+[source,java]
+----
+Image home = new com.codename1.generated.svg.Home();
+button.setIcon(home);
+----
+
+Constructors come in two flavours:
+
+[source,java]
+----
+public Home() { ... }                    // default DENSITY_MEDIUM source
+public Home(int sourceDensity) { ... }   // explicit density, used by SVGRegistry
+----
+
+The single-arg constructor is what `SVGRegistry.install()` calls when
+the CSS rule declared a `cn1-source-dpi`. The no-arg constructor is the
+escape hatch for tests / authored code that prefers a per-instance
+density override:
+
+[source,java]
+----
+GeneratedSVGImage img = new com.codename1.generated.svg.Home(CN1Constants.DENSITY_VERY_HIGH);
+Image small = img.scaled(48, 48);  // any explicit size still works
+----
+
+`scaled(int, int)` returns a lightweight view that reports the
+requested dimensions from `getWidth()`/`getHeight()` and shares the
+animation clock with its source.
+
+== Limitations and notes
+
+* The transcoder uses the JDK's StAX parser at build time. There is no
+  Batik dependency and no runtime SVG XML parsing.
+* Generated classes are emitted under
+  `com.codename1.generated.svg.<ClassName>` (override with the
+  `cn1.svg.package` Maven property if you need a different package).
+* The runtime base class lives in `com.codename1.ui.GeneratedSVGImage`
+  -- it is part of the core framework, no extra Cn1lib is needed.
+* On ParparVM / iOS, `SVGRegistry.install()` is **explicit** rather
+  than reflective. Add the one-line call to your `init(Object)` so the
+  static-reachability analyzer keeps the transcoded classes alive.
+* Animated SVGs return `true` from `Image.isAnimation()`. As with
+  `Timeline`, you must register the image with a `Form`'s animation
+  manager (or set it as a `Component.setIcon` with `isAnimation()` true)
+  for the repaint loop to tick the SMIL clock.
+
+== Troubleshooting
+
+`theme.getImage("name.svg")` returns null::
+  The registry probably wasn't installed. Call
+  `com.codename1.generated.svg.SVGRegistry.install(theme)` in your
+  `init(Object)` after `initFirstTheme`.
+
+`Resources.getImage(name)` returns a 1x1 transparent PNG::
+  The runtime registry didn't run for the bundle you queried, so the
+  CSS compiler placeholder is still in place. Make sure
+  `install(globalRes)` is called on the same Resources instance the
+  theme was loaded into. The global fallback registry is also
+  consulted -- a `Resources.registerGeneratedImage(name, image)` call
+  fixes this for arbitrary bundles.
+
+SVG looks the wrong size::
+  Add `cn1-source-dpi: <bucket>` to the CSS rule that references it
+  to tell the transcoder which density the SVG was authored for. The
+  buckets match CN1's multi-image density buckets exactly.
+
+Spinner / pulse render but don't animate::
+  Check that the image is mounted into a `Component` whose animation
+  manager ticks (Labels added to a Form do this automatically). For a
+  pure-`Graphics`-driven capture (screenshot tests) pin
+  `AnimationTime.setTime(...)` and re-render.

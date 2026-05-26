@@ -22,11 +22,18 @@ public final class SVGTranscoder {
         public final String className;
         /** Logical resource name used at runtime (e.g. "home" for "home.svg"). */
         public final String resourceName;
+        /** Source density extracted from CSS (`cn1-source-dpi`), or {@code 0} if not specified. */
+        public final int sourceDensity;
 
         public GeneratedClass(String packageName, String className, String resourceName) {
+            this(packageName, className, resourceName, 0);
+        }
+
+        public GeneratedClass(String packageName, String className, String resourceName, int sourceDensity) {
             this.packageName = packageName;
             this.className = className;
             this.resourceName = resourceName;
+            this.sourceDensity = sourceDensity;
         }
 
         public String fullyQualified() {
@@ -98,7 +105,7 @@ public final class SVGTranscoder {
         out.write("        installGlobal();\n");
         out.write("        if (r != null) {\n");
         for (GeneratedClass c : unique.values()) {
-            out.write("            r.setImage(\"" + escapeJavaString(c.resourceName) + "\", new " + c.fullyQualified() + "());\n");
+            out.write("            r.setImage(\"" + escapeJavaString(c.resourceName) + "\", " + newInstance(c) + ");\n");
         }
         out.write("        }\n");
         out.write("    }\n\n");
@@ -109,12 +116,19 @@ public final class SVGTranscoder {
         out.write("        synchronized (" + className + ".class) {\n");
         out.write("            if (__installed) return;\n");
         for (GeneratedClass c : unique.values()) {
-            out.write("            Resources.registerGeneratedImage(\"" + escapeJavaString(c.resourceName) + "\", new " + c.fullyQualified() + "());\n");
+            out.write("            Resources.registerGeneratedImage(\"" + escapeJavaString(c.resourceName) + "\", " + newInstance(c) + ");\n");
         }
         out.write("            __installed = true;\n");
         out.write("        }\n");
         out.write("    }\n");
         out.write("}\n");
+    }
+
+    private static String newInstance(GeneratedClass c) {
+        if (c.sourceDensity > 0) {
+            return "new " + c.fullyQualified() + "(" + c.sourceDensity + ")";
+        }
+        return "new " + c.fullyQualified() + "()";
     }
 
     /** "home.svg" -> "HomeSvg". Used to derive a class name from a filename. */

@@ -48,6 +48,7 @@ public abstract class GeneratedSVGImage extends Image {
 
     private final int intrinsicWidth;
     private final int intrinsicHeight;
+    private final int sourceDensity;
     private final int width;
     private final int height;
     private final float viewBoxX;
@@ -81,12 +82,33 @@ public abstract class GeneratedSVGImage extends Image {
                                 float viewBoxX, float viewBoxY,
                                 float viewBoxWidth, float viewBoxHeight,
                                 boolean animated) {
+        this(intrinsicWidth, intrinsicHeight,
+                viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight,
+                animated, CN1Constants.DENSITY_MEDIUM);
+    }
+
+    /// Construct with an explicit source density for the SVG's declared
+    /// dimensions. This is the constructor the auto-generated `SVGRegistry`
+    /// targets when the CSS for an SVG declared a `cn1-source-dpi` -- the
+    /// runtime width/height then track that hint instead of assuming
+    /// [com.codename1.ui.CN1Constants#DENSITY_MEDIUM].
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceDensity`: one of the `CN1Constants.DENSITY_*` constants,
+    ///   describing the device class the SVG was designed for. A value of
+    ///   `0` falls back to the SVG's intrinsic pixels (no scaling).
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
+                                float viewBoxX, float viewBoxY,
+                                float viewBoxWidth, float viewBoxHeight,
+                                boolean animated, int sourceDensity) {
         super(null);
         this.intrinsicWidth = intrinsicWidth;
         this.intrinsicHeight = intrinsicHeight;
+        this.sourceDensity = sourceDensity;
         int density = readDeviceDensitySafely();
-        this.width = scaleForDensity(intrinsicWidth, density);
-        this.height = scaleForDensity(intrinsicHeight, density);
+        this.width = scaleForDensity(intrinsicWidth, density, sourceDensity);
+        this.height = scaleForDensity(intrinsicHeight, density, sourceDensity);
         this.viewBoxX = viewBoxX;
         this.viewBoxY = viewBoxY;
         this.viewBoxWidth = viewBoxWidth <= 0 ? intrinsicWidth : viewBoxWidth;
@@ -240,14 +262,21 @@ public abstract class GeneratedSVGImage extends Image {
         }
     }
 
-    private static int scaleForDensity(int designPixels, int density) {
+    /// Returns the source density the SVG was designed for, in
+    /// `CN1Constants.DENSITY_*` units. `0` means "no scaling, use intrinsic
+    /// pixels". CSS can override the default via `cn1-source-dpi:`.
+    public final int getSourceDensity() {
+        return sourceDensity;
+    }
+
+    private static int scaleForDensity(int designPixels, int density, int sourceDensity) {
         if (designPixels <= 0) {
             return 1;
         }
-        if (density <= 0 || density == CN1Constants.DENSITY_MEDIUM) {
+        if (sourceDensity <= 0 || density <= 0 || density == sourceDensity) {
             return designPixels;
         }
-        int scaled = (int) Math.floor(((double) designPixels * density) / CN1Constants.DENSITY_MEDIUM + 0.5);
+        int scaled = (int) Math.floor(((double) designPixels * density) / sourceDensity + 0.5);
         return scaled < 1 ? 1 : scaled;
     }
 

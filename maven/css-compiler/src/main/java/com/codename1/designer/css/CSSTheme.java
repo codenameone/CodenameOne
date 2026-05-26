@@ -2904,6 +2904,34 @@ public class CSSTheme {
     public Image getBorderImage(Map<String,LexicalUnit> styles) {
         return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
     }
+
+    /// 1x1 transparent PNG (43 bytes) -- used to satisfy the EditableResources
+    /// image slot when a CSS rule references an SVG by URL. The runtime
+    /// {@code com.codename1.generated.svg.SVGRegistry} (emitted by the SVG
+    /// transcoder mojo) replaces the placeholder with the transcoded image
+    /// when {@code install(theme)} runs at startup.
+    private static final byte[] SVG_PLACEHOLDER_PNG = new byte[] {
+            (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, (byte)0xC4,
+            (byte)0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
+            0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, (byte)0xB4, 0x00,
+            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, (byte)0xAE,
+            0x42, 0x60, (byte)0x82
+    };
+
+    private Image registerSVGPlaceholder(String imageIdStr) {
+        Image existing = res.getImage(imageIdStr);
+        if (existing != null) {
+            return existing;
+        }
+        com.codename1.ui.EncodedImage placeholder =
+                com.codename1.ui.EncodedImage.create(SVG_PLACEHOLDER_PNG);
+        res.setImage(imageIdStr, placeholder);
+        return placeholder;
+    }
     
     
     
@@ -2918,11 +2946,27 @@ public class CSSTheme {
             if (fileName.indexOf("/") != -1) {
                 fileName = fileName.substring(fileName.lastIndexOf("/")+1);
             }
-            
+
+            // SVG references handled by the build-time transcoder land here too.
+            // We don't rasterize them at CSS compile time: the SVG XML can't go
+            // through ImageIO and the actual image instance is a Java class
+            // emitted by codenameone-svg-transcoder. Drop a 1x1 transparent
+            // EncodedImage placeholder into the resource under the SVG filename
+            // so the theme references it by name; the runtime
+            // com.codename1.generated.svg.SVGRegistry then overrides the entry
+            // with the transcoded image when SVGRegistry.install(theme) runs.
+            if (fileName.toLowerCase().endsWith(".svg")) {
+                Image placeholder = registerSVGPlaceholder(fileName);
+                if (placeholder != null) {
+                    loadedImages.put(url, placeholder);
+                    return placeholder;
+                }
+            }
+
             if (loadedImages.containsKey(url)) {
                 return loadedImages.get(url);
             }
-            
+
             LexicalUnit imageId = styles.get("cn1-image-id");
             String imageIdStr = fileName;
             
