@@ -97,7 +97,7 @@ When Maven runs the mojo:
 . It scans `src/main/css/**/*.css` for `url(*.svg)` occurrences and the
   enclosing rule's `cn1-source-dpi`; that density is baked into the
   registry's `install()` call for each image.
-. It drops a 1x1 transparent PNG placeholder into
+. It drops a 1×1 transparent PNG placeholder into
   `target/css-resources/` so the standalone CSS compiler can finish
   even though the file extension on the URL is `.svg`. The placeholder
   is overwritten in the theme by the runtime registry call.
@@ -117,8 +117,8 @@ specificity. The first one declared on a rule wins:
 . **Explicit millimeter dimensions** -- `cn1-svg-width` and
   `cn1-svg-height` are the recommended option for icons that need a
   fixed physical size on every device. Many SVGs in the wild have
-  arbitrary declared `width`/`height` (sometimes a 1024x1024 export of
-  a 24x24 icon); pinning the rendered size in millimeters sidesteps the
+  arbitrary declared `width`/`height` (sometimes a 1024×1024 export of
+  a 24×24 icon); pinning the rendered size in millimeters sidesteps the
   guesswork entirely.
 +
 [source,css]
@@ -263,7 +263,7 @@ animation clock with its source.
   `com.codename1.generated.svg.<ClassName>` (override with the
   `cn1.svg.package` Maven property if you need a different package).
 * The runtime base class lives in `com.codename1.ui.GeneratedSVGImage`
-  -- it is part of the core framework, no extra Cn1lib is needed.
+  -- part of the core framework, no extra Cn1lib needed.
 * On ParparVM / iOS, `SVGRegistry.install()` is **explicit** rather
   than reflective. Add the one-line call to your `init(Object)` so the
   static-reachability analyzer keeps the transcoded classes alive.
@@ -279,7 +279,7 @@ animation clock with its source.
   `com.codename1.generated.svg.SVGRegistry.install(theme)` in your
   `init(Object)` after `initFirstTheme`.
 
-`Resources.getImage(name)` returns a 1x1 transparent PNG::
+`Resources.getImage(name)` returns a 1×1 transparent PNG::
   The runtime registry didn't run for the bundle you queried, so the
   CSS compiler placeholder is still in place. Make sure
   `install(globalRes)` is called on the same Resources instance the
