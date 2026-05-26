@@ -135,9 +135,15 @@ the project's `pom.xml`:
 The generated dispatcher class is written to the project's own
 `target/classes` -- it's never shipped in `cn1-core`. A built-in stub
 would shadow the per-project class on platforms that translate bytecode
-(parparvm, Android), so `Display` looks the generated class up
-reflectively at startup and skips installation when no project declares
-any `@Route`.
+(parparvm, Android). The application stub the builders write for each
+target platform calls `new com.codename1.router.generated.Routes()`
+directly before `Display.init(...)`. Direct symbol references survive
+obfuscation; reflective lookups do not. The Maven plugin's
+`generate-annotation-stubs` goal always emits a no-op `Routes` source
+at `target/generated-sources/cn1-annotations`, so projects with no
+`@Route` annotations still compile and run -- the no-op constructor
+simply doesn't install a dispatcher, and `Navigation.navigate(...)`
+calls become no-ops.
 
 The validation gate catches every problem in a single build run:
 

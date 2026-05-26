@@ -2837,9 +2837,19 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n";
 
 
+        // The Routes class is generated per-project by the Maven plugin --
+        // emitStubs writes a no-op stub at generate-sources, and
+        // process-annotations overwrites it with the real dispatcher when
+        // @Route is present. The stub here references it by symbol (no
+        // Class.forName) so obfuscation rewrites the call site together with
+        // the class. The reinit branches do *not* repeat the binding because
+        // the dispatcher is held in a static field on Navigation that
+        // survives a Display reinit.
+        String installRoutes = "        new com.codename1.router.generated.Routes();\n";
+
         String reinitCode0 = "Display.init(this);\n";
 
-        reinitCode0 = "AndroidImplementation.startContext(this);\n";
+        reinitCode0 = installRoutes + "        AndroidImplementation.startContext(this);\n";
 
         String reinitCode = "Display.init(this);\n";
 

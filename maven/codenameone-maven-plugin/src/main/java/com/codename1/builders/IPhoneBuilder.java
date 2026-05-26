@@ -1207,6 +1207,15 @@ public class IPhoneBuilder extends Executor {
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                    // Install the build-time-generated @Route dispatcher before
+                    // Display.init so deep links delivered during launch see
+                    // the route table. Direct symbol reference (no
+                    // Class.forName) -- ParparVM obfuscation rewrites the call
+                    // site and the Routes class together. The Maven plugin's
+                    // generate-annotation-stubs Mojo guarantees Routes always
+                    // exists (no-op constructor when the project has no
+                    // @Route, real dispatcher otherwise).
+                    + "        new com.codename1.router.generated.Routes();\n"
                     + "        Display.init(stub);\n"
 
                     + "    }\n"

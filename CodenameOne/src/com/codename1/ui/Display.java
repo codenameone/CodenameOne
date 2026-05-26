@@ -399,24 +399,13 @@ public final class Display extends CN1Constants {
             impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
 
-            // The build-time-generated route table is bound here. The Routes
-            // class is generated per-project by the Codename One Maven plugin
-            // (or the equivalent step in the server-side builders) and is not
-            // shipped in cn1-core -- shipping a stub here would shadow the
-            // real generated class on platforms that translate bytecode
-            // (parparvm, Android). Construct it reflectively so cn1-core has
-            // no compile-time dependency on it; the generated constructor
-            // self-registers via Navigation#setDispatcher, and a missing
-            // class is the no-route case (silently skipped). CLDC11 has
-            // Class.forName + Class.newInstance but not Class.getMethod, so
-            // we lean on the constructor rather than a static bootstrap call.
-            try {
-                Class.forName("com.codename1.router.generated.Routes").newInstance();
-            } catch (ClassNotFoundException ignored) {
-                // No @Route in this project: nothing to install.
-            } catch (Throwable t) {
-                Log.e(t);
-            }
+            // Note: the per-project route dispatcher (Navigation
+            // setDispatcher(...)) is installed by the application stub the
+            // builders generate at build time, before this point. cn1-core
+            // does not reference it directly -- a built-in stub here would
+            // shadow the generated class on platforms that translate
+            // bytecode, and a reflective lookup would break under
+            // obfuscation. See Deep-Links-Routing.asciidoc for the wiring.
         } else {
             impl.confirmControlView();
         }
