@@ -58,6 +58,7 @@ jobs:
           # back to this file via clang's -I search path overrides below.
           stub_h() {
               cat > "$1" <<'EOF'
+          #pragma once
           #import <UIKit/UIKit.h>
           #import <Foundation/Foundation.h>
           @interface MLKVisionImage : NSObject

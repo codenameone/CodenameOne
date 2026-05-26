@@ -137,17 +137,21 @@ jobs:
         # Exercises every cn1-ai-* multi-module project: compiles the
         # common module, runs its JUnit 5 tests, and packages the
         # .cn1lib archive (including native iOS Obj-C / Android Java
-        # sources). Validates that the auto-generated multi-module
-        # layout in scripts/gen-ai-cn1libs.py stays consistent with the
-        # checked-in poms.
+        # sources). Also re-runs the generator and verifies the working
+        # tree matches what's checked in.
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
+          set -eu
           python3 ../scripts/gen-ai-cn1libs.py > /tmp/gen-ai.log
-          if ! git diff --quiet -- 'cn1-ai-*'; then
+          # Capture a list of changed files instead of using --exit-code/--quiet,
+          # which interacted poorly with the surrounding `set -e -o pipefail`.
+          drift=$(git -C .. status --porcelain -- 'maven/cn1-ai-*' || true)
+          if [ -n "$drift" ]; then
             echo "::error::Checked-in cn1-ai-* tree is out of sync with scripts/gen-ai-cn1libs.py"
-            git --no-pager diff -- 'cn1-ai-*'
+            echo "$drift"
+            git -C .. --no-pager diff -- 'maven/cn1-ai-*' || true
             exit 1
           fi
           mvn -B -Dmaven.javadoc.skip=true \
