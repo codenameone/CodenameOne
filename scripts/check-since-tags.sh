@@ -37,11 +37,39 @@ fi
 
 # Build the allowed-versions set from `git tag`, stripping a leading "v" so
 # both "v7.0" and "7.0" map to the same allowed value.
+#
+# We also seed the set with the "next patch" of every X.Y.Z tag because
+# contributors necessarily write @since BEFORE the release that ships the
+# feature is tagged. Concretely, if the highest 7.0.x tag is 7.0.244, we
+# also accept @since 7.0.245 so the upcoming release can be referenced
+# without flipping the build red on every PR. We deliberately do NOT
+# auto-accept next-minor or next-major bumps (e.g. 7.1 or 8.0) — those
+# require an explicit prior tag, because they are also exactly the values
+# Claude hallucinates most often.
 ALLOWED_TAGS_FILE="$(mktemp -t cn1-since-tags.XXXXXX)"
 trap 'rm -f "$ALLOWED_TAGS_FILE"' EXIT
 
+# Pipe through awk to add next-patch entries, then sort -u.
 git -C "$REPO_ROOT" tag --list \
   | sed -E 's/^v//' \
+  | awk '
+      { print $0 }
+      # Capture every X.Y.Z (numeric Z) and track the largest Z per X.Y.
+      /^[0-9]+\.[0-9]+\.[0-9]+$/ {
+        n = split($0, parts, ".")
+        prefix = parts[1] "." parts[2]
+        patch = parts[3] + 0
+        if (patch > max_patch[prefix]) {
+          max_patch[prefix] = patch
+        }
+      }
+      END {
+        # Emit one extra allowed version per release line: max+1.
+        for (prefix in max_patch) {
+          print prefix "." (max_patch[prefix] + 1)
+        }
+      }
+  ' \
   | sort -u > "$ALLOWED_TAGS_FILE"
 
 if [[ ! -s "$ALLOWED_TAGS_FILE" ]]; then
@@ -60,8 +88,14 @@ trap 'rm -f "$ALLOWED_TAGS_FILE" "$HITS_FILE"' EXIT
 # -E for ERE, -H to print filename, -n for line numbers, -r for recurse.
 # The version captures digits.dots optionally followed by letters/dashes
 # (e.g. "7.0.245", "3.5", "1.0-RC1"). A trailing period is stripped below.
+#
+# We deliberately require the @since to be preceded on the same line by a
+# javadoc marker (`*` from /** */ blocks or `///` from Markdown javadoc).
+# That excludes plain `// @since X.Y` code comments — which appear in
+# vendored libraries (e.g. MiG Layout in ui/layouts/mig) where the value
+# references the upstream library's changelog, not a Codename One release.
 grep -EHnr --include='*.java' \
-  '@since[[:space:]]+[0-9][0-9A-Za-z._-]*' \
+  '(\*|///).*@since[[:space:]]+[0-9][0-9A-Za-z._-]*' \
   "$SRC_DIR" > "$HITS_FILE" || true
 
 violations=0

@@ -2565,7 +2565,7 @@ image::img/components-imageviewer-multi.png[An ImageViewer with many elements is
 
 Notice that you use a https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] to allow swiping between images.
 
-From Codename One 9.0, `ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
+`ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
 
 [source,java]
 ----

@@ -47,4 +47,8 @@ jobs:
 
       - name: Run Error Prone over the core module
         working-directory: maven
-        run: mvn -B -Perrorprone -pl core -am install -DskipTests
+        # `errorprone-checks` must be in -pl explicitly: it is referenced
+        # from core via annotationProcessorPaths, which `-am` does not
+        # recognise as a Maven dependency. Without listing it here the
+        # build fails resolving com.codenameone:errorprone-checks:8.0-SNAPSHOT.
+        run: mvn -B -Perrorprone -pl errorprone-checks,core -am install -DskipTests

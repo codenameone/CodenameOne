@@ -72,6 +72,10 @@ public final class NativeLookup {
     ///
     /// @return an instance of that interface that can be invoked or null if the native interface isn't
     /// present on the underlying platform (e.g. simulator platform).
+    // NativeLookup is itself the sanctioned escape hatch for class-by-name
+    // resolution; the JavaSE simulator path falls back to a name-derived
+    // *Impl lookup that the registered map cannot cover.
+    @SuppressWarnings("BanClassForName")
     public static <T extends NativeInterface> T create(Class<T> c) {
         try {
             Class cls = interfaceToClassLookup.get(c);
