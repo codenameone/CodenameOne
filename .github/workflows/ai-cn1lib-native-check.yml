@@ -150,40 +150,47 @@ jobs:
           PY
           ls -la "$PROBE/CN1AIProbe.xcodeproj/"
 
-      - name: pod install (or skip when no pod)
+      - name: pod install (no project integration)
         if: ${{ matrix.pod != '' }}
+        # Skip pbxproj integration -- our synth project doesn't have the
+        # config-section fields CocoaPods expects to inject into. We only
+        # need the pod headers + xcframeworks on disk plus the generated
+        # xcconfig; xcodebuild will load that xcconfig via -xcconfig below.
         run: |
           set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
           cd "$PROBE"
           cat > Podfile <<EOF
           platform :ios, '14.0'
-          install! 'cocoapods', :integrate_targets => true
+          install! 'cocoapods', :integrate_targets => false
           target 'CN1AIProbe' do
             use_frameworks!
             pod '${{ matrix.pod }}'
           end
           EOF
           pod install --repo-update
+          # CocoaPods drops the per-target xcconfig under Target Support Files.
+          # With integrate_targets=false the directory is named after the
+          # target without a `Pods-` prefix.
+          find "Pods/Target Support Files" -name '*.debug.xcconfig' | head -5
 
-      - name: xcodebuild (workspace if pod-installed, project otherwise)
+      - name: xcodebuild
         run: |
           set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}
           cd "$PROBE"
-          if [ -d "CN1AIProbe.xcworkspace" ]; then
-              xcodebuild -workspace CN1AIProbe.xcworkspace \
-                         -scheme CN1AIProbe \
-                         -configuration Debug \
-                         -destination 'generic/platform=iOS Simulator' \
-                         -sdk iphonesimulator \
-                         CODE_SIGNING_ALLOWED=NO \
-                         build
-          else
-              xcodebuild -project CN1AIProbe.xcodeproj \
-                         -target CN1AIProbe \
-                         -configuration Debug \
-                         -sdk iphonesimulator \
-                         CODE_SIGNING_ALLOWED=NO \
-                         build
+          XCCONFIG_ARG=()
+          if [ -d "Pods" ]; then
+              POD_CONFIG=$(find "Pods/Target Support Files" -name '*.debug.xcconfig' | head -1)
+              if [ -n "$POD_CONFIG" ]; then
+                  echo "Using pod xcconfig: $POD_CONFIG"
+                  XCCONFIG_ARG=(-xcconfig "$POD_CONFIG")
+              fi
           fi
+          xcodebuild -project CN1AIProbe.xcodeproj \
+                     -target CN1AIProbe \
+                     -configuration Debug \
+                     -sdk iphonesimulator \
+                     "${XCCONFIG_ARG[@]}" \
+                     CODE_SIGNING_ALLOWED=NO \
+                     build
