@@ -144,6 +144,13 @@ public class HelloCodenameOneStub implements Runnable, WindowListener {
             @Override
             public void run() {
                 if(Display.getInstance().isEdt()) {
+                    // Register build-time-transcoded SVGs with the global
+                    // Resources image table before the app's init() runs --
+                    // this is what makes `theme.getImage("foo.svg")` return
+                    // the transcoded image instead of the CSS-compiler PNG
+                    // placeholder. The IPhoneBuilder / AndroidGradleBuilder
+                    // emit the same call into their generated Stubs.
+                    com.codename1.generated.svg.SVGRegistry.installGlobal();
                     mainApp = new HelloCodenameOne();
                     mainApp.init(this);
                     mainApp.start();

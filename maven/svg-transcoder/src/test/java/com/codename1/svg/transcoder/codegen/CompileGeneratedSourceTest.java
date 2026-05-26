@@ -126,7 +126,7 @@ public class CompileGeneratedSourceTest {
         // just sanity-check the source contents.
         String src = sw.toString();
         assertTrue(src.contains("package com.test.gen;"));
-        assertTrue(src.contains("public static void install(Resources r)"));
+        assertTrue(src.contains("public static void installGlobal()"));
         assertTrue(src.contains("new com.test.gen.FooSvg()"));
         assertTrue(src.contains("Resources.registerGeneratedImage(\"foo.svg\""));
     }

@@ -107,19 +107,16 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         List<File> svgs = locateSvgs();
         Map<String, CssHint> cssHints = scanCssHints();
 
-        if (svgs.isEmpty() && cssHints.isEmpty()) {
-            getLog().debug("No SVGs found and no CSS references -- skipping SVG transcoding.");
-            registerSourceRoot();
-            return;
-        }
-        if (svgs.isEmpty()) {
+        if (svgs.isEmpty() && !cssHints.isEmpty()) {
             getLog().warn("CSS references " + cssHints.size()
                     + " SVG(s) but no .svg files were found under "
                     + String.join(", ", effectiveSourceDirs()));
-            registerSourceRoot();
-            return;
         }
 
+        // Always emit a SVGRegistry (possibly with zero entries) so the
+        // per-platform Stub can always reference SVGRegistry.installGlobal()
+        // without conditional compilation. Saves the cn1app archetype +
+        // builders from having to detect whether the user shipped any SVGs.
         File packageDir = new File(svgOutputDir, svgPackage.replace('.', '/'));
         packageDir.mkdirs();
         long registrySrcMtime = lastModified(svgs);
