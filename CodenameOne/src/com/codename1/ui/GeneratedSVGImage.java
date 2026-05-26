@@ -163,7 +163,7 @@ public abstract class GeneratedSVGImage extends Image {
     /// (e.g. during unit tests that construct an image before
     /// `Display.init()` has run).
     public static int mmToPixels(float mm) {
-        if (!(mm > 0f)) {
+        if (mm <= 0f || Float.isNaN(mm)) {
             throw new IllegalArgumentException("SVG dimension must be > 0mm; got " + mm);
         }
         int pixels;
