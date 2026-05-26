@@ -50,6 +50,10 @@ public class SVGStaticScreenshotTest extends BaseTest {
         form.add(label("star.svg", res == null ? null : res.getImage("star.svg")));
         form.add(label("gradient_circle.svg", res == null ? null : res.getImage("gradient_circle.svg")));
         form.add(label("path_arrow.svg", res == null ? null : res.getImage("path_arrow.svg")));
+        // <text> end-to-end -- font-weight + anchor + multi-color fills:
+        form.add(label("logo_text.svg", res == null ? null : res.getImage("logo_text.svg")));
+        // S/T smooth curves + dashed strokes:
+        form.add(label("wave_path.svg", res == null ? null : res.getImage("wave_path.svg")));
         form.show();
         return true;
     }

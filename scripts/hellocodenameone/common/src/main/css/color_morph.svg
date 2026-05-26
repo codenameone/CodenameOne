@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Multi-attribute animated SVG: size, position and rotation all run
+       in parallel so screenshot tests can prove every animateTransform /
+       animate path actually drives the painter. -->
+  <g transform="translate(50,50)">
+    <animateTransform attributeName="transform" type="rotate"
+                     from="0" to="180" dur="2s" repeatCount="indefinite"/>
+    <rect x="-30" y="-30" width="60" height="60"
+          fill="#4CAF50" stroke="#1B5E20" stroke-width="3"
+          rx="6" ry="6">
+      <animate attributeName="rx" from="6" to="30"
+               dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="ry" from="6" to="30"
+               dur="2s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>

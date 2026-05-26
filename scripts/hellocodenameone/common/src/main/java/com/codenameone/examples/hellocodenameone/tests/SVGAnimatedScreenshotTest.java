@@ -23,6 +23,7 @@ public class SVGAnimatedScreenshotTest extends AbstractAnimationScreenshotTest {
 
     private Image spinner;
     private Image pulse;
+    private Image colorMorph;
 
     @Override
     protected int getAnimationDurationMillis() {
@@ -35,6 +36,7 @@ public class SVGAnimatedScreenshotTest extends AbstractAnimationScreenshotTest {
         Resources res = SVGStaticScreenshotTest.resolveGlobalResources();
         spinner = res == null ? null : res.getImage("spinner_animated.svg");
         pulse = res == null ? null : res.getImage("pulsing_circle.svg");
+        colorMorph = res == null ? null : res.getImage("color_morph.svg");
     }
 
     @Override
@@ -43,16 +45,22 @@ public class SVGAnimatedScreenshotTest extends AbstractAnimationScreenshotTest {
         g.setColor(0xFFFFFF);
         g.fillRect(0, 0, width, height);
 
-        if (spinner == null || pulse == null) {
+        if (spinner == null || pulse == null || colorMorph == null) {
             g.setColor(0xFF0000);
             g.drawString("SVGRegistry not installed", 10, 20);
             return;
         }
 
-        int half = width / 2;
-        Image scaledSpinner = spinner.scaled(half, height);
-        Image scaledPulse = pulse.scaled(width - half, height);
+        // Three animated SVGs in a row so the grid covers
+        // animateTransform (spinner), <animate> on a numeric attribute
+        // (pulse radius / opacity), and combined animateTransform +
+        // multi-attribute <animate> on the same element (colorMorph).
+        int third = width / 3;
+        Image scaledSpinner = spinner.scaled(third, height);
+        Image scaledPulse = pulse.scaled(third, height);
+        Image scaledMorph = colorMorph.scaled(width - 2 * third, height);
         g.drawImage(scaledSpinner, 0, 0);
-        g.drawImage(scaledPulse, half, 0);
+        g.drawImage(scaledPulse, third, 0);
+        g.drawImage(scaledMorph, 2 * third, 0);
     }
 }

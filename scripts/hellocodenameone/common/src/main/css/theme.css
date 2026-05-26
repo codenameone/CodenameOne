@@ -255,3 +255,31 @@ SVGPulsingCircleStyle {
     bg-type: image_scaled_fit;
     padding: 4mm;
 }
+
+/* Exercises <text> rendering with fill colors, anchor, font-weight,
+ * font-style + a rounded-rect frame underneath. */
+SVGLogoTextStyle {
+    background: url(logo_text.svg);
+    cn1-svg-width: 30mm;
+    cn1-svg-height: 12mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Exercises complex path commands -- S/T smooth curves, dashed strokes. */
+SVGWavePathStyle {
+    background: url(wave_path.svg);
+    cn1-svg-width: 30mm;
+    cn1-svg-height: 8mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Multiple parallel animations on one element -- rotate + rx/ry. */
+SVGColorMorphStyle {
+    background: url(color_morph.svg);
+    cn1-svg-width: 18mm;
+    cn1-svg-height: 18mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
