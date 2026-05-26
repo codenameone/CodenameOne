@@ -253,6 +253,9 @@ public final class GeofenceManager implements Iterable<Geofence> {
     }
 
     /// Gets the currently registered Listener class.
+    // The listener class name is persisted to Storage during registration; we
+    // have no Class literal here, so reflective resolution is unavoidable.
+    @SuppressWarnings("BanClassForName")
     public synchronized Class<? extends GeofenceListener> getListenerClass() {
         if (listenerClass == null) {
             String className = (String) Storage.getInstance().readObject(LISTENER_CLASS_KEY);

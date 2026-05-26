@@ -99,21 +99,6 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
     BOOL ignore = (touch == nil || pressedView == nil || !viewInWindow || ![pressedView isDescendantOfView:v]);
 
-    // Touches that land on the active native text editor (the CN1UITextField /
-    // CN1UITextView created by editStringAtImpl) must be left to UIKit. They
-    // drive cursor positioning, selection handles, the magnifier loupe, and on
-    // iOS 26.x the RTI / emoji-search input session. If we dispatch them into
-    // CN1's pointer pipeline, touchesEnded fires foldKeyboard -- whose
-    // 22pt-tall hit-test rect rejects most taps on a single-line TextField --
-    // which calls stringEdit(YES,...), tears down editingComponent, and lets
-    // the same touch's pointerReleasedC re-enter Java's TextArea.pointerReleased,
-    // which recreates the field. The visible symptom is the keyboard bouncing
-    // and the selection / cursor resetting on every interaction; see #5010.
-    if (!ignore && editingComponent != nil && pressedView != nil
-            && [pressedView isDescendantOfView:editingComponent]) {
-        ignore = YES;
-    }
-
     return ignore;
 }
 

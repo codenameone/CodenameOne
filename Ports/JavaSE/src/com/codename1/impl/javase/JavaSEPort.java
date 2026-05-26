@@ -3154,6 +3154,64 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public boolean isPortrait() {
+        // When setSimulatorPortrait has been called explicitly (e.g. by the
+        // @Orientation JUnit annotation), honor that flag rather than the
+        // canvas-derived inference. The canvas inherits the host window's
+        // dimensions, which in unit-test JVMs almost always read as
+        // landscape regardless of what the test asked for.
+        if (simulatorPortraitExplicit) {
+            return portrait;
+        }
+        return super.isPortrait();
+    }
+
+    /**
+     * Programmatically flips the simulator between portrait and landscape
+     * without persisting the choice to user preferences. The menu's Rotate
+     * action goes through the private {@link #setPortrait(boolean)} helper
+     * (which does persist, since it is driven by an explicit user click);
+     * this entry point is meant for runtime / test callers that want the
+     * orientation state to last only for the current JVM &mdash; in
+     * particular the {@code @Orientation} JUnit annotation.
+     *
+     * <p>Sets an explicit-override flag so that {@link #isPortrait()} returns
+     * this value instead of inferring orientation from canvas dimensions.
+     * In tests the canvas inherits the host frame's size and the inference
+     * would otherwise read "landscape" on any wide screen.
+     *
+     * @param portraitValue true for portrait, false for landscape
+     */
+    public void setSimulatorPortrait(boolean portraitValue) {
+        simulatorPortraitExplicit = true;
+        if (portrait != portraitValue) {
+            portrait = portraitValue;
+            updateFrameUI();
+        }
+    }
+
+    private boolean simulatorPortraitExplicit = false;
+
+    /**
+     * Sets the simulator's accessibility text-scale multiplier. Does not
+     * persist the value to user preferences &mdash; the Simulate &gt;
+     * Larger Text menu remains the only restart-stable source of truth.
+     * Does not refresh the active theme either; the caller decides when
+     * to redraw (the {@code @LargerText} JUnit annotation, for instance,
+     * batches several config changes and then issues one refresh).
+     *
+     * <p>A value of {@code 1.0f} restores the default size; values like
+     * {@code 1.3f}, {@code 1.6f}, {@code 2.0f} mirror the menu's
+     * "AX2 / AX3 / AX5" presets.
+     *
+     * @param scale text-scale multiplier; {@code 1.0f} for default
+     */
+    public void setSimulatorLargerTextScale(float scale) {
+        largerTextScale = scale;
+        largerTextEnabled = scale > 1.0f + 0.001f;
+    }
+
 
     private void updateFrameUI() {
         if (instance.appFrame != null) {

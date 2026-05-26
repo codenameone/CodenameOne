@@ -39,17 +39,6 @@ public final class GestureSuite {
                 new TapStep(),
                 new DragStep(),
                 new LongPressStep()
-                // KeyTypeStep is disabled pending #5010 resolution. The
-                // step exercises the HW-keyboard UIPress chain (typeText in
-                // XCUITest), which depends on [super pressesBegan:] being
-                // forwarded from CodenameOne_GLViewController while a field
-                // is being edited. The iOS-26.4.2 freeze investigation
-                // points to that same forwarding as the trigger, so the
-                // override now returns early without forwarding -- which
-                // breaks this step on the simulator. Re-enable once the
-                // freeze root cause and a fix that preserves both paths
-                // are landed.
-                //, new KeyTypeStep()
         };
         this.form = new Form("Input Validation", new BorderLayout());
         this.statusLabel = new Label("Initializing");

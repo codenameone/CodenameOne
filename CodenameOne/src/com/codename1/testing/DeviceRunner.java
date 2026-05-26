@@ -103,6 +103,10 @@ public abstract class DeviceRunner {
     /// #### Parameters
     ///
     /// - `testClassName`: the class name of the test case
+    // The test runner receives the unit test class as a String (it is the
+    // entry point invoked from the device-side test bootstrap), so loading
+    // it by name is the whole point of the method.
+    @SuppressWarnings("BanClassForName")
     public void runTest(String testClassName) {
         try {
             final UnitTest t = (UnitTest) Class.forName(testClassName).newInstance();

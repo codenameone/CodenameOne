@@ -19,6 +19,31 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          Test-scope deps needed if you add JUnit 5 tests under
+          src/test/java that drive the simulator via
+          com.codename1.testing.junit.CodenameOneTest. Surefire stays
+          skipped at this module (see skipTests on surefire below);
+          JUnit tests actually run from the javase module, which
+          inherits these sources via testSourceDirectory. They live
+          here only so common can compile the test sources.
+
+          Apps that prefer the legacy AbstractTest / cn1:test flow can
+          delete both blocks; they are inert unless a test imports
+          them.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
@@ -368,6 +393,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <!--
+                  Surefire is intentionally skipped in the common module.
+                  Legacy AbstractTest classes run through `cn1:test` (wired
+                  in the javase module's "test" profile). New JUnit 5
+                  tests under src/test/java run from the javase module as
+                  well, which mounts these same sources via
+                  testSourceDirectory. Enabling Surefire here too would
+                  execute every JUnit test twice.
+                  -->
                 <configuration>
                     <skipTests>true</skipTests>
                 </configuration>
