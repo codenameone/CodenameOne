@@ -138,12 +138,12 @@ would shadow the per-project class on platforms that translate bytecode
 (parparvm, Android). The application stub the builders write for each
 target platform calls `new com.codename1.router.generated.Routes()`
 directly before `Display.init(...)`. Direct symbol references survive
-obfuscation; reflective lookups do not. The Maven plugin's
+obfuscation; reflective lookups don't. The Maven plugin's
 `generate-annotation-stubs` goal always emits a no-op `Routes` source
 at `target/generated-sources/cn1-annotations`, so projects with no
 `@Route` annotations still compile and run -- the no-op constructor
-simply doesn't install a dispatcher, and `Navigation.navigate(...)`
-calls become no-ops.
+doesn't install a dispatcher, and `Navigation.navigate(...)` calls
+become no-ops.
 
 The validation gate catches every problem in a single build run:
 
