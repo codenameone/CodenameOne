@@ -369,6 +369,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // reliably. The validation stays on iOS/Android so dropped chunks
         // still surface as failures there.
         return "KotlinUiTest".equals(testName)
+                // The SVG screenshot tests need iOS/Android/JavaSE coverage but
+                // overflow the JS port's ~150s browser-lifetime budget when added
+                // on top of the current suite; revisit when that budget is bumped.
+                || "SVGStaticScreenshotTest".equals(testName)
+                || "SVGAnimatedScreenshotTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
                 || "StatusBarTapDiagnosticScreenshotTest".equals(testName)

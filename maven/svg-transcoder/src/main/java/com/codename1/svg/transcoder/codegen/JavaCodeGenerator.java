@@ -284,10 +284,14 @@ public final class JavaCodeGenerator {
         if (fill == null) fill = SVGPaint.BLACK;
 
         if (!fill.isNone()) {
-            emitPaintSet(fill, animFloat("fill-opacity",
-                    style.getFillOpacity() == null ? 1f : style.getFillOpacity(), anims),
-                    style.getOpacity());
-            line("g.fillShape(__p);");
+            AnimatedFloat fillOpacity = animFloat("fill-opacity",
+                    style.getFillOpacity() == null ? 1f : style.getFillOpacity(), anims);
+            if (fill.isReference()) {
+                emitGradientFill(fill, fillOpacity, style.getOpacity());
+            } else {
+                emitPaintSet(fill, fillOpacity, style.getOpacity());
+                line("g.fillShape(__p);");
+            }
         }
         if (stroke != null && !stroke.isNone()) {
             Float sw = style.getStrokeWidth();
@@ -307,61 +311,69 @@ public final class JavaCodeGenerator {
 
     private void emitPaintSet(SVGPaint paint, AnimatedFloat opacity, Float groupOpacity) {
         // group opacity multiplies attribute opacity
-        String alphaExpr;
-        if (groupOpacity != null) {
-            alphaExpr = "(int)(255f * Math.max(0f, Math.min(1f, " + opacity.expr + " * "
-                    + floatLit(groupOpacity) + ")))";
-        } else {
-            alphaExpr = "(int)(255f * Math.max(0f, Math.min(1f, " + opacity.expr + ")))";
-        }
+        String alphaExpr = alphaExpression(opacity, groupOpacity, 0xFF);
         if (paint.isReference()) {
+            // Gradient paths are handled by emitGradientFill; this is for the
+            // solid-color stroke path or the radial-fallback case.
             SVGNode def = doc.getDefinitions().get(paint.getReference());
-            if (def instanceof SVGLinearGradient) {
-                emitLinearGradient((SVGLinearGradient) def, alphaExpr);
-                return;
-            }
-            // radial or unknown: fall back to first stop or black
+            int color = 0xFF000000;
             if (def instanceof SVGRadialGradient) {
                 SVGRadialGradient g = (SVGRadialGradient) def;
-                int color = g.getStops().isEmpty() ? 0xFF000000 : g.getStops().get(0).getColor();
-                line("g.setColor(0x" + hex(color & 0xFFFFFF) + ");");
-                line("g.setAlpha(" + alphaExpr + ");");
-                return;
+                if (!g.getStops().isEmpty()) {
+                    color = g.getStops().get(0).getColor();
+                }
             }
-            // unresolved
-            line("g.setColor(0x000000);");
+            line("g.setColor(0x" + hex(color & 0xFFFFFF) + ");");
             line("g.setAlpha(" + alphaExpr + ");");
             return;
         }
         int argb = paint.getColor();
         line("g.setColor(0x" + hex(argb & 0xFFFFFF) + ");");
-        // baked alpha from color overrides explicit opacity expr to keep simple
         int colorAlpha = (argb >>> 24) & 0xFF;
-        if (colorAlpha != 0xFF) {
-            line("g.setAlpha((int)(" + colorAlpha + " * Math.max(0f, Math.min(1f, "
-                    + (groupOpacity == null ? opacity.expr : opacity.expr + " * " + floatLit(groupOpacity))
-                    + ")) + 0.5f));");
-        } else {
-            line("g.setAlpha(" + alphaExpr + ");");
-        }
+        line("g.setAlpha(" + alphaExpression(opacity, groupOpacity, colorAlpha) + ");");
     }
 
-    private void emitLinearGradient(SVGLinearGradient lg, String alphaExpr) {
-        // resolve href-chained stops
+    private static String alphaExpression(AnimatedFloat opacity, Float groupOpacity, int baseAlpha) {
+        String mult = "Math.max(0f, Math.min(1f, " + opacity.expr;
+        if (groupOpacity != null) {
+            mult += " * " + floatLit(groupOpacity);
+        }
+        mult += "))";
+        if (baseAlpha >= 0xFF) {
+            return "(int)(255f * " + mult + ")";
+        }
+        return "(int)(" + baseAlpha + " * " + mult + " + 0.5f)";
+    }
+
+    /// Gradient fills require shape clipping: CN1's [LinearGradientPaint#paint]
+    /// fills its bounding rectangle, not the path -- a `fillShape(p)` after
+    /// `setColor(paint)` ends up painting the gradient through any space inside
+    /// the shape's bounding box. Pushing the path itself as the clip masks the
+    /// gradient to the actual outline.
+    private void emitGradientFill(SVGPaint fill, AnimatedFloat opacity, Float groupOpacity) {
+        SVGNode def = doc.getDefinitions().get(fill.getReference());
+        if (!(def instanceof SVGLinearGradient)) {
+            // Radial / unresolved: fall back to first stop or black via the
+            // solid-color path so we always render something.
+            emitPaintSet(fill, opacity, groupOpacity);
+            line("g.fillShape(__p);");
+            return;
+        }
+        SVGLinearGradient lg = (SVGLinearGradient) def;
         SVGLinearGradient effective = lg;
         if (lg.getStops().isEmpty() && lg.getHref() != null) {
             SVGNode ref = doc.getDefinitions().get(lg.getHref());
-            if (ref instanceof SVGLinearGradient) effective = (SVGLinearGradient) ref;
+            if (ref instanceof SVGLinearGradient) {
+                effective = (SVGLinearGradient) ref;
+            }
         }
         List<SVGGradientStop> stops = effective.getStops();
         if (stops.isEmpty()) {
-            line("g.setColor(0x000000);");
-            line("g.setAlpha(" + alphaExpr + ");");
+            emitPaintSet(SVGPaint.BLACK, opacity, groupOpacity);
+            line("g.fillShape(__p);");
             return;
         }
-        // Build the gradient using the SVG-declared coordinates.
-        // For objectBoundingBox (default) we map [0..1] to the path bounds at runtime
-        // by querying the path. For userSpaceOnUse we use the coords directly.
+
         StringBuilder fracs = new StringBuilder("new float[]{");
         StringBuilder cols = new StringBuilder("new int[]{");
         for (int i = 0; i < stops.size(); i++) {
@@ -375,35 +387,44 @@ public final class JavaCodeGenerator {
         fracs.append("}");
         cols.append("}");
 
+        line("{");
+        indent++;
+        line("float[] __b = new float[4];");
+        line("__p.getBounds2D(__b);");
+        line("float __bx = __b[0], __by = __b[1];");
+        line("float __bw = __b[2], __bh = __b[3];");
+        String startX, startY, endX, endY;
         if (lg.isUserSpace()) {
-            line("g.setColor(new LinearGradientPaint("
-                    + floatLit(lg.getX1()) + ", " + floatLit(lg.getY1()) + ", "
-                    + floatLit(lg.getX2()) + ", " + floatLit(lg.getY2()) + ", "
-                    + fracs + ", " + cols + ", "
-                    + "MultipleGradientPaint.CycleMethod.NO_CYCLE, "
-                    + "MultipleGradientPaint.ColorSpaceType.SRGB, "
-                    + "Transform.makeIdentity()));");
+            startX = floatLit(lg.getX1());
+            startY = floatLit(lg.getY1());
+            endX = floatLit(lg.getX2());
+            endY = floatLit(lg.getY2());
         } else {
-            // objectBoundingBox -- map [0..1] to path bounds
-            line("{");
-            indent++;
-            line("float[] __b = new float[4];");
-            line("__p.getBounds2D(__b);");
-            line("float __bx = __b[0], __by = __b[1];");
-            line("float __bw = __b[2], __bh = __b[3];");
-            line("g.setColor(new LinearGradientPaint("
-                    + "__bx + " + floatLit(lg.getX1()) + " * __bw, "
-                    + "__by + " + floatLit(lg.getY1()) + " * __bh, "
-                    + "__bx + " + floatLit(lg.getX2()) + " * __bw, "
-                    + "__by + " + floatLit(lg.getY2()) + " * __bh, "
-                    + fracs + ", " + cols + ", "
-                    + "MultipleGradientPaint.CycleMethod.NO_CYCLE, "
-                    + "MultipleGradientPaint.ColorSpaceType.SRGB, "
-                    + "Transform.makeIdentity()));");
-            indent--;
-            line("}");
+            startX = "__bx + " + floatLit(lg.getX1()) + " * __bw";
+            startY = "__by + " + floatLit(lg.getY1()) + " * __bh";
+            endX = "__bx + " + floatLit(lg.getX2()) + " * __bw";
+            endY = "__by + " + floatLit(lg.getY2()) + " * __bh";
         }
-        line("g.setAlpha(" + alphaExpr + ");");
+        line("LinearGradientPaint __paint = new LinearGradientPaint("
+                + startX + ", " + startY + ", " + endX + ", " + endY + ", "
+                + fracs + ", " + cols + ", "
+                + "MultipleGradientPaint.CycleMethod.NO_CYCLE, "
+                + "MultipleGradientPaint.ColorSpaceType.SRGB, "
+                + "Transform.makeIdentity());");
+        line("g.setAlpha(" + alphaExpression(opacity, groupOpacity, 0xFF) + ");");
+        line("g.pushClip();");
+        line("try {");
+        indent++;
+        line("g.setClip(__p);");
+        line("__paint.paint(g, __bx, __by, __bw, __bh);");
+        indent--;
+        line("} finally {");
+        indent++;
+        line("g.popClip();");
+        indent--;
+        line("}");
+        indent--;
+        line("}");
     }
 
     // ---- transforms --------------------------------------------------------
