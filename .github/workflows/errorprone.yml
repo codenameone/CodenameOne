@@ -45,10 +45,16 @@ jobs:
           java-version: 17
           cache: maven
 
+      - name: Install errorprone-checks
+        working-directory: maven
+        # The checker module must be installed to the local repo BEFORE
+        # core compiles. We can't rely on the reactor ordering: core
+        # references errorprone-checks only via annotationProcessorPaths,
+        # which Maven does not treat as a build-time dependency, so the
+        # reactor would otherwise schedule core first and fail to resolve
+        # com.codenameone:errorprone-checks:8.0-SNAPSHOT.
+        run: mvn -B -Perrorprone -pl errorprone-checks -am install -DskipTests
+
       - name: Run Error Prone over the core module
         working-directory: maven
-        # `errorprone-checks` must be in -pl explicitly: it is referenced
-        # from core via annotationProcessorPaths, which `-am` does not
-        # recognise as a Maven dependency. Without listing it here the
-        # build fails resolving com.codenameone:errorprone-checks:8.0-SNAPSHOT.
-        run: mvn -B -Perrorprone -pl errorprone-checks,core -am install -DskipTests
+        run: mvn -B -Perrorprone -pl core -am install -DskipTests
