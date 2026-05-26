@@ -187,13 +187,6 @@ REQUIRED_EVENTS=(
   "CN1IV:EVENT:drag"
   "CN1IV:READY:longpress"
   "CN1IV:EVENT:longpress"
-  # keytype is disabled pending #5010 resolution -- see GestureSuite.java
-  # and ios-tests/Sources/InputValidationUITests.swift. Re-enable both
-  # CN1IV:READY:keytype and CN1IV:EVENT:keytype together when a fix
-  # that preserves both the HW-keyboard UIPress chain and the iOS-26.4.2
-  # virtual-keyboard freeze fix has landed.
-  # "CN1IV:READY:keytype"
-  # "CN1IV:EVENT:keytype"
   "CN1IV:SUITE:FINISHED"
 )
 FAILED=0
