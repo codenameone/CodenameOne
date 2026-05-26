@@ -249,11 +249,13 @@ public final class RouteAnnotationProcessor extends AbstractAnnotationProcessor 
         sb.append("import com.codename1.ui.Form;\n\n");
         sb.append("public final class ").append(ROUTES_SIMPLE)
                 .append(" implements RouteDispatcher {\n\n");
-        sb.append("    public static void bootstrap() {\n");
-        sb.append("        Navigation.setDispatcher(new ")
-                .append(ROUTES_SIMPLE).append("());\n");
+        // Self-registering constructor: Display#init() calls
+        // Class.forName(...).newInstance() to bootstrap (CLDC11's Class API
+        // has forName + newInstance but not getMethod, so we cannot rely on
+        // a static `bootstrap` entry point).
+        sb.append("    public Routes() {\n");
+        sb.append("        Navigation.setDispatcher(this);\n");
         sb.append("    }\n\n");
-        sb.append("    private Routes() { }\n\n");
         sb.append("    @Override\n");
         sb.append("    public Form dispatch(String url) {\n");
         sb.append("        if (url == null || url.length() == 0) {\n");

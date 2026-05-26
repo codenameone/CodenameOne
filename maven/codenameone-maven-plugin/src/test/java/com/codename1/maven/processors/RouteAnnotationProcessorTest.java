@@ -68,7 +68,7 @@ public class RouteAnnotationProcessorTest {
         runProcessorOrFail(classes);
 
         RoutesIntrospection rx = readRoutes(classes);
-        assertTrue("Routes.bootstrap should install via Navigation.setDispatcher",
+        assertTrue("Routes constructor should install via Navigation.setDispatcher",
                 rx.bootstrapInstallsViaNavigation);
         assertTrue("dispatch should return Form",
                 rx.dispatchReturnsForm);
@@ -242,7 +242,7 @@ public class RouteAnnotationProcessorTest {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor,
                                               String signature, String[] exceptions) {
-                if ("bootstrap".equals(name)) {
+                if ("<init>".equals(name)) {
                     return new MethodVisitor(Opcodes.ASM9) {
                         @Override
                         public void visitMethodInsn(int opcode, String owner, String mname,
