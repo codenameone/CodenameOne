@@ -13,23 +13,19 @@ import java.io.InputStream;
 /**
  * End-to-end test for the build-time SVG transcoder.
  *
- * <p><b>iOS Metal goldens diverge from the other ports.</b> Two known
- * Metal renderer bugs surface here -- the goldens capture the current
- * Metal behavior on purpose so the next Metal-focused PR can replace
- * them with the correct output:
+ * <p><b>Goldens capture current per-port rendering bugs intentionally.</b>
+ * The follow-up port-side PRs will replace the goldens with the corrected
+ * output. See {@code docs/developer-guide/SVG-Transcoder.asciidoc} for
+ * the full list; the SVG-affecting items are:</p>
  * <ul>
- *   <li>{@code logo_text.svg} -- the rounded background rectangle
- *       paints, but the {@code <text>} on top of it does not.
- *       {@code Graphics.drawString} on Metal does not pick up the
- *       active transform applied by the SVG renderer, so the text
- *       ends up at the wrong screen position (or off-screen).</li>
- *   <li>{@code gradient_circle.svg} -- the gradient fill renders as a
- *       triangle rather than a circle. The Metal port replaces a
- *       non-rectangular {@code setClip(Shape)} with a degenerate
- *       polygon clip for arc-decomposed paths.</li>
+ *   <li>iOS (legacy + Metal): {@code gradient_circle.svg} and
+ *       {@code clipped_badge.svg} render as triangles because the
+ *       iOS port's {@code setClip(GeneralPath)} substitutes a
+ *       degenerate polygon for arc-decomposed paths.</li>
+ *   <li>Android: {@code gradient_circle.svg} draws both the filled
+ *       circle and an outline of the same circle stacked, rather than
+ *       a single filled circle with a darker stroke.</li>
  * </ul>
- * Both render correctly on Android, the JavaSE simulator and the
- * legacy iOS OpenGL ES port.
  *
  * <p>Demonstrates the full developer-facing flow:</p>
  *

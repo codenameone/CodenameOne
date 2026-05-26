@@ -258,24 +258,33 @@ Image small = img.scaled(48, 48);  // any explicit size still works
 requested dimensions from `getWidth()`/`getHeight()` and shares the
 animation clock with its source.
 
-== Known iOS Metal limitations
+== Known port-side rendering bugs
 
-The iOS Metal renderer has two SVG-relevant bugs that this transcoder
-does not work around -- the goldens capture the current behavior and a
-Metal-focused PR will fix the rendering path:
+The screenshot goldens captured at `scripts/{android,ios/screenshots,ios/screenshots-metal}/SVGStatic.png`
+and `SVGAnimatedScreenshotTest.png` deliberately record the **current**
+behavior of each port -- the bugs below are tracked separately and a
+follow-up port-side PR will replace the goldens with the corrected
+output:
 
-`<text>` elements may misrender::
-  `Graphics.drawString` under a non-identity transform does not always
-  pick up the active transform on the Metal port. Transcoded SVG text
-  may render at the wrong screen position or not at all (logo
-  background paints correctly, the text on top of it does not). Solid
-  shapes and stroked paths render correctly.
+iOS (both OpenGL ES and Metal) -- gradient fills clipped to a non-rectangular path render as a triangle::
+  `setClip(GeneralPath)` on iOS substitutes a degenerate polygon for an
+  arc-decomposed path, so a `<circle fill="url(#grad)"/>` ends up shaped
+  like a triangle. The transcoder's `<clipPath>` support sits on top of
+  the same primitive so `clipped_badge.svg` shows the same shape on both
+  iOS variants.
 
-Gradient fills clipped by a non-rectangular path render as triangles::
-  `setClip(GeneralPath)` substitutes a degenerate polygon for an
-  arc-decomposed path on Metal, so a `<circle fill="url(#grad)"/>`
-  ends up shaped like a triangle. The OpenGL ES port (`build-ios`,
-  the default before Metal) renders both correctly.
+iOS (both OpenGL ES and Metal) -- `<animate>` on `fill` colors does not tick::
+  Numeric attribute animation (`r`, `cx`, transforms) animates correctly
+  on iOS. Color-valued animation -- e.g. `color_morph.svg` morphing red
+  diamonds through the palette -- renders the start color but does not
+  advance, so the diamonds vanish on iOS legacy (start color is white)
+  and freeze on iOS Metal. Android animates them as expected.
+
+Android -- gradient fills draw the path outline twice::
+  `gradient_circle.svg` ends up with both the gradient-filled circle and
+  an outline of the same circle stacked, instead of a single filled
+  circle with a darker stroke. The transcoder emits a fill + stroke
+  pair so the platform paint pipeline is on the hook.
 
 == Limitations and notes
 
