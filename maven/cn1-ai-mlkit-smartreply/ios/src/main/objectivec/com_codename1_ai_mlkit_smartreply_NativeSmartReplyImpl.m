@@ -1,9 +1,6 @@
 #import "com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitSmartReply/MLKSmartReply.h>
-#import <MLKitSmartReply/MLKTextMessage.h>
-#import <MLKitSmartReply/MLKSmartReplySuggestion.h>
-#import <MLKitSmartReply/MLKSmartReplySuggestionResult.h>
+#import <MLKitSmartReply/MLKitSmartReply.h>
 #import <arpa/inet.h>
 
 @implementation com_codename1_ai_mlkit_smartreply_NativeSmartReplyImpl

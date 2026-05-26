@@ -86,7 +86,12 @@ jobs:
               iOS: "14.0"
           targets:
             CN1AIProbe:
-              type: framework
+              # Static library: archives .o files without linking, so cn1libs
+              # that reference externs supplied by the real build server
+              # (libwhisper.a for whisper, cn1_sd_generate for stable
+              # diffusion, the actual ML Kit framework binaries) still
+              # compile-check successfully.
+              type: library.static
               platform: iOS
               sources:
                 - path: CN1AIProbe
@@ -95,9 +100,6 @@ jobs:
                   CLANG_ENABLE_MODULES: YES
                   CLANG_ENABLE_OBJC_ARC: YES
                   CODE_SIGNING_ALLOWED: NO
-                  GENERATE_INFOPLIST_FILE: YES
-                  DEFINES_MODULE: YES
-                  PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.cn1ai.probe
           YAML
           cd "$PROBE"
           xcodegen generate --spec project.yml

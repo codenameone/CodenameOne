@@ -1,10 +1,7 @@
 #import "com_codename1_ai_mlkit_pose_NativePoseDetectorImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitPoseDetection/MLKPoseDetector.h>
-#import <MLKitPoseDetection/MLKPoseDetectorOptions.h>
-#import <MLKitPoseDetection/MLKPose.h>
-#import <MLKitPoseDetection/MLKPoseLandmark.h>
-#import <MLKitVision/MLKVisionImage.h>
+#import <MLKitPoseDetection/MLKitPoseDetection.h>
+#import <MLKitVision/MLKitVision.h>
 
 @implementation com_codename1_ai_mlkit_pose_NativePoseDetectorImpl
 

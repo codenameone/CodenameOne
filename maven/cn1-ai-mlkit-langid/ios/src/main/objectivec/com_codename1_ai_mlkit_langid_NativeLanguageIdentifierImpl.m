@@ -1,6 +1,6 @@
 #import "com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitLanguageID/MLKLanguageIdentification.h>
+#import <MLKitLanguageID/MLKitLanguageID.h>
 
 @implementation com_codename1_ai_mlkit_langid_NativeLanguageIdentifierImpl
 

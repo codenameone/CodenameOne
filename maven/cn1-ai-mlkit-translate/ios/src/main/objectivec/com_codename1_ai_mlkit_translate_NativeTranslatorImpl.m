@@ -1,8 +1,7 @@
 #import "com_codename1_ai_mlkit_translate_NativeTranslatorImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitTranslate/MLKTranslator.h>
-#import <MLKitTranslate/MLKTranslatorOptions.h>
-#import <MLKitCommon/MLKModelDownloadConditions.h>
+#import <MLKitTranslate/MLKitTranslate.h>
+#import <MLKitCommon/MLKitCommon.h>
 
 @implementation com_codename1_ai_mlkit_translate_NativeTranslatorImpl
 

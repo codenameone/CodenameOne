@@ -1,6 +1,6 @@
 #import "com_codename1_ai_tflite_NativeInterpreterImpl.h"
 #import <UIKit/UIKit.h>
-#import <TensorFlowLiteObjC/TFLTensorFlowLite.h>
+#import <TFLTensorFlowLite/TFLTensorFlowLite.h>
 
 @implementation com_codename1_ai_tflite_NativeInterpreterImpl
 

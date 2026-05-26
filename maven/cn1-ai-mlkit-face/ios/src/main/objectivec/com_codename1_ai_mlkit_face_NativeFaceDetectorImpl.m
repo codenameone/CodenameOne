@@ -1,9 +1,7 @@
 #import "com_codename1_ai_mlkit_face_NativeFaceDetectorImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitFaceDetection/MLKFaceDetector.h>
-#import <MLKitFaceDetection/MLKFaceDetectorOptions.h>
-#import <MLKitFaceDetection/MLKFace.h>
-#import <MLKitVision/MLKVisionImage.h>
+#import <MLKitFaceDetection/MLKitFaceDetection.h>
+#import <MLKitVision/MLKitVision.h>
 #import <arpa/inet.h>
 
 @implementation com_codename1_ai_mlkit_face_NativeFaceDetectorImpl

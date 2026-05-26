@@ -1,9 +1,7 @@
 #import "com_codename1_ai_mlkit_text_NativeTextRecognizerImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitTextRecognition/MLKTextRecognizer.h>
-#import <MLKitTextRecognition/MLKTextRecognizerOptions.h>
-#import <MLKitVision/MLKVisionImage.h>
-#import <MLKitVision/MLKText.h>
+#import <MLKitTextRecognition/MLKitTextRecognition.h>
+#import <MLKitVision/MLKitVision.h>
 
 @implementation com_codename1_ai_mlkit_text_NativeTextRecognizerImpl
 

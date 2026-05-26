@@ -1,9 +1,7 @@
 #import "com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitImageLabeling/MLKImageLabeler.h>
-#import <MLKitImageLabeling/MLKImageLabelerOptions.h>
-#import <MLKitImageLabeling/MLKImageLabel.h>
-#import <MLKitVision/MLKVisionImage.h>
+#import <MLKitImageLabeling/MLKitImageLabeling.h>
+#import <MLKitVision/MLKitVision.h>
 #import <arpa/inet.h>
 
 @implementation com_codename1_ai_mlkit_labeling_NativeImageLabelerImpl

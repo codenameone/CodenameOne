@@ -1,9 +1,7 @@
 #import "com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitBarcodeScanning/MLKBarcodeScanner.h>
-#import <MLKitBarcodeScanning/MLKBarcodeScannerOptions.h>
-#import <MLKitBarcodeScanning/MLKBarcode.h>
-#import <MLKitVision/MLKVisionImage.h>
+#import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
+#import <MLKitVision/MLKitVision.h>
 #import <arpa/inet.h>
 
 @implementation com_codename1_ai_mlkit_barcode_NativeBarcodeScannerImpl

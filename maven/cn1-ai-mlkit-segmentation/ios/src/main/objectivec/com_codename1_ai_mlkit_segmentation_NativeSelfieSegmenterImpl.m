@@ -1,9 +1,7 @@
 #import "com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl.h"
 #import <UIKit/UIKit.h>
-#import <MLKitSegmentationSelfie/MLKSelfieSegmenterOptions.h>
-#import <MLKitSegmentationCommon/MLKSegmenter.h>
-#import <MLKitSegmentationCommon/MLKSegmentationMask.h>
-#import <MLKitVision/MLKVisionImage.h>
+#import <MLKitSegmentationSelfie/MLKitSegmentationSelfie.h>
+#import <MLKitVision/MLKitVision.h>
 #import <CoreVideo/CoreVideo.h>
 
 @implementation com_codename1_ai_mlkit_segmentation_NativeSelfieSegmenterImpl

@@ -842,11 +842,13 @@ def lib_mlkit_text() -> Lib:
             return result;
         }
         """)
+    # ML Kit ships per-framework umbrella headers (named after the
+    # framework itself, e.g. MLKitTextRecognition.h). Importing the
+    # umbrella pulls every public class -- the per-class header paths
+    # we previously used aren't actually exported.
     ios_imports = textwrap.dedent("""\
-        #import <MLKitTextRecognition/MLKTextRecognizer.h>
-        #import <MLKitTextRecognition/MLKTextRecognizerOptions.h>
-        #import <MLKitVision/MLKVisionImage.h>
-        #import <MLKitVision/MLKText.h>
+        #import <MLKitTextRecognition/MLKitTextRecognition.h>
+        #import <MLKitVision/MLKitVision.h>
         """)
 
     android_impl = textwrap.dedent("""\
@@ -1023,10 +1025,8 @@ def lib_mlkit_barcode() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitBarcodeScanning/MLKBarcodeScanner.h>
-        #import <MLKitBarcodeScanning/MLKBarcodeScannerOptions.h>
-        #import <MLKitBarcodeScanning/MLKBarcode.h>
-        #import <MLKitVision/MLKVisionImage.h>
+        #import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
+        #import <MLKitVision/MLKitVision.h>
         #import <arpa/inet.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -1181,10 +1181,8 @@ def lib_mlkit_face() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitFaceDetection/MLKFaceDetector.h>
-        #import <MLKitFaceDetection/MLKFaceDetectorOptions.h>
-        #import <MLKitFaceDetection/MLKFace.h>
-        #import <MLKitVision/MLKVisionImage.h>
+        #import <MLKitFaceDetection/MLKitFaceDetection.h>
+        #import <MLKitVision/MLKitVision.h>
         #import <arpa/inet.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -1381,10 +1379,8 @@ def lib_mlkit_labeling() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitImageLabeling/MLKImageLabeler.h>
-        #import <MLKitImageLabeling/MLKImageLabelerOptions.h>
-        #import <MLKitImageLabeling/MLKImageLabel.h>
-        #import <MLKitVision/MLKVisionImage.h>
+        #import <MLKitImageLabeling/MLKitImageLabeling.h>
+        #import <MLKitVision/MLKitVision.h>
         #import <arpa/inet.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -1515,9 +1511,8 @@ def lib_mlkit_translate() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitTranslate/MLKTranslator.h>
-        #import <MLKitTranslate/MLKTranslatorOptions.h>
-        #import <MLKitCommon/MLKModelDownloadConditions.h>
+        #import <MLKitTranslate/MLKitTranslate.h>
+        #import <MLKitCommon/MLKitCommon.h>
         """)
     android_impl = textwrap.dedent("""\
         public String translate(String text, String sourceLang, String targetLang) {
@@ -1647,10 +1642,7 @@ def lib_mlkit_smartreply() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitSmartReply/MLKSmartReply.h>
-        #import <MLKitSmartReply/MLKTextMessage.h>
-        #import <MLKitSmartReply/MLKSmartReplySuggestion.h>
-        #import <MLKitSmartReply/MLKSmartReplySuggestionResult.h>
+        #import <MLKitSmartReply/MLKitSmartReply.h>
         #import <arpa/inet.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -1750,7 +1742,7 @@ def lib_mlkit_langid() -> Lib:
             return result;
         }
         """)
-    ios_imports = "#import <MLKitLanguageID/MLKLanguageIdentification.h>\n"
+    ios_imports = "#import <MLKitLanguageID/MLKitLanguageID.h>\n"
     android_impl = textwrap.dedent("""\
         public String identify(String input) {
             com.google.mlkit.nl.languageid.LanguageIdentifier id =
@@ -1870,11 +1862,8 @@ def lib_mlkit_pose() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitPoseDetection/MLKPoseDetector.h>
-        #import <MLKitPoseDetection/MLKPoseDetectorOptions.h>
-        #import <MLKitPoseDetection/MLKPose.h>
-        #import <MLKitPoseDetection/MLKPoseLandmark.h>
-        #import <MLKitVision/MLKVisionImage.h>
+        #import <MLKitPoseDetection/MLKitPoseDetection.h>
+        #import <MLKitVision/MLKitVision.h>
         """)
     android_impl = textwrap.dedent("""\
         public float[] detect(byte[] imageBytes) {
@@ -2014,10 +2003,8 @@ def lib_mlkit_segmentation() -> Lib:
         }
         """)
     ios_imports = textwrap.dedent("""\
-        #import <MLKitSegmentationSelfie/MLKSelfieSegmenterOptions.h>
-        #import <MLKitSegmentationCommon/MLKSegmenter.h>
-        #import <MLKitSegmentationCommon/MLKSegmentationMask.h>
-        #import <MLKitVision/MLKVisionImage.h>
+        #import <MLKitSegmentationSelfie/MLKitSegmentationSelfie.h>
+        #import <MLKitVision/MLKitVision.h>
         #import <CoreVideo/CoreVideo.h>
         """)
     android_impl = textwrap.dedent("""\
@@ -2258,7 +2245,11 @@ def lib_tflite() -> Lib:
             return outBytes ?: [NSData data];
         }
         """)
-    ios_imports = "#import <TensorFlowLiteObjC/TFLTensorFlowLite.h>\n"
+    # TensorFlowLiteObjC pod installs the `TFLTensorFlowLite` framework
+    # with umbrella header `TFLTensorFlowLite.h`. The framework dir
+    # name (used as the angle-bracket prefix) is the module name
+    # `TFLTensorFlowLite`, not the pod name `TensorFlowLiteObjC`.
+    ios_imports = "#import <TFLTensorFlowLite/TFLTensorFlowLite.h>\n"
     android_impl = textwrap.dedent("""\
         public float[] run(byte[] modelBytes, float[] input, int outputLength) {
             java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocateDirect(modelBytes.length);
