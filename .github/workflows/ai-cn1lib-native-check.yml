@@ -23,7 +23,10 @@ on:
 jobs:
   xcodebuild-cn1libs:
     name: xcodebuild ${{ matrix.lib }}
-    runs-on: macos-14
+    # macos-15 ships Xcode 16+, which can read xcodegen's
+    # objectVersion=77 projects. The macos-14 runner's Xcode 15.4
+    # rejected them with "future Xcode project file format (77)".
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
