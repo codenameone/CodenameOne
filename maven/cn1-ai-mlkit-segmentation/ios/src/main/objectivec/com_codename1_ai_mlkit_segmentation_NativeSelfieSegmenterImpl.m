@@ -18,9 +18,13 @@
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     [seg processImage:vision completion:^(MLKSegmentationMask * _Nullable mask, NSError * _Nullable e) {
         if (mask) {
-            size_t w = mask.width, h = mask.height;
-            void *base = CVPixelBufferGetBaseAddress(mask.buffer);
-            CVPixelBufferLockBaseAddress(mask.buffer, kCVPixelBufferLock_ReadOnly);
+            // MLKSegmentationMask exposes only `pixelBuffer`; the
+            // dimensions come from the CVPixelBuffer API.
+            CVPixelBufferRef buf = mask.pixelBuffer;
+            size_t w = CVPixelBufferGetWidth(buf);
+            size_t h = CVPixelBufferGetHeight(buf);
+            CVPixelBufferLockBaseAddress(buf, kCVPixelBufferLock_ReadOnly);
+            void *base = CVPixelBufferGetBaseAddress(buf);
             NSMutableData *m = [NSMutableData dataWithLength:w * h];
             uint8_t *out = m.mutableBytes;
             float *src = (float *)base;
@@ -28,7 +32,7 @@
                 float v = src[i];
                 out[i] = (uint8_t)(v * 255.0f);
             }
-            CVPixelBufferUnlockBaseAddress(mask.buffer, kCVPixelBufferLock_ReadOnly);
+            CVPixelBufferUnlockBaseAddress(buf, kCVPixelBufferLock_ReadOnly);
             result = m;
         }
         dispatch_semaphore_signal(sem);
