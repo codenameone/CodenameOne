@@ -107,25 +107,62 @@ compile output that flows into every port.
 
 == Sizing rules
 
-The transcoder treats the SVG's declared `width`/`height` (or, if those
-are absent, the `viewBox`) as **design pixels at the source density
-declared in CSS**:
+CSS controls the rendered dimensions via three mechanisms, in order of
+specificity. The first one declared on a rule wins:
 
-* No `cn1-source-dpi` -> the SVG is treated as designed for
-  `DENSITY_MEDIUM` (~160dpi). On every other device the rendered
-  width/height scale linearly with `Display.getDeviceDensity() /
-  DENSITY_MEDIUM`.
-* `cn1-source-dpi: very-high` (or any keyword the CSS compiler accepts
-  for multi-images -- `low`, `medium`, `high`, `very-high`, `hd`,
-  `560`, `2hd`, `4k`) tells the transcoder to size the image as if it
-  were authored at that density. The same SVG drawn on a `medium`
-  device renders smaller; on a `4k` device it renders larger.
+. **Explicit millimeter dimensions** -- `cn1-svg-width` and
+  `cn1-svg-height` are the recommended option for icons that need a
+  fixed physical size on every device. Many SVGs in the wild have
+  arbitrary declared `width`/`height` (sometimes a 1024x1024 export of
+  a 24x24 icon); pinning the rendered size in millimeters sidesteps the
+  guesswork entirely.
++
+[source,css]
+----
+HomeIcon {
+    background: url(home.svg);
+    cn1-svg-width: 6mm;
+    cn1-svg-height: 6mm;
+}
+----
++
+The transcoder routes both values through `Display.convertToPixels()`
+at install time, so the rendered icon is 6mm tall on a desktop, 6mm
+tall on a high-DPI handset, and 6mm tall on a 4K tablet -- the same
+way `font-size: 3mm` behaves elsewhere in CN1 CSS.
 
-The convention is intentionally identical to the multi-image
-`cn1-source-dpi` declaration: a `24x24` SVG with
-`cn1-source-dpi: very-high` is interchangeable, from a layout
-perspective, with a `24x24` `_very-high` density bucket of a multi-image
-PNG.
+. **Source density bucket** -- `cn1-source-dpi: <bucket>` tells the
+  transcoder which CN1 density bucket the SVG was authored for. The
+  rendered size then tracks `Display.getDeviceDensity() / sourceDensity`,
+  identical to the multi-image multi-density rule. Use this when the
+  SVG already declares sensible pixel dimensions for one density
+  target.
++
+[source,css]
+----
+Star {
+    background: url(star.svg);
+    cn1-source-dpi: very-high;
+}
+----
++
+Accepted keywords: `low`, `medium`, `high`, `very-high`, `hd`, `560`,
+`2hd`, `4k`.
+
+. **No hint** -- the SVG's declared `width`/`height` (or, if absent,
+  the `viewBox`) are treated as design pixels at `DENSITY_MEDIUM` and
+  scaled linearly with the device density. Fine for icons authored at
+  the standard mdpi baseline; expect surprises if your SVG declares
+  `width="600"` for a small icon.
+
+[TIP]
+====
+Mixing the three keys on the same rule is allowed: explicit
+millimeters always wins, then `cn1-source-dpi`, then the implicit
+medium-density default. This lets you ship a single CSS file where
+"normal" icons use `cn1-source-dpi: very-high` and the few icons with
+weird natural dimensions get an explicit `cn1-svg-width` override.
+====
 
 == CSS coverage
 
@@ -187,18 +224,19 @@ Image home = new com.codename1.generated.svg.Home();
 button.setIcon(home);
 ----
 
-Constructors come in two flavours:
+Constructors come in three flavours, matching the three CSS sizing
+mechanisms above:
 
 [source,java]
 ----
-public Home() { ... }                    // default DENSITY_MEDIUM source
-public Home(int sourceDensity) { ... }   // explicit density, used by SVGRegistry
+public Home() { ... }                                  // default DENSITY_MEDIUM source
+public Home(int sourceDensity) { ... }                 // for cn1-source-dpi hints
+public Home(float widthMm, float heightMm) { ... }     // for cn1-svg-width / cn1-svg-height
 ----
 
-The single-arg constructor is what `SVGRegistry.install()` calls when
-the CSS rule declared a `cn1-source-dpi`. The no-arg constructor is the
-escape hatch for tests / authored code that prefers a per-instance
-density override:
+The `SVGRegistry.install()` method picks the right one per image based
+on what the CSS declared. The no-arg constructor is also the escape
+hatch for code that wants a per-instance density override:
 
 [source,java]
 ----

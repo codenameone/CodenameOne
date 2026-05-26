@@ -239,14 +239,19 @@ SVGPathArrowStyle {
 
 SVGSpinnerStyle {
     background: url(spinner_animated.svg);
-    cn1-source-dpi: very-high;
+    /* Explicit millimeter dimensions carry across DPIs the same way
+     * font-size: 3mm does -- 12mm by 12mm on every device, regardless
+     * of the SVG's declared <svg width=> or device density. */
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
     bg-type: image_scaled_fit;
     padding: 4mm;
 }
 
 SVGPulsingCircleStyle {
     background: url(pulsing_circle.svg);
-    cn1-source-dpi: very-high;
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
     bg-type: image_scaled_fit;
     padding: 4mm;
 }

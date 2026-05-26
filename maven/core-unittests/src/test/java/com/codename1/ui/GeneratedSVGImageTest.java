@@ -78,6 +78,29 @@ public class GeneratedSVGImageTest extends UITestBase {
     }
 
     @FormTest
+    public void explicitPixelDimensionsOverrideDensityHeuristic() {
+        // The cn1-svg-width / cn1-svg-height -> mm -> pixels path lands on the
+        // (intrinsic..., int, int) constructor. The reported size is exactly
+        // what was passed, regardless of intrinsic SVG dimensions or device
+        // density.
+        RecordingSVG img = new RecordingSVG(24, 24, false, 64, 48);
+        assertEquals(64, img.getWidth());
+        assertEquals(48, img.getHeight());
+    }
+
+    @FormTest
+    public void mmToPixelsHonorsDeviceDpi() {
+        // mmToPixels is the helper the generated mm-constructor uses. It
+        // routes through Display.convertToPixels(float) so the result tracks
+        // the device's actual DPI. We can't assert exact pixels (depends on
+        // density) but the result must be >= 1 and grow with mm.
+        int small = GeneratedSVGImage.mmToPixels(1f);
+        int large = GeneratedSVGImage.mmToPixels(20f);
+        assertTrue(small >= 1, "1mm always rounds to at least 1 pixel");
+        assertTrue(large > small, "20mm produces more pixels than 1mm");
+    }
+
+    @FormTest
     public void scaledViewChainsToFreshViewWithoutLeakingDimensions() {
         // scaled(a).scaled(b) must report b's dimensions; the intermediate a
         // shouldn't haunt the inner view.
@@ -242,6 +265,12 @@ public class GeneratedSVGImageTest extends UITestBase {
 
         RecordingSVG(int w, int h, boolean animated) {
             super(w, h, 0f, 0f, w, h, animated);
+        }
+
+        RecordingSVG(int intrinsicW, int intrinsicH, boolean animated,
+                     int explicitW, int explicitH) {
+            super(intrinsicW, intrinsicH, 0f, 0f, intrinsicW, intrinsicH,
+                    animated, explicitW, explicitH);
         }
 
         @Override

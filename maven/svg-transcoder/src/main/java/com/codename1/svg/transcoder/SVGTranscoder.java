@@ -24,16 +24,27 @@ public final class SVGTranscoder {
         public final String resourceName;
         /** Source density extracted from CSS (`cn1-source-dpi`), or {@code 0} if not specified. */
         public final int sourceDensity;
+        /** Explicit width from CSS (`cn1-svg-width`), in millimeters; {@code 0} if not specified. */
+        public final float widthMm;
+        /** Explicit height from CSS (`cn1-svg-height`), in millimeters; {@code 0} if not specified. */
+        public final float heightMm;
 
         public GeneratedClass(String packageName, String className, String resourceName) {
-            this(packageName, className, resourceName, 0);
+            this(packageName, className, resourceName, 0, 0f, 0f);
         }
 
         public GeneratedClass(String packageName, String className, String resourceName, int sourceDensity) {
+            this(packageName, className, resourceName, sourceDensity, 0f, 0f);
+        }
+
+        public GeneratedClass(String packageName, String className, String resourceName,
+                              int sourceDensity, float widthMm, float heightMm) {
             this.packageName = packageName;
             this.className = className;
             this.resourceName = resourceName;
             this.sourceDensity = sourceDensity;
+            this.widthMm = widthMm;
+            this.heightMm = heightMm;
         }
 
         public String fullyQualified() {
@@ -125,10 +136,20 @@ public final class SVGTranscoder {
     }
 
     private static String newInstance(GeneratedClass c) {
+        // Explicit millimeter dimensions win over density-based scaling --
+        // they yield a deterministic physical size regardless of how the
+        // SVG itself declares width/height.
+        if (c.widthMm > 0f && c.heightMm > 0f) {
+            return "new " + c.fullyQualified() + "(" + floatLit(c.widthMm) + ", " + floatLit(c.heightMm) + ")";
+        }
         if (c.sourceDensity > 0) {
             return "new " + c.fullyQualified() + "(" + c.sourceDensity + ")";
         }
         return "new " + c.fullyQualified() + "()";
+    }
+
+    private static String floatLit(float f) {
+        return f + "f";
     }
 
     /** "home.svg" -> "HomeSvg". Used to derive a class name from a filename. */

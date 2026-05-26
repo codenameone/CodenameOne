@@ -120,6 +120,42 @@ public class JavaCodeGeneratorTest {
     }
 
     @Test
+    public void generatedClassHasAllThreeConstructors() throws Exception {
+        // The codegen must emit the no-arg, source-density, and mm-dimensions
+        // constructors so SVGRegistry can pick the right one based on whether
+        // the CSS rule declared cn1-source-dpi / cn1-svg-width / nothing.
+        String out = transcode("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+                + "<rect x='0' y='0' width='24' height='24' fill='red'/></svg>");
+        assertTrue("no-arg constructor required for code-driven instantiation",
+                out.contains("public TestIcon() {"));
+        assertTrue("sourceDensity constructor required for cn1-source-dpi hints",
+                out.contains("public TestIcon(int sourceDensity) {"));
+        assertTrue("millimeter constructor required for cn1-svg-width/height hints",
+                out.contains("public TestIcon(float widthMm, float heightMm) {"));
+        assertTrue("mm constructor must convert through GeneratedSVGImage.mmToPixels",
+                out.contains("GeneratedSVGImage.mmToPixels(widthMm)"));
+    }
+
+    @Test
+    public void registryHonorsMillimeterDimensions() throws Exception {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        SVGTranscoder.writeRegistry("gen", "SVGRegistry",
+                java.util.Arrays.asList(
+                        new SVGTranscoder.GeneratedClass("gen", "MmIcon", "icon.svg", 0, 6f, 6f),
+                        new SVGTranscoder.GeneratedClass("gen", "DpiIcon", "dpi.svg", 50),
+                        new SVGTranscoder.GeneratedClass("gen", "PlainIcon", "plain.svg")
+                ), sw);
+        String src = sw.toString();
+        // mm > density > default precedence:
+        assertTrue("expected mm constructor for cn1-svg-width hint: " + src,
+                src.contains("new gen.MmIcon(6.0f, 6.0f)"));
+        assertTrue("expected sourceDensity constructor for cn1-source-dpi hint",
+                src.contains("new gen.DpiIcon(50)"));
+        assertTrue("expected no-arg constructor when no CSS hint was given",
+                src.contains("new gen.PlainIcon()"));
+    }
+
+    @Test
     public void classNameFor() {
         assertEquals("HomeIcon", SVGTranscoder.classNameFor("home-icon.svg"));
         assertEquals("Foo", SVGTranscoder.classNameFor("foo"));

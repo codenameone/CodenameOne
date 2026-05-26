@@ -105,7 +105,7 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         List<File> svgs = locateSvgs();
-        Map<String, Integer> cssHints = scanCssHints();
+        Map<String, CssHint> cssHints = scanCssHints();
 
         if (svgs.isEmpty() && cssHints.isEmpty()) {
             getLog().debug("No SVGs found and no CSS references -- skipping SVG transcoding.");
@@ -141,8 +141,12 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
                     throw new MojoExecutionException("Failed to transcode " + svg, ex);
                 }
             }
-            int sourceDensity = cssHints.getOrDefault(resourceName, 0);
-            generated.add(new GeneratedClass(svgPackage, className, resourceName, sourceDensity));
+            CssHint hint = cssHints.get(resourceName);
+            int sourceDensity = hint == null ? 0 : hint.sourceDensity;
+            float widthMm = hint == null ? 0f : hint.widthMm;
+            float heightMm = hint == null ? 0f : hint.heightMm;
+            generated.add(new GeneratedClass(svgPackage, className, resourceName,
+                    sourceDensity, widthMm, heightMm));
         }
 
         emitRegistry(packageDir, generated, registrySrcMtime);
@@ -179,11 +183,20 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         return Arrays.asList(DEFAULT_SVG_DIRS);
     }
 
-    /** Scans theme CSS files for {@code url(*.svg)} and the rule's
-     *  {@code cn1-source-dpi}. Returns a map of svgFilename -> sourceDensity
-     *  (one of the CN1Constants.DENSITY_* codes; 0 when unspecified). */
-    private Map<String, Integer> scanCssHints() throws MojoExecutionException {
-        Map<String, Integer> result = new HashMap<String, Integer>();
+    /** Holds the CSS-declared sizing hints for one SVG. Either / both fields
+     *  may be unset (0 / 0f) -- the generator picks the right constructor
+     *  variant based on which fields actually have values. */
+    private static final class CssHint {
+        int sourceDensity;
+        float widthMm;
+        float heightMm;
+    }
+
+    /** Scans theme CSS files for {@code url(*.svg)} together with the
+     *  enclosing rule's {@code cn1-source-dpi} / {@code cn1-svg-width} /
+     *  {@code cn1-svg-height}. Returns a map of svgFilename -> CssHint. */
+    private Map<String, CssHint> scanCssHints() throws MojoExecutionException {
+        Map<String, CssHint> result = new HashMap<String, CssHint>();
         File cssDir = new File(project.getBasedir(), "src/main/css");
         if (!cssDir.isDirectory()) {
             return result;
@@ -197,6 +210,12 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         Pattern dpiPattern = Pattern.compile(
                 "cn1-source-dpi\\s*:\\s*([\\w-]+)\\s*;?",
                 Pattern.CASE_INSENSITIVE);
+        Pattern widthMmPattern = Pattern.compile(
+                "cn1-svg-width\\s*:\\s*([\\d.]+)\\s*mm\\s*;?",
+                Pattern.CASE_INSENSITIVE);
+        Pattern heightMmPattern = Pattern.compile(
+                "cn1-svg-height\\s*:\\s*([\\d.]+)\\s*mm\\s*;?",
+                Pattern.CASE_INSENSITIVE);
         for (File css : cssFiles) {
             String content;
             try {
@@ -207,22 +226,38 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
             Matcher blocks = blockPattern.matcher(content);
             while (blocks.find()) {
                 String block = blocks.group(1);
-                Matcher svgUrls = svgUrlPattern.matcher(block);
                 Matcher dpis = dpiPattern.matcher(block);
                 int dpi = dpis.find() ? densityForCssValue(dpis.group(1)) : 0;
+                Matcher widths = widthMmPattern.matcher(block);
+                float wMm = widths.find() ? parsePositiveFloat(widths.group(1)) : 0f;
+                Matcher heights = heightMmPattern.matcher(block);
+                float hMm = heights.find() ? parsePositiveFloat(heights.group(1)) : 0f;
+                Matcher svgUrls = svgUrlPattern.matcher(block);
                 while (svgUrls.find()) {
                     String name = trimToFileName(svgUrls.group(1));
-                    int existing = result.getOrDefault(name, 0);
-                    // Last-write wins when the same SVG appears in multiple
-                    // rules with different cn1-source-dpi hints -- but a
-                    // specified density always beats the default 0.
-                    if (dpi != 0 || existing == 0) {
-                        result.put(name, dpi == 0 ? existing : dpi);
-                    }
+                    CssHint hint = result.computeIfAbsent(name, k -> new CssHint());
+                    // A more-specific declaration always wins; otherwise keep
+                    // whatever was set by an earlier rule.
+                    if (dpi != 0) hint.sourceDensity = dpi;
+                    if (wMm > 0f) hint.widthMm = wMm;
+                    if (hMm > 0f) hint.heightMm = hMm;
                 }
             }
         }
+        // If only one of width/height was specified, derive the other from
+        // the SVG's natural aspect ratio at registry-emit time. For now we
+        // leave aspect derivation to the runtime by treating a single-axis
+        // declaration as "use that axis, ignore mm on the other".
         return result;
+    }
+
+    private static float parsePositiveFloat(String s) {
+        try {
+            float f = Float.parseFloat(s.trim());
+            return f > 0f ? f : 0f;
+        } catch (NumberFormatException nfe) {
+            return 0f;
+        }
     }
 
     /** Drop a 1x1 transparent PNG under each referenced SVG name so the CSS

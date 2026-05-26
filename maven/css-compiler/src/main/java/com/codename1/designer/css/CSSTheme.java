@@ -6444,6 +6444,16 @@ public class CSSTheme {
                 style.put("cn1-source-dpi", value);
                 break;
             }
+
+            // cn1-svg-* attributes are consumed by the build-time SVG
+            // transcoder mojo (see TranscodeSVGMojo), not the CSS compiler.
+            // Acknowledge them here so the parser doesn't log
+            // "Unsupported CSS property" warnings -- the values themselves
+            // are irrelevant to the compiled theme.res.
+            case "cn1-svg-width" :
+            case "cn1-svg-height" : {
+                break;
+            }
             
             case "cn1-derive" : {
                 

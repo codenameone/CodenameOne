@@ -116,6 +116,51 @@ public abstract class GeneratedSVGImage extends Image {
         this.animated = animated;
     }
 
+    /// Construct with explicit absolute width/height -- expressed in device
+    /// pixels here, but the auto-generated subclass takes them in millimeters
+    /// and converts via [Display#convertToPixels(float)] so the dimensions
+    /// carry across DPIs the same way `font-size: 3mm` does. This is the
+    /// constructor the [SVGRegistry] uses when the CSS rule specified
+    /// `cn1-svg-width` / `cn1-svg-height`, overriding any density-based
+    /// sizing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `explicitWidth`: rendered width in device pixels (`>= 1`)
+    ///
+    /// - `explicitHeight`: rendered height in device pixels (`>= 1`)
+    protected GeneratedSVGImage(int intrinsicWidth, int intrinsicHeight,
+                                float viewBoxX, float viewBoxY,
+                                float viewBoxWidth, float viewBoxHeight,
+                                boolean animated,
+                                int explicitWidth, int explicitHeight) {
+        super(null);
+        this.intrinsicWidth = intrinsicWidth;
+        this.intrinsicHeight = intrinsicHeight;
+        this.sourceDensity = 0;
+        this.width = Math.max(1, explicitWidth);
+        this.height = Math.max(1, explicitHeight);
+        this.viewBoxX = viewBoxX;
+        this.viewBoxY = viewBoxY;
+        this.viewBoxWidth = viewBoxWidth <= 0 ? intrinsicWidth : viewBoxWidth;
+        this.viewBoxHeight = viewBoxHeight <= 0 ? intrinsicHeight : viewBoxHeight;
+        this.animated = animated;
+    }
+
+    /// Convert a length in millimeters to device pixels using the current
+    /// [Display] DPI. Provided as a static helper for the generated subclass
+    /// constructors that accept mm-typed dimensions. Falls back to treating
+    /// the input as a literal pixel count when [Display] is not initialized
+    /// (e.g. during unit tests that construct an image before
+    /// `Display.init()` has run).
+    public static int mmToPixels(float mm) {
+        try {
+            return Math.max(1, Display.getInstance().convertToPixels(mm));
+        } catch (Throwable t) {
+            return Math.max(1, (int) Math.round(mm));
+        }
+    }
+
     @Override
     public final int getWidth() {
         return width;

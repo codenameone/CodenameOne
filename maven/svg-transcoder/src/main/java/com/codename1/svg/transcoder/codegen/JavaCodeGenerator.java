@@ -68,6 +68,15 @@ public final class JavaCodeGenerator {
         src.append("    public ").append(className).append("(int sourceDensity) {\n");
         src.append("        super(").append(dimensions).append(", sourceDensity);\n");
         src.append("    }\n\n");
+        src.append("    /** Construct with explicit dimensions in millimeters; converted to\n");
+        src.append("     *  device pixels via Display.convertToPixels so the rendered size\n");
+        src.append("     *  carries across DPIs. Used by the auto-generated SVGRegistry to\n");
+        src.append("     *  honor `cn1-svg-width` / `cn1-svg-height` CSS hints. */\n");
+        src.append("    public ").append(className).append("(float widthMm, float heightMm) {\n");
+        src.append("        super(").append(dimensions).append(",\n");
+        src.append("                GeneratedSVGImage.mmToPixels(widthMm),\n");
+        src.append("                GeneratedSVGImage.mmToPixels(heightMm));\n");
+        src.append("    }\n\n");
         src.append("    @Override\n");
         src.append("    protected void paintSVG(Graphics g, long __t) {\n");
         src.append(body);
