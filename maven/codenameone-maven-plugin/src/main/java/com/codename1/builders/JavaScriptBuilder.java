@@ -25,10 +25,11 @@ package com.codename1.builders;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -298,7 +299,7 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("No .java files found under " + portSources);
         }
         File sourceList = new File(tmpDir, "javascript-port-sources.txt");
-        PrintWriter sw = new PrintWriter(new FileWriter(sourceList));
+        PrintWriter sw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(sourceList), StandardCharsets.UTF_8));
         try {
             for (File f : javaFiles) {
                 String name = f.getName();
@@ -347,7 +348,7 @@ public class JavaScriptBuilder extends Executor {
 
     private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass) throws IOException {
         File f = new File(workDir, launcherName + ".java");
-        PrintWriter pw = new PrintWriter(new FileWriter(f));
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8));
         try {
             pw.println("import com.codename1.impl.html5.ParparVMBootstrap;");
             pw.println("import " + packageName + "." + mainClass + ";");
