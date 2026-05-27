@@ -166,6 +166,11 @@ public final class EntityManager {
             INDEX = resolved;
         }
 
+        private IndexHolder() {
+            // Utility-style holder: only the static initializer + touch
+            // matter. PMD `UseUtilityClass` requires this private ctor.
+        }
+
         static void touch() {
             if (INDEX == null) {
                 throw new IllegalStateException(

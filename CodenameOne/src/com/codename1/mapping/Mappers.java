@@ -228,6 +228,11 @@ public final class Mappers {
             INDEX = resolved;
         }
 
+        private IndexHolder() {
+            // Utility-style holder: only the static initializer + touch
+            // matter. PMD `UseUtilityClass` requires this private ctor.
+        }
+
         static void touch() {
             // Read INDEX so SpotBugs sees the field as used. Defensive
             // null check documents the contract; createIndex pins a
