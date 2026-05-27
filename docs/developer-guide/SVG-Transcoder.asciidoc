@@ -82,8 +82,8 @@ reach for first.
 * It's the only sizing mode that survives a re-export of the SVG
   from the asset pipeline. `cn1-source-dpi` and the implicit
   medium-density default both depend on the SVG's declared pixel
-  size, so a tool that "helpfully" rescales the source on export
-  silently changes the rendered size.
+  size, so a tool that rescales the source on export will change
+  the rendered size without any warning.
 
 [source,css]
 ----
