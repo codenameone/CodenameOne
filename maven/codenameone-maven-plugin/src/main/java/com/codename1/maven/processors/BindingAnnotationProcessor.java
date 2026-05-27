@@ -114,10 +114,9 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
             }
             bc.fields.add(bf);
         }
-        if (bc.fields.isEmpty()) {
-            // Accepted with no fields is a no-op binder; still generate so the
-            // user gets a registration hit even if they remove every @Bind.
-        }
+        // An @Bindable class with no @Bind fields is still accepted -- the
+        // generated binder is a no-op, but it stays in the index so the user
+        // gets a registration hit even if they remove every @Bind later.
         accepted.put(bc.binaryName, bc);
     }
 

@@ -402,8 +402,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private static void emitFieldRead(StringBuilder sb, PersistedField f, String inst) {
         switch (f.kind.kind) {
-            case STRING:
-                sb.append(inst).append('.').append(f.fieldName); return;
+            case STRING: case BYTE_ARRAY:
+                // Strings go through Database#execute(String, Object...) as
+                // String params; byte[] is passed through unchanged for the
+                // platforms that support blob binding (the others raise the
+                // documented Database "Blobs aren't supported" error).
+                sb.append(inst).append('.').append(f.fieldName);
+                return;
             case INT: case LONG: case SHORT: case BYTE:
                 sb.append("Long.valueOf(").append(inst).append('.').append(f.fieldName).append(")");
                 return;
@@ -419,9 +424,6 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             case DATE:
                 sb.append(inst).append('.').append(f.fieldName).append(" == null ? null : Long.valueOf(")
                         .append(inst).append('.').append(f.fieldName).append(".getTime())");
-                return;
-            case BYTE_ARRAY:
-                sb.append(inst).append('.').append(f.fieldName);
                 return;
             case PROPERTY:
                 emitPropertyRead(sb, f, inst);
