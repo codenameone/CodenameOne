@@ -849,8 +849,9 @@ public class JSONParser implements JSONParseCallback {
             sb.append('{');
             boolean first = true;
             Map m = (Map) o;
-            for (Object kObj : m.keySet()) {
-                Object v = m.get(kObj);
+            for (Object entryObj : m.entrySet()) {
+                Map.Entry entry = (Map.Entry) entryObj;
+                Object v = entry.getValue();
                 if (v == null) {
                     // Null-valued entries are dropped on purpose; if
                     // a caller really needs `"k":null` on the wire,
@@ -861,7 +862,7 @@ public class JSONParser implements JSONParseCallback {
                     sb.append(',');
                 }
                 first = false;
-                writeJsonString(sb, kObj.toString());
+                writeJsonString(sb, entry.getKey().toString());
                 sb.append(':');
                 writeJsonValue(sb, v);
             }
