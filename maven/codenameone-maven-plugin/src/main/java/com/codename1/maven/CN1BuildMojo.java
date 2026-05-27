@@ -391,7 +391,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // in the staged jar — the build server normally re-supplies those, but ParparVM's
             // ByteCodeTranslator runs locally here and resolves everything from the staged class
             // directory.
-            boolean localJsBuild = buildTarget != null && buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
+            boolean localJsBuild = buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
             for (Artifact artifact : project.getArtifacts()) {
                 boolean addToBlacklist = false;
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
