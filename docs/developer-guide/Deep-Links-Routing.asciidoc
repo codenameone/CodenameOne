@@ -1,0 +1,216 @@
+== Deep-Link Routing
+
+[[deep-link-routing-section,Deep-Link Routing Section]]
+Codename One can dispatch a deep link -- an iOS Universal Link, an Android
+App Link, a custom-scheme URL, a push-notification payload, or anything
+else the platform delivers as a URL -- to a specific `Form` by class or by
+static factory method. The same route table powers in-app navigation
+through `Navigation.navigate("/path")`, so the application chooses
+declarative or imperative per call site without maintaining two parallel
+maps.
+
+The application surface is two annotations plus a tiny `Navigation`
+class -- five static methods and one value type.
+
+=== Declare a route
+
+Annotate the target `Form` class:
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.Route;
+import com.codename1.annotations.RouteParam;
+import com.codename1.ui.Form;
+
+@Route("/users/:id")
+public class ProfileForm extends Form {
+    public ProfileForm(@RouteParam("id") String id) {
+        setTitle("Profile " + id);
+        // ...
+    }
+}
+----
+
+Or annotate a static factory method:
+
+[source,java]
+----
+public class Routes {
+    @Route("/home")
+    public static Form home() {
+        return new HomeForm();
+    }
+
+    @Route("/users/:id")
+    public static Form profile(@RouteParam("id") String id) {
+        return new ProfileForm(id);
+    }
+}
+----
+
+Both forms are supported and a project can mix them. Path variables in
+the pattern (`:id`, `*`, `**`) are matched by name against parameters
+annotated with `@RouteParam`. Missing `@RouteParam` on a path-variable
+parameter fails the build.
+
+=== Path syntax
+
+|===
+|Pattern              |Matches                              |Bound
+
+|`/about`             |`/about`                             |--
+|`/users/:id`         |`/users/42`                          |`id = "42"`
+|`/files/*`           |`/files/photo.png` (one segment)     |`* = "photo.png"`
+|`/files/**`          |`/files/a/b/c` (catch-all)           |`* = "a/b/c"`
+|===
+
+Query string parameters are bound the same way as path variables. The
+build prefers a path-variable match for a given name and falls back to
+the query string when the pattern doesn't include that name.
+
+=== Navigate from app code
+
+The `Navigation` class is the imperative counterpart to `@Route`.
+Calling `Navigation.navigate("/users/42")` from anywhere in the app
+resolves the URL through the same generated route table that handles
+incoming deep links, builds the matching `Form`, pushes it onto the
+navigation stack, and shows it.
+
+[source,java]
+----
+Navigation.navigate("/users/42");
+
+// Go back one step:
+Navigation.back();
+
+// Inspect the stack for a breadcrumb UI:
+Container breadcrumbs = new Container(BoxLayout.x());
+for (final NavigationEntry e : Navigation.getStack()) {
+    Button crumb = new Button(e.getTitle());
+    crumb.addActionListener(evt -> Navigation.popTo(e));
+    breadcrumbs.add(crumb);
+}
+----
+
+The five-method surface (`navigate`, `back`, `getCurrent`, `getStack`,
+`popTo`) is everything the application sees -- the rest of the URL-to-
+form machinery is generated. Applications that prefer raw
+`new MyForm().show()` keep working unchanged; only URL-driven calls
+update the `Navigation` stack.
+
+=== How it works
+
+Codename One scans the project's compiled bytecode at build time and
+generates an internal dispatcher class from every `@Route` declaration.
+The dispatcher is bound into the per-platform application stub before
+`Display.init(...)`, so deep links delivered during launch see the route
+table immediately. The validation gate catches every problem in a single
+build run:
+
+* `@Route` declared on a class that doesn't extend `Form`
+* Pattern with no leading `/` or empty value
+* Path variable with no matching `@RouteParam` on the constructor /
+  factory
+* Duplicate pattern declared on two different targets
+* `@Route` on an abstract class or non-`public static` method
+
+=== iOS Universal Links
+
+Host an `apple-app-site-association` JSON file at
+`https://your.domain/.well-known/apple-app-site-association` over HTTPS
+without redirects. The plugin's `AasaBuilder` produces the payload:
+
+[source,java]
+----
+String json = new com.codename1.maven.routing.AasaBuilder()
+    .appId("ABCD1234.com.example.app")
+    .addRouterPattern("/users/:id")
+    .addRouterPattern("/share/**")
+    .addPath("NOT /admin/*")
+    .build();
+// Write `json` to https://example.com/.well-known/apple-app-site-association
+----
+
+Tell iOS which domains your app claims by setting the
+`ios.associatedDomains` build hint -- a comma-separated list of
+`applinks:` entries. The iOS builder writes the Associated Domains
+entitlement so the resulting `.ipa` is signed for those domains
+automatically.
+
+[source,properties]
+----
+codename1.arg.ios.associatedDomains=applinks:example.com,applinks:www.example.com
+----
+
+=== Android App Links
+
+Host an `assetlinks.json` file at
+`https://your.domain/.well-known/assetlinks.json`. The plugin's
+`AssetLinksBuilder` produces the payload:
+
+[source,java]
+----
+String json = new com.codename1.maven.routing.AssetLinksBuilder()
+    .addApp("com.example.app",
+            "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5")
+    .addFingerprint("AB:CD:..." /* Play App Signing upload cert */)
+    .build();
+----
+
+Tell Android which URLs to intercept by setting the
+`android.xintent_filter` build hint with a verified intent filter for
+your domain. The Android builder injects the filter into the manifest.
+
+The SHA-256 fingerprint comes from `keytool -list -v -keystore ...`, or
+from the Play Console under **Setup > App integrity** when using Play
+App Signing.
+
+=== Testing
+
+==== iOS Simulator
+
+[source,sh]
+----
+xcrun simctl openurl booted "https://example.com/users/42"
+----
+
+==== Android Emulator
+
+[source,sh]
+----
+adb shell am start -a android.intent.action.VIEW \
+    -d "https://example.com/users/42" com.example.app
+----
+
+==== Desktop Simulator
+
+Pass `--cn1-arg=https://example.com/users/42` on the run command, or use
+the simulator's URL-injection helper.
+
+=== Back-press guard
+
+Independent of deep linking, individual forms can intercept back / pop
+attempts so they can confirm before discarding unsaved work:
+
+[source,java]
+----
+import com.codename1.router.PopGuard;
+import com.codename1.router.PopReason;
+
+editForm.setPopGuard(new PopGuard() {
+    public boolean canPop(Form form, PopReason reason) {
+        if (!isDirty()) {
+            return true;
+        }
+        Dialog.show("Discard changes?", "You have unsaved edits.",
+                    "Stay", "Discard");
+        return false;
+    }
+});
+----
+
+The guard fires for the toolbar back button, the Android hardware back
+key, the iOS edge-swipe gesture, and any programmatic back navigation.
+`PopReason` distinguishes the trigger so a guard can be selective.

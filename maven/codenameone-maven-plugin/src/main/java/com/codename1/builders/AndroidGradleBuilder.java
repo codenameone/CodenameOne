@@ -2837,9 +2837,15 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n";
 
 
-        String reinitCode0 = "Display.init(this);\n";
+        // Install the build-time-generated @Route dispatcher before the
+        // first Display init. The reinit branch doesn't repeat the call
+        // because Navigation#setDispatcher writes a static field that
+        // survives a Display reinit. See Executor#routeDispatcher
+        // InstallSource for the conditional emission and obfuscation
+        // reasoning.
+        String installRoutes = routeDispatcherInstallSource(sourceZip, "        ");
 
-        reinitCode0 = "AndroidImplementation.startContext(this);\n";
+        String reinitCode0 = installRoutes + "        AndroidImplementation.startContext(this);\n";
 
         String reinitCode = "Display.init(this);\n";
 
@@ -5272,4 +5278,5 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
     }
+
 }

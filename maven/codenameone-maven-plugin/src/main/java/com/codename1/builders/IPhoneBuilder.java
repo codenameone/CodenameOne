@@ -1207,8 +1207,8 @@ public class IPhoneBuilder extends Executor {
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                    + routeDispatcherInstallSource(sourceZip, "        ")
                     + "        Display.init(stub);\n"
-
                     + "    }\n"
                     + "}\n";
 
@@ -4101,7 +4101,4 @@ public class IPhoneBuilder extends Executor {
         return out.toString();
     }
 
-
-
-            
 }

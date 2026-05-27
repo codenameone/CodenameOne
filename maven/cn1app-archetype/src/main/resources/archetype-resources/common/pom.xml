@@ -371,6 +371,12 @@
                         <goals>
                             <goal>compliance-check</goal>
                             <goal>css</goal>
+                            <!-- Scans the project's compiled bytecode for
+                                 @Route declarations and generates the
+                                 dispatcher class consumed by the per-platform
+                                 application stub. No-op for projects with no
+                                 @Route. -->
+                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>

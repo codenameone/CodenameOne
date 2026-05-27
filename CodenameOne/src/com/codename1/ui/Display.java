@@ -3655,6 +3655,30 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Heuristic test for URL-shaped strings. Accepts anything containing
+    /// `://` or a `scheme:` prefix; falls through for `AppArg` payloads that
+    /// happen to be non-URL data.
+    private static boolean looksLikeUrl(String v) {
+        if (v == null) {
+            return false;
+        }
+        if (v.indexOf("://") >= 0) {
+            return true;
+        }
+        int colon = v.indexOf(':');
+        if (colon <= 0) {
+            return false;
+        }
+        for (int i = 0; i < colon; i++) {
+            char c = v.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Returns the property from the underlying platform deployment or the default
     /// value if no deployment values are supported. This is equivalent to the
     /// getAppProperty from the jad file.
@@ -3712,6 +3736,14 @@ public final class Display extends CN1Constants {
     public void setProperty(String key, String value) {
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);
+            // Every CN1 port (iOS cn1OpenURL / cn1ContinueUserActivity, Android
+            // onNewIntent, JS URL navigation) already pipes deep links through
+            // setProperty("AppArg", url). Treat URL-shaped values as deep links
+            // and route them through the build-time-generated dispatcher; other
+            // AppArg payloads (free-form launch data) are untouched.
+            if (value != null && value.length() > 0 && looksLikeUrl(value)) {
+                com.codename1.router.Navigation.dispatchExternalUrl(value);
+            }
             return;
         }
         if ("blockOverdraw".equals(key)) {

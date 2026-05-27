@@ -510,6 +510,11 @@ Keycloak
 Cognito
 Authentik
 
+# Codename One router & JS port - technical identifiers used in the Routing
+# and Deep Links chapters.
+parparvm
+assetlinks
+
 # WebAuthn / passkey terminology used in the Authentication & Identity chapter.
 # IdP is the standard W3C abbreviation for "identity provider"; the
 # server-library names below appear verbatim in the recommended-libraries

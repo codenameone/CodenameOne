@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven.routing;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class AasaBuilderTest {
+
+    @Test
+    void buildsCanonicalEnvelope() {
+        String json = new AasaBuilder()
+                .appId("ABCD1234.com.example.app")
+                .addPath("/share/*")
+                .addPath("NOT /admin/*")
+                .build();
+        assertTrue(json.contains("\"applinks\""));
+        assertTrue(json.contains("\"ABCD1234.com.example.app\""));
+        assertTrue(json.contains("\"/\": \"/share/*\""));
+        assertTrue(json.contains("\"/\": \"/admin/*\""));
+        assertTrue(json.contains("\"exclude\": true"));
+    }
+
+    @Test
+    void routerPatternIsConvertedToAasaWildcards() {
+        assertEquals("/users/*", AasaBuilder.toAasaPath("/users/:id"));
+        assertEquals("/files/*", AasaBuilder.toAasaPath("/files/*"));
+        assertEquals("/share/*", AasaBuilder.toAasaPath("/share/**"));
+    }
+
+    @Test
+    void multipleAppEntries() {
+        String json = new AasaBuilder()
+                .appId("T.com.example.a").addPath("/a/*")
+                .appId("T.com.example.b").addPath("/b/*")
+                .build();
+        // Crude but resilient: both team IDs present, two object entries.
+        assertTrue(json.contains("T.com.example.a"));
+        assertTrue(json.contains("T.com.example.b"));
+        int firstAppIDs = json.indexOf("\"appIDs\"");
+        int secondAppIDs = json.indexOf("\"appIDs\"", firstAppIDs + 1);
+        assertTrue(secondAppIDs > firstAppIDs, "two appIDs blocks expected");
+    }
+
+    @Test
+    void addPathBeforeAppIdThrows() {
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override public void execute() { new AasaBuilder().addPath("/x"); }
+        });
+    }
+}
