@@ -154,7 +154,9 @@ public final class JSONWriter {
             sb.append('{');
             boolean first = true;
             for (Map.Entry<?, ?> e : m.entrySet()) {
-                if (!first) sb.append(',');
+                if (!first) {
+                    sb.append(',');
+                }
                 first = false;
                 writeString(String.valueOf(e.getKey()), sb);
                 sb.append(':');
@@ -167,7 +169,9 @@ public final class JSONWriter {
             sb.append('[');
             boolean first = true;
             for (Object e : (List<?>) o) {
-                if (!first) sb.append(',');
+                if (!first) {
+                    sb.append(',');
+                }
                 first = false;
                 writeJson(e, sb);
             }
@@ -202,7 +206,9 @@ public final class JSONWriter {
                     if (c < 0x20) {
                         sb.append("\\u");
                         String hex = Integer.toHexString(c);
-                        for (int p = hex.length(); p < 4; p++) sb.append('0');
+                        for (int p = hex.length(); p < 4; p++) {
+                            sb.append('0');
+                        }
                         sb.append(hex);
                     } else {
                         sb.append(c);
