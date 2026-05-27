@@ -2,22 +2,31 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ai.ChatMessage;
 import com.codename1.components.ChatView;
-import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.Layout;
 
-/// Renders ChatView with a representative system+user+assistant exchange
-/// plus the typing indicator visible. Baselines this PR's new AI UI surface
-/// against iOS Modern + Android Material themes (the existing
-/// build-ios-metal / build-ios / Build Android screenshot jobs pick up the
-/// emitted "ChatView" image automatically).
-public class ChatViewScreenshotTest extends BaseTest {
-    private ChatView chat;
+/// ChatView screenshot: representative system + user + assistant
+/// exchange with the typing indicator visible. Baselines ChatBubbleUser,
+/// ChatBubbleAssistant, ChatBubbleSystem, ChatBubbleText, and
+/// ChatTypingIndicator UIIDs against iOS Modern + Android Material
+/// modern themes (emits a `_light` and `_dark` pair, like the other
+/// theme-fidelity tests in this directory).
+public class ChatViewScreenshotTest extends DualAppearanceBaseTest {
 
     @Override
-    public boolean runTest() {
-        Form form = createForm("ChatView", new BorderLayout(), "ChatView");
-        chat = new ChatView();
+    protected String baseName() {
+        return "ChatView";
+    }
+
+    @Override
+    protected Layout newLayout() {
+        return new BorderLayout();
+    }
+
+    @Override
+    protected void populate(Form form, String suffix) {
+        ChatView chat = new ChatView();
 
         // System framing (small grey bubble centred).
         chat.addMessage(ChatMessage.system("AI Travel Assistant"));
@@ -39,9 +48,6 @@ public class ChatViewScreenshotTest extends BaseTest {
         // Typing indicator visible -- exercises the dots animation styling.
         chat.setTypingIndicatorVisible(true);
 
-        Container body = (Container) form.getContentPane();
-        body.add(BorderLayout.CENTER, chat);
-        form.show();
-        return true;
+        form.add(BorderLayout.CENTER, chat);
     }
 }

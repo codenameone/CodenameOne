@@ -1,20 +1,30 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.components.ChatInput;
-import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.Layout;
 
-/// Renders ChatInput with attach + voice + send affordances all visible.
-/// Baselines the ChatInputField / ChatSendButton / ChatAttachButton /
-/// ChatVoiceButton UIIDs.
-public class ChatInputScreenshotTest extends BaseTest {
+/// ChatInput screenshot: attach + voice + send affordances all visible.
+/// Baselines the ChatInput / ChatInputField / ChatSendButton /
+/// ChatAttachButton / ChatVoiceButton UIIDs in both modern theme
+/// appearances (light + dark via DualAppearanceBaseTest).
+public class ChatInputScreenshotTest extends DualAppearanceBaseTest {
 
     @Override
-    public boolean runTest() {
-        Form form = createForm("ChatInput", new BorderLayout(), "ChatInput");
+    protected String baseName() {
+        return "ChatInput";
+    }
+
+    @Override
+    protected Layout newLayout() {
+        return new BorderLayout();
+    }
+
+    @Override
+    protected void populate(Form form, String suffix) {
         ChatInput input = new ChatInput();
         // Setters install ActionListener -> button becomes visible. Use no-op
         // listeners; this is a layout test, not an interaction test.
@@ -26,10 +36,6 @@ public class ChatInputScreenshotTest extends BaseTest {
         input.setOnSend(noop);
         input.setOnAttach(noop);
         input.setOnVoice(noop);
-
-        Container body = (Container) form.getContentPane();
-        body.add(BorderLayout.SOUTH, input);
-        form.show();
-        return true;
+        form.add(BorderLayout.SOUTH, input);
     }
 }
