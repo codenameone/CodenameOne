@@ -289,17 +289,27 @@ jobs:
           fi
 
       - name: Set up Java 17 for LanguageTool
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Install language-tool-python
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           pip install --user language-tool-python==2.9.4
 
       - name: Run LanguageTool grammar check
+        # LanguageTool consumes the rendered HTML produced by "Build
+        # Developer Guide HTML and PDF". That step is gated on the same
+        # paths filter (docs/demos/workflow). Without this gate the
+        # LanguageTool step ran on PRs that didn't touch docs and exited
+        # non-zero because `developer-guide.html` was never generated,
+        # turning every unrelated PR (e.g. iOS port fixes) red on the
+        # final quality-gate check.
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           REPORT_DIR="build/developer-guide/reports"
