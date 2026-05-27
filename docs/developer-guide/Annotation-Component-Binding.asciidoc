@@ -7,7 +7,7 @@ a `Binder` per `@Bindable` class at build time, so the wiring happens
 through direct symbol references -- no reflection, no listener bookkeeping
 in application code.
 
-It is a thin alternative to the imperative `UiBinding` API
+It's a thin alternative to the imperative `UiBinding` API
 (`com.codename1.properties.UiBinding`). Both can be used together.
 
 === Annotate the model

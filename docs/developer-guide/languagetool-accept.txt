@@ -523,3 +523,10 @@ IdP
 webauthn
 [Pp]asskey
 [Pp]asskeys
+
+# Build-time POJO annotation framework terminology used in the
+# Annotation-{JSON-XML-Mapping,Component-Binding,SQLite-ORM} chapters.
+# `dao` (data access object) and `daos` aren't in LanguageTool's en_US
+# dictionary.
+[Dd]ao
+[Dd]aos

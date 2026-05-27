@@ -4,13 +4,13 @@
 Codename One includes a build-time POJO mapping framework that turns a
 plain Java class -- or a `PropertyBusinessObject` -- into JSON or XML
 without any runtime reflection. The Maven plugin scans the project's
-compiled bytecode at build time, generates a tightly-typed `Mapper` for
-every `@Mapped` class, and ships it inside the same `target/classes` tree
-as the rest of the application. The runtime entry point is two methods
-on `com.codename1.mapping.Mappers`.
+compiled bytecode at build time, generates a typed `Mapper` for every
+`@Mapped` class, and ships it inside the same `target/classes` tree as
+the rest of the application. The runtime entry point is two methods on
+`com.codename1.mapping.Mappers`.
 
 The framework sits next to the existing `JSONParser`, `XMLParser` and
-`PropertyIndex.toJSON` / `fromJSON` helpers -- it does not replace them.
+`PropertyIndex.toJSON` / `fromJSON` helpers -- it doesn't replace them.
 Use the imperative APIs when you want to read a foreign JSON shape
 without modelling it; use the annotation framework when you have a model
 class and want a one-liner round-trip.
@@ -123,7 +123,7 @@ User fromXml = Mappers.fromXml(xml, User.class);
 
 `Mappers.fromJson` and `Mappers.fromXml` both accept either a `String`
 or a `java.io.Reader`, so streamed responses (network, file, resource)
-do not need to be fully buffered first.
+don't need to be fully buffered first.
 
 === How the plumbing works
 
@@ -149,7 +149,7 @@ class together, so the binding survives obfuscation in shipped builds.
 
 === Custom mappers
 
-Sometimes a class lives in a third-party JAR the build cannot annotate.
+Sometimes a class lives in a third-party JAR the build can't annotate.
 Hand-write a `Mapper<T>` and register it during `Display#init`:
 
 [source,java]

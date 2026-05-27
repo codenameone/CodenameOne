@@ -262,9 +262,14 @@ public final class Mappers {
                 case '\t': sb.append("\\t"); break;
                 default:
                     if (c < 0x20) {
+                        // cn1's java.lang.Character is a stripped-down subset
+                        // and does not include Character.forDigit. Inline the
+                        // hex-digit lookup so this class stays portable to
+                        // every cn1 target (ParparVM iOS, Android, JavaSE,
+                        // CLDC11, ...).
                         sb.append("\\u00");
-                        sb.append(Character.forDigit((c >> 4) & 0xF, 16));
-                        sb.append(Character.forDigit(c & 0xF, 16));
+                        sb.append("0123456789abcdef".charAt((c >> 4) & 0xF));
+                        sb.append("0123456789abcdef".charAt(c & 0xF));
                     } else {
                         sb.append(c);
                     }

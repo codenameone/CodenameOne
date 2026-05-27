@@ -9,9 +9,9 @@ generates one `XxxDao` per entity, and hands them to
 prepared statements through `com.codename1.db.Database`, the same
 surface every cn1 SQLite port exposes.
 
-The framework is a JPA-inspired, deliberately simplified alternative to
-the existing imperative `SQLMap`. It does not replace `SQLMap`; both can
-be used side by side.
+The framework is a JPA-inspired, simplified alternative to the existing
+imperative `SQLMap`. It doesn't replace `SQLMap`; both can be used side
+by side.
 
 === Annotate the entity
 
@@ -93,15 +93,15 @@ users.delete(u);
 em.close();
 ----
 <1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
-<2> The auto-increment `id` is filled in via
+<2> The autoincrement `id` is filled in via
     `SELECT last_insert_rowid()` after the insert.
 <3> `findById` returns `null` when no row matches.
 <4> Free-form `WHERE` clause; positional `?` parameters bind in order.
 <5> `update` and `delete` key off the entity's `@Id` value.
 
-`EntityManager` is a thin facade over `Database`. The underlying
+`EntityManager` is a thin façade over `Database`. The underlying
 connection is reachable through `em.database()` for raw SQL when the
-dao surface is not enough. Transactions:
+dao surface isn't enough. Transactions:
 
 [source,java]
 ----
@@ -118,7 +118,7 @@ try {
 
 === Relationships
 
-Relationship annotations (`@OneToMany`, `@ManyToOne`, ...) are not yet
+Relationship annotations (`@OneToMany`, `@ManyToOne`, ...) aren't yet
 supported. An entity field that references another entity or a
 `java.util.List<X>` of entities fails the build with a clear error --
 mark such fields `@DbTransient` and persist the foreign key (id) as a
@@ -131,7 +131,7 @@ The annotation processor fails the build when:
 * `@Entity` lands on an abstract class or interface.
 * The class has no public no-arg constructor.
 * No field carries `@Id`, or more than one does.
-* A field's static type is not supported (relationships, unsupported
+* A field's static type isn't supported (relationships, unsupported
   reference types).
 
 Errors are accumulated so the first build run reports every offending
@@ -144,7 +144,7 @@ entity at once.
 `DaosIndex` whose no-arg constructor registers them with
 `EntityManager#registerDao`. The iOS and Android per-build stubs call
 `new DaosIndex()` before `Display.init`, so `em.dao(User.class)` works
-the first time it is called.
+the first time it's called.
 
 There is no `Class.forName`, no service loader, and no field reflection
 at runtime: every parameter bind, every column read, every constructor
