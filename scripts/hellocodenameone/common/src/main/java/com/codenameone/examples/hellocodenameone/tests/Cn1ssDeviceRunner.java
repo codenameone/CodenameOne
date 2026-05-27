@@ -215,6 +215,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // Build-time SVG transcoder coverage: the static test renders
+            // shapes / gradients / paths, the animated test pins
+            // AnimationTime so the captured frame is deterministic.
+            new SVGStaticScreenshotTest(),
+            new SVGAnimatedScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -375,6 +380,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // reliably. The validation stays on iOS/Android so dropped chunks
         // still surface as failures there.
         return "KotlinUiTest".equals(testName)
+                // The SVG screenshot tests need iOS/Android/JavaSE coverage but
+                // overflow the JS port's ~150s browser-lifetime budget when added
+                // on top of the current suite; revisit when that budget is bumped.
+                || "SVGStaticScreenshotTest".equals(testName)
+                || "SVGAnimatedScreenshotTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
                 || "StatusBarTapDiagnosticScreenshotTest".equals(testName)

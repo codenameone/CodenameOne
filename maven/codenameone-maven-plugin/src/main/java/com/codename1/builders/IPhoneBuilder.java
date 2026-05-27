@@ -1204,6 +1204,17 @@ public class IPhoneBuilder extends Executor {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
 
+        // If the build-time SVG transcoder produced a registry class, weave
+        // its installGlobal() call into the Stub right before the first
+        // init(Object) so theme.getImage("foo.svg") returns the transcoded
+        // SVG immediately. Skipped silently for apps that have no SVGs.
+        String svgRegistryInstall = "";
+        File svgRegistryClassFile = new File(classesDir,
+                "com/codename1/generated/svg/SVGRegistry.class");
+        if (svgRegistryClassFile.isFile()) {
+            svgRegistryInstall = "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n";
+        }
+
         String didEnterBackground =  "        stopped = true;\n"
                 + "        final long bgTask = com.codename1.impl.ios.IOSImplementation.beginBackgroundTask();\n"
                 + "        Display.getInstance().callSerially(new Runnable() { \n"
@@ -1248,6 +1259,7 @@ public class IPhoneBuilder extends Executor {
 
                     + "        if(!initialized) {\n"
                     + "            initialized = true;\n"
+                    + svgRegistryInstall
                     + "            i.init(this);\n"
                     + createStartInvocation(request, "i")
                     + "        } else {\n"

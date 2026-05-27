@@ -6757,11 +6757,37 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /** Reflectively run the build-time SVG transcoder's registry if the
+     *  current classpath contains one. Lets desktop / simulator runs pick
+     *  up transcoded SVGs without the per-platform Stub needing an explicit
+     *  call -- the Stub call is omitted on JavaSE because the user's
+     *  ${mainName}Stub doesn't know at template-expansion time whether the
+     *  project ships any SVGs. Apps without an SVG registry are unaffected. */
+    private static boolean svgRegistryInstalled;
+    private static void installGeneratedSvgRegistry() {
+        if (svgRegistryInstalled) {
+            return;
+        }
+        try {
+            Class<?> r = Class.forName("com.codename1.generated.svg.SVGRegistry");
+            r.getMethod("installGlobal").invoke(null);
+        } catch (ClassNotFoundException noSvgs) {
+            // Project ships no SVGs -- skip silently.
+        } catch (Throwable t) {
+            // Don't take init() down if the registry blows up; surface it
+            // but let the app keep running so missing SVGs don't blank the
+            // whole UI.
+            t.printStackTrace();
+        }
+        svgRegistryInstalled = true;
+    }
+
     /**
      * @inheritDoc
      */
     public void init(Object m) {
         inInit = true;
+        installGeneratedSvgRegistry();
 
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.

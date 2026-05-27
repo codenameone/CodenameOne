@@ -2971,6 +2971,17 @@ public class AndroidGradleBuilder extends Executor {
 
 
         File stubFileSourceFile = new File(stubFileSourceDir, request.getMainClass() + "Stub.java");
+
+        // If the build-time SVG transcoder produced a registry class, weave
+        // its installGlobal() call into the Stub right before the first
+        // i.init(this) so theme.getImage("foo.svg") returns the transcoded
+        // SVG immediately. Skipped silently for apps without any SVGs.
+        String svgRegistryInstall = "";
+        File svgRegistryClassFile = new File(dummyClassesDir,
+                "com/codename1/generated/svg/SVGRegistry.class");
+        if (svgRegistryClassFile.isFile()) {
+            svgRegistryInstall = "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n";
+        }
         String consumableCode;
         consumableCode = "public boolean isConsumable(String sku) {\n"
                 + "  boolean retVal = super.isConsumable(sku);\n"
@@ -3251,6 +3262,7 @@ public class AndroidGradleBuilder extends Executor {
                             + "    public void run(Form currentForm, boolean wasStopped) {\n"
                             + "        if(firstTime) {\n"
                             + "            firstTime = false;\n"
+                            + svgRegistryInstall
                             + "            i.init(this);\n"
                             + fcmRegisterPushCode
                             + "         } else {\n"

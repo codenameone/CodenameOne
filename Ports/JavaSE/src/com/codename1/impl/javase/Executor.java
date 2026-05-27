@@ -331,6 +331,10 @@ public class Executor {
                                 @Override
                                 public void run() {
                                     try {
+                                        // JavaSEPort.init() already loads
+                                        // com.codename1.generated.svg.SVGRegistry reflectively
+                                        // when it's on the classpath, so no per-Executor
+                                        // install is needed here.
                                         m.invoke(app, new Object[]{null});
                                         Method start = c.getMethod("start", new Class[0]);
                                         if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
