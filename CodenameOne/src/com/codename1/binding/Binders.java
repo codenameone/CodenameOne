@@ -171,8 +171,7 @@ public final class Binders {
         synchronized (LIVE_BINDINGS) {
             snapshot = bindings.toArray(new NotifiableBinding[0]);
         }
-        for (int i = 0; i < snapshot.length; i++) {
-            NotifiableBinding b = snapshot[i];
+        for (NotifiableBinding b : snapshot) {
             if (b.matches(model)) {
                 enterUpdate();
                 try {
@@ -214,7 +213,7 @@ public final class Binders {
             }
             for (Iterator<NotifiableBinding> it = list.iterator(); it.hasNext(); ) {
                 NotifiableBinding b = it.next();
-                if (b == binding) {
+                if (b == binding) { //NOPMD CompareObjectsWithEquals -- identity dedup
                     it.remove();
                     break;
                 }
