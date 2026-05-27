@@ -64,6 +64,19 @@ form.add(BorderLayout.CENTER, col);
 
 **Note on `ComboBox`**: It exists but is **not recommended** in CN1. The dropdown rendering is awkward on touch screens and behaves inconsistently across platforms. Use `Picker` (set `pickerType` to `Display.PICKER_TYPE_STRINGS` for a string-list picker) — it opens a native sheet on iOS, a Material dialog on Android, and a normal popup in the simulator. `ComboBox` is kept only for legacy ports of Swing apps.
 
+### Package locations — don't trust autocomplete to find these
+
+A few components live in package paths that don't match where you'd guess from the type name. Importing from the wrong package gives `cannot find symbol` and the IDE will helpfully offer to import the (deprecated or non-existent) sibling.
+
+| Component | Package |
+| --- | --- |
+| `Label`, `Button`, `TextField`, `TextArea`, `Form`, `Container`, `TextComponent`, `Dialog`, `Tabs`, `CheckBox`, `RadioButton`, `Slider`, `List` | `com.codename1.ui` |
+| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion` | `com.codename1.components` |
+| `Picker` | `com.codename1.ui.spinner` |
+| `InfiniteContainer` | `com.codename1.ui` (despite being a "component") |
+
+When in doubt, `find CodenameOne/src -name "<ClassName>.java"` from the framework checkout — much faster than guessing which sub-package is current.
+
 ## Container is structural — don't style its UIID
 
 `Container` is the layout glue between visible components, **not** a styled component itself. The default `Container` UIID must remain transparent with **0 padding / 0 margin / no border**.
@@ -442,6 +455,57 @@ nextForm.setTransitionInAnimator(CommonTransitions.createFade(200));
 In most CN1 codebases the **default transition** is set globally via theme constants (`formTransitionIn`, `formTransitionOut`, `formTransitionInImage`, `formTransitionOutImage`) — the native theme typically defines a platform-appropriate default (iOS-style horizontal slide on iOS, Material slide on Android). You usually only call `setTransitionOutAnimator` / `setTransitionInAnimator` to **override** that default for a specific navigation step, not to define one from scratch.
 
 `CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition.create(durationMs).morph(sourceCmp, targetCmp)` animates a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
+
+#### `MorphTransition.snapshotMode(boolean)` — for sources inside scrolling parents
+
+By default `MorphTransition` paints both endpoints by re-rendering the live source / destination components every frame at the interpolated bounds. That works for sources that are fully visible. It produces visible artifacts when:
+
+- The source is inside a scrolling parent and has children that extend past the source's bounds (the layered-pane copy used during the morph doesn't carry the original parent's clip, so off-viewport children leak into the morph).
+- The source has dynamic content (a video frame, a `BrowserComponent`, a custom painter) that you want frozen visually during the morph.
+
+`snapshotMode(true)` captures each `(source, dest)` as a clipped `Image` at `initTransition()` and tweens those images at the interpolated bounds. The image's own bounds are the clip, so off-viewport children cannot leak.
+
+```java
+MorphTransition morph = MorphTransition.create(300)
+        .snapshotMode(true)
+        .morph("card");
+nextForm.setTransitionInAnimator(morph);
+nextForm.show();
+```
+
+The default (live-paint) path is unchanged for back-compat. Opt into snapshot mode only when the live path exhibits a visible artifact — it adds a one-time per-morphed-component `Image` allocation at init.
+
+#### Tabs animated indicator — Material 3 / iOS 26 NavigationBar
+
+`Tabs` ships an opt-in sliding underline indicator (off in framework default; on by default in the modern iOS / Android native themes). When enabled, selection changes tween the indicator's x/width from the previously-selected tab's bounds to the new selection's bounds with `Motion.createEaseInOutMotion`.
+
+```java
+Tabs tabs = new Tabs();
+tabs.setAnimatedIndicator(true);   // or set tabsAnimatedIndicatorBool: true in theme
+```
+
+Theme constants:
+
+| Constant | Purpose |
+| --- | --- |
+| `tabsAnimatedIndicatorBool` | Enable / disable. Default `false` in framework, `true` in iOS Modern + Android Material themes. |
+| `tabsAnimatedIndicatorDurationInt` | Tween duration in ms, default `200`. |
+| `tabsAnimatedIndicatorThicknessMm` | Underline thickness in mm, default `1`. |
+| `TabIndicator { color: ... }` UIID | Indicator colour. Falls back to the selected tab's fg when no `TabIndicator` UIID is defined. |
+
+#### Modern pull-to-refresh
+
+The legacy `addPullToRefresh` paint is a rotating-arrow + text Label stack. The **modern path** (opt-in via `pullToRefreshModernBool` theme constant; on by default in the modern themes) replaces that with a thin circular arc spinner painted directly via `Graphics.drawArc`: the arc sweep grows 0°→330° proportional to the user's pull, then spins continuously while the refresh task runs.
+
+Theme constants:
+
+| Constant | Purpose |
+| --- | --- |
+| `pullToRefreshModernBool` | Enable the arc-spinner path. |
+| `pullToRefreshIndicatorDiameterMm` | Outer diameter, default `8`mm. |
+| `pullToRefreshIndicatorStrokeMm` | Stroke thickness, default `0.6`mm. |
+
+Color follows the `TabIndicator` UIID (shared with the animated tab indicator) so brand accent stays consistent.
 
 ### Ongoing per-component animation: `Component.animate()` + `registerAnimated`
 

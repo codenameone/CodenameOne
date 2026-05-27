@@ -22,7 +22,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 
 - `references/build-and-run.md` — Local vs cloud builds, JDK matrix, Maven goals, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (Enterprise) cloud builds in CI.
 - `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, web).
-- `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
+- `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), OAuth/OpenID Connect (`OidcClient`), WebSockets (cn1lib), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.
 - `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.

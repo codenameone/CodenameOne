@@ -1201,8 +1201,54 @@ hi.getContentPane().addPullToRefresh(() -> {
 hi.show();
 ----
 
+`setPullToRefresh(Runnable)` is provided as a more discoverable alias for the
+same single-task slot -- both names route to the same field, and a second
+call replaces whatever runnable was previously registered.
+
 .Pull to refresh demo
 image::img/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
+
+==== Modern arc-spinner pull-to-refresh
+
+The legacy pull-to-refresh visual is the classic "rotating arrow + text"
+stack. Modern Material 3 / iOS apps instead show a thin circular arc
+that grows as the user pulls and spins once the task fires. This is
+shipped as an opt-in path via the `pullToRefreshModernBool` theme
+constant; the iOS Modern and Android Material themes enable it by
+default so apps shipping against those themes get the spec-accurate
+look without any extra wiring.
+
+To enable in a custom theme:
+
+[source,css]
+----
+#Constants {
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;       /* 8mm circle           */
+    pullToRefreshIndicatorStrokeMm: "0.6";     /* 0.6mm stroke thickness */
+}
+
+TabIndicator {
+    /* The pull-to-refresh arc shares its colour with the animated tab
+       indicator -- both follow the brand's accent. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+----
+
+Behaviour:
+
+* During the pull gesture the arc sweep grows from 0&deg; to ~330&deg;
+ proportional to how far the user has pulled past the threshold.
+* When the refresh task fires the arc rotates continuously at ~360&deg;/sec
+ until the task completes.
+* All sizing is in millimetres so the indicator stays physical-size-accurate
+ across device densities; no rasterized images involved.
+
+The legacy `addPullToRefresh` API is unchanged -- the same `Runnable` is
+invoked at the same moment; only the visual rendering differs.
 
 === Running 3rd party apps using display's execute
 

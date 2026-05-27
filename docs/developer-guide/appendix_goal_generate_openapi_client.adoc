@@ -1,0 +1,124 @@
+=== Generate OpenAPI client (`generate-openapi-client`)
+
+Generates a typed Codename One client from an OpenAPI 3.x JSON
+specification. Emits one `@Mapped`-annotated POJO per
+`components.schemas` entry and one `<Tag>Api.java` per OpenAPI tag.
+The generated code uses only the Codename One JDK subset --
+`Rest` + `JSONWriter` + `Mappers` for transport / serialisation, no
+`java.net.http`, no reflection.
+
+This is the build-time complement to the `Rest.fetchAsMapped` /
+`Rest.fetchAsMappedList` runtime APIs. Run it once at
+`generate-sources` time; the output is regular Java that the standard
+compiler picks up and the generated files are added to the project's
+compile-source-roots automatically.
+
+==== Usage example
+
+Add an execution to the Maven plugin block in your `common/pom.xml`:
+
+[source, xml]
+----
+<plugin>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-maven-plugin</artifactId>
+    <executions>
+        <execution>
+            <id>generate-openapi-client</id>
+            <phase>generate-sources</phase>
+            <goals><goal>generate-openapi-client</goal></goals>
+            <configuration>
+                <openapiSpec>https://petstore3.swagger.io/api/v3/openapi.json</openapiSpec>
+                <basePackage>com.example.petstore</basePackage>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+----
+
+Configuration:
+
+[cols="2,4,1", options="header"]
+|===
+| Property | Description | Required
+
+| `openapiSpec`
+| URL or local file path of the OpenAPI 3.x JSON document. YAML is
+not supported -- convert with `yq` or an online tool upstream.
+| Yes
+
+| `basePackage`
+| Base Java package for the generated client. Api classes go under
+`<basePackage>`; schemas under `<basePackage>.model`.
+| Yes
+
+| `outputDirectory`
+| Where the generated sources land. Defaults to
+`${project.build.directory}/generated-sources/openapi`. The directory
+is added to the project's compile-source-roots automatically so the
+generated code is picked up by the compiler in the same build.
+| No
+
+| `overwrite`
+| `true` to regenerate every file, `false` to skip files that haven't
+changed. Default `true`.
+| No
+|===
+
+==== Generated output
+
+For the Swagger Petstore reference spec (`/pet`, `/store`, `/user`
+endpoints), the goal emits:
+
+[listing]
+----
+target/generated-sources/openapi/
+  com/example/petstore/
+    PetApi.java          // addPet, updatePet, findPetsByStatus, getPetById, deletePet, ...
+    StoreApi.java        // getInventory, placeOrder, getOrderById, deleteOrder
+    UserApi.java         // createUser, loginUser, logoutUser, getUserByName, updateUser, ...
+  com/example/petstore/model/
+    Pet.java             // @Mapped POJO with id / name / category / photoUrls / tags / status
+    Order.java
+    User.java
+    Category.java
+    Tag.java
+    ApiResponse.java
+----
+
+Each generated Api method has a uniform shape: path parameters first,
+then required query parameters, then the optional request body, then a
+`String bearerToken` (or `null` to skip the `Authorization` header),
+then an `OnComplete<Response<T>>` callback. Method body is a single
+chained `Rest.<verb>(url)...fetchAsMapped(Type.class, callback)` call.
+
+[source,java]
+----
+PetApi api = new PetApi("https://petstore3.swagger.io/api/v3");
+api.getPetById(123L, "MY_TOKEN", response -> {
+    if (response.getResponseCode() == 200) {
+        Pet pet = response.getResponseData();
+        renderPet(pet);
+    }
+});
+----
+
+==== Scope (MVP)
+
+* HTTP verbs: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
+* Parameter locations: `path`, `query`. Header / cookie parameters are
+silently ignored; submit them via `Rest`'s `header(...)` builder
+method after-the-fact if needed.
+* Request bodies: `application/json` only -- serialised via
+`Mappers.toJson(body)` before being attached.
+* Response schemas: `$ref` resolution, primitives (`string` / `number`
+/ `integer` / `boolean`), arrays, object schemas. `oneOf` / `anyOf` /
+`allOf` compositions collapse to `Object` -- callers cast.
+* Authentication: bearer token as a per-method `String bearerToken`
+parameter. Other schemes (API key, basic, OAuth) are not in the MVP
+scope -- use `Rest`'s `header(...)` / `basicAuth(...)` builders or the
+`OidcClient` directly.
+
+Multipart upload (`multipart/form-data`), header / cookie parameter
+locations, richer composition modelling, and async / pagination
+wrappers are tracked as follow-ups.

@@ -374,6 +374,45 @@ forms so the transition will be able to find them:
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/MorphTransitionDemo.java[tag=morphTransition,indent=0]
 ----
 
+===== Snapshot mode
+
+By default `MorphTransition` paints both endpoints by re-rendering the live
+source / destination components every frame at the interpolated bounds.
+That works well when the source is fully visible -- a card in the body
+of one form morphing to a card in the next.
+
+It runs into edge cases when the source lives inside a scrolling
+container that has children extending past the source's bounds, or
+when the source has dynamic content (a video frame, a `BrowserComponent`,
+a custom-painted background) that should be visually frozen for the
+duration of the animation. The legacy live-paint path can leak
+off-viewport pixels into the morph because the layered pane that holds
+the source during the animation doesn't carry the original parent's clip.
+
+To opt into the image-snapshot path call `snapshotMode(true)` on the
+builder:
+
+[source,java]
+----
+MorphTransition morph = MorphTransition.create(300)
+        .snapshotMode(true)
+        .morph("card");
+nextForm.setTransitionInAnimator(morph);
+nextForm.show();
+----
+
+`snapshotMode(true)` captures each `(source, dest)` pair as a clipped
+`Image` at `initTransition()`, then the tween draws those images at the
+interpolated bounds rather than re-painting the live components.
+Off-viewport children of the source are clipped at capture time (the
+image's own bounds are the clip), so they cannot leak into the morph.
+
+The default `MorphTransition` behaviour (live paint, no snapshots) is
+unchanged for back-compat. Use snapshot mode opportunistically when
+the live-paint output exhibits the off-viewport leak, or when the
+source's children produce frame-by-frame visual change you want to
+freeze.
+
 ==== SwipeBackSupport
 
 iOS7+ allows swiping back one form to the previous form, Codename One has an API to enable back swipe transition:

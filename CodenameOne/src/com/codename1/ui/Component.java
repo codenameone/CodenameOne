@@ -5265,6 +5265,19 @@ public class Component implements Animation, StyleListener, Editable {
         this.refreshTask = task;
     }
 
+    /// Alias for `#addPullToRefresh(Runnable)`. Provided because the natural
+    /// guess from Flutter (`RefreshIndicator`), React Native
+    /// (`refreshControl`) and SwiftUI (`refreshable`) is `setPullToRefresh`,
+    /// not `addPullToRefresh`. Both names point at the same single-task
+    /// slot -- a second call replaces the previously-registered runnable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `task`: the refresh task to execute, or `null` to clear.
+    public void setPullToRefresh(Runnable task) {
+        this.refreshTask = task;
+    }
+
     /// Checks if the component responds to pointer events.  A component is considered
     /// to respond to pointer events if it is visible and enabled, and is either scrollable,
     /// focusable, or has the `#isGrabsPointerEvents()` flag true.

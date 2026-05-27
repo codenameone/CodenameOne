@@ -71,6 +71,19 @@
     tabsSafeAreaBool: true;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* Material 3 NavigationBar-style sliding indicator: a thin coloured
+       underline that tweens between tabs when the user changes
+       selection. Off by default in the framework so existing apps
+       don't suddenly animate; on by default in the modern Material
+       theme to match the spec. Duration 200ms matches Material 3. */
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;
+    tabsAnimatedIndicatorThicknessMm: 1;
+    /* Modern arc-spinner pull-to-refresh, Material 3 style. Color
+       comes from the TabIndicator UIID's fg (accent-tinted). */
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;
+    pullToRefreshIndicatorStrokeMm: "0.6";
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.5";
     switchTrackScaleY: "0.9";
@@ -342,6 +355,11 @@ Tab.pressed { color: var(--accent-on-container-color, #21005d); background-color
 SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }
 
+/* TabIndicator: color reference read by Tabs.paintAnimatedIndicator()
+   for the sliding underline. The actual drawing is done in Java; this
+   UIID only contributes the foreground colour. */
+TabIndicator { color: var(--accent-color, #6750a4); background-color: transparent; padding: 0; margin: 0; }
+
 SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
 
 SideCommand {
@@ -533,6 +551,9 @@ PopupContent {
     Tab.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-pressed-color-dark, #4f378b); }
     SelectedTab { color: var(--accent-color-dark, #d0bcff); }
     UnselectedTab { color: #cac4d0; }
+
+    /* Animated indicator inherits the dark-mode accent. */
+    TabIndicator { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 
     SideNavigationPanel { background-color: #141218; }
     SideCommand { color: #e6e0e9; background-color: transparent; }

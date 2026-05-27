@@ -500,6 +500,37 @@ top).
 |`@tabsFillRowsBool`, `@tabsGridBool`
 |Distribute tabs evenly across the bar.
 
+|`@tabsAnimatedIndicatorBool`
+|`true` paints a thin coloured underline below the currently-selected
+tab and tweens its `x` / `width` between tabs on selection change. Both
+modern themes set this to `true`. Off in the framework default; opt-in
+for legacy themes by setting it explicitly.
+
+|`@tabsAnimatedIndicatorDurationInt`
+|Duration of the indicator tween in milliseconds (default `200`,
+matching Material 3's `NavigationBar` spec).
+
+|`@tabsAnimatedIndicatorThicknessMm`
+|Indicator underline thickness in millimetres (default `1`).
+
+|`@pullToRefreshModernBool`
+|`true` switches the pull-to-refresh visual from the legacy
+rotating-arrow + text Label stack to a thin circular arc spinner
+painted directly via `Graphics.drawArc`. The arc sweep grows from 0&deg;
+to ~330&deg; proportional to the user's pull, then spins continuously
+once the refresh task fires. Both modern themes set this to `true`.
+Color comes from the `TabIndicator` UIID's fg (consistent with the
+animated tab indicator), falling back to the Title fg if unset.
+
+|`@pullToRefreshIndicatorDiameterMm`
+|Outer diameter of the modern arc spinner in millimetres (default `8`).
+Drives the gesture threshold too -- the user must pull this distance
+plus a small margin to fire the refresh task.
+
+|`@pullToRefreshIndicatorStrokeMm`
+|Stroke thickness of the modern arc spinner in millimetres (default
+`0.6`).
+
 |`@darkModeBool`
 |`true` enables `$DarkUIID` resolution when the app is in dark
 mode. Both modern themes set this; user themes that want dark

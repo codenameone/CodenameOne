@@ -2467,6 +2467,52 @@ image::img/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect
 
 NOTE: Notice that you used `setRadioButtonImages` to explicitly set the radio button images to the look you want for the carousel.
 
+==== Animated tab indicator
+
+Modern Material 3 (`NavigationBar`) and iOS 26 tab bars animate a small
+underline between tabs when the user changes selection. `Tabs` ships
+this as an opt-in feature gated by the `tabsAnimatedIndicatorBool`
+theme constant; the iOS Modern and Android Material themes turn it on
+by default, so apps shipping against those themes get the effect for
+free.
+
+To enable in a custom theme:
+
+[source,css]
+----
+#Constants {
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;    /* tween duration in ms */
+    tabsAnimatedIndicatorThicknessMm: 1;      /* underline thickness  */
+}
+
+TabIndicator {
+    /* The indicator picks up its colour from this UIID's fg. If the
+       UIID isn't defined or has fgColor == 0, the indicator falls
+       back to the currently-selected tab's fgColor. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+----
+
+To toggle programmatically (e.g. add it to a Tabs instance whose theme
+hasn't enabled it):
+
+[source,java]
+----
+Tabs tabs = new Tabs();
+tabs.setAnimatedIndicator(true);
+----
+
+The indicator tweens its `x` / `width` from the previously-selected
+tab's bounds to the new selection's bounds using a `Motion.createEaseInOutMotion`
+over the configured duration (200ms default, matching Material 3's
+spec). Rapid double-taps start the tween from the *current
+interpolated position* rather than from a stale baseline, so the
+animation chains cleanly.
+
 [[mediamanager-section]]
 === MediaManager & MediaPlayer
 

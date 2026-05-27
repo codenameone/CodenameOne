@@ -17,6 +17,8 @@
 
 package java.util;
 
+import java.util.function.Predicate;
+
 
 /// `Collection` is the root of the collection hierarchy. It defines operations on
 /// data collections and the behavior that they will have in all implementations
@@ -364,4 +366,24 @@ public interface Collection<E> extends java.lang.Iterable<E> {
     /// if the type of an element in this `Collection` cannot be
     /// stored in the type of the specified array.
     public <T> T[] toArray(T[] array);
+
+    /// Removes all of the elements of this collection that satisfy the given
+    /// predicate. Returns `true` if any elements were removed. The default
+    /// implementation walks the `iterator()` and calls `Iterator#remove()`
+    /// for matching elements; implementations whose iterator doesn't support
+    /// `remove` should override.
+    default boolean removeIf(Predicate<? super E> filter) {
+        if (filter == null) {
+            throw new NullPointerException();
+        }
+        boolean removed = false;
+        Iterator<E> it = iterator();
+        while (it.hasNext()) {
+            if (filter.test(it.next())) {
+                it.remove();
+                removed = true;
+            }
+        }
+        return removed;
+    }
 }

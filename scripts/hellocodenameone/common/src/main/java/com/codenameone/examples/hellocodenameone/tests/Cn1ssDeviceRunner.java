@@ -100,6 +100,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new UncoverHorizontalTransitionTest(),
             new FadeTransitionTest(),
             new FlipTransitionTest(),
+            new MorphTransitionTest(),
+            new MorphTransitionScrolledSourceTest(),
+            new MorphTransitionSnapshotTest(),
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
@@ -356,6 +359,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "UncoverHorizontalTransitionTest".equals(testName)
                 || "FadeTransitionTest".equals(testName)
                 || "FlipTransitionTest".equals(testName)
+                || "MorphTransitionTest".equals(testName)
+                || "MorphTransitionScrolledSourceTest".equals(testName)
+                || "MorphTransitionSnapshotTest".equals(testName)
                 || "AnimateLayoutScreenshotTest".equals(testName)
                 || "AnimateHierarchyScreenshotTest".equals(testName)
                 || "AnimateUnlayoutScreenshotTest".equals(testName)

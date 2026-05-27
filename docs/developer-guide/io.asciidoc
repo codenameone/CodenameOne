@@ -873,6 +873,45 @@ An alternative approach is to use the static data parse() method of the `JSONPar
 
 Notice that a static version of the method is used! The callback object is an instance of the `JSONParseCallback` interface, which includes many methods. These methods are invoked by the parser to show internal parser states, this is like the way traditional XML SAX event parsers work.
 
+===== Writing JSON — `JSONWriter`
+
+For typed DTO serialisation use the `@Mapped` annotation framework
+(see `<<binding-framework>>`) plus `Mappers.toJson(...)`. For ad-hoc
+maps / lists where a build-time `Mapper` would be overkill, the
+`com.codename1.io.JSONWriter` class is the complement of `JSONParser`:
+
+[source,java]
+----
+// One-shot encoding of any Map / List / String / Number / Boolean / null tree
+String json = JSONWriter.toJson(Map.of("name", "ada", "values", List.of(1, 2, 3)));
+
+// Streaming variants for large outputs (UTF-8)
+JSONWriter.toJson(value, writer);
+JSONWriter.toJson(value, outputStream);
+----
+
+For tiny request bodies the fluent builders are usually faster to read
+than a `Map` literal:
+
+[source,java]
+----
+String body = JSONWriter.object()
+        .put("email", email)
+        .put("password", password)
+        .toJson();
+
+String coords = JSONWriter.array()
+        .add(JSONWriter.object().put("lat", 37.7749).put("lng", -122.4194))
+        .add(JSONWriter.object().put("lat", 51.5074).put("lng",   -0.1278))
+        .toJson();
+----
+
+Strings are double-quoted with the standard backslash escapes for `"`,
+`\`, `\n`, `\r`, `\t`, `\b`, `\f`, and control chars below `0x20` are
+emitted as `+\u00xx+`. The writer does not pretty-print; if you need
+indented output, run the result through an external formatter at debug
+time.
+
 ===== XML parsing
 
 The https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html[XMLParser] started its life as an HTML parser built for displaying mobile HTML. That usage has since been deprecated but the parser can still parse many HTML pages and is "loose" in verification. This is both good and bad as the parser will work with invalid data without complaining.
@@ -1349,6 +1388,78 @@ Some highlights that are easy to miss:
 * `.cacheMode(...)` and `.postParameters(...)` expose the same knobs as
  `ConnectionRequest`, keeping you in the fluent API even for advanced tweaks.
 
+==== Top-level JSON arrays — `fetchAsJsonList`
+
+When the endpoint returns a top-level JSON array (e.g. `+[{...}, {...}]+`),
+use `fetchAsJsonList` rather than `fetchAsJsonMap`. The underlying
+`JSONParser` wraps top-level arrays under a synthetic `"root"` key;
+`fetchAsJsonList` unwraps that envelope for you so the callback receives
+the array directly:
+
+[source,java]
+----
+Rest.get("https://api.example.com/items")
+    .header("Authorization", "Bearer " + token)
+    .acceptJson()
+    .fetchAsJsonList(response -> {
+        List items = response.getResponseData();
+        renderItems(items);
+    });
+----
+
+There is no separate builder for "JSON object or array, I don't know which":
+if you don't know up-front, use `fetchAsJsonMap` and branch on
+`data.get("root") instanceof List`.
+
+==== Typed responses — `fetchAsMapped` and `fetchAsMappedList`
+
+`Rest.fetchAsJsonMap` returns a generic `Map<String, Object>` that the caller
+casts and inspects key by key. Once your DTOs are `@Mapped`-annotated
+(see `<<binding-framework>>`), `fetchAsMapped` returns the typed object
+directly:
+
+[source,java]
+----
+// Model
+@Mapped
+public class Pet {
+    @JsonProperty("id")        public long id;
+    @JsonProperty("name")      public String name;
+    @JsonProperty("photoUrls") public List<String> photoUrls;
+}
+
+// Call site
+Rest.get(baseUrl + "/pet/" + petId)
+    .header("Authorization", "Bearer " + token)
+    .acceptJson()
+    .fetchAsMapped(Pet.class, response -> {
+        Pet pet = response.getResponseData();    // already typed -- no Map casts
+        renderPet(pet);
+    });
+----
+
+For endpoints that return a list of DTOs, use `fetchAsMappedList`:
+
+[source,java]
+----
+Rest.get(baseUrl + "/albums")
+    .header("Authorization", "Bearer " + token)
+    .acceptJson()
+    .fetchAsMappedList(Album.class, response -> {
+        List<Album> albums = response.getResponseData();
+        renderAlbums(albums);
+    });
+----
+
+Both builders fall back to the untyped `fetchAsJsonMap` / `fetchAsJsonList`
+path internally and then route every map element through the build-time
+mapper that the `@Mapped` annotation processor generated. If a mapper isn't
+registered for the requested class (typical cause: the
+`process-annotations` Mojo didn't run on the class, or the class isn't
+`@Mapped`-annotated), the callback completes with `null` data -- so always
+inspect `response.getResponseCode()` rather than `response.getResponseData()`
+to differentiate "server returned an error" from "no mapper registered".
+
 The code in the kitchen sink webservice sample was updated to use this API. The result is shorter and more readable without sacrificing anything.
 
 ==== Rest in practice - twilio
@@ -1437,6 +1548,54 @@ if(result.getResponseData() != null) {
     ToastBar.showErrorMessage("Error sending SMS: " + result.getResponseCode());
 }
 ----
+
+
+=== WebSockets
+
+For server-push, real-time chat, multiplayer game sync, Socket.IO-style
+framing, or any client-initiated persistent connection, use
+`com.codename1.io.websocket.WebSocket`. Subclass it and override the
+four `onXxx` callbacks; the framework dispatches inbound events on
+the EDT so the callbacks can touch UI directly.
+
+[source,java]
+----
+WebSocket socket = new WebSocket("wss://example.com/socket") {
+    @Override protected void onOpen() {
+        send("hello");
+    }
+    @Override protected void onMessage(String message) {
+        Log.p("recv: " + message);
+    }
+    @Override protected void onMessage(byte[] message) {
+        Log.p("recv " + message.length + " bytes");
+    }
+    @Override protected void onClose(int statusCode, String reason) {
+        Log.p("closed: " + reason);
+    }
+    @Override protected void onError(Exception ex) {
+        Log.e(ex);
+    }
+};
+if (WebSocket.isSupported()) {
+    socket.connect();
+}
+----
+
+`send(String)` / `send(byte[])` may be called from any thread.
+`getReadyState()` returns one of `WebSocketState.CONNECTING`,
+`WebSocketState.OPEN`, `WebSocketState.CLOSING`, or
+`WebSocketState.CLOSED`. Always check `WebSocket.isSupported()` before
+constructing: support requires a per-platform native implementation
+and platforms without one return `false`.
+
+NOTE: The Java API lives in
+`com.codename1.io.websocket` and ships in `codenameone-core`. The
+per-platform native implementations (iOS / Android / JavaScript / desktop
+simulator) are tracked in the separate
+https://github.com/codenameone/cn1-websockets[cn1-websockets repository]
+for the moment; install that cn1lib to wire up the bridge on each platform
+until the per-platform impls are merged into the matching port modules.
 
 
 === Webservice wizard

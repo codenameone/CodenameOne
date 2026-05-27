@@ -697,7 +697,22 @@ public class StubGenerator {
             return true;
         }
         if(cls.isArray()) {
-            return cls.getComponentType().isPrimitive();
+            // Primitive arrays (byte[], int[], long[], double[], float[],
+            // boolean[], char[], short[]) plus String[] are valid parameter
+            // and return types.
+            //
+            // CAVEAT: the iOS Objective-C marshaller at
+            // javaTypeToObjectiveCType() currently maps every array to
+            // NSData* -- i.e. iOS callers receive byte-buffer semantics
+            // regardless of declared component type. For int[] / long[] /
+            // double[] / float[] this means the native side has to read the
+            // raw bytes (still useful for fixed-format payloads). For
+            // String[] this means the native side has to deserialize the
+            // payload itself. Per-component-type ObjC marshalling
+            // (NSArray<NSNumber*>* / NSArray<NSString*>*) is a separate
+            // follow-up; see the IMPROVEMENT_PLAN.
+            Class component = cls.getComponentType();
+            return component.isPrimitive() || component == String.class;
         }
         if(cls == String.class) {
             return true;

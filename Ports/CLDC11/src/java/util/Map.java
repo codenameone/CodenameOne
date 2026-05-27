@@ -17,6 +17,10 @@
 
 package java.util;
 
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 
 /// A `Map` is a data structure consisting of a set of keys and values
 /// in which each key is mapped to a single value.  The class of the objects
@@ -290,4 +294,171 @@ public interface Map<K,V> {
     ///
     /// a collection of the values contained in this map.
     public Collection<V> values();
+
+    // ---- Java 8 default methods. ----
+    //
+    // Implementations override these as needed (e.g. for synchronized maps).
+    // The default implementations are written to be ParparVM-friendly:
+    // synchronous, no streams, no `default Optional<T>` returns.
+
+    /// Returns the value to which the specified key is mapped, or
+    /// `defaultValue` if this map contains no mapping for the key. Equivalent
+    /// to:
+    /// ```java
+    /// V v = m.get(key);
+    /// return v != null ? v : defaultValue;
+    /// ```
+    default V getOrDefault(Object key, V defaultValue) {
+        V v = get(key);
+        return v != null ? v : defaultValue;
+    }
+
+    /// If the specified key is not already associated with a value (or is
+    /// mapped to `null`) associates it with the given value and returns
+    /// `null`, else returns the current value.
+    default V putIfAbsent(K key, V value) {
+        V v = get(key);
+        if (v == null) {
+            v = put(key, value);
+        }
+        return v;
+    }
+
+    /// Removes the entry for the specified key only if it is currently mapped
+    /// to the specified value.
+    default boolean remove(Object key, Object value) {
+        Object curr = get(key);
+        if (curr == null ? value != null : !curr.equals(value)) {
+            return false;
+        }
+        if (curr == null && !containsKey(key)) {
+            return false;
+        }
+        remove(key);
+        return true;
+    }
+
+    /// Replaces the entry for the specified key only if currently mapped to
+    /// the specified value.
+    default boolean replace(K key, V oldValue, V newValue) {
+        Object curr = get(key);
+        if (curr == null ? oldValue != null : !curr.equals(oldValue)) {
+            return false;
+        }
+        if (curr == null && !containsKey(key)) {
+            return false;
+        }
+        put(key, newValue);
+        return true;
+    }
+
+    /// Replaces the entry for the specified key only if it is currently
+    /// mapped to some value. Returns the previous value associated with the
+    /// key, or `null` if there was no mapping.
+    default V replace(K key, V value) {
+        V curr = get(key);
+        if (curr != null || containsKey(key)) {
+            curr = put(key, value);
+        }
+        return curr;
+    }
+
+    /// Performs the given action for each entry in this map until all entries
+    /// have been processed or the action throws an exception. Exceptions
+    /// thrown by the action propagate to the caller.
+    default void forEach(BiConsumer<? super K, ? super V> action) {
+        if (action == null) {
+            throw new NullPointerException();
+        }
+        for (Map.Entry<K, V> entry : entrySet()) {
+            action.accept(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /// Replaces each entry's value with the result of invoking the given
+    /// function on that entry until all entries have been processed or the
+    /// function throws an exception.
+    default void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+        if (function == null) {
+            throw new NullPointerException();
+        }
+        for (Map.Entry<K, V> entry : entrySet()) {
+            entry.setValue(function.apply(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    /// If the specified key is not already associated with a value (or is
+    /// mapped to `null`), attempts to compute its value using the given
+    /// mapping function and enters it into this map unless `null`.
+    default V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
+        if (mappingFunction == null) {
+            throw new NullPointerException();
+        }
+        V v = get(key);
+        if (v == null) {
+            V newValue = mappingFunction.apply(key);
+            if (newValue != null) {
+                put(key, newValue);
+                return newValue;
+            }
+        }
+        return v;
+    }
+
+    /// If the value for the specified key is present and non-null, attempts to
+    /// compute a new mapping given the key and its current mapped value.
+    default V computeIfPresent(K key,
+            BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        if (remappingFunction == null) {
+            throw new NullPointerException();
+        }
+        V old = get(key);
+        if (old != null) {
+            V newValue = remappingFunction.apply(key, old);
+            if (newValue != null) {
+                put(key, newValue);
+                return newValue;
+            }
+            remove(key);
+        }
+        return null;
+    }
+
+    /// Attempts to compute a mapping for the specified key and its current
+    /// mapped value (or `null` if there is no current mapping).
+    default V compute(K key,
+            BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        if (remappingFunction == null) {
+            throw new NullPointerException();
+        }
+        V old = get(key);
+        V newValue = remappingFunction.apply(key, old);
+        if (newValue == null) {
+            if (old != null || containsKey(key)) {
+                remove(key);
+            }
+            return null;
+        }
+        put(key, newValue);
+        return newValue;
+    }
+
+    /// If the specified key is not already associated with a value or is
+    /// associated with null, associates it with the given non-null value.
+    /// Otherwise, replaces the associated value with the results of the given
+    /// remapping function, or removes if the result is `null`.
+    default V merge(K key, V value,
+            BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+        if (remappingFunction == null || value == null) {
+            throw new NullPointerException();
+        }
+        V old = get(key);
+        V newValue = old == null ? value : remappingFunction.apply(old, value);
+        if (newValue == null) {
+            remove(key);
+        } else {
+            put(key, newValue);
+        }
+        return newValue;
+    }
 }

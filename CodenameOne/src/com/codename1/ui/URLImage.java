@@ -165,23 +165,92 @@ public final class URLImage extends EncodedImage {
     private static final EasyThread imageLoader = EasyThread.start("ImageLoader");
     /// The exception handler is used for callbacks in case of an error
     private static ErrorCallback exceptionHandler;
+    /// Global default applied to every URLImage download request that doesn't
+    /// already carry a per-instance decorator. See `#setDefaultRequestDecorator`.
+    private static RequestDecorator defaultRequestDecorator;
     private final EncodedImage placeholder;
     private final String url;
     private final ImageAdapter adapter;
     private final String storageFile;
     private final String fileSystemFile;
+    private final RequestDecorator requestDecorator;
     private boolean fetching;
     private byte[] imageData;
     private boolean repaintImage;
     private boolean locked;
 
     private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter, String storageFile, String fileSystemFile) {
+        this(placeholder, url, adapter, storageFile, fileSystemFile, null);
+    }
+
+    private URLImage(EncodedImage placeholder, String url, ImageAdapter adapter,
+                     String storageFile, String fileSystemFile,
+                     RequestDecorator requestDecorator) {
         super(placeholder.getWidth(), placeholder.getHeight());
         this.placeholder = placeholder;
         this.url = url;
         this.adapter = adapter;
         this.storageFile = storageFile;
         this.fileSystemFile = fileSystemFile;
+        this.requestDecorator = requestDecorator;
+    }
+
+    /// Decorator hook applied to the `ConnectionRequest` that loads a
+    /// network-backed `URLImage`. Useful when the image endpoint sits
+    /// behind an `Authorization: Bearer ...` header, when you need to
+    /// override the user-agent, set a cookie, or anything else
+    /// `ConnectionRequest` exposes.
+    ///
+    /// Two ways to install one:
+    ///
+    /// - **Global default**:
+    ///   `URLImage.setDefaultRequestDecorator(req ->
+    ///   req.addRequestHeader("Authorization", "Bearer " + token));` --
+    ///   applies to every `URLImage` from then on. This covers the common
+    ///   "all our images are private" case in one app-boot line.
+    ///
+    /// - **Per-image**: use the
+    ///   `createToStorage(EncodedImage, String, String, ImageAdapter,
+    ///   RequestDecorator)` overload. Per-instance decorators run **after**
+    ///   the global default, so the per-call decorator can override or
+    ///   augment headers set by the default.
+    public interface RequestDecorator {
+        void decorate(com.codename1.io.ConnectionRequest req);
+    }
+
+    /// Installs a global `RequestDecorator`. Pass `null` to clear the
+    /// existing default. The decorator runs on every URLImage's
+    /// `ConnectionRequest` immediately before it's queued.
+    public static void setDefaultRequestDecorator(RequestDecorator decorator) {
+        defaultRequestDecorator = decorator;
+    }
+
+    /// Returns the global default decorator installed via
+    /// `#setDefaultRequestDecorator(RequestDecorator)`, or `null`.
+    public static RequestDecorator getDefaultRequestDecorator() {
+        return defaultRequestDecorator;
+    }
+
+    /// Convenience for the most common case: every URLImage fetch should
+    /// carry the same `Authorization: Bearer <token>` header. Equivalent
+    /// to `setDefaultRequestDecorator(req -> req.addRequestHeader(
+    /// "Authorization", "Bearer " + token))`.
+    ///
+    /// Pass `null` to clear. Subsequent calls replace the previously-set
+    /// header value; the same `Authorization` header is not appended
+    /// twice.
+    public static void setDefaultBearerToken(String token) {
+        if (token == null) {
+            defaultRequestDecorator = null;
+            return;
+        }
+        final String headerValue = "Bearer " + token;
+        defaultRequestDecorator = new RequestDecorator() {
+            @Override
+            public void decorate(com.codename1.io.ConnectionRequest req) {
+                req.addRequestHeader("Authorization", headerValue);
+            }
+        };
     }
 
     /// The exception handler is used for callbacks in case of an error
@@ -283,12 +352,27 @@ public final class URLImage extends EncodedImage {
     ///
     /// a URLImage that will initialy just delegate to the placeholder
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
+        return createToStorage(placeholder, storageFile, url, adapter, null);
+    }
+
+    /// Same as `#createToStorage(EncodedImage, String, String, ImageAdapter)`,
+    /// plus a per-call `RequestDecorator` applied to the
+    /// `ConnectionRequest` that fetches the image bytes. Use when the URL
+    /// requires authentication, custom headers, or other
+    /// `ConnectionRequest` configuration not covered by the default.
+    ///
+    /// If a global default decorator is also installed via
+    /// `#setDefaultRequestDecorator(RequestDecorator)`, the global default
+    /// runs first, then the per-call decorator -- so the per-call decorator
+    /// can override headers set by the default.
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url,
+                                           ImageAdapter adapter, RequestDecorator decorator) {
         // intern is used to trigger an NPE in case of a null URL or storage file
         URLImage out = pendingToStorage.get(storageFile);
         if (out != null) {
             return out;
         }
-        out = new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
+        out = new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null, decorator);
         pendingToStorage.put(storageFile, out);
         return out;
     }
@@ -502,56 +586,58 @@ public final class URLImage extends EncodedImage {
                 }
                 if (adapter != null) {
                     if (url.startsWith("http://") || url.startsWith("https://")) {
-                        Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX,
-                                new SuccessCallback<Image>() {
+                        SuccessCallback<Image> downloadCb = new SuccessCallback<Image>() {
+                            @Override
+                            public void onSucess(final Image value) {
+                                imageLoader.run(new Runnable() {
                                     @Override
-                                    public void onSucess(final Image value) {
-                                        imageLoader.run(new Runnable() {
+                                    public void run() {
+                                        runAndWait(new Runnable() {
                                             @Override
                                             public void run() {
-                                                runAndWait(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        DownloadCompleted onComplete = new DownloadCompleted();
-                                                        onComplete.setSourceImage(value);
-                                                        onComplete.actionPerformed(new ActionEvent(value));
-                                                    }
-                                                });
+                                                DownloadCompleted onComplete = new DownloadCompleted();
+                                                onComplete.setSourceImage(value);
+                                                onComplete.actionPerformed(new ActionEvent(value));
                                             }
                                         });
-
-
                                     }
-
                                 });
+                            }
+                        };
+                        if (hasRequestDecorator()) {
+                            downloadDecorated(url, storageFile + IMAGE_SUFFIX, downloadCb);
+                        } else {
+                            Util.downloadImageToStorage(url, storageFile + IMAGE_SUFFIX, downloadCb);
+                        }
                     } else {
                         // from file
                         loadImageFromLocalUrl(storageFile + IMAGE_SUFFIX, false);
                     }
                 } else {
                     if (url.startsWith("http://") || url.startsWith("https://")) {
-                        // Load image from http
-                        Util.downloadImageToStorage(url, storageFile,
-                                new SuccessCallback<Image>() {
+                        SuccessCallback<Image> downloadCb = new SuccessCallback<Image>() {
+                            @Override
+                            public void onSucess(final Image value) {
+                                imageLoader.run(new Runnable() {
                                     @Override
-                                    public void onSucess(final Image value) {
-                                        imageLoader.run(new Runnable() {
+                                    public void run() {
+                                        runAndWait(new Runnable() {
                                             @Override
                                             public void run() {
-                                                runAndWait(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        DownloadCompleted onComplete = new DownloadCompleted();
-                                                        onComplete.setSourceImage(value);
-                                                        onComplete.actionPerformed(new ActionEvent(value));
-                                                    }
-                                                });
+                                                DownloadCompleted onComplete = new DownloadCompleted();
+                                                onComplete.setSourceImage(value);
+                                                onComplete.actionPerformed(new ActionEvent(value));
                                             }
                                         });
-
-
                                     }
                                 });
+                            }
+                        };
+                        if (hasRequestDecorator()) {
+                            downloadDecorated(url, storageFile, downloadCb);
+                        } else {
+                            Util.downloadImageToStorage(url, storageFile, downloadCb);
+                        }
                     } else {
                         //load image from file system
                         loadImageFromLocalUrl(storageFile, false);
@@ -771,6 +857,53 @@ public final class URLImage extends EncodedImage {
         public boolean isAsyncAdapter() {
             return false;
         }
+    }
+
+    /// Whether this URLImage has an applicable RequestDecorator (per-instance
+     /// or a global default).
+    private boolean hasRequestDecorator() {
+        return requestDecorator != null || defaultRequestDecorator != null;
+    }
+
+    /// Downloads `url` to `Storage` under `storageKey`, applying the global
+    /// default `RequestDecorator` then the per-instance one to the
+    /// `ConnectionRequest` before queueing. Mirrors the contract of
+    /// `Util.downloadImageToStorage(url, storageKey, onSuccess)`: invokes
+    /// `onSuccess` on the EDT with the decoded `Image` when the file is
+    /// fully written.
+    ///
+    /// We can't reuse `Util.downloadImageToStorage(...)` directly here
+    /// because it offers no extension point for decorating the underlying
+    /// `ConnectionRequest`; this method assembles an equivalent request
+    /// inline so the decorators can run before the queue dispatch.
+    private void downloadDecorated(final String url, final String storageKey,
+                                   final SuccessCallback<Image> onSuccess) {
+        com.codename1.io.ConnectionRequest cr = new com.codename1.io.ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        // Run decorators first so anything they set is in place by the time
+        // the network manager pulls the request off the queue.
+        if (defaultRequestDecorator != null) {
+            defaultRequestDecorator.decorate(cr);
+        }
+        if (requestDecorator != null) {
+            requestDecorator.decorate(cr);
+        }
+        cr.downloadImageToStorage(storageKey, onSuccess, new com.codename1.util.FailureCallback<Image>() {
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                if (exceptionHandler != null) {
+                    exceptionHandler.onError(URLImage.this, new java.io.IOException(
+                            "Image download failed (" + errorCode + "): " + errorMessage));
+                } else {
+                    com.codename1.io.Log.e(new RuntimeException(
+                            "URLImage download failed (" + errorCode + "): " + errorMessage));
+                }
+            }
+        });
     }
 
     /// CachedImage used by `java.lang.String, com.codename1.ui.Image, int)`
