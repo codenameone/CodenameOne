@@ -9,9 +9,11 @@ import com.codename1.ui.util.Resources;
 ///
 /// 1. SVGs land in `src/main/css/` and are referenced from `theme.css` --
 ///    no Java-side hardcoding.
-/// 2. The build emits a `SVGRegistry`; we call `install(globalResources)`
-///    during {@link #prepare} so the theme's placeholder entries are
-///    replaced with the transcoded SVGs.
+/// 2. The per-port wiring (`JavaSEPort.init`, `IPhoneBuilder` and
+///    `AndroidGradleBuilder` injecting the call into their generated Stub)
+///    runs `SVGRegistry.installGlobal()` automatically so the theme's
+///    placeholder entries are replaced with the transcoded SVGs before
+///    this test runs.
 /// 3. {@link Resources#getImage(String)} returns the animated SVG, which is
 ///    painted into each cell of the standard
 ///    {@link AbstractAnimationScreenshotTest} grid. Because both SVGs read

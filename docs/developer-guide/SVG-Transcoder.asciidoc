@@ -25,16 +25,6 @@ emitted as a Java class that subclasses `com.codename1.ui.GeneratedSVGImage`,
 and rendered through the standard `Graphics` shape API. The same vector
 source produces pixel-perfect output at any size on every port.
 
-[NOTE]
-====
-A captured screenshot of the hellocodenameone screenshot suite's
-`SVGStaticScreenshotTest` (a column of transcoded SVGs rendered from
-`Resources.getGlobalResources().getImage(name)`) is published as a CI
-artifact on every PR; the live grid lives under
-`scripts/hellocodenameone/common/src/main/css/` if you want to inspect
-the source fixtures.
-====
-
 == Quick start
 
 . Drop your SVG next to `theme.css` in `src/main/css/`:
@@ -43,37 +33,74 @@ the source fixtures.
 ----
 src/main/css/
   theme.css
-  spinner.svg
   home.svg
 ----
 
-. Reference it from CSS the same way you would a PNG:
+. Reference it from CSS and pin its rendered size in millimeters --
+  the recommended sizing knob, since it carries unchanged across every
+  device DPI:
 +
 [source,css]
 ----
 HomeIcon {
     background: url(home.svg);
-    cn1-source-dpi: very-high;
+    cn1-svg-width: 6mm;
+    cn1-svg-height: 6mm;
     bg-type: image_scaled_fit;
-    padding: 4mm;
 }
 ----
 
-. Build the project as usual:
+. Build the project:
 +
 [source,bash]
 ----
 mvn package
 ----
 
-That's it. App code doesn't call into the registry -- the per-
-platform Stub that the cn1 builder generates emits
-`com.codename1.generated.svg.SVGRegistry.installGlobal()` before
-`init(Object)` runs, so by the time your app fetches an image via
-`Resources.getGlobalResources().getImage("home.svg")` (or the same name
-through any CSS-driven lookup) the transcoded `GeneratedSVGImage` is
-already registered. CSS rules that reference the SVG by URL pick it
-up via the same registry.
+That's it. App code doesn't call into the registry. The transcoder
+emits `com.codename1.generated.svg.SVGRegistry` only when SVGs are
+present, and the per-port build wiring (`IPhoneBuilder`,
+`AndroidGradleBuilder`, the JavaSE port) loads it automatically before
+`init(Object)`. `Resources.getGlobalResources().getImage("home.svg")`
+returns the transcoded image; CSS rules that reference the SVG by URL
+pick it up via the same registry.
+
+== Why millimeters
+
+`cn1-svg-width` / `cn1-svg-height` are the sizing knob you should
+reach for first.
+
+* A 6mm icon is 6mm tall on a 1x desktop, 6mm on a high-DPI handset,
+  and 6mm on a 4K tablet. The transcoder routes both values through
+  `Display.convertToPixels()` at install time, the same way
+  `font-size: 3mm` behaves elsewhere in CN1 CSS.
+* SVGs in the wild routinely declare odd `width`/`height` attributes
+  (a 1024×1024 export of a 24×24 icon, no dimensions at all, etc.).
+  Pinning the rendered size in millimeters sidesteps that guesswork
+  -- the SVG's declared pixel size and the device DPI become
+  irrelevant.
+* It's the only sizing mode that survives a re-export of the SVG
+  from the asset pipeline. `cn1-source-dpi` and the implicit
+  medium-density default both depend on the SVG's declared pixel
+  size, so a tool that "helpfully" rescales the source on export
+  silently changes the rendered size.
+
+[source,css]
+----
+StarIcon       { background: url(star.svg);    cn1-svg-width: 4mm;  cn1-svg-height: 4mm; }
+PrimaryIcon    { background: url(home.svg);    cn1-svg-width: 6mm;  cn1-svg-height: 6mm; }
+LogoBanner     { background: url(logo.svg);    cn1-svg-width: 32mm; cn1-svg-height: 12mm; }
+----
+
+Use `cn1-source-dpi: <bucket>` (accepted keywords: `low`, `medium`,
+`high`, `very-high`, `hd`, `560`, `2hd`, `4k`) only when an SVG has
+sensible declared pixel dimensions for a known density target and you
+want the rendered size to track `Display.getDeviceDensity()` instead
+of millimeters. With no hint at all, the SVG's declared dimensions are
+treated as design pixels at `DENSITY_MEDIUM`.
+
+If both keys appear on the same rule, `cn1-svg-width` /
+`cn1-svg-height` wins.
 
 == How the build flow works
 
@@ -93,105 +120,54 @@ The `cn1app` archetype binds the `transcode-svg` goal to the
 
 When Maven runs the mojo:
 
-. It scans `src/main/css/` and `src/main/svg/` for `*.svg` files.
-. It parses each SVG (built-in StAX, no Batik dependency) and emits
-  `target/generated-sources/svg/com/codename1/generated/svg/<Name>.java`
-  -- one class per SVG, plus a `SVGRegistry`.
+. It scans `src/main/css/` and `src/main/svg/` for `*.svg` files. If
+  there are none, the goal is a no-op -- no registry class is emitted,
+  no per-port stub injection happens.
+. For each SVG it emits `target/generated-sources/svg/com/codename1/generated/svg/<Name>.java`
+  -- one class per file -- plus a single `SVGRegistry` class whose
+  `installGlobal()` registers every transcoded image with the global
+  `Resources` table.
 . It scans `src/main/css/**/*.css` for `url(*.svg)` occurrences and the
-  enclosing rule's `cn1-source-dpi`; that density is baked into the
-  registry's `install()` call for each image.
+  enclosing rule's `cn1-svg-width` / `cn1-svg-height` / `cn1-source-dpi`
+  hints. Those values are baked into the registry's `installGlobal()`
+  call per image.
 . It drops a 1×1 transparent PNG placeholder into
   `target/css-resources/` so the standalone CSS compiler can finish
   even though the file extension on the URL is `.svg`. The placeholder
   is overwritten in the theme by the runtime registry call.
 
-Subsequent steps in the standard CN1 build (`generate-gui-sources`,
-`css`, the simulator launcher, the cloud build for iOS/Android, the
-JavaScript port pipeline) all consume the generated classes -- nothing
-else needs configuration. The transcoder runs **for every target**, so
-the generated `SVGRegistry` and `*.java` files are part of the shared
-compile output that flows into every port.
+The simulator / desktop ports load `SVGRegistry` reflectively, so a
+project that adds its first SVG today rebuilds and runs without any
+code change. The iOS and Android builders detect the generated class
+in the user's compile output and weave `installGlobal()` into the
+generated `Stub` right before the first `init(Object)`; a project with
+no SVGs gets no weaving.
 
-== Sizing rules
+== Calling the registry yourself
 
-CSS controls the rendered dimensions via three mechanisms, in order of
-specificity. The first one declared on a rule wins:
+If you don't use `theme.css` but still want a transcoded SVG, construct
+the generated class directly:
 
-. **Explicit millimeter dimensions** -- `cn1-svg-width` and
-  `cn1-svg-height` are the recommended option for icons that need a
-  fixed physical size on every device. Many SVGs in the wild have
-  arbitrary declared `width`/`height` (sometimes a 1024×1024 export of
-  a 24×24 icon); pinning the rendered size in millimeters sidesteps the
-  guesswork entirely.
-+
-[source,css]
+[source,java]
 ----
-HomeIcon {
-    background: url(home.svg);
-    cn1-svg-width: 6mm;
-    cn1-svg-height: 6mm;
-}
-----
-+
-The transcoder routes both values through `Display.convertToPixels()`
-at install time, so the rendered icon is 6mm tall on a desktop, 6mm
-tall on a high-DPI handset, and 6mm tall on a 4K tablet -- the same
-way `font-size: 3mm` behaves elsewhere in CN1 CSS.
-
-. **Source density bucket** -- `cn1-source-dpi: <bucket>` tells the
-  transcoder which CN1 density bucket the SVG was authored for. The
-  rendered size then tracks `Display.getDeviceDensity() / sourceDensity`,
-  identical to the multi-image multi-density rule. Use this when the
-  SVG already declares sensible pixel dimensions for one density
-  target.
-+
-[source,css]
-----
-Star {
-    background: url(star.svg);
-    cn1-source-dpi: very-high;
-}
-----
-+
-Accepted keywords: `low`, `medium`, `high`, `very-high`, `hd`, `560`,
-`2hd`, `4k`.
-
-. **No hint** -- the SVG's declared `width`/`height` (or, if absent,
-  the `viewBox`) are treated as design pixels at `DENSITY_MEDIUM` and
-  scaled linearly with the device density. Fine for icons authored at
-  the standard mdpi baseline; expect surprises if your SVG declares
-  `width="600"` for a small icon.
-
-[TIP]
-====
-Mixing the three keys on the same rule is allowed: explicit
-millimeters always wins, then `cn1-source-dpi`, then the implicit
-medium-density default. This lets you ship a single CSS file where
-"normal" icons use `cn1-source-dpi: very-high` and the few icons with
-weird natural dimensions get an explicit `cn1-svg-width` override.
-====
-
-== CSS coverage
-
-Any CSS property that resolves to an image URL is supported:
-
-[source,css]
-----
-.Star {
-    background: url(star.svg);
-    cn1-source-dpi: very-high;
-}
-
-.Border {
-    border-image: url(divider.svg);
-    cn1-source-dpi: high;
-}
+Image home = new com.codename1.generated.svg.Home(6f, 6f);  // 6mm × 6mm
+button.setIcon(home);
 ----
 
-The CSS compiler installs a 1-byte placeholder entry for the SVG name
-in the compiled `theme.res`. At runtime, `SVGRegistry.install(theme)`
-replaces the placeholder with the transcoded image, so every code
-path that calls `theme.getImage(name)` returns the SVG.
+Constructors come in three flavours, matching the three CSS sizing
+mechanisms above. The two-`float` constructor takes millimeters; that's
+the one to prefer for the reasons in the previous section.
+
+[source,java]
+----
+public Home(float widthMm, float heightMm) { ... }   // for cn1-svg-width / cn1-svg-height
+public Home(int sourceDensity) { ... }               // for cn1-source-dpi hints
+public Home() { ... }                                // default DENSITY_MEDIUM source
+----
+
+`scaled(int, int)` returns a lightweight view that reports the
+requested dimensions from `getWidth()` / `getHeight()` and shares the
+animation clock with its source.
 
 == SVG feature coverage
 
@@ -207,7 +183,7 @@ SMIL animation subset:
 | `fill`, `stroke`, `stroke-width`, `stroke-linecap/linejoin/miterlimit` | Full
 | `opacity`, `fill-opacity`, `stroke-opacity` | Full (animatable)
 | `<linearGradient>` | Full (shape-clipped fill on every port)
-| `<radialGradient>` | First-stop fallback for v1
+| `<radialGradient>` | First-stop fallback
 | `<animate>` (numeric attributes) | Full
 | `<animateTransform type="translate \| scale \| rotate">` | Full
 | `<set>` (instant value snap) | Full
@@ -221,109 +197,28 @@ SMIL animation subset:
 SMIL animations read the current time from
 `com.codename1.ui.animations.AnimationTime`, so tests can pin the
 clock with `AnimationTime.setTime(t)` to capture a deterministic
-frame.
-
-== Calling the registry yourself
-
-If you don't use `theme.css` but still want to use transcoded SVGs,
-construct the generated classes directly:
-
-[source,java]
-----
-Image home = new com.codename1.generated.svg.Home();
-button.setIcon(home);
-----
-
-Constructors come in three flavours, matching the three CSS sizing
-mechanisms above:
-
-[source,java]
-----
-public Home() { ... }                                  // default DENSITY_MEDIUM source
-public Home(int sourceDensity) { ... }                 // for cn1-source-dpi hints
-public Home(float widthMm, float heightMm) { ... }     // for cn1-svg-width / cn1-svg-height
-----
-
-The `SVGRegistry.install()` method picks the right one per image based
-on what the CSS declared. The no-arg constructor is also the escape
-hatch for code that wants a per-instance density override:
-
-[source,java]
-----
-GeneratedSVGImage img = new com.codename1.generated.svg.Home(CN1Constants.DENSITY_VERY_HIGH);
-Image small = img.scaled(48, 48);  // any explicit size still works
-----
-
-`scaled(int, int)` returns a lightweight view that reports the
-requested dimensions from `getWidth()`/`getHeight()` and shares the
-animation clock with its source.
-
-== Known port-side rendering bugs
-
-The screenshot goldens captured at `scripts/{android,ios/screenshots,ios/screenshots-metal}/SVGStatic.png`
-and `SVGAnimatedScreenshotTest.png` record the **current** behavior of
-each port on purpose -- the bugs below are tracked in their own issues
-and a follow-up port-side PR will replace the goldens with the
-corrected output:
-
-iOS (both OpenGL ES and Metal) -- gradient fills clipped to a non-rectangular path render as a triangle::
-  `setClip(GeneralPath)` on iOS substitutes a degenerate polygon for an
-  arc-decomposed path, so a `<circle fill="url(#grad)"/>` ends up shaped
-  like a triangle. The transcoder's `<clipPath>` support sits on top of
-  the same primitive so `clipped_badge.svg` shows the same shape on both
-  iOS variants.
-
-iOS (both OpenGL ES and Metal) -- `<animate>` on `fill` colors doesn't tick::
-  Numeric attribute animation (`r`, `cx`, transforms) animates correctly
-  on iOS. Color-valued animation -- for example `color_morph.svg`
-  morphing red diamonds through the palette -- renders the start color
-  but doesn't advance, so the diamonds vanish on iOS legacy (start color
-  is white) and freeze on iOS Metal. Android animates them as expected.
-
-Android -- gradient fills draw the path outline twice::
-  `gradient_circle.svg` ends up with both the gradient-filled circle and
-  an outline of the same circle stacked, instead of a single filled
-  circle with a darker stroke. The transcoder emits a fill + stroke
-  pair so the platform paint pipeline is on the hook.
-
-== Limitations and notes
-
-* The transcoder uses the JDK's StAX parser at build time. There is no
-  Batik dependency and no runtime SVG XML parsing.
-* Generated classes are emitted under
-  `com.codename1.generated.svg.<ClassName>` (override with the
-  `cn1.svg.package` Maven property if you need a different package).
-* The runtime base class lives in `com.codename1.ui.GeneratedSVGImage`
-  -- part of the core framework, no extra Cn1lib needed.
-* The per-platform Stub generated by the cn1 builder
-  (`IPhoneBuilder`, `AndroidGradleBuilder`, the JavaSE archetype) emits
-  a `SVGRegistry.installGlobal()` call before `init(Object)`, so app
-  code doesn't need a manual install hook. On ParparVM that line is
-  also what keeps the transcoded classes alive under the static-
-  reachability analyzer.
-* Animated SVGs return `true` from `Image.isAnimation()`. As with
-  `Timeline`, you must register the image with a `Form`'s animation
-  manager (or set it as a `Component.setIcon` with `isAnimation()` true)
-  for the repaint loop to tick the SMIL clock.
+frame. Animated SVGs return `true` from `Image.isAnimation()` -- as
+with `Timeline`, you must register the image with a `Form`'s animation
+manager (or set it as a `Component.setIcon` with `isAnimation()` true)
+for the repaint loop to tick the SMIL clock.
 
 == Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::
-  The Stub-emitted `SVGRegistry.installGlobal()` call didn't run for
-  this build. Check that the platform Stub generated by the cn1 builder
-  contains the line (look in `target/generated-sources/.../Stub.java`
-  on iOS, `target/.../HelloCodenameOne.java` on Android). For arbitrary
+  The transcoder didn't run, or it ran with zero SVGs. Confirm the SVG
+  lives under `src/main/css/` (or `src/main/svg/`) and that the
+  `transcode-svg` goal is bound in the project POM. For arbitrary
   Resources bundles loaded outside the global slot, call
   `com.codename1.ui.util.Resources.registerGeneratedImage(name, image)`
-  yourself with a fresh `new com.codename1.generated.svg.YourSvg()`.
+  yourself with a fresh `new com.codename1.generated.svg.YourSvg(widthMm, heightMm)`.
 
 SVG looks the wrong size::
-  Add `cn1-source-dpi: <bucket>` to the CSS rule that references it
-  to tell the transcoder which density the SVG was authored for. The
-  buckets match CN1's multi-image density buckets exactly.
+  Switch the rule to `cn1-svg-width` / `cn1-svg-height` in millimeters.
+  The other sizing modes depend on the SVG's declared pixel size, which
+  is what's biting you here.
 
-Spinner / pulse render but don't animate::
+Spinner / pulse renders but doesn't animate::
   Check that the image is mounted into a `Component` whose animation
-  manager ticks (Labels added to a Form do this automatically). For a
-  pure-`Graphics`-driven capture (screenshot tests) pin
+  manager ticks (`Labels` added to a `Form` do this automatically). For
+  a pure-`Graphics`-driven capture (screenshot tests) pin
   `AnimationTime.setTime(...)` and re-render.

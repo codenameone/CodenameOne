@@ -2908,8 +2908,9 @@ public class CSSTheme {
     /// 1x1 transparent PNG (43 bytes) -- used to satisfy the EditableResources
     /// image slot when a CSS rule references an SVG by URL. The runtime
     /// {@code com.codename1.generated.svg.SVGRegistry} (emitted by the SVG
-    /// transcoder mojo) replaces the placeholder with the transcoded image
-    /// when {@code install(theme)} runs at startup.
+    /// transcoder mojo when the project contains any SVGs) replaces the
+    /// placeholder with the transcoded image when its {@code installGlobal()}
+    /// runs at startup.
     private static final byte[] SVG_PLACEHOLDER_PNG = new byte[] {
             (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
             0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -2953,8 +2954,8 @@ public class CSSTheme {
             // emitted by codenameone-svg-transcoder. Drop a 1x1 transparent
             // EncodedImage placeholder into the resource under the SVG filename
             // so the theme references it by name; the runtime
-            // com.codename1.generated.svg.SVGRegistry then overrides the entry
-            // with the transcoded image when SVGRegistry.install(theme) runs.
+            // com.codename1.generated.svg.SVGRegistry (when present) then
+            // overrides the entry with the transcoded image during init().
             if (fileName.toLowerCase().endsWith(".svg")) {
                 Image placeholder = registerSVGPlaceholder(fileName);
                 if (placeholder != null) {

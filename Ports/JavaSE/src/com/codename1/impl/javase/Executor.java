@@ -331,21 +331,10 @@ public class Executor {
                                 @Override
                                 public void run() {
                                     try {
-                                        // Run the build-time SVG transcoder's registry before
-                                        // the app's init() -- equivalent to what IPhoneBuilder
-                                        // / AndroidGradleBuilder emit into their generated
-                                        // Stubs. The simulator goes through this Executor
-                                        // rather than the desktop Stub, so do the install
-                                        // dynamically here using the same classloader that
-                                        // loaded the app's main class.
-                                        try {
-                                            Class<?> svgRegistry = Class.forName(
-                                                    "com.codename1.generated.svg.SVGRegistry",
-                                                    true, c.getClassLoader());
-                                            svgRegistry.getMethod("installGlobal").invoke(null);
-                                        } catch (ClassNotFoundException noSVGs) {
-                                            // App has no transcoded SVGs -- nothing to do.
-                                        }
+                                        // JavaSEPort.init() already loads
+                                        // com.codename1.generated.svg.SVGRegistry reflectively
+                                        // when it's on the classpath, so no per-Executor
+                                        // install is needed here.
                                         m.invoke(app, new Object[]{null});
                                         Method start = c.getMethod("start", new Class[0]);
                                         if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {

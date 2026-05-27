@@ -888,8 +888,10 @@ public class Resources {
     public Image getImage(String id) {
         // The generated-image registry wins over the local resources map
         // so the build-time SVG transcoder's installGlobal() call -- run
-        // from the per-platform Stub before init() -- overrides the 1x1
-        // PNG placeholder the CSS compiler stored under the same name.
+        // from the per-port wiring (JavaSEPort.init reflectively, or the
+        // iOS / Android Stub emitted by IPhoneBuilder / AndroidGradleBuilder
+        // when the project contains SVGs) -- overrides the 1x1 PNG
+        // placeholder the CSS compiler stored under the same name.
         Image gen;
         synchronized (generatedImages) {
             gen = generatedImages.get(id);
@@ -922,19 +924,6 @@ public class Resources {
     /// `.svg`) under the bare filename stem so a CSS reference like
     /// `url(home.svg)` and a code reference like `getImage("home")` both
     /// resolve to the same instance.
-    ///
-    /// To wire up the generated SVGs in a Codename One app, invoke the
-    /// generated registry once during startup -- typically right after the
-    /// theme is loaded:
-    /// ```
-    /// com.codename1.generated.svg.SVGRegistry.install(theme);
-    /// ```
-    /// This call also populates the global registry so any other
-    /// [Resources] instance opened later will resolve the same SVGs by name.
-    /// The two-step (explicit install + global fallback) design is what lets
-    /// the transcoder coexist with ParparVM's static-reachability analysis on
-    /// iOS, which cannot tolerate the reflective probe a fully transparent
-    /// hook would require.
     public static void registerGeneratedImage(String id, Image image) {
         if (id == null || image == null) {
             return;

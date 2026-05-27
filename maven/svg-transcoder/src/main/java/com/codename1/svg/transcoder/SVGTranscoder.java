@@ -78,17 +78,12 @@ public final class SVGTranscoder {
     }
 
     /**
-     * Emit a {@code SVGRegistry} class with a public static
-     * {@code install(Resources)} method that instantiates each generated SVG
-     * image and registers it under its source filename. {@code install} also
-     * pushes the same set into a global registry so other {@code Resources}
-     * instances opened later in the VM resolve the SVGs by name through
-     * {@link com.codename1.ui.util.Resources#getImage(String)} too.
-     *
-     * <p>App code is expected to call {@code SVGRegistry.install(theme)} once
-     * at startup -- this explicit call (rather than a reflective auto-probe)
-     * keeps the runtime compatible with ParparVM's static reachability
-     * analysis on iOS.</p>
+     * Emit a {@code SVGRegistry} class with a single public static
+     * {@code installGlobal()} method that instantiates each generated SVG
+     * image and registers it in the global {@link com.codename1.ui.util.Resources}
+     * image table under its source filename. {@code installGlobal} is invoked
+     * by the per-port wiring (JavaSE port reflectively, iOS / Android Stubs
+     * emit a direct call) so app code does not call into the registry.
      */
     public static void writeRegistry(String packageName, String className, java.util.List<GeneratedClass> classes, Writer out) throws IOException {
         // dedupe by resource name; last wins

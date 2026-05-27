@@ -113,16 +113,27 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
                     + String.join(", ", effectiveSourceDirs()));
         }
 
-        // Always emit a SVGRegistry (possibly with zero entries) so the
-        // per-platform Stub can always reference SVGRegistry.installGlobal()
-        // without conditional compilation. Saves the cn1app archetype +
-        // builders from having to detect whether the user shipped any SVGs.
         File packageDir = new File(svgOutputDir, svgPackage.replace('.', '/'));
-        packageDir.mkdirs();
         long registrySrcMtime = lastModified(svgs);
         List<GeneratedClass> generated = new ArrayList<GeneratedClass>();
         Set<String> usedClassNames = new HashSet<String>();
 
+        if (svgs.isEmpty()) {
+            // No SVGs in this project -- skip the registry entirely so the
+            // per-platform Stub injection (IPhoneBuilder / AndroidGradleBuilder
+            // checking for SVGRegistry.class) stays a no-op. JavaSE Executor's
+            // dynamic load also tolerates the absence. Sweep a leftover from a
+            // previous build so a stale class doesn't trick the .isFile() check.
+            File leftover = new File(packageDir, REGISTRY_CLASS_NAME + ".java");
+            if (leftover.exists()) {
+                leftover.delete();
+            }
+            emitPlaceholders(cssHints.keySet());
+            registerSourceRoot();
+            return;
+        }
+
+        packageDir.mkdirs();
         for (File svg : svgs) {
             String resourceName = svg.getName();
             String className = uniqueClassName(SVGTranscoder.classNameFor(resourceName), usedClassNames);
