@@ -124,4 +124,55 @@ public class SecureStorage {
     public void setKeychainAccessGroup(String group) {
         // No-op fallback.
     }
+
+    // -----------------------------------------------------------------
+    // Non-prompting (no-biometric) storage
+    // -----------------------------------------------------------------
+    //
+    // The methods above all gate reads on biometric authentication.
+    // That is the right contract for refresh tokens and other things
+    // the user actively unlocks, but it is the wrong contract for
+    // secrets that the app needs to read on every network call --
+    // notably LLM API keys, where prompting at chat-call time would
+    // be unusable.
+    //
+    // The single-argument overloads below provide a quieter store
+    // that the platform persists with the OS's strong-but-non-
+    // interactive secrets backend:
+    //
+    // - iOS: keychain with `kSecAttrAccessibleAfterFirstUnlock`, no
+    //   `SecAccessControl`. Entries survive app updates and OS
+    //   reboots; they are extracted only after the user unlocks the
+    //   device at least once after each reboot.
+    // - Android: `EncryptedSharedPreferences` (Tink-backed AES-GCM)
+    //   without `setUserAuthenticationRequired(true)`. No biometric
+    //   prompt.
+    // - JavaSE simulator: `java.util.prefs.Preferences` encrypted
+    //   with an AES key derived from the OS user account. Useful
+    //   for round-tripping `LlmClient.openai(SecureStorage.getInstance().get("openai_key"))`
+    //   during simulator runs without storing the key in plaintext
+    //   in the project tree.
+    // - All other platforms: the base class returns null / false so
+    //   the call is observable but harmless. Treat `null` from
+    //   `get(account)` the same way you'd treat "not configured".
+
+    /// Quietly stores or overwrites an entry under `account`. The
+    /// user is not prompted. Returns `false` on the fallback base
+    /// class.
+    public boolean set(String account, String value) {
+        return false;
+    }
+
+    /// Quietly retrieves a previously-stored entry. Returns `null`
+    /// when the entry does not exist or when the platform does not
+    /// provide non-prompting storage.
+    public String get(String account) {
+        return null;
+    }
+
+    /// Quietly removes an entry. Returns `false` on the fallback
+    /// base class.
+    public boolean remove(String account) {
+        return false;
+    }
 }

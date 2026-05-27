@@ -1,0 +1,147 @@
+name: AI cn1lib iOS xcodebuild check
+
+# Per cn1lib: synthesise a tiny Xcode project that links the bundled
+# `nativeios/*.m` against the real `GoogleMLKit/*` (or TFLite / whisper)
+# pod, run `pod install`, then `xcodebuild build`. Catches API drift,
+# missing imports, and missing pod hints early -- on the same macOS
+# runners we already use for build-ios.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+      - '.github/workflows/ai-cn1lib-native-check.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+
+jobs:
+  xcodebuild-cn1libs:
+    name: xcodebuild ${{ matrix.lib }}
+    # macos-14 ships Xcode 15.4 by default but also has Xcode 16.x
+    # under /Applications/Xcode_16.X.app. xcodegen 2.45.4 emits
+    # objectVersion=77 (Xcode 16-format) projects, so we explicitly
+    # select Xcode 16 via xcode-select in a setup step below.
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { lib: cn1-ai-mlkit-text,         pod: 'GoogleMLKit/TextRecognition'    }
+          - { lib: cn1-ai-mlkit-barcode,      pod: 'GoogleMLKit/BarcodeScanning'    }
+          - { lib: cn1-ai-mlkit-face,         pod: 'GoogleMLKit/FaceDetection'      }
+          - { lib: cn1-ai-mlkit-labeling,     pod: 'GoogleMLKit/ImageLabeling'      }
+          - { lib: cn1-ai-mlkit-translate,    pod: 'GoogleMLKit/Translate'          }
+          - { lib: cn1-ai-mlkit-smartreply,   pod: 'GoogleMLKit/SmartReply'         }
+          - { lib: cn1-ai-mlkit-langid,       pod: 'GoogleMLKit/LanguageID'         }
+          - { lib: cn1-ai-mlkit-pose,         pod: 'GoogleMLKit/PoseDetection'      }
+          - { lib: cn1-ai-mlkit-segmentation, pod: 'GoogleMLKit/SegmentationSelfie' }
+          - { lib: cn1-ai-mlkit-docscan,      pod: ''                               }   # VisionKit/CoreImage only
+          - { lib: cn1-ai-tflite,             pod: 'TensorFlowLiteObjC'             }
+          - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
+          - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16 (xcodegen emits Xcode-16-format projects)
+        # The default xcode-select on macos-14 is Xcode 15.4; that can't
+        # read xcodegen's objectVersion=77 projects ("future project file
+        # format"). Pick the highest-version Xcode 16.* available on this
+        # runner image.
+        run: |
+          set -euxo pipefail
+          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then
+              echo "::error::No Xcode 16.* found in /Applications"; ls /Applications/Xcode_*.app; exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install xcodegen
+        # xcodegen produces a full-featured pbxproj from a YAML spec. We need
+        # a real Xcode project (not a hand-rolled minimal pbxproj) so the
+        # CocoaPods integration step can inject baseConfigurationReference
+        # entries and the xcframework -> framework extraction script phase.
+        run: brew install xcodegen
+
+      - name: Synthesise Xcode project via xcodegen
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          mkdir -p "$PROBE/CN1AIProbe"
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AIProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/"
+          ls -la "$PROBE/CN1AIProbe/"
+
+          cat > "$PROBE/project.yml" <<'YAML'
+          name: CN1AIProbe
+          options:
+            bundleIdPrefix: com.codenameone.cn1ai
+            deploymentTarget:
+              iOS: "14.0"
+          targets:
+            CN1AIProbe:
+              # Static library: archives .o files without linking, so cn1libs
+              # that reference externs supplied by the real build server
+              # (libwhisper.a for whisper, cn1_sd_generate for stable
+              # diffusion, the actual ML Kit framework binaries) still
+              # compile-check successfully.
+              type: library.static
+              platform: iOS
+              sources:
+                - path: CN1AIProbe
+              settings:
+                base:
+                  CLANG_ENABLE_MODULES: YES
+                  CLANG_ENABLE_OBJC_ARC: YES
+                  CODE_SIGNING_ALLOWED: NO
+          YAML
+          cd "$PROBE"
+          xcodegen generate --spec project.yml
+
+      - name: pod install (with integration)
+        if: ${{ matrix.pod != '' }}
+        # With a proper xcodegen-generated pbxproj, CocoaPods can integrate
+        # normally -- it injects the baseConfigurationReference, sets up the
+        # framework-extraction script phase, and produces a workspace that
+        # xcodebuild can build directly.
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          cd "$PROBE"
+          cat > Podfile <<EOF
+          platform :ios, '14.0'
+          target 'CN1AIProbe' do
+            use_frameworks!
+            pod '${{ matrix.pod }}'
+          end
+          EOF
+          pod install --repo-update
+
+      - name: xcodebuild
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}
+          cd "$PROBE"
+          if [ -d "CN1AIProbe.xcworkspace" ]; then
+              xcodebuild -workspace CN1AIProbe.xcworkspace \
+                         -scheme CN1AIProbe \
+                         -configuration Debug \
+                         -sdk iphonesimulator \
+                         -destination 'generic/platform=iOS Simulator' \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
+          else
+              xcodebuild -project CN1AIProbe.xcodeproj \
+                         -scheme CN1AIProbe \
+                         -configuration Debug \
+                         -sdk iphonesimulator \
+                         -destination 'generic/platform=iOS Simulator' \
+                         CODE_SIGNING_ALLOWED=NO \
+                         build
+          fi

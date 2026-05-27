@@ -160,6 +160,23 @@
     </Match>
 
     <!--
+    The AI package and ChatView use a lot of anonymous Runnable /
+    StreamingListener / SuccessCallback subclasses to bridge
+    network-thread events back onto the EDT via callSerially.
+    Refactoring each to a named static inner class would force a
+    field per captured parameter for no real benefit (the implicit
+    this$0 reference is the smaller cost than the explosion of
+    one-shot helper classes the alternative would introduce).
+    -->
+    <Match>
+        <Or>
+            <Class name="~com\.codename1\.ai\..*" />
+            <Class name="~com\.codename1\.components\.Chat.*" />
+        </Or>
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+    </Match>
+
+    <!--
     Map adapters register themselves in the constructor for simplicity.
     Changing this would force developers to use a more obtuse API for no
     valid reason.

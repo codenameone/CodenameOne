@@ -421,6 +421,48 @@ FloatingActionButton {
 }
 FloatingActionButton.pressed { background-color: var(--accent-pressed-color, #d0bcff); }
 
+/* ChatView (com.codename1.components.ChatView) -- mirrors the iOS modern
+   layout but uses Material 3 surfaces. USER bubble = primary container,
+   ASSISTANT = surface variant, SYSTEM = transparent + muted. Rounded
+   bubble corners use plain border-radius (no border) so the CSS
+   compiler doesn't need the CEF-backed rasterizer. */
+ChatView { background-color: #fffbfe; padding: 0; margin: 0; }
+ChatViewMessages { background-color: #fffbfe; padding: 1mm; margin: 0; }
+ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleUser {
+    background-color: var(--accent-container-color, #eaddff);
+    color: var(--accent-on-container-color, #21005d);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleAssistant {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleSystem {
+    background-color: transparent;
+    color: #79747e;
+    padding: 1mm 2mm;
+    margin: 0.5mm 0;
+}
+ChatBubbleText { cn1-derive: Label; background-color: transparent; padding: 0; margin: 0; }
+ChatTypingIndicator { background-color: transparent; color: #79747e; padding: 1mm 3mm; margin: 0; }
+ChatInput { background-color: #fffbfe; padding: 1mm 2mm; margin: 0; }
+ChatInputField {
+    cn1-derive: TextField;
+    background-color: #f3edf7;
+    padding: 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: 3mm;
+}
+ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; border-radius: 3mm; }
+ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+
 Separator { background-color: #cac4d0; padding: 0; margin: 0; }
 PopupContent {
     background-color: #e6e0e9;
@@ -514,6 +556,16 @@ PopupContent {
 
     FloatingActionButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }
     FloatingActionButton.pressed { background-color: var(--accent-color-dark, #d0bcff); }
+
+    ChatView { background-color: #141218; }
+    ChatViewMessages { background-color: #141218; }
+    ChatBubbleUser { background-color: var(--accent-container-color-dark, #4f378b); color: var(--accent-on-container-color-dark, #eaddff); }
+    ChatBubbleAssistant { background-color: #2b2930; color: #e6e0e9; }
+    ChatBubbleSystem { color: #938f99; }
+    ChatBubbleText { color: #e6e0e9; background-color: transparent; }
+    ChatTypingIndicator { color: #938f99; }
+    ChatInput { background-color: #141218; }
+    ChatInputField { background-color: #1d1b20; color: #e6e0e9; border-radius: 3mm; }
 
     Separator { background-color: #49454f; }
 }

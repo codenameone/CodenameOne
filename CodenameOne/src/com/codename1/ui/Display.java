@@ -5369,6 +5369,44 @@ public final class Display extends CN1Constants {
         return impl.createMediaRecorder(path, mimeType);
     }
 
+    /// Whether [com.codename1.media.SpeechRecognizer] is implemented
+    /// on the current platform. The user may still deny mic / speech
+    /// permission at call time even when this returns true.
+    public boolean isSpeechRecognitionSupported() {
+        return impl.speechRecognitionIsSupported();
+    }
+
+    /// Begins a speech-recognition session. See
+    /// [com.codename1.media.SpeechRecognizer#recognize] for the
+    /// callable surface; this hook is the direct delegation point
+    /// that platform ports override.
+    public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
+                                       com.codename1.media.RecognitionCallback callback) {
+        impl.startSpeechRecognition(options, callback);
+    }
+
+    public void stopSpeechRecognition() {
+        impl.stopSpeechRecognition();
+    }
+
+    /// Whether [com.codename1.media.TextToSpeech] is implemented on
+    /// the current platform.
+    public boolean isTextToSpeechSupported() {
+        return impl.textToSpeechIsSupported();
+    }
+
+    public void textToSpeechSpeak(String text, com.codename1.media.TtsOptions options) {
+        impl.textToSpeechSpeak(text, options);
+    }
+
+    public void textToSpeechStop() {
+        impl.textToSpeechStop();
+    }
+
+    public String[] textToSpeechAvailableVoices() {
+        return impl.textToSpeechAvailableVoices();
+    }
+
     /// Returns the image IO instance that allows scaling image files.
     ///
     /// #### Returns

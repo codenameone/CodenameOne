@@ -179,6 +179,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),
+            // ChatView (new AI UI primitive). Renders an assistant
+            // conversation + typing indicator so the iOS Modern and
+            // Android Material themes have a baseline for ChatBubbleUser,
+            // ChatBubbleAssistant, ChatBubbleSystem, and ChatTypingIndicator
+            // UIIDs the moment the cn1-ai PR adds them.
+            new ChatViewScreenshotTest(),
+            // ChatInput on its own (attach + voice + send all visible) so
+            // the input-row UIIDs (ChatInput, ChatInputField, ChatSendButton,
+            // ChatAttachButton, ChatVoiceButton) have a baseline independent
+            // of the surrounding ChatView.
+            new ChatInputScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
