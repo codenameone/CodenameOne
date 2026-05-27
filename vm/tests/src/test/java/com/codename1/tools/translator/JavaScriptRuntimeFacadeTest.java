@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavaScriptRuntimeFacadeTest {
@@ -186,7 +187,14 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Graphics should route linear gradients through the shape/gradient adapter");
         assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.fillRadialGradient("),
                 "HTML5Graphics should route radial gradients through the shape/gradient adapter");
-        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.charsWidth("),
+        // ``charsWidth`` was refactored to delegate to ``stringWidth`` via
+        // ``new String(ch, offset, length)`` -- the direct
+        // ``JavaScriptTextMetricsAdapter.charsWidth`` call is gone, but the
+        // measurement still goes through the adapter via ``stringWidth``.
+        // Verify either delegation chain.
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.charsWidth(")
+                        || (html5GraphicsSource.contains("public int charsWidth(")
+                                && html5GraphicsSource.contains("return stringWidth(")),
                 "HTML5Graphics should delegate char measurement to the text metrics adapter");
         assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.stringWidth("),
                 "HTML5Graphics should delegate string measurement to the text metrics adapter");
@@ -214,10 +222,20 @@ class JavaScriptRuntimeFacadeTest {
                 "DrawShape should delegate stroke style mapping to the shared shape path adapter");
         assertTrue(clipShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
                 "ClipShape should delegate path traversal to the shared shape path adapter");
-        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb("),
+        // Delegation may go through either the per-pixel ``readRgbaToArgb``
+        // helper or the native ``readRgbaToArgbBulk`` intrinsic -- either one
+        // counts as "delegating to the image data adapter". The current
+        // HTML5Implementation calls the bulk variant for the host-side
+        // path (see commit c5080d78b for the rationale).
+        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb(")
+                        || html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgbBulk("),
                 "HTML5Implementation should delegate image-data readback packing to the image data adapter");
-        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.writeArgbToRgba("),
-                "HTML5Implementation should delegate image-data writes to the image data adapter");
+        assertTrue(html5Source.contains(".writeArgbBuffer("),
+                "HTML5Implementation should delegate image-data writes through ImageData.writeArgbBuffer "
+                + "(host-side prototype extension in browser_bridge.js) — the worker-side "
+                + "JavaScriptImageDataAdapter.writeArgbToRgba round-trip lost every byte to the "
+                + "Uint8ClampedArray clone optimization in hostResult, see commit 6c6c48330 for the "
+                + "rationale and the diagnosis chain");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveWidth("),
                 "HTML5Implementation.NativeImage should delegate width resolution to the native image adapter");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveHeight("),
@@ -544,10 +562,21 @@ class JavaScriptRuntimeFacadeTest {
         });
         wiringClass.getMethod("registerPeerPointerEvents", elementRegistrarClass, boolean.class, boolean.class, boolean.class, boolean.class, boolean.class, String.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class)
                 .invoke(null, elementRegistrar, true, true, true, true, true, "wheel", new Object(), new Object(), new Object(), new Object(), new Object(), new Object());
-        assertTrue(peerEvents.contains("mousedown:true"));
+        // The peer-pointer wiring intentionally drops legacy ``mousedown`` /
+        // ``mouseup`` registrations: every supported browser ships pointer
+        // events, and registering both fired listeners twice per real click,
+        // causing a stateful dedup race that dropped Dialog OK releases.
+        // See JavaScriptEventWiring.registerPeerPointerEvents and the
+        // bafab5308 fix commentary.
         assertTrue(peerEvents.contains("pointerdown:true"));
+        assertTrue(peerEvents.contains("pointerup:true"));
+        assertTrue(peerEvents.contains("pointercancel:true"));
         assertTrue(peerEvents.contains("hittest:true"));
         assertTrue(peerEvents.contains("wheel:true"));
+        assertFalse(peerEvents.contains("mousedown:true"),
+                "mousedown registration was removed -- pointerdown covers it without the dedup race");
+        assertFalse(peerEvents.contains("mouseup:true"),
+                "mouseup registration was removed -- pointerup covers it without the dedup race");
     }
 
     @Test
@@ -1180,6 +1209,15 @@ class JavaScriptRuntimeFacadeTest {
         Files.write(geomPackageDir.resolve("Shape.java"), (
                 "package com.codename1.ui.geom;\n" +
                 "public interface Shape { PathIterator getPathIterator(); }\n").getBytes(StandardCharsets.UTF_8));
+        // JavaScriptImageDataAdapter now imports Uint8ClampedArray for the
+        // bulk-read native intrinsic added in c5080d78b. Stub the type so the
+        // standalone compile resolves it without pulling in the full
+        // typedarrays package.
+        Path typedArraysPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "html5", "js", "typedarrays"));
+        Files.createDirectories(typedArraysPackageDir);
+        Files.write(typedArraysPackageDir.resolve("Uint8ClampedArray.java"), (
+                "package com.codename1.html5.js.typedarrays;\n" +
+                "public interface Uint8ClampedArray {}\n").getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
         int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
@@ -1189,6 +1227,7 @@ class JavaScriptRuntimeFacadeTest {
                 uiPackageDir.resolve("Stroke.java").toString(),
                 geomPackageDir.resolve("PathIterator.java").toString(),
                 geomPackageDir.resolve("Shape.java").toString(),
+                typedArraysPackageDir.resolve("Uint8ClampedArray.java").toString(),
                 html5PackageDir.resolve("JavaScriptShapePathAdapter.java").toString(),
                 html5PackageDir.resolve("JavaScriptImageDataAdapter.java").toString(),
                 html5PackageDir.resolve("JavaScriptNativeImageAdapter.java").toString()

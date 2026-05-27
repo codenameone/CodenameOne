@@ -2298,7 +2298,10 @@ window.virtualKeyboardDetector = ( function( window, undefined ) {
 
     	try {
 			audio.setAttribute('data-cn1-unlocked', 'true');
-			console.log('Unlocking audio ', audio);
+			// (Removed always-on ``console.log('Unlocking audio', audio)``
+			// -- fires once per <audio> element on every user-gesture
+			// unlock pass and shows up as 5+ duplicate lines in the
+			// initializr console for no diagnostic value.)
 			var testPlay = audio.play();
 			
 			

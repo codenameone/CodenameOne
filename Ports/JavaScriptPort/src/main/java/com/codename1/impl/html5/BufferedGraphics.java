@@ -238,6 +238,28 @@ public class BufferedGraphics extends HTML5Graphics {
         applyTransform();
     }
 
+    @Override
+    public void translateMatrix(double tx, double ty) {
+        // Master added Graphics.translateMatrix in commit 826d60f32 / the
+        // InscribedTriangleGrid test; the framework dispatches to
+        // HTML5Implementation.translateMatrix which delegates to
+        // ((HTML5Graphics) graphics).translateMatrix(...). Without this
+        // override BufferedGraphics inherits HTML5Graphics's translateMatrix,
+        // which mutates the parent class's ``transform`` field -- a
+        // *different* field from the one BufferedGraphics's own
+        // scale/rotate/etc. overrides use. The result: translateMatrix on
+        // the form's graphics silently no-ops as far as queued ops are
+        // concerned, leaving the InscribedTriangleGrid cells anchored at
+        // (0,0) instead of their per-cell column/row pivots. Override here
+        // so the BufferedGraphics-side ``transform`` field receives the
+        // composition and the next applyTransform() submits a SetTransform
+        // op carrying the right matrix.
+        if (transform == null) transform = Transform.makeIdentity();
+        transform.translate((float)tx, (float)ty);
+        setTransformChanged();
+        applyTransform();
+    }
+
     //@Override
     //public void shear(double shx, double shy) {
     //    setTransform(JSAffineTransform.Factory.getShearInstance(shx, shy), false);
