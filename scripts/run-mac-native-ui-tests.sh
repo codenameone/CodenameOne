@@ -253,34 +253,41 @@ fi
 rm_log "App bundle id: ${BUNDLE_IDENTIFIER:-<unknown>}"
 rm_log "App executable: $APP_EXECUTABLE"
 
-# Mac NSLog output goes to the unified log when running as a foreground
-# process from a terminal, but the Codename One screenshot helper (CN1SS)
-# emits the chunked PNG payloads via printf / fprintf to stdout. We
-# capture both stdout and stderr to be safe, and also start a `log
-# stream` predicate filter as a fallback in case the runtime decides to
-# route some lines to os_log only (Catalyst behaviour drifts between SDKs).
+# Mac Catalyst apps need a proper window-server session to keep their
+# UIScene alive. Running the binary directly from a non-interactive shell
+# (which is what the CI runner provides) launches the app outside of any
+# Aqua session; the app gets a few seconds before the OS tears it down,
+# which on CI manifests as an exit before any CN1SS:CHUNK is emitted.
+# Launching via `open -W -n` routes through LaunchServices so the app
+# gets the same session a normal user-launched Mac app would. Stdout is
+# no longer connected to our pipe in that flow, so the unified log
+# becomes the primary capture channel; stdout is best-effort.
 APP_PID=0
 LOG_STREAM_PID=0
+APP_PROCESS_NAME_PATTERN="^${APP_PROCESS_NAME}$"
 cleanup() {
   if [ "$LOG_STREAM_PID" -ne 0 ]; then
     kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
     wait "$LOG_STREAM_PID" 2>/dev/null || true
   fi
+  # Terminate the launched Catalyst app by process name (open -W detaches
+  # the child PID so a direct kill of $APP_PID only ends the `open`
+  # wrapper, not the actual app). pkill -x matches exact name so we
+  # don't accidentally hit a host process.
+  pkill -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || true
+  for _ in 1 2 3 4 5; do
+    pkill -0 -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || break
+    sleep 1
+  done
+  pkill -9 -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || true
   if [ "$APP_PID" -ne 0 ]; then
     kill "$APP_PID" >/dev/null 2>&1 || true
-    # SIGTERM doesn't always reach a Catalyst NSApplication-bridged main
-    # loop quickly; give it 3s then KILL.
-    for _ in 1 2 3; do
-      if ! kill -0 "$APP_PID" >/dev/null 2>&1; then break; fi
-      sleep 1
-    done
-    kill -KILL "$APP_PID" >/dev/null 2>&1 || true
     wait "$APP_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
 
-rm_log "Starting unified log stream (fallback capture)"
+rm_log "Starting unified log stream (primary capture)"
 if [ -n "$BUNDLE_IDENTIFIER" ]; then
   log stream --style compact --level debug \
     --predicate "(subsystem == \"$BUNDLE_IDENTIFIER\") OR (composedMessage CONTAINS \"CN1SS\") OR (eventMessage CONTAINS \"CN1SS\")" \
@@ -293,39 +300,60 @@ fi
 LOG_STREAM_PID=$!
 sleep 1
 
-rm_log "Launching Mac Catalyst app: $APP_EXECUTABLE"
+# Make sure no leftover instance is around from a previous attempt.
+pkill -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || true
+sleep 1
+
+rm_log "Launching Mac Catalyst app via LaunchServices: $APP_BUNDLE_PATH"
 LAUNCH_START=$(date +%s)
+# `open -W -n -F` waits for the app to terminate, forces a fresh
+# instance, and skips state restoration. `--stdout / --stderr` pipe the
+# bundled binary's I/O straight to a file (avoids the `log stream` drop
+# problem that occurs once base64 PNG chunks land in os_log). `--env`
+# forwards CN1SS_OUTPUT_DIR / CN1SS_PREVIEW_DIR into the launched
+# process even though LaunchServices doesn't inherit the parent shell
+# environment.
 (
-  # Per-process environment for the launched binary. CN1SS_OUTPUT_DIR /
-  # CN1SS_PREVIEW_DIR are read by the screenshot helper. Disable the Mac
-  # window restoration so each run starts clean.
-  export CN1SS_OUTPUT_DIR
-  export CN1SS_PREVIEW_DIR
-  export NSWindowRestoresAlerts=0
-  export NSDisableAppNapAssertions=1
-  "$APP_EXECUTABLE" > "$TEST_LOG" 2>&1
+  open -W -n -F \
+       --stdout "$TEST_LOG" \
+       --stderr "$TEST_LOG" \
+       --env "CN1SS_OUTPUT_DIR=$CN1SS_OUTPUT_DIR" \
+       --env "CN1SS_PREVIEW_DIR=$CN1SS_PREVIEW_DIR" \
+       -a "$APP_BUNDLE_PATH"
 ) &
 APP_PID=$!
 LAUNCH_END=$(date +%s)
 echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/mac-test-stats.txt"
+
+# Resolve the actual app PID once LaunchServices has started it. Used
+# only for diagnostics; the wait loop polls log content, not the PID.
+sleep 2
+RESOLVED_APP_PID="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
+if [ -n "$RESOLVED_APP_PID" ]; then
+  rm_log "Mac Catalyst app pid=$RESOLVED_APP_PID"
+else
+  rm_log "Warning: could not resolve pid for $APP_PROCESS_NAME"
+fi
 
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
 START_TIME="$(date +%s)"
 rm_log "Waiting for DeviceRunner completion marker ($END_MARKER) -- timeout ${TIMEOUT_SECONDS}s"
 while true; do
-  if [ -s "$TEST_LOG" ] && grep -q "$END_MARKER" "$TEST_LOG"; then
-    rm_log "Detected completion marker in stdout log"
-    break
-  fi
   if [ -s "$FALLBACK_LOG" ] && grep -q "$END_MARKER" "$FALLBACK_LOG"; then
-    rm_log "Detected completion marker in unified log fallback"
+    rm_log "Detected completion marker in unified log"
     break
   fi
-  # Bail out early if the app crashed (PID gone before marker arrived).
-  if ! kill -0 "$APP_PID" >/dev/null 2>&1; then
-    rm_log "App process exited before completion marker -- check $TEST_LOG"
+  if [ -s "$TEST_LOG" ] && grep -q "$END_MARKER" "$TEST_LOG"; then
+    rm_log "Detected completion marker in `open` stdout fallback"
     break
+  fi
+  # Bail out early if the app process is gone (open -W has returned).
+  if [ "$APP_PID" -ne 0 ] && ! kill -0 "$APP_PID" >/dev/null 2>&1; then
+    if ! pgrep -x "$APP_PROCESS_NAME" >/dev/null 2>&1; then
+      rm_log "App process exited before completion marker -- check $FALLBACK_LOG"
+      break
+    fi
   fi
   NOW="$(date +%s)"
   if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
@@ -368,6 +396,12 @@ APP_PID=0
 
 # Aggregate CN1SS sources in priority order: stdout (richest -- chunked
 # PNGs are emitted there) first, then the unified-log streams.
+# With `open --stdout PATH` the launched Catalyst binary writes printf
+# / fprintf / System.out output (ParparVM routes Java stdout through
+# stdout fd 1) into TEST_LOG. That's a file write, not os_log, so it
+# never loses chunks under load. log stream / log show stay as
+# belt-and-suspenders in case ParparVM ever switches to NSLog-only
+# routing on a future SDK.
 declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG" "SIMLOG:$FALLBACK_LOG" "SIMLOG:$LATE_FALLBACK_LOG")
 
 # Find the source with the most chunks for diagnostic logging.
@@ -387,7 +421,8 @@ fi
 
 # Pick whichever source has chunks for the test enumeration. The decoder
 # iterates over all sources for each test, so this is just to seed
-# TEST_NAMES.
+# TEST_NAMES. TEST_LOG (open --stdout) is the primary capture; the
+# unified log only catches lines if `open --stdout` ever fails to fd 1.
 PRIMARY_LOG="$TEST_LOG"
 if [ "${LOG_CHUNKS:-0}" = "0" ]; then
   if [ "${FALLBACK_CHUNKS:-0}" != "0" ]; then PRIMARY_LOG="$FALLBACK_LOG"; else PRIMARY_LOG="$LATE_FALLBACK_LOG"; fi
