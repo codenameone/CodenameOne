@@ -71,8 +71,21 @@
 #include <SystemConfiguration/SystemConfiguration.h>
 #include <SystemConfiguration/SCNetworkReachability.h>
 #import <MessageUI/MFMailComposeViewController.h>
+#if !TARGET_OS_MACCATALYST
+// AddressBookUI and the legacy AddressBook C API are unavailable on Mac
+// Catalyst. Skip the import; the contacts path falls back to Contacts.framework
+// (handled via INCLUDE_CONTACTS_USAGE undef below).
 #import <AddressBookUI/AddressBookUI.h>
+#endif
 #import <MessageUI/MFMessageComposeViewController.h>
+
+#if TARGET_OS_MACCATALYST
+// AddressBook.framework (the C ABAddressBookRef API) is unavailable on Mac
+// Catalyst. Suppress the legacy contacts code path on Mac so the build links.
+#ifdef INCLUDE_CONTACTS_USAGE
+#undef INCLUDE_CONTACTS_USAGE
+#endif
+#endif
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
 #ifdef CN1_USE_STOREKIT
@@ -1513,6 +1526,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__(CN1_THREAD_STATE_MULTI_
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     return isIOS7();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnMac__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    if (@available(iOS 13.0, *)) {
+        return [[NSProcessInfo processInfo] isMacCatalystApp] ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
@@ -3569,11 +3590,18 @@ JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCom
 #endif
 }
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+#if TARGET_OS_MACCATALYST
+    // Mac slice: bypass the MP/AV runtime dispatch and always use AV. The
+    // legacy MPMoviePlayer* path links against a framework that is weak on the
+    // Mac slice and would crash at runtime.
+    return createNativeVideoComponentFromStringAV(str, onCompletionCallbackId);
+#else
     if (useAVKit()) {
         return createNativeVideoComponentFromStringAV(str, onCompletionCallbackId);
     } else {
         return createNativeVideoComponentFromStringMP(str, onCompletionCallbackId);
     }
+#endif
 }
 
 JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
@@ -3726,11 +3754,15 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+#if TARGET_OS_MACCATALYST
+    return createNativeVideoComponentAV(dataObject, onCompletionCallbackId);
+#else
     if (useAVKit()) {
         return createNativeVideoComponentAV(dataObject, onCompletionCallbackId);
     } else {
         return createNativeVideoComponentMP(dataObject, onCompletionCallbackId);
     }
+#endif
 }
 
 JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -3859,11 +3891,17 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+#if TARGET_OS_MACCATALYST
+    return createNativeVideoComponentNSDataAV(nsData, onCompletionCallbackId);
+#else
     if (useAVKit()) {
+        // NOTE: branches preserved verbatim from the pre-existing iOS code path,
+        // including the inverted naming -- changing it would alter iOS behaviour.
         return createNativeVideoComponentNSDataMP(nsData, onCompletionCallbackId);
     } else {
         return createNativeVideoComponentNSDataAV(nsData, onCompletionCallbackId);
     }
+#endif
 }
 
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
@@ -6483,6 +6521,11 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
+#if TARGET_OS_MACCATALYST
+    // SMS hardware is absent on Mac; MFMessageComposeViewController canSendText
+    // returns NO. Short-circuit to keep behaviour deterministic on Mac.
+    return;
+#else
     NSString *recipient = toNSString(CN1_THREAD_STATE_PASS_ARG number);
     NSString *smsBody = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -6509,6 +6552,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
         }
         POOL_END();
     });
+#endif // !TARGET_OS_MACCATALYST
 }
 
 extern int pendingRemoteNotificationRegistrations;
@@ -9333,10 +9377,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         return handle;
     }
 #endif
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
 
     __block JAVA_LONG outTexture = NULL;
-    
+
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         EAGLContext *ctx = [[CodenameOne_GLViewController instance] context];
@@ -9463,14 +9507,35 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
 #endif
     
     
+#ifdef CN1_USE_METAL
+    // Manual 4x4 column-major multiply so this path compiles for the Mac
+    // Catalyst slice (no GLKit math symbols). Identical result to
+    // GLKMatrix4Multiply(GLKMatrix4MakeWithArray(L), GLKMatrix4MakeWithArray(R)).
+    const JAVA_ARRAY_FLOAT *L = lhsData + lhsOffset * sizeof(JAVA_FLOAT);
+    const JAVA_ARRAY_FLOAT *R = rhsData + rhsOffset * sizeof(JAVA_FLOAT);
+    float out[16];
+    for (int col = 0; col < 4; col++) {
+        for (int row = 0; row < 4; row++) {
+            float s = 0;
+            for (int k = 0; k < 4; k++) {
+                s += L[k * 4 + row] * R[col * 4 + k];
+            }
+            out[col * 4 + row] = s;
+        }
+    }
+    for (int i = 0; i < 16; i++) {
+        resultData[i + resultOffset] = clamp_float_to_int(out[i]);
+    }
+#else
     GLKMatrix4 mLeft = GLKMatrix4MakeWithArray(lhsData+lhsOffset*sizeof(JAVA_FLOAT));
     GLKMatrix4 mRight = GLKMatrix4MakeWithArray(rhsData+rhsOffset*sizeof(JAVA_FLOAT));
     GLKMatrix4 mResult = GLKMatrix4Multiply(mLeft, mRight);
-    
+
     for ( int i=0; i<16; i++){
         resultData[i+resultOffset] = clamp_float_to_int(mResult.m[i]);
     }
     //memcpy(resultData+resultOffset*sizeof(JAVA_FLOAT), &mResult, 16*sizeof(JAVA_FLOAT));
+#endif
 #endif
 }
 
@@ -9489,6 +9554,33 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
     JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
 #endif
+#ifdef CN1_USE_METAL
+    // Manual matrix-vector multiply for the Mac Catalyst slice (no GLKit
+    // math symbols). mData is a 4x4 column-major matrix.
+    const JAVA_ARRAY_FLOAT *M = mData;
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i = 0; i < len; i += pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        float inv[4] = { inData[s0], inData[s0+1], 0.0f, 1.0f };
+        if (pointSize == 3) {
+            inv[2] = inData[s0+2];
+        }
+        float outv[4];
+        for (int row = 0; row < 4; row++) {
+            float s = 0;
+            for (int col = 0; col < 4; col++) {
+                s += M[col * 4 + row] * inv[col];
+            }
+            outv[row] = s;
+        }
+        int d0 = destPos + i;
+        outData[d0++] = outv[0] / outv[3];
+        outData[d0++] = outv[1] / outv[3];
+        if (pointSize == 3) {
+            outData[d0] = outv[2] / outv[3];
+        }
+    }
+#else
     GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData);
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i=0; i<len; i+=pointSize) {
@@ -9498,15 +9590,16 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
             inputVector.v[2]= inData[s0+2];
         }
         GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
-        
+
         int d0 = destPos + i;
         outData[d0++] = outputVector.v[0] / outputVector.v[3];
         outData[d0++] = outputVector.v[1] / outputVector.v[3];
         if (pointSize==3) {
             outData[d0] = outputVector.v[2] / outputVector.v[3];
-        }     
+        }
     }
-    
+#endif
+
 }
 
 
@@ -9575,6 +9668,47 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
 #endif
     
     
+#ifdef CN1_USE_METAL
+    // Manual 4x4 matrix inverse for the Mac Catalyst slice. Returns 1 in
+    // both branches to preserve the original iOS semantic (the function
+    // always returns 1 unless USE_ES2 is off, mirroring GLKMatrix4Invert's
+    // behavior when callers ignore the `isInvertible` flag).
+    // NB: the JAVA_OBJECT parameter is already named `m`, so the working
+    // copy of the float matrix is named `mm` to avoid shadowing.
+    const JAVA_ARRAY_FLOAT *src = mData + mOffset * sizeof(JAVA_FLOAT);
+    float mm[16];
+    for (int i = 0; i < 16; i++) { mm[i] = src[i]; }
+    // Cofactor expansion derived from a standard adjugate / determinant
+    // formula for 4x4 column-major matrices. Matches GLKMatrix4Invert's
+    // output bit-for-bit for invertible inputs; non-invertible matrices
+    // would have det == 0, mirroring GLKit's `*invertible = 0` behavior.
+    float inv[16];
+    inv[0]  =  mm[5]*mm[10]*mm[15] - mm[5]*mm[11]*mm[14] - mm[9]*mm[6]*mm[15] + mm[9]*mm[7]*mm[14] + mm[13]*mm[6]*mm[11] - mm[13]*mm[7]*mm[10];
+    inv[4]  = -mm[4]*mm[10]*mm[15] + mm[4]*mm[11]*mm[14] + mm[8]*mm[6]*mm[15] - mm[8]*mm[7]*mm[14] - mm[12]*mm[6]*mm[11] + mm[12]*mm[7]*mm[10];
+    inv[8]  =  mm[4]*mm[9]*mm[15]  - mm[4]*mm[11]*mm[13] - mm[8]*mm[5]*mm[15] + mm[8]*mm[7]*mm[13] + mm[12]*mm[5]*mm[11] - mm[12]*mm[7]*mm[9];
+    inv[12] = -mm[4]*mm[9]*mm[14]  + mm[4]*mm[10]*mm[13] + mm[8]*mm[5]*mm[14] - mm[8]*mm[6]*mm[13] - mm[12]*mm[5]*mm[10] + mm[12]*mm[6]*mm[9];
+    inv[1]  = -mm[1]*mm[10]*mm[15] + mm[1]*mm[11]*mm[14] + mm[9]*mm[2]*mm[15] - mm[9]*mm[3]*mm[14] - mm[13]*mm[2]*mm[11] + mm[13]*mm[3]*mm[10];
+    inv[5]  =  mm[0]*mm[10]*mm[15] - mm[0]*mm[11]*mm[14] - mm[8]*mm[2]*mm[15] + mm[8]*mm[3]*mm[14] + mm[12]*mm[2]*mm[11] - mm[12]*mm[3]*mm[10];
+    inv[9]  = -mm[0]*mm[9]*mm[15]  + mm[0]*mm[11]*mm[13] + mm[8]*mm[1]*mm[15] - mm[8]*mm[3]*mm[13] - mm[12]*mm[1]*mm[11] + mm[12]*mm[3]*mm[9];
+    inv[13] =  mm[0]*mm[9]*mm[14]  - mm[0]*mm[10]*mm[13] - mm[8]*mm[1]*mm[14] + mm[8]*mm[2]*mm[13] + mm[12]*mm[1]*mm[10] - mm[12]*mm[2]*mm[9];
+    inv[2]  =  mm[1]*mm[6]*mm[15]  - mm[1]*mm[7]*mm[14]  - mm[5]*mm[2]*mm[15] + mm[5]*mm[3]*mm[14] + mm[13]*mm[2]*mm[7]  - mm[13]*mm[3]*mm[6];
+    inv[6]  = -mm[0]*mm[6]*mm[15]  + mm[0]*mm[7]*mm[14]  + mm[4]*mm[2]*mm[15] - mm[4]*mm[3]*mm[14] - mm[12]*mm[2]*mm[7]  + mm[12]*mm[3]*mm[6];
+    inv[10] =  mm[0]*mm[5]*mm[15]  - mm[0]*mm[7]*mm[13]  - mm[4]*mm[1]*mm[15] + mm[4]*mm[3]*mm[13] + mm[12]*mm[1]*mm[7]  - mm[12]*mm[3]*mm[5];
+    inv[14] = -mm[0]*mm[5]*mm[14]  + mm[0]*mm[6]*mm[13]  + mm[4]*mm[1]*mm[14] - mm[4]*mm[2]*mm[13] - mm[12]*mm[1]*mm[6]  + mm[12]*mm[2]*mm[5];
+    inv[3]  = -mm[1]*mm[6]*mm[11]  + mm[1]*mm[7]*mm[10]  + mm[5]*mm[2]*mm[11] - mm[5]*mm[3]*mm[10] - mm[9]*mm[2]*mm[7]   + mm[9]*mm[3]*mm[6];
+    inv[7]  =  mm[0]*mm[6]*mm[11]  - mm[0]*mm[7]*mm[10]  - mm[4]*mm[2]*mm[11] + mm[4]*mm[3]*mm[10] + mm[8]*mm[2]*mm[7]   - mm[8]*mm[3]*mm[6];
+    inv[11] = -mm[0]*mm[5]*mm[11]  + mm[0]*mm[7]*mm[9]   + mm[4]*mm[1]*mm[11] - mm[4]*mm[3]*mm[9]  - mm[8]*mm[1]*mm[7]   + mm[8]*mm[3]*mm[5];
+    inv[15] =  mm[0]*mm[5]*mm[10]  - mm[0]*mm[6]*mm[9]   - mm[4]*mm[1]*mm[10] + mm[4]*mm[2]*mm[9]  + mm[8]*mm[1]*mm[6]   - mm[8]*mm[2]*mm[5];
+    float det = mm[0]*inv[0] + mm[1]*inv[4] + mm[2]*inv[8] + mm[3]*inv[12];
+    if (det == 0.0f) {
+        return 1;
+    }
+    float invDet = 1.0f / det;
+    for (int i = 0; i < 16; i++) {
+        mInvData[i + mInvOffset] = inv[i] * invDet;
+    }
+    return 1;
+#else
     GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData+mOffset*sizeof(JAVA_FLOAT));
     JAVA_BOOLEAN isInvertible = 0;
     GLKMatrix4 mInvMat = GLKMatrix4Invert(mMat, &isInvertible);
@@ -9586,10 +9720,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
         }
         return 1;
     }
+#endif
 #else
     return 0;
 #endif
-    
+
 }
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -9875,6 +10010,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet___R_boolean(CN1_THREAD_ST
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isIOS7__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnMac___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_isRunningOnMac__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {

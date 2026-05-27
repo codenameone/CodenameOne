@@ -150,6 +150,7 @@ public final class IOSNative {
 
     native boolean isTablet();
     native boolean isIOS7();
+    native boolean isRunningOnMac();
     
     native void setImageName(long nativeImage, String name);
     

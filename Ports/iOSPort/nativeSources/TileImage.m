@@ -29,6 +29,7 @@
 
 
 #ifdef USE_ES2
+#ifndef CN1_USE_METAL
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -88,10 +89,10 @@ static GLuint getOGLProgram(){
         GLErrorLog;
         vertexCoordAtt = glGetAttribLocation(program, "aVertexCoord");
         GLErrorLog;
-        
+
         textureCoordAtt = glGetAttribLocation(program, "aTextureRGBACoord");
         GLErrorLog;
-       
+
         modelViewMatrixUniform = glGetUniformLocation(program, "uModelViewMatrix");
         GLErrorLog;
         projectionMatrixUniform = glGetUniformLocation(program, "uProjectionMatrix");
@@ -102,16 +103,17 @@ static GLuint getOGLProgram(){
         GLErrorLog;
         colorUniform = glGetUniformLocation(program, "uColor");
         GLErrorLog;
-        
-        
+
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         GLErrorLog;
-        
+
 
     }
     return program;
 }
 
+#endif // !CN1_USE_METAL
 #endif
 
 GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
@@ -158,7 +160,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
         }
         return;
     }
-#endif
+#else
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
@@ -292,6 +294,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
+#endif // !CN1_USE_METAL
 
 }
 

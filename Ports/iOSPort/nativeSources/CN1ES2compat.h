@@ -43,6 +43,10 @@ enum CN1GLenum {
 };
 
 #ifdef USE_ES2
+// On Mac Catalyst the GLKit/OpenGLES headers resolve to stub headers under
+// macCatalystStubs/ via HEADER_SEARCH_PATHS[sdk=macosx*] (set by
+// IPhoneBuilder when macNative.enabled=true). On iOS the real SDK headers
+// are picked up.
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/gl.h>
 #import "ExecutableOp.h"

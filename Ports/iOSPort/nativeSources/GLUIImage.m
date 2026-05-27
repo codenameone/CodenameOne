@@ -56,6 +56,13 @@ extern int nextPowerOf2(int val);
 }
 
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
+#ifdef CN1_USE_METAL
+    // Metal builds never sample via GL texture handles; DrawImage / TileImage
+    // route through getMTLTexture instead. Return 0 so the GL helpers are
+    // preprocessed away and the Mac Catalyst slice can link without GL
+    // function symbols.
+    return 0;
+#else
     if(textureName == 0) {
         textureWidth = texWidth;
         textureHeight = texHeight;
@@ -87,14 +94,14 @@ extern int nextPowerOf2(int val);
         int h = texHeight;//(int)img.size.height;
         int p2w = nextPowerOf2(w);
         int p2h = nextPowerOf2(h);
-        
+
         if (p2w > GL_MAX_TEXTURE_SIZE) {
             NSLog(@"Warning: Trying to create texture with width %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2w, GL_MAX_TEXTURE_SIZE);
         }
         if (p2h > GL_MAX_TEXTURE_SIZE) {
             NSLog(@"Warning: Trying to create texture with height %d which exceeds the max texture size %d.  This will fail, and image will appear black.", p2h, GL_MAX_TEXTURE_SIZE);
         }
-        
+
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
         void* imageData = malloc(p2h * p2w * 4);
         CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
@@ -111,7 +118,7 @@ extern int nextPowerOf2(int val);
         GLErrorLog;
         CGContextRelease(context);
         GLErrorLog;
-        
+
         glBindTexture(GL_TEXTURE_2D, 0);
         GLErrorLog;
         free(imageData);
@@ -123,6 +130,7 @@ extern int nextPowerOf2(int val);
         }
     }
     return textureName;
+#endif // !CN1_USE_METAL
 }
 
 -(void)setImage:(UIImage*)i {
@@ -143,6 +151,7 @@ extern int nextPowerOf2(int val);
     [mtlTexture release];
     mtlTexture = nil;
 #endif
+#ifndef CN1_USE_METAL
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -158,6 +167,7 @@ extern int nextPowerOf2(int val);
             });
         }
     }
+#endif // !CN1_USE_METAL
 }
 
 -(void)setName:(NSString*)s {
@@ -222,6 +232,7 @@ extern int nextPowerOf2(int val);
         [name release];
 #endif
     }
+#ifndef CN1_USE_METAL
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -237,6 +248,7 @@ extern int nextPowerOf2(int val);
             });
         }
     }
+#endif // !CN1_USE_METAL
 #ifdef CN1_USE_METAL
     // Both ivars hold a +1 MTLTexture retain (newTextureWithDescriptor /
     // CN1MetalTextureFromUIImage both return owned references). Without

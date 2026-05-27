@@ -41,12 +41,52 @@ float currentRotateY = 1;
 #ifdef USE_ES2
     m = [SetTransform currentTransform];
     float a = angle * M_PI / 180.0;
+#ifdef CN1_USE_METAL
+    // GLKMatrix4Translate / GLKMatrix4Rotate are inline GLKit math
+    // helpers that the Mac Catalyst stub headers don't provide. Inline
+    // the equivalent column-major matrix multiplies so the math is
+    // identical to the GL path without depending on GLKit symbols.
+    // Step 1: m = m * Translate(x, y, 0)
+    //   New columns: c0,c1,c2 unchanged; c3' = c3 + x*c0 + y*c1.
+    {
+        GLKMatrix4 r = m;
+        for (int i = 0; i < 4; i++) {
+            r.m[3*4 + i] = m.m[3*4 + i] + ((float)x) * m.m[0*4 + i]
+                                        + ((float)y) * m.m[1*4 + i];
+        }
+        m = r;
+    }
+    // Step 2: m = m * Rotate(a, 0, 0, 1). Z-axis rotation: only the
+    //   first two columns rotate; columns 2 and 3 are unchanged.
+    //   c0' =  c0*cos(a) + c1*sin(a)
+    //   c1' = -c0*sin(a) + c1*cos(a)
+    {
+        float ca = cosf(a);
+        float sa = sinf(a);
+        GLKMatrix4 r = m;
+        for (int i = 0; i < 4; i++) {
+            r.m[0*4 + i] =  m.m[0*4 + i] * ca + m.m[1*4 + i] * sa;
+            r.m[1*4 + i] = -m.m[0*4 + i] * sa + m.m[1*4 + i] * ca;
+        }
+        m = r;
+    }
+    // Step 3: m = m * Translate(-x, -y, 0). Same as step 1, signs flipped.
+    {
+        GLKMatrix4 r = m;
+        for (int i = 0; i < 4; i++) {
+            r.m[3*4 + i] = m.m[3*4 + i] + (-(float)x) * m.m[0*4 + i]
+                                        + (-(float)y) * m.m[1*4 + i];
+        }
+        m = r;
+    }
+#else
     m = GLKMatrix4Translate(m, x, y, 0);
     m = GLKMatrix4Rotate(m, a, 0, 0, 1);
     m = GLKMatrix4Translate(m, -x, -y, 0);
+#endif
 
     [SetTransform currentTransform:m];
-    
+
 #endif
     return self;
 }

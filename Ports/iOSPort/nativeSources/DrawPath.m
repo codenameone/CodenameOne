@@ -44,10 +44,15 @@
 }
 -(void)execute
 {
-    
+#ifdef CN1_USE_METAL
+    // DrawPath is an ES1 alpha-mask path; on the Metal backend shapes are
+    // rasterised via DrawTextureAlphaMask + CN1Metalcompat. Nothing to do
+    // here in Metal mode. Gating the body also keeps the Mac Catalyst
+    // slice free of OpenGL function symbols.
+#else
     GlColorFromRGB(color, alpha);
     JAVA_INT outputBounds[4];
-    
+
     Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
     if ( outputBounds[2] < 0 || outputBounds[3] < 0 ){
         return;
@@ -56,7 +61,7 @@
     JAVA_INT y = min(outputBounds[1], outputBounds[3]);
     JAVA_INT width = outputBounds[2]-outputBounds[0];
     JAVA_INT height = outputBounds[3]-outputBounds[1];
-    
+
     if ( width < 0 ) width = -width;
     if ( height < 0 ) height = -height;
     if (width == 0 || height == 0) {
@@ -74,21 +79,21 @@
         0, 1,
         1, 1,
     };
-    
-    
+
+
     AlphaConsumer ac = {
         x,
         y,
         width,
         height,
     };
-    
+
     jbyte maskArray[ac.width*ac.height];
-    
+
     ac.alphas = (JAVA_BYTE*)&maskArray;
     Renderer_produceAlphas(renderer, &ac);
-    
-    
+
+
     glGenTextures(1, &tex);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -96,11 +101,11 @@
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
+
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    
+
     glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ac.width, ac.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, maskArray);
-    
+
     _glEnableClientState(GL_VERTEX_ARRAY);
     GLErrorLog;
     //_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -122,16 +127,17 @@
     GLErrorLog;
     //_glDisable(GL_TEXTURE_2D);
     GLErrorLog;
-
-    
+#endif // !CN1_USE_METAL
 }
 -(void)dealloc
 {
+#ifndef CN1_USE_METAL
     glDeleteTextures(1, &tex);
+#endif
     Renderer_destroy(renderer);
 #ifndef CN1_USE_ARC
     [super dealloc];
 #endif
-    
+
 }
 @end

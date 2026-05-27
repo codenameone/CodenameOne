@@ -323,7 +323,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return nativeInstance.isTablet();
+        return isDesktop() || nativeInstance.isTablet();
+    }
+
+    @Override
+    public boolean isDesktop() {
+        return nativeInstance.isRunningOnMac();
     }
     
     @Override

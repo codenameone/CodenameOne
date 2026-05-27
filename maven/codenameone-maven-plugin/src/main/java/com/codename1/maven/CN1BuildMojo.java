@@ -711,6 +711,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
     }
 
+    private File getGeneratedMacProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-mac-source");
+    }
+
+    private boolean isMacNativeBuild(Properties props) {
+        return "true".equalsIgnoreCase(props.getProperty("codename1.arg.macNative.enabled", "false"));
+    }
+
     private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
 
@@ -943,9 +951,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
 
+        boolean macNativeBuild = isMacNativeBuild(props);
+
         if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
 
-            File generatedProject = getGeneratedIOSProjectSourceDirectory();
+            File generatedProject = macNativeBuild
+                    ? getGeneratedMacProjectSourceDirectory()
+                    : getGeneratedIOSProjectSourceDirectory();
             getLog().info("Generating Xcode Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -971,7 +983,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         IPhoneBuilder e = new IPhoneBuilder();
         e.setLogger(getLog());
-        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "ios-build");
+        File buildDirectory = new File(tmpProjectDir,
+                "dist" + File.separator + (macNativeBuild ? "mac-build" : "ios-build"));
         e.setBuildDirectory(buildDirectory);
 
         e.setCodenameOneJar(codenameOneJar);
@@ -1035,7 +1048,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
-                File output = getGeneratedIOSProjectSourceDirectory();
+                File output = macNativeBuild
+                        ? getGeneratedMacProjectSourceDirectory()
+                        : getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Xcode Project to "+output);
