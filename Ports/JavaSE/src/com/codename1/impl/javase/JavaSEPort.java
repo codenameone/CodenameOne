@@ -7271,6 +7271,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
+        // Install build-time annotation-framework bootstraps. Each
+        // bootstrap class lives at a fixed FQN under cn1app.* and is
+        // generated only when the project actually uses the
+        // corresponding annotations -- ClassNotFoundException is the
+        // "feature not used" signal. JavaSE is the legitimate place
+        // for Class.forName here (matches the @Route pattern above).
+        for (String bootstrap : new String[] {
+                "cn1app.MapperBootstrap",
+                "cn1app.BinderBootstrap",
+                "cn1app.DaoBootstrap"}) {
+            try {
+                Class.forName(bootstrap).newInstance();
+            } catch (ClassNotFoundException ignored) {
+                // Feature not used by this project.
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+        }
     }
 
     protected void sizeChanged(int w, int h) {

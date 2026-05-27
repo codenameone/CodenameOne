@@ -200,6 +200,7 @@ public final class ClassScanner {
             final int fAccess = access;
             final String fName = name;
             final String fDesc = descriptor;
+            final String fSig = signature;
             final Map<String, AnnotationValues> fAnnotations =
                     new LinkedHashMap<String, AnnotationValues>();
             return new FieldVisitor(API) {
@@ -212,7 +213,7 @@ public final class ClassScanner {
 
                 @Override
                 public void visitEnd() {
-                    fields.add(new FieldInfo(fName, fDesc, fAccess, fAnnotations));
+                    fields.add(new FieldInfo(fName, fDesc, fSig, fAccess, fAnnotations));
                 }
             };
         }
