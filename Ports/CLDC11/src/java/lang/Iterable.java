@@ -34,14 +34,9 @@ public interface Iterable<T> {
     /// An `Iterator` instance.
     Iterator<T> iterator();
 
-    /// Performs the given action for each element of the `Iterable` until all
-    /// elements have been processed or the action throws an exception.
+    /// Performs the given action for each element of the `Iterable`.
+    /// Stubbed in the CLDC11 subset; the actual implementation comes
+    /// from the platform's JDK at runtime.
     default void forEach(Consumer<? super T> action) {
-        if (action == null) {
-            throw new NullPointerException();
-        }
-        for (T t : this) {
-            action.accept(t);
-        }
     }
 }

@@ -434,34 +434,16 @@ public interface List<E> extends Collection<E> {
     /// in the type of the specified array.
     public <T> T[] toArray(T[] array);
 
-    /// Replaces each element of this list with the result of applying the
-    /// operator to that element.
+    /// Replaces each element of this list with the result of applying
+    /// the operator to that element. Stubbed in the CLDC11 subset;
+    /// the actual implementation comes from the platform's JDK at
+    /// runtime.
     default void replaceAll(UnaryOperator<E> operator) {
-        if (operator == null) {
-            throw new NullPointerException();
-        }
-        ListIterator<E> it = listIterator();
-        while (it.hasNext()) {
-            it.set(operator.apply(it.next()));
-        }
     }
 
     /// Sorts this list according to the order induced by the specified
-    /// `Comparator`. All elements in this list must be **mutually
-    /// comparable** using the specified comparator. A `null` comparator sorts
-    /// elements by their natural ordering (each must implement `Comparable`).
-    ///
-    /// The default implementation extracts the list contents to an array,
-    /// sorts the array via `Arrays.sort`, then writes the sorted elements
-    /// back through a `ListIterator`. Implementations may override for
-    /// efficiency.
+    /// `Comparator`. Stubbed in the CLDC11 subset; the actual
+    /// implementation comes from the platform's JDK at runtime.
     default void sort(Comparator<? super E> c) {
-        Object[] a = toArray();
-        Arrays.sort(a, (Comparator) c);
-        ListIterator<E> it = listIterator();
-        for (Object e : a) {
-            it.next();
-            it.set((E) e);
-        }
     }
 }

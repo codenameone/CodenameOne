@@ -15,115 +15,80 @@
  */
 package java.util.concurrent.atomic;
 
-/**
- * Codename One subset implementation of {@code AtomicInteger}. Backed by a
- * monitor on the receiver rather than the JDK's CAS hardware intrinsics --
- * the visible contract (happens-before, CAS semantics) is preserved.
- */
+/// CLDC11 subset stub. Compile-time visible only; the actual runtime
+/// implementation comes from the platform (the Android JDK on Android,
+/// `vm/JavaAPI` on ParparVM, the host JDK in the JavaSE simulator).
 public class AtomicInteger extends Number implements java.io.Serializable {
-    private volatile int value;
 
     public AtomicInteger(int initialValue) {
-        value = initialValue;
     }
 
     public AtomicInteger() {
     }
 
     public final int get() {
-        return value;
+        return 0;
     }
 
     public final void set(int newValue) {
-        value = newValue;
     }
 
     public final void lazySet(int newValue) {
-        value = newValue;
     }
 
     public final int getAndSet(int newValue) {
-        synchronized (this) {
-            int prev = value;
-            value = newValue;
-            return prev;
-        }
+        return 0;
     }
 
     public final boolean compareAndSet(int expect, int update) {
-        synchronized (this) {
-            if (value == expect) {
-                value = update;
-                return true;
-            }
-            return false;
-        }
+        return false;
     }
 
     public final boolean weakCompareAndSet(int expect, int update) {
-        return compareAndSet(expect, update);
+        return false;
     }
 
     public final int getAndIncrement() {
-        synchronized (this) {
-            return value++;
-        }
+        return 0;
     }
 
     public final int getAndDecrement() {
-        synchronized (this) {
-            return value--;
-        }
+        return 0;
     }
 
     public final int getAndAdd(int delta) {
-        synchronized (this) {
-            int prev = value;
-            value += delta;
-            return prev;
-        }
+        return 0;
     }
 
     public final int incrementAndGet() {
-        synchronized (this) {
-            return ++value;
-        }
+        return 0;
     }
 
     public final int decrementAndGet() {
-        synchronized (this) {
-            return --value;
-        }
+        return 0;
     }
 
     public final int addAndGet(int delta) {
-        synchronized (this) {
-            return value += delta;
-        }
-    }
-
-    @Override
-    public String toString() {
-        return Integer.toString(get());
+        return 0;
     }
 
     @Override
     public int intValue() {
-        return get();
+        return 0;
     }
 
     @Override
     public long longValue() {
-        return (long) get();
+        return 0L;
     }
 
     @Override
     public float floatValue() {
-        return (float) get();
+        return 0f;
     }
 
     @Override
     public double doubleValue() {
-        return (double) get();
+        return 0.0;
     }
 }

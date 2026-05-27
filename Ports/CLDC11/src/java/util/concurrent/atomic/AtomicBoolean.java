@@ -15,57 +15,36 @@
  */
 package java.util.concurrent.atomic;
 
-/**
- * Codename One subset implementation of {@code AtomicBoolean}. Backed by a
- * monitor on the receiver rather than the JDK's CAS hardware intrinsics --
- * the visible contract (happens-before, CAS semantics) is preserved.
- */
+/// CLDC11 subset stub. Compile-time visible only; the actual runtime
+/// implementation comes from the platform (the Android JDK on Android,
+/// `vm/JavaAPI` on ParparVM, the host JDK in the JavaSE simulator).
 public class AtomicBoolean implements java.io.Serializable {
-    private volatile boolean value;
 
     public AtomicBoolean(boolean initialValue) {
-        value = initialValue;
     }
 
     public AtomicBoolean() {
     }
 
     public final boolean get() {
-        return value;
+        return false;
     }
 
     public final void set(boolean newValue) {
-        value = newValue;
     }
 
     public final void lazySet(boolean newValue) {
-        value = newValue;
     }
 
     public final boolean getAndSet(boolean newValue) {
-        synchronized (this) {
-            boolean prev = value;
-            value = newValue;
-            return prev;
-        }
+        return false;
     }
 
     public final boolean compareAndSet(boolean expect, boolean update) {
-        synchronized (this) {
-            if (value == expect) {
-                value = update;
-                return true;
-            }
-            return false;
-        }
+        return false;
     }
 
     public final boolean weakCompareAndSet(boolean expect, boolean update) {
-        return compareAndSet(expect, update);
-    }
-
-    @Override
-    public String toString() {
-        return String.valueOf(get());
+        return false;
     }
 }

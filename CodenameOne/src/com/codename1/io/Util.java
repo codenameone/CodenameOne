@@ -1818,6 +1818,21 @@ public final class Util {
         cryptoImpl().secureRandomBytes(out);
     }
 
+    /// Builds the per-platform WebSocket implementation for `parent` by
+    /// delegating to
+    /// [com.codename1.impl.CodenameOneImplementation#createWebSocketImpl].
+    /// Returns `null` when the platform does not ship a WebSocket
+    /// implementation. Used by
+    /// [com.codename1.io.websocket.WebSocket] (which lives in a sibling
+    /// package and cannot reach the package-private impl accessor).
+    public static com.codename1.io.websocket.WebSocketImpl createWebSocketImpl(
+            com.codename1.io.websocket.WebSocket parent) {
+        if (implInstance == null) {
+            return null;
+        }
+        return implInstance.createWebSocketImpl(parent);
+    }
+
     /// AES encryption. See
     /// [com.codename1.impl.CodenameOneImplementation#aesEncrypt] for the
     /// parameter contract. Used by [com.codename1.security.Cipher].
