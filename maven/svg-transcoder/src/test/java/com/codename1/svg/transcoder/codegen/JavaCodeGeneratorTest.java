@@ -115,13 +115,22 @@ public class JavaCodeGeneratorTest {
                 + "<stop offset='1' stop-color='blue'/>"
                 + "</linearGradient></defs>"
                 + "<rect x='0' y='0' width='10' height='10' fill='url(#g1)'/></svg>");
-        // Gradient fills use the setClip(path) + LinearGradientPaint.paint
-        // recipe. iOS Metal currently misrenders these (substitutes a
-        // degenerate polygon clip) -- see SVG-Transcoder.asciidoc; the
-        // Metal port bug is being tracked separately and the screenshot
-        // goldens capture the platform-current behavior.
+        // Gradient fills emit a LinearGradientPaint + a runtime branch on
+        // __p.isRectangle(): rectangular paths use clipRect (which INTERSECTS
+        // with the existing clip), non-rectangular paths still use setClip
+        // (which replaces). The clipRect branch is what lets a rect with an
+        // outer clip-path survive into the gradient body -- before the
+        // branch was added, clipped_badge.svg's rounded outer clip was
+        // wiped by the inner setClip(__p) and the badge rendered as a
+        // sharp-cornered square on every port.
         assertTrue(out.contains("new LinearGradientPaint("));
         assertTrue(out.contains("CycleMethod.NO_CYCLE"));
+        assertTrue("expected runtime branch on __p.isRectangle() in emitted gradient block: " + out,
+                out.contains("if (__p.isRectangle())"));
+        assertTrue("rectangular path branch must clip via clipRect to intersect with the outer clip: " + out,
+                out.contains("g.clipRect("));
+        assertTrue("non-rectangular path branch must still confine the gradient inside the shape: " + out,
+                out.contains("g.setClip(__p);"));
     }
 
     @Test

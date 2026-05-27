@@ -155,18 +155,56 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
                 // showing, so the wheels would stay on "today" and the
                 // screenshot diff would fail any day other than April 11.
                 picker.setDate(fixedDate);
+                // setDate -> currentSpinner.setValue rebuilds the wheels'
+                // ListModels and snaps each scroller to the new selected
+                // index, but neither setListModel nor the snap calls
+                // revalidate() on the popup container. Without an explicit
+                // pump, the wheels reach the right scrollY but the
+                // surrounding tick rows are still laid out for the
+                // pre-setDate model (visible as off-by-one row offsets in
+                // the screenshot diff) until the next user interaction.
+                // PopupButtonActionListener does this revalidate+repaint
+                // for button-driven setDate paths; the screenshot test
+                // calls setDate directly so we have to drive it here.
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    current.revalidate();
+                    current.repaint();
+                }
                 // Second wait: give the wheels a couple of frames to settle
-                // at the new month/day/year before snapping the PNG.
+                // at the new month/day/year before the capture chain below.
                 UITimer.timer(400, false, form, new Runnable() {
                     @Override
                     public void run() {
-                        Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
+                        // Three nested callSerially hops before capture so
+                        // at least three EDT paint cycles (and on iOS Metal
+                        // three CAMetalLayer presents) land between the
+                        // settle timer and cn1_captureView's
+                        // afterScreenUpdates:NO grab. Same pattern as
+                        // DualAppearanceBaseTest where the previous frame's
+                        // pixels were lingering in the front buffer.
+                        Display.getInstance().callSerially(new Runnable() {
                             @Override
                             public void run() {
-                                picker.stopEditing(new Runnable() {
+                                Display.getInstance().callSerially(new Runnable() {
                                     @Override
                                     public void run() {
-                                        runVariantsFrom(index + 1);
+                                        Display.getInstance().callSerially(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(variant.imageName, new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        picker.stopEditing(new Runnable() {
+                                                            @Override
+                                                            public void run() {
+                                                                runVariantsFrom(index + 1);
+                                                            }
+                                                        });
+                                                    }
+                                                });
+                                            }
+                                        });
                                     }
                                 });
                             }

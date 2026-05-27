@@ -613,12 +613,18 @@ public final class JavaCodeGenerator {
         fracs.append("}");
         cols.append("}");
 
-        // Gradient fills on iOS Metal currently misrender because
-        // setClip(non-rect Shape) substitutes a degenerate polygon for
-        // arc-decomposed paths -- the gradient ends up shaped like a
-        // triangle. That is being tracked as a Metal port bug; the
-        // transcoder emits the simple setClip + LinearGradientPaint.paint
-        // recipe and the screenshot goldens capture the current behavior.
+        // Confining the gradient to the shape: setClip(__p) REPLACES the
+        // current clip, which wipes any outer clip-path the enclosing
+        // element already set (clipped_badge.svg's rounded clipPath was
+        // erased here -- the badge rendered as a sharp-cornered square).
+        // For a rectangular __p the bounds are the shape, so clipRect on
+        // the bounds intersects with the existing clip and the rounded
+        // outer clip survives. For non-rectangular __p (circle / ellipse
+        // / path), setClip is still needed to confine the gradient inside
+        // the shape -- the runtime branch on __p.isRectangle() picks the
+        // right one. Side effect: a rect with an outer clipPath now
+        // renders the gradient inside the clipped region instead of the
+        // bounding box.
         line("{");
         indent++;
         line("float[] __b = new float[4];");
@@ -647,7 +653,17 @@ public final class JavaCodeGenerator {
         line("g.pushClip();");
         line("try {");
         indent++;
+        line("if (__p.isRectangle()) {");
+        indent++;
+        line("g.clipRect((int)Math.floor(__bx), (int)Math.floor(__by),");
+        line("        (int)Math.ceil(__bx + __bw) - (int)Math.floor(__bx),");
+        line("        (int)Math.ceil(__by + __bh) - (int)Math.floor(__by));");
+        indent--;
+        line("} else {");
+        indent++;
         line("g.setClip(__p);");
+        indent--;
+        line("}");
         line("__paint.paint(g, __bx, __by, __bw, __bh);");
         indent--;
         line("} finally {");
