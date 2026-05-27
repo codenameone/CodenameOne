@@ -896,10 +896,10 @@ public final class URLImage extends EncodedImage {
             @Override
             public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
                 if (exceptionHandler != null) {
-                    exceptionHandler.onError(URLImage.this, new java.io.IOException(
+                    exceptionHandler.onError(URLImage.this, new IOException(
                             "Image download failed (" + errorCode + "): " + errorMessage));
                 } else {
-                    com.codename1.io.Log.e(new RuntimeException(
+                    Log.e(new RuntimeException(
                             "URLImage download failed (" + errorCode + "): " + errorMessage));
                 }
             }

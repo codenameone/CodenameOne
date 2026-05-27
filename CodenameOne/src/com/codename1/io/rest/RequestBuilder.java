@@ -1363,7 +1363,7 @@ public class RequestBuilder {
                 if (m == null) {
                     out = java.util.Collections.emptyList();
                 } else {
-                    out = new java.util.ArrayList<T>(raw.size());
+                    out = new ArrayList<T>(raw.size());
                     for (Object e : raw) {
                         if (e instanceof Map) {
                             Map<String, Object> mm = (Map<String, Object>) e;

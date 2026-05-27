@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 
@@ -381,7 +382,7 @@ public final class MorphTransition extends Transition {
     /// Draws `img` into the `(x, y, w, h)` rectangle. Skips a scaled copy
     /// when the image already happens to be at the target size (cheap
     /// fast-path for the first and last frames of the animation).
-    private static void drawImageScaled(Graphics g, com.codename1.ui.Image img, int x, int y, int w, int h) {
+    private static void drawImageScaled(Graphics g, Image img, int x, int y, int w, int h) {
         if (img.getWidth() == w && img.getHeight() == h) {
             g.drawImage(img, x, y);
         } else {
@@ -402,9 +403,9 @@ public final class MorphTransition extends Transition {
         /// Snapshot-mode capture of `source` at its original bounds, clipped
         /// to its own size. Populated in `MorphTransition#captureSnapshot`
         /// when `snapshotMode == true`; null on the legacy path.
-        com.codename1.ui.Image sourceImage;
+        Image sourceImage;
         /// Snapshot-mode capture of `dest` at its destination-form bounds.
-        com.codename1.ui.Image destImage;
+        Image destImage;
 
         public CC(Component source, Component dest, int duration) {
             this.source = source;
@@ -444,11 +445,11 @@ public final class MorphTransition extends Transition {
     /// outside `(0, 0, width, height)` -- which is exactly the
     /// "off-viewport children don't leak" property the legacy live-paint
     /// path lacked.
-    private static com.codename1.ui.Image captureSnapshot(Component cmp) {
+    private static Image captureSnapshot(Component cmp) {
         int w = Math.max(1, cmp.getWidth());
         int h = Math.max(1, cmp.getHeight());
-        com.codename1.ui.Image img = com.codename1.ui.Image.createImage(w, h, 0);
-        com.codename1.ui.Graphics g = img.getGraphics();
+        Image img = Image.createImage(w, h, 0);
+        Graphics g = img.getGraphics();
         // paintComponent renders the component at its current screen position
         // by default; offset so the top-left of `cmp` lands at (0, 0) of the
         // image buffer. The image's bounds clip outside-of-buffer paints.

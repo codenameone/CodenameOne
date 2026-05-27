@@ -222,7 +222,7 @@ every accepted `@Bindable` class. At app start:
   the binding still resolves after the pass.
 * On **JavaSE** `JavaSEPort#postInit` loads the bootstrap via
   `Class.forName("cn1app.BinderBootstrap")` -- the unobfuscated
-  class-loading path.
+  classloader path.
 
 Projects with no `@Bindable` classes produce no bootstrap; the build
 server probe falls through and the registry stays empty.

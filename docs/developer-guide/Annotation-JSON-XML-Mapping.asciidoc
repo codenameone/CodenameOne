@@ -151,7 +151,7 @@ At app start:
   direct symbol reference stays valid after the pass.
 * On the **JavaSE simulator and desktop run**, `JavaSEPort#postInit`
   loads the bootstrap via `Class.forName("cn1app.MapperBootstrap")`.
-  Class-loading is the legitimate path here -- JavaSE runs unobfuscated
+  The classloader is the legitimate path here -- JavaSE runs unobfuscated
   and the same `Class.forName` pattern is used by the @Route dispatcher.
 
 Projects that ship no `@Mapped` classes produce no bootstrap, the build
