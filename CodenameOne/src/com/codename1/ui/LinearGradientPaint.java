@@ -204,7 +204,7 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         // baked them into `t2.translate(startX + tx, startY + ty)`, then
         // zeroed `g.translate(-tx, -ty)` before `g.setTransform(t2)`. On
         // ports where `isTranslationSupported()` is false (iOS, Android,
-        // JavaSE — every active port today), Graphics already conjugates
+        // JavaSE -- every active port today), Graphics already conjugates
         // setTransform with `T(xTranslate)` so the user matrix operates in
         // local coordinates regardless of prior g.translate; that
         // conjugation re-applies the cell offset at the *screen* level
