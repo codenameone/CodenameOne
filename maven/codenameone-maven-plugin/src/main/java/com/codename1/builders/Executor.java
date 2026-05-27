@@ -2015,4 +2015,22 @@ public abstract class Executor {
         }
         return indent + "new com.codename1.router.generated.Routes();\n";
     }
+
+    /// Stub-source fragment to splice into a generated application stub
+    /// right before `Display.init(...)` to install the build-time-generated
+    /// JSON / XML mapper index, the component binder index, and the SQLite
+    /// dao index in one go. Each call is a direct symbol reference so
+    /// ParparVM iOS / R8 Android rename the call site and the generated
+    /// class together; projects without the corresponding annotations get
+    /// an empty fragment because cn1-core ships a no-op stub for each index
+    /// class that is shadowed by the real one at build time. The constructors
+    /// register the per-class mapper / binder / dao with their respective
+    /// runtime registries.
+    protected static String annotationFrameworksInstallSource(File sourceZip, String indent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(indent).append("new com.codename1.mapping.generated.MappersIndex();\n");
+        sb.append(indent).append("new com.codename1.binding.generated.BindersIndex();\n");
+        sb.append(indent).append("new com.codename1.orm.generated.DaosIndex();\n");
+        return sb.toString();
+    }
 }

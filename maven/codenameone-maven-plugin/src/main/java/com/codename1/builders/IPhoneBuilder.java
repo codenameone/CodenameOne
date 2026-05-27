@@ -1208,6 +1208,7 @@ public class IPhoneBuilder extends Executor {
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
                     + routeDispatcherInstallSource(sourceZip, "        ")
+                    + annotationFrameworksInstallSource(sourceZip, "        ")
                     + "        Display.init(stub);\n"
                     + "    }\n"
                     + "}\n";

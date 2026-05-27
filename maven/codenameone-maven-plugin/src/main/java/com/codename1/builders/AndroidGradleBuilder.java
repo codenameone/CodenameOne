@@ -2844,8 +2844,10 @@ public class AndroidGradleBuilder extends Executor {
         // InstallSource for the conditional emission and obfuscation
         // reasoning.
         String installRoutes = routeDispatcherInstallSource(sourceZip, "        ");
+        String installFrameworks = annotationFrameworksInstallSource(sourceZip, "        ");
 
-        String reinitCode0 = installRoutes + "        AndroidImplementation.startContext(this);\n";
+        String reinitCode0 = installRoutes + installFrameworks
+                + "        AndroidImplementation.startContext(this);\n";
 
         String reinitCode = "Display.init(this);\n";
 

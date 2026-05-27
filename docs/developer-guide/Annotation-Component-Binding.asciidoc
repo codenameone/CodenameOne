@@ -1,0 +1,136 @@
+== Component Binding
+
+[[annotation-binding-section,Annotation Binding Section]]
+The component binding framework wires a model field to the matching
+component in a `Form` or `Container` by name. The Maven plugin generates
+a `Binder` per `@Bindable` class at build time, so the wiring happens
+through direct symbol references -- no reflection, no listener bookkeeping
+in application code.
+
+It is a thin alternative to the imperative `UiBinding` API
+(`com.codename1.properties.UiBinding`). Both can be used together.
+
+=== Annotate the model
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+import com.codename1.binding.BindAttr;
+import com.codename1.properties.Property;
+
+@Bindable
+public class LoginModel {
+
+    @Bind(name = "userField", attr = BindAttr.TEXT)
+    public Property<String, LoginModel> user =
+            new Property<>("user");
+
+    @Bind(name = "passwordField", attr = BindAttr.TEXT)
+    public String password;
+
+    // One-way: the model decides the style, the user never edits it.
+    @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
+    public String bannerStyle;
+
+    @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
+    public boolean remember;
+}
+----
+
+Every `@Bind(name=...)` is looked up against `Component#getName()`,
+walking the container's children recursively until a match is found.
+The default lookup matches GUI-builder names exactly.
+
+==== Attribute kinds
+
+[cols="1,3", options="header"]
+|===
+| `BindAttr`     | Mirrors
+| `TEXT`         | `getText` / `setText` on `Label`, `Button`,
+                   `TextField`, `TextArea`, `SpanLabel`, `SpanButton`.
+                   Two-way for `TextArea` / `TextField`.
+| `UIID`         | `getUIID` / `setUIID`. One-way.
+| `VISIBLE`      | `isVisible` / `setVisible`. One-way.
+| `HIDDEN`       | `isHidden` / `setHidden`. One-way.
+| `ENABLED`      | `isEnabled` / `setEnabled`. One-way.
+| `SELECTED`     | `isSelected` / `setSelected` on `CheckBox`,
+                   `RadioButton`. Two-way.
+| `ICON_NAME`    | Calls `Resources.getGlobalResources().getImage(name)`
+                   and writes the result via `Label#setIcon`. One-way.
+| `NAME`         | `setName`. One-way.
+|===
+
+=== Bind at runtime
+
+[source,java]
+----
+import com.codename1.binding.Binders;
+import com.codename1.binding.Binding;
+
+Form f = (Form) Resources.getGlobalResources().getForm("LoginForm");
+LoginModel model = new LoginModel();
+Binding b = Binders.bind(model, f);
+
+// The two-way bindings push every keystroke / toggle back into the model.
+// Mutate the model and call b.refresh() to update the form.
+model.user.set("alice");
+b.refresh();
+
+// Before submitting:
+b.commit();              // pull non-two-way fields back into the model
+
+// On form dispose:
+b.disconnect();          // remove every installed listener
+----
+
+`Binding` is the handle the binder returns:
+
+[cols="1,3", options="header"]
+|===
+| Method        | Purpose
+| `refresh()`   | Push the current model values into every bound
+                  component. Use after mutating the model outside the
+                  form.
+| `commit()`    | Pull current component values back into the model.
+                  Useful before validating / submitting when none of
+                  the bindings is two-way.
+| `disconnect()`| Remove every listener the binder installed so the
+                  form can be garbage-collected without keeping the
+                  model alive.
+|===
+
+=== POJOs versus Property objects
+
+A `String`, `int`, or `boolean` field is read and written through direct
+field access. A `Property<T, ?>` field is read through `get()` and
+written through `set()` -- so existing `PropertyChangeListener`
+subscribers fire as expected. Both styles can sit on the same class.
+
+=== Validation
+
+The annotation processor fails the build when:
+
+* `@Bind` is applied to a private field (use a `Property` field if you
+  want a real accessor + change notification).
+* `@Bind(name=...)` is empty.
+* The field's static type isn't supported (raw collections, opaque
+  references that aren't `@Bindable` themselves, ...).
+
+Errors are accumulated so a single build run reports every offending
+field at once.
+
+=== How the plumbing works
+
+`cn1:process-annotations` writes one
+`com.codename1.binding.generated.XxxBinder` per `@Bindable` class and a
+single `BindersIndex` whose no-arg constructor registers them. The iOS
+and Android per-build stubs call `new BindersIndex()` before
+`Display.init`, so the registry is ready by the time the application's
+first form opens.
+
+Generated binders never call `Class.forName`; the lookup of the target
+component walks `Container#getComponentAt` directly. The binding
+survives ParparVM / R8 obfuscation because the call sites and the
+generated class are renamed together.

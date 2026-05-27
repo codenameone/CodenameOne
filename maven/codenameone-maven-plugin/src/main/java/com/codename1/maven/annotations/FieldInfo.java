@@ -34,12 +34,15 @@ public final class FieldInfo {
 
     private final String name;
     private final String descriptor;
+    private final String signature;
     private final int access;
     private final Map<String, AnnotationValues> annotations;
 
-    FieldInfo(String name, String descriptor, int access, Map<String, AnnotationValues> annotations) {
+    FieldInfo(String name, String descriptor, String signature, int access,
+              Map<String, AnnotationValues> annotations) {
         this.name = name;
         this.descriptor = descriptor;
+        this.signature = signature;
         this.access = access;
         this.annotations = (annotations == null)
                 ? Collections.<String, AnnotationValues>emptyMap()
@@ -48,6 +51,15 @@ public final class FieldInfo {
 
     public String getName() { return name; }
     public String getDescriptor() { return descriptor; }
+
+    /// The JVM generic-type signature (e.g.
+    /// `Lcom/codename1/properties/Property<Ljava/lang/String;Lfoo/User;>;`)
+    /// when one is recorded in the class file. Null for fields whose static
+    /// type carries no parameterization. Processors that need to inspect
+    /// type arguments (`Property<T>`, `ListProperty<T>`, `List<T>`) parse this
+    /// string; for declarative use the descriptor still wins.
+    public String getSignature() { return signature; }
+
     public int getAccess() { return access; }
 
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
