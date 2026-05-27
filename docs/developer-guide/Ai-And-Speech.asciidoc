@@ -1,0 +1,609 @@
+== AI, Chat UI, and Speech
+
+[[ai-and-speech-section,AI And Speech Section]]
+Codename One ships a portable LLM client, a streaming chat component,
+speech-to-text and text-to-speech APIs, and a family of cn1lib bridges
+that wire ML Kit into iOS and Android builds. All the public surface
+lives next to the rest of the framework, so the simulator, the cloud
+build, and your CI pipeline route everything through the same code
+paths.
+
+This chapter introduces every piece in turn:
+
+* `com.codename1.ai` -- provider-agnostic chat, embeddings, tool calls,
+  and image generation.
+* `com.codename1.components.ChatView` -- a theme-aware chat surface that
+  streams tokens in place.
+* `com.codename1.media.SpeechRecognizer` and
+  `com.codename1.media.TextToSpeech` -- on-device speech-to-text and
+  speech synthesis.
+* `com.codename1.security.SecureStorage` non-prompting overloads --
+  silent reads for secrets the network layer needs on every call, such
+  as LLM API keys.
+* The `cn1-ai-mlkit-*` cn1libs -- ML Kit barcode, document, and face
+  detection bridges with the native build-time scanner already wired up.
+
+NOTE: Each async call in this chapter returns an
+`com.codename1.util.AsyncResource`. Use `.ready(...)` for the success
+path, `.except(...)` for errors, and `.cancel()` to abort an in-flight
+request. The streaming chat call also dispatches deltas through a
+`StreamingListener`; both listener callbacks and `ready` callbacks fire
+on the EDT.
+
+=== The `com.codename1.ai` package
+
+The `LlmClient` class is the single entry point. Static factories return
+a configured client for each supported provider. Every client speaks the
+same `ChatRequest` and `ChatResponse` value types, so the call site does
+not change when you swap providers:
+
+[source,java]
+----
+import com.codename1.ai.*;
+
+// OpenAI (also drives Ollama, vLLM, llama.cpp, and other
+// OpenAI-compatible endpoints).
+LlmClient openai = LlmClient.openai(apiKey);
+
+// Local Ollama on the default port (http://localhost:11434).
+LlmClient ollama = LlmClient.ollama("llama3.2");
+
+// Any OpenAI-compatible endpoint (Together, Groq, Fireworks, vLLM, ...).
+LlmClient together = LlmClient.localOpenAiCompatible(
+        "https://api.together.xyz/v1",
+        apiKey,
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo");
+
+// Scaffolded; native wire format pending. Today these throw a clear
+// error pointing callers at the OpenAI-compatible shim.
+LlmClient anthropic = LlmClient.anthropic(apiKey);
+LlmClient gemini = LlmClient.gemini(apiKey);
+----
+
+The OpenAI client is the fully implemented native client. It also drives
+Ollama, vLLM, and `llama.cpp` because the wire format matches. The
+Anthropic and Gemini factories compile and register, but throw an
+`LlmException` until their native clients land, so route through
+`localOpenAiCompatible` if you need them today.
+
+==== A first chat
+
+`ChatRequest` is a builder. The bare minimum is a model identifier and
+one user message:
+
+[source,java]
+----
+ChatRequest req = ChatRequest.builder()
+        .model("gpt-4o-mini")
+        .addMessage(ChatMessage.system("Reply in haiku."))
+        .addMessage(ChatMessage.user("Describe a Codename One app."))
+        .temperature(0.7f)
+        .maxTokens(200)
+        .build();
+
+openai.chat(req).ready(resp -> {
+    Dialog.show("Reply", resp.getText(), "OK", null);
+}).except(err -> {
+    Log.e(err);
+});
+----
+
+`ChatResponse.getText()` concatenates every text part of the assistant
+message. `getFinishReason()` returns one of `"stop"`, `"length"`,
+`"tool_calls"`, `"content_filter"`, or `"error"`. `getUsage()` returns
+prompt, completion, and total token counts when the provider reports
+them; the fields return -1 when the provider omits them.
+
+==== Streaming tokens
+
+`chatStream(...)` opens an SSE connection and dispatches deltas through
+a `StreamingListener` on the EDT. The returned `AsyncResource` resolves
+to the final aggregated `ChatResponse` when the stream completes;
+calling `cancel()` on the resource closes the underlying socket:
+
+[source,java]
+----
+StringBuilder buffer = new StringBuilder();
+
+openai.chatStream(req, new StreamingListener.Adapter() {
+    @Override
+    public void onContentDelta(String delta) {
+        buffer.append(delta);
+        chatView.appendToLastMessage(delta);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        Log.e(t);
+    }
+}).ready(resp -> {
+    Log.p("Total tokens: " + resp.getUsage().getTotalTokens());
+});
+----
+
+The decoder reassembles fragmented SSE deltas before invoking the
+listener, so `onContentDelta` always receives a complete token chunk.
+Tool-call fragments are reassembled the same way and surfaced through
+`onToolCallDelta(index, id, name, argumentsFragment)`; `name` is non-null
+on the first fragment and `id` is present on the first call.
+
+==== Tool calling
+
+`Tool` describes a callable function with a JSON schema. Pass a
+`ToolHandler` to make it executable; the model can then call the tool
+and the handler returns the JSON result that gets fed back into the
+conversation:
+
+[source,java]
+----
+Tool weather = new Tool(
+        "get_weather",
+        "Return the current weather for a city.",
+        "{\"type\":\"object\",\"properties\":{" +
+            "\"city\":{\"type\":\"string\"}}," +
+            "\"required\":[\"city\"]}",
+        argumentsJson -> {
+            Map<String, Object> args = JsonHelper.parseObject(argumentsJson);
+            return "{\"tempC\": 22, \"city\": \"" + args.get("city") + "\"}";
+        });
+
+ChatRequest req = ChatRequest.builder()
+        .model("gpt-4o-mini")
+        .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
+        .tools(Collections.singletonList(weather))
+        .toolChoice(ToolChoice.AUTO)
+        .build();
+
+openai.chat(req).ready(resp -> {
+    for (ToolCall call : resp.getToolCalls()) {
+        String result = call.execute(Collections.singletonList(weather));
+        // Feed the tool result back as a new turn and call chat() again.
+    }
+});
+----
+
+`ToolChoice` covers the four standard modes:
+
+* `ToolChoice.AUTO` -- the model picks at will (default).
+* `ToolChoice.NONE` -- the model must not call any tool.
+* `ToolChoice.REQUIRED` -- the model must call exactly one tool.
+* `ToolChoice.named("get_weather")` -- force a specific tool.
+
+==== Structured output
+
+Constrain a response to JSON with `ResponseFormat.JSON_OBJECT`. The
+client adds the provider-specific flag, and `ChatResponse.getText()`
+returns a string the runtime can hand to `JSONParser`:
+
+[source,java]
+----
+ChatRequest req = ChatRequest.builder()
+        .model("gpt-4o-mini")
+        .responseFormat(ResponseFormat.JSON_OBJECT)
+        .addMessage(ChatMessage.system(
+            "Return a JSON object with keys city and population."))
+        .addMessage(ChatMessage.user("Tel Aviv"))
+        .build();
+----
+
+==== Multi-modal messages
+
+Attach an image to a user message by adding an `ImagePart`. The part
+accepts either inline bytes plus a MIME type or a remote HTTPS URL:
+
+[source,java]
+----
+ImagePart photo = new ImagePart(receiptBytes, "image/jpeg");
+ChatMessage msg = ChatMessage.userWithImage(
+        "Extract the line items from this receipt.", photo);
+
+ChatRequest req = ChatRequest.builder()
+        .model("gpt-4o")
+        .addMessage(msg)
+        .build();
+----
+
+==== Embeddings
+
+`embed(EmbeddingRequest)` returns one `Embedding` vector per input. Use
+the vectors for semantic search, deduplication, or downstream
+clustering:
+
+[source,java]
+----
+EmbeddingRequest req = EmbeddingRequest.builder()
+        .model("text-embedding-3-small")
+        .addInput("a cat sat on the mat")
+        .addInput("a feline rested on the rug")
+        .build();
+
+openai.embed(req).ready(resp -> {
+    float[] v0 = resp.getData().get(0).getVector();
+    float[] v1 = resp.getData().get(1).getVector();
+    // Compute cosine similarity, persist to Storage, etc.
+});
+----
+
+==== Image generation
+
+`ImageGenerator` mirrors the LLM client shape. The OpenAI factory drives
+DALL-E 3 today; the on-device factory routes through the optional
+`cn1-ai-stablediffusion` cn1lib (when present in the consumer project):
+
+[source,java]
+----
+ImageGenerator gen = ImageGenerator.openai(apiKey);
+GenerateImageRequest req = new GenerateImageRequest(
+        "A pastel watercolor of a Tel Aviv beach at sunset");
+req.setSize("1024x1024");
+req.setQuality("hd");
+
+gen.generate(req).ready(image -> {
+    Label preview = new Label(image);
+    Display.getInstance().getCurrent().add(preview).revalidate();
+});
+----
+
+DALL-E 3 supports `count = 1` only. Larger batches require a different
+underlying model; pass it via `setModel(...)`.
+
+==== Conversation persistence
+
+`ConversationStore` wraps `Storage` to serialize a list of
+`ChatMessage` values to JSON under a named key:
+
+[source,java]
+----
+ConversationStore store = new ConversationStore("chat-history");
+List<ChatMessage> history = store.load();        // empty list on first call
+
+history.add(ChatMessage.user("Hello"));
+ChatResponse resp = openai.chat(
+        ChatRequest.builder().model("gpt-4o-mini").messages(history).build())
+    .get();                                       // blocking helper, EDT-safe
+history.add(resp.getAssistantMessage());
+store.save(history);
+----
+
+`Tokenizer.estimateMessages(history)` returns a rough token count so you
+can trim the oldest turns before the conversation outgrows the model's
+context window.
+
+==== Prompt templates
+
+`PromptTemplate` does simple `{placeholder}` substitution. Unknown
+placeholders pass through unchanged so partially-filled templates are
+safe to log:
+
+[source,java]
+----
+PromptTemplate t = PromptTemplate.of(
+        "Translate the following from {source} to {target}: {text}");
+t.put("source", "English");
+t.put("target", "French");
+t.put("text", "good morning");
+
+ChatMessage user = t.asUser();                    // wraps the rendered string
+----
+
+==== Retry policy
+
+`RetryPolicy.exponentialBackoff()` returns a sensible default (four
+attempts, 500ms initial delay, 30s cap, jitter). Wrap any chat call in a
+retry loop yourself, or attach the policy to a higher-level wrapper.
+`LlmException.getRetryAfterSeconds()` returns the provider's
+`Retry-After` header value when present, or -1, so the policy can honor
+rate-limit hints.
+
+==== Simulator redirect for offline development
+
+The JavaSE simulator pings `localhost:11434` at startup. When Ollama is
+running, the simulator exports the flag `cn1.ai.ollamaDetected=true`. A
+second system property, `cn1.ai.simulatorRedirect`, controls whether the
+simulator transparently routes `LlmClient.openai(...)` calls to the
+local Ollama endpoint instead:
+
+[cols="1,3", options="header"]
+|===
+| Value | Behavior
+
+| `disabled` | The default on a device. Calls go to the configured
+provider, even in the simulator.
+| `auto` | The default in the simulator. If Ollama is reachable, route
+OpenAI calls through it. Otherwise behave like `disabled`.
+| `ollama` | Force redirect to Ollama. Use this in offline-only
+development environments.
+|===
+
+The redirect target is also configurable: `cn1.ai.ollamaUrl` defaults to
+`http://localhost:11434/v1`, and `cn1.ai.ollamaModel` defaults to
+`llama3.2`. Unchanged production code therefore runs offline against a
+local model without any conditional wiring at the call site.
+
+==== Storing the API key
+
+Production builds need somewhere to keep the provider API key. The
+non-prompting `SecureStorage` overloads (added in the same release as
+the AI surface) are designed for this: a single string argument, no
+biometric prompt, return `null` or `false` on platforms that lack
+support:
+
+[source,java]
+----
+SecureStorage store = SecureStorage.getInstance();
+store.set("openai.key", apiKey);                  // returns false when unsupported
+
+String key = store.get("openai.key");             // returns null when absent
+LlmClient client = LlmClient.openai(key);
+----
+
+The biometric-gated overloads (`get(reason, account)`,
+`set(reason, account, value)`, `remove(reason, account)`) remain the
+right choice for credentials a human user authenticates against. Use the
+non-prompting overloads only for secrets the network layer reads on
+every request, where a biometric prompt would be unusable.
+
+=== The `ChatView` component
+
+`ChatView` is a scrollable, theme-aware chat surface that handles the
+list of bubbles, the streaming append, the typing indicator, and the
+input strip in one component. Drop it into a `Form` with a single
+`BorderLayout.CENTER`:
+
+.ChatView mockup
+image::img/chat-view-mockup.svg[ChatView mockup, 360, 640]
+
+The component exposes thread-safe mutators, so background callbacks
+from `chatStream(...)` can mutate the view directly:
+
+[source,java]
+----
+Form chat = new Form("Assistant", new BorderLayout());
+ChatView view = new ChatView();
+chat.add(BorderLayout.CENTER, view);
+
+view.addMessage(ChatMessage.assistant("How can I help?"));
+
+view.setOnSend(e -> {
+    String text = view.getInput().getText();
+    view.getInput().clear();
+    view.addMessage(ChatMessage.user(text));
+    view.setTypingIndicatorVisible(true);
+
+    ChatBubble streaming = view.beginAssistantStream();
+    ChatRequest req = ChatRequest.builder()
+            .model("gpt-4o-mini")
+            .messages(view.getHistory())
+            .build();
+
+    LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
+        @Override public void onContentDelta(String d) {
+            view.appendToLastMessage(d);
+        }
+    }).ready(resp -> view.setTypingIndicatorVisible(false));
+});
+chat.show();
+----
+
+`ChatBubble` and `ChatInput` are public, so subclass them for custom
+rendering. Override `ChatView.createBubble(message)` to swap in a
+custom subclass when the view builds the message list.
+
+==== Theming
+
+`ChatView` exposes the following UIIDs out of the box:
+
+[cols="1,2", options="header"]
+|===
+| UIID | Applies to
+| `ChatView` | The outer container.
+| `ChatViewMessages` | The scrollable message column.
+| `ChatBubbleUser` | The container for a user message.
+| `ChatBubbleAssistant` | The container for an assistant message.
+| `ChatBubbleSystem` | The container for a system message.
+| `ChatBubbleText` | The inner `TextArea` of every bubble.
+| `ChatTypingIndicator` | The animated typing dots.
+| `ChatInput` | The input strip.
+| `ChatInputField` | The text field inside the strip.
+| `ChatSendButton` | The send button.
+| `ChatAttachButton` | The attach button.
+| `ChatVoiceButton` | The voice button.
+|===
+
+Style them from `theme.css` to align with the rest of the app. Hide the
+voice or attach button by leaving its listener unset; the corresponding
+`Button` instance is hidden when no `ActionListener` is registered.
+
+==== One-call binding to an LLM
+
+`LlmChatBinding.bind(view, client, baseRequest)` wires the input bar
+directly to `chatStream(...)`. Every send replays the conversation
+history, dispatches the response into the view, and updates the typing
+indicator. Use it for prototypes, or as a reference implementation when
+you need a custom send pipeline:
+
+[source,java]
+----
+LlmChatBinding.bind(view,
+        LlmClient.openai(apiKey),
+        ChatRequest.builder().model("gpt-4o-mini").build());
+----
+
+=== Speech recognition and TextToSpeech
+
+The new media APIs route through `Display` and into the implementation
+hooks on `CodenameOneImplementation`, so the call surface is identical
+on every platform. The default implementation returns `false` from
+`isSupported()` and is a no-op for `recognize`/`speak`.
+
+==== `SpeechRecognizer`
+
+[source,java]
+----
+import com.codename1.media.*;
+
+if (!SpeechRecognizer.isSupported()) {
+    Dialog.show("Unavailable", "Speech is not supported on this device.",
+                "OK", null);
+    return;
+}
+
+RecognitionOptions opts = new RecognitionOptions()
+        .setLanguageTag("en-US")
+        .setPartialResults(true)
+        .setContinuous(false)
+        .setMaxResults(3);
+
+SpeechRecognizer.recognize(opts, new RecognitionCallback.Adapter() {
+    @Override public void onPartialResult(String transcript) {
+        chatView.getInput().setText(transcript);
+    }
+    @Override public void onResult(String transcript, float confidence,
+                                   String[] alternatives) {
+        chatView.addMessage(ChatMessage.user(transcript));
+    }
+});
+----
+
+iOS uses `SFSpeechRecognizer`, Android uses `android.speech.SpeechRecognizer`,
+and the JavaSE simulator stays unsupported unless the optional
+`cn1-ai-whisper` cn1lib is on the classpath. Call `stop()` to end an
+active session early; partial results stop firing immediately.
+
+==== `TextToSpeech`
+
+[source,java]
+----
+if (TextToSpeech.isSupported()) {
+    TtsOptions opts = new TtsOptions()
+            .setLanguageTag("fr-FR")
+            .setRate(1.0f);
+    TextToSpeech.speak("Bonjour", opts);
+}
+----
+
+iOS uses `AVSpeechSynthesizer`, Android uses
+`android.speech.tts.TextToSpeech`, and the JavaSE simulator falls back
+to `say` on macOS, `espeak` on Linux, and SAPI on Windows.
+`getAvailableVoices()` returns the platform-specific voice identifiers
+when the OS exposes them; `setVoiceId(...)` accepts any of those
+strings, or `null` to use the default voice for the configured
+language.
+
+=== ML Kit cn1libs
+
+Three cn1libs ship with the framework today, each backed by ML Kit on
+both platforms. The build-time scanner picks up the `com.codename1.ai.*`
+class references in your code and injects the matching Pods, Swift
+Packages, Gradle dependencies, `Info.plist` usage strings, and Android
+permissions; you don't edit build hints by hand.
+
+[cols="1,1,2", options="header"]
+|===
+| cn1lib | Public API | Provides
+
+| `cn1-ai-mlkit-barcode` | `BarcodeScanner.scan(byte[])` | Decode QR,
+EAN, Code 128, and the other ML Kit-supported barcode formats from an
+image.
+| `cn1-ai-mlkit-docscan` | `DocumentScanner.scanToFile(byte[])` |
+Capture and crop document photos. On iOS this routes through `VisionKit`
+and on Android through the Google Play Services document scanner.
+| `cn1-ai-mlkit-face` | `FaceDetector.detect(byte[])` | Detect faces and
+return packed `int[]` bounding rectangles (four ints per face: x, y,
+width, height).
+|===
+
+==== Adding a cn1lib
+
+Add the dependency to `common/pom.xml` with `<type>pom</type>` so Maven
+pulls in the per-platform classifier jars:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-ai-mlkit-barcode-lib</artifactId>
+    <version>${cn1.version}</version>
+    <type>pom</type>
+</dependency>
+----
+
+==== Example: Scanning a barcode
+
+[source,java]
+----
+import com.codename1.ai.mlkit.barcode.BarcodeScanner;
+
+Capture.capturePhoto(new ActionListener() {
+    @Override public void actionPerformed(ActionEvent evt) {
+        String path = (String) evt.getSource();
+        try (InputStream in = FileSystemStorage.getInstance().openInputStream(path)) {
+            byte[] bytes = Util.readInputStream(in);
+            BarcodeScanner.scan(bytes).ready(values -> {
+                for (String v : values) {
+                    Log.p("Detected: " + v);
+                }
+            });
+        } catch (IOException ex) {
+            Log.e(ex);
+        }
+    }
+});
+----
+
+==== Example: Face detection
+
+[source,java]
+----
+import com.codename1.ai.mlkit.face.FaceDetector;
+
+FaceDetector.detect(jpegBytes).ready(rects -> {
+    for (int i = 0; i < rects.length; i += 4) {
+        Log.p("Face at (" + rects[i] + "," + rects[i + 1]
+                + ") size " + rects[i + 2] + "x" + rects[i + 3]);
+    }
+});
+----
+
+NOTE: ML Kit barcode and face detection ship as small Pods or Gradle
+dependencies that add a few megabytes to the binary. The document
+scanner depends on Google Play Services on Android; on devices without
+Play Services the call returns an error through `AsyncResource.except`.
+
+==== Putting it all together
+
+The pieces compose well. The following loop captures a photo,
+extracts text with the multi-modal `gpt-4o` model, speaks the result,
+and streams the same text into a `ChatView`:
+
+[source,java]
+----
+Capture.capturePhoto(evt -> {
+    String path = (String) evt.getSource();
+    byte[] bytes = readAllBytes(path);
+    ImagePart img = new ImagePart(bytes, "image/jpeg");
+
+    ChatRequest req = ChatRequest.builder()
+            .model("gpt-4o")
+            .addMessage(ChatMessage.userWithImage(
+                "Describe the photo in one sentence.", img))
+            .build();
+
+    chatView.addMessage(req.getMessages().get(0));
+    ChatBubble streaming = chatView.beginAssistantStream();
+    StringBuilder full = new StringBuilder();
+
+    LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
+        @Override public void onContentDelta(String d) {
+            full.append(d);
+            chatView.appendToLastMessage(d);
+        }
+    }).ready(resp -> {
+        TextToSpeech.speak(full.toString());
+    });
+});
+----
+
+The same code runs unchanged in the simulator when Ollama is detected,
+on Android with the multi-modal native client, and on iOS through the
+cloud build pipeline.
