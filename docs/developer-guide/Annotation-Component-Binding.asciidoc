@@ -164,10 +164,11 @@ public void setName(String name) {
 }
 ----
 
-at every `return` point of the setter. The instrumented setter is
-written back to `target/classes`, replacing the original. Application
-code that calls `model.setName(...)` -- from any thread, any code
-path -- now triggers the binding fan-out automatically.
+The injection lands before every `return` point of the setter. The
+instrumented setter is written back to `target/classes`, replacing the
+original. Application code that calls `model.setName(...)` -- from any
+thread, any code path -- now triggers the binding fan-out
+automatically.
 
 ==== Limitation -- cross-field setter chains
 
@@ -216,10 +217,12 @@ every accepted `@Bindable` class. At app start:
 * On **iOS / Android** the build server probes the project zip for
   `cn1app/BinderBootstrap.class` and splices
   `new cn1app.BinderBootstrap();` into the per-build application stub
-  before `Display.init`. Direct symbol references survive ParparVM
-  rename and R8 obfuscation.
+  before `Display.init`. ParparVM rename and R8 obfuscation rewrite
+  the direct symbol reference together with the generated class so
+  the binding still resolves after the pass.
 * On **JavaSE** `JavaSEPort#postInit` loads the bootstrap via
-  `Class.forName("cn1app.BinderBootstrap")`.
+  `Class.forName("cn1app.BinderBootstrap")` -- the unobfuscated
+  classloading path.
 
 Projects with no `@Bindable` classes produce no bootstrap; the build
 server probe falls through and the registry stays empty.

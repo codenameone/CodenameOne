@@ -150,12 +150,13 @@ accepted `@Entity` class. At app start:
 * On **iOS / Android** the build server probes the project zip for
   `cn1app/DaoBootstrap.class` and splices
   `new cn1app.DaoBootstrap();` into the per-build application stub
-  before `Display.init`. Direct symbol references survive ParparVM
-  rename and R8 obfuscation: the call site and the generated dao are
-  renamed together.
+  before `Display.init`. ParparVM rename and R8 obfuscation rewrite
+  the call site and the generated dao together, so the direct symbol
+  reference stays valid after the pass.
 * On the **JavaSE simulator and desktop run** `JavaSEPort#postInit`
   loads the bootstrap via `Class.forName("cn1app.DaoBootstrap")`.
-  Classloading is the legitimate path here -- JavaSE runs unobfuscated.
+  Class-loading is the legitimate path here -- JavaSE runs
+  unobfuscated.
 
 Projects with no `@Entity` classes produce no bootstrap; the build
 server probe falls through and the registry stays empty.
