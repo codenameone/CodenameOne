@@ -57,13 +57,6 @@ import java.util.Map;
 public final class Mappers {
 
     private static final Map<Class<?>, Mapper<?>> BY_TYPE = new HashMap<Class<?>, Mapper<?>>();
-    /// Doubles as the "index loaded" sentinel and as the place we pin the
-    /// instantiated `MappersIndex` against SpotBugs' no-side-effect check:
-    /// the cn1-core stub has an empty constructor, so without an
-    /// assignment SpotBugs flags `new MappersIndex()` as a no-op
-    /// (`RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT`). Reading the field as the
-    /// gate keeps SpotBugs from flipping that to `URF_UNREAD_FIELD` instead.
-    private static volatile Object indexInstance;
 
     private Mappers() { }
 
@@ -94,7 +87,9 @@ public final class Mappers {
     /// missing `@Mapped` annotation or a build that ran without the
     /// process-annotations Mojo.
     public static String toJson(Object instance) {
-        if (instance == null) return "null";
+        if (instance == null) {
+            return "null";
+        }
         @SuppressWarnings("unchecked")
         Mapper<Object> m = (Mapper<Object>) get(instance.getClass());
         if (m == null) {
@@ -109,7 +104,9 @@ public final class Mappers {
     /// Inverse of `#toJson`. Parses the JSON text and hands the resulting Map
     /// to the registered mapper.
     public static <T> T fromJson(String json, Class<T> type) {
-        if (json == null) return null;
+        if (json == null) {
+            return null;
+        }
         Mapper<T> m = get(type);
         if (m == null) {
             throw missing(type);
@@ -126,7 +123,9 @@ public final class Mappers {
     /// Parses JSON read from a `Reader` (file, network response, ...) without
     /// fully buffering it into a String first.
     public static <T> T fromJson(Reader json, Class<T> type) {
-        if (json == null) return null;
+        if (json == null) {
+            return null;
+        }
         Mapper<T> m = get(type);
         if (m == null) {
             throw missing(type);
@@ -142,7 +141,9 @@ public final class Mappers {
 
     /// Serializes `instance` to XML.
     public static String toXml(Object instance) {
-        if (instance == null) return "";
+        if (instance == null) {
+            return "";
+        }
         @SuppressWarnings("unchecked")
         Mapper<Object> m = (Mapper<Object>) get(instance.getClass());
         if (m == null) {
@@ -156,7 +157,9 @@ public final class Mappers {
     /// Inverse of `#toXml`. Parses the XML text and hands the resulting
     /// Element to the registered mapper.
     public static <T> T fromXml(String xml, Class<T> type) {
-        if (xml == null) return null;
+        if (xml == null) {
+            return null;
+        }
         Mapper<T> m = get(type);
         if (m == null) {
             throw missing(type);
@@ -168,7 +171,9 @@ public final class Mappers {
 
     /// Parses XML read from a `Reader` without fully buffering it first.
     public static <T> T fromXml(Reader xml, Class<T> type) {
-        if (xml == null) return null;
+        if (xml == null) {
+            return null;
+        }
         Mapper<T> m = get(type);
         if (m == null) {
             throw missing(type);
@@ -182,24 +187,56 @@ public final class Mappers {
     // Index bootstrap
     // ---------------------------------------------------------------
 
-    /// Lazily instantiates the generated `MappersIndex` class once. We use a
-    /// direct symbol reference (compiled in only when the build emits the
-    /// class) rather than `Class.forName`, so ParparVM / R8 rename the call
-    /// site and the generated class together and the binding survives in
-    /// shipped builds. The reference is guarded by `try` so projects without
-    /// the annotation Mojo on their build path still compile and run -- the
-    /// class is generated only when the project actually has @Mapped types.
-    private static synchronized void ensureIndexLoaded() {
-        if (indexInstance != null) return;
-        try {
-            indexInstance = new com.codename1.mapping.generated.MappersIndex();
-        } catch (NoClassDefFoundError e) {
-            // No @Mapped types in this project. Pin a sentinel so we don't
-            // retry the lookup on every Mappers.get call.
-            indexInstance = Boolean.FALSE;
-        } catch (RuntimeException e) {
-            // Index already loaded by another path.
-            indexInstance = Boolean.FALSE;
+    /// Forces the lazy `IndexHolder` class to initialize. Its static
+    /// initializer constructs the build-time-generated `MappersIndex`,
+    /// whose constructor registers every generated mapper with this
+    /// registry. Calling `bootstrap()` is harmless after the first call;
+    /// the JVM guarantees the holder's class init runs exactly once.
+    ///
+    /// The iOS / Android per-build application stub invokes this from the
+    /// `annotationFrameworksInstallSource` fragment before `Display.init`.
+    public static void bootstrap() {
+        IndexHolder.touch();
+    }
+
+    private static void ensureIndexLoaded() {
+        IndexHolder.touch();
+    }
+
+    /// Initialization-on-demand holder. The JVM defers class init until
+    /// the first field reference, then runs it exactly once under the
+    /// class-init monitor -- a race-free lazy singleton without
+    /// `volatile`. Direct symbol reference (no `Class.forName`) so
+    /// ParparVM / R8 rewrite the call site and the generated class
+    /// together; the binding survives obfuscation in shipped builds.
+    private static final class IndexHolder {
+        static final Object INDEX;
+        static {
+            Object resolved;
+            try {
+                resolved = new com.codename1.mapping.generated.MappersIndex();
+            } catch (NoClassDefFoundError missing) {
+                // No @Mapped types in this project -- nothing to register.
+                resolved = Boolean.FALSE;
+            } catch (RuntimeException failed) {
+                // The generated index hit a registration failure. Pin a
+                // sentinel so we don't retry on every call; the missing
+                // mapper surfaces from `Mappers.get` as the regular
+                // "no mapper registered" error.
+                resolved = Boolean.FALSE;
+            }
+            INDEX = resolved;
+        }
+
+        static void touch() {
+            // Read INDEX so SpotBugs sees the field as used. Defensive
+            // null check documents the contract; createIndex pins a
+            // non-null sentinel on every fallback, so the throw is
+            // unreachable in practice.
+            if (INDEX == null) {
+                throw new IllegalStateException(
+                        "MappersIndex failed to initialize");
+            }
         }
     }
 
@@ -228,7 +265,9 @@ public final class Mappers {
             boolean first = true;
             Map<?, ?> map = (Map<?, ?>) value;
             for (Map.Entry<?, ?> e : map.entrySet()) {
-                if (!first) sb.append(',');
+                if (!first) {
+                    sb.append(',');
+                }
                 first = false;
                 writeJsonString(sb, String.valueOf(e.getKey()));
                 sb.append(':');
@@ -241,7 +280,9 @@ public final class Mappers {
             sb.append('[');
             boolean first = true;
             for (Object item : (java.util.Collection<?>) value) {
-                if (!first) sb.append(',');
+                if (!first) {
+                    sb.append(',');
+                }
                 first = false;
                 writeJson(sb, item);
             }

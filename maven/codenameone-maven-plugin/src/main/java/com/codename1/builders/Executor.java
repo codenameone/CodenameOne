@@ -2019,18 +2019,23 @@ public abstract class Executor {
     /// Stub-source fragment to splice into a generated application stub
     /// right before `Display.init(...)` to install the build-time-generated
     /// JSON / XML mapper index, the component binder index, and the SQLite
-    /// dao index in one go. Each call is a direct symbol reference so
-    /// ParparVM iOS / R8 Android rename the call site and the generated
-    /// class together; projects without the corresponding annotations get
-    /// an empty fragment because cn1-core ships a no-op stub for each index
-    /// class that is shadowed by the real one at build time. The constructors
-    /// register the per-class mapper / binder / dao with their respective
-    /// runtime registries.
+    /// dao index in one go. Each call is a direct symbol reference (no
+    /// `Class.forName`) so ParparVM iOS / R8 Android rename the call site
+    /// and the generated class together; projects without the corresponding
+    /// annotations resolve against the no-op stub cn1-core ships, which is
+    /// shadowed by the build-time-generated class when present.
+    ///
+    /// Each `bootstrap()` triggers an initialization-on-demand holder whose
+    /// static initializer instantiates the generated `XxxIndex`; that
+    /// constructor calls `Mappers.register` / `Binders.register` /
+    /// `EntityManager.registerDao` for every entry, so the registries are
+    /// populated by the time application code reaches `Mappers.toJson`,
+    /// `Binders.bind`, or `EntityManager.dao`.
     protected static String annotationFrameworksInstallSource(File sourceZip, String indent) {
         StringBuilder sb = new StringBuilder();
-        sb.append(indent).append("new com.codename1.mapping.generated.MappersIndex();\n");
-        sb.append(indent).append("new com.codename1.binding.generated.BindersIndex();\n");
-        sb.append(indent).append("new com.codename1.orm.generated.DaosIndex();\n");
+        sb.append(indent).append("com.codename1.mapping.Mappers.bootstrap();\n");
+        sb.append(indent).append("com.codename1.binding.Binders.bootstrap();\n");
+        sb.append(indent).append("com.codename1.orm.EntityManager.bootstrap();\n");
         return sb.toString();
     }
 }

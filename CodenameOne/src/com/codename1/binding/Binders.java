@@ -45,13 +45,6 @@ import java.util.Map;
 public final class Binders {
 
     private static final Map<Class<?>, Binder<?>> BY_TYPE = new HashMap<Class<?>, Binder<?>>();
-    /// Doubles as the "index loaded" sentinel and as the place we pin the
-    /// instantiated `BindersIndex` against SpotBugs' no-side-effect check:
-    /// the cn1-core stub has an empty constructor, so without an
-    /// assignment SpotBugs flags `new BindersIndex()` as a no-op. Reading
-    /// the field as the gate keeps SpotBugs from flipping that to
-    /// `URF_UNREAD_FIELD` instead.
-    private static volatile Object indexInstance;
 
     private Binders() { }
 
@@ -93,16 +86,40 @@ public final class Binders {
         return binder.bind(model, container);
     }
 
-    private static synchronized void ensureIndexLoaded() {
-        if (indexInstance != null) return;
-        try {
-            indexInstance = new com.codename1.binding.generated.BindersIndex();
-        } catch (NoClassDefFoundError e) {
-            // No @Bindable types in this project. Pin a sentinel so we
-            // don't retry the lookup on every Binders.get call.
-            indexInstance = Boolean.FALSE;
-        } catch (RuntimeException e) {
-            indexInstance = Boolean.FALSE;
+    /// Forces the lazy `IndexHolder` class to initialize, registering every
+    /// generated binder. Called from the per-build application stub before
+    /// `Display.init`.
+    public static void bootstrap() {
+        IndexHolder.touch();
+    }
+
+    private static void ensureIndexLoaded() {
+        IndexHolder.touch();
+    }
+
+    /// Initialization-on-demand holder. Class init runs exactly once,
+    /// race-free, without `volatile`. Direct symbol reference to the
+    /// generated index so ParparVM / R8 rewrite the call site and the
+    /// generated class together.
+    private static final class IndexHolder {
+        static final Object INDEX;
+        static {
+            Object resolved;
+            try {
+                resolved = new com.codename1.binding.generated.BindersIndex();
+            } catch (NoClassDefFoundError missing) {
+                resolved = Boolean.FALSE;
+            } catch (RuntimeException failed) {
+                resolved = Boolean.FALSE;
+            }
+            INDEX = resolved;
+        }
+
+        static void touch() {
+            if (INDEX == null) {
+                throw new IllegalStateException(
+                        "BindersIndex failed to initialize");
+            }
         }
     }
 }
