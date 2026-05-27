@@ -892,7 +892,7 @@ public final class URLImage extends EncodedImage {
         if (requestDecorator != null) {
             requestDecorator.decorate(cr);
         }
-        cr.downloadImageToStorage(storageKey, onSuccess, new com.codename1.util.FailureCallback<Image>() {
+        cr.downloadImageToStorage(storageKey, onSuccess, new FailureCallback<Image>() {
             @Override
             public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
                 if (exceptionHandler != null) {
