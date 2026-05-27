@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.Log;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -49,7 +50,24 @@ import java.io.InputStream;
 public class SVGStaticScreenshotTest extends BaseTest {
 
     @Override
+    public boolean shouldTakeScreenshot() {
+        // The JS port is in this test's HTML5_SKIP set, but the global
+        // shouldForceTimeoutInHtml5 path is not reliable (it never logs the
+        // "forced timeout (HTML5 fallback)" marker in CI output), so opt
+        // out at the per-test level too. Suite stays under the 150s
+        // browser-lifetime budget on JS without truncating the iOS /
+        // Android coverage this test exists to provide.
+        return !"HTML5".equals(Display.getInstance().getPlatformName());
+    }
+
+    @Override
     public boolean runTest() throws Exception {
+        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
+            // Skip on JS per shouldTakeScreenshot above. Mark done immediately
+            // so the runner doesn't spin its per-test 10s deadline.
+            done();
+            return true;
+        }
         Resources res = resolveGlobalResources();
 
         // 2x3 grid so every transcoded SVG fits in a single screenshot
