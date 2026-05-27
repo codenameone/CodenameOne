@@ -2506,12 +2506,12 @@ Tabs tabs = new Tabs();
 tabs.setAnimatedIndicator(true);
 ----
 
-The indicator tweens its `x` / `width` from the previously selected
+The indicator animates its `x` / `width` from the previously selected
 tab's bounds to the new selection's bounds using a `Motion.createEaseInOutMotion`
 over the configured duration (200ms default, matching Material 3's
-spec). Rapid double-taps start the tween from the *current
+spec). Rapid double-taps start the animation from the *current
 interpolated position* rather than from a stale baseline, so the
-animation chains cleanly.
+indicator chains cleanly.
 
 [[mediamanager-section]]
 === MediaManager & MediaPlayer

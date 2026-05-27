@@ -148,9 +148,11 @@ public class Tabs extends Container {
     private int animatedIndicatorThicknessMm = 1; // 1mm-tall underline
     private Motion indicatorAnimMotion;
     // Tab bounds at the start of the indicator animation.
-    private int indicatorFromX, indicatorFromW;
+    private int indicatorFromX;
+    private int indicatorFromW;
     // Tab bounds at the end of the indicator animation.
-    private int indicatorToX, indicatorToW;
+    private int indicatorToX;
+    private int indicatorToW;
 
     /// Creates an empty `TabbedPane` with a default
     /// tab placement of `Component.TOP`.
@@ -1410,7 +1412,8 @@ public class Tabs extends Container {
         if (!animatedIndicator || tabsContainer.getComponentCount() == 0) {
             return;
         }
-        int x, w;
+        int x;
+        int w;
         if (indicatorAnimMotion != null) {
             int v = indicatorAnimMotion.getValue();    // 0..100
             x = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
