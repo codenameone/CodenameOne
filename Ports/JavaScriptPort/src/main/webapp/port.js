@@ -3214,20 +3214,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // emitChannel hijack — see matching entry in cn1ssForcedTimeoutTestNames below.
   "com_codenameone_examples_hellocodenameone_tests_ChatInputScreenshotTest": "chatInputEmitHijack",
   "com_codenameone_examples_hellocodenameone_tests_ChatViewScreenshotTest": "chatViewEmitHijack",
-  "com_codenameone_examples_hellocodenameone_tests_ButtonThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_TextFieldThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_SwitchThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_PickerThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_ToolbarThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_TabsThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_MultiButtonThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_ListThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_DialogThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_SpanLabelThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
-  "com_codenameone_examples_hellocodenameone_tests_PaletteOverrideThemeScreenshotTest": "themeScreenshot",
+  // The 14 *ThemeScreenshotTest entries that used to live here were
+  // unparked when the JS port started bundling the modern native
+  // theme resources (iOSModernTheme.res / AndroidMaterialTheme.res
+  // mirrored into webapp/assets/ by scripts/build-native-themes.sh).
+  // DualAppearanceBaseTest now installs the OS-appropriate modern
+  // theme via the cn1.modernThemeResource Display property that
+  // HTML5Implementation publishes during installNativeTheme(); see
+  // the matching cn1ssForcedTimeoutTestNames map below for the
+  // short-name list that was un-parked in tandem.
   // jsChunkDrop block removed for the graphics grid, KotlinUiTest,
   // MainScreenScreenshotTest, the Tabs / ImageViewer / TextArea /
   // ToastBar / picker tests, and ChartLine -- the chunk emitter bug
@@ -3348,20 +3343,10 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   // the JS-port emit path (separate investigation).
   "ChatInputScreenshotTest": "chatInputEmitHijack",
   "ChatViewScreenshotTest": "chatViewEmitHijack",
-  "ButtonThemeScreenshotTest": "themeScreenshot",
-  "TextFieldThemeScreenshotTest": "themeScreenshot",
-  "CheckBoxRadioThemeScreenshotTest": "themeScreenshot",
-  "SwitchThemeScreenshotTest": "themeScreenshot",
-  "PickerThemeScreenshotTest": "themeScreenshot",
-  "ToolbarThemeScreenshotTest": "themeScreenshot",
-  "TabsThemeScreenshotTest": "themeScreenshot",
-  "MultiButtonThemeScreenshotTest": "themeScreenshot",
-  "ListThemeScreenshotTest": "themeScreenshot",
-  "DialogThemeScreenshotTest": "themeScreenshot",
-  "FloatingActionButtonThemeScreenshotTest": "themeScreenshot",
-  "SpanLabelThemeScreenshotTest": "themeScreenshot",
-  "DarkLightShowcaseThemeScreenshotTest": "themeScreenshot",
-  "PaletteOverrideThemeScreenshotTest": "themeScreenshot",
+  // The 14 *ThemeScreenshotTest short-name entries were un-parked
+  // alongside the fully-qualified-class entries in
+  // cn1ssForcedTimeoutTestClasses above when the modern native
+  // theme resources started shipping in the JS port bundle.
   // See the matching comment in cn1ssForcedTimeoutTestClasses above:
   // the jsChunkDrop short-name entries (KotlinUiTest,
   // MainScreenScreenshotTest, the ImageViewer / Tabs / TextArea /

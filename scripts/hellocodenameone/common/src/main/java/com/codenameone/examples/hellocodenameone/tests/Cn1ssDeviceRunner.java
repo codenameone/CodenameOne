@@ -306,7 +306,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // the 300s end-marker deadline. Keep all skip lookups inline to avoid
         // triggering the same static-init failure path.
         return isJsSkippedNativeTest(testName)
-                || isJsSkippedThemeTest(testName)
                 || isJsSkippedAnimationTest(testName)
                 || isJsSkippedScreenshotTest(testName);
     }
@@ -325,31 +324,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // route through CodenameOneImplementation overrides; the
                 // JavaScript port doesn't yet provide a crypto bridge.
                 || "CryptoApiTest".equals(testName);
-    }
-
-    private static boolean isJsSkippedThemeTest(String testName) {
-        // The native-theme fidelity tests (each emits a light+dark PNG pair)
-        // matter for iOS/Android/JavaSE where the user actually looks at
-        // visual output. The JS port run has a tight 150s browser-lifetime
-        // budget that doesn't accommodate another 13 x 2 captures; skip them
-        // here. Re-enable selectively when we move the JS port to a
-        // longer-lived harness.
-        return "ButtonThemeScreenshotTest".equals(testName)
-                || "TextFieldThemeScreenshotTest".equals(testName)
-                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
-                || "SwitchThemeScreenshotTest".equals(testName)
-                || "PickerThemeScreenshotTest".equals(testName)
-                || "ToolbarThemeScreenshotTest".equals(testName)
-                || "TabsThemeScreenshotTest".equals(testName)
-                || "MultiButtonThemeScreenshotTest".equals(testName)
-                || "ListThemeScreenshotTest".equals(testName)
-                || "DialogThemeScreenshotTest".equals(testName)
-                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
-                || "SpanLabelThemeScreenshotTest".equals(testName)
-                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName)
-                || "CssGradientsScreenshotTest".equals(testName)
-                || "CssFilterBlurScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {
