@@ -1423,11 +1423,14 @@ public class Tabs extends Container {
         }
         int thicknessMm = getUIManager().getThemeConstant("tabsAnimatedIndicatorThicknessMm", animatedIndicatorThicknessMm);
         int thickness = Display.getInstance().convertToPixels(thicknessMm);
-        // Use TabIndicator UIID color if present; otherwise pull from the
-        // selected tab's foreground.
+        // Use TabIndicator UIID color when its fg is set; otherwise pull
+        // from the selected tab's foreground. `getComponentStyle(...)`
+        // never returns null -- it synthesises an empty Style if no
+        // matching UIID exists -- so a `null` check on the result would
+        // be redundant.
         int color;
         Style indicatorStyle = getUIManager().getComponentStyle("TabIndicator");
-        if (indicatorStyle != null && indicatorStyle.getFgColor() != 0) {
+        if (indicatorStyle.getFgColor() != 0) {
             color = indicatorStyle.getFgColor();
         } else {
             Component active = tabsContainer.getComponentAt(activeComponent);

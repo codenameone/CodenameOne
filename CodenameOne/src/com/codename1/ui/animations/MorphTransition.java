@@ -345,10 +345,19 @@ public final class MorphTransition extends Transition {
     /// stretch via `drawImage(scaled)`. Both images already represent the
     /// component clipped to its own bounds at the moment of capture, so
     /// nothing off-viewport leaks into the morph.
+    ///
+    /// Callers must have already invoked `#initTransition()` -- the guard
+    /// at the top of the method protects against late-call paths
+    /// (`finished` flush, animation cancel) where the field has been
+    /// nulled out.
     private void paintSnapshots(Graphics g, int alpha) {
+        CC[] pairs = fromToComponents;
+        if (pairs == null) {
+            return;
+        }
         int oldAlpha = g.getAlpha();
         try {
-            for (CC c : fromToComponents) {
+            for (CC c : pairs) {
                 if (c == null || c.sourceImage == null || c.destImage == null) {
                     continue;
                 }

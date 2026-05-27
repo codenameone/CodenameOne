@@ -1398,7 +1398,7 @@ URLImage.setDefaultRequestDecorator(req ->
         req.addRequestHeader("Authorization", "Bearer " + token));
 ----
 
-For per-image overrides (e.g. one endpoint needs an extra API-version
+For per-image overrides (for example one endpoint needs an extra API-version
 header on top of the global bearer token), use the
 `createToStorage(placeholder, key, url, adapter, RequestDecorator)`
 overload. Per-instance decorators run *after* the global default so they

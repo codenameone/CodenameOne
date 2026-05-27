@@ -2424,15 +2424,19 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     }
 
     private int modernIndicatorColor() {
+        // `getComponentStyle(...)` always returns a non-null Style
+        // (synthesising an empty one when no matching UIID is registered),
+        // so the null check on the result would be redundant.
         Style indicator = getUIManager().getComponentStyle("TabIndicator");
-        if (indicator != null && indicator.getFgColor() != 0) {
+        if (indicator.getFgColor() != 0) {
             return indicator.getFgColor();
         }
         // Fall back to the form's title foreground, which already tracks
         // accent in the modern themes.
         Style title = getUIManager().getComponentStyle("Title");
-        if (title != null) {
-            return title.getFgColor();
+        int titleFg = title.getFgColor();
+        if (titleFg != 0) {
+            return titleFg;
         }
         return 0x007aff;     // iOS blue as ultimate fallback
     }

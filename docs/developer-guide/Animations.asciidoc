@@ -405,9 +405,9 @@ nextForm.show();
 `Image` at `initTransition()`, then the tween draws those images at the
 interpolated bounds rather than re-painting the live components.
 Off-viewport children of the source are clipped at capture time (the
-image's own bounds are the clip), so they cannot leak into the morph.
+image's own bounds are the clip), so they can't leak into the morph.
 
-The default `MorphTransition` behaviour (live paint, no snapshots) is
+The default `MorphTransition` behavior (live paint, no snapshots) is
 unchanged for back-compat. Use snapshot mode opportunistically when
 the live-paint output exhibits the off-viewport leak, or when the
 source's children produce frame-by-frame visual change you want to

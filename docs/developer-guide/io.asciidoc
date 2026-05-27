@@ -875,7 +875,7 @@ Notice that a static version of the method is used! The callback object is an in
 
 ===== Writing JSON — `JSONWriter`
 
-For typed DTO serialisation use the `@Mapped` annotation framework
+For typed DTO serialization use the `@Mapped` annotation framework
 (see `<<binding-framework>>`) plus `Mappers.toJson(...)`. For ad-hoc
 maps / lists where a build-time `Mapper` would be overkill, the
 `com.codename1.io.JSONWriter` class is the complement of `JSONParser`:
@@ -908,7 +908,7 @@ String coords = JSONWriter.array()
 
 Strings are double-quoted with the standard backslash escapes for `"`,
 `\`, `\n`, `\r`, `\t`, `\b`, `\f`, and control chars below `0x20` are
-emitted as `+\u00xx+`. The writer does not pretty-print; if you need
+emitted as `+\u00xx+`. The writer doesn't pretty-print; if you need
 indented output, run the result through an external formatter at debug
 time.
 
@@ -1390,7 +1390,7 @@ Some highlights that are easy to miss:
 
 ==== Top-level JSON arrays — `fetchAsJsonList`
 
-When the endpoint returns a top-level JSON array (e.g. `+[{...}, {...}]+`),
+When the endpoint returns a top-level JSON array (for example `+[{...}, {...}]+`),
 use `fetchAsJsonList` rather than `fetchAsJsonMap`. The underlying
 `JSONParser` wraps top-level arrays under a synthetic `"root"` key;
 `fetchAsJsonList` unwraps that envelope for you so the callback receives
@@ -1407,9 +1407,9 @@ Rest.get("https://api.example.com/items")
     });
 ----
 
-There is no separate builder for "JSON object or array, I don't know which":
-if you don't know up-front, use `fetchAsJsonMap` and branch on
-`data.get("root") instanceof List`.
+There is no separate builder for the ambiguous "object or array" case:
+when the response shape isn't known up-front, use `fetchAsJsonMap` and
+branch on `data.get("root") instanceof List`.
 
 ==== Typed responses — `fetchAsMapped` and `fetchAsMappedList`
 
@@ -1458,7 +1458,7 @@ registered for the requested class (typical cause: the
 `process-annotations` Mojo didn't run on the class, or the class isn't
 `@Mapped`-annotated), the callback completes with `null` data -- so always
 inspect `response.getResponseCode()` rather than `response.getResponseData()`
-to differentiate "server returned an error" from "no mapper registered".
+to differentiate a server error response from the missing-mapper case.
 
 The code in the kitchen sink webservice sample was updated to use this API. The result is shorter and more readable without sacrificing anything.
 

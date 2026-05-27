@@ -4,7 +4,7 @@ Generates a typed Codename One client from an OpenAPI 3.x JSON
 specification. Emits one `@Mapped`-annotated POJO per
 `components.schemas` entry and one `<Tag>Api.java` per OpenAPI tag.
 The generated code uses only the Codename One JDK subset --
-`Rest` + `JSONWriter` + `Mappers` for transport / serialisation, no
+`Rest` + `JSONWriter` + `Mappers` for transport / serialization, no
 `java.net.http`, no reflection.
 
 This is the build-time complement to the `Rest.fetchAsMapped` /
@@ -106,16 +106,16 @@ api.getPetById(123L, "MY_TOKEN", response -> {
 ==== Scope (MVP)
 
 * HTTP verbs: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
-* Parameter locations: `path`, `query`. Header / cookie parameters are
-silently ignored; submit them via `Rest`'s `header(...)` builder
-method after-the-fact if needed.
-* Request bodies: `application/json` only -- serialised via
+* Parameter locations: `path`, `query`. Header and cookie parameters are
+dropped during code generation; submit them via `Rest`'s `header(...)`
+builder method after-the-fact if needed.
+* Request bodies: `application/json` only -- serialized via
 `Mappers.toJson(body)` before being attached.
 * Response schemas: `$ref` resolution, primitives (`string` / `number`
 / `integer` / `boolean`), arrays, object schemas. `oneOf` / `anyOf` /
 `allOf` compositions collapse to `Object` -- callers cast.
 * Authentication: bearer token as a per-method `String bearerToken`
-parameter. Other schemes (API key, basic, OAuth) are not in the MVP
+parameter. Other schemes (API key, basic, OAuth) aren't in the MVP
 scope -- use `Rest`'s `header(...)` / `basicAuth(...)` builders or the
 `OidcClient` directly.
 
