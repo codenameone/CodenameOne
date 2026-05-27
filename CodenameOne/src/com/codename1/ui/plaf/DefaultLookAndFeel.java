@@ -2409,7 +2409,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         String s = getUIManager().getThemeConstant("pullToRefreshIndicatorDiameterMm", null);
         if (s != null) {
             float f = Util.toFloatValue(s);
-            if (f > 0) return f;
+            if (f > 0) {
+                return f;
+            }
         }
         return 8f;
     }
@@ -2418,7 +2420,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         String s = getUIManager().getThemeConstant("pullToRefreshIndicatorStrokeMm", null);
         if (s != null) {
             float f = Util.toFloatValue(s);
-            if (f > 0) return f;
+            if (f > 0) {
+                return f;
+            }
         }
         return 0.6f;
     }
