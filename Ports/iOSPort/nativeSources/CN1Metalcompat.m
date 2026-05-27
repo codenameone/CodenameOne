@@ -784,11 +784,18 @@ static inline float currentTransformGlyphScale(void) {
     float c1y = currentTransform.columns[1].y;
     float sx = sqrtf(c0x * c0x + c0y * c0y);
     float sy = sqrtf(c1x * c1x + c1y * c1y);
+    float s = (sx + sy) * 0.5f;
+    // Reject NaN / inf / non-positive values: any of those would
+    // poison `font.pointSize * s` below and produce a UIFont with
+    // bad metrics that hangs the CTLine layout. `isfinite` is true
+    // only for finite numbers; treat anything else as "use unscaled
+    // font" by returning 1.0 (the `useScaledFont` gate at the call
+    // site clears that to the fast path).
+    if (!isfinite(s) || s <= 0.0f) return 1.0f;
     // Cap at 8x to keep the atlas from rasterising absurdly large
     // bitmaps for a runaway transform; well past 8x the difference
     // between "atlas-perfect" and "sampled-and-filtered" is below
     // what the user can see anyway.
-    float s = (sx + sy) * 0.5f;
     if (s < 1.0f) s = 1.0f;     // No down-rasterising; 1px atlas is fine for downscale.
     if (s > 8.0f) s = 8.0f;
     return s;
