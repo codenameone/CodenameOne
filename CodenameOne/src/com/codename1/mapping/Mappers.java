@@ -230,7 +230,10 @@ public final class Mappers {
 
         private IndexHolder() {
             // Utility-style holder: only the static initializer + touch
-            // matter. PMD `UseUtilityClass` requires this private ctor.
+            // matter. PMD `UseUtilityClass` requires this private ctor;
+            // `UnnecessaryConstructor` then requires a non-empty body,
+            // so document the contract by refusing instantiation.
+            throw new AssertionError("IndexHolder is not instantiable");
         }
 
         static void touch() {
