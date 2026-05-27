@@ -11,16 +11,8 @@ function windows_desktop {
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=windows-desktop" "-U" "-e"
 }
 function javascript {
+  
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
-}
-function javascript_parparvm {
-  # Experimental local build via the ParparVM-backed JavaScript port. The
-  # branch that originally moved initializr to this path didn't ship -- the
-  # canvasContextWipe Heisenbug (see Ports/JavaScriptPort/STATUS.md) keeps
-  # the cascade tests flake-prone. Kept as an opt-in alias so the wiring
-  # stays alive while the bug is chased in smaller PRs.
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  "$SCRIPT_DIR/../build-javascript-port-initializr.sh"
 }
 function android {
   
@@ -84,9 +76,6 @@ function help {
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
   "echo" "-e" "    *Javascript builds are an Enterprise user feature"
-  "echo" "-e" "  javascript_parparvm"
-  "echo" "-e" "    Experimental: builds locally via the ParparVM-backed JavaScript port"
-  "echo" "-e" "    (see Ports/JavaScriptPort/STATUS.md for known issues)."
 }
 function settings {
   

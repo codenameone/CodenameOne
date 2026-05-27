@@ -63,5 +63,3 @@ cd ../scripts/initializr
 ----
 
 This switches Initializr to `8.0-SNAPSHOT` so JavaScript builds use your local Codename One code.
-
-// Touched 2026-05-19 to retrigger Hugo deploy for dialog fix (be3bc6dcd)

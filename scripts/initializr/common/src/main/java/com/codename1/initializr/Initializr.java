@@ -10,7 +10,6 @@ import com.codename1.initializr.model.IDE;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.initializr.ui.TemplatePreviewPanel;
-import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
@@ -181,47 +180,7 @@ public class Initializr extends Lifecycle {
                     includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
                     liveCustomCss
             );
-            // Zip generation walks 1000+ template entries through LocalForage. The
-            // earlier Display.startThread approach hung on the JS-port cooperative
-            // scheduler -- background green threads never got their async LocalForage
-            // callbacks delivered, so the toast got stuck forever. Stay on the EDT
-            // and let LocalForage's own per-op yields keep the UI responsive (each
-            // I/O op is async and the scheduler runs other ready work between
-            // callbacks). The toast goes up first via callSerially so it actually
-            // paints before the heavy work starts; subsequent callSerially calls
-            // chain the work so each chunk renders.
-            final GeneratorModel model = GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options);
-            final String originalLabel = generateButton.getText();
-            generateButton.setEnabled(false);
-            generateButton.setText("Generating…");
-            form.revalidate();
-            final ToastBar.Status status = ToastBar.getInstance().createStatus();
-            status.setMessage("Generating project…");
-            status.setShowProgressIndicator(true);
-            status.setExpires(0);
-            status.show();
-            // Defer the heavy work by one EDT cycle so the toast + disabled button
-            // get painted first. Then run generate() inline on the EDT -- the JS-port
-            // native download path yields between async steps so the UI stays
-            // responsive.
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    String errorMessage = null;
-                    try {
-                        model.generate();
-                    } catch (Throwable t) {
-                        errorMessage = String.valueOf(t);
-                        Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(errorMessage));
-                    }
-                    status.clear();
-                    generateButton.setEnabled(true);
-                    generateButton.setText(originalLabel);
-                    form.revalidate();
-                    if (errorMessage != null) {
-                        ToastBar.showErrorMessage("Generation failed: " + errorMessage);
-                    }
-                }
-            });
+            GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
         Container body = createResponsiveBody(leftColumn, rightColumn);

@@ -1,14 +1,12 @@
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
-import com.codename1.initializr.DownloadNative;
-import com.codename1.initializr.InflateNative;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import com.codename1.system.NativeLookup;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
+import net.sf.zipme.ZipOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -20,7 +18,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.243";
+    private static final String CN1_PLUGIN_VERSION = "7.0.244";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -114,50 +112,6 @@ public class GeneratorModel {
     }
 
     public void generate() {
-        // Build the zip into memory first. On platforms with a working
-        // native download path (the JS port) we hand the bytes straight
-        // to the browser without going through the file system at all --
-        // openFileOutputStream/exists()/openFileAsBlob on the JS port
-        // round-trip through localforage/IndexedDB which silently drops
-        // Uint8Array writes (the setItem callback returns null for the
-        // stored value and the read-back exists() check sees nothing).
-        // Falling back to the disk path on other platforms means
-        // Display.execute() can still open the file with the OS handler.
-        byte[] inMemoryZip = null;
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            writeProjectZip(baos);
-            inMemoryZip = baos.toByteArray();
-        } catch (Throwable t) {
-            Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(String.valueOf(t)));
-        }
-        if (inMemoryZip != null) {
-            DownloadNative dn = NativeLookup.create(DownloadNative.class);
-            if (dn != null && dn.isSupported()) {
-                String name = appName.toLowerCase() + ".zip";
-                try {
-                    if (dn.downloadBytes(name, inMemoryZip)) {
-                        return;
-                    }
-                } catch (Throwable t) {
-                    Log.e(t instanceof Exception ? (Exception) t : new RuntimeException(String.valueOf(t)));
-                }
-            }
-        }
-        // Fallback for platforms without DownloadNative: write to disk and open.
-        String filePath = generateZip();
-        if (filePath != null) {
-            openGeneratedZip(filePath);
-        }
-    }
-
-    /// Builds the project zip into storage and returns its path. Safe to
-    /// call from a background thread -- all I/O is synchronous-friendly
-    /// (the JS port uses LocalForage/IndexedDB which serialises requests
-    /// internally). Returns null when the zip could not be written even
-    /// after a quota-recovery retry, in which case a user-facing
-    /// ToastBar message has already been shown.
-    public String generateZip() {
         // The JavaScript port backs openFileOutputStream with IndexedDB. The Blob handed to
         // execute() retains the bytes, but the IndexedDB entry sticks around forever, so each
         // generation accumulates a multi-MB record until the browser quota is exhausted.
@@ -165,60 +119,26 @@ public class GeneratorModel {
         String filePath = getAppHomePath() + appName.toLowerCase() + ".zip";
         try {
             writeProjectZipToStorage(filePath);
-        } catch (Throwable firstErr) {
+        } catch (IOException firstErr) {
             // Almost always quota-exhaustion. Clean up once more (covers orphan entries the
             // first sweep missed, e.g. a half-written file from this attempt) and retry.
             cleanupGeneratedZips();
             try {
                 writeProjectZipToStorage(filePath);
-            } catch (Throwable retryErr) {
+            } catch (IOException retryErr) {
                 Log.e(retryErr);
                 ToastBar.showErrorMessage(
                         "Browser storage is full. Open your browser settings, clear site "
                                 + "data for this page, then try again.");
-                return null;
+                return;
             }
         }
-        return filePath;
-    }
-
-    /// Hands the generated zip to the platform via Display.execute, which
-    /// on the JS port shows a download Sheet. Must be called on the EDT --
-    /// Sheet.show() does layout/style work that assumes single-threaded
-    /// access. Pair with {@link #generateZip()} when running generation
-    /// off the EDT (e.g. via Display.startThread + callSerially).
-    public void openGeneratedZip(String filePath) {
         execute(filePath);
     }
 
-    // Explicit try/catch + manual fos.close() instead of try-with-resources:
-    // the JS-port translator silently elides every statement inside a
-    // try-with-resources block when the resource init's a Java object whose
-    // class has a static-init-time bug (zipme's ZipOutputStream is one;
-    // ours uses the manual writeStoredZip instead). Keeping the explicit
-    // close path here means the LocalForage-backed fallback FOS still gets
-    // its close() (which triggers the IndexedDB persist) even if
-    // writeProjectZip threw.
     private void writeProjectZipToStorage(String filePath) throws IOException {
-        OutputStream fos = openFileOutputStream(filePath);
-        Throwable primary = null;
-        try {
+        try (OutputStream fos = openFileOutputStream(filePath)) {
             writeProjectZip(fos);
-        } catch (Throwable t) {
-            primary = t;
-        }
-        try {
-            fos.close();
-        } catch (Throwable t) {
-            if (primary == null) {
-                primary = t;
-            }
-        }
-        if (primary != null) {
-            if (primary instanceof IOException) {
-                throw (IOException) primary;
-            }
-            throw new IOException("writeProjectZipToStorage: " + primary);
         }
     }
 
@@ -258,198 +178,15 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
-        writeStoredZip(outputStream, mergedEntries);
-    }
 
-    // STORED-mode (uncompressed) zip writer. Bypasses net.sf.zipme.ZipOutputStream
-    // whose constructor throws ``Array expected: null`` under the JS-port
-    // translator (likely a static-init order issue in the Deflater path that
-    // pre-populates a null Huffman table or window buffer array). STORED mode
-    // doesn't touch any of the Deflater state -- it just writes a Local File
-    // Header + raw bytes per entry, then a Central Directory at the end --
-    // so the broken classes never load.
-    //
-    // The downside is a larger output (zip files are uncompressed), but the
-    // Initializr template is text + small zips totalling a few hundred KB,
-    // which is fine for a one-shot download.
-    private static void writeStoredZip(OutputStream out, Map<String, byte[]> entries) throws IOException {
-        int offset = 0;
-        // Buffer central-directory records to write after all local headers.
-        ByteArrayOutputStream centralDir = new ByteArrayOutputStream();
-        int entryCount = 0;
-        for (Map.Entry<String, byte[]> fileEntry : entries.entrySet()) {
-            byte[] name = fileEntry.getKey().getBytes("UTF-8");
-            byte[] data = fileEntry.getValue();
-            int len = data.length;
-            int crc = crc32(data);
-            // Local file header
-            write32(out, 0x04034b50); // signature
-            write16(out, 20);         // version needed to extract (2.0)
-            write16(out, 0);          // general purpose flags
-            write16(out, 0);          // compression method = STORED
-            write16(out, 0);          // last mod time
-            write16(out, 0x0021);     // last mod date = 1980-01-01
-            write32(out, crc);
-            write32(out, len);        // compressed size = uncompressed
-            write32(out, len);
-            write16(out, name.length);
-            write16(out, 0);          // extra-field length
-            out.write(name);
-            out.write(data);
-            // Central directory file header (buffered, emitted after all locals)
-            write32(centralDir, 0x02014b50); // signature
-            write16(centralDir, 20);         // version made by
-            write16(centralDir, 20);         // version needed
-            write16(centralDir, 0);          // flags
-            write16(centralDir, 0);          // method
-            write16(centralDir, 0);          // mtime
-            write16(centralDir, 0x0021);     // mdate
-            write32(centralDir, crc);
-            write32(centralDir, len);
-            write32(centralDir, len);
-            write16(centralDir, name.length);
-            write16(centralDir, 0);          // extra len
-            write16(centralDir, 0);          // comment len
-            write16(centralDir, 0);          // disk number
-            write16(centralDir, 0);          // internal attrs
-            write32(centralDir, 0);          // external attrs
-            write32(centralDir, offset);     // local header offset
-            centralDir.write(name);
-            offset += 30 + name.length + len;
-            entryCount++;
-        }
-        int centralDirOffset = offset;
-        byte[] cd = centralDir.toByteArray();
-        out.write(cd);
-        // End of Central Directory Record
-        write32(out, 0x06054b50); // signature
-        write16(out, 0);          // disk number
-        write16(out, 0);          // disk with central dir
-        write16(out, entryCount); // num records on this disk
-        write16(out, entryCount); // total records
-        write32(out, cd.length);  // central dir size
-        write32(out, centralDirOffset);
-        write16(out, 0);          // comment length
-    }
-
-    private static void write16(OutputStream out, int v) throws IOException {
-        out.write(v & 0xFF);
-        out.write((v >>> 8) & 0xFF);
-    }
-
-    // Writes 4 bytes little-endian. Uses int arithmetic throughout so we don't
-    // tickle the JS-port translator's long-cast bug where ``(long)negativeInt``
-    // doesn't sign-extend the way Java says it should -- the resulting long
-    // ANDed with 0xFFFFFFFFL produced just the low byte instead of all four
-    // bytes for any 32-bit value whose high bit was set (most CRCs).
-    private static void write32(OutputStream out, int v) throws IOException {
-        out.write(v & 0xFF);
-        out.write((v >>> 8) & 0xFF);
-        out.write((v >>> 16) & 0xFF);
-        out.write((v >>> 24) & 0xFF);
-    }
-
-    // Inline CRC32 (RFC 1952). Avoids depending on net.sf.zipme.CRC32 -- if
-    // the same translator/runtime bug that breaks ZipOutputStream's Deflater
-    // also breaks CRC32's static lookup-table initializer, we'd be stuck.
-    private static final int[] CRC32_TABLE = makeCrc32Table();
-
-    private static int[] makeCrc32Table() {
-        int[] t = new int[256];
-        for (int i = 0; i < 256; i++) {
-            int c = i;
-            for (int j = 0; j < 8; j++) {
-                c = ((c & 1) != 0) ? 0xEDB88320 ^ (c >>> 1) : (c >>> 1);
+        try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
+            for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
+                ZipEntry zipEntry = new ZipEntry(fileEntry.getKey());
+                zos.putNextEntry(zipEntry);
+                zos.write(fileEntry.getValue());
+                zos.closeEntry();
             }
-            t[i] = c;
         }
-        return t;
-    }
-
-    private static int crc32(byte[] data) {
-        int crc = -1; // 0xFFFFFFFF as 32-bit signed int
-        for (int i = 0; i < data.length; i++) {
-            crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ data[i]) & 0xFF];
-        }
-        return ~crc;
-    }
-
-    /// Manual zip parser used on the JS port where zipme's ZipInputStream
-    /// Inflater corrupts state between entries. Walks the central directory
-    /// inferred from the local file headers, reads each entry's compressed
-    /// bytes from the raw resource buffer, and routes deflate decompression
-    /// through ``InflateNative`` (browser DecompressionStream). STORED
-    /// entries (method == 0) are copied as-is.
-    private void copyZipEntriesViaNativeInflate(String zipResource, Map<String, byte[]> mergedEntries,
-                                                ZipEntryType zipType, boolean dropWindowsModule,
-                                                InflateNative inflater) throws IOException {
-        java.io.InputStream raw = getResourceAsStream(zipResource);
-        if (raw == null) {
-            throw new IOException("Resource not found: " + zipResource);
-        }
-        byte[] zipBytes;
-        try {
-            zipBytes = readToBytesNoClose(raw);
-        } finally {
-            try { raw.close(); } catch (Throwable ignored) {}
-        }
-        int pos = 0;
-        while (pos + 30 <= zipBytes.length) {
-            int sig = readUInt32LE(zipBytes, pos);
-            if (sig != 0x04034b50) {
-                // Reached central directory (signature 0x02014b50) or EOCD.
-                break;
-            }
-            int method = readUInt16LE(zipBytes, pos + 8);
-            int cSize = readUInt32LE(zipBytes, pos + 18);
-            int nameLen = readUInt16LE(zipBytes, pos + 26);
-            int extraLen = readUInt16LE(zipBytes, pos + 28);
-            int nameStart = pos + 30;
-            int dataStart = nameStart + nameLen + extraLen;
-            if (dataStart + cSize > zipBytes.length) {
-                throw new IOException("Truncated zip entry in " + zipResource);
-            }
-            String name;
-            try {
-                name = new String(zipBytes, nameStart, nameLen, "UTF-8");
-            } catch (java.io.UnsupportedEncodingException ex) {
-                name = new String(zipBytes, nameStart, nameLen);
-            }
-            boolean isDir = name.endsWith("/");
-            if (!isDir) {
-                if (dropWindowsModule && (name.startsWith("win/") || name.startsWith("win\\"))) {
-                    pos = dataStart + cSize;
-                    continue;
-                }
-                byte[] data;
-                if (method == 0) {
-                    data = new byte[cSize];
-                    System.arraycopy(zipBytes, dataStart, data, 0, cSize);
-                } else if (method == 8) {
-                    byte[] compressed = new byte[cSize];
-                    System.arraycopy(zipBytes, dataStart, compressed, 0, cSize);
-                    data = inflater.inflateRaw(compressed);
-                    if (data == null) {
-                        throw new IOException("inflate failed for " + name + " in " + zipResource);
-                    }
-                } else {
-                    throw new IOException("Unsupported zip compression method " + method + " for " + name + " in " + zipResource);
-                }
-                copyEntryToMap(name, data, mergedEntries, zipType);
-            }
-            pos = dataStart + cSize;
-        }
-    }
-
-    private static int readUInt16LE(byte[] data, int off) {
-        return (data[off] & 0xFF) | ((data[off + 1] & 0xFF) << 8);
-    }
-
-    private static int readUInt32LE(byte[] data, int off) {
-        return (data[off] & 0xFF)
-                | ((data[off + 1] & 0xFF) << 8)
-                | ((data[off + 2] & 0xFF) << 16)
-                | ((data[off + 3] & 0xFF) << 24);
     }
 
 
@@ -514,21 +251,7 @@ public class GeneratorModel {
 
     private void copyZipEntriesToMap(String zipResource, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
         boolean dropWindowsModule = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17;
-        // Prefer InflateNative when available (JS port). The bundled zipme
-        // Inflater on that port leaks state between successive ZipInputStream
-        // entries, so we parse the zip framing manually and route deflate
-        // decompression through DecompressionStream. On platforms without the
-        // native helper (JavaSE / Android tests) fall through to zipme.
-        InflateNative inflater = NativeLookup.create(InflateNative.class);
-        if (inflater != null && inflater.isSupported()) {
-            copyZipEntriesViaNativeInflate(zipResource, mergedEntries, zipType, dropWindowsModule, inflater);
-            return;
-        }
-        java.io.InputStream raw = getResourceAsStream(zipResource);
-        if (raw == null) {
-            throw new IOException("Resource not found: " + zipResource);
-        }
-        try (ZipInputStream zis = new ZipInputStream(raw)) {
+        try(ZipInputStream zis = new ZipInputStream(getResourceAsStream(zipResource))) {
             ZipEntry entry = zis.getNextEntry();
             while (entry != null) {
                 if (!entry.isDirectory()) {

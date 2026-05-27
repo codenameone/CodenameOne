@@ -52,42 +52,17 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
     private void captureAndEmit() {
         int width = Math.max(1, host.getWidth());
         int height = Math.max(1, host.getHeight());
-        Image grid = null;
+        Image grid;
         try {
-            try {
-                grid = buildScreenshot(width, height);
-            } catch (Throwable t) {
-                System.out.println("CN1SS:ERR:test=" + getImageName() + " animation_grid_failed=" + t);
-                t.printStackTrace();
-                try {
-                    grid = Image.createImage(width, height, 0xff202020);
-                } catch (Throwable t2) {
-                    // If even the placeholder fails (e.g. JS-port createCanvas
-                    // is broken in this test's state), fall through and signal
-                    // done() so the suite scheduler advances instead of
-                    // re-dispatching this test forever.
-                    System.out.println("CN1SS:ERR:test=" + getImageName() + " placeholder_failed=" + t2);
-                }
-            } finally {
-                AnimationTime.reset();
-            }
-            // Use emitImageDirect (not emitImage) so the off-screen grid PNG
-            // bytes reach the chunk stream verbatim. emitImage routes through
-            // emitChannel, which the JS port hijacks with a host capture of
-            // the visible browser canvas - that's correct for tests that go
-            // through Display.screenshot() (worker OffscreenCanvas may be
-            // stale), but for animation/transition tests the off-screen
-            // buildScreenshot Image already IS the ground truth.
-            if (grid != null) {
-                Cn1ssDeviceRunnerHelper.emitImageDirect(grid, getImageName(), this::done);
-            } else {
-                done();
-            }
+            grid = buildScreenshot(width, height);
         } catch (Throwable t) {
-            System.out.println("CN1SS:ERR:test=" + getImageName() + " capture_failed=" + t);
+            System.out.println("CN1SS:ERR:test=" + getImageName() + " animation_grid_failed=" + t);
             t.printStackTrace();
-            done();
+            grid = Image.createImage(width, height, 0xff202020);
+        } finally {
+            AnimationTime.reset();
         }
+        Cn1ssDeviceRunnerHelper.emitImage(grid, getImageName(), this::done);
     }
 
     /// Build the final screenshot Image. The default implementation runs the

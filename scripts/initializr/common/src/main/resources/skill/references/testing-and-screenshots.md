@@ -1,6 +1,20 @@
 # Testing and Screenshots Reference
 
-Codename One runs tests through its own runner (`cn1:test`), not Surefire. Tests can mutate the UI on the EDT, drive components programmatically, and capture screenshots for regression. This document covers the API and the screenshot comparison algorithm, plus how to use screenshots to evaluate UI you just generated.
+This document covers Codename One's `AbstractTest` framework, which runs through `cn1:test`. Standard JUnit 5 tests against the simulator are covered in `references/junit-testing.md` — both frameworks coexist in the same project and you pick per test class.
+
+When to use `AbstractTest` (this doc):
+
+- The test must also run on a device via `mvn cn1:test -Dtarget=ios`. JUnit Jupiter is not available on ParparVM, so on-device tests must use `AbstractTest`.
+- The test compiles under the strict device subset (no reflection, no `java.nio.file.*`, no `java.net.http.*`).
+- You already have a body of `AbstractTest` tests and want to keep adding peers in the same style.
+
+When to use JUnit instead (`references/junit-testing.md`):
+
+- Simulator-only tests that want reflection, Mockito, AssertJ, `assertThrows`, parameterized tests, `-Dtest=Foo#bar` filtering, IDE-native test discovery.
+
+Either way, the `TestUtils` helpers below (`waitForFormTitle`, `clickButtonByLabel`, `screenshotTest`, etc.) are framework-independent — they work the same from both.
+
+`AbstractTest` tests mutate the UI on the EDT, drive components programmatically, and capture screenshots for regression. This document covers the API and the screenshot comparison algorithm, plus how to use screenshots to evaluate UI you just generated.
 
 ## Where tests live
 

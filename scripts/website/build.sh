@@ -563,14 +563,6 @@ build_initializr_for_site() {
   fi
 
   echo "Building Initializr JavaScript bundle for website..." >&2
-
-  # Build the TeaVM-based JS bundle via the Codename One cloud build server.
-  # The original branch (75803715d, see Ports/JavaScriptPort/STATUS.md) moved
-  # this to a local ParparVM build, but the canvasContextWipe Heisenbug kept
-  # the cascade tests flake-prone, so initializr is back on TeaVM while the
-  # bug is chased in smaller follow-up PRs. The build script and bundle
-  # infrastructure remain in tree (scripts/build-javascript-port-initializr.sh,
-  # build.sh's javascript_parparvm function) for the next attempt.
   (
     cd "${REPO_ROOT}/scripts/initializr"
 
