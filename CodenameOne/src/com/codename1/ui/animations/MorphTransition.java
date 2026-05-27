@@ -366,7 +366,9 @@ public final class MorphTransition extends Transition {
                 int y = c.yMotion.getValue();
                 int w = c.wMotion.getValue();
                 int h = c.hMotion.getValue();
-                if (w <= 0 || h <= 0) continue;
+                if (w <= 0 || h <= 0) {
+                    continue;
+                }
                 // Source fades out
                 g.setAlpha(255 - alpha);
                 drawImageScaled(g, c.sourceImage, x, y, w, h);
