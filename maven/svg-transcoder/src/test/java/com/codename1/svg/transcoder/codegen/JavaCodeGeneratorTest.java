@@ -115,22 +115,53 @@ public class JavaCodeGeneratorTest {
                 + "<stop offset='1' stop-color='blue'/>"
                 + "</linearGradient></defs>"
                 + "<rect x='0' y='0' width='10' height='10' fill='url(#g1)'/></svg>");
-        // Gradient fills emit a LinearGradientPaint + a runtime branch on
-        // __p.isRectangle(): rectangular paths use clipRect (which INTERSECTS
-        // with the existing clip), non-rectangular paths still use setClip
-        // (which replaces). The clipRect branch is what lets a rect with an
-        // outer clip-path survive into the gradient body -- before the
-        // branch was added, clipped_badge.svg's rounded outer clip was
-        // wiped by the inner setClip(__p) and the badge rendered as a
-        // sharp-cornered square on every port.
+        // Standalone gradient (no enclosing clip-path) keeps the existing
+        // setClip(__p) inner clamp: LinearGradientPaint.paint rasterises
+        // bands wider than __p's bounding box and would bleed without it.
         assertTrue(out.contains("new LinearGradientPaint("));
         assertTrue(out.contains("CycleMethod.NO_CYCLE"));
-        assertTrue("expected runtime branch on __p.isRectangle() in emitted gradient block: " + out,
-                out.contains("if (__p.isRectangle())"));
-        assertTrue("rectangular path branch must clip via clipRect to intersect with the outer clip: " + out,
-                out.contains("g.clipRect("));
-        assertTrue("non-rectangular path branch must still confine the gradient inside the shape: " + out,
+        assertTrue("standalone gradient must keep the inner setClip(__p): " + out,
                 out.contains("g.setClip(__p);"));
+    }
+
+    @Test
+    public void gradientInsideClipPathSkipsInnerClip() throws Exception {
+        // clipped_badge.svg-style structure: a <rect> filled with a
+        // gradient and clipped by a rounded-rect <clipPath>. The
+        // generator must NOT emit the inner setClip(__p) inside the
+        // clipPath block -- that setClip REPLACES the outer rounded
+        // clip and the badge would render as a sharp-cornered square
+        // on every port. Outer clip alone constrains the gradient.
+        String out = transcode("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                + "<defs>"
+                + "<clipPath id='rounded'>"
+                + "<rect x='10' y='10' width='80' height='80' rx='20' ry='20'/>"
+                + "</clipPath>"
+                + "<linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
+                + "<stop offset='0' stop-color='red'/>"
+                + "<stop offset='1' stop-color='blue'/>"
+                + "</linearGradient>"
+                + "</defs>"
+                + "<rect x='0' y='0' width='100' height='100' fill='url(#g)' clip-path='url(#rounded)'/>"
+                + "</svg>");
+        // The outer clip-path block IS emitted.
+        assertTrue("expected outer clip-path setClip block: " + out,
+                out.contains("g.setClip(__clip0);"));
+        // The gradient runs but with NO inner setClip / pushClip /
+        // popClip wrapping it. We assert paint(g, ...) appears without
+        // an inner setClip(__p) anywhere in the file -- the only
+        // setClip should be the outer one.
+        assertTrue("expected paint(g, __bx, __by, __bw, __bh): " + out,
+                out.contains("__paint.paint(g, __bx, __by, __bw, __bh);"));
+        // Count setClip occurrences -- exactly 1 (the outer clipPath).
+        int setClipCount = 0;
+        int idx = 0;
+        while ((idx = out.indexOf("g.setClip(", idx)) != -1) {
+            setClipCount++;
+            idx++;
+        }
+        assertTrue("expected exactly one setClip call (the outer clipPath); found " + setClipCount
+                + " in:\n" + out, setClipCount == 1);
     }
 
     @Test

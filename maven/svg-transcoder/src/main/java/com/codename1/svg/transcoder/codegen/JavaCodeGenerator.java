@@ -27,6 +27,14 @@ public final class JavaCodeGenerator {
     private final StringBuilder body = new StringBuilder();
     private int indent = 2;
     private int idSeq;
+    /// Depth of the currently active clip-path stack -- bumped on the way
+    /// into an emitNode that resolved its element's clip-path attr, popped
+    /// on the way out. Read by emitGradientFill to decide whether the
+    /// inner setClip(__p) is needed: an outer clip-path already constrains
+    /// the gradient to the visible region, and the inner setClip would
+    /// REPLACE the outer clip and wipe the rounded clipPath
+    /// (clipped_badge.svg) before the gradient runs.
+    private int clipPathDepth;
 
     public JavaCodeGenerator(SVGDocument doc, String packageName, String className) {
         this.doc = doc;
@@ -143,6 +151,7 @@ public final class JavaCodeGenerator {
                 line("try {");
                 indent++;
                 line("g.setClip(" + clipVar + ");");
+                clipPathDepth++;
             }
         }
 
@@ -169,6 +178,7 @@ public final class JavaCodeGenerator {
             }
         } finally {
             if (clip != null) {
+                clipPathDepth--;
                 indent--;
                 line("} finally {");
                 indent++;
@@ -613,18 +623,25 @@ public final class JavaCodeGenerator {
         fracs.append("}");
         cols.append("}");
 
-        // Confining the gradient to the shape: setClip(__p) REPLACES the
-        // current clip, which wipes any outer clip-path the enclosing
-        // element already set (clipped_badge.svg's rounded clipPath was
-        // erased here -- the badge rendered as a sharp-cornered square).
-        // For a rectangular __p the bounds are the shape, so clipRect on
-        // the bounds intersects with the existing clip and the rounded
-        // outer clip survives. For non-rectangular __p (circle / ellipse
-        // / path), setClip is still needed to confine the gradient inside
-        // the shape -- the runtime branch on __p.isRectangle() picks the
-        // right one. Side effect: a rect with an outer clipPath now
-        // renders the gradient inside the clipped region instead of the
-        // bounding box.
+        // Confining the gradient: LinearGradientPaint.paint() rasterises
+        // bands wider than `__p`'s bounding box (Math.max(w, h) inset on
+        // both sides), so a clip is needed to keep the gradient inside
+        // the shape. The natural choice is `setClip(__p)`, but setClip
+        // REPLACES the current clip -- and when the element carries a
+        // clip-path attribute, the enclosing block already set the clip
+        // to the clipPath. setClip(__p) wipes the clipPath, and
+        // clipped_badge.svg's rounded outline ends up rendered as a
+        // sharp-cornered square. When we're already inside a clipPath
+        // block, that outer clip is more restrictive than __p (every
+        // SVG sample we ship and every authoring tool we've seen builds
+        // a clipPath that's a subset of the element it clips), so we
+        // can skip the inner clip and let the outer one constrain the
+        // gradient -- which is what the rounded badge needs to render.
+        // Outside a clipPath block we still need the inner setClip(__p)
+        // to confine the gradient to non-rectangular shapes
+        // (gradient_circle.svg would bleed past the circle into the
+        // bounding-rect corners without it).
+        boolean outerClipActive = clipPathDepth > 0;
         line("{");
         indent++;
         line("float[] __b = new float[4];");
@@ -650,27 +667,21 @@ public final class JavaCodeGenerator {
                 + "MultipleGradientPaint.ColorSpaceType.SRGB, "
                 + "Transform.makeIdentity());");
         line("g.setAlpha(" + alphaExpression(opacity, elementOpacity, 0xFF) + ");");
-        line("g.pushClip();");
-        line("try {");
-        indent++;
-        line("if (__p.isRectangle()) {");
-        indent++;
-        line("g.clipRect((int)Math.floor(__bx), (int)Math.floor(__by),");
-        line("        (int)Math.ceil(__bx + __bw) - (int)Math.floor(__bx),");
-        line("        (int)Math.ceil(__by + __bh) - (int)Math.floor(__by));");
-        indent--;
-        line("} else {");
-        indent++;
-        line("g.setClip(__p);");
-        indent--;
-        line("}");
-        line("__paint.paint(g, __bx, __by, __bw, __bh);");
-        indent--;
-        line("} finally {");
-        indent++;
-        line("g.popClip();");
-        indent--;
-        line("}");
+        if (outerClipActive) {
+            line("__paint.paint(g, __bx, __by, __bw, __bh);");
+        } else {
+            line("g.pushClip();");
+            line("try {");
+            indent++;
+            line("g.setClip(__p);");
+            line("__paint.paint(g, __bx, __by, __bw, __bh);");
+            indent--;
+            line("} finally {");
+            indent++;
+            line("g.popClip();");
+            indent--;
+            line("}");
+        }
         indent--;
         line("}");
     }
