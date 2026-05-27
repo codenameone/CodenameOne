@@ -2374,7 +2374,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             // after one paint pass.
             Form f = cmp.getComponentForm();
             if (f != null) {
-                f.registerAnimated(modernSpinnerRepaintAnimation(cmp, f));
+                f.registerAnimated(modernSpinnerRepaintAnimation(cmp));
             }
         } else {
             modernSpinStartTime = 0L;
@@ -2451,7 +2451,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// registered once and stops itself when `taskExecuted` flips back to
     /// false (the pull-to-refresh container repaints from elsewhere when
     /// the task finishes).
-    private Animation modernSpinnerRepaintAnimation(final Component cmp, final Form host) {
+    private Animation modernSpinnerRepaintAnimation(final Component cmp) {
         return new Animation() {
             @Override
             public boolean animate() {
