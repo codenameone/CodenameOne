@@ -344,6 +344,12 @@
                     <xmlOutput>true</xmlOutput>
                     <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
                     <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <!-- The plugin grew an ASM bytecode-instrumentation pass for
+                         BindingAnnotationProcessor; with effort=Max the
+                         FindOpenStream dataflow detector blew the default 512m
+                         heap on CI ("GC overhead limit exceeded"). Bump the
+                         forked JVM's max heap so SpotBugs has room to finish. -->
+                    <maxHeap>1536</maxHeap>
                 </configuration>
                 <executions>
                     <execution>
