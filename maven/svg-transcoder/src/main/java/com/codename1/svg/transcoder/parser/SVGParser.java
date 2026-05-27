@@ -444,9 +444,16 @@ public final class SVGParser {
         Map<String, String> pres = new HashMap<String, String>();
         for (Map.Entry<String, String> e : a.entrySet()) {
             String k = e.getKey();
+            // Whitelist of SVG presentation attributes we forward to
+            // StyleParser. Missing `clip-path` here was why
+            // clipped_badge.svg's outer rect lost its rounded clip --
+            // StyleParser only sees the keys that land in `pres`, so any
+            // attribute *not* listed is silently dropped even if it is a
+            // well-formed presentation attribute on the element.
             if ("fill".equals(k) || "stroke".equals(k) || "fill-opacity".equals(k) || "stroke-opacity".equals(k)
                     || "opacity".equals(k) || "stroke-width".equals(k) || "stroke-linecap".equals(k)
-                    || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)) {
+                    || "stroke-linejoin".equals(k) || "stroke-miterlimit".equals(k)
+                    || "clip-path".equals(k)) {
                 pres.put(k, e.getValue());
             }
         }
