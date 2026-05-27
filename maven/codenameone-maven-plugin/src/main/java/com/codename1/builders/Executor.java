@@ -2019,23 +2019,47 @@ public abstract class Executor {
     /// Stub-source fragment to splice into a generated application stub
     /// right before `Display.init(...)` to install the build-time-generated
     /// JSON / XML mapper index, the component binder index, and the SQLite
-    /// dao index in one go. Each call is a direct symbol reference (no
-    /// `Class.forName`) so ParparVM iOS / R8 Android rename the call site
-    /// and the generated class together; projects without the corresponding
-    /// annotations resolve against the no-op stub cn1-core ships, which is
-    /// shadowed by the build-time-generated class when present.
+    /// dao index -- but only when the project actually uses each feature.
     ///
-    /// Each `bootstrap()` triggers an initialization-on-demand holder whose
-    /// static initializer instantiates the generated `XxxIndex`; that
-    /// constructor calls `Mappers.register` / `Binders.register` /
-    /// `EntityManager.registerDao` for every entry, so the registries are
-    /// populated by the time application code reaches `Mappers.toJson`,
-    /// `Binders.bind`, or `EntityManager.dao`.
+    /// The annotation processor emits `cn1app.MapperBootstrap` /
+    /// `BinderBootstrap` / `DaoBootstrap` only when there are `@Mapped` /
+    /// `@Bindable` / `@Entity` classes to register. Each bootstrap's
+    /// constructor references every generated per-class mapper / binder /
+    /// dao by direct symbol (`new com.example.UserCn1Mapper();` etc.), so
+    /// ParparVM iOS / R8 Android rename the call sites and the generated
+    /// classes together.
+    ///
+    /// We probe the project zip for each bootstrap and emit the
+    /// instantiation only when the class is present, so a project that
+    /// uses only `@Mapped` (no `@Bindable`, no `@Entity`) gets just the
+    /// mapper bootstrap line and nothing else. cn1-core does not ship a
+    /// stub: an absent feature leaves the registries empty.
     protected static String annotationFrameworksInstallSource(File sourceZip, String indent) {
         StringBuilder sb = new StringBuilder();
-        sb.append(indent).append("com.codename1.mapping.Mappers.bootstrap();\n");
-        sb.append(indent).append("com.codename1.binding.Binders.bootstrap();\n");
-        sb.append(indent).append("com.codename1.orm.EntityManager.bootstrap();\n");
+        if (projectHasBootstrap(sourceZip, "cn1app/MapperBootstrap.class")) {
+            sb.append(indent).append("new cn1app.MapperBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/BinderBootstrap.class")) {
+            sb.append(indent).append("new cn1app.BinderBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/DaoBootstrap.class")) {
+            sb.append(indent).append("new cn1app.DaoBootstrap();\n");
+        }
         return sb.toString();
+    }
+
+    /// Returns true when `sourceZip` (the project's
+    /// `jar-with-dependencies`) contains `entryPath`. Used to gate the
+    /// per-feature bootstrap install lines so projects that don't use
+    /// every annotation framework still produce a clean stub.
+    protected static boolean projectHasBootstrap(File sourceZip, String entryPath) {
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
+            return zf.getEntry(entryPath) != null;
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

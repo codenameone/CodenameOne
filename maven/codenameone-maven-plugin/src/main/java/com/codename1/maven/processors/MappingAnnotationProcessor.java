@@ -42,22 +42,23 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /// Build-time `@Mapped` processor. Scans the project's compiled classes for
-/// `@Mapped` types, validates each one (no abstract / interface targets, a
-/// usable public no-arg constructor, supported field types), then generates:
+/// `@Mapped` types, validates each one (concrete class, public no-arg
+/// constructor, supported field types), then generates:
 ///
-/// 1. One `XxxMapper` Java class per `@Mapped` type, in package
-///    `com.codename1.mapping.generated`, implementing
-///    `com.codename1.mapping.Mapper<XXX>`.
-/// 2. A single `MappersIndex` class in the same package whose no-arg
-///    constructor calls `Mappers.register(new XxxMapper())` for every
-///    discovered type. `Mappers#ensureIndexLoaded` lazy-loads it on the first
-///    `Mappers.toJson` / `Mappers.fromJson` / `Mappers.toXml` / `Mappers.fromXml`
-///    call.
-///
-/// Everything goes through `JavaSourceCompiler` (the same JSR-199 wrapper the
-/// router processor uses) so the emitted classes survive ParparVM rename and
-/// R8 obfuscation in shipped builds -- the generated source references
-/// application classes by direct symbol, not by `Class.forName`.
+/// 1. One `<SimpleName>Cn1Mapper` Java class per `@Mapped` type, in the
+///    **same package as the source class** (so the generated artifact
+///    lives alongside the model it describes), implementing
+///    `com.codename1.mapping.Mapper<XXX>`. Each has a public
+///    `static register()` method that installs an instance in
+///    `Mappers`.
+/// 2. A single `cn1app.MapperBootstrap` whose no-arg constructor calls
+///    `UserCn1Mapper.register()`, `ItemCn1Mapper.register()`, ... for every
+///    accepted `@Mapped` class. The build server probes the project zip
+///    for this class and splices `new cn1app.MapperBootstrap();` into the
+///    iOS / Android per-build application stub before `Display.init`;
+///    `JavaSEPort#postInit` loads it via `Class.forName`. Direct symbol
+///    references survive ParparVM rename and R8 obfuscation; the JavaSE
+///    classloading path is the legitimate exception (unobfuscated run).
 public final class MappingAnnotationProcessor extends AbstractAnnotationProcessor {
 
     public static final String MAPPED_DESC = "Lcom/codename1/annotations/Mapped;";
@@ -68,7 +69,9 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     public static final String XML_ATTRIBUTE_DESC = "Lcom/codename1/annotations/XmlAttribute;";
     public static final String XML_TRANSIENT_DESC = "Lcom/codename1/annotations/XmlTransient;";
 
-    static final String GENERATED_PACKAGE = "com.codename1.mapping.generated";
+    static final String BOOTSTRAP_BINARY = "cn1app.MapperBootstrap";
+    static final String BOOTSTRAP_SIMPLE = "MapperBootstrap";
+    static final String BOOTSTRAP_PACKAGE = "cn1app";
 
     private static final Set<String> DESCRIPTORS;
     static {
@@ -109,8 +112,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         MappedClass mc = new MappedClass();
         mc.binaryName = cls.getBinaryName();
         mc.simpleName = simpleName(cls.getBinaryName());
-        mc.mapperSimpleName = mc.simpleName + "Mapper";
-        mc.mapperBinaryName = GENERATED_PACKAGE + "." + mc.mapperSimpleName;
+        mc.packageName = packageOf(cls.getBinaryName());
+        mc.mapperSimpleName = mc.simpleName + "Cn1Mapper";
+        mc.mapperBinaryName = (mc.packageName.length() == 0)
+                ? mc.mapperSimpleName
+                : mc.packageName + "." + mc.mapperSimpleName;
 
         AnnotationValues xmlRoot = cls.getClassAnnotation(XML_ROOT_DESC);
         if (xmlRoot != null) {
@@ -183,7 +189,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         for (MappedClass mc : accepted.values()) {
             sources.put(mc.mapperBinaryName, generateMapperSource(mc));
         }
-        sources.put(GENERATED_PACKAGE + ".MappersIndex", generateIndexSource(accepted.values()));
+        sources.put(BOOTSTRAP_BINARY, generateBootstrapSource(accepted.values()));
 
         try {
             // The output directory holds the application's @Mapped types --
@@ -197,7 +203,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     + ioe.getMessage(), ioe);
         }
         ctx.getLog().info("cn1: generated " + accepted.size()
-                + " @Mapped mapper(s) under " + GENERATED_PACKAGE);
+                + " @Mapped mapper(s) + " + BOOTSTRAP_BINARY);
     }
 
     // ---------------------------------------------------------------
@@ -206,11 +212,24 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
     private static String generateMapperSource(MappedClass mc) {
         StringBuilder sb = new StringBuilder(2048);
-        sb.append("package ").append(GENERATED_PACKAGE).append(";\n\n");
+        if (mc.packageName.length() > 0) {
+            sb.append("package ").append(mc.packageName).append(";\n\n");
+        }
         sb.append("// Auto-generated by cn1:process-annotations. Do not edit.\n");
         sb.append("@SuppressWarnings({\"all\"})\n");
         sb.append("public final class ").append(mc.mapperSimpleName)
                 .append(" implements com.codename1.mapping.Mapper<").append(mc.binaryName).append("> {\n\n");
+
+        // Public static register() hook. The bootstrap class invokes
+        // this once per generated mapper at app start; the call
+        // triggers this class's <clinit> and installs the mapper in
+        // the Mappers registry.
+        sb.append("    public static void register() {\n");
+        sb.append("        com.codename1.mapping.Mappers.register(new ").append(mc.mapperSimpleName).append("());\n");
+        sb.append("    }\n\n");
+
+        sb.append("    public ").append(mc.mapperSimpleName).append("() {\n");
+        sb.append("    }\n\n");
 
         // type()
         sb.append("    public Class<").append(mc.binaryName).append("> type() {\n");
@@ -284,18 +303,30 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         return sb.toString();
     }
 
-    private static String generateIndexSource(Iterable<MappedClass> classes) {
+    private static String generateBootstrapSource(Iterable<MappedClass> classes) {
         StringBuilder sb = new StringBuilder(1024);
-        sb.append("package ").append(GENERATED_PACKAGE).append(";\n\n");
+        sb.append("package ").append(BOOTSTRAP_PACKAGE).append(";\n\n");
         sb.append("// Auto-generated by cn1:process-annotations. Do not edit.\n");
-        sb.append("public final class MappersIndex {\n");
-        sb.append("    public MappersIndex() {\n");
+        sb.append("///\n");
+        sb.append("/// JSON / XML mapper bootstrap. The iOS / Android per-build\n");
+        sb.append("/// application stub instantiates this class before Display.init\n");
+        sb.append("/// (the build server probes the project zip for it and emits the\n");
+        sb.append("/// install line conditionally); JavaSEPort.postInit picks it up\n");
+        sb.append("/// via Class.forName for the simulator and desktop runs.\n");
+        sb.append("@SuppressWarnings({\"all\"})\n");
+        sb.append("public final class ").append(BOOTSTRAP_SIMPLE).append(" {\n");
+        sb.append("    public ").append(BOOTSTRAP_SIMPLE).append("() {\n");
         for (MappedClass mc : classes) {
-            sb.append("        com.codename1.mapping.Mappers.register(new ").append(mc.mapperSimpleName).append("());\n");
+            sb.append("        ").append(mc.mapperBinaryName).append(".register();\n");
         }
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    private static String packageOf(String binary) {
+        int dot = binary.lastIndexOf('.');
+        return dot < 0 ? "" : binary.substring(0, dot);
     }
 
     // ---------------------------------------------------------------
@@ -764,6 +795,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
     static final class MappedClass {
         String binaryName;
+        String packageName;
         String simpleName;
         String mapperBinaryName;
         String mapperSimpleName;

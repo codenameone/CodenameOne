@@ -20,22 +20,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.mapping.generated;
+package com.codename1.binding;
 
-/// Compile-time stub for the @Mapped annotation processor output. Projects
-/// that ship one or more `@Mapped` classes get a real `MappersIndex`
-/// generated under `target/classes`, shadowing this stub at runtime; projects
-/// with no `@Mapped` classes fall through to this no-op and the
-/// `com.codename1.mapping.Mappers` registry stays empty.
-///
-/// Application code never references this class directly -- the lazy
-/// instantiation happens inside `Mappers#bootstrap`, by direct symbol
-/// reference, so the iOS `Class.forName` ban does not apply.
-///
-/// The compiler-generated default no-arg public constructor is intentionally
-/// inherited (no explicit constructor here) so the cn1 PMD gate's
-/// `UnnecessaryConstructor` rule stays satisfied. The build-time-shadowing
-/// `MappersIndex` written by `cn1:process-annotations` declares its own
-/// constructor body that does the `Mappers.register(...)` work.
-public class MappersIndex {
+/// Internal contract every generated `Binding` implementation provides so
+/// `Binders#notifyChanged(Object)` can route a model mutation to the
+/// bindings that observe it. Application code never references this
+/// directly -- the `Binding` interface remains the public handle returned
+/// from `Binders.bind`.
+public interface NotifiableBinding extends Binding {
+
+    /// `model.getClass().getName()` -- the registry key
+    /// `Binders.notifyChanged` uses to find the bindings that care about
+    /// this model class. Stored at bind time so it survives obfuscation:
+    /// the value is whatever `getName()` returned at bind, which is
+    /// guaranteed to match `notifyChanged`'s lookup within a single
+    /// execution.
+    String modelTypeName();
+
+    /// True when this binding's source object IS `model` (identity, not
+    /// equality). The notification fan-out uses identity so multiple
+    /// independent instances of the same `@Bindable` class don't refresh
+    /// each other.
+    boolean matches(Object model);
 }

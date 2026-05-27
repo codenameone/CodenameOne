@@ -24,51 +24,106 @@ package com.codename1.binding;
 
 import com.codename1.ui.Container;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /// Public entry point for the build-time component binding framework.
 ///
-/// `@Bindable` classes are picked up by the Maven plugin's annotation
-/// processor at build time. The generated `Binder` is wired into this
-/// registry through a generated `com.codename1.binding.generated.BindersIndex`
-/// whose no-arg constructor fires the first time the registry is touched.
-/// (Projects with no `@Bindable` classes fall through to an empty no-op
-/// stub shipped with cn1-core, so the lookup degrades cleanly.)
+/// `@Bindable` classes get a generated binder at build time. Each binder's
+/// static initializer self-registers with this registry. The registry stays
+/// empty until something triggers each generated class's `<clinit>`:
 ///
-/// ```java
-/// Form f = (Form) Resources.getGlobalResources().getForm("LoginForm");
-/// LoginModel model = new LoginModel();
-/// Binding b = Binders.bind(model, f);
-/// // user types -- model is updated; mutate the model and call b.refresh().
-/// ```
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.BinderBootstrap` and splices a
+///   `new cn1app.BinderBootstrap();` into the per-build application stub
+///   before `Display.init`.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName("cn1app.BinderBootstrap")` so the registry is
+///   populated on the same boundary.
+/// - **Unit tests / manual init** -- application code can call
+///   `Binders.register(...)` directly.
+///
+/// ## Two-way bindings and the change-notification contract
+///
+/// A binding declared `twoWay = true` flows in both directions:
+///
+/// 1. **Component -> model.** The generated binder installs a listener on
+///    the editable component (`TextField`, `CheckBox`, etc.). When the
+///    user mutates the component, the binder calls the model's setter (or
+///    writes the public field directly), and the setter's
+///    instrumented exit calls `notifyChanged(this)`.
+/// 2. **Model -> component.** Application code that mutates the model
+///    through a setter (instrumented by the build-time processor) causes
+///    `notifyChanged(this)` to fire, which walks every live binding for
+///    that model and pushes the new value into the matching component.
+///
+/// The two paths together would loop forever if left to themselves -- the
+/// model setter fires a change event, which refreshes the component, which
+/// fires its own change event, which calls the model setter again. To
+/// break the loop, every framework-initiated mutation runs inside an
+/// "update region" guarded by a thread-local flag. While the flag is set,
+/// `notifyChanged` is a no-op, and component listeners short-circuit.
+///
+/// Concretely:
+///
+/// - `Binders.bind(model, container)` enters an update region for the
+///   initial model -> component push.
+/// - `Binding#refresh()` enters an update region for every subsequent
+///   model -> component push.
+/// - `Binding#commit()` enters an update region for the component -> model
+///   pull.
+/// - The generated component listener enters an update region before
+///   calling the setter.
+///
+/// **Limitation:** when a setter synchronously mutates a *second* bound
+/// field (e.g. `setFirstName` also calls `setFullName`), the second field's
+/// notification is also suppressed -- the user must call
+/// `binding.refresh()` explicitly if they want the second component to
+/// catch up. See `Annotation-Component-Binding.asciidoc` for details.
 public final class Binders {
 
-    private static final Map<Class<?>, Binder<?>> BY_TYPE = new HashMap<Class<?>, Binder<?>>();
+    private static final Map<String, Binder<?>> BY_NAME = new HashMap<String, Binder<?>>();
 
-    private Binders() { }
+    /// Active bindings keyed by `model.getClass().getName()` so
+    /// `notifyChanged(model)` can iterate them in O(matches). Each live
+    /// binding registers itself in `Binders#registerBinding` from inside
+    /// `Binder#bind`; the binding removes itself on `disconnect`.
+    private static final Map<String, List<NotifiableBinding>> LIVE_BINDINGS =
+            new HashMap<String, List<NotifiableBinding>>();
 
-    /// Installs a binder for `binder.type()`. Generated binders call this
-    /// from the `BindersIndex` static initializer; hand-written binders for
-    /// classes outside the build's annotation scan call it explicitly.
+    private static final ThreadLocal<int[]> IN_UPDATE = new ThreadLocal<int[]>();
+
+    private Binders() {
+    }
+
+    /// Installs `binder` under `binder.type().getName()`. The generated
+    /// per-class binder's static initializer calls this; hand-written
+    /// binders for classes outside the build's annotation scan call it
+    /// explicitly.
     public static <T> void register(Binder<T> binder) {
         if (binder == null) {
             throw new IllegalArgumentException("binder is null");
         }
-        BY_TYPE.put(binder.type(), binder);
+        BY_NAME.put(binder.type().getName(), binder);
     }
 
-    /// Looks up the binder for `type` or null when no binder is registered.
+    /// Looks up the binder for `type` (by `type.getName()`) or null when
+    /// none is registered.
     @SuppressWarnings("unchecked")
     public static <T> Binder<T> get(Class<T> type) {
-        ensureIndexLoaded();
-        return (Binder<T>) BY_TYPE.get(type);
+        if (type == null) {
+            return null;
+        }
+        return (Binder<T>) BY_NAME.get(type.getName());
     }
 
-    /// Pushes the model values into the matching components in `container`,
-    /// wiring up the two-way listeners declared on its `@Bind` fields.
-    /// Throws `IllegalStateException` when no binder is registered for
-    /// `model.getClass()`.
+    /// Pushes the model values into the matching components in
+    /// `container`, wiring up the two-way listeners declared on its
+    /// `@Bind` fields. Throws `IllegalStateException` when no binder is
+    /// registered for `model.getClass()`.
     @SuppressWarnings("unchecked")
     public static <T> Binding bind(T model, Container container) {
         if (model == null) {
@@ -77,56 +132,128 @@ public final class Binders {
         if (container == null) {
             throw new IllegalArgumentException("container is null");
         }
-        Binder<T> binder = (Binder<T>) get((Class<T>) model.getClass());
+        Binder<T> binder = (Binder<T>) BY_NAME.get(model.getClass().getName());
         if (binder == null) {
             throw new IllegalStateException("No binder registered for "
-                    + model.getClass().getName() + ". Add @Bindable and "
-                    + "ensure the cn1:process-annotations Mojo ran during build.");
+                    + model.getClass().getName() + ". Add @Bindable and ensure the "
+                    + "cn1:process-annotations Mojo ran during build, then re-run -- the "
+                    + "generated BinderBootstrap populates this registry at startup.");
         }
         return binder.bind(model, container);
     }
 
-    /// Forces the lazy `IndexHolder` class to initialize, registering every
-    /// generated binder. Called from the per-build application stub before
-    /// `Display.init`.
-    public static void bootstrap() {
-        IndexHolder.touch();
-    }
+    // ---------------------------------------------------------------
+    // Binding-aware change notification
+    // ---------------------------------------------------------------
 
-    private static void ensureIndexLoaded() {
-        IndexHolder.touch();
-    }
-
-    /// Initialization-on-demand holder. Class init runs exactly once,
-    /// race-free, without `volatile`. Direct symbol reference to the
-    /// generated index so ParparVM / R8 rewrite the call site and the
-    /// generated class together.
-    private static final class IndexHolder {
-        static final Object INDEX;
-        static {
-            Object resolved;
-            try {
-                resolved = new com.codename1.binding.generated.BindersIndex();
-            } catch (NoClassDefFoundError missing) {
-                resolved = Boolean.FALSE;
-            } catch (RuntimeException failed) {
-                resolved = Boolean.FALSE;
-            }
-            INDEX = resolved;
+    /// Called from the build-time-instrumented setter at every return
+    /// point. Walks the live bindings for `model.getClass().getName()`
+    /// and refreshes those whose source is `model`. Short-circuits when
+    /// the calling thread is already inside an update region, breaking
+    /// the model -> component -> model loop.
+    ///
+    /// Application code rarely calls this directly; the build-time
+    /// instrumentation wires it into generated setters automatically.
+    public static void notifyChanged(Object model) {
+        if (model == null) {
+            return;
         }
-
-        private IndexHolder() {
-            // Utility-style holder: only the static initializer + touch
-            // matter. PMD `UseUtilityClass` requires this private ctor;
-            // `UnnecessaryConstructor` then requires a non-empty body.
-            throw new AssertionError("IndexHolder is not instantiable");
+        if (isInUpdate()) {
+            return;
         }
-
-        static void touch() {
-            if (INDEX == null) {
-                throw new IllegalStateException(
-                        "BindersIndex failed to initialize");
+        List<NotifiableBinding> bindings = LIVE_BINDINGS.get(model.getClass().getName());
+        if (bindings == null || bindings.isEmpty()) {
+            return;
+        }
+        // Snapshot so a refresh that disconnects/reinstalls bindings
+        // doesn't break the iteration.
+        NotifiableBinding[] snapshot;
+        synchronized (LIVE_BINDINGS) {
+            snapshot = bindings.toArray(new NotifiableBinding[0]);
+        }
+        for (int i = 0; i < snapshot.length; i++) {
+            NotifiableBinding b = snapshot[i];
+            if (b.matches(model)) {
+                enterUpdate();
+                try {
+                    b.refresh();
+                } finally {
+                    exitUpdate();
+                }
             }
         }
+    }
+
+    /// Generated binders call this to enroll a new live binding in the
+    /// per-class registry. Call `unregisterBinding` from `disconnect` to
+    /// remove it.
+    public static void registerBinding(NotifiableBinding binding) {
+        if (binding == null) {
+            return;
+        }
+        synchronized (LIVE_BINDINGS) {
+            List<NotifiableBinding> list = LIVE_BINDINGS.get(binding.modelTypeName());
+            if (list == null) {
+                list = new ArrayList<NotifiableBinding>();
+                LIVE_BINDINGS.put(binding.modelTypeName(), list);
+            }
+            list.add(binding);
+        }
+    }
+
+    /// Inverse of `registerBinding`. Called from
+    /// `Binding#disconnect`.
+    public static void unregisterBinding(NotifiableBinding binding) {
+        if (binding == null) {
+            return;
+        }
+        synchronized (LIVE_BINDINGS) {
+            List<NotifiableBinding> list = LIVE_BINDINGS.get(binding.modelTypeName());
+            if (list == null) {
+                return;
+            }
+            for (Iterator<NotifiableBinding> it = list.iterator(); it.hasNext(); ) {
+                NotifiableBinding b = it.next();
+                if (b == binding) {
+                    it.remove();
+                    break;
+                }
+            }
+            if (list.isEmpty()) {
+                LIVE_BINDINGS.remove(binding.modelTypeName());
+            }
+        }
+    }
+
+    /// Enter an update region. Generated binder code calls this around
+    /// every framework-initiated mutation -- model->component pushes and
+    /// component->model pulls -- so the setter notification and the
+    /// component change listener both short-circuit while we're inside.
+    public static void enterUpdate() {
+        int[] depth = IN_UPDATE.get();
+        if (depth == null) {
+            depth = new int[]{0};
+            IN_UPDATE.set(depth);
+        }
+        depth[0]++;
+    }
+
+    /// Exit an update region. Call once per `enterUpdate`.
+    public static void exitUpdate() {
+        int[] depth = IN_UPDATE.get();
+        if (depth == null) {
+            return;
+        }
+        depth[0]--;
+        if (depth[0] <= 0) {
+            IN_UPDATE.remove();
+        }
+    }
+
+    /// True while the calling thread is inside a binding update region.
+    /// Generated component listeners check this and bail out early.
+    public static boolean isInUpdate() {
+        int[] depth = IN_UPDATE.get();
+        return depth != null && depth[0] > 0;
     }
 }

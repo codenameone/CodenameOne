@@ -31,12 +31,18 @@ import java.util.Map;
 
 /// Public entry point for the build-time SQLite ORM.
 ///
-/// `@Entity` classes are picked up by the Maven plugin's annotation processor
-/// at build time. The generated `Dao` is wired into an internal registry via
-/// `com.codename1.orm.generated.DaosIndex` whose static initializer fires the
-/// first time `EntityManager.open` is called.
+/// `@Entity` classes get a generated dao at build time. Each dao's static
+/// initializer self-registers with this registry. The registry stays empty
+/// until something triggers each generated class's `<clinit>`:
 ///
-/// Typical use:
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.DaoBootstrap` and splices a `new cn1app.DaoBootstrap();` into
+///   the per-build application stub before `Display.init`.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName("cn1app.DaoBootstrap")` so the registry is populated
+///   on the same boundary.
+/// - **Unit tests / manual init** -- application code can call
+///   `EntityManager.registerDao(...)` directly.
 ///
 /// ```java
 /// EntityManager em = EntityManager.open("MyApp.db");
@@ -46,9 +52,13 @@ import java.util.Map;
 /// for (User u : users.findAll()) { ... }
 /// em.close();
 /// ```
+///
+/// The registry is keyed on `getClass().getName()` so it survives ParparVM
+/// rename and R8 obfuscation: both the registration site and the lookup
+/// site see the same renamed name within a single execution.
 public final class EntityManager {
 
-    private static final Map<Class<?>, Dao<?>> BY_TYPE = new HashMap<Class<?>, Dao<?>>();
+    private static final Map<String, Dao<?>> BY_NAME = new HashMap<String, Dao<?>>();
 
     private final Database db;
     private boolean closed;
@@ -58,8 +68,8 @@ public final class EntityManager {
     }
 
     /// Opens (or creates) the SQLite file `databaseName` via
-    /// `Display.openOrCreate`. Throws `IOException` when the platform refuses
-    /// to provide a SQLite database.
+    /// `Display.openOrCreate`. Throws `IOException` when the platform
+    /// refuses to provide a SQLite database.
     public static EntityManager open(String databaseName) throws IOException {
         Database db = Display.getInstance().openOrCreate(databaseName);
         if (db == null) {
@@ -69,9 +79,9 @@ public final class EntityManager {
         return open(db);
     }
 
-    /// Wraps an existing `Database` (e.g. one already opened with a custom
-    /// path) in an `EntityManager`. The caller retains ownership; `close()`
-    /// will still close the database.
+    /// Wraps an existing `Database` (e.g. one opened with a custom path)
+    /// in an `EntityManager`. The caller retains ownership; `close()`
+    /// closes the database.
     public static EntityManager open(Database db) {
         if (db == null) {
             throw new IllegalArgumentException("database is null");
@@ -79,105 +89,64 @@ public final class EntityManager {
         return new EntityManager(db);
     }
 
-    /// Registers a hand-written dao. The build-time-generated `DaosIndex`
-    /// uses the same call; explicit registration is only needed for entity
-    /// classes that live in a dependency JAR the annotation Mojo cannot scan.
+    /// Installs `dao` under `dao.type().getName()`. The generated
+    /// per-class dao's static initializer calls this; hand-written daos
+    /// for classes outside the build's annotation scan call it
+    /// explicitly.
     public static <T> void registerDao(Dao<T> dao) {
         if (dao == null) {
             throw new IllegalArgumentException("dao is null");
         }
-        BY_TYPE.put(dao.type(), dao);
+        BY_NAME.put(dao.type().getName(), dao);
     }
 
-    /// Returns the dao for `entityClass`, freshly attached to this entity
-    /// manager's `Database`. Throws `IllegalStateException` when no dao was
-    /// generated for the class -- typically because `@Entity` is missing or
-    /// the process-annotations Mojo did not run.
+    /// Returns the dao for `entityClass`, freshly attached to this
+    /// entity manager's `Database`. Throws `IllegalStateException` when
+    /// no dao was generated for the class -- typically because `@Entity`
+    /// is missing or the process-annotations Mojo did not run.
     @SuppressWarnings("unchecked")
     public <T> Dao<T> dao(Class<T> entityClass) {
-        ensureIndexLoaded();
-        Dao<T> d = (Dao<T>) BY_TYPE.get(entityClass);
+        if (entityClass == null) {
+            throw new IllegalArgumentException("entityClass is null");
+        }
+        Dao<T> d = (Dao<T>) BY_NAME.get(entityClass.getName());
         if (d == null) {
             throw new IllegalStateException("No dao registered for "
                     + entityClass.getName() + ". Add @Entity and ensure the "
-                    + "cn1:process-annotations Mojo ran during build.");
+                    + "cn1:process-annotations Mojo ran during build, then re-run -- "
+                    + "the generated DaoBootstrap populates this registry at startup.");
         }
         d.attach(db);
         return d;
     }
 
-    /// The underlying `Database`. Use it for raw SQL when the dao surface is
-    /// not enough.
+    /// The underlying `Database`. Use it for raw SQL when the dao surface
+    /// isn't enough.
     public Database database() {
         return db;
     }
 
-    /// Begin a transaction on the underlying database. Equivalent to
-    /// `database().beginTransaction()`.
+    /// Begin a transaction. Equivalent to `database().beginTransaction()`.
     public void beginTransaction() throws IOException {
         db.beginTransaction();
     }
 
-    /// Commit a transaction on the underlying database.
+    /// Commit the current transaction.
     public void commitTransaction() throws IOException {
         db.commitTransaction();
     }
 
-    /// Roll back a transaction on the underlying database.
+    /// Roll back the current transaction.
     public void rollbackTransaction() throws IOException {
         db.rollbackTransaction();
     }
 
-    /// Closes the underlying database. Idempotent.
+    /// Close the underlying database. Idempotent.
     public void close() throws IOException {
         if (closed) {
             return;
         }
         closed = true;
         db.close();
-    }
-
-    /// Forces the lazy `IndexHolder` class to initialize, registering every
-    /// generated dao. Called from the per-build application stub before
-    /// `Display.init`.
-    public static void bootstrap() {
-        IndexHolder.touch();
-    }
-
-    private static void ensureIndexLoaded() {
-        IndexHolder.touch();
-    }
-
-    /// Initialization-on-demand holder. Class init runs exactly once,
-    /// race-free, without `volatile`. Direct symbol reference to the
-    /// generated index so ParparVM / R8 rewrite the call site and the
-    /// generated class together.
-    private static final class IndexHolder {
-        static final Object INDEX;
-        static {
-            Object resolved;
-            try {
-                resolved = new com.codename1.orm.generated.DaosIndex();
-            } catch (NoClassDefFoundError missing) {
-                resolved = Boolean.FALSE;
-            } catch (RuntimeException failed) {
-                resolved = Boolean.FALSE;
-            }
-            INDEX = resolved;
-        }
-
-        private IndexHolder() {
-            // Utility-style holder: only the static initializer + touch
-            // matter. PMD `UseUtilityClass` requires this private ctor;
-            // `UnnecessaryConstructor` then requires a non-empty body.
-            throw new AssertionError("IndexHolder is not instantiable");
-        }
-
-        static void touch() {
-            if (INDEX == null) {
-                throw new IllegalStateException(
-                        "DaosIndex failed to initialize");
-            }
-        }
     }
 }

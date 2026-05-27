@@ -54,15 +54,15 @@ public class MappingAnnotationProcessorTest {
                         + "}\n");
         runProcessorOrFail(classes);
 
-        assertTrue(new File(classes, "com/codename1/mapping/generated/UserMapper.class").exists());
-        assertTrue(new File(classes, "com/codename1/mapping/generated/MappersIndex.class").exists());
+        assertTrue(new File(classes, "com/example/UserCn1Mapper.class").exists());
+        assertTrue(new File(classes, "cn1app/MapperBootstrap.class").exists());
 
         // Load both the fixture and the generated mapper through a single child
         // classloader so the generic bound on Mapper<User> resolves against the
         // same User class.
         try (URLClassLoader cl = childLoader(classes)) {
             Class<?> userCls = cl.loadClass("com.example.User");
-            Class<?> mapperCls = cl.loadClass("com.codename1.mapping.generated.UserMapper");
+            Class<?> mapperCls = cl.loadClass("com.example.UserCn1Mapper");
             Object mapper = mapperCls.newInstance();
 
             Object user = userCls.newInstance();
@@ -109,7 +109,7 @@ public class MappingAnnotationProcessorTest {
 
         try (URLClassLoader cl = childLoader(classes)) {
             Class<?> itemCls = cl.loadClass("com.example.Item");
-            Class<?> mapperCls = cl.loadClass("com.codename1.mapping.generated.ItemMapper");
+            Class<?> mapperCls = cl.loadClass("com.example.ItemCn1Mapper");
             Object mapper = mapperCls.newInstance();
 
             // Create item and populate via the generated mapper's fromMap.

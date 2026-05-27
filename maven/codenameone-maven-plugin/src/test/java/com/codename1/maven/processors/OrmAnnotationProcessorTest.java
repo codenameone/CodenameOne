@@ -52,10 +52,10 @@ public class OrmAnnotationProcessorTest {
                         + "}\n");
         runProcessorOrFail(classes);
 
-        File daoFile = new File(classes, "com/codename1/orm/generated/UserDao.class");
+        File daoFile = new File(classes, "com/example/UserCn1Dao.class");
         assertTrue("generated dao file should exist: " + daoFile, daoFile.exists());
-        File indexFile = new File(classes, "com/codename1/orm/generated/DaosIndex.class");
-        assertTrue("DaosIndex should exist", indexFile.exists());
+        File bootstrapFile = new File(classes, "cn1app/DaoBootstrap.class");
+        assertTrue("DaoBootstrap should exist", bootstrapFile.exists());
 
         Shape shape = readShape(daoFile);
         assertTrue("dao should implement com.codename1.orm.Dao",

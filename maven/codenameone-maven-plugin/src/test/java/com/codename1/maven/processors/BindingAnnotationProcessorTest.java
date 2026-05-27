@@ -54,33 +54,95 @@ public class BindingAnnotationProcessorTest {
                         + "}\n");
         runProcessorOrFail(classes);
 
-        File binderFile = new File(classes, "com/codename1/binding/generated/LoginModelBinder.class");
+        File binderFile = new File(classes, "com/example/LoginModelCn1Binder.class");
         assertTrue("generated binder file should exist: " + binderFile, binderFile.exists());
-        File indexFile = new File(classes, "com/codename1/binding/generated/BindersIndex.class");
-        assertTrue("BindersIndex should exist", indexFile.exists());
+        File bootstrapFile = new File(classes, "cn1app/BinderBootstrap.class");
+        assertTrue("BinderBootstrap should exist", bootstrapFile.exists());
 
         Shape shape = readShape(binderFile);
         assertTrue("binder should implement com.codename1.binding.Binder",
                 shape.interfaces.contains("com/codename1/binding/Binder"));
         assertTrue("binder should expose type()", shape.methodNames.contains("type"));
         assertTrue("binder should expose bind()", shape.methodNames.contains("bind"));
+        assertTrue("binder should expose register() static hook",
+                shape.methodNames.contains("register"));
     }
 
     @Test
-    public void rejectsBindOnPrivateField() throws Exception {
+    public void resolvesJavaBeansAccessorsOnPrivateField() throws Exception {
+        File classes = compileFixture(
+                "com.example.PrivateBean",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Bindable\n"
+                        + "public class PrivateBean {\n"
+                        + "    @Bind(name=\"u\") private String user;\n"
+                        + "    public String getUser() { return user; }\n"
+                        + "    public void setUser(String u) { this.user = u; }\n"
+                        + "    public PrivateBean() {}\n"
+                        + "}\n");
+        runProcessorOrFail(classes);
+        assertTrue(new File(classes, "com/example/PrivateBeanCn1Binder.class").exists());
+    }
+
+    @Test
+    public void rejectsBindOnPrivateFieldWithoutAccessor() throws Exception {
         File classes = tmp.newFolder("classes");
         JavaSourceCompiler.compile(
                 JavaSourceCompiler.singleSource("com.example.Bad",
                         "package com.example;\n"
                                 + "import com.codename1.annotations.*;\n"
-                                + "import com.codename1.binding.BindAttr;\n"
                                 + "@Bindable public class Bad {\n"
                                 + "    @Bind(name=\"x\") private String x;\n"
                                 + "    public Bad() {}\n"
                                 + "}\n"),
                 classes, Arrays.asList(testClassesDir()));
         ProcessorContext ctx = runProcessor(classes);
-        assertTrue("expected validation error on private @Bind field", ctx.hasErrors());
+        assertTrue("expected validation error on private field without accessor", ctx.hasErrors());
+    }
+
+    @Test
+    public void instrumentsSetterWithNotifyChanged() throws Exception {
+        File classes = compileFixture(
+                "com.example.NotifyBean",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Bindable\n"
+                        + "public class NotifyBean {\n"
+                        + "    @Bind(name=\"u\") private String user;\n"
+                        + "    public String getUser() { return user; }\n"
+                        + "    public void setUser(String u) { this.user = u; }\n"
+                        + "    public NotifyBean() {}\n"
+                        + "}\n");
+        runProcessorOrFail(classes);
+
+        // The setter bytes should now contain an INVOKESTATIC of
+        // Binders.notifyChanged before the void RETURN.
+        File beanFile = new File(classes, "com/example/NotifyBean.class");
+        assertTrue(beanFile.exists());
+        byte[] bytes = java.nio.file.Files.readAllBytes(beanFile.toPath());
+        final boolean[] found = new boolean[1];
+        new org.objectweb.asm.ClassReader(bytes).accept(new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String descriptor,
+                                                                String signature, String[] exceptions) {
+                if (!"setUser".equals(name)) {
+                    return null;
+                }
+                return new org.objectweb.asm.MethodVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                    @Override
+                    public void visitMethodInsn(int opcode, String owner, String mname,
+                                                 String desc, boolean iface) {
+                        if (opcode == org.objectweb.asm.Opcodes.INVOKESTATIC
+                                && "com/codename1/binding/Binders".equals(owner)
+                                && "notifyChanged".equals(mname)) {
+                            found[0] = true;
+                        }
+                    }
+                };
+            }
+        }, 0);
+        assertTrue("setUser should be instrumented with Binders.notifyChanged", found[0]);
     }
 
     // ---------------------------------------------------------------
@@ -115,6 +177,17 @@ public class BindingAnnotationProcessorTest {
             if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
         }
         proc.finish(ctx);
+        // Mirror ProcessAnnotationsMojo's flush step: write emitted
+        // bytecode back to disk so the modified class file overlays the
+        // original on subsequent file reads.
+        for (java.util.Map.Entry<String, byte[]> e : ctx.getEmittedClasses().entrySet()) {
+            File target = new File(classesDir, e.getKey() + ".class");
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+            java.nio.file.Files.write(target.toPath(), e.getValue());
+        }
         return ctx;
     }
 

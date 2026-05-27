@@ -4,10 +4,9 @@
 Codename One includes a build-time POJO mapping framework that turns a
 plain Java class -- or a `PropertyBusinessObject` -- into JSON or XML
 without any runtime reflection. The Maven plugin scans the project's
-compiled bytecode at build time, generates a typed `Mapper` for every
-`@Mapped` class, and ships it inside the same `target/classes` tree as
-the rest of the application. The runtime entry point is two methods on
-`com.codename1.mapping.Mappers`.
+compiled bytecode at build time, generates a typed `Mapper` next to each
+`@Mapped` class, and ships it alongside the source. The runtime entry
+point is two methods on `com.codename1.mapping.Mappers`.
 
 The framework sits next to the existing `JSONParser`, `XMLParser` and
 `PropertyIndex.toJSON` / `fromJSON` helpers -- it doesn't replace them.
@@ -134,23 +133,41 @@ At build time:
 . The processor validates each one (concrete, public no-arg constructor,
   supported field types) and fails the build on the first offender --
   every offending class shows up in the same error report.
-. A `XxxMapper` class is generated under
-  `com.codename1.mapping.generated` for every `@Mapped` type, plus a
-  single `MappersIndex` whose no-arg constructor registers them all
-  with `Mappers#register`.
-. The iOS and Android per-build stubs call `new MappersIndex()` before
-  `Display.init`, so the registry is populated by the time application
-  code runs.
+. A `<SimpleName>Cn1Mapper` class is generated for every `@Mapped` type
+  in the **same package as the source class** (e.g.
+  `com.example.UserCn1Mapper` next to `com.example.User`). Each
+  generated mapper exposes a public `static register()` hook.
+. A single `cn1app.MapperBootstrap` is generated whose constructor calls
+  `UserCn1Mapper.register()`, `ItemCn1Mapper.register()`, ... for every
+  accepted `@Mapped` class.
 
-At runtime there is no `Class.forName`, no reflection, and no service
-loader: every read and write in a generated mapper is a direct symbol
-reference. ParparVM and R8 rename the call sites and the generated
-class together, so the binding survives obfuscation in shipped builds.
+At app start:
+
+* On **iOS / Android**, the build server probes the project zip for
+  `cn1app/MapperBootstrap.class`. When found it splices
+  `new cn1app.MapperBootstrap();` into the per-build application stub
+  right before `Display.init`. Direct symbol references survive the
+  ParparVM rename and the R8 obfuscation pass: the call site and the
+  generated class are renamed together.
+* On the **JavaSE simulator and desktop run**, `JavaSEPort#postInit`
+  loads the bootstrap via `Class.forName("cn1app.MapperBootstrap")`.
+  Classloading is the legitimate path here -- JavaSE runs unobfuscated
+  and the same `Class.forName` pattern is used by the @Route dispatcher.
+
+Projects that ship no `@Mapped` classes produce no bootstrap, the build
+server probe falls through, and `JavaSEPort` catches the
+`ClassNotFoundException` -- the registry stays empty and `Mappers.toJson`
+throws a clear "no mapper registered" error.
+
+The runtime registry is keyed on `Class#getName()`. The map keys survive
+obfuscation because both the registration site and the lookup site see
+the same renamed name within a single execution -- the keys are never
+persisted across builds.
 
 === Custom mappers
 
 Sometimes a class lives in a third-party JAR the build can't annotate.
-Hand-write a `Mapper<T>` and register it during `Display#init`:
+Hand-write a `Mapper<T>` and register it at startup:
 
 [source,java]
 ----

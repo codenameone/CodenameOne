@@ -35,12 +35,25 @@ import java.util.Map;
 
 /// Public entry point for the build-time JSON / XML mapping framework.
 ///
-/// `@Mapped` classes are picked up by the Maven plugin's annotation processor
-/// at build time. A generated `Mapper` is wired into this registry through a
-/// generated `com.codename1.mapping.generated.MappersIndex` whose static
-/// initializer fires the first time the registry is touched.
+/// `@Mapped` classes get a generated mapper at build time. The generated
+/// mapper's static initializer self-registers with this registry. The
+/// registry stays empty until something triggers each generated class's
+/// `<clinit>`:
 ///
-/// Typical use:
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.MapperBootstrap`, and when present splices a
+///   `new cn1app.MapperBootstrap();` into the per-build application stub
+///   before `Display.init`. That constructor references every generated
+///   mapper, triggering their static initializers.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName("cn1app.MapperBootstrap")` so the registry is populated
+///   on the same boundary. Classloading is the legitimate path here:
+///   JavaSE runs unobfuscated.
+/// - **Unit tests / manual init** -- application code can call
+///   `Mappers.register(...)` directly to install a hand-written mapper for
+///   a class the build can't annotate.
+///
+/// Typical use after init:
 ///
 /// ```java
 /// String json = Mappers.toJson(user);
@@ -50,48 +63,49 @@ import java.util.Map;
 /// User u = Mappers.fromXml(xml, User.class);
 /// ```
 ///
-/// `register(...)` is public so application code can install a hand-written
-/// mapper for a class the build-time processor cannot see (e.g. classes that
-/// live in a dependency JAR). Generated mappers register themselves through
-/// the same call.
+/// The registry is keyed on `getClass().getName()` so it survives ParparVM
+/// rename and R8 obfuscation: both the registration site and the lookup
+/// site see the same renamed name within a single execution. The map keys
+/// are never persisted, so the renaming has no observable effect on
+/// behavior.
 public final class Mappers {
 
-    private static final Map<Class<?>, Mapper<?>> BY_TYPE = new HashMap<Class<?>, Mapper<?>>();
+    private static final Map<String, Mapper<?>> BY_NAME = new HashMap<String, Mapper<?>>();
 
-    private Mappers() { }
+    private Mappers() {
+    }
 
-    /// Installs a mapper for `mapper.type()`. Subsequent calls with the same
-    /// type replace the previously registered mapper. Thread-safe relative to
-    /// `get` (the registry is a plain HashMap, written from app init and read
-    /// at steady state; concurrent registration during steady-state lookups
-    /// is not supported and not needed in practice).
+    /// Installs `mapper` under `mapper.type().getName()`. The generated
+    /// per-class mapper's static initializer calls this; hand-written
+    /// mappers for classes outside the build's annotation scan call it
+    /// explicitly.
     public static <T> void register(Mapper<T> mapper) {
         if (mapper == null) {
             throw new IllegalArgumentException("mapper is null");
         }
-        BY_TYPE.put(mapper.type(), mapper);
+        BY_NAME.put(mapper.type().getName(), mapper);
     }
 
-    /// Looks up the mapper for `type`, returning `null` when no mapper is
-    /// registered. The first call lazily triggers the generated
-    /// `MappersIndex` static initializer when present, so application code
-    /// does not need to wire it up explicitly.
+    /// Looks up the mapper for `type` (by `type.getName()`) or null when
+    /// none is registered.
     @SuppressWarnings("unchecked")
     public static <T> Mapper<T> get(Class<T> type) {
-        ensureIndexLoaded();
-        return (Mapper<T>) BY_TYPE.get(type);
+        if (type == null) {
+            return null;
+        }
+        return (Mapper<T>) BY_NAME.get(type.getName());
     }
 
-    /// Serializes `instance` to JSON. Throws `IllegalStateException` when no
-    /// mapper is registered for its concrete class; that always points at a
-    /// missing `@Mapped` annotation or a build that ran without the
+    /// Serializes `instance` to JSON. Throws `IllegalStateException` when
+    /// no mapper is registered for its concrete class; that always points
+    /// at a missing `@Mapped` annotation or a build that ran without the
     /// process-annotations Mojo.
     public static String toJson(Object instance) {
         if (instance == null) {
             return "null";
         }
         @SuppressWarnings("unchecked")
-        Mapper<Object> m = (Mapper<Object>) get(instance.getClass());
+        Mapper<Object> m = (Mapper<Object>) BY_NAME.get(instance.getClass().getName());
         if (m == null) {
             throw missing(instance.getClass());
         }
@@ -101,8 +115,8 @@ public final class Mappers {
         return sb.toString();
     }
 
-    /// Inverse of `#toJson`. Parses the JSON text and hands the resulting Map
-    /// to the registered mapper.
+    /// Inverse of `#toJson`. Parses the JSON text and hands the resulting
+    /// Map to the registered mapper.
     public static <T> T fromJson(String json, Class<T> type) {
         if (json == null) {
             return null;
@@ -145,7 +159,7 @@ public final class Mappers {
             return "";
         }
         @SuppressWarnings("unchecked")
-        Mapper<Object> m = (Mapper<Object>) get(instance.getClass());
+        Mapper<Object> m = (Mapper<Object>) BY_NAME.get(instance.getClass().getName());
         if (m == null) {
             throw missing(instance.getClass());
         }
@@ -183,85 +197,16 @@ public final class Mappers {
         return m.readXml(root);
     }
 
-    // ---------------------------------------------------------------
-    // Index bootstrap
-    // ---------------------------------------------------------------
-
-    /// Forces the lazy `IndexHolder` class to initialize. Its static
-    /// initializer constructs the build-time-generated `MappersIndex`,
-    /// whose constructor registers every generated mapper with this
-    /// registry. Calling `bootstrap()` is harmless after the first call;
-    /// the JVM guarantees the holder's class init runs exactly once.
-    ///
-    /// The iOS / Android per-build application stub invokes this from the
-    /// `annotationFrameworksInstallSource` fragment before `Display.init`.
-    public static void bootstrap() {
-        IndexHolder.touch();
-    }
-
-    private static void ensureIndexLoaded() {
-        IndexHolder.touch();
-    }
-
-    /// Initialization-on-demand holder. The JVM defers class init until
-    /// the first field reference, then runs it exactly once under the
-    /// class-init monitor -- a race-free lazy singleton without
-    /// `volatile`. Direct symbol reference (no `Class.forName`) so
-    /// ParparVM / R8 rewrite the call site and the generated class
-    /// together; the binding survives obfuscation in shipped builds.
-    private static final class IndexHolder {
-        static final Object INDEX;
-        static {
-            Object resolved;
-            try {
-                resolved = new com.codename1.mapping.generated.MappersIndex();
-            } catch (NoClassDefFoundError missing) {
-                // No @Mapped types in this project -- nothing to register.
-                resolved = Boolean.FALSE;
-            } catch (RuntimeException failed) {
-                // The generated index hit a registration failure. Pin a
-                // sentinel so we don't retry on every call; the missing
-                // mapper surfaces from `Mappers.get` as the regular
-                // "no mapper registered" error.
-                resolved = Boolean.FALSE;
-            }
-            INDEX = resolved;
-        }
-
-        private IndexHolder() {
-            // Utility-style holder: only the static initializer + touch
-            // matter. PMD `UseUtilityClass` requires this private ctor;
-            // `UnnecessaryConstructor` then requires a non-empty body,
-            // so document the contract by refusing instantiation.
-            throw new AssertionError("IndexHolder is not instantiable");
-        }
-
-        static void touch() {
-            // Read INDEX so SpotBugs sees the field as used. Defensive
-            // null check documents the contract; createIndex pins a
-            // non-null sentinel on every fallback, so the throw is
-            // unreachable in practice.
-            if (INDEX == null) {
-                throw new IllegalStateException(
-                        "MappersIndex failed to initialize");
-            }
-        }
-    }
-
     private static IllegalStateException missing(Class<?> type) {
         return new IllegalStateException("No mapper registered for "
                 + type.getName() + ". Add @Mapped and ensure the cn1:process-annotations "
-                + "Mojo ran during build.");
+                + "Mojo ran during build, then re-run -- the generated MapperBootstrap "
+                + "populates this registry at startup.");
     }
 
     // ---------------------------------------------------------------
     // Tiny JSON writer
     // ---------------------------------------------------------------
-    //
-    // Hand-rolled rather than reusing PropertyIndex / Result so this class
-    // works on plain POJO maps without any cn1.properties dependency. We only
-    // emit the subset that JSONParser can read back: strings, numbers,
-    // booleans, null, nested maps, lists.
 
     static void writeJson(StringBuilder sb, Object value) {
         if (value == null) {
@@ -319,11 +264,6 @@ public final class Mappers {
                 case '\t': sb.append("\\t"); break;
                 default:
                     if (c < 0x20) {
-                        // cn1's java.lang.Character is a stripped-down subset
-                        // and does not include Character.forDigit. Inline the
-                        // hex-digit lookup so this class stays portable to
-                        // every cn1 target (ParparVM iOS, Android, JavaSE,
-                        // CLDC11, ...).
                         sb.append("\\u00");
                         sb.append("0123456789abcdef".charAt((c >> 4) & 0xF));
                         sb.append("0123456789abcdef".charAt(c & 0xF));
