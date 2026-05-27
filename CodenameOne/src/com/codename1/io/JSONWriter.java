@@ -131,8 +131,12 @@ public final class JSONWriter {
     /// Lets builders embed each other transparently: `object().put("xs",
     /// array().add(1).add(2))` stores the *list*, not the builder wrapper.
     private static Object unwrap(Object value) {
-        if (value instanceof ObjectBuilder) return ((ObjectBuilder) value).map;
-        if (value instanceof ArrayBuilder) return ((ArrayBuilder) value).list;
+        if (value instanceof ObjectBuilder) {
+            return ((ObjectBuilder) value).map;
+        }
+        if (value instanceof ArrayBuilder) {
+            return ((ArrayBuilder) value).list;
+        }
         return value;
     }
 
