@@ -181,7 +181,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
     @Override
     @SuppressWarnings("UnusedFormalParameter")
     public void paint(Graphics g, double x, double y, double w, double h) {
-        // TODO: x and y probably need to be taken into consideration here...
         paint(g, w, h, true);
     }
 
@@ -200,11 +199,26 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         if (getTransform() != null) {
             t2.concatenate(getTransform());
         }
-        int tx = g.getTranslateX();
-        int ty = g.getTranslateY();
-        g.translate(-tx, -ty);
-
-        t2.translate((float) (startX + tx), (float) (startY + ty));
+        // Build the gradient frame on top of the caller's transform. The
+        // previous version captured `g.getTranslateX()/getTranslateY()` and
+        // baked them into `t2.translate(startX + tx, startY + ty)`, then
+        // zeroed `g.translate(-tx, -ty)` before `g.setTransform(t2)`. On
+        // ports where `isTranslationSupported()` is false (iOS, Android,
+        // JavaSE — every active port today), Graphics already conjugates
+        // setTransform with `T(xTranslate)` so the user matrix operates in
+        // local coordinates regardless of prior g.translate; that
+        // conjugation re-applies the cell offset at the *screen* level
+        // automatically. Baking `tx, ty` into a translate that sits
+        // *inside* the SVG / theme scale meant the cell offset went
+        // through the scale a second time, shifting the gradient fill
+        // away from the stroke. Most visible on SVGStaticScreenshotTest's
+        // gradient_circle, where the filled circle appeared stacked below
+        // the dark-blue outline on Android (and would have appeared the
+        // same on iOS Metal once the triangle-clip bug was unmasked).
+        // Just build `t * Translate(startX, startY) * Rotate * Translate(0,
+        // -ph/2)` and let Graphics.setTransform's existing conjugation
+        // restore the screen-level offset.
+        t2.translate((float) startX, (float) startY);
         t2.rotate((float) theta, 0, 0);
         t2.translate(0, -(float) ph / 2);
 
@@ -293,7 +307,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         }*/
         g.setAlpha(alpha);
         g.setTransform(t);
-        g.translate(tx, ty);
         if (p != null) {
             g.setColor(p);
         }

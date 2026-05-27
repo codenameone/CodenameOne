@@ -23,26 +23,6 @@ import java.io.InputStream;
  * startup, replacing every placeholder with the transcoded
  * {@code GeneratedSVGImage}. No glue code in app land.</p>
  *
- * <h3>Known port-side rendering bugs the goldens encode</h3>
- *
- * <p>The screenshot baselines record the current per-port behavior so
- * regressions in the rendering pipeline show up as diffs. These items
- * are tracked separately and a follow-up port-side PR will refresh the
- * goldens once the underlying bugs are fixed:</p>
- * <ul>
- *   <li>iOS (legacy + Metal): {@code gradient_circle.svg} and
- *       {@code clipped_badge.svg} render as triangles because the
- *       iOS port's {@code setClip(GeneralPath)} substitutes a
- *       degenerate polygon for arc-decomposed paths.</li>
- *   <li>iOS (legacy + Metal): {@code <animate>} on {@code fill}
- *       colors doesn't tick. {@code color_morph.svg} freezes on the
- *       start color (white on legacy, the first palette stop on
- *       Metal); Android animates it as expected.</li>
- *   <li>Android: {@code gradient_circle.svg} draws both the filled
- *       circle and an outline of the same circle stacked, rather than
- *       a single filled circle with a darker stroke.</li>
- * </ul>
- *
  * <p>If this test calls {@code SVGRegistry.install(...)} explicitly it
  * has failed the point of the test: the registry is supposed to be
  * seamless to the developer.</p>
