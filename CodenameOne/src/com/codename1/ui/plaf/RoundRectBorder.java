@@ -912,17 +912,8 @@ public final class RoundRectBorder extends Border {
         int y = c.getY();
         boolean antiAliased = g.isAntiAliased();
         g.setAntiAliased(true);
-        // The JS port's main-canvas g.fillShape doesn't render through
-        // the cooperative-scheduler worker-side bridge (visible symptom:
-        // Dialog/TextField/ChatBubble UIIDs lose their rounded bg). The
-        // cached-image path below renders into an off-screen canvas via
-        // createTargetImage -> drawImage and works correctly there, so
-        // skip the simple-direct path on HTML5 and let every JS render
-        // go through the cached-image route. Other ports keep the fast
-        // simple-direct path.
-        boolean forceCachedImagePath = "HTML5".equals(Display.getInstance().getPlatformName());
         try {
-            if (shadowOpacity == 0 && !forceCachedImagePath) {
+            if (shadowOpacity == 0) {
                 Style s = c.getStyle();
                 if (s.getBgImage() == null) {
                     byte type = s.getBackgroundType();
