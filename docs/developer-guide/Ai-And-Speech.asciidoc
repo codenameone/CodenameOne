@@ -349,8 +349,8 @@ list of bubbles, the streaming append, the typing indicator, and the
 input strip in one component. Drop it into a `Form` with a single
 `BorderLayout.CENTER`:
 
-.ChatView mockup
-image::img/chat-view-mockup.svg[ChatView mockup, 360, 640]
+.`ChatView` rendered in the JavaSE simulator under the iOS Modern theme
+image::img/chat-view.png[ChatView in the JavaSE simulator, 320]
 
 The component exposes thread-safe `addMessage`, `appendToLastMessage`,
 and `setTypingIndicatorVisible` methods, so background callbacks from
