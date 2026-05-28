@@ -127,6 +127,12 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
+      # Use the exact key build-port saved against (published as a job
+      # output). Recomputing the src_hash on this runner has been
+      # observed to produce a different value than build-port on the
+      # same SHA -- and even when the algorithm is identical, any new
+      # source path added to the hash here has to land in three
+      # places at once or the keys diverge.
       - name: Restore built CN1 + iOS port artifacts
         uses: actions/cache/restore@v4
         with:
@@ -134,7 +140,7 @@ jobs:
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
 
       - name: Install XcodeGen
