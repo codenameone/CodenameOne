@@ -181,6 +181,14 @@ static void updateDisplayMetricsFromView(UIView *view) {
 // screenSizeChanged event between stop and start (issue #4767).
 static CGSize cn1OrientationCorrectSize(UIView *view) {
     CGSize size = view.bounds.size;
+#if TARGET_OS_MACCATALYST
+    // Mac Catalyst windows are user-resizable and don't have a true device
+    // orientation; the scene's interfaceOrientation is hard-coded to portrait
+    // even when the window is landscape, which would trip the swap logic
+    // below and publish the swapped size to the EDT. Trust the view bounds
+    // as-is on Mac.
+    return size;
+#else
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
     if (@available(iOS 13.0, *)) {
         UIWindowScene *scene = view.window.windowScene;
@@ -197,6 +205,7 @@ static CGSize cn1OrientationCorrectSize(UIView *view) {
     }
 #endif
     return size;
+#endif
 }
 BOOL forceSlideUpField;
 
@@ -2432,6 +2441,50 @@ static CodenameOne_GLViewController *sharedSingleton;
 +(CGAffineTransform) currentMutableTransform {
     return currentMutableTransform;
 }
+
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+// On Mac Catalyst the iOS XIB never compiles (IBAgent-macOS-UIKit crashes
+// on it under Xcode 26), so CodenameOne_GLAppDelegate.m passes nil to
+// initWithNibName: and the default loadView would hand us a plain
+// UIView. The rendering pipeline expects [eaglView] to find a METALView
+// in self.view or its subviews; without one CN1MetalSetDeviceAndCommand-
+// Queue never runs and CN1MetalGlyphAtlas+atlasForFont: returns nil for
+// every font ("no atlas available" on every CN1MetalDrawString). Build
+// the METALView programmatically and set it as the controller's view.
+- (void)loadView {
+    CGRect screen = [UIScreen mainScreen].bounds;
+    if (CGRectIsEmpty(screen)) {
+        screen = CGRectMake(0, 0, 1024, 684);
+    }
+    METALView *rv = [[METALView alloc] initWithFrame:screen];
+    rv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.view = rv;
+#ifndef CN1_USE_ARC
+    [rv release];
+#endif
+}
+
+// Reapply displayWidth / displayHeight whenever the window resizes the
+// view. The AppDelegate seeds them from [UIScreen mainScreen].bounds,
+// which on Mac Catalyst is the full Mac display (e.g., 1470x956) -- not
+// the app window (1024x768 by default). Without this update the form
+// lays out for the full screen but renders into the window-sized
+// framebuffer; the captured screenshot then shows components shrunken
+// to fit the smaller buffer. layoutSubviews fires after the view is
+// attached to the actual window so view.bounds reflects the real size.
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.view == nil) return;
+    CGSize sz = self.view.bounds.size;
+    int newW = (int)(sz.width * scaleValue);
+    int newH = (int)(sz.height * scaleValue);
+    if (newW <= 0 || newH <= 0) return;
+    if (displayWidth == newW && displayHeight == newH) return;
+    displayWidth = newW;
+    displayHeight = newH;
+    screenSizeChanged(displayWidth, displayHeight);
+}
+#endif
 
 #ifdef INCLUDE_MOPUB
 @synthesize adView;
