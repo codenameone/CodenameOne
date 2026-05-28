@@ -911,7 +911,7 @@ public final class RoundRectBorder extends Border {
         int x = c.getX();
         int y = c.getY();
         boolean rrbDiag = false;
-        if ("HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
             String uiid = c.getUIID();
             if ("Dialog".equals(uiid) || "DialogBody".equals(uiid)) {
                 rrbDiag = true;
