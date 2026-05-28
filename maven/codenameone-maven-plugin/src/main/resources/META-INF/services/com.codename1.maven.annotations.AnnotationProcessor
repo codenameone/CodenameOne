@@ -2,3 +2,4 @@ com.codename1.maven.processors.RouteAnnotationProcessor
 com.codename1.maven.processors.MappingAnnotationProcessor
 com.codename1.maven.processors.BindingAnnotationProcessor
 com.codename1.maven.processors.OrmAnnotationProcessor
+com.codename1.maven.processors.RestClientAnnotationProcessor

@@ -59,7 +59,9 @@ mvn -pl common cn1:generate-native-interfaces
 # at <basePackage>. The annotation processors run during the next compile
 # and emit the wire impls into common/target/generated-sources -- the
 # project source stays clean.
-mvn -pl common cn1:generate-openapi petstore.json com.example.petstore
+mvn -pl common cn1:generate-openapi \
+  -Dcn1.openapi.spec=petstore.json \
+  -Dcn1.openapi.basePackage=com.example.petstore
 
 # --- Cloud builds (need a Codename One account; some need Enterprise tier) ---
 

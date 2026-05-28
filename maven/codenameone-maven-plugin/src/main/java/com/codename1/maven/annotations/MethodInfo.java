@@ -22,8 +22,10 @@
  */
 package com.codename1.maven.annotations;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.objectweb.asm.Opcodes;
@@ -38,20 +40,46 @@ public final class MethodInfo {
 
     private final String name;
     private final String descriptor;
+    private final String signature;
     private final int access;
     private final Map<String, AnnotationValues> annotations;
+    private final List<Map<String, AnnotationValues>> parameterAnnotations;
 
-    MethodInfo(String name, String descriptor, int access, Map<String, AnnotationValues> annotations) {
+    MethodInfo(String name, String descriptor, String signature, int access,
+               Map<String, AnnotationValues> annotations,
+               List<Map<String, AnnotationValues>> parameterAnnotations) {
         this.name = name;
         this.descriptor = descriptor;
+        this.signature = signature;
         this.access = access;
         this.annotations = (annotations == null)
                 ? Collections.<String, AnnotationValues>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotationValues>(annotations));
+        if (parameterAnnotations == null) {
+            this.parameterAnnotations = Collections.emptyList();
+        } else {
+            List<Map<String, AnnotationValues>> copy =
+                    new ArrayList<Map<String, AnnotationValues>>(parameterAnnotations.size());
+            for (Map<String, AnnotationValues> m : parameterAnnotations) {
+                copy.add(m == null
+                        ? Collections.<String, AnnotationValues>emptyMap()
+                        : Collections.unmodifiableMap(
+                                new LinkedHashMap<String, AnnotationValues>(m)));
+            }
+            this.parameterAnnotations = Collections.unmodifiableList(copy);
+        }
     }
 
     public String getName() { return name; }
     public String getDescriptor() { return descriptor; }
+
+    /// The JVM generic-type signature (e.g.
+    /// `(Ljava/lang/Long;Lcom/codename1/util/OnComplete<...>;)V`). Null when
+    /// the class file does not carry a signature attribute for this method
+    /// (no generics, no type parameters). Processors that need to inspect
+    /// type arguments on parameters parse this string.
+    public String getSignature() { return signature; }
+
     public int getAccess() { return access; }
 
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
@@ -68,6 +96,15 @@ public final class MethodInfo {
 
     /// Convenience: look up an annotation by descriptor, returning null if absent.
     public AnnotationValues getAnnotation(String descriptor) { return annotations.get(descriptor); }
+
+    /// Annotations attached to each parameter, indexed by parameter position
+    /// (0-based). Each entry is keyed by annotation descriptor. The list size
+    /// equals the parameter count when the class file records any parameter
+    /// annotations, and is empty otherwise -- callers should treat an empty
+    /// list as "no parameter carries any annotation".
+    public List<Map<String, AnnotationValues>> getParameterAnnotations() {
+        return parameterAnnotations;
+    }
 
     @Override
     public String toString() {

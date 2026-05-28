@@ -177,8 +177,13 @@ public final class ClassScanner {
             final int mAccess = access;
             final String mName = name;
             final String mDesc = descriptor;
+            final String mSig = signature;
             final Map<String, AnnotationValues> mAnnotations =
                     new LinkedHashMap<String, AnnotationValues>();
+            // Parameter-annotation maps are created lazily on first write so
+            // unannotated methods keep an empty list rather than a sparse one.
+            final List<Map<String, AnnotationValues>> paramAnnotations =
+                    new ArrayList<Map<String, AnnotationValues>>();
             return new MethodVisitor(API) {
                 @Override
                 public AnnotationVisitor visitAnnotation(String d, boolean v) {
@@ -188,8 +193,21 @@ public final class ClassScanner {
                 }
 
                 @Override
+                public AnnotationVisitor visitParameterAnnotation(int parameter,
+                                                                  String d, boolean v) {
+                    while (paramAnnotations.size() <= parameter) {
+                        paramAnnotations.add(new LinkedHashMap<String, AnnotationValues>());
+                    }
+                    Map<String, Object> values = new LinkedHashMap<String, Object>();
+                    paramAnnotations.get(parameter)
+                            .put(d, new AnnotationValues(d, values));
+                    return new AnnotationCollector(API, values);
+                }
+
+                @Override
                 public void visitEnd() {
-                    methods.add(new MethodInfo(mName, mDesc, mAccess, mAnnotations));
+                    methods.add(new MethodInfo(mName, mDesc, mSig, mAccess,
+                            mAnnotations, paramAnnotations));
                 }
             };
         }
