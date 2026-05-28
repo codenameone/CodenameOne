@@ -30,16 +30,17 @@ Configuration:
 |===
 | Property | Description
 
-| `-Dcn1.openapi.spec=<path|url>`
-| `petstore.json` (local file) or `https://petstore3.swagger.io/api/v3/openapi.json`.
-YAML is not supported -- convert with `yq` upstream.
+| `-Dcn1.openapi.spec=PATH`
+| Local file path or URL of the OpenAPI 3.x JSON document, for example
+`petstore.json` or `https://petstore3.swagger.io/api/v3/openapi.json`.
+YAML isn't supported -- convert with `yq` upstream.
 
-| `-Dcn1.openapi.basePackage=<pkg>`
+| `-Dcn1.openapi.basePackage=PKG`
 | Java package the generated sources are written under.  Records / classes
 go under `<basePackage>.model`; the `@RestClient` interfaces go under
 `<basePackage>`.
 
-| `-Dcn1.openapi.outputDirectory=<dir>` (optional)
+| `-Dcn1.openapi.outputDirectory=DIR` (optional)
 | Defaults to `${project.basedir}/src/main/java`.
 
 | `-Dcn1.openapi.overwrite=false` (optional)
@@ -94,9 +95,9 @@ public interface PetApi {
 }
 ----
 
-Model types are emitted as fully-qualified names (the API interface
+Model types are emitted as fully qualified names (the API interface
 lives in `<basePackage>` and models under `<basePackage>.model`) so
-the generator never needs to bookkeep imports or worry about
+the generator never needs to track imports or worry about
 collisions between an API class name and a same-named model.
 
 Call sites use the static factory:
