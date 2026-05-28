@@ -910,6 +910,21 @@ public final class RoundRectBorder extends Border {
         final int h = c.getHeight();
         int x = c.getX();
         int y = c.getY();
+        boolean rrbDiag = false;
+        if ("HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
+            String uiid = c.getUIID();
+            if ("Dialog".equals(uiid) || "DialogBody".equals(uiid)) {
+                rrbDiag = true;
+                Style sDiag = c.getStyle();
+                System.out.println("RRB-DIAG-ENTRY uiid=" + uiid + " w=" + w + " h=" + h
+                        + " bgt=" + (sDiag.getBgTransparency() & 0xff)
+                        + " bgColor=" + Integer.toHexString(sDiag.getBgColor())
+                        + " cornerRadius=" + cornerRadius
+                        + " shadowOp=" + shadowOpacity + " type=" + sDiag.getBackgroundType()
+                        + " bgImage=" + (sDiag.getBgImage() != null)
+                        + " strokeOp=" + strokeOpacity + " strokeTh=" + strokeThickness);
+            }
+        }
         boolean antiAliased = g.isAntiAliased();
         g.setAntiAliased(true);
         try {
@@ -920,11 +935,20 @@ public final class RoundRectBorder extends Border {
                     if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
                         GeneralPath gp = createShape(w, h);
                         byte bgt = c.getStyle().getBgTransparency();
+                        if (rrbDiag) {
+                            System.out.println("RRB-DIAG-SIMPLE uiid=" + c.getUIID()
+                                    + " entering-simple-path bgt=" + (bgt & 0xff));
+                        }
                         if (bgt != 0) {
                             int a = g.getAlpha();
                             g.setAlpha(bgt & 0xff);
                             g.setColor(s.getBgColor());
                             g.translate(x, y);
+                            if (rrbDiag) {
+                                System.out.println("RRB-DIAG-FILL uiid=" + c.getUIID()
+                                        + " calling-fillShape gpBounds=" + gp.getBounds()
+                                        + " x=" + x + " y=" + y + " gColor=" + Integer.toHexString(g.getColor()) + " gAlpha=" + g.getAlpha());
+                            }
                             g.fillShape(gp);
                             if (this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
                                 g.setAlpha(strokeOpacity);
