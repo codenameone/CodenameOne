@@ -98,7 +98,7 @@ Behind the scenes:
 - **Java reload (mode 2)** is driven by the standard JVM HotSwap protocol (`-agentlib:jdwp=...,redefinitions=true`) plus [HotswapAgent](https://github.com/HotswapProjects/HotswapAgent) for the deeper redefinitions (added/removed methods, new classes). The IDE compiles the `.java` to a `.class` and JDWP-pushes it; the simulator notices via a system property and re-clones the form.
 - The watcher only sees files written by the IDE — running `mvn compile` from a separate shell doesn't trigger reload because the IDE's incremental compiler is what writes the `.class` to `target/classes/`.
 
-Comparing to Flutter / React Native: this is closer to Flutter's "hot restart" semantics (mode 2 above) than to Flutter's true "hot reload" (which preserves *all* in-memory state across the patch). Method-body edits feel instantaneous; structural edits cost a form rebuild.
+Method-body edits feel instantaneous; structural edits cost a form rebuild but no JVM restart.
 
 ## Tests in CI/CD
 

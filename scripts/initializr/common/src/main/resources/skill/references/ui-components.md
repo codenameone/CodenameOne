@@ -456,56 +456,19 @@ In most CN1 codebases the **default transition** is set globally via theme const
 
 `CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition.create(durationMs).morph(sourceCmp, targetCmp)` animates a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
 
-#### `MorphTransition.snapshotMode(boolean)` — for sources inside scrolling parents
+#### `MorphTransition.snapshotMode(boolean)`
 
-By default `MorphTransition` paints both endpoints by re-rendering the live source / destination components every frame at the interpolated bounds. That works for sources that are fully visible. It produces visible artifacts when:
-
-- The source is inside a scrolling parent and has children that extend past the source's bounds (the layered-pane copy used during the morph doesn't carry the original parent's clip, so off-viewport children leak into the morph).
-- The source has dynamic content (a video frame, a `BrowserComponent`, a custom painter) that you want frozen visually during the morph.
-
-`snapshotMode(true)` captures each `(source, dest)` as a clipped `Image` at `initTransition()` and tweens those images at the interpolated bounds. The image's own bounds are the clip, so off-viewport children cannot leak.
+Opt into snapshot-mode when the live-paint morph leaks off-viewport children (source inside a scrolling parent) or renders dynamic content (video, `BrowserComponent`):
 
 ```java
-MorphTransition morph = MorphTransition.create(300)
-        .snapshotMode(true)
-        .morph("card");
+MorphTransition morph = MorphTransition.create(300).snapshotMode(true).morph("card");
 nextForm.setTransitionInAnimator(morph);
 nextForm.show();
 ```
 
-The default (live-paint) path is unchanged for back-compat. Opt into snapshot mode only when the live path exhibits a visible artifact — it adds a one-time per-morphed-component `Image` allocation at init.
+#### Tabs animated indicator and modern pull-to-refresh
 
-#### Tabs animated indicator — Material 3 / iOS 26 NavigationBar
-
-`Tabs` ships an opt-in sliding underline indicator (off in framework default; on by default in the modern iOS / Android native themes). When enabled, selection changes tween the indicator's x/width from the previously-selected tab's bounds to the new selection's bounds with `Motion.createEaseInOutMotion`.
-
-```java
-Tabs tabs = new Tabs();
-tabs.setAnimatedIndicator(true);   // or set tabsAnimatedIndicatorBool: true in theme
-```
-
-Theme constants:
-
-| Constant | Purpose |
-| --- | --- |
-| `tabsAnimatedIndicatorBool` | Enable / disable. Default `false` in framework, `true` in iOS Modern + Android Material themes. |
-| `tabsAnimatedIndicatorDurationInt` | Tween duration in ms, default `200`. |
-| `tabsAnimatedIndicatorThicknessMm` | Underline thickness in mm, default `1`. |
-| `TabIndicator { color: ... }` UIID | Indicator colour. Falls back to the selected tab's fg when no `TabIndicator` UIID is defined. |
-
-#### Modern pull-to-refresh
-
-The legacy `addPullToRefresh` paint is a rotating-arrow + text Label stack. The **modern path** (opt-in via `pullToRefreshModernBool` theme constant; on by default in the modern themes) replaces that with a thin circular arc spinner painted directly via `Graphics.drawArc`: the arc sweep grows 0°→330° proportional to the user's pull, then spins continuously while the refresh task runs.
-
-Theme constants:
-
-| Constant | Purpose |
-| --- | --- |
-| `pullToRefreshModernBool` | Enable the arc-spinner path. |
-| `pullToRefreshIndicatorDiameterMm` | Outer diameter, default `8`mm. |
-| `pullToRefreshIndicatorStrokeMm` | Stroke thickness, default `0.6`mm. |
-
-Color follows the `TabIndicator` UIID (shared with the animated tab indicator) so brand accent stays consistent.
+`Tabs` has a sliding underline indicator and `addPullToRefresh` has an arc-spinner — both on by default in the modern iOS / Android themes, so apps inherit them with no extra setup. Override via `Tabs.setAnimatedIndicator(boolean)` or the `tabsAnimatedIndicatorBool` / `pullToRefreshModernBool` theme constants when needed.
 
 ### Ongoing per-component animation: `Component.animate()` + `registerAnimated`
 

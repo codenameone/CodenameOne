@@ -48,6 +48,7 @@ import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
@@ -2365,9 +2366,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (taskExecuted) {
             // Continuous spin: rotate the arc by ~360 deg/sec.
             if (modernSpinStartTime == 0L) {
-                modernSpinStartTime = System.currentTimeMillis();
+                modernSpinStartTime = AnimationTime.now();
             }
-            long elapsed = System.currentTimeMillis() - modernSpinStartTime;
+            long elapsed = AnimationTime.now() - modernSpinStartTime;
             startAngle = (int) ((elapsed / 2L) % 360L);
             sweep = 280;
             // Schedule the next frame -- without this the spinner freezes

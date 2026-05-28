@@ -5265,11 +5265,9 @@ public class Component implements Animation, StyleListener, Editable {
         this.refreshTask = task;
     }
 
-    /// Alias for `#addPullToRefresh(Runnable)`. Provided because the natural
-    /// guess from Flutter (`RefreshIndicator`), React Native
-    /// (`refreshControl`) and SwiftUI (`refreshable`) is `setPullToRefresh`,
-    /// not `addPullToRefresh`. Both names point at the same single-task
-    /// slot -- a second call replaces the previously-registered runnable.
+    /// Alias for `#addPullToRefresh(Runnable)` -- both names point at the
+    /// same single-task slot, and a second call replaces the
+    /// previously-registered runnable.
     ///
     /// #### Parameters
     ///
