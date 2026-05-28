@@ -53,14 +53,13 @@ mvn -pl common compile
 # (one per platform under android/, ios/, javase/, javascript/).
 mvn -pl common cn1:generate-native-interfaces
 
-# Generate a typed REST client from an OpenAPI 3.x spec. Emits @Mapped POJOs
-# under common/target/generated-sources/openapi/<basePackage>/model/ and one
-# <Tag>Api.java per OpenAPI tag. Hooks into the generate-sources phase when
-# wired as an execution in common/pom.xml (see references/java-api-subset.md
-# "Typed responses").
-mvn -pl common cn1:generate-openapi-client \
-  -Dcn1.openapi.spec=https://petstore3.swagger.io/api/v3/openapi.json \
-  -Dcn1.openapi.basePackage=com.example.petstore
+# Generate a typed REST client from an OpenAPI 3.x spec. Writes
+# `@Mapped` records (Java 17+) or classes (Java 8) per schema plus one
+# `@RestClient`-annotated interface per OpenAPI tag into common/src/main/java
+# at <basePackage>. The annotation processors run during the next compile
+# and emit the wire impls into common/target/generated-sources -- the
+# project source stays clean.
+mvn -pl common cn1:generate-openapi petstore.json com.example.petstore
 
 # --- Cloud builds (need a Codename One account; some need Enterprise tier) ---
 

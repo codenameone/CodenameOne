@@ -1,0 +1,127 @@
+=== Generate OpenAPI client (`generate-openapi`)
+
+Generates a typed Codename One client from an OpenAPI 3.x JSON
+specification.  Writes one `@Mapped` record (Java 17+) or class (Java
+8 target) per `components.schemas` entry and one
+`@RestClient`-annotated interface per OpenAPI tag.  The generated
+files land in `common/src/main/java` so the project owns the
+contract; the matching networking implementation is emitted into
+`common/target/generated-sources` by the build-time annotation
+processor so the project source stays clean.
+
+The mojo is paired with the existing `process-annotations` pipeline:
+identical schemas across operations collapse to one record/class, and
+operationIds become interface methods that resolve at runtime via a
+`com.codename1.io.rest.RestClients` registry populated by the generated
+bootstrap class (the same splice pattern as `@Mapped` mappers).
+
+==== Usage example
+
+[source, bash]
+----
+mvn -pl common cn1:generate-openapi petstore.json com.example.petstore
+----
+
+Positional arguments:
+
+[cols="1,3", options="header"]
+|===
+| Argument | Description
+
+| Specification path or URL
+| `petstore.json` (local file) or `https://petstore3.swagger.io/api/v3/openapi.json`.
+YAML is not supported -- convert with `yq` upstream.
+
+| Base package
+| Java package the generated sources are written under.  Records / classes
+go under `<basePackage>.model`; the `@RestClient` interfaces go under
+`<basePackage>`.
+|===
+
+==== Generated output
+
+For the Swagger Petstore reference spec the goal emits, under
+`common/src/main/java`:
+
+[listing]
+----
+com/example/petstore/
+  PetApi.java          // @RestClient interface, methods addPet, updatePet,
+                       // findPetsByStatus, getPetById, deletePet, ...
+  StoreApi.java        // @RestClient interface, methods getInventory,
+                       // placeOrder, getOrderById, deleteOrder
+  UserApi.java         // @RestClient interface
+com/example/petstore/model/
+  Pet.java             // @Mapped record (Java 17+) or class (Java 8)
+  Order.java
+  User.java
+  Category.java
+  Tag.java
+----
+
+Each `@RestClient` interface method is annotated with the HTTP verb
+and path; parameters are annotated `@Path` / `@Query` / `@Header` /
+`@Body` so the processor knows how to assemble the `Rest` call.  The
+emitted method shape:
+
+[source, java]
+----
+@RestClient
+public interface PetApi {
+
+    @GET("/pet/{petId}")
+    void getPetById(@Path("petId") Long petId,
+                    @Header("Authorization") String bearerToken,
+                    OnComplete<Response<Pet>> callback);
+
+    @POST("/pet")
+    void addPet(@Body Pet body,
+                @Header("Authorization") String bearerToken,
+                OnComplete<Response<Pet>> callback);
+
+    static PetApi of(String baseUrl) {
+        return com.codename1.io.rest.RestClients.create(PetApi.class, baseUrl);
+    }
+}
+----
+
+Call sites use the static factory:
+
+[source, java]
+----
+PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
+api.getPetById(123L, "MY_TOKEN", response -> {
+    if (response.getResponseCode() == 200) {
+        Pet pet = response.getResponseData();
+        renderPet(pet);
+    }
+});
+----
+
+The `<Tag>ApiImpl` class that actually performs the HTTP call lives
+in `target/generated-sources` -- the project source never references
+it directly.  The build server probes the project zip for the
+generated `cn1app.RestClientBootstrap` and splices the registry
+wiring in, mirroring the existing `cn1app.MapperBootstrap` pattern.
+
+==== Scope (MVP)
+
+* HTTP verbs: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
+* Parameter locations: `path`, `query`, `header`.  `cookie` parameters
+are dropped during code generation -- attach them via the `Rest`
+builder if needed.
+* Request bodies: `application/json` only -- serialized via
+`Mappers.toJson(body)` before being attached.
+* Response schemas: `$ref` resolution, primitives (`string` /
+`number` / `integer` / `boolean`), arrays, object schemas.
+`oneOf` / `anyOf` / `allOf` collapse to `Object` -- callers cast.
+* Schema unification: two `components.schemas` entries with identical
+property shapes collapse to a single record/class to avoid an
+explosion of duplicates.
+* Authentication: bearer token is exposed as a `@Header("Authorization")
+String bearerToken` parameter on every operation.  Other schemes (API
+key, basic, OAuth) aren't in MVP scope -- use the `Rest` header
+builder or the `OidcClient` directly.
+
+Multipart upload (`multipart/form-data`), richer composition modelling,
+and async / pagination wrappers are tracked as follow-ups.

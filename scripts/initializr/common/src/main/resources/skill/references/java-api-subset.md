@@ -361,7 +361,7 @@ Rest.get(baseUrl + "/albums")
 
 If no `Mapper<T>` is registered for `Class<T>` (typical cause: the class isn't `@Mapped`, or the `process-annotations` Mojo didn't run), the callback completes with `null` data and a normal response code — inspect `response.getResponseCode()` to differentiate "server error" from "no mapper registered".
 
-For **bulk REST clients** (an existing OpenAPI 3.x spec, dozens of endpoints), use the `cn1:generate-openapi-client` Maven goal — it emits one `<Tag>Api.java` per OpenAPI tag plus `@Mapped` POJOs for every schema. See `references/build-and-run.md` and the developer guide's Maven goals appendix.
+For **bulk REST clients** (an existing OpenAPI 3.x spec, dozens of endpoints), use the `cn1:generate-openapi` Maven goal — it emits `@Mapped` records / classes per schema and one `@RestClient`-annotated interface per OpenAPI tag into `common/src/main/java`. The annotation processors run on the next compile and write the wire impls into generated-sources, so the implementation isn't part of the project source. Call sites instantiate via the generated `<Tag>Api.of(baseUrl)` static factory.
 
 ### Writing JSON — `JSONWriter`
 
