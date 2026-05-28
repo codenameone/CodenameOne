@@ -1541,40 +1541,67 @@ void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_T
 #if TARGET_OS_MACCATALYST
     if (@available(iOS 13.0, *)) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            // Step 1: trait-collection override. This propagates UIUserInterfaceStyle
-            // through UIKit descendants. It does NOT, by itself, redraw the AppKit
-            // titlebar -- that's owned by NSWindow on the host side -- but it keeps
-            // UIKit-rendered content (popovers, contextMenus, alerts) consistent.
-            UIUserInterfaceStyle style = dark ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
+            // Step 1: trait-collection override on the UIWindow. This
+            // propagates the style through UIKit descendants (popovers,
+            // alerts, context menus) but does NOT, by itself, redraw the
+            // host NSWindow chrome (titlebar + traffic lights) on the
+            // AppKit side. Each UIWindow on Catalyst is backed by a
+            // UINSWindow which holds the actual NSWindow.
+            UIUserInterfaceStyle uiStyle = dark ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
+            Class nsAppearanceClass = NSClassFromString(@"NSAppearance");
+            // Build the AppKit appearance object once. NSAppearance is
+            // available in the Catalyst process (UIScene.titlebar uses
+            // it internally) even though the rest of AppKit is not in
+            // the public surface. Look up the class + factory selector
+            // through the Obj-C runtime so the build doesn't need to
+            // link AppKit.
+            NSString *appearanceName = dark ? @"NSAppearanceNameDarkAqua" : @"NSAppearanceNameAqua";
+            id appearance = nil;
+            if (nsAppearanceClass != nil) {
+                appearance = ((id (*)(id, SEL, id))objc_msgSend)(nsAppearanceClass, @selector(appearanceNamed:), appearanceName);
+            }
             for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
                 if (![scene isKindOfClass:[UIWindowScene class]]) continue;
                 UIWindowScene *ws = (UIWindowScene *)scene;
                 for (UIWindow *w in ws.windows) {
-                    w.overrideUserInterfaceStyle = style;
+                    // (a) UIKit-side style override.
+                    w.overrideUserInterfaceStyle = uiStyle;
+                    // (b) walk the UIWindow's internal chain to the host
+                    // NSWindow. On Catalyst the UIWindow is wrapped by a
+                    // UINSWindow whose actual NSWindow is stored either
+                    // under "_nsWindow" or reachable via the wrapper's
+                    // "attachedWindow"/"hostWindow" private key. Try the
+                    // documented Apple keys first, then the common
+                    // private ones.
+                    if (appearance == nil) continue;
+                    id nsWindow = nil;
+                    @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+                    if (nsWindow == nil) {
+                        @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; }
+                    }
+                    if (nsWindow == nil) {
+                        @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; }
+                    }
+                    if (nsWindow != nil && [nsWindow respondsToSelector:@selector(setAppearance:)]) {
+                        ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setAppearance:), appearance);
+                    }
                 }
             }
 
-            // Step 2: bridge into AppKit and set NSWindow.appearance. The
-            // titlebar + traffic lights are drawn by the host NSWindow on
-            // the AppKit side, which UIKit's overrideUserInterfaceStyle
-            // does NOT reach. AppKit isn't linked into a Catalyst app, so
-            // we have to look up NSApplication / NSAppearance dynamically
-            // through the Objective-C runtime.
+            // Step 2: also walk NSApplication.windows as a fallback in
+            // case the UIWindow -> NSWindow bridge isn't reachable via
+            // KVC on this OS version. NSApplication is reachable from
+            // a Catalyst process under at least macOS 11+.
             Class nsAppClass = NSClassFromString(@"NSApplication");
-            Class nsAppearanceClass = NSClassFromString(@"NSAppearance");
-            if (nsAppClass == nil || nsAppearanceClass == nil) {
-                return;
-            }
-            id sharedApp = [nsAppClass performSelector:@selector(sharedApplication)];
-            if (sharedApp == nil) return;
-            NSArray *nsWindows = [sharedApp performSelector:@selector(windows)];
-            if (nsWindows == nil) return;
-            NSString *appearanceName = dark ? @"NSAppearanceNameDarkAqua" : @"NSAppearanceNameAqua";
-            id appearance = ((id (*)(id, SEL, id))objc_msgSend)(nsAppearanceClass, @selector(appearanceNamed:), appearanceName);
-            if (appearance == nil) return;
-            for (id nsWindow in nsWindows) {
-                if (![nsWindow respondsToSelector:@selector(setAppearance:)]) continue;
-                ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setAppearance:), appearance);
+            if (nsAppClass != nil && appearance != nil) {
+                id sharedApp = ((id (*)(id, SEL))objc_msgSend)(nsAppClass, @selector(sharedApplication));
+                if (sharedApp != nil) {
+                    NSArray *nsWindows = ((NSArray *(*)(id, SEL))objc_msgSend)(sharedApp, @selector(windows));
+                    for (id nsWindow in nsWindows) {
+                        if (![nsWindow respondsToSelector:@selector(setAppearance:)]) continue;
+                        ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setAppearance:), appearance);
+                    }
+                }
             }
         });
     }
