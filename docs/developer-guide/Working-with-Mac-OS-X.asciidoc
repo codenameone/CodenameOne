@@ -108,3 +108,80 @@ desktop.mac.plist.KEYNAME::
 Injects the entry with key `KEYNAME` into the Info.plist file. For example, `desktop.mac.plist.LSApplicationCategoryType=public.app-category.business`
 
 
+=== Mac Native Build (AOT-compiled macOS App)
+
+The "macOS Desktop" section above covers the JavaSE bundled-JRE wrapper. *Mac Native* is a separate, AOT-compiled target: it routes through the same iOS pipeline (ParparVM bytecode-to-C, native UIKit) so the resulting macOS app shares its rendering code path, its memory profile, and its certificate story with your iPhone / iPad build. The output is a single signed `.app` bundle suitable for Mac App Store or Developer ID distribution.
+
+This target is a good fit when:
+
+* Your app already builds against the iOS slice and you want a Mac version that looks and behaves the same.
+* You need native-speed startup and rendering on Mac, not a wrapped JVM.
+* You want a single AppKit-grade `.app` bundle without bundling a JRE.
+
+Java source is shared with the iOS target; no separate Mac-specific code is required.
+
+==== Local Build
+
+To generate an Xcode project locally that you can open and run on _My Mac_:
+
+[source,shell]
+----
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source package
+----
+
+The output is written to:
+
+----
+target/<finalName>-mac-source/<MainClass>.xcodeproj
+----
+
+Open the project in Xcode, select the _My Mac_ destination, and press Run. The resulting `.app` is identical in shape to one produced by the cloud build server.
+
+==== Cloud Build
+
+To produce a release-ready signed Mac app on the Codename One build server:
+
+[source,shell]
+----
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native package
+----
+
+This reuses the iOS release certificate / provisioning profile (set with the same hints as `ios-device-release` -- `codename1.ios.release.certificate`, `codename1.ios.release.certificatePassword`, `codename1.ios.release.provision`, `codename1.ios.appid`). The server returns a signed `.app` bundle.
+
+==== IDE Shortcuts
+
+The IntelliJ workspace template ships two Mac Native run configurations alongside the iOS ones:
+
+* *Mac Native Project* (Local Builds folder) -- equivalent to running `mvn package -Dcodename1.buildTarget=mac-source`. Use this to generate the Xcode project for hands-on debugging.
+* *Mac Native Build* (Build Server folder) -- equivalent to `mvn package -Dcodename1.buildTarget=mac-os-x-native`. Use this for cloud builds.
+
+==== Distribution
+
+The Mac Native build supports both Mac App Store and Developer ID distribution. The generated Xcode project includes two `ExportOptions-*-Mac.plist` files in `dist/`:
+
+* `ExportOptions-AppStore-Mac.plist` -- App Store distribution (sandboxed, hardened runtime off).
+* `ExportOptions-DeveloperID-Mac.plist` -- Developer ID distribution (hardened runtime on, sandbox off).
+
+After archiving in Xcode, run:
+
+[source,shell]
+----
+xcodebuild -exportArchive \
+  -archivePath build/<MainClass>.xcarchive \
+  -exportOptionsPlist dist/ExportOptions-AppStore-Mac.plist \
+  -exportPath build/export
+----
+
+==== Entitlements
+
+The Mac Native build emits a `<MainClass>.entitlements` plist (or `<MainClass>-AppStore.entitlements` + `<MainClass>-DeveloperID.entitlements` when both channels are configured). The defaults are sensible: App Sandbox on for the App Store channel, hardened runtime on for the Developer ID channel, network client access enabled, user-selected file access enabled. The signing-certificate identity defaults to _Apple Distribution_ for the App Store channel and _Developer ID Application_ for the Developer ID channel.
+
+==== Supported Distribution Channels
+
+[cols="1,3", options="header"]
+|===
+| Channel        | Notes
+| App Store      | Sandboxed, hardened runtime off. Signed with _Apple Distribution_; uploaded via App Store Connect.
+| Developer ID   | Hardened runtime on, sandbox off. Signed with _Developer ID Application_; notarized before distribution.
+|===
+

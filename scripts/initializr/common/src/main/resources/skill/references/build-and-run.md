@@ -11,6 +11,7 @@ A Codename One project can produce four kinds of artifacts. Some build entirely 
 | Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) |
 | Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` |
 | iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) |
+| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) |
 | JavaScript / web bundle | Cloud | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript` |
 
 The two big "local-only" outputs are the **simulator** and **tests** — those are everything you need for ordinary development and CI feedback loops. You only invoke the cloud builds when you want a deployable native artifact.
@@ -53,6 +54,14 @@ mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
 
 # Local Xcode project, no cloud. See Xcode prerequisites below.
 mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+
+# Native Mac app (AOT-compiled, shares the iOS pipeline so the Mac slice
+# is rendered + compiled the same way as the iOS one). Cloud-built.
+mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
+
+# Local Xcode project for the Mac slice. Open the project in Xcode and
+# select My Mac (Mac Catalyst) to run.
+mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
 
 # Native Android APK/AAB. Cloud-built by default.
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
