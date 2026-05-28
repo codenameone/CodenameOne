@@ -4,9 +4,8 @@
 Codename One ships a portable LLM client, a streaming chat component,
 speech-to-text and text-to-speech APIs, and a family of cn1lib bridges
 that wire ML Kit into iOS and Android builds. All the public surface
-lives next to the rest of the framework, so the simulator, the cloud
-build, and your CI pipeline route everything through the same code
-paths.
+lives next to the rest of the framework: the simulator, the cloud
+builder, and your CI pipeline all run the same code.
 
 This chapter introduces every piece in turn:
 
@@ -353,8 +352,9 @@ input strip in one component. Drop it into a `Form` with a single
 .ChatView mockup
 image::img/chat-view-mockup.svg[ChatView mockup, 360, 640]
 
-The component exposes thread-safe mutators, so background callbacks
-from `chatStream(...)` can mutate the view directly:
+The component exposes thread-safe `addMessage`, `appendToLastMessage`,
+and `setTypingIndicatorVisible` methods, so background callbacks from
+`chatStream(...)` can mutate the view directly:
 
 [source,java]
 ----
@@ -484,7 +484,8 @@ if (TextToSpeech.isSupported()) {
 
 iOS uses `AVSpeechSynthesizer`, Android uses
 `android.speech.tts.TextToSpeech`, and the JavaSE simulator falls back
-to `say` on macOS, `espeak` on Linux, and SAPI on Windows.
+to `say` on macOS, `espeak` on Linux, and the platform `SAPI` bridge on
+Windows.
 `getAvailableVoices()` returns the platform-specific voice identifiers
 when the OS exposes them; `setVoiceId(...)` accepts any of those
 strings, or `null` to use the default voice for the configured
