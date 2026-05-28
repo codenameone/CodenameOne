@@ -73,7 +73,7 @@ This project targets **Java 17** (`<source>17</source>` / `<target>17</target>` 
 - `switch` expressions
 - Lambdas, method references, `Stream`s
 
-**Caveat — the build server cross-compiles to bytecode that ParparVM/TeaVM can consume.** Codename One ships a curated subset of the JDK, **not** the full `java.*` namespace. The `cn1:compliance-check` Maven goal runs on every compile and fails the build if you call an unsupported API. The most common gotchas:
+**Caveat — the build server cross-compiles to bytecode that ParparVM/TeaVM can consume.** Codename One ships a curated subset of the JDK, **not** the full `java.*` namespace. The `cn1:bytecode-compliance` Maven goal runs on every compile and fails the build if you call an unsupported API. The most common gotchas:
 
 - No `java.nio.file.*` — use `com.codename1.io.FileSystemStorage` and `Storage`.
 - No `java.net.http.*` / `java.net.URLConnection` — use `com.codename1.io.rest.Rest` (preferred) or `ConnectionRequest`.

@@ -46,10 +46,10 @@
                         </goals>
                     </execution>
                     <execution>
-                        <id>cn1-compliance-check</id>
+                        <id>cn1-bytecode-compliance</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>compliance-check</goal>
+                            <goal>bytecode-compliance</goal>
                         </goals>
                     </execution>
                     <execution>

@@ -344,7 +344,7 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>compliance-check</goal>
+                            <goal>bytecode-compliance</goal>
                             <goal>css</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
