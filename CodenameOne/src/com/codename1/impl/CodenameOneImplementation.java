@@ -4826,36 +4826,6 @@ public abstract class CodenameOneImplementation {
         }
     }
 
-    /// Builds the per-platform WebSocket implementation that backs the public
-    /// [com.codename1.io.websocket.WebSocket] class. Each port overrides this
-    /// to return a subclass of
-    /// [com.codename1.io.websocket.WebSocketImpl] wrapping the platform-native
-    /// WebSocket API (URLSessionWebSocketTask on iOS, OkHttp on Android,
-    /// `window.WebSocket` on JavaScript, `java.net.http.WebSocket` on
-    /// JavaSE 11+).
-    ///
-    /// The default implementation here returns `null` -- meaning the platform
-    /// does not ship a WebSocket implementation. Application code branches
-    /// on [com.codename1.io.websocket.WebSocket#isSupported()] before
-    /// constructing a `WebSocket`.
-    ///
-    /// #### Parameters
-    ///
-    /// - `parent`: the public [com.codename1.io.websocket.WebSocket]
-    ///   instance that the new impl is bound to. The platform implementation
-    ///   typically holds a reference so it can dispatch inbound events to
-    ///   `parent` via the public callbacks (`onOpenReceived`,
-    ///   `onMessageReceived`, `onCloseReceived`, `onErrorReceived`).
-    ///
-    /// #### Returns
-    ///
-    /// a per-instance `WebSocketImpl`, or `null` if the platform does not
-    /// support WebSockets
-    public com.codename1.io.websocket.WebSocketImpl createWebSocketImpl(
-            com.codename1.io.websocket.WebSocket parent) {
-        return null;
-    }
-
     /// Creates a soft/weak reference to an object that allows it to be collected
     /// yet caches it. This method is in the porting layer since CLDC only includes
     /// weak references while some platforms include nothing at all and some include

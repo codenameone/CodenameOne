@@ -459,25 +459,6 @@ The pre-existing `com.codename1.io.Oauth2` and `com.codename1.social.Login` clas
 
 Companion classes in `com.codename1.io.oidc`: `OidcConfiguration` (endpoints + supported scopes), `OidcTokens` (access / id / refresh tokens + claim accessors), `PkceChallenge`, `SystemBrowser` (the per-platform browser driver), `TokenStore` (defaults to `Preferences`), `OidcException`.
 
-### WebSockets — `com.codename1.io.websocket.WebSocket`
-
-Subclass `WebSocket` and override the four `onXxx` callbacks (`onOpen`, `onMessage(String)` / `onMessage(byte[])`, `onClose`, `onError`); they all fire on the EDT. `send(String)` / `send(byte[])` may be called from any thread.
-
-```java
-if (WebSocket.isSupported()) {
-    WebSocket s = new WebSocket("wss://example.com/socket") {
-        @Override protected void onOpen()                                { send("hello"); }
-        @Override protected void onMessage(String m)                     { Log.p("recv: " + m); }
-        @Override protected void onMessage(byte[] m)                     { Log.p("recv " + m.length + " bytes"); }
-        @Override protected void onClose(int code, String reason)        { Log.p("closed: " + reason); }
-        @Override protected void onError(Exception ex)                   { Log.e(ex); }
-    };
-    s.connect();
-}
-```
-
-The Java API lives in `com.codename1.io.websocket` and ships in `codenameone-core`. The transport is provided by a per-platform `WebSocketImpl` returned from `CodenameOneImplementation.createWebSocketImpl(WebSocket)` — same pattern as `Media`, `Storage`, `LocationManager`. iOS wraps `URLSessionWebSocketTask`, Android wraps `okhttp3.WebSocket`, JavaScript wraps `window.WebSocket`, JavaSE wraps `java.net.http.WebSocket`. Until the per-platform overrides land in the matching port modules the framework default returns `null` from `createWebSocketImpl` and `WebSocket.isSupported()` is `false` — branch on that before constructing.
-
 For raw HTTP server-push (Server-Sent Events / long-poll), use `ConnectionRequest` with `readResponse(InputStream)` overridden to consume the stream incrementally — the same pattern as the authenticated-image loader above.
 
 ### TLS, redirects, gzip
