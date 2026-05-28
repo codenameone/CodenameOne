@@ -119,13 +119,13 @@ it directly.  The build server probes the project zip for the
 generated `cn1app.RestClientBootstrap` and splices the registry
 wiring in, mirroring the existing `cn1app.MapperBootstrap` pattern.
 
-==== Scope (MVP)
+==== Scope
 
 * HTTP verbs: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
-* Parameter locations: `path`, `query`, `header`.  `cookie` parameters
-are dropped during code generation -- attach them via the `Rest`
-builder if needed.
-* Request bodies: `application/json` only -- serialized via
+* Parameter locations: `path`, `query`, `header`, `cookie`. Multiple
+`cookie` parameters on the same operation are joined into a single
+`Cookie: a=1; b=2` request header.
+* Request bodies: `application/json` -- serialized via
 `Mappers.toJson(body)` before being attached.
 * Response schemas: `$ref` resolution, primitives (`string` /
 `number` / `integer` / `boolean`), arrays, object schemas.
@@ -134,9 +134,7 @@ builder if needed.
 property shapes collapse to a single record/class to avoid an
 explosion of duplicates.
 * Authentication: bearer token is exposed as a `@Header("Authorization")
-String bearerToken` parameter on every operation.  Other schemes (API
-key, basic, OAuth) aren't in MVP scope -- use the `Rest` header
-builder or the `OidcClient` directly.
-
-Multipart upload (`multipart/form-data`), richer composition modelling,
-and async / pagination wrappers are tracked as follow-ups.
+String bearerToken` parameter on every operation.  API-key auth
+declared in the spec is emitted as `@Header` or `@Query` like any
+other parameter; basic auth and OAuth bearer tokens travel through
+the same `bearerToken` slot.

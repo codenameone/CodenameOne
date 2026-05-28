@@ -73,6 +73,7 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
     public static final String PATH_DESC = "Lcom/codename1/annotations/rest/Path;";
     public static final String QUERY_DESC = "Lcom/codename1/annotations/rest/Query;";
     public static final String HEADER_DESC = "Lcom/codename1/annotations/rest/Header;";
+    public static final String COOKIE_DESC = "Lcom/codename1/annotations/rest/Cookie;";
     public static final String BODY_DESC = "Lcom/codename1/annotations/rest/Body;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.RestClientBootstrap";
@@ -184,12 +185,13 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
                         ? paramAnnotations.get(i) : null;
 
                 int annoCount = 0;
-                AnnotationValues path = null, query = null, header = null;
+                AnnotationValues path = null, query = null, header = null, cookie = null;
                 boolean body = false;
                 if (pa != null) {
                     if ((path = pa.get(PATH_DESC)) != null) annoCount++;
                     if ((query = pa.get(QUERY_DESC)) != null) annoCount++;
                     if ((header = pa.get(HEADER_DESC)) != null) annoCount++;
+                    if ((cookie = pa.get(COOKIE_DESC)) != null) annoCount++;
                     if (pa.get(BODY_DESC) != null) { body = true; annoCount++; }
                 }
                 if (annoCount > 1) {
@@ -216,6 +218,11 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
                     rp.bindingName = header.getString("value");
                     if (rp.bindingName == null) rp.bindingName = "p" + i;
                     rp.name = sanitizeIdentifier(rp.bindingName + "Header");
+                } else if (cookie != null) {
+                    rp.kind = ParamKind.COOKIE;
+                    rp.bindingName = cookie.getString("value");
+                    if (rp.bindingName == null) rp.bindingName = "p" + i;
+                    rp.name = sanitizeIdentifier(rp.bindingName + "Cookie");
                 } else if (body) {
                     rp.kind = ParamKind.BODY;
                     rp.name = "body";
@@ -352,6 +359,24 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
             if (p.kind != ParamKind.HEADER) continue;
             sb.append("        if (").append(p.name).append(" != null) _rb.header(\"")
                     .append(escape(p.bindingName)).append("\", ").append(p.name).append(");\n");
+        }
+        // Cookie params: collapsed into a single `Cookie: a=1; b=2` header.
+        boolean anyCookie = false;
+        for (RestParam p : rm.params) {
+            if (p.kind == ParamKind.COOKIE) { anyCookie = true; break; }
+        }
+        if (anyCookie) {
+            sb.append("        StringBuilder _ck = new StringBuilder();\n");
+            for (RestParam p : rm.params) {
+                if (p.kind != ParamKind.COOKIE) continue;
+                sb.append("        if (").append(p.name).append(" != null) {\n");
+                sb.append("            if (_ck.length() > 0) _ck.append(\"; \");\n");
+                sb.append("            _ck.append(\"").append(escape(p.bindingName))
+                        .append("=\").append(com.codename1.io.Util.encodeUrl(String.valueOf(")
+                        .append(p.name).append(")));\n");
+                sb.append("        }\n");
+            }
+            sb.append("        if (_ck.length() > 0) _rb.header(\"Cookie\", _ck.toString());\n");
         }
         // Body.
         for (RestParam p : rm.params) {
@@ -714,7 +739,7 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
     // Accumulators
     // ----------------------------------------------------------------
 
-    enum ParamKind { PATH, QUERY, HEADER, BODY, CALLBACK }
+    enum ParamKind { PATH, QUERY, HEADER, COOKIE, BODY, CALLBACK }
 
     enum FetchKind { MAPPED, MAPPED_LIST, STRING }
 
