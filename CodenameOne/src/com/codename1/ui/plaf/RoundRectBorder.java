@@ -809,7 +809,17 @@ public final class RoundRectBorder extends Border {
 
         GeneralPath gp = createShape(shapeW, shapeH);
         Style s = c.getStyle();
-        if (s.getBgImage() == null) {
+        // The JS port's fillShape doesn't render on the cooperative-
+        // scheduler worker-side bridge (Dialog/TextField/ChatBubble
+        // would have empty backgrounds). The setClip(shape) +
+        // bgPainter.paint(fillRect) path below works on JS because
+        // fillRect is a primitive that goes through a different
+        // canvas op. Skip the fillShape simple-path on HTML5 and
+        // always fall through to the clip + fillRect route, matching
+        // RoundBorder which has always used setClip+bgPainter and
+        // already renders correctly on JS (Button UIID).
+        boolean skipFillShapeSimplePath = "HTML5".equals(Display.getInstance().getPlatformName());
+        if (!skipFillShapeSimplePath && s.getBgImage() == null) {
             byte type = s.getBackgroundType();
             if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
                 byte bgt = c.getStyle().getBgTransparency();
