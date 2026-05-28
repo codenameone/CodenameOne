@@ -6188,9 +6188,19 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     }
 #endif
     if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-        // afterScreenUpdates:NO — YES can stall indefinitely under UIScene waiting
-        // for a scene display-link cycle that never fires during a synchronous capture.
+        // afterScreenUpdates:NO — YES can stall indefinitely under UIScene on
+        // iPhone/iPad waiting for a scene display-link cycle that never fires
+        // during a synchronous capture. On Mac Catalyst the scene model is
+        // different and YES is required: the live screenTexture isn't
+        // committed by CADisplayLink between form.show() and the screenshot
+        // callback, so afterScreenUpdates:NO captures the previous form's
+        // framebuffer (see Cn1ssDeviceRunnerHelper's repaint-before-capture
+        // dance which alone isn't enough).
+#if TARGET_OS_MACCATALYST
+        drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
+#else
         drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:NO];
+#endif
     }
     if (!drawn) {
         [renderView.layer renderInContext:ctx];

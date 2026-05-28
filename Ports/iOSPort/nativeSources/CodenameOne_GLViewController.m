@@ -2464,14 +2464,22 @@ static CodenameOne_GLViewController *sharedSingleton;
 #endif
 }
 
-// Reapply displayWidth / displayHeight whenever the window resizes the
-// view. The AppDelegate seeds them from [UIScreen mainScreen].bounds,
-// which on Mac Catalyst is the full Mac display (e.g., 1470x956) -- not
-// the app window (1024x768 by default). Without this update the form
-// lays out for the full screen but renders into the window-sized
-// framebuffer; the captured screenshot then shows components shrunken
-// to fit the smaller buffer. layoutSubviews fires after the view is
-// attached to the actual window so view.bounds reflects the real size.
+// Mac Catalyst routinely fires layoutSubviews several times per second
+// while the window is being laid out (Catalyst's UINSView host bridge
+// negotiates size with NSWindow on the AppKit side, then echoes that
+// back into UIKit through repeated layoutIfNeeded passes). Re-emitting
+// screenSizeChanged on every cycle reallocated CN1Metal mutable
+// textures faster than the GC could reclaim them -- a CI run sat at
+// 70+ GB resident memory after a minute. The guard here debounces:
+// fire screenSizeChanged at most once per ~250 ms, and only when the
+// observed size actually differs by more than one pixel from the
+// previously reported size. The displayLink isn't running in this
+// port (CADisplayLink is commented out -- see startAnimation), so we
+// rely on this hook to keep the Metal layer in sync with the host
+// window when the user resizes. Skipping it means form.show() after
+// the first frame stops triggering a repaint of the GL view (every
+// subsequent screenshot captures whatever the GL view was last asked
+// to paint, which is usually the previous test's form).
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     if (self.view == nil) return;
@@ -2479,11 +2487,24 @@ static CodenameOne_GLViewController *sharedSingleton;
     int newW = (int)(sz.width * scaleValue);
     int newH = (int)(sz.height * scaleValue);
     if (newW <= 0 || newH <= 0) return;
-    if (displayWidth == newW && displayHeight == newH) return;
+    int dw = newW - displayWidth;
+    int dh = newH - displayHeight;
+    if (dw < 0) dw = -dw;
+    if (dh < 0) dh = -dh;
+    if (dw <= 1 && dh <= 1) {
+        return;
+    }
+    static NSTimeInterval lastFire = 0;
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    if (lastFire != 0 && (now - lastFire) < 0.25) {
+        return;
+    }
+    lastFire = now;
     displayWidth = newW;
     displayHeight = newH;
     screenSizeChanged(displayWidth, displayHeight);
 }
+
 #endif
 
 #ifdef INCLUDE_MOPUB
@@ -2686,6 +2707,29 @@ extern void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MUL
 bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+    // Reapply displayWidth / displayHeight once the view is attached to
+    // its window. The AppDelegate seeds them from [UIScreen mainScreen].bounds
+    // which on Mac Catalyst is the full Mac display (e.g., 1470x956), not
+    // the app window (1024x768 by default). Without this update the form
+    // lays out for the full screen but renders into the window-sized
+    // framebuffer. Doing this in viewDidLayoutSubviews instead caused a
+    // runaway form-relayout loop (observed locally: 70+ GB resident memory
+    // after a minute) -- layoutSubviews fires repeatedly during normal
+    // Catalyst window updates and re-triggering screenSizeChanged on every
+    // cycle re-allocated Metal mutable-image textures faster than the GC
+    // could reclaim them.
+    if (self.view != nil) {
+        CGSize sz = self.view.bounds.size;
+        int newW = (int)(sz.width * scaleValue);
+        int newH = (int)(sz.height * scaleValue);
+        if (newW > 0 && newH > 0 && (displayWidth != newW || displayHeight != newH)) {
+            displayWidth = newW;
+            displayHeight = newH;
+            screenSizeChanged(displayWidth, displayHeight);
+        }
+    }
+#endif
     [self becomeFirstResponder];
     [self updateCanvas:animated];
     // Re-install / bring the status-bar tap proxy to the front. Native peers

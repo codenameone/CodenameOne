@@ -410,8 +410,21 @@ FALLBACK_CHUNKS="$(cn1ss_count_chunks "$FALLBACK_LOG")"; FALLBACK_CHUNKS="${FALL
 LATE_CHUNKS="$(cn1ss_count_chunks "$LATE_FALLBACK_LOG")"; LATE_CHUNKS="${LATE_CHUNKS//[^0-9]/}"; : "${LATE_CHUNKS:=0}"
 rm_log "Chunk counts -> stdout: ${LOG_CHUNKS}, log-stream: ${FALLBACK_CHUNKS}, log-show: ${LATE_CHUNKS}"
 
-if [ "${LOG_CHUNKS:-0}" = "0" ] && [ "${FALLBACK_CHUNKS:-0}" = "0" ] && [ "${LATE_CHUNKS:-0}" = "0" ]; then
-  rm_log "STAGE:MARKERS_NOT_FOUND -> no CN1SS chunks captured"
+# Count CN1SS:FILE: announcements -- Mac native uses the file fast path
+# and emits no CN1SS:CHUNK lines on success, so the chunk-zero guard
+# below mustn't fire if files exist on disk.
+FILE_HITS=0
+for src in "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG"; do
+  [ -s "$src" ] || continue
+  c=$( { grep -c "CN1SS:FILE:" "$src" 2>/dev/null || true; } | head -n 1)
+  c="${c//[^0-9]/}"
+  : "${c:=0}"
+  FILE_HITS=$(( FILE_HITS + c ))
+done
+rm_log "CN1SS:FILE: lines captured: ${FILE_HITS}"
+
+if [ "${LOG_CHUNKS:-0}" = "0" ] && [ "${FALLBACK_CHUNKS:-0}" = "0" ] && [ "${LATE_CHUNKS:-0}" = "0" ] && [ "${FILE_HITS}" -eq 0 ]; then
+  rm_log "STAGE:MARKERS_NOT_FOUND -> no CN1SS chunks captured (and no CN1SS:FILE entries)"
   rm_log "---- last 50 lines of stdout log ----"
   tail -n 50 "$TEST_LOG" 2>/dev/null | sed 's/^/[STDOUT] /' || true
   rm_log "---- last 50 lines of unified log fallback ----"
@@ -428,15 +441,52 @@ if [ "${LOG_CHUNKS:-0}" = "0" ]; then
   if [ "${FALLBACK_CHUNKS:-0}" != "0" ]; then PRIMARY_LOG="$FALLBACK_LOG"; else PRIMARY_LOG="$LATE_FALLBACK_LOG"; fi
 fi
 
-TEST_NAMES_RAW="$(cn1ss_list_tests "$PRIMARY_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
+# On Mac native the helper writes PNGs/JPEGs straight to the app's
+# FileSystemStorage and emits CN1SS:FILE: lines pointing at the absolute
+# paths. The base64 chunk channel is unused on Mac (os_log rate-limits
+# 900-byte CN1SS:CHUNK lines under load); reading the files directly is
+# both faster and immune to log-line drops. Use a flat file index instead
+# of an associative array because macOS bash 3.2 doesn't support `declare -A`.
+CN1SS_FILE_INDEX="$SCREENSHOT_TMP_DIR/cn1ss-file-index.tsv"
+: > "$CN1SS_FILE_INDEX"
+for src in "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG"; do
+  [ -s "$src" ] || continue
+  { grep "CN1SS:FILE:" "$src" 2>/dev/null || true; } | \
+    sed -nE 's|.*CN1SS:FILE:test=([^ ]+) channel=([^ ]*) path=([^ ]+).*|\1	\2	\3|p' \
+    >> "$CN1SS_FILE_INDEX" || true
+done
+# Strip the file:// scheme that FileSystemStorage prepends on iOS/Mac.
+# BSD sed (macOS) doesn't grok `\b`, so anchor the substitution on the
+# tab-delimited column instead. The 3rd column starts after the second
+# tab; replace a leading 'file://' there.
+sed -i.bak -E 's@([^	]+	[^	]*	)file://@\1@' "$CN1SS_FILE_INDEX" 2>/dev/null || true
+rm -f "${CN1SS_FILE_INDEX}.bak" 2>/dev/null || true
+FILE_PNG_COUNT=$( { awk -F'\t' '$2==""' "$CN1SS_FILE_INDEX" 2>/dev/null || true; } | wc -l | tr -d ' ')
+FILE_JPG_COUNT=$( { awk -F'\t' '$2=="PREVIEW"' "$CN1SS_FILE_INDEX" 2>/dev/null || true; } | wc -l | tr -d ' ')
+rm_log "CN1SS:FILE: entries found -> png=${FILE_PNG_COUNT} preview=${FILE_JPG_COUNT}"
+
+# Look up a test's PNG / preview path from the flat index.
+cn1ss_file_path_for() {
+  # $1=testName, $2=channel ("" for png, "PREVIEW" for jpeg)
+  awk -F'\t' -v t="$1" -v c="$2" '$1==t && $2==c {print $3; exit}' "$CN1SS_FILE_INDEX" 2>/dev/null
+}
+
 declare -a TEST_NAMES=()
-if [ -n "$TEST_NAMES_RAW" ]; then
+if [ "${FILE_PNG_COUNT:-0}" -gt 0 ]; then
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     TEST_NAMES+=("$name")
-  done <<< "$TEST_NAMES_RAW"
+  done < <(awk -F'\t' '$2==""' "$CN1SS_FILE_INDEX" 2>/dev/null | awk -F'\t' '{print $1}' | sort -u)
 else
-  TEST_NAMES+=("default")
+  TEST_NAMES_RAW="$(cn1ss_list_tests "$PRIMARY_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
+  if [ -n "$TEST_NAMES_RAW" ]; then
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      TEST_NAMES+=("$name")
+    done <<< "$TEST_NAMES_RAW"
+  else
+    TEST_NAMES+=("default")
+  fi
 fi
 rm_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 
@@ -447,10 +497,31 @@ ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
+  preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+
+  # Fast path: copy from the file the app dropped onto the local
+  # filesystem (Mac native) -- no base64 decode, no chunk reassembly.
+  file_png="$(cn1ss_file_path_for "$test" "")"
+  if [ -n "$file_png" ] && [ -s "$file_png" ]; then
+    if cp -f "$file_png" "$dest"; then
+      TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
+      rm_log "Copied screenshot for '$test' (file=$file_png, size: $(cn1ss_file_size "$dest") bytes)"
+      file_jpg="$(cn1ss_file_path_for "$test" "PREVIEW")"
+      if [ -n "$file_jpg" ] && [ -s "$file_jpg" ]; then
+        cp -f "$file_jpg" "$preview_dest" 2>/dev/null || true
+        rm_log "Copied preview for '$test' (file=$file_jpg, size: $(cn1ss_file_size "$preview_dest") bytes)"
+      else
+        rm -f "$preview_dest" 2>/dev/null || true
+      fi
+      continue
+    fi
+  fi
+
+  # Fallback: classic CN1SS:CHUNK base64 decode (iOS path, kept here so
+  # the Mac script keeps working if the file-based emit is ever disabled).
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
     TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
     rm_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
-    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
     if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
       rm_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
     else
