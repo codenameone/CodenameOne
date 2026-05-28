@@ -24,8 +24,8 @@ The build-time scanner in the Codename One Maven plugin (`AiDependencyTable`) pi
 ```java
 import com.codename1.ai.*;
 
-// OpenAI (the fully implemented native client). Also drives Ollama,
-// vLLM, llama.cpp, Together, Groq, Fireworks etc. via shared wire format.
+// OpenAI. Also drives Ollama, vLLM, llama.cpp, Together, Groq,
+// Fireworks etc. via shared wire format.
 LlmClient client = LlmClient.openai(apiKey);
 
 // Local Ollama on http://localhost:11434
@@ -35,11 +35,22 @@ LlmClient local = LlmClient.ollama("llama3.2");
 LlmClient together = LlmClient.localOpenAiCompatible(
     "https://api.together.xyz/v1", apiKey, "meta-llama/Llama-3.3-70B-Instruct-Turbo");
 
-// Scaffolds today: throw a clear error until native clients land.
-// Route via localOpenAiCompatible() instead.
-LlmClient.anthropic(apiKey);
-LlmClient.gemini(apiKey);
+// Anthropic + Gemini route through their OpenAI-compatible endpoints
+// (Anthropic at /v1/chat/completions, Gemini at /v1beta/openai/
+// chat/completions). Same ChatRequest / ChatResponse value types,
+// same streaming, same tool-call API.
+LlmClient claude = LlmClient.anthropic(apiKey);   // default model: claude-sonnet-4-5
+LlmClient gemini = LlmClient.gemini(apiKey);      // default model: gemini-2.0-flash
 ```
+
+Default models per provider when `ChatRequest.builder().model(...)` is not called:
+
+| Provider | Default model | Override via |
+| --- | --- | --- |
+| OpenAI | `gpt-4o-mini` | `ChatRequest.builder().model("gpt-4o")` etc. |
+| Anthropic | `claude-sonnet-4-5` | `ChatRequest.builder().model("claude-opus-4-1")` etc. |
+| Gemini | `gemini-2.0-flash` | `ChatRequest.builder().model("gemini-2.5-pro")` etc. |
+| Ollama | `llama3.2` | `LlmClient.ollama("qwen2.5-7b")` or per request |
 
 `ChatRequest` is a fluent builder. `chat()` returns the response, `chatStream()` streams deltas:
 

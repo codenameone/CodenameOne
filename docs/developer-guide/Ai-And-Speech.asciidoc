@@ -53,17 +53,22 @@ LlmClient together = LlmClient.localOpenAiCompatible(
         apiKey,
         "meta-llama/Llama-3.3-70B-Instruct-Turbo");
 
-// Scaffolded; native wire format pending. Today these throw a clear
-// error pointing callers at the OpenAI-compatible shim.
+// Anthropic and Google Gemini, both via their OpenAI-compatible
+// endpoints. The wire format is identical; only the base URL,
+// default model, and auth differ.
 LlmClient anthropic = LlmClient.anthropic(apiKey);
 LlmClient gemini = LlmClient.gemini(apiKey);
 ----
 
-The OpenAI client is the fully implemented native client. It also drives
-Ollama, vLLM, and `llama.cpp` because the wire format matches. The
-Anthropic and Gemini factories compile and register, but throw an
-`LlmException` until their native clients land, so route through
-`localOpenAiCompatible` if you need them today.
+All five factories return the same `LlmClient` API. OpenAI, Ollama,
+vLLM, and `llama.cpp` share the canonical wire format. Anthropic's
+`https://api.anthropic.com/v1/chat/completions` and Google's
+`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`
+implement the same shape, so the framework speaks to all three through
+one network layer. Default models pick a sensible production-grade
+target per provider (`gpt-4o-mini`, `claude-sonnet-4-5`,
+`gemini-2.0-flash`, `llama3.2`); override per request with
+`ChatRequest.builder().model(...)`.
 
 ==== A first chat
 
