@@ -53,20 +53,10 @@ public class IPhoneBuilder extends Executor {
     private boolean useMetal;
 
     // macNative.enabled=true switches this iOS build to also emit a native Mac
-    // variant of the same app. The underlying Apple technology is Mac Catalyst,
-    // but that is an implementation detail -- never surfaced in hint names.
-    private boolean macNative;
-    private String macNativeDistribution;       // appStore | developerID | both
-    private String macNativeTeamId;
-    private String macNativeBundleId;
-    private boolean macNativeDeriveBundleId;
-    private String macNativeMinDeploymentTarget;     // MACOSX_DEPLOYMENT_TARGET
-    private String macNativeIosMinDeploymentTarget;  // IPHONEOS floor for Catalyst
-    private String macNativeAppCategory;
-    private String macNativeCopyright;
-    private String macNativeSigningStyle;       // automatic | manual
-    private String macNativeSigningIdentityAppStore;
-    private String macNativeSigningIdentityDeveloperID;
+    // variant of the same app. All Mac-specific code lives in MacNativeBuilder
+    // (same package). The underlying Apple technology is Mac Catalyst, but
+    // that is an implementation detail -- never surfaced in hint names.
+    private final MacNativeBuilder macNativeBuilder = new MacNativeBuilder(this);
 
     private boolean enableGalleryMultiselect;
     private boolean usePhotoKitForMultigallery;
@@ -199,6 +189,12 @@ public class IPhoneBuilder extends Executor {
     private static String escapeRuby(String input) {
         return input.replace("\\", "\\\\").replace("'", "\\'");
     }
+
+    /** Package-private accessor so {@link MacNativeBuilder} (separate file in
+     *  the same package) can use the same escaping helper. */
+    static String escapeRubyStr(String input) {
+        return escapeRuby(input);
+    }
     
     @Override
     protected String getDeviceIdCode() {
@@ -297,47 +293,19 @@ public class IPhoneBuilder extends Executor {
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
 
         // macNative: extend this iOS build to also produce a native Mac slice.
-        // Implemented as Mac Catalyst at the Xcode level, but that's hidden from
-        // the user-facing hint surface (macNative.* names, *-mac-source/ output).
-        macNative = "true".equals(request.getArg("macNative.enabled", "false"));
-        if (macNative) {
-            macNativeDistribution = request.getArg("macNative.distribution", "appStore");
-            macNativeTeamId = request.getArg("macNative.teamId",
-                    request.getArg("ios.release.teamId",
-                            request.getArg("ios.teamId",
-                                    request.getArg("ios.debug.teamId", ""))));
-            macNativeBundleId = request.getArg("macNative.bundleId",
-                    request.getPackageName() + ".mac");
-            macNativeDeriveBundleId = !"false".equals(request.getArg("macNative.deriveBundleId", "true"));
-            macNativeMinDeploymentTarget = request.getArg("macNative.minDeploymentTarget", "10.15");
-            macNativeIosMinDeploymentTarget = request.getArg("macNative.iosMinDeploymentTarget", "13.1");
-            macNativeAppCategory = request.getArg("macNative.appCategory", "public.app-category.utilities");
-            String defaultCopyright = "Copyright (c) "
-                    + java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                    + " " + (request.getVendor() != null ? request.getVendor() : request.getPackageName());
-            macNativeCopyright = request.getArg("macNative.copyright", defaultCopyright);
-            macNativeSigningStyle = request.getArg("macNative.signing.style", "automatic");
-            macNativeSigningIdentityAppStore = request.getArg(
-                    "macNative.signingIdentity.appStore", "Apple Distribution");
-            macNativeSigningIdentityDeveloperID = request.getArg(
-                    "macNative.signingIdentity.developerID", "Developer ID Application");
-
+        // All Mac-specific work is delegated to MacNativeBuilder; this builder
+        // only flips a few iOS-side knobs (Metal forced on, minimum deployment
+        // target floor, Ruby xcodeproj gem required) when Mac is enabled.
+        macNativeBuilder.parseHints(request);
+        if (macNativeBuilder.isEnabled()) {
             // The Mac slice cannot link OpenGL ES; force Metal on regardless of
             // the ios.metal hint. (Metal becomes the default soon anyway.)
             useMetal = true;
-
-            // Catalyst requires iOS 13.1+ -> macOS 10.15+
-            addMinDeploymentTarget(macNativeIosMinDeploymentTarget);
-
+            // Catalyst requires iOS 13.1+ -> macOS 10.15+.
+            addMinDeploymentTarget(macNativeBuilder.getIosMinDeploymentTarget());
             // Mac requires the iPad device family. iphone-only is incompatible.
-            if ("iphone".equalsIgnoreCase(request.getArg("ios.project_type", "ios"))) {
-                throw new BuildException("macNative.enabled=true is incompatible with ios.project_type=iphone. "
-                        + "Use 'ios' (universal) or 'ipad'.");
-            }
-
-            // Ruby + xcodeproj gem is unconditionally required for the Mac slice;
-            // it is the mechanism we use to inject SUPPORTS_MACCATALYST and the
-            // Mac signing/deployment settings post-generation.
+            macNativeBuilder.validateProjectType(request);
+            // Ruby + xcodeproj gem is unconditionally required for the Mac slice.
             ensureXcodeprojInstalled();
         }
 
@@ -2255,13 +2223,8 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
-                if (macNative) {
-                    // Weak-link iOS frameworks that are absent or behave differently
-                    // on the Mac slice. ByteCodeTranslator already honours this list
-                    // and emits ATTRIBUTES = (Weak, ); for each entry.
-                    parparCmd.add("-Doptional.frameworks=AddressBookUI.framework;"
-                            + "AddressBook.framework;MessageUI.framework;"
-                            + "MediaPlayer.framework;GLKit.framework;OpenGLES.framework");
+                if (macNativeBuilder.isEnabled()) {
+                    parparCmd.add(macNativeBuilder.parparvmOptionalFrameworksArg());
                 }
                 parparCmd.add("-Xmx384m");
                 parparCmd.add("-jar");
@@ -2879,18 +2842,18 @@ public class IPhoneBuilder extends Executor {
                 // injectDevelopmentTeam anchors on `SDKROOT = iphoneos;`, which only
                 // matches the project-level XCBuildConfiguration. That stays correct
                 // for the iOS slice. The Mac slice's team is routed by
-                // applyMacNativeXcodeSettings via a target-level [sdk=macosx*] key,
+                // MacNativeBuilder.applyXcodeSettings via a [sdk=macosx*] key,
                 // so this regex injection is intentionally NOT broadened.
                 injectDevelopmentTeam(pbxprojFile,
                         request.getArg("ios.debug.teamId", teamId),
                         request.getArg("ios.release.teamId", teamId));
 
-                if (macNative) {
+                if (macNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
-                    writeMacNativeEntitlements(request, appSrcDir);
-                    writeMacCatalystStubHeaders(appSrcDir);
-                    applyMacNativeXcodeSettings(request);
-                    writeMacNativeExportOptions(request, new File(tmpFile, "dist"));
+                    macNativeBuilder.writeEntitlements(request, appSrcDir);
+                    macNativeBuilder.writeStubHeaders(appSrcDir);
+                    macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                    macNativeBuilder.writeExportOptions(request, new File(tmpFile, "dist"));
                 }
 
             } catch (Exception ex) {
@@ -4203,7 +4166,9 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    private String sanitizeTeamId(String raw, String hint) {
+    /** Package-private so {@link MacNativeBuilder} can validate its own
+     *  {@code macNative.teamId} hint with the same regex as the iOS team. */
+    String sanitizeTeamId(String raw, String hint) {
         if (raw == null) {
             return "";
         }
@@ -4218,414 +4183,6 @@ public class IPhoneBuilder extends Executor {
         return trimmed;
     }
 
-    private String macNativeEntitlementsFileName(String distribution) {
-        if ("developerID".equalsIgnoreCase(distribution)) {
-            return "DeveloperID";
-        }
-        return "AppStore";
-    }
-
-    private boolean writeEntitlementsBoolean(BuildRequest request, String hint, boolean defaultValue) {
-        return Boolean.parseBoolean(request.getArg(hint, Boolean.toString(defaultValue)));
-    }
-
-    private void writeMacNativeEntitlements(BuildRequest request, File appSrcDir) throws IOException {
-        appSrcDir.mkdirs();
-        if ("both".equalsIgnoreCase(macNativeDistribution)) {
-            writeMacNativeEntitlementsFile(request, appSrcDir,
-                    request.getMainClass() + "-AppStore", "appStore");
-            writeMacNativeEntitlementsFile(request, appSrcDir,
-                    request.getMainClass() + "-DeveloperID", "developerID");
-        } else {
-            writeMacNativeEntitlementsFile(request, appSrcDir,
-                    request.getMainClass(), macNativeDistribution);
-        }
-    }
-
-    private void writeMacNativeEntitlementsFile(BuildRequest request, File appSrcDir,
-                                                String baseName, String channel) throws IOException {
-        boolean sandbox = writeEntitlementsBoolean(request,
-                "macNative.entitlements.appSandbox",
-                "appStore".equalsIgnoreCase(channel));
-        boolean networkClient = writeEntitlementsBoolean(request,
-                "macNative.entitlements.network.client", true);
-        boolean networkServer = writeEntitlementsBoolean(request,
-                "macNative.entitlements.network.server", false);
-        String filesUserSelected = request.getArg(
-                "macNative.entitlements.files.userSelected", "readwrite").toLowerCase();
-        boolean hardenedRuntime = writeEntitlementsBoolean(request,
-                "macNative.entitlements.hardenedRuntime",
-                "developerID".equalsIgnoreCase(channel));
-        boolean allowJit = writeEntitlementsBoolean(request,
-                "macNative.entitlements.allowJit", false);
-        String extra = request.getArg("macNative.entitlements.extra", "");
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        sb.append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-                + "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n");
-        sb.append("<plist version=\"1.0\">\n<dict>\n");
-        if (sandbox) {
-            sb.append("    <key>com.apple.security.app-sandbox</key>\n    <true/>\n");
-        }
-        if (networkClient) {
-            sb.append("    <key>com.apple.security.network.client</key>\n    <true/>\n");
-        }
-        if (networkServer) {
-            sb.append("    <key>com.apple.security.network.server</key>\n    <true/>\n");
-        }
-        if ("readwrite".equals(filesUserSelected)) {
-            sb.append("    <key>com.apple.security.files.user-selected.read-write</key>\n    <true/>\n");
-            sb.append("    <key>com.apple.security.files.downloads.read-write</key>\n    <true/>\n");
-        } else if ("readonly".equals(filesUserSelected)) {
-            sb.append("    <key>com.apple.security.files.user-selected.read-only</key>\n    <true/>\n");
-        }
-        if (hardenedRuntime && !allowJit) {
-            sb.append("    <key>com.apple.security.cs.allow-jit</key>\n    <false/>\n");
-            sb.append("    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>\n    <false/>\n");
-        } else if (allowJit) {
-            sb.append("    <key>com.apple.security.cs.allow-jit</key>\n    <true/>\n");
-        }
-        if (extra != null && extra.trim().length() > 0) {
-            sb.append(extra);
-            if (!extra.endsWith("\n")) {
-                sb.append("\n");
-            }
-        }
-        sb.append("</dict>\n</plist>\n");
-
-        File ent = new File(appSrcDir, baseName + ".entitlements");
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(ent.toPath()), StandardCharsets.UTF_8)) {
-            w.write(sb.toString());
-        }
-        log("Wrote Mac entitlements: " + ent.getAbsolutePath() + " (channel=" + channel + ")");
-    }
-
-    private void writeMacNativeExportOptions(BuildRequest request, File distDir) throws IOException {
-        distDir.mkdirs();
-        if ("both".equalsIgnoreCase(macNativeDistribution)) {
-            writeMacNativeExportOptionsFile(request, distDir, "appStore");
-            writeMacNativeExportOptionsFile(request, distDir, "developerID");
-        } else {
-            writeMacNativeExportOptionsFile(request, distDir, macNativeDistribution);
-        }
-        log("Use xcodebuild to archive and export the Mac app, e.g.:");
-        log("  xcodebuild -project " + request.getMainClass() + ".xcodeproj"
-                + " -scheme " + request.getMainClass()
-                + " -destination 'generic/platform=macOS,variant=Mac Catalyst'"
-                + " -archivePath build/" + request.getMainClass() + ".xcarchive archive");
-        log("  xcodebuild -exportArchive -archivePath build/" + request.getMainClass()
-                + ".xcarchive -exportOptionsPlist ExportOptions-<channel>-Mac.plist"
-                + " -exportPath build/export");
-    }
-
-    private void writeMacNativeExportOptionsFile(BuildRequest request, File distDir, String channel)
-            throws IOException {
-        boolean isAppStore = "appStore".equalsIgnoreCase(channel);
-        String method = isAppStore ? "app-store" : "developer-id";
-        String signingIdentity = isAppStore
-                ? macNativeSigningIdentityAppStore : macNativeSigningIdentityDeveloperID;
-        String teamId = sanitizeTeamId(macNativeTeamId, "macNative.teamId");
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        sb.append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-                + "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n");
-        sb.append("<plist version=\"1.0\">\n<dict>\n");
-        sb.append("    <key>destination</key>\n    <string>export</string>\n");
-        sb.append("    <key>method</key>\n    <string>").append(method).append("</string>\n");
-        if (teamId != null && !teamId.isEmpty()) {
-            sb.append("    <key>teamID</key>\n    <string>").append(teamId).append("</string>\n");
-        }
-        sb.append("    <key>signingStyle</key>\n    <string>")
-                .append("manual".equalsIgnoreCase(macNativeSigningStyle) ? "manual" : "automatic")
-                .append("</string>\n");
-        if (signingIdentity != null && !signingIdentity.isEmpty()) {
-            sb.append("    <key>signingCertificate</key>\n    <string>")
-                    .append(signingIdentity).append("</string>\n");
-        }
-        if ("manual".equalsIgnoreCase(macNativeSigningStyle)) {
-            String profile = request.getArg(
-                    "macNative.provisioningProfile." + (isAppStore ? "appStore" : "developerID"),
-                    "");
-            if (!profile.isEmpty()) {
-                String macBundleId = macNativeDeriveBundleId
-                        ? request.getPackageName() + ".maccatalyst"
-                        : macNativeBundleId;
-                sb.append("    <key>provisioningProfiles</key>\n    <dict>\n")
-                        .append("        <key>").append(macBundleId).append("</key>\n")
-                        .append("        <string>").append(profile).append("</string>\n")
-                        .append("    </dict>\n");
-            }
-        }
-        sb.append("</dict>\n</plist>\n");
-
-        String label = isAppStore ? "AppStore" : "DeveloperID";
-        File f = new File(distDir, "ExportOptions-" + label + "-Mac.plist");
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
-            w.write(sb.toString());
-        }
-        log("Wrote Mac ExportOptions: " + f.getAbsolutePath());
-    }
-
-    private void writeMacNativeAppIconset(File assetCatalogDir, BuildRequest request) throws IOException {
-        // Minimal Mac iconset: maps the existing 1024 source icon as the largest
-        // size (512x512@2x). actool will scale down the other sizes. Users with
-        // dedicated Mac-style artwork can override entries individually later.
-        File iconset = new File(assetCatalogDir, "Mac.appiconset");
-        iconset.mkdirs();
-        File source = icon512;
-        if (source == null || !source.exists()) {
-            // Fall back to any pre-existing 1024 icon the build pipeline produced.
-            File alt = new File(assetCatalogDir, "AppIcon.appiconset/Icon-1024.png");
-            if (alt.exists()) {
-                source = alt;
-            }
-        }
-        if (source == null || !source.exists()) {
-            log("Skipping Mac.appiconset generation: no 512/1024 source icon available");
-            return;
-        }
-        File dest = new File(iconset, "icon_512x512@2x.png");
-        copy(source, dest);
-        StringBuilder json = new StringBuilder();
-        json.append("{\n  \"images\" : [\n");
-        json.append("    { \"size\" : \"512x512\", \"idiom\" : \"mac\", \"filename\" : \"icon_512x512@2x.png\", \"scale\" : \"2x\" }\n");
-        json.append("  ],\n  \"info\" : { \"version\" : 1, \"author\" : \"xcode\" }\n}\n");
-        File contents = new File(iconset, "Contents.json");
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(contents.toPath()), StandardCharsets.UTF_8)) {
-            w.write(json.toString());
-        }
-        log("Wrote Mac.appiconset at " + iconset.getAbsolutePath());
-    }
-
-    private void writeMacCatalystStubHeaders(File appSrcDir) throws IOException {
-        // Stub headers for GLKit and OpenGL ES, used only by the Mac Catalyst
-        // slice via HEADER_SEARCH_PATHS[sdk=macosx*]. These satisfy the
-        // umbrella #import lines in the iOS-port headers (GLViewController.h,
-        // EAGLView.h, CN1ES2compat.h, etc.) so the project compiles for Mac.
-        // Real GL calls are preprocessed out by #ifdef CN1_USE_METAL or in
-        // EXCLUDED_SOURCE_FILE_NAMES-excluded .m files.
-        File stubsDir = new File(appSrcDir, "macCatalystStubs");
-        File openGLES = new File(stubsDir, "OpenGLES");
-        File openGLESes1 = new File(openGLES, "ES1");
-        File openGLESes2 = new File(openGLES, "ES2");
-        File glkit = new File(stubsDir, "GLKit");
-        openGLESes1.mkdirs();
-        openGLESes2.mkdirs();
-        glkit.mkdirs();
-        writeStub(new File(openGLES, "EAGL.h"),
-                "#ifndef CN1_MAC_CATALYST_STUB_EAGL_H\n"
-                + "#define CN1_MAC_CATALYST_STUB_EAGL_H\n"
-                + "#import <Foundation/Foundation.h>\n"
-                + "@interface EAGLContext : NSObject @end\n"
-                + "typedef enum { kEAGLRenderingAPIOpenGLES1 = 1,"
-                + " kEAGLRenderingAPIOpenGLES2 = 2,"
-                + " kEAGLRenderingAPIOpenGLES3 = 3 } EAGLRenderingAPI;\n"
-                + "#endif\n");
-        // Stub OpenGL ES types only -- no function declarations. With the
-        // rendering ops properly gated via #ifdef CN1_USE_METAL / #else / #endif
-        // in the iOS port, the GL code is preprocessed out on Mac and no
-        // function symbols are needed. These typedefs are still required
-        // because some unconditional header declarations (extern variables of
-        // type GLuint / GLint / GLKMatrix4) need to compile.
-        String glTypes =
-                "#ifndef CN1_MAC_CATALYST_STUB_GLES_TYPES\n"
-                + "#define CN1_MAC_CATALYST_STUB_GLES_TYPES\n"
-                + "typedef unsigned int   GLenum;\n"
-                + "typedef unsigned int   GLuint;\n"
-                + "typedef int            GLint;\n"
-                + "typedef int            GLsizei;\n"
-                + "typedef float          GLfloat;\n"
-                + "typedef float          GLclampf;\n"
-                + "typedef unsigned char  GLubyte;\n"
-                + "typedef unsigned char  GLboolean;\n"
-                + "typedef void           GLvoid;\n"
-                + "typedef signed char    GLbyte;\n"
-                + "typedef short          GLshort;\n"
-                + "typedef unsigned short GLushort;\n"
-                + "typedef int            GLfixed;\n"
-                + "typedef unsigned int   GLbitfield;\n"
-                + "typedef long           GLintptr;\n"
-                + "typedef long           GLsizeiptr;\n"
-                + "#endif\n";
-        writeStub(new File(openGLESes1, "gl.h"), glTypes);
-        writeStub(new File(openGLESes1, "glext.h"), "");
-        writeStub(new File(openGLESes2, "gl.h"), glTypes);
-        writeStub(new File(openGLESes2, "glext.h"), "");
-        writeStub(new File(glkit, "GLKit.h"),
-                "#ifndef CN1_MAC_CATALYST_STUB_GLKIT_H\n"
-                + "#define CN1_MAC_CATALYST_STUB_GLKIT_H\n"
-                + "#import <Foundation/Foundation.h>\n"
-                + "#import <OpenGLES/ES2/gl.h>\n"
-                + "typedef struct { float m[16]; } GLKMatrix4;\n"
-                + "typedef struct { float v[4];  } GLKVector4;\n"
-                + "typedef struct { float v[3];  } GLKVector3;\n"
-                + "typedef struct { float v[2];  } GLKVector2;\n"
-                + "@interface GLKView : NSObject @end\n"
-                + "@interface GLKBaseEffect : NSObject @end\n"
-                + "@interface GLKTextureLoader : NSObject @end\n"
-                + "@interface GLKTextureInfo : NSObject @end\n"
-                + "#endif\n");
-        log("Wrote Mac Catalyst stub headers under " + stubsDir.getAbsolutePath());
-    }
-
-    private void writeStub(File f, String content) throws IOException {
-        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
-            w.write(content);
-        }
-    }
-
-    private void applyMacNativeXcodeSettings(BuildRequest request) throws BuildException {
-        File hooksDir = new File(tmpFile, "hooks");
-        hooksDir.mkdir();
-        File scriptFile = new File(hooksDir, "apply_mac_native_settings.rb");
-        String mainClass = request.getMainClass();
-        String projectFile = new File(tmpFile, "dist/" + mainClass + ".xcodeproj").getAbsolutePath();
-        String teamId = sanitizeTeamId(macNativeTeamId, "macNative.teamId");
-        boolean manualSigning = "manual".equalsIgnoreCase(macNativeSigningStyle);
-
-        // For the "both" case the AppStore variant is wired as the default
-        // CODE_SIGN_ENTITLEMENTS; xcodebuild -exportOptionsPlist picks up the
-        // DeveloperID entitlements via the matching ExportOptions file.
-        String entitlementsLeaf = "both".equalsIgnoreCase(macNativeDistribution)
-                ? mainClass + "-AppStore.entitlements"
-                : mainClass + ".entitlements";
-        String entitlementsPath = mainClass + "-src/" + entitlementsLeaf;
-
-        StringBuilder s = new StringBuilder();
-        s.append("#!/usr/bin/env ruby\n")
-                .append("require 'xcodeproj'\n")
-                .append("project_file = '").append(escapeRuby(projectFile)).append("'\n")
-                .append("xcproj = Xcodeproj::Project.open(project_file)\n")
-                .append("target = xcproj.targets.find { |t| t.name == '")
-                .append(escapeRuby(mainClass)).append("' }\n")
-                .append("abort('Unable to find app target ").append(escapeRuby(mainClass))
-                .append("') unless target\n")
-                .append("target.build_configurations.each do |config|\n")
-                .append("  bs = config.build_settings\n")
-                .append("  bs['SUPPORTS_MACCATALYST'] = 'YES'\n")
-                .append("  bs['SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD'] = 'NO'\n")
-                .append("  bs['TARGETED_DEVICE_FAMILY'] = '1,2,6'\n")
-                .append("  bs['DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER'] = '")
-                .append(macNativeDeriveBundleId ? "YES" : "NO").append("'\n");
-        if (!macNativeDeriveBundleId) {
-            s.append("  bs['PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]'] = '")
-                    .append(escapeRuby(macNativeBundleId)).append("'\n");
-        }
-        s.append("  bs['MACOSX_DEPLOYMENT_TARGET'] = '")
-                .append(escapeRuby(macNativeMinDeploymentTarget)).append("'\n")
-                .append("  bs['IPHONEOS_DEPLOYMENT_TARGET'] = '")
-                .append(escapeRuby(macNativeIosMinDeploymentTarget)).append("'\n")
-                .append("  bs['MARKETING_VERSION'] = '")
-                .append(escapeRuby(request.getVersion() == null ? "1.0" : request.getVersion())).append("'\n")
-                .append("  bs['CURRENT_PROJECT_VERSION'] = '")
-                .append(escapeRuby(buildVersion == null ? "1" : buildVersion)).append("'\n")
-                .append("  bs['LD_RUNPATH_SEARCH_PATHS'] = '$(inherited) @executable_path/Frameworks @executable_path/../Frameworks'\n")
-                .append("  bs['INFOPLIST_KEY_LSApplicationCategoryType'] = '")
-                .append(escapeRuby(macNativeAppCategory)).append("'\n")
-                .append("  bs['INFOPLIST_KEY_NSHumanReadableCopyright'] = '")
-                .append(escapeRuby(macNativeCopyright)).append("'\n")
-                .append("  bs['CODE_SIGN_ENTITLEMENTS'] = '")
-                .append(escapeRuby(entitlementsPath)).append("'\n")
-                .append("  bs['CODE_SIGN_STYLE'] = '")
-                .append(manualSigning ? "Manual" : "Automatic").append("'\n");
-        if (teamId != null && !teamId.isEmpty()) {
-            s.append("  bs['DEVELOPMENT_TEAM[sdk=macosx*]'] = '").append(teamId).append("'\n");
-        }
-        if (manualSigning) {
-            if (macNativeSigningIdentityAppStore != null && !macNativeSigningIdentityAppStore.isEmpty()) {
-                s.append("  bs['CODE_SIGN_IDENTITY[sdk=macosx*]'] = '")
-                        .append(escapeRuby(macNativeSigningIdentityAppStore)).append("'\n");
-            }
-        }
-        // OpenGL ES backbone files have no Mac Catalyst equivalent (GLKit /
-        // OpenGLES headers are missing from recent macOS SDKs). Exclude them
-        // from the Mac slice via EXCLUDED_SOURCE_FILE_NAMES so the build
-        // compiles. The rendering-op .m files (DrawRect.m, ClearRect.m, etc.)
-        // stay because they have internal #ifdef CN1_USE_METAL guards that
-        // route to the Metal path on Mac.
-        // All four iOS XIBs trigger an IBAgent-macOS-UIKit internal error
-        // when compiled for the Mac slice (observed on Xcode 26.x).
-        // CodenameOne_GLAppDelegate.m has a TARGET_OS_MACCATALYST branch
-        // that passes nil to initWithNibName: on Mac, so the runtime never
-        // tries to load these NIBs by name and excluding them at compile
-        // time is safe. The iOS slice keeps loading them normally.
-        s.append("  bs['EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]'] = ")
-                .append("'CN1ES2compat.m CN1ES1compat.m EAGLView.m ")
-                .append("CodenameOne_GLViewController.xib MainWindow.xib ")
-                .append("CodenameOne_METALViewController.xib MainWindowMETAL.xib'\n");
-        // Header search path stubs for the Mac slice: the iOS port ships an
-        // umbrella set of empty/stub GLKit and OpenGLES headers under
-        // macCatalystStubs/. These resolve the #import <GLKit/...> and
-        // #import <OpenGLES/...> lines across the iOS port without touching
-        // every header. The actual GL calls inside .m files are preprocessed
-        // out by #ifdef CN1_USE_METAL or excluded above.
-        s.append("  bs['HEADER_SEARCH_PATHS[sdk=macosx*]'] = ")
-                .append("'$(inherited) $(SRCROOT)/").append(escapeRuby(mainClass))
-                .append("-src/macCatalystStubs'\n");
-        s.append("end\n");
-        // OpenGLES.framework is absent from the macOS SDK and cannot be
-        // hard-linked when the Mac Catalyst slice is in use. The Frameworks
-        // build phase entries for OpenGLES come from the ParparVM
-        // template.pbxproj, which doesn't know about Mac Catalyst. Drop the
-        // OpenGLES build-file entry from the unconditional Frameworks phase
-        // and re-add it only for the iOS slice via OTHER_LDFLAGS[sdk=iphoneos*].
-        // GLKit stays in the build phase: Mac Catalyst provides a GLKit.tbd
-        // that links cleanly (the missing pieces are math inlines / OpenGL
-        // helpers we route around at the source level). We mark it Weak for
-        // safety so any genuinely-absent symbol surfaces at runtime, not link.
-        s.append("removed_refs = []\n");
-        s.append("target.frameworks_build_phase.files.to_a.each do |bf|\n")
-                .append("  ref = bf.file_ref\n")
-                .append("  next unless ref && ref.path\n")
-                .append("  base = File.basename(ref.path)\n")
-                .append("  if base == 'OpenGLES.framework'\n")
-                .append("    removed_refs << ref\n")
-                .append("    bf.remove_from_project\n")
-                .append("  elsif base == 'GLKit.framework'\n")
-                .append("    bf.settings ||= {}\n")
-                .append("    attrs = (bf.settings['ATTRIBUTES'] || []).dup\n")
-                .append("    attrs << 'Weak' unless attrs.include?('Weak')\n")
-                .append("    bf.settings['ATTRIBUTES'] = attrs\n")
-                .append("  end\n")
-                .append("end\n");
-        // Wire OpenGLES back in for the iOS slice only. The macosx slice
-        // gets nothing -- the source has been gated to avoid every OpenGLES
-        // call already so the linker doesn't need the framework there.
-        //
-        // Also force DEAD_CODE_STRIPPING=YES for the Mac slice. The iOS port
-        // includes a handful of `native` JNI methods (java.io.File hidden /
-        // directory probes, IOSNative biometrics, etc.) whose C
-        // implementations live in template files outside the per-app source
-        // tree; ParparVM declares them in the .h but never copies the .m
-        // into the generated tree. iOS gets away with this thanks to its
-        // default `-dead_strip` flag pruning the unreferenced symbols; Mac
-        // Catalyst doesn't enable dead-stripping by default in Debug, so
-        // those refs surface as link errors. Turning the flag on for the
-        // Mac slice mirrors the iOS behaviour.
-        s.append("target.build_configurations.each do |config|\n")
-                .append("  bs = config.build_settings\n")
-                .append("  existing = bs['OTHER_LDFLAGS[sdk=iphoneos*]'] || '$(inherited)'\n")
-                .append("  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = existing + ' -framework OpenGLES'\n")
-                .append("  existing_sim = bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] || '$(inherited)'\n")
-                .append("  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = existing_sim + ' -framework OpenGLES'\n")
-                .append("  bs['DEAD_CODE_STRIPPING[sdk=macosx*]'] = 'YES'\n")
-                .append("end\n");
-        s.append("xcproj.save\n");
-
-        try {
-            createFile(scriptFile, s.toString().getBytes(StandardCharsets.UTF_8));
-            exec(hooksDir, "chmod", "0755", scriptFile.getAbsolutePath());
-            if (!exec(hooksDir, scriptFile.getAbsolutePath())) {
-                throw new BuildException("Failed to apply macNative Xcode settings via xcodeproj");
-            }
-        } catch (BuildException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new BuildException("Failed to apply macNative Xcode settings via xcodeproj", ex);
-        }
-    }
 
     private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
         if (localizedIcons.isEmpty()) {
@@ -4696,8 +4253,8 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
-        if (macNative) {
-            writeMacNativeAppIconset(new File(appSrcDir, "Images.xcassets"), request);
+        if (macNativeBuilder.isEnabled()) {
+            macNativeBuilder.writeAppIconset(new File(appSrcDir, "Images.xcassets"), icon512);
         }
     }
 
