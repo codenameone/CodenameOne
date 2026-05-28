@@ -77,6 +77,7 @@ import org.xeustechnologies.jtar.TarOutputStream;
 public abstract class Executor {
     public static final String BUILD_TARGET_XCODE_PROJECT = "ios-source";
     public static final String BUILD_TARGET_ANDROID_PROJECT = "android-source";
+    public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = "mac-source";
     private String buildTarget;
 
     private static boolean disableDelete;
