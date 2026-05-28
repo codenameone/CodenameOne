@@ -220,6 +220,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // AnimationTime so the captured frame is deterministic.
             new SVGStaticScreenshotTest(),
             new SVGAnimatedScreenshotTest(),
+            // Build-time Lottie transcoder -- same pipeline as SVG, lowers
+            // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
+            new LottieAnimatedScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -385,6 +388,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // on top of the current suite; revisit when that budget is bumped.
                 || "SVGStaticScreenshotTest".equals(testName)
                 || "SVGAnimatedScreenshotTest".equals(testName)
+                || "LottieAnimatedScreenshotTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
                 || "StatusBarTapDiagnosticScreenshotTest".equals(testName)

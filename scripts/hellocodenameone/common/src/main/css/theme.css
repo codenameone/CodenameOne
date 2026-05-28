@@ -292,3 +292,22 @@ SVGClippedBadgeStyle {
     bg-type: image_scaled_fit;
     padding: 2mm;
 }
+
+/* Build-time Lottie transcoder: Bodymovin JSON files are lowered into the
+ * same SVG model the SVG transcoder uses, so the cn1-svg-width / -height
+ * hints sized for SVG apply here too. */
+LottieSpinnerStyle {
+    background: url(lottie_spinner.json);
+    cn1-svg-width: 14mm;
+    cn1-svg-height: 14mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+LottiePulseStyle {
+    background: url(lottie_pulse.json);
+    cn1-svg-width: 14mm;
+    cn1-svg-height: 14mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}

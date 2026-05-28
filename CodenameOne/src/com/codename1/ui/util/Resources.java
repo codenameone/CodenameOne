@@ -930,8 +930,15 @@ public class Resources {
         }
         synchronized (generatedImages) {
             generatedImages.put(id, image);
-            if (id.endsWith(".svg")) {
-                generatedImages.put(id.substring(0, id.length() - 4), image);
+            // Register the bare stem too so getImage("home") works whether
+            // the source asset was home.svg, home.json (Lottie), or
+            // home.lottie. Keeps the call site format-agnostic.
+            int dot = id.lastIndexOf('.');
+            if (dot > 0) {
+                String stem = id.substring(0, dot);
+                if (!generatedImages.containsKey(stem)) {
+                    generatedImages.put(stem, image);
+                }
             }
         }
     }
