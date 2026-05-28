@@ -3480,37 +3480,13 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void paintBackgroundImpl(Graphics g) {
-        boolean diagDialog = false;
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            String uiid = getUIID();
-            if ("Dialog".equals(uiid) || "DialogBody".equals(uiid)) {
-                diagDialog = true;
-                System.out.println("DLG-DIAG paintBackgroundImpl uiid=" + uiid
-                        + " w=" + getWidth() + " h=" + getHeight()
-                        + " borderPainted=" + isBorderPainted()
-                        + " border=" + (getBorder() == null ? "null" : getBorder().getClass().getSimpleName())
-                        + " borderIsBackgroundPainter=" + (getBorder() != null && getBorder().isBackgroundPainter())
-                        + " opaque=" + opaque + " flatten=" + isFlatten()
-                        + " bgTrans=" + (getStyle().getBgTransparency() & 0xff)
-                        + " bgColor=" + Integer.toHexString(getStyle().getBgColor())
-                        + " bgPainter=" + (getStyle().getBgPainter() == null ? "null" : getStyle().getBgPainter().getClass().getSimpleName()));
-            }
-        }
         if (isBorderPainted()) {
             Border b = getBorder();
             if (b != null && b.isBackgroundPainter()) {
-                if (diagDialog) {
-                    System.out.println("DLG-DIAG calling border.paintBorderBackground uiid=" + getUIID()
-                            + " border=" + b.getClass().getSimpleName());
-                }
                 b.paintBorderBackground(g, this);
                 paintRippleEffect(g);
                 return;
             }
-        }
-        if (diagDialog) {
-            System.out.println("DLG-DIAG fell-through-to-bgPainter uiid=" + getUIID()
-                    + " bgPainter=" + (getStyle().getBgPainter() == null ? "null" : getStyle().getBgPainter().getClass().getSimpleName()));
         }
         if (getStyle().getBgPainter() != null) {
             Painter bp = getStyle().getBgPainter();
