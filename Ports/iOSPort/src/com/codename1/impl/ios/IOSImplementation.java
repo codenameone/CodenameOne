@@ -816,14 +816,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             stopTextEditing();
         }
         super.setCurrentForm(f);
-        if (f != null && isDesktop()) {
-            int bg = f.getContentPane().getStyle().getBgColor();
-            int r = (bg >> 16) & 0xff;
-            int g = (bg >> 8) & 0xff;
-            int b = bg & 0xff;
-            int luma = (r * 299 + g * 587 + b * 114) / 1000;
-            nativeInstance.setMacWindowDarkAppearance(luma < 128);
-        }
+        syncMacWindowAppearance(f);
+    }
+
+    private Boolean lastMacWindowDark;
+    private void syncMacWindowAppearance(Form f) {
+        if (f == null || !isDesktop()) return;
+        int bg = f.getContentPane().getStyle().getBgColor();
+        int r = (bg >> 16) & 0xff;
+        int g = (bg >> 8) & 0xff;
+        int b = bg & 0xff;
+        int luma = (r * 299 + g * 587 + b * 114) / 1000;
+        boolean dark = luma < 128;
+        if (lastMacWindowDark != null && lastMacWindowDark.booleanValue() == dark) return;
+        lastMacWindowDark = Boolean.valueOf(dark);
+        nativeInstance.setMacWindowDarkAppearance(dark);
     }
 
     @Override
@@ -1219,6 +1226,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void flushGraphics(int x, int y, int width, int height) {
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
+        if (isDesktop()) {
+            // Form-show isn't the only path that changes dark mode -- a theme
+            // refresh or a system appearance toggle re-styles the contentPane
+            // without dropping a new Form on the EDT. Re-check after every
+            // flush so the host NSWindow titlebar tracks the live form.
+            // syncMacWindowAppearance is no-op when the state hasn't changed.
+            syncMacWindowAppearance(Display.getInstance().getCurrent());
+        }
     }
 
     private final static int[] singleDimensionX = new int[1];

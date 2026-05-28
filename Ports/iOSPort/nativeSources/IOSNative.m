@@ -6178,11 +6178,23 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
                 [config release];
 
                 if (!snapshotComplete) {
+                    // Pump the run loop in NSRunLoopCommonModes (not just
+                    // NSDefaultRunLoopMode) so the snapshot completion source
+                    // -- which on Mac Catalyst delivers via a tracking-mode
+                    // source -- gets picked up. 1 s is enough on iOS / iPadOS
+                    // (snapshotWithConfiguration delivers in ~50 ms when the
+                    // page is loaded) but on Mac Catalyst's headless CI the
+                    // first snapshot of a freshly-loaded page can take 2+ s,
+                    // so wait up to 3 s before giving up.
+#if TARGET_OS_MACCATALYST
+                    NSTimeInterval timeout = 3.0;
+#else
                     NSTimeInterval timeout = 1.0;
+#endif
                     while (!snapshotComplete && timeout > 0) {
                         NSTimeInterval step = 0.01;
                         NSDate *stepDate = [NSDate dateWithTimeIntervalSinceNow:step];
-                        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:stepDate];
+                        [[NSRunLoop currentRunLoop] runMode:NSRunLoopCommonModes beforeDate:stepDate];
                         timeout -= step;
                     }
                 }
