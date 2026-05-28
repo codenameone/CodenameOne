@@ -268,14 +268,14 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case BOOLEAN:    return "boolean";
             case DATE:       return "java.util.Date";
             case BYTE_ARRAY: return "byte[]";
-            case REFERENCE:  return f.kind.binaryName;
-            case LIST:       return "java.util.List<" + f.kind.elementBinaryName + ">";
             // PROPERTY / LIST_PROPERTY are rejected upstream for records;
-            // include a safe fallback so the helper can't NPE if it's ever
-            // reached from a non-record path.
+            // they share the same fallback shape as a plain REFERENCE so the
+            // helper can't NPE if it's ever reached from a non-record path.
+            case REFERENCE:
             case PROPERTY:
             case LIST_PROPERTY:
                 return f.kind.binaryName;
+            case LIST:       return "java.util.List<" + f.kind.elementBinaryName + ">";
             default:
                 return "Object";
         }
