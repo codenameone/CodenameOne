@@ -5,20 +5,37 @@ import java.util.Set;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class JavaSEPortFontMappingTest {
-    
+
     private Boolean originalIsIOS;
+    private JavaSEPort originalInstance;
+    private boolean instanceCaptured;
+
+    @BeforeEach
+    public void captureInstance() {
+        // new JavaSEPort() inside the loadTrueTypeFont tests overwrites the
+        // global JavaSEPort.instance via the port's constructor. Other test
+        // classes (CodenameOneExtensionTest) reach back through that static
+        // to drive the live Display, so leaking the throwaway port across
+        // test classes causes order-dependent failures.
+        originalInstance = JavaSEPort.instance;
+        instanceCaptured = true;
+    }
 
     @AfterEach
     public void tearDown() throws Exception {
         JavaSEPort.clearAvailableFontNamesLowercaseForTest();
         if (originalIsIOS != null) {
             setIsIOS(originalIsIOS.booleanValue());
+        }
+        if (instanceCaptured) {
+            JavaSEPort.instance = originalInstance;
         }
     }
 
