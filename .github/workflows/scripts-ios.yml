@@ -76,7 +76,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
-    timeout-minutes: 45         # only sample app build + UI tests now; iOS port build runs in build-port
+    timeout-minutes: 60         # only sample app build + UI tests now; bumped from 45 to accommodate the 45-min test-step cap
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
@@ -223,7 +223,11 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # Bumped from 30 to 45: the Metal screenshot suite has been
+        # bumping up against the prior 30-min cap on master (timing out
+        # at the CN1SS:SUITE:FINISHED wait), and the GL job has the
+        # same envelope so it stays symmetric.
+        timeout-minutes: 45
 
       - name: Upload iOS artifacts
         if: always()
@@ -244,7 +248,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     concurrency:
       group: mac-ci-${{ github.workflow }}-metal-${{ github.ref_name }}
       cancel-in-progress: true
@@ -428,7 +432,10 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # See the matching note on the GL job: 30-min cap was being
+        # hit on master while the simulator was still draining the
+        # screenshot suite.
+        timeout-minutes: 45
 
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
