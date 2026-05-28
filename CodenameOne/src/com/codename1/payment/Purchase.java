@@ -65,7 +65,12 @@ public abstract class Purchase {
     /// continue to do so via `Display#callSeriallyAndWait`.
     private static boolean syncInProgress;
     private static boolean loadInProgress;
-    private static List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks;
+    /// Eagerly initialized (rather than lazy) so that SpotBugs doesn't
+    /// flag the now-unlocked update path as `LI_LAZY_INIT_STATIC`.
+    /// Access is EDT-only by construction, so neither the lazy-init
+    /// race nor the field assignment need synchronization.
+    private static final List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks =
+            new ArrayList<SuccessCallback<Boolean>>();
     /// `receiptStore` is set and queried from off-EDT callers (the
     /// `#subscribe(java.lang.String)` family and `#getReceiptStore()`
     /// have no thread contract), hence `volatile` for safe
@@ -619,9 +624,6 @@ public abstract class Purchase {
 
     private void fireSynchronizeReceiptsCallbacks(boolean result) {
         // Caller is always on the EDT.
-        if (synchronizeReceiptsCallbacks == null) {
-            return;
-        }
         for (SuccessCallback<Boolean> cb : synchronizeReceiptsCallbacks) {
             cb.onSucess(result);
         }
@@ -648,9 +650,6 @@ public abstract class Purchase {
         }
 
         if (callback != null) {
-            if (synchronizeReceiptsCallbacks == null) {
-                synchronizeReceiptsCallbacks = new ArrayList<SuccessCallback<Boolean>>();
-            }
             synchronizeReceiptsCallbacks.add(callback);
         }
         if (syncInProgress) {
