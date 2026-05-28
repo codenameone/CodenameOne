@@ -99,12 +99,18 @@ public final class JSONWriter {
             return this;
         }
 
-        public Map<String, Object> toMap() { return map; }
+        public Map<String, Object> toMap() {
+            return map;
+        }
 
-        public String toJson() { return JSONWriter.toJson(map); }
+        public String toJson() {
+            return JSONWriter.toJson(map);
+        }
 
         @Override
-        public String toString() { return toJson(); }
+        public String toString() {
+            return toJson();
+        }
     }
 
     /// Fluent builder for `[ ..., ..., ... ]`.
@@ -118,12 +124,18 @@ public final class JSONWriter {
             return this;
         }
 
-        public List<Object> toList() { return list; }
+        public List<Object> toList() {
+            return list;
+        }
 
-        public String toJson() { return JSONWriter.toJson(list); }
+        public String toJson() {
+            return JSONWriter.toJson(list);
+        }
 
         @Override
-        public String toString() { return toJson(); }
+        public String toString() {
+            return toJson();
+        }
     }
 
     // ---- internal encoding ----
