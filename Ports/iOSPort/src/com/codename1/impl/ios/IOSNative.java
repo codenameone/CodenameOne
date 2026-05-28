@@ -151,6 +151,11 @@ public final class IOSNative {
     native boolean isTablet();
     native boolean isIOS7();
     native boolean isRunningOnMac();
+
+    // Mac native: propagate the current form's brightness to the host
+    // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
+    // CN1) matches the app's dark/light theme. A no-op on iOS/iPadOS.
+    native void setMacWindowDarkAppearance(boolean dark);
     
     native void setImageName(long nativeImage, String name);
     

@@ -816,7 +816,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             stopTextEditing();
         }
         super.setCurrentForm(f);
-
+        if (f != null && isDesktop()) {
+            int bg = f.getContentPane().getStyle().getBgColor();
+            int r = (bg >> 16) & 0xff;
+            int g = (bg >> 8) & 0xff;
+            int b = bg & 0xff;
+            int luma = (r * 299 + g * 587 + b * 114) / 1000;
+            nativeInstance.setMacWindowDarkAppearance(luma < 128);
+        }
     }
 
     @Override
