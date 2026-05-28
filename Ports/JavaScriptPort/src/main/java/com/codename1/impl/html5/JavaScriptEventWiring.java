@@ -45,16 +45,35 @@ public final class JavaScriptEventWiring {
                                                  boolean touchStartEnabled, boolean touchEndEnabled, boolean wheelEnabled,
                                                  String wheelEventType, Object mouseDown, Object hitTest, Object mouseUp,
                                                  Object touchStart, Object touchEnd, Object wheel) {
+        // Modern browsers fire BOTH ``pointerdown`` AND ``mousedown`` for the
+        // same user click (pointer events first, then a follow-up mouse event
+        // for backwards compat). Registering the SAME listener for both fires
+        // it twice per real click. ``HTML5Implementation.onMouseDown`` /
+        // ``onMouseUp`` try to dedupe via a stateful ``mouseDown`` flag
+        // (``shouldIgnoreMousePress`` + ``!isMouseDown()`` early-returns), but
+        // the dedup gets out of sync — ``mouseDown`` ends up cleared by one
+        // event-pair half before the matching opposite half can run, so on
+        // the JS port a Dialog OK click can land on a press whose release
+        // gets dropped (or vice-versa). Net effect: the modal Dialog never
+        // disposes, ``invokeAndBlock`` blocks the EDT forever, the UI freezes
+        // — see PR #4795 dialog-freeze repro.
+        //
+        // Fix: register ONLY pointer events. Every browser this port supports
+        // (Chrome 55+, Edge, Firefox 59+, Safari 13+) ships pointer events;
+        // they cover mouse, touch, and pen input in one event family. The
+        // legacy ``mousedown`` / ``mouseup`` registrations are redundant
+        // and were the cause of the dedup race.
         if (mouseDownEnabled) {
-            registrar.add("mousedown", mouseDown, true);
             registrar.add("pointerdown", mouseDown, true);
         }
         registrar.add("hittest", hitTest, true);
         if (mouseUpEnabled) {
-            registrar.add("mouseup", mouseUp, true);
             registrar.add("pointerup", mouseUp, true);
-            registrar.add("mouseout", mouseUp, true);
-            registrar.add("pointerout", mouseUp, true);
+            // ``pointercancel`` is the pointer-events equivalent of
+            // ``mouseout`` for the click-aborted case (e.g. browser takes
+            // focus elsewhere mid-drag); keep that side-channel so a stuck
+            // ``mouseDown`` flag can still recover.
+            registrar.add("pointercancel", mouseUp, true);
         }
         if (touchStartEnabled) {
             registrar.add("touchstart", touchStart, true);

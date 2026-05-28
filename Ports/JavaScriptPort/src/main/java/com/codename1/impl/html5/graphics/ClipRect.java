@@ -40,11 +40,24 @@ public class ClipRect implements ExecutableOp {
     public void execute(CanvasRenderingContext2D context) {
         if (clipState.isSet()){
             context.restore();
+            // Canvas2D save/restore captures and restores the FULL state,
+            // including the transform. The prior clip op may have been a
+            // ClipShape whose save() recorded a non-identity transform (the
+            // shape's coord space, e.g. a rotation); restore() would silently
+            // revert the canvas transform to that. ClipRect is only ever
+            // emitted by HTML5Graphics under an identity Java-side transform
+            // (the non-identity path is routed through clipShape() → the
+            // ClipShape op), so resetting the canvas to identity here
+            // restores the canvas-tracks-Java invariant and stops the
+            // rotated/translated transform from leaking into every draw op
+            // that follows -- without paying for a getTransform()/setTransform
+            // pair per clip in the slide-transition rendering hot path.
+            context.setTransform(1, 0, 0, 1, 0, 0);
         }
         clipState.set(true);
         context.save();
         context.beginPath();
-        
+
         context.rect(x, y, w, h);
         context.clip();
     }

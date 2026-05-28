@@ -1,0 +1,338 @@
+== Component Binding
+
+[[annotation-binding-section,Annotation Binding Section]]
+The component binding framework wires a model field to the matching
+component in a `Form` or `Container` by name. The Maven plugin generates
+a `<SimpleName>Cn1Binder` per `@Bindable` class at build time, so the
+wiring happens through direct symbol references -- no reflection, no
+listener bookkeeping in application code.
+
+It's a thin alternative to the imperative `UiBinding` API
+(`com.codename1.properties.UiBinding`). Both can be used together.
+
+=== Annotate the model
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+import com.codename1.binding.BindAttr;
+import com.codename1.properties.Property;
+
+@Bindable
+public class LoginModel {
+
+    @Bind(name = "userField", attr = BindAttr.TEXT)
+    private String user;
+    public String getUser()              { return user; }
+    public void   setUser(String u)      { this.user = u; }                  // <1>
+
+    @Bind(name = "rememberMe", attr = BindAttr.SELECTED)
+    public boolean remember;                                                   // <2>
+
+    @Bind(name = "banner", attr = BindAttr.UIID, twoWay = false)
+    public String bannerStyle;
+
+    @Bind(name = "fullName",
+          attr = BindAttr.TEXT,
+          getter = "computeFullName",
+          setter = "applyFullName")                                           // <3>
+    private String fullName;
+    public String computeFullName()      { return fullName.toUpperCase(); }
+    public void   applyFullName(String f){ this.fullName = f.trim(); }
+}
+----
+<1> JavaBeans `getUser` / `setUser` are detected automatically when the
+    field is private. The processor instruments `setUser` to fire a
+    change notification for two-way bindings.
+<2> Public field still works -- direct field access falls back when no
+    accessor matches the JavaBeans convention.
+<3> Explicit `getter` / `setter` override the JavaBeans search. Use
+    when the convention doesn't apply (renamed accessors, transforms,
+    fluent setters).
+
+Every `@Bind(name=...)` is looked up against `Component#getName()`,
+walking the container's children recursively until a match is found.
+The default lookup matches GUI-builder names exactly.
+
+==== Attribute kinds
+
+[cols="1,3", options="header"]
+|===
+| `BindAttr`     | Mirrors
+| `TEXT`         | `getText` / `setText` on `Label`, `Button`,
+                   `TextField`, `TextArea`, `SpanLabel`, `SpanButton`.
+                   Two-way for `TextArea` / `TextField`.
+| `UIID`         | `getUIID` / `setUIID`. One-way.
+| `VISIBLE`      | `isVisible` / `setVisible`. One-way.
+| `HIDDEN`       | `isHidden` / `setHidden`. One-way.
+| `ENABLED`      | `isEnabled` / `setEnabled`. One-way.
+| `SELECTED`     | `isSelected` / `setSelected` on `CheckBox`,
+                   `RadioButton`. Two-way.
+| `ICON_NAME`    | Calls `Resources.getGlobalResources().getImage(name)`
+                   and writes the result via `Label#setIcon`. One-way.
+| `NAME`         | `setName`. One-way.
+|===
+
+=== Bind at runtime
+
+[source,java]
+----
+import com.codename1.binding.Binders;
+import com.codename1.binding.Binding;
+
+Form f = (Form) Resources.getGlobalResources().getForm("LoginForm");
+LoginModel model = new LoginModel();
+Binding b = Binders.bind(model, f);
+
+// The two-way bindings push every keystroke / toggle back into the model.
+// Mutate the model through the setter and the bound component refreshes
+// automatically:
+model.setUser("alice");
+
+// Or pull pending edits into the model before submit:
+b.commit();
+
+// On form dispose:
+b.disconnect();          // remove every installed listener
+----
+
+`Binding` is the handle the binder returns:
+
+[cols="1,3", options="header"]
+|===
+| Method        | Purpose
+| `refresh()`   | Push the current model values into every bound
+                  component. Use after mutating the model outside the
+                  form, or to re-sync after `commit()`.
+| `commit()`    | Pull current component values back into the model.
+                  Useful before validating / submitting when none of
+                  the bindings is two-way.
+| `disconnect()`| Remove every listener the binder installed and
+                  unregister the binding from the change-notification
+                  fan-out.
+|===
+
+=== Two-way bindings and the change-notification contract
+
+[[annotation-binding-loop,Loop guard]]
+A binding declared `twoWay = true` flows in both directions:
+
+. **Component -> model.** The generated binder installs a listener on
+  the editable component (`TextField`, `CheckBox`, etc.). When the user
+  mutates the component, the binder calls the model's setter (or
+  assigns the public field). The setter's instrumented exit calls
+  `Binders.notifyChanged(this)`.
+. **Model -> component.** Application code that mutates the model
+  through a setter causes `Binders.notifyChanged(this)` to fire, which
+  walks every live binding for that model and pushes the new value
+  into the matching component.
+
+The two paths together would loop forever if left alone -- the model
+setter fires a change event, which refreshes the component, which
+fires its own change event, which calls the model setter again, ...
+To break the loop, every framework-initiated mutation runs inside an
+**update region** guarded by a thread-local depth counter. While the
+counter is positive, `notifyChanged` is a no-op and component
+listeners short-circuit.
+
+Concretely:
+
+* `Binders.bind(model, container)` enters an update region for the
+  initial model -> component push.
+* `Binding#refresh()` enters an update region for every subsequent
+  model -> component push.
+* `Binding#commit()` enters an update region for the component ->
+  model pull.
+* The generated component listener enters an update region before
+  calling the setter.
+
+==== Setter instrumentation
+
+For every two-way `@Bind` field whose write accessor is a method
+(whether you wrote `@Bind(setter="setName")` or the processor detected
+`setName(String)` via the JavaBeans convention), the
+`cn1:process-annotations` Mojo reads the original `.class` file with
+ASM and inserts the equivalent of:
+
+[source,java]
+----
+public void setName(String name) {
+    this.name = name;
+    com.codename1.binding.Binders.notifyChanged(this);   // injected
+}
+----
+
+The injection lands before every `return` point of the setter. The
+instrumented setter is written back to `target/classes`, replacing the
+original. Application code that calls `model.setName(...)` -- from any
+thread, any code path -- now triggers the binding fan-out
+automatically.
+
+==== Limitation -- cross-field setter chains
+
+When a setter synchronously mutates a *second* bound field
+(`setFirstName` also calls `setFullName`, for example), the second
+field's `notifyChanged` lands inside the same update region as the
+first and is suppressed. The bound component for `fullName` won't
+catch up until something exits the region and a separate event drives
+the refresh. If you need the cross-field update to propagate, call
+`binding.refresh()` explicitly after the setter chain completes, or
+restructure the model so the cross-field mutation happens outside the
+setter's call frame -- for example via a `Display.callSerially`.
+
+=== POJOs versus Property objects
+
+A `String`, `int`, or `boolean` field is read and written through the
+resolved accessors. A `Property<T, ?>` field is read through `get()`
+and written through `set()` -- so existing `PropertyChangeListener`
+subscribers fire as expected. Both styles can sit on the same class.
+
+[[annotation-binding-validation,Validation Annotations]]
+=== Validation annotations
+
+The same `@Bind` field can carry validation annotations that are wired
+into a `com.codename1.ui.validation.Validator`. The validator is built
+by the generated binder at the moment you call `Binders.bind(...)` and
+is reachable via `Binding#getValidator()` -- so the same generated
+plumbing that pushes model values into components also installs the
+constraints that gate them.
+
+[cols="1,2,3", options="header"]
+|===
+| Annotation                | Maps to                                      | Notes
+| `@Required`               | `LengthConstraint(1)`                         | "Field must be non-empty."
+| `@Length(min = N)`        | `LengthConstraint(N, message)`                | Minimum string length.
+| `@Regex(pattern = ..., message = ...)` | `RegexConstraint(pattern, message)`        | Same dialect as `com.codename1.util.regex.RE`.
+| `@Email`                  | `RegexConstraint.validEmail(message)`         | The standard email regex (also accepts empty -- stack with `@Required`).
+| `@Url`                    | `RegexConstraint.validURL(message)`           | `http` / `https` / `ftp` / `file` schemes.
+| `@Numeric(decimal = ..., min = ..., max = ..., message = ...)` | `NumericConstraint(...)` | Bounds are inclusive; default range is unbounded.
+| `@ExistIn({...})`         | `ExistInConstraint(values, caseSensitive, message)` | Whitelist of allowed string values.
+| `@Validate(MyConstraint.class)` | `new MyConstraint()`                    | Escape hatch -- the class must have a public no-arg constructor and implement `Constraint`.
+|===
+
+Multiple annotations on the same field are combined into a
+`GroupConstraint` (first failure wins), matching the behaviour of
+`Validator.addConstraint(Component, Constraint...)`.
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+import com.codename1.binding.BindAttr;
+
+@Bindable
+public class SignupModel {
+
+    @Bind(name = "userField")
+    @Required
+    @Length(min = 3, message = "User name too short")
+    private String user;
+
+    @Bind(name = "emailField")
+    @Required
+    @Email                                                          // <1>
+    private String email;
+
+    @Bind(name = "ageField")
+    @Numeric(min = 13, max = 120, message = "Age 13-120")           // <2>
+    private String age;                                             // <3>
+
+    @Bind(name = "roleField")
+    @ExistIn({ "admin", "editor", "viewer" })
+    private String role;
+
+    @Bind(name = "phoneField")
+    @Validate(PhoneConstraint.class)                                // <4>
+    private String phone;
+
+    // ... getters / setters omitted for brevity
+}
+----
+<1> `@Required @Email` is the canonical "mandatory address" pair. The
+    standard email regex accepts the empty string as "not yet an
+    address," so `@Required` is what enforces presence.
+<2> Inclusive bounds. Omit either side to remove that side of the
+    range (defaults are negative / positive infinity).
+<3> The field's static type is `String` because the user types the
+    digits into a `TextField` -- the binder runs `Integer.parseInt`
+    only when committing the value back through the JavaBeans setter
+    for an `int` target.
+<4> `PhoneConstraint` is a hand-written
+    `com.codename1.ui.validation.Constraint` with a public no-argument
+    constructor. The generated binder instantiates it once per
+    `bind()` call.
+
+After binding, drive validation through the returned handle:
+
+[source,java]
+----
+LoginModel model = new LoginModel();
+Binding b = Binders.bind(model, form);
+
+// Auto-disable a submit button until everything is valid.
+Button submit = (Button) form.findByName("submitButton");
+b.getValidator().addSubmitButtons(submit);
+
+// Live feedback as the user types (static toggle on the Validator
+// class -- one switch flips the behaviour for every validator in the
+// app):
+Validator.setValidateOnEveryKey(true);
+
+// Programmatic gate before saving:
+if (b.getValidator().isValid()) {
+    repository.save(model);
+}
+----
+
+`Binding#getValidator()` never returns `null` -- when the model has no
+validation annotations the validator is empty and `isValid()` returns
+`true`. The validator owns the listener and emblem plumbing on the
+matching components; calling `addSubmitButtons` after `bind` is the
+typical pattern.
+
+=== Build-time validation
+
+In addition to the runtime constraints above, the annotation processor
+itself fails the build when:
+
+* `@Bind` is applied to a field with no accessible read path -- the
+  field must be public, declare a JavaBeans `getX` / `isX` getter, or
+  the annotation must name an explicit `getter`.
+* A two-way `@Bind` field on a `TEXT` or `SELECTED` attr has no
+  writable accessor. Set `twoWay=false` to keep the binding one-way,
+  or add a setter / explicit `setter=`.
+* `@Bind(name=...)` is empty.
+* The field's static type isn't supported (raw collections, opaque
+  references that aren't `@Bindable` themselves, ...).
+* `@Regex` is missing a pattern, or `@ExistIn` is missing values.
+
+Errors are accumulated so a single build run reports every offending
+field at once.
+
+=== How the plumbing works
+
+`cn1:process-annotations` writes one
+`<SimpleName>Cn1Binder` per `@Bindable` class in the source class's
+package, plus a single `cn1app.BinderBootstrap` whose constructor calls
+`UserCn1Binder.register()`, `LoginModelCn1Binder.register()`, ... for
+every accepted `@Bindable` class. At app start:
+
+* On **iOS / Android** the build server probes the project zip for
+  `cn1app/BinderBootstrap.class` and splices
+  `new cn1app.BinderBootstrap();` into the per-build application stub
+  before `Display.init`. ParparVM rename and R8 obfuscation rewrite
+  the direct symbol reference together with the generated class so
+  the binding still resolves after the pass.
+* On **JavaSE** `JavaSEPort#postInit` loads the bootstrap via
+  `Class.forName("cn1app.BinderBootstrap")` -- the unobfuscated
+  class-loading path.
+
+Projects with no `@Bindable` classes produce no bootstrap; the build
+server probe falls through and the registry stays empty.
+
+The runtime registry is keyed on `Class#getName()`; obfuscation renames
+the call sites and the registered keys together within a single
+execution.

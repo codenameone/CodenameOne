@@ -44,7 +44,7 @@ Run `mvn -pl common compile` and the CN1 plugin scans `cn1libs/`, unpacks each f
 To verify a cn1lib is wired in correctly, run the bytecode compliance check — it scans all dependencies and will fail noisily if a class is missing:
 
 ```bash
-mvn -pl common compile cn1:compliance-check
+mvn -pl common compile cn1:bytecode-compliance
 ```
 
 ## Creating a new cn1lib (Maven)

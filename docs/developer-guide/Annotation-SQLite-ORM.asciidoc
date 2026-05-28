@@ -1,0 +1,167 @@
+== SQLite ORM
+
+[[annotation-orm-section,Annotation ORM Section]]
+The SQLite ORM framework turns a plain Java class into a typed data
+access object at build time. The Maven plugin reads `@Entity` /
+`@Id` / `@Column` annotations from the project's compiled bytecode,
+generates one `<SimpleName>Cn1Dao` per entity in the source class's
+package, and hands the dao to `com.codename1.orm.EntityManager` for
+typed retrieval. The dao issues prepared statements through
+`com.codename1.db.Database`, the same surface every cn1 SQLite port
+exposes.
+
+The framework is a JPA-inspired, simplified alternative to the existing
+imperative `SQLMap`. It doesn't replace `SQLMap`; both can be used side
+by side.
+
+=== Annotate the entity
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+
+@Entity(table = "users")
+public class User {
+
+    @Id(autoIncrement = true)
+    public long id;
+
+    @Column(name = "full_name", nullable = false)
+    public String name;
+
+    public int age;
+
+    public java.util.Date createdAt;
+
+    @DbTransient
+    public String cacheKey;                            // <1>
+
+    public User() { }
+}
+----
+<1> Excluded from the generated table.
+
+`Property` fields work the same way; the dao calls `Property#get` and
+`Property#set` for read and write.
+
+==== Field-level annotations
+
+[cols="1,3", options="header"]
+|===
+| Annotation       | Purpose
+| `@Id`            | Marks the primary-key field. Exactly one per entity.
+                     `autoIncrement=true` (the default) emits
+                     `INTEGER PRIMARY KEY AUTOINCREMENT` and back-fills
+                     the field after `insert`.
+| `@Column(name)`  | Rename the column. Default: the field name.
+| `@Column(type)`  | Override the SQL type. Default: inferred from the
+                     Java type (`String -> TEXT`, `int/long -> INTEGER`,
+                     `float/double -> REAL`, `boolean -> INTEGER`,
+                     `java.util.Date -> INTEGER` (epoch millis),
+                     `byte[] -> BLOB`).
+| `@Column(nullable=false)`| Adds `NOT NULL` to the column declaration.
+| `@DbTransient`   | Excludes the field from the table.
+|===
+
+=== Use the dao
+
+[source,java]
+----
+import com.codename1.orm.EntityManager;
+import com.codename1.orm.Dao;
+
+EntityManager em = EntityManager.open("MyApp.db");
+Dao<User> users = em.dao(User.class);
+
+users.createTable();                                   // <1>
+
+User u = new User();
+u.name = "Alice";
+u.age = 30;
+users.insert(u);                                       // <2>
+
+User found = users.findById(u.id);                     // <3>
+
+for (User x : users.find("age > ?", 18)) {             // <4>
+    // ...
+}
+
+u.age = 31;
+users.update(u);                                       // <5>
+users.delete(u);
+em.close();
+----
+<1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
+<2> The autoincrement `id` is filled in via
+    `SELECT last_insert_rowid()` after the insert.
+<3> `findById` returns `null` when no row matches.
+<4> Free-form `WHERE` clause; positional `?` parameters bind in order.
+<5> `update` and `delete` key off the entity's `@Id` value.
+
+`EntityManager` is a thin façade over `Database`. The underlying
+connection is reachable through `em.database()` for raw SQL when the
+dao surface isn't enough. Transactions:
+
+[source,java]
+----
+em.beginTransaction();
+try {
+    users.insert(u1);
+    users.insert(u2);
+    em.commitTransaction();
+} catch (IOException e) {
+    em.rollbackTransaction();
+    throw e;
+}
+----
+
+=== Relationships
+
+Relationship annotations (`@OneToMany`, `@ManyToOne`, ...) aren't yet
+supported. An entity field that references another entity or a
+`java.util.List<X>` of entities fails the build with a clear error --
+mark such fields `@DbTransient` and persist the foreign key (id) as a
+separate scalar column for now.
+
+=== Validation
+
+The annotation processor fails the build when:
+
+* `@Entity` lands on an abstract class or interface.
+* The class has no public no-arg constructor.
+* No field carries `@Id`, or more than one does.
+* A field's static type isn't supported (relationships, unsupported
+  reference types).
+
+Errors are accumulated so the first build run reports every offending
+entity at once.
+
+=== How the plumbing works
+
+`cn1:process-annotations` writes one
+`<SimpleName>Cn1Dao` per `@Entity` in the source class's package
+(`com.example.UserCn1Dao` next to `com.example.User`), plus a single
+`cn1app.DaoBootstrap` whose constructor calls
+`UserCn1Dao.register()`, `OrderCn1Dao.register()`, ... for every
+accepted `@Entity` class. At app start:
+
+* On **iOS / Android** the build server probes the project zip for
+  `cn1app/DaoBootstrap.class` and splices
+  `new cn1app.DaoBootstrap();` into the per-build application stub
+  before `Display.init`. ParparVM rename and R8 obfuscation rewrite
+  the call site and the generated dao together, so the direct symbol
+  reference stays valid after the pass.
+* On the **JavaSE simulator and desktop run** `JavaSEPort#postInit`
+  loads the bootstrap via `Class.forName("cn1app.DaoBootstrap")`.
+  Class-loading is the legitimate path here -- JavaSE runs
+  unobfuscated.
+
+Projects with no `@Entity` classes produce no bootstrap; the build
+server probe falls through and the registry stays empty.
+
+The runtime registry is keyed on `Class#getName()`; obfuscation renames
+the call sites and the registered keys together within a single
+execution. The keys are never persisted across builds, so the renaming
+has no observable effect on behavior.

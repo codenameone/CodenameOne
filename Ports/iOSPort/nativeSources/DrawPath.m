@@ -54,9 +54,10 @@
     JAVA_INT outputBounds[4];
 
     Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
-    if ( outputBounds[2] < 0 || outputBounds[3] < 0 ){
-        return;
-    }
+    // outputBounds is { minX, minY, maxX, maxY } in renderer pixel
+    // space; maxX / maxY are legitimately negative when the path sits
+    // in the negative quadrant. Filter on width / height (computed
+    // below) rather than the raw max values.
     JAVA_INT x = min(outputBounds[0], outputBounds[2]);
     JAVA_INT y = min(outputBounds[1], outputBounds[3]);
     JAVA_INT width = outputBounds[2]-outputBounds[0];

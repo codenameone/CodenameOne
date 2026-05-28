@@ -9389,19 +9389,23 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     JAVA_INT outputBounds[4];
     
     Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
-    if ( outputBounds[2] < 0 || outputBounds[3] < 0 ){
-        return 0;
-    }
-    
+    // outputBounds is { minX, minY, maxX, maxY }; maxX / maxY can be
+    // legitimately negative for shapes drawn at negative coordinates
+    // (see the comment in nativePathRendererCreateTexture above).
+    // Filter on the actual width / height below.
+
     //GLuint tex=0;
     JAVA_INT x = min(outputBounds[0], outputBounds[2]);
     JAVA_INT y = min(outputBounds[1], outputBounds[3]);
     JAVA_INT width = outputBounds[2]-outputBounds[0];
     JAVA_INT height = outputBounds[3]-outputBounds[1];
-    
+
     if ( width < 0 ) width = -width;
     if ( height < 0 ) height = -height;
-    
+    if (width == 0 || height == 0) {
+        return 0;
+    }
+
     AlphaConsumer ac = {
         x,
         y,
@@ -9451,7 +9455,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         Renderer *r = (Renderer*)renderer;
         JAVA_INT outputBounds[4];
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
-        if (outputBounds[2] < 0 || outputBounds[3] < 0) return 0;
+        // outputBounds is { minX, minY, maxX, maxY } in renderer pixel
+        // space, which can legitimately be entirely negative when the
+        // input shape sits at negative coordinates (e.g. the SVG
+        // transcoder emits `<rect x="-5" y="-40" width="10" height="20">`
+        // for the spinner_animated.svg children -- after the SVG scale
+        // bake the renderer sees a path with bounds (-7, -60, 8, -30)).
+        // The previous check rejected those legitimate negative maxX /
+        // maxY values, returned 0 / nil texture, and silently dropped
+        // every fillShape on negatively-positioned paths -- the
+        // spinner column was blank on iOS Metal screenshots as a
+        // result. Only reject *empty* bounds (max <= min on either
+        // axis); the unsigned width / height computed below carry the
+        // actual extent.
         JAVA_INT x = min(outputBounds[0], outputBounds[2]);
         JAVA_INT y = min(outputBounds[1], outputBounds[3]);
         JAVA_INT width = outputBounds[2] - outputBounds[0];
@@ -9501,20 +9517,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         
         Renderer *r = (Renderer*)renderer;
         JAVA_INT outputBounds[4];
-        
+
         Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
-        if ( outputBounds[2] < 0 || outputBounds[3] < 0 ){
-            //return 0;
-            POOL_END();
-            return;
-        }
-        
+        // outputBounds is { minX, minY, maxX, maxY }; the maxX/maxY
+        // values can legitimately be negative when the shape sits in
+        // the negative quadrant (e.g. the spinner SVG draws each
+        // rotated rect at y in [-40, -20]). The width / height check
+        // below filters degenerate / empty paths. Mirrors the Metal
+        // branch above.
+
         GLuint tex=0;
         JAVA_INT x = min(outputBounds[0], outputBounds[2]);
         JAVA_INT y = min(outputBounds[1], outputBounds[3]);
         JAVA_INT width = outputBounds[2]-outputBounds[0];
         JAVA_INT height = outputBounds[3]-outputBounds[1];
-        
+
         if ( width < 0 ) width = -width;
         if ( height < 0 ) height = -height;
         if (width == 0 || height == 0) {

@@ -22,56 +22,29 @@
  */
 package com.codename1.ai;
 
-import com.codename1.util.AsyncResource;
-
-/// Google Gemini client. The native wire format diverges from OpenAI's:
-/// system messages live in `systemInstruction`, content is split into
-/// `parts` with `inline_data` / `text`, tool calls arrive atomically
-/// at stream end rather than fragment-by-fragment.
+/// Google Gemini client.
 ///
-/// Google publishes an OpenAI-compatibility endpoint at
-/// `https://generativelanguage.googleapis.com/v1beta/openai/` that
-/// works with [LlmClient#localOpenAiCompatible] today; this dedicated
-/// client (which handles the native shape end-to-end) is a follow-up.
-class GeminiClient extends LlmClient {
-    private final String apiKey;
+/// Talks to `https://generativelanguage.googleapis.com/v1beta/openai/`,
+/// Google's official OpenAI-compatible shim. The endpoint accepts the
+/// standard `/chat/completions` and `/embeddings` shape -- including
+/// streaming, tool calls, multi-modal image parts, and structured
+/// JSON output -- so this client inherits the full
+/// implementation from `OpenAiClient` and only overrides the provider
+/// name and default model.
+///
+/// Authentication uses `Authorization: Bearer <gemini-api-key>`,
+/// identical to the OpenAI header layout. Models are addressed by
+/// their public identifiers (`gemini-2.0-flash`, `gemini-2.5-pro`,
+/// `gemini-2.5-flash`, ...).
+class GeminiClient extends OpenAiClient {
 
     GeminiClient(String apiKey, String baseUrl) {
-        super(baseUrl);
-        this.apiKey = apiKey;
+        super(apiKey, baseUrl);
+        setDefaultModel("gemini-2.0-flash");
     }
 
     @Override
     public String getProvider() {
         return "gemini";
-    }
-
-    @Override
-    public AsyncResource<ChatResponse> chat(ChatRequest req) {
-        AsyncResource<ChatResponse> r = new AsyncResource<ChatResponse>();
-        r.error(new UnsupportedOperationException(
-                "GeminiClient (native) is not yet implemented in this release. "
-                + "Use LlmClient.localOpenAiCompatible("
-                + "\"https://generativelanguage.googleapis.com/v1beta/openai\", apiKey, model) "
-                + "to reach Gemini through Google's OpenAI-compatible shim."));
-        return r;
-    }
-
-    @Override
-    public AsyncResource<ChatResponse> chatStream(ChatRequest req, StreamingListener listener) {
-        return chat(req);
-    }
-
-    @Override
-    public AsyncResource<EmbeddingResponse> embed(EmbeddingRequest req) {
-        AsyncResource<EmbeddingResponse> r = new AsyncResource<EmbeddingResponse>();
-        r.error(new UnsupportedOperationException(
-                "GeminiClient.embed is not yet implemented. Use the OpenAI-compatible shim "
-                + "or LlmClient.openai(...) with text-embedding-3-small."));
-        return r;
-    }
-
-    String getApiKey() {
-        return apiKey;
     }
 }

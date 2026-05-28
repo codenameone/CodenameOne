@@ -144,6 +144,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/cn1libs.md",
                 ".agent-skills/codename-one/references/snapshot-builds.md",
                 ".agent-skills/codename-one/references/debugging.md",
+                ".agent-skills/codename-one/references/ai-and-speech.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
                 ".agent-skills/codename-one/tools/IsCssValid.java"

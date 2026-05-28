@@ -53,7 +53,7 @@ class JavascriptTargetIntegrationTest {
 
         assertTrue(translatedApp.contains("function*") && translatedApp.contains("JsHello"),
                 "Main class should contribute translated JS generator functions");
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsHello\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsHello"),
                 "Bundle should register the translated main entrypoint");
         assertTrue(runtime.contains("cn1_java_lang_Thread_start") || runtime.contains("cn1_java_lang_Thread_start__"),
                 "Runtime should provide JS native implementations for thread start");
@@ -117,7 +117,7 @@ class JavascriptTargetIntegrationTest {
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsThreadingApp\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsThreadingApp"),
                 "Threaded app should register a translated main entrypoint");
         assertTrue(translatedApp.contains("waitForSignal"),
                 "Inner-class wait loop should be present in translated output");
@@ -220,18 +220,35 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStraightLine-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStraightLine_add_int_int_R_int__impl(__cn1Arg1, __cn1Arg2){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsStraightLine_add_int_int_R_int__impl", "(__cn1Arg1, __cn1Arg2)");
         assertTrue(start >= 0, "Straight-line fixture should emit the add() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Straight-line fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("let l0 = __cn1Arg1;") && methodBody.contains("let l1 = __cn1Arg2;"),
-                "Straight-line lowering should use direct local variables for arguments");
-        assertTrue(!methodBody.contains("stack["),
+        // After the post-emit param-into-locals lift (f4381c716) plus the
+        // per-method ``lN/sN/pc`` → single-letter rename (aab1aebff), the
+        // canonical ``let l0 = __cn1Arg1; let l1 = __cn1Arg2;`` prelude is
+        // gone -- the function params ARE the locals, then renamed to
+        // single letters. Verify the signature carries the right number
+        // of params (one per Java arg, since add() is static) instead.
+        String signature = methodBody.substring(0, methodBody.indexOf("{") + 1);
+        int paramOpen = signature.indexOf('(');
+        int paramClose = signature.lastIndexOf(')');
+        String paramList = signature.substring(paramOpen + 1, paramClose).trim();
+        int paramCount = paramList.isEmpty() ? 0 : paramList.split(",").length;
+        assertEquals(2, paramCount,
+                "Straight-line lowering should expose the two Java args directly as function params (signature: " + signature + ")");
+        // ``stack`` / ``locals`` were renamed whole-word to ``S`` / ``L`` by
+        // shortenStackAndLocals, so the renamed interpreter prelude looks
+        // like ``let L = _N(N); let S = []; let <X> = 0;`` followed by a
+        // ``for(;;)switch(<X>)`` loop. Check the post-rename signature.
+        assertTrue(!methodBody.contains("S[") && !methodBody.contains("stack["),
                 "Straight-line lowering should avoid stack-array indexing");
-        assertTrue(!methodBody.contains("const locals = new Array") && !methodBody.contains("const stack = []") && !methodBody.contains("let pc = 0"),
+        assertTrue(!methodBody.contains("L = _N(") && !methodBody.contains("S = []")
+                        && !methodBody.contains("const locals = new Array")
+                        && !methodBody.contains("const stack = []")
+                        && !methodBody.contains("for(;;)switch("),
                 "Straight-line lowering should avoid the interpreter locals/stack/pc loop");
     }
 
@@ -256,7 +273,7 @@ class JavascriptTargetIntegrationTest {
 
         assertTrue(translatedApp.contains("JsCapturedRunnable"),
                 "Translator should emit a bundle for the synthetic-accessor runnable fixture");
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsCapturedRunnable\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsCapturedRunnable"),
                 "Translator should complete bundle generation for the synthetic-accessor runnable fixture");
     }
 
@@ -279,7 +296,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsAuxiliaryMainApp-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsAuxiliaryMainApp\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsAuxiliaryMainApp"),
                 "Translator should keep the first application main as the bundle entrypoint");
         assertTrue(translatedApp.contains("HelperMain"),
                 "Translator should still include auxiliary classes that happen to declare a main()");
@@ -304,7 +321,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsLambdaCapture-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        assertTrue(translatedApp.contains("jvm.setMain(\"JsLambdaCapture\""),
+        assertTrue(bundleReferencesLiteral(translatedApp, "jvm.setMain(", "JsLambdaCapture"),
                 "Translator should complete bundle generation for the lambda-capture fixture");
         assertTrue(translatedApp.contains("JsLambdaCapture"),
                 "Translated output should include the lambda-capture fixture classes");
@@ -329,16 +346,32 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticAccess-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStaticAccess_twice_R_int__impl(){";
-        int start = translatedApp.indexOf(marker);
+        // twice() has no virtual/interface dispatch and no intrinsic
+        // suspension, so the CHA analysis emits it as a plain
+        // ``function`` rather than ``function*``. Accept either form.
+        int start = findFunctionStart(translatedApp, "cn1_JsStaticAccess_twice_R_int__impl", "()");
         assertTrue(start >= 0, "Static access fixture should emit the twice() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Static access fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        String initCheck = "jvm.ensureClassInitialized(\"JsStaticAccess\");";
-        assertEquals(methodBody.indexOf(initCheck), methodBody.lastIndexOf(initCheck),
-                "Repeated static field access should only emit one class-init check in straight-line mode");
+        // ``_I(<cls>)`` is the short alias for ``jvm.ensureClassInitialized``
+        // and the class-name argument may have been hoisted to a ``_qN``
+        // alias by the string-hoist pass. The alias dictionary lives at
+        // the top of ``translatedApp``, outside ``methodBody``, so pass
+        // both: scan the method body for call sites, resolve the alias
+        // in the full bundle. The assertion is AT MOST ONE -- with the
+        // per-method __cn1Init cache gone (init now lives in the public
+        // wrapper around __impl), zero is also valid when the analyser
+        // proves the class is already initialised by the time the
+        // method runs (the wrapper handled it). The bug this test
+        // guards against is the OLD interpreter loop's tendency to emit
+        // a fresh init guard for each static-field access in the body.
+        int initChecks = countLiteralReferences(methodBody, translatedApp, "_I(", "JsStaticAccess")
+                + countLiteralReferences(methodBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticAccess");
+        assertTrue(initChecks <= 1,
+                "Repeated static field access should emit at most one class-init check in straight-line mode "
+                        + "(got " + initChecks + ")");
     }
 
     @ParameterizedTest
@@ -360,17 +393,30 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticAccessFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStaticAccessFlow_pick_int_R_int__impl(__cn1Arg1){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsStaticAccessFlow_pick_int_R_int__impl", "(__cn1Arg1)");
         assertTrue(start >= 0, "Interpreter static access fixture should emit the pick() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Interpreter static access fixture should have a bounded method body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("const __cn1Init = Object.create(null);"),
-                "Interpreter mode should allocate a method-level static init cache when static fields are used");
-        assertTrue(methodBody.contains("if (!__cn1Init[\"JsStaticAccessFlow\"]) { jvm.ensureClassInitialized(\"JsStaticAccessFlow\"); __cn1Init[\"JsStaticAccessFlow\"] = true; }"),
-                "Interpreter mode should guard repeated static field access behind the method-level init cache");
+        // The per-method ``__cn1Init`` cache was dropped in favour of a
+        // single ``_I(cls)`` call in the public wrapper: the ``__impl``
+        // body runs only through that wrapper (or through another method
+        // on the same class / ancestor, which the JVM spec guarantees is
+        // already initialised). Verify the wrapper still guards entry.
+        int wrapperStart = findFunctionStart(translatedApp, "cn1_JsStaticAccessFlow_pick_int_R_int", "(__cn1Arg1)");
+        assertTrue(wrapperStart >= 0,
+                "Interpreter static access fixture should emit a public pick() wrapper around pick()__impl");
+        int wrapperEnd = translatedApp.indexOf("\n}\n", wrapperStart);
+        assertTrue(wrapperEnd > wrapperStart,
+                "Interpreter static access fixture wrapper should have a bounded body");
+        String wrapperBody = translatedApp.substring(wrapperStart, wrapperEnd);
+        // Aliases for the class name live at the top of translatedApp,
+        // outside wrapperBody, so pass both: scan wrapperBody for call
+        // sites and resolve any ``_qN`` alias against the full bundle.
+        assertTrue(bundleReferencesLiteral(wrapperBody, translatedApp, "_I(", "JsStaticAccessFlow")
+                        || bundleReferencesLiteral(wrapperBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticAccessFlow"),
+                "Interpreter static access wrapper should guard class init before delegating to __impl");
     }
 
     @ParameterizedTest
@@ -392,28 +438,29 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticInvokeFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String callerMarker = "function* cn1_JsStaticInvokeFlow_pick_int_R_int__impl(__cn1Arg1){";
-        int callerStart = translatedApp.indexOf(callerMarker);
+        int callerStart = findFunctionStart(translatedApp, "cn1_JsStaticInvokeFlow_pick_int_R_int__impl", "(__cn1Arg1)");
         assertTrue(callerStart >= 0, "Static invoke fixture should emit an internal implementation for pick()");
         int callerEnd = translatedApp.indexOf("\n}\n", callerStart);
         assertTrue(callerEnd > callerStart, "Static invoke fixture should have a bounded pick() body");
         String callerBody = translatedApp.substring(callerStart, callerEnd);
 
-        assertTrue(callerBody.contains("const __cn1Init = Object.create(null);"),
-                "Interpreter static invoke caller should allocate a method-level init cache");
-        assertTrue(callerBody.contains("typeof cn1_JsStaticInvokeFlow_helper_R_int__impl === \"function\" ? cn1_JsStaticInvokeFlow_helper_R_int__impl : cn1_JsStaticInvokeFlow_helper_R_int"),
-                "Static invoke caller should target the internal implementation when available");
-        assertTrue(callerBody.contains("if (!__cn1Init[\"JsStaticInvokeFlow\"]) { jvm.ensureClassInitialized(\"JsStaticInvokeFlow\"); __cn1Init[\"JsStaticInvokeFlow\"] = true; }"),
-                "Static invoke caller should guard repeated class init through the method-level cache");
+        // Method-level ``__cn1Init`` cache removed; class-init for the
+        // containing class is elided entirely inside ``pick()`` because
+        // the JVM spec guarantees JsStaticAccessFlow's clinit has run by
+        // the time any of its methods execute. What matters is that the
+        // caller reaches the internal ``__impl`` body directly (no
+        // redundant wrapper that would re-run class init).
+        assertTrue(callerBody.contains("cn1_JsStaticInvokeFlow_helper_R_int__impl"),
+                "Static invoke caller should target the internal __impl implementation");
 
-        String calleeMarker = "function* cn1_JsStaticInvokeFlow_helper_R_int__impl(){";
-        int calleeStart = translatedApp.indexOf(calleeMarker);
+        int calleeStart = findFunctionStart(translatedApp, "cn1_JsStaticInvokeFlow_helper_R_int__impl", "()");
         assertTrue(calleeStart >= 0, "Static invoke fixture should emit an internal implementation for helper()");
         int calleeEnd = translatedApp.indexOf("\n}\n", calleeStart);
         assertTrue(calleeEnd > calleeStart, "Static invoke fixture should have a bounded helper() body");
         String calleeBody = translatedApp.substring(calleeStart, calleeEnd);
 
-        assertTrue(!calleeBody.contains("jvm.ensureClassInitialized(\"JsStaticInvokeFlow\")"),
+        assertTrue(!bundleReferencesLiteral(calleeBody, translatedApp, "jvm.ensureClassInitialized(", "JsStaticInvokeFlow")
+                        && !bundleReferencesLiteral(calleeBody, translatedApp, "_I(", "JsStaticInvokeFlow"),
                 "Internal static method implementations should not repeat class-init guards");
     }
 
@@ -436,20 +483,23 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsVirtualInvokeFlow-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsVirtualInvokeFlow_repeat_JsVirtualInvokeBase_int_R_int__impl(__cn1Arg1, __cn1Arg2){";
-        int start = translatedApp.indexOf(marker);
+        int start = findFunctionStart(translatedApp, "cn1_JsVirtualInvokeFlow_repeat_JsVirtualInvokeBase_int_R_int__impl", "(__cn1Arg1, __cn1Arg2)");
         assertTrue(start >= 0, "Virtual invoke fixture should emit the repeat() method");
         int end = translatedApp.indexOf("\n}\n", start);
         assertTrue(end > start, "Virtual invoke fixture should have a bounded repeat() body");
         String methodBody = translatedApp.substring(start, end);
 
-        assertTrue(methodBody.contains("const __cn1Virtual = Object.create(null);"),
-                "Interpreter-mode virtual dispatch should allocate a per-method cache");
-        assertTrue(methodBody.contains("const __cacheKey = __target.__class + \"|cn1_JsVirtualInvokeBase_value_R_int\";"),
-                "Virtual dispatch cache should key on runtime class and method id");
-        assertTrue(methodBody.contains("__method = __cn1Virtual[__cacheKey];")
-                        && methodBody.contains("__cn1Virtual[__cacheKey] = __method;"),
-                "Virtual dispatch cache should store and reuse resolved fallback methods");
+        // The per-method ``__cn1Virtual`` cache and its className|methodId
+        // cache-key pattern moved to a global ``resolvedVirtualCache`` on
+        // the runtime (see jvm.resolveVirtual in parparvm_runtime.js) —
+        // one cache per running app rather than one per emitted method.
+        // The bytecode-level INVOKEVIRTUAL emission simply calls the
+        // ``cn1_iv*`` helper, which consults the runtime cache. Assert
+        // that virtual dispatch still runs through that helper family.
+        assertTrue(methodBody.contains("cn1_iv0(") || methodBody.contains("cn1_iv1(")
+                        || methodBody.contains("cn1_iv2(") || methodBody.contains("cn1_iv3(")
+                        || methodBody.contains("cn1_iv4(") || methodBody.contains("cn1_ivN("),
+                "Interpreter-mode virtual dispatch should route through the cn1_iv* helper family");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
@@ -517,6 +567,149 @@ class JavascriptTargetIntegrationTest {
         } finally {
             Parser.cleanup();
         }
+    }
+
+    /**
+     * Find the alias used by the post-emit string-hoist pass for the
+     * given literal string. The hoist rewrites repeated identifier
+     * literals to ``const _qN="..."`` declarations and replaces every
+     * subsequent use with the alias. Returns the alias name (e.g.
+     * ``_q0M0``) or ``null`` if the literal is used only once / not
+     * hoisted.
+     */
+    static String findStringAlias(String translatedApp, String literal) {
+        String needle = "=\"" + literal + "\"";
+        int idx = translatedApp.indexOf(needle);
+        if (idx <= 0) {
+            return null;
+        }
+        int aliasEnd = idx;
+        int aliasStart = aliasEnd;
+        while (aliasStart > 0) {
+            char ch = translatedApp.charAt(aliasStart - 1);
+            if (ch == '_' || ch == '$' || Character.isLetterOrDigit(ch)) {
+                aliasStart--;
+            } else {
+                break;
+            }
+        }
+        if (aliasStart >= aliasEnd) {
+            return null;
+        }
+        String candidate = translatedApp.substring(aliasStart, aliasEnd);
+        // Hoisted alias names always start with ``_q``. Avoid matching
+        // a stray identifier (e.g. a method-suffix like ``...impl="X"``
+        // emitted as a property).
+        if (!candidate.startsWith("_q")) {
+            return null;
+        }
+        return candidate;
+    }
+
+    /**
+     * True if ``searchRegion`` contains a call to
+     * ``invocationPrefix("literal")`` after the post-emit string-hoist
+     * pass — either the direct literal form ``foo("X"`` or the aliased
+     * form ``foo(_qN`` where ``_qN`` resolves to ``"X"`` in the
+     * top-of-bundle alias dictionary. ``aliasSource`` is the full
+     * translated_app.js (or any region that contains the
+     * ``const _qN="..."`` declarations); ``searchRegion`` is the
+     * substring to scan (e.g. a method body extracted via substring).
+     * Pass the same string for both when scanning the whole bundle.
+     */
+    static boolean bundleReferencesLiteral(String searchRegion, String aliasSource, String invocationPrefix, String literal) {
+        if (searchRegion.contains(invocationPrefix + "\"" + literal + "\"")) {
+            return true;
+        }
+        String alias = findStringAlias(aliasSource, literal);
+        return alias != null && searchRegion.contains(invocationPrefix + alias);
+    }
+
+    /**
+     * Whole-bundle convenience: passes the bundle as both
+     * ``searchRegion`` and ``aliasSource``.
+     */
+    static boolean bundleReferencesLiteral(String bundle, String invocationPrefix, String literal) {
+        return bundleReferencesLiteral(bundle, bundle, invocationPrefix, literal);
+    }
+
+    /**
+     * Count occurrences of ``invocationPrefix("literal"`` in
+     * ``searchRegion``, accounting for the post-emit string hoist
+     * (literals replaced by ``_qN`` aliases). The alias is looked up
+     * in ``aliasSource`` — pass the whole bundle when ``searchRegion``
+     * is a substring that doesn't contain the alias-definition table
+     * (e.g. an extracted method body).
+     */
+    static int countLiteralReferences(String searchRegion, String aliasSource, String invocationPrefix, String literal) {
+        String directNeedle = invocationPrefix + "\"" + literal + "\"";
+        int direct = 0;
+        int from = 0;
+        while ((from = searchRegion.indexOf(directNeedle, from)) >= 0) {
+            direct++;
+            from += directNeedle.length();
+        }
+        String alias = findStringAlias(aliasSource, literal);
+        if (alias == null) {
+            return direct;
+        }
+        String aliasNeedle = invocationPrefix + alias;
+        int aliased = 0;
+        from = 0;
+        while ((from = searchRegion.indexOf(aliasNeedle, from)) >= 0) {
+            aliased++;
+            from += aliasNeedle.length();
+        }
+        return direct + aliased;
+    }
+
+    /**
+     * Locate a translated method's body entry given its identifier and
+     * parameter list. Accepts either the ``function* name(args){`` or
+     * ``function name(args){`` shape — the JS suspension analysis may
+     * classify a method as synchronous and emit the non-generator form.
+     * Returns the index of the first character (``f`` of ``function``)
+     * or ``-1`` if neither form is found.
+     */
+    static int findFunctionStart(String translatedApp, String identifier, String parameterList) {
+        // First try the exact canonical signature (covers the few methods
+        // that bail out of the post-emit local/param rename passes:
+        // synchronized methods, methods whose emit shape the rename
+        // scanner doesn't recognise, etc).
+        String generator = "function* " + identifier + parameterList + "{";
+        int idx = translatedApp.indexOf(generator);
+        if (idx >= 0) {
+            return idx;
+        }
+        String plain = "function " + identifier + parameterList + "{";
+        idx = translatedApp.indexOf(plain);
+        if (idx >= 0) {
+            return idx;
+        }
+        // Post-rename emission: the ``__cn1Arg<N>`` / ``__cn1ThisObject``
+        // params are renamed to ``l<N>`` (commit f4381c716) and then
+        // ``l<N>`` is further compressed to single-letter aliases
+        // (commit aab1aebff). The function name is global and stays
+        // stable; the parameter LIST is what changes. Match the
+        // signature with any parameter list shape ``(...){``.
+        for (String prefix : new String[]{"function* ", "function "}) {
+            String token = prefix + identifier + "(";
+            int searchFrom = 0;
+            while (true) {
+                int hit = translatedApp.indexOf(token, searchFrom);
+                if (hit < 0) {
+                    break;
+                }
+                int close = translatedApp.indexOf(')', hit + token.length());
+                if (close > hit
+                        && close + 1 < translatedApp.length()
+                        && translatedApp.charAt(close + 1) == '{') {
+                    return hit;
+                }
+                searchFrom = hit + token.length();
+            }
+        }
+        return -1;
     }
 
     static String loadFixture(String name) throws Exception {

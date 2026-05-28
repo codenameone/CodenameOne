@@ -1330,6 +1330,7 @@ public class IPhoneBuilder extends Executor {
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
                     + routeDispatcherInstallSource(sourceZip, "        ")
+                    + annotationFrameworksInstallSource(sourceZip, "        ")
                     + "        Display.init(stub);\n"
                     + "    }\n"
                     + "}\n";
@@ -1468,7 +1469,7 @@ public class IPhoneBuilder extends Executor {
                     if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
                         mFileBody += "    " + typeToXMLVMName(returnType) + " returnValue = " + convertToJavaMethod(returnType);
                     }
-                    mFileBody += "[ptr " + name;
+                    mFileBody += "[((" + classNameWithUnderscores + "Impl*)ptr) " + name;
                     
                     if(returnType.getName().equals("com.codename1.ui.PeerComponent")) {
                         javaImplSourceFile += "    public native long " + name + "(";

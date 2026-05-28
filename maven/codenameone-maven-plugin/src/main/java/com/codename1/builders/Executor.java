@@ -2016,4 +2016,51 @@ public abstract class Executor {
         }
         return indent + "new com.codename1.router.generated.Routes();\n";
     }
+
+    /// Stub-source fragment to splice into a generated application stub
+    /// right before `Display.init(...)` to install the build-time-generated
+    /// JSON / XML mapper index, the component binder index, and the SQLite
+    /// dao index -- but only when the project actually uses each feature.
+    ///
+    /// The annotation processor emits `cn1app.MapperBootstrap` /
+    /// `BinderBootstrap` / `DaoBootstrap` only when there are `@Mapped` /
+    /// `@Bindable` / `@Entity` classes to register. Each bootstrap's
+    /// constructor references every generated per-class mapper / binder /
+    /// dao by direct symbol (`new com.example.UserCn1Mapper();` etc.), so
+    /// ParparVM iOS / R8 Android rename the call sites and the generated
+    /// classes together.
+    ///
+    /// We probe the project zip for each bootstrap and emit the
+    /// instantiation only when the class is present, so a project that
+    /// uses only `@Mapped` (no `@Bindable`, no `@Entity`) gets just the
+    /// mapper bootstrap line and nothing else. cn1-core does not ship a
+    /// stub: an absent feature leaves the registries empty.
+    protected static String annotationFrameworksInstallSource(File sourceZip, String indent) {
+        StringBuilder sb = new StringBuilder();
+        if (projectHasBootstrap(sourceZip, "cn1app/MapperBootstrap.class")) {
+            sb.append(indent).append("new cn1app.MapperBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/BinderBootstrap.class")) {
+            sb.append(indent).append("new cn1app.BinderBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/DaoBootstrap.class")) {
+            sb.append(indent).append("new cn1app.DaoBootstrap();\n");
+        }
+        return sb.toString();
+    }
+
+    /// Returns true when `sourceZip` (the project's
+    /// `jar-with-dependencies`) contains `entryPath`. Used to gate the
+    /// per-feature bootstrap install lines so projects that don't use
+    /// every annotation framework still produce a clean stub.
+    protected static boolean projectHasBootstrap(File sourceZip, String entryPath) {
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
+            return zf.getEntry(entryPath) != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 }

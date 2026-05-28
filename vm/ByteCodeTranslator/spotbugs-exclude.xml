@@ -110,6 +110,55 @@
             <Bug pattern="OS_OPEN_STREAM" />
             <Bug pattern="OS_OPEN_STREAM_EXCEPTION_PATH" />
             <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
+            <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+        </Or>
+    </Match>
+
+    <!--
+    JavascriptMethodGenerator emits the per-class JS module — uncalled
+    private helpers are kept around for the conditional emission paths
+    (peephole-passes, debug-trace flags) and the redundant null-checks /
+    useless conditions match the same defensive pattern the existing
+    translator classes use for visit-callback chains.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.tools\.translator\.JavascriptMethodGenerator(\$.*)?" />
+        <Or>
+            <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD" />
+            <Bug pattern="NP_NULL_ON_SOME_PATH" />
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+            <Bug pattern="UC_USELESS_CONDITION" />
+            <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+            <Bug pattern="DB_DUPLICATE_SWITCH_CLAUSES" />
+            <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+        </Or>
+    </Match>
+
+    <!--
+    JavascriptSuspensionAnalysis maintains the CHA worklist that decides
+    which methods are emitted as ``function*``; the static-suspending
+    set is intentionally written from instance methods because the
+    analysis is single-threaded across one translator run.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.tools\.translator\.JavascriptSuspensionAnalysis(\$.*)?" />
+        <Or>
+            <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+            <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+        </Or>
+    </Match>
+
+    <!--
+    JavascriptReachability tracks reachable-types analysis and uses
+    per-opcode switch dispatch (duplicate cases mirror BytecodeMethod's
+    pattern); the cached ``unreadField`` is populated lazily via reflection.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.tools\.translator\.JavascriptReachability(\$.*)?" />
+        <Or>
+            <Bug pattern="DB_DUPLICATE_SWITCH_CLAUSES" />
+            <Bug pattern="URF_UNREAD_FIELD" />
         </Or>
     </Match>
 

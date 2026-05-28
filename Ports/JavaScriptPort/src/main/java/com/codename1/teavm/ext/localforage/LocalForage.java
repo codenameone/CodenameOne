@@ -363,138 +363,109 @@ public class LocalForage {
     
     
     
+    // Poll-based wait helper. Avoids synchronized(done) + done.wait() which
+    // on the JS-port cooperative scheduler strands the waiter (the monitor
+    // isn't released when wait() parks, so the async callback can't enter
+    // synchronized(done) to deliver the result). The worker is single-threaded
+    // so cross-thread visibility from the callback to the waiter is implicit.
+    private static void awaitLocalForageDone(boolean[] done) throws IOException {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (!done[0]) {
+            if (System.currentTimeMillis() >= deadline) {
+                throw new IOException("LocalForage callback timed out after 10s");
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                throw new IOException("Interrupted", e);
+            }
+        }
+    }
+
     private static JSObject setValue(LocalForageImpl impl, String key, JSObject value) throws IOException {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.setItem(key, value, new SetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        HTML5Implementation._logObj(err);
-                        error[0] = new QuotaExceededException("Failed to set value");
-                    } else {
-                        result[0] = val;
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    HTML5Implementation._logObj(err);
+                    error[0] = new QuotaExceededException("Failed to set value");
+                } else {
+                    result[0] = val;
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
         return (JSObject) result[0];
     }
-    
+
     private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.getItem(key, new GetItemCallback(){
             @Override
             public void callback(JSObject err, JSObject val) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException(JS.unwrapString(err));
-                    } else {
-                        result[0] = val;
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException(JS.unwrapString(err));
+                } else {
+                    result[0] = val;
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
         return (JSObject) result[0];
     }
-    
+
     private static void removeItem(LocalForageImpl impl, String key) throws IOException {
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.removeItem(key, new SuccessCallback(){
             @Override
             public void callback(JSObject err) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to delete value");
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to delete value");
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
     }
-    
+
     private static void clear(LocalForageImpl impl) throws IOException {
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.clear(new SuccessCallback(){
             @Override
             public void callback(JSObject err) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to clear forage");
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to clear forage");
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
@@ -504,32 +475,26 @@ public class LocalForage {
         final Object[] result = new Object[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.keys(new KeysCallback(){
             @Override
             public void callback(JSObject err, JSArray<JSString> k) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to get keys");
-                    } else {
-                        result[0] = JS.unwrapStringArray(k);
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to get keys");
+                } else {
+                    result[0] = JS.unwrapStringArray(k);
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
+
+        try {
+            awaitLocalForageDone(done);
+        } catch (IOException timeoutEx) {
+            // Cleanup callers treat null/empty as "no files to delete"; better
+            // than a hard failure when the bridge response is delayed.
+            return new String[0];
         }
-        
         if (error[0] != null) {
             throw error[0];
         }
@@ -540,32 +505,20 @@ public class LocalForage {
         final int[] result = new int[1];
         final IOException[] error = new IOException[1];
         final boolean[] done = new boolean[1];
-        
+
         impl.length(new LengthCallback(){
             @Override
             public void callback(JSObject err, JSObject len) {
-                synchronized(done) {
-                    if (err != null && !JS.isUndefined(err)) {
-                        error[0] = new IOException("Failed to get length");
-                    } else {
-                        result[0] = JS.unwrapInt(len);
-                    }
-                    done[0] = true;
-                    done.notifyAll();
+                if (err != null && !JS.isUndefined(err)) {
+                    error[0] = new IOException("Failed to get length");
+                } else {
+                    result[0] = JS.unwrapInt(len);
                 }
+                done[0] = true;
             }
         });
-        
-        synchronized(done) {
-            while (!done[0]) {
-                try {
-                    done.wait();
-                } catch (InterruptedException e) {
-                    throw new IOException("Interrupted", e);
-                }
-            }
-        }
-        
+
+        awaitLocalForageDone(done);
         if (error[0] != null) {
             throw error[0];
         }
@@ -642,10 +595,9 @@ public class LocalForage {
         private void save() throws IOException {
             byte[] bytes = this.toByteArray();
             int len = bytes.length;
-            Uint8Array arr = Uint8Array.create(len);
-            for (int i = 0; i < len; i++) {
-                arr.set(i, bytes[i]);
-            }
+            // Bulk-copy the Java byte[] into a Uint8Array in one JS
+            // call instead of paying a JSO virtual dispatch per byte.
+            Uint8Array arr = BlobUtil.byteArrayToUint8Array(bytes);
             inst.setItem(key, arr);
             if (onComplete != null) {
                 ItemSavedEvent evt = new ItemSavedEvent();

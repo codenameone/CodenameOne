@@ -24,22 +24,25 @@ package com.codename1.ai;
 
 import com.codename1.util.AsyncResource;
 
-/// Anthropic /v1/messages client. Wire format differs from OpenAI in
-/// three important ways: system messages live in a top-level `system`
-/// string rather than a role; image parts use `{type:"image", source:
-/// {type:"base64", media_type, data}}`; tool calls stream argument
-/// JSON via `input_json_delta` events.
+/// Anthropic Messages client.
 ///
-/// This is currently a scaffold -- the full request/response mapping
-/// is tracked as a follow-up. The class compiles and registers under
-/// `LlmClient.anthropic(...)` so app code using the API can be built;
-/// runtime calls throw a clear `UnsupportedOperationException`.
-class AnthropicClient extends LlmClient {
-    private final String apiKey;
+/// Talks to `https://api.anthropic.com/v1/chat/completions`, the
+/// official OpenAI-compatible Messages shim. The wire format on that
+/// endpoint is the same `/v1/chat/completions` shape that OpenAI and
+/// every OpenAI-compatible provider speaks, so this client inherits the
+/// full streaming, tool-call, response-format and image-attachment
+/// implementation from `OpenAiClient`. Only the provider name, default
+/// model, and the embeddings shape (Anthropic does not publish a
+/// first-party embeddings endpoint) are overridden here.
+///
+/// Authentication uses `Authorization: Bearer sk-ant-...` -- identical
+/// header layout to OpenAI -- which is why the inherited request
+/// configuration works without modification.
+class AnthropicClient extends OpenAiClient {
 
     AnthropicClient(String apiKey, String baseUrl) {
-        super(baseUrl);
-        this.apiKey = apiKey;
+        super(apiKey, baseUrl);
+        setDefaultModel("claude-sonnet-4-5");
     }
 
     @Override
@@ -48,29 +51,13 @@ class AnthropicClient extends LlmClient {
     }
 
     @Override
-    public AsyncResource<ChatResponse> chat(ChatRequest req) {
-        AsyncResource<ChatResponse> r = new AsyncResource<ChatResponse>();
-        r.error(new UnsupportedOperationException(
-                "AnthropicClient is not yet implemented in this release. "
-                + "Use LlmClient.openai(...) or run the model behind an OpenAI-compatible proxy."));
-        return r;
-    }
-
-    @Override
-    public AsyncResource<ChatResponse> chatStream(ChatRequest req, StreamingListener listener) {
-        return chat(req);
-    }
-
-    @Override
     public AsyncResource<EmbeddingResponse> embed(EmbeddingRequest req) {
         AsyncResource<EmbeddingResponse> r = new AsyncResource<EmbeddingResponse>();
         r.error(new UnsupportedOperationException(
                 "Anthropic does not publish a first-party embeddings endpoint. "
-                + "Use a Voyage AI key via LlmClient.localOpenAiCompatible(\"https://api.voyageai.com/v1\", key, model)."));
+                + "Use a Voyage AI key via LlmClient.localOpenAiCompatible("
+                + "\"https://api.voyageai.com/v1\", key, \"voyage-3\") or "
+                + "LlmClient.openai(...) with text-embedding-3-small."));
         return r;
-    }
-
-    String getApiKey() {
-        return apiKey;
     }
 }

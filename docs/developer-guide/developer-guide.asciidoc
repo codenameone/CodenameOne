@@ -90,6 +90,14 @@ include::Authentication-And-Identity.asciidoc[]
 
 include::Deep-Links-Routing.asciidoc[]
 
+include::Annotation-JSON-XML-Mapping.asciidoc[]
+
+include::Annotation-Component-Binding.asciidoc[]
+
+include::Annotation-SQLite-ORM.asciidoc[]
+
+include::Ai-And-Speech.asciidoc[]
+
 include::Near-Field-Communication.asciidoc[]
 
 include::Network-Connectivity.asciidoc[]

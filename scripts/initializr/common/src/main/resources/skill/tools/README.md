@@ -27,7 +27,7 @@ java tools/IsApiSupported.java java.util.HashMap#put
 # YES (class present at java-runtime-7.0.242.jar!java/util/HashMap.class — for method-level confirmation run `javap -p -classpath …` and grep for `put`)
 ```
 
-Useful when porting code from desktop Java and you want a quick "is this safe to use" check before discovering it at `mvn cn1:compliance-check` time.
+Useful when porting code from desktop Java and you want a quick "is this safe to use" check before discovering it at `mvn cn1:bytecode-compliance` time.
 
 For the full picture of what's supported and what isn't, see `references/java-api-subset.md`.
 

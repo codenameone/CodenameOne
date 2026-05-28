@@ -6,6 +6,8 @@
  */
 package com.codename1.impl.html5;
 
+import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
+
 public final class JavaScriptImageDataAdapter {
     private JavaScriptImageDataAdapter() {
     }
@@ -41,4 +43,19 @@ public final class JavaScriptImageDataAdapter {
                     (reader.get(i + 2) & 0x000000ff);
         }
     }
+
+    /**
+     * Bulk RGBA->ARGB conversion implemented as a native intrinsic that
+     * loops once in JS over the raw Uint8ClampedArray. Avoids the
+     * per-byte JSO virtual dispatch the {@link PixelReader} path pays
+     * (4 calls per pixel; 4.6M calls for a 1280x900 screenshot).
+     *
+     * <p>If the native binding is missing (test stubs etc.) callers must
+     * fall back to {@link #readRgbaToArgb(PixelReader, int[], int)}.</p>
+     *
+     * @param src    the canvas image data buffer in RGBA order
+     * @param dst    destination ARGB int[]
+     * @param offset starting index in {@code dst}
+     */
+    public static native void readRgbaToArgbBulk(Uint8ClampedArray src, int[] dst, int offset);
 }

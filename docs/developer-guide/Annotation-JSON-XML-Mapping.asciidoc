@@ -1,0 +1,195 @@
+== JSON / XML Object Mapping
+
+[[annotation-mapping-section,Annotation Mapping Section]]
+Codename One includes a build-time POJO mapping framework that turns a
+plain Java class -- or a `PropertyBusinessObject` -- into JSON or XML
+without any runtime reflection. The Maven plugin scans the project's
+compiled bytecode at build time, generates a typed `Mapper` next to each
+`@Mapped` class, and ships it alongside the source. The runtime entry
+point is two methods on `com.codename1.mapping.Mappers`.
+
+The framework sits next to the existing `JSONParser`, `XMLParser` and
+`PropertyIndex.toJSON` / `fromJSON` helpers -- it doesn't replace them.
+Use the imperative APIs when you want to read a foreign JSON shape
+without modelling it; use the annotation framework when you have a model
+class and want a one-liner round-trip.
+
+=== Annotate the model
+
+Apply `@Mapped` to the class. The processor accepts POJOs with public
+fields, `PropertyBusinessObject`-style classes with `Property` fields,
+or any mix:
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+import com.codename1.properties.*;
+
+@Mapped
+@XmlRoot("user")
+public class User {
+
+    @JsonProperty("first_name")
+    @XmlElement("first")
+    public String firstName;
+
+    public int age;
+
+    // Renders as <user role="admin"/> in XML; omitted from JSON.
+    @XmlAttribute
+    @JsonIgnore
+    public String role;
+
+    public User() { }                                  // <1>
+}
+----
+<1> Every `@Mapped` class must declare a public no-arg constructor --
+    the generated mapper calls it from `fromJson` / `fromXml`.
+
+For `PropertyBusinessObject`-style classes the same annotations work on
+`Property<T>` fields. The processor reads through `Property#get` /
+`Property#set` so subscribers (`addChangeListener`) still see the
+mutation:
+
+[source,java]
+----
+@Mapped
+public class Item implements PropertyBusinessObject {
+    public final Property<String, Item>  name = new Property<>("name");
+    public final Property<Integer, Item> qty  = new Property<>("qty");
+
+    private final PropertyIndex idx =
+            new PropertyIndex(this, "Item", name, qty);
+
+    public PropertyIndex getPropertyIndex() { return idx; }
+
+    public Item() { }
+}
+----
+
+==== Field-level annotations
+
+[cols="1,3", options="header"]
+|===
+| Annotation             | Purpose
+
+| `@JsonProperty("k")`   | Rename the JSON key. Default: the field name.
+| `@JsonIgnore`          | Omit the field from JSON.
+| `@XmlElement("name")`  | Rename the XML element. Default: the field name.
+| `@XmlAttribute("name")`| Lift the field into an XML attribute rather
+                           than a nested child element. Only valid for
+                           scalar or `Property<scalar>` fields.
+| `@XmlTransient`        | Omit the field from XML.
+|===
+
+==== Supported field types
+
+[cols="1,4", options="header"]
+|===
+| Kind                  | Detail
+| Scalars               | `String`, all primitives, boxed primitives,
+                          `java.util.Date`, `byte[]` (base64 in JSON /
+                          XML).
+| `Property<T, ?>`      | `T` must be a scalar or another `@Mapped` type.
+| `ListProperty<T, ?>`  | Same rules as `Property`.
+| `java.util.List<T>`   | Read from the field's generic signature.
+| Nested `@Mapped` ref. | Recursive serialization through the registered
+                          nested mapper.
+|===
+
+=== Round-trip
+
+[source,java]
+----
+import com.codename1.mapping.Mappers;
+
+User u = new User();
+u.firstName = "Alice";
+u.age = 30;
+
+String json = Mappers.toJson(u);
+//  -> {"first_name":"Alice","age":30}
+
+User restored = Mappers.fromJson(json, User.class);
+
+String xml = Mappers.toXml(u);
+//  -> <user><first>Alice</first><age>30</age></user>
+
+User fromXml = Mappers.fromXml(xml, User.class);
+----
+
+`Mappers.fromJson` and `Mappers.fromXml` both accept either a `String`
+or a `java.io.Reader`, so streamed responses (network, file, resource)
+don't need to be fully buffered first.
+
+=== How the plumbing works
+
+At build time:
+
+. `cn1:process-annotations` (PROCESS_CLASSES phase) scans `target/classes`
+  for every class carrying `@Mapped`.
+. The processor validates each one (concrete, public no-arg constructor,
+  supported field types) and fails the build on the first offender --
+  every offending class shows up in the same error report.
+. A `<SimpleName>Cn1Mapper` class is generated for every `@Mapped` type
+  in the **same package as the source class** (e.g.
+  `com.example.UserCn1Mapper` next to `com.example.User`). Each
+  generated mapper exposes a public `static register()` hook.
+. A single `cn1app.MapperBootstrap` is generated whose constructor calls
+  `UserCn1Mapper.register()`, `ItemCn1Mapper.register()`, ... for every
+  accepted `@Mapped` class.
+
+At app start:
+
+* On **iOS / Android**, the build server probes the project zip for
+  `cn1app/MapperBootstrap.class`. When found it splices
+  `new cn1app.MapperBootstrap();` into the per-build application stub
+  right before `Display.init`. ParparVM rename and R8 obfuscation
+  rewrite the call site and the generated class together, so the
+  direct symbol reference stays valid after the pass.
+* On the **JavaSE simulator and desktop run**, `JavaSEPort#postInit`
+  loads the bootstrap via `Class.forName("cn1app.MapperBootstrap")`.
+  Class-loading is the legitimate path here -- JavaSE runs unobfuscated
+  and the same `Class.forName` pattern is used by the @Route dispatcher.
+
+Projects that ship no `@Mapped` classes produce no bootstrap, the build
+server probe falls through, and `JavaSEPort` catches the
+`ClassNotFoundException` -- the registry stays empty and `Mappers.toJson`
+throws a clear "no mapper registered" error.
+
+The runtime registry is keyed on `Class#getName()`. The map keys survive
+obfuscation because both the registration site and the lookup site see
+the same renamed name within a single execution -- the keys are never
+persisted across builds.
+
+=== Custom mappers
+
+Sometimes a class lives in a third-party JAR the build can't annotate.
+Hand-write a `Mapper<T>` and register it at startup:
+
+[source,java]
+----
+Mappers.register(new Mapper<UUID>() {
+    public Class<UUID> type() { return UUID.class; }
+    public Map<String, Object> toMap(UUID u) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("uuid", u.toString());
+        return m;
+    }
+    public UUID fromMap(Map<String, Object> m) {
+        return UUID.fromString((String) m.get("uuid"));
+    }
+    public String xmlRootName() { return "uuid"; }
+    public void writeXml(UUID u, Element root) {
+        root.addChild(new Element(u.toString(), true));
+    }
+    public UUID readXml(Element root) {
+        return UUID.fromString(textOf(root));
+    }
+});
+----
+
+Hand-written mappers take precedence over generated ones for the same
+class.

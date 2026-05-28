@@ -3001,13 +3001,23 @@ public class Component implements Animation, StyleListener, Editable {
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             g.translate(-scrollX, -scrollY);
-            paint(g);
+            Display.impl.beginPaintScope(g.getGraphics(), this);
+            try {
+                paint(g);
+            } finally {
+                Display.impl.endPaintScope(g.getGraphics(), this);
+            }
             g.translate(scrollX, scrollY);
             if (isScrollVisible) {
                 paintScrollbars(g);
             }
         } else {
-            paint(g);
+            Display.impl.beginPaintScope(g.getGraphics(), this);
+            try {
+                paint(g);
+            } finally {
+                Display.impl.endPaintScope(g.getGraphics(), this);
+            }
         }
         if (isBorderPainted()) {
             paintBorder(g);
@@ -3395,9 +3405,19 @@ public class Component implements Animation, StyleListener, Editable {
                 rect.getSize().setWidth(par.getWidth());
                 rect.getSize().setHeight(par.getHeight());
             }
-            p.paint(g, rect);
+            Display.impl.beginPaintScope(g.getGraphics(), p);
+            try {
+                p.paint(g, rect);
+            } finally {
+                Display.impl.endPaintScope(g.getGraphics(), p);
+            }
         }
-        par.paintBackground(g);
+        Display.impl.beginPaintScope(g.getGraphics(), par);
+        try {
+            par.paintBackground(g);
+        } finally {
+            Display.impl.endPaintScope(g.getGraphics(), par);
+        }
         ((Container) par).paintIntersecting(g, c, x, y, w, h, false, 0);
         g.translate(-transX, -transY);
     }
@@ -3469,9 +3489,20 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         if (getStyle().getBgPainter() != null) {
-            getStyle().getBgPainter().paint(g, bounds);
+            Painter bp = getStyle().getBgPainter();
+            Display.impl.beginPaintScope(g.getGraphics(), bp);
+            try {
+                bp.paint(g, bounds);
+            } finally {
+                Display.impl.endPaintScope(g.getGraphics(), bp);
+            }
         }
-        paintBackground(g);
+        Display.impl.beginPaintScope(g.getGraphics(), this);
+        try {
+            paintBackground(g);
+        } finally {
+            Display.impl.endPaintScope(g.getGraphics(), this);
+        }
         paintRippleEffect(g);
     }
 
@@ -5086,7 +5117,12 @@ public class Component implements Animation, StyleListener, Editable {
 
         g.translate(-getX(), -getY());
         paintComponentBackground(g);
-        paint(g);
+        Display.impl.beginPaintScope(g.getGraphics(), this);
+        try {
+            paint(g);
+        } finally {
+            Display.impl.endPaintScope(g.getGraphics(), this);
+        }
         if (isBorderPainted()) {
             paintBorder(g);
         }
@@ -5132,7 +5168,12 @@ public class Component implements Animation, StyleListener, Editable {
 
         g.translate(-getX(), -getY());
         paintComponentBackground(g);
-        paint(g);
+        Display.impl.beginPaintScope(g.getGraphics(), this);
+        try {
+            paint(g);
+        } finally {
+            Display.impl.endPaintScope(g.getGraphics(), this);
+        }
         if (isBorderPainted()) {
             paintBorder(g);
         }
