@@ -40,7 +40,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '8'
-          distribution: 'zulu'
+          distribution: 'temurin'
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
