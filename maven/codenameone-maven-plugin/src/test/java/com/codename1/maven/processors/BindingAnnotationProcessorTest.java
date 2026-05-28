@@ -102,6 +102,196 @@ public class BindingAnnotationProcessorTest {
     }
 
     @Test
+    public void generatesValidatorForAnnotatedFields() throws Exception {
+        File classes = compileFixture(
+                "com.example.SignupModel",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Bindable\n"
+                        + "public class SignupModel {\n"
+                        + "    @Bind(name=\"emailField\") @Required @Email\n"
+                        + "    public String email;\n"
+                        + "    @Bind(name=\"ageField\") @Numeric(min = 13, max = 120)\n"
+                        + "    public String age;\n"
+                        + "    @Bind(name=\"phoneField\") @Regex(pattern=\"^[0-9]+$\", message=\"digits only\")\n"
+                        + "    public String phone;\n"
+                        + "    @Bind(name=\"siteField\") @Url\n"
+                        + "    public String site;\n"
+                        + "    @Bind(name=\"roleField\") @ExistIn({\"admin\", \"viewer\"})\n"
+                        + "    public String role;\n"
+                        + "    @Bind(name=\"lengthField\") @Length(min = 8)\n"
+                        + "    public String secret;\n"
+                        + "    public SignupModel() {}\n"
+                        + "}\n");
+        runProcessorOrFail(classes);
+
+        // The binder source is generated then compiled in-memory. Probe
+        // the constant pool of the resulting .class for the type / method
+        // references each constraint variant should emit.
+        String pool = readClassConstantPool(classes,
+                "com/example/SignupModelCn1Binder");
+        assertTrue("validator type referenced",
+                pool.contains("com/codename1/ui/validation/Validator"));
+        assertTrue("addConstraint method referenced",
+                pool.contains("addConstraint"));
+        // getValidator() lives on the anonymous NotifiableBinding subclass
+        // (`<binder>$1.class`), not on the outer binder. Scan the binder
+        // class + every anonymous inner.
+        String allPool = readBinderConstantPool(classes, "com/example/SignupModelCn1Binder");
+        assertTrue("getValidator method emitted on Binding impl",
+                allPool.contains("getValidator"));
+        assertTrue("@Required / @Length both reference LengthConstraint",
+                pool.contains("com/codename1/ui/validation/LengthConstraint"));
+        assertTrue("@Email / @Regex reference RegexConstraint",
+                pool.contains("com/codename1/ui/validation/RegexConstraint"));
+        assertTrue("@Email reaches the validEmail factory",
+                pool.contains("validEmail"));
+        assertTrue("@Url reaches the validURL factory",
+                pool.contains("validURL"));
+        assertTrue("@Numeric references NumericConstraint",
+                pool.contains("com/codename1/ui/validation/NumericConstraint"));
+        assertTrue("@Regex pattern survives into constant pool",
+                pool.contains("^[0-9]+$"));
+        assertTrue("@ExistIn references ExistInConstraint",
+                pool.contains("com/codename1/ui/validation/ExistInConstraint"));
+        assertTrue("@ExistIn vocabulary survives into constant pool",
+                pool.contains("admin") && pool.contains("viewer"));
+    }
+
+    @Test
+    public void emptyValidatorWhenNoConstraintAnnotations() throws Exception {
+        File classes = compileFixture(
+                "com.example.NoValidation",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Bindable\n"
+                        + "public class NoValidation {\n"
+                        + "    @Bind(name=\"x\") public String x;\n"
+                        + "    public NoValidation() {}\n"
+                        + "}\n");
+        runProcessorOrFail(classes);
+        String pool = readClassConstantPool(classes,
+                "com/example/NoValidationCn1Binder");
+        // The validator must still be there so getValidator() never
+        // returns null, but no constraint type should be referenced.
+        assertTrue("validator type still referenced",
+                pool.contains("com/codename1/ui/validation/Validator"));
+        String allPool = readBinderConstantPool(classes, "com/example/NoValidationCn1Binder");
+        assertTrue("getValidator method still emitted", allPool.contains("getValidator"));
+        assertTrue("no LengthConstraint when no @Required/@Length present",
+                !pool.contains("com/codename1/ui/validation/LengthConstraint"));
+        assertTrue("no RegexConstraint when no @Regex/@Email/@Url present",
+                !pool.contains("com/codename1/ui/validation/RegexConstraint"));
+    }
+
+    @Test
+    public void rejectsEmptyRegexPattern() throws Exception {
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.BadRegex",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@Bindable public class BadRegex {\n"
+                                + "    @Bind(name=\"x\") @Regex(pattern=\"\") public String x;\n"
+                                + "    public BadRegex() {}\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("expected error on empty @Regex pattern", ctx.hasErrors());
+    }
+
+    @Test
+    public void rejectsEmptyExistInList() throws Exception {
+        File classes = tmp.newFolder("classes");
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.BadExistIn",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@Bindable public class BadExistIn {\n"
+                                + "    @Bind(name=\"x\") @ExistIn({}) public String x;\n"
+                                + "    public BadExistIn() {}\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("expected error on empty @ExistIn value list", ctx.hasErrors());
+    }
+
+    @Test
+    public void customValidateAnnotationEmitsNewExpression() throws Exception {
+        // Two top-level fixtures in the same package so the generated binder
+        // can reference the custom constraint by binary name.
+        File classes = tmp.newFolder("classes");
+        java.util.Map<String, String> sources = new java.util.LinkedHashMap<String, String>();
+        sources.put("com.example.PhoneConstraint",
+                "package com.example;\n"
+                        + "import com.codename1.ui.validation.Constraint;\n"
+                        + "public class PhoneConstraint implements Constraint {\n"
+                        + "    public boolean isValid(Object v) { return true; }\n"
+                        + "    public String getDefaultFailMessage() { return \"\"; }\n"
+                        + "}\n");
+        sources.put("com.example.PhoneHolder",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.*;\n"
+                        + "@Bindable public class PhoneHolder {\n"
+                        + "    @Bind(name=\"phone\") @Validate(PhoneConstraint.class)\n"
+                        + "    public String phone;\n"
+                        + "    public PhoneHolder() {}\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+        String pool = readClassConstantPool(classes,
+                "com/example/PhoneHolderCn1Binder");
+        // The Validate annotation's class literal is captured as a Type ref
+        // and emitted as a direct `new` expression on that class.
+        assertTrue("custom constraint type referenced",
+                pool.contains("com/example/PhoneConstraint"));
+    }
+
+    /// Returns the concatenation of every UTF-8 entry in the class file's
+    /// constant pool. The .class binary embeds type / method / String
+    /// references as UTF-8 records, so substring matching against this
+    /// blob is sufficient for "does the generated binder reference
+    /// `com/codename1/ui/validation/LengthConstraint`?" style checks.
+    private static String readClassConstantPool(File classesRoot, String internalName) throws Exception {
+        File classFile = new File(classesRoot, internalName + ".class");
+        if (!classFile.exists()) {
+            throw new IllegalStateException("Generated binder class missing: " + classFile);
+        }
+        byte[] bytes = java.nio.file.Files.readAllBytes(classFile.toPath());
+        // ISO-8859-1 round-trips the raw bytes 1:1, so UTF-8 entries inside
+        // the constant pool show up as ASCII substrings without needing the
+        // full constant-pool walker -- enough for the assertions here.
+        return new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+    }
+
+    /// Returns the union of every UTF-8 constant pool entry across the
+    /// binder class and any inner classes that share its prefix. The
+    /// generated binder splits methods across the outer class and one or
+    /// more anonymous inner classes (the NotifiableBinding subclass, the
+    /// listeners, the disposers); methods like `getValidator` live on the
+    /// inner classes so a substring check against just the outer class
+    /// would miss them.
+    private static String readBinderConstantPool(File classesRoot, String binderInternalName) throws Exception {
+        File parent = new File(classesRoot, binderInternalName).getParentFile();
+        String prefix = binderInternalName.substring(binderInternalName.lastIndexOf('/') + 1);
+        StringBuilder out = new StringBuilder();
+        File[] files = parent.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.getName().endsWith(".class")
+                        && (f.getName().equals(prefix + ".class")
+                                || f.getName().startsWith(prefix + "$"))) {
+                    out.append(new String(
+                            java.nio.file.Files.readAllBytes(f.toPath()),
+                            java.nio.charset.StandardCharsets.ISO_8859_1));
+                    out.append('\n');
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    @Test
     public void instrumentsSetterWithNotifyChanged() throws Exception {
         File classes = compileFixture(
                 "com.example.NotifyBean",

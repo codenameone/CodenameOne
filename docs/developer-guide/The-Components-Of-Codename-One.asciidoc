@@ -1156,6 +1156,14 @@ v.addSubmitButtons(submit);
 .Validation & Regular Expressions
 image::img/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
 
+When the form components are bound to a model with `@Bindable`, the
+same constraints can be expressed as field annotations -- `@Required`,
+`@Length`, `@Regex`, `@Email`, `@Url`, `@Numeric`, `@ExistIn`,
+`@Validate` -- and the generated binder wires them into a `Validator`
+exposed through `Binding#getValidator()`. See the
+<<annotation-binding-validation,Validation annotations>> section in the
+component binding chapter for the full reference.
+
 === InfiniteProgress
 
 The https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] indicator spins an image infinitely to show that a background process is still working.
