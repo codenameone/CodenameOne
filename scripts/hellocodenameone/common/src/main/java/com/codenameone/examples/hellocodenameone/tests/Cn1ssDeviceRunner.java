@@ -55,23 +55,25 @@ import com.codenameone.examples.hellocodenameone.tests.accessibility.Accessibili
 
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Per-test deadline cap. On the JavaScript port the overall CI browser
-    // lifetime is only ~150s, so a stuck test mustn't eat the whole budget;
-    // the tight 10s cap kept the suite from being blocked by the rare hung
-    // form (e.g. KotlinUiTest's missing cn1lib). iOS / Android / JavaSE
-    // run with much longer wall budgets so a per-test cap of 30s is safe -
-    // it only matters for genuinely stuck tests, and 30s leaves headroom
-    // for theme captures whose chunked-log emission is rate-limited (Android
-    // throttles 500-byte chunks at 30ms each to keep logcat from dropping
-    // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
-    // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
-    // even on a healthy device). The 30s figure also covers the iOS Metal
-    // port's mutable rendering, which allocates a temp UIImage + MTLTexture
-    // per round-rect / arc / gradient call (the CG-rasterise-then-DrawImage
-    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
-    // simulators legitimately blow past the 10s budget while still making
-    // forward progress.
-    private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
+    // Per-test deadline cap. The historical 10s HTML5 cap dates back to
+    // a 150s browser-lifetime budget; the current CI budget is 1740s
+    // (CN1_JS_BROWSER_LIFETIME_SECONDS), so even a worst-case 30s per
+    // test only burns ~15 min for the full suite. The bump to 30s is
+    // required by DualAppearanceBaseTest subclasses: each test runs
+    // light + dark phases serially and each phase pays
+    // registerReadyCallback's 1500ms UITimer + wait_for_ui_settle
+    // (up to ~800ms) + capture/encode + chunked emit, so the
+    // bytecode-translated path easily clears 10s on shared GHA
+    // runners. At 10s the dark phase's emit fired AFTER the test had
+    // already timed out and the runner had advanced to the next test
+    // - the late dark emit then captured whatever form happened to
+    // be on the canvas at that moment (visible symptom:
+    // ToolbarTheme_dark.png showed "TabsTheme / light"). iOS /
+    // Android / JavaSE still get 30s; matching that on HTML5 keeps
+    // the cap consistent across ports and only matters for
+    // genuinely stuck tests, which the suite-level timeout still
+    // catches.
+    private static final int TEST_TIMEOUT_MS_HTML5 = 30000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
