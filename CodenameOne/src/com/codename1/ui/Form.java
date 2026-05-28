@@ -1123,10 +1123,20 @@ public class Form extends Container {
             int tx = g.getTranslateX();
             int ty = g.getTranslateY();
             g.translate(-tx, -ty);
-            glassPane.paint(g, getBounds());
+            Display.impl.beginPaintScope(g.getGraphics(), glassPane);
+            try {
+                glassPane.paint(g, getBounds());
+            } finally {
+                Display.impl.endPaintScope(g.getGraphics(), glassPane);
+            }
             g.translate(tx, ty);
         }
-        paintGlass(g);
+        Display.impl.beginPaintScope(g.getGraphics(), this);
+        try {
+            paintGlass(g);
+        } finally {
+            Display.impl.endPaintScope(g.getGraphics(), this);
+        }
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             int[] c = g.getClip();
             g.setClip(0, 0, getWidth(), getHeight());

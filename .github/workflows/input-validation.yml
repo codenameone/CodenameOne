@@ -82,24 +82,6 @@ jobs:
         id: setup_hash
         run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
-      - name: Compute CN1 source hash
-        id: src_hash
-        run: |
-          set -euo pipefail
-          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
-              maven/codenameone-maven-plugin/src/main \
-              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
-              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
-          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
-              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
-          SCRIPT_HASH=$(shasum -a 256 \
-              scripts/setup-workspace.sh \
-              scripts/build-ios-port.sh \
-              scripts/build-native-themes.sh \
-              .github/workflows/_build-ios-port.yml \
-              | shasum -a 256 | awk '{print $1}')
-          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
-
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
@@ -128,13 +110,18 @@ jobs:
             cn1-binaries-${{ runner.os }}-
 
       - name: Restore built CN1 + iOS port artifacts
+        # Reuse the exact cache key the build-port job saved against. Locally
+        # recomputing the hash here has drifted out of sync with
+        # _build-ios-port.yml before (e.g. svg-transcoder/src/main added on
+        # one side only), causing a permanent cache miss for any PR that
+        # touches a file matching this workflow's paths filter.
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
 
       - name: Install XcodeGen
