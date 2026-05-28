@@ -296,13 +296,11 @@ if (TextToSpeech.isSupported()) {
 
 ## SecureStorage — non-prompting overloads for LLM keys
 
-The biometric-gated overloads (`get(reason, account)`, `set(reason, account, value)`, `remove(reason, account)`) remain the right choice for credentials a human user authenticates against.
-
-For things like LLM API keys, where the network layer reads the secret on every call and a biometric prompt would be unusable, use the new single-argument overloads:
+**Never hard-code a provider API key in source, ship it in a bundled resource, or commit it to git.** Mobile binaries are trivially reverse-engineered; any key embedded in the app is a key your users can extract. Fetch the key from a server endpoint the user authenticates against, then cache it locally with the non-prompting `SecureStorage` overloads:
 
 ```java
 SecureStorage store = SecureStorage.getInstance();
-store.set("openai.key", apiKey);                 // returns false when unsupported
+store.set("openai.key", apiKeyFromServer);       // returns false when unsupported
 String key = store.get("openai.key");            // returns null when absent
 LlmClient client = LlmClient.openai(key);
 ```

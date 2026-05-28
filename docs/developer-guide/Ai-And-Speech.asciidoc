@@ -326,26 +326,21 @@ local model without any conditional wiring at the call site.
 
 ==== Storing the API key
 
-Production builds need somewhere to keep the provider API key. The
-non-prompting `SecureStorage` overloads (added in the same release as
-the AI surface) are designed for this: a single string argument, no
-biometric prompt, return `null` or `false` on platforms that lack
-support:
+WARNING: Never hard-code a provider API key in source, ship it in a
+bundled resource, or commit it to git. Mobile binaries are trivially
+reverse-engineered; any key embedded in the app is a key your users
+can extract. Fetch the key from a server endpoint that the user
+authenticates against, then cache it locally with the non-prompting
+`SecureStorage` overloads:
 
 [source,java]
 ----
 SecureStorage store = SecureStorage.getInstance();
-store.set("openai.key", apiKey);                  // returns false when unsupported
+store.set("openai.key", apiKeyFromServer);        // returns false when unsupported
 
 String key = store.get("openai.key");             // returns null when absent
 LlmClient client = LlmClient.openai(key);
 ----
-
-The biometric-gated overloads (`get(reason, account)`,
-`set(reason, account, value)`, `remove(reason, account)`) remain the
-right choice for credentials a human user authenticates against. Use the
-non-prompting overloads only for secrets the network layer reads on
-every request, where a biometric prompt would be unusable.
 
 === The `ChatView` component
 
