@@ -17,7 +17,7 @@
                             </process-resources>
                             <compile>
                                 org.apache.maven.plugins:maven-compiler-plugin:compile,
-                                com.codenameone:codenameone-maven-plugin:compliance-check
+                                com.codenameone:codenameone-maven-plugin:bytecode-compliance
                             </compile>
                             <process-test-resources>
                                 org.apache.maven.plugins:maven-resources-plugin:testResources

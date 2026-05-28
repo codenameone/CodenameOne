@@ -1,12 +1,12 @@
 # Java API Subset, IO, and Networking
 
-Codename One does **not** ship with the full JDK. The Java code you write in `common/` is cross-compiled by ParparVM (iOS) and TeaVM (web), and runs on Android against a hand-curated JDK subset. If you call a class or method that isn't in the subset, the cloud build fails the **compliance check** (`cn1:compliance-check`, which the `process-classes` phase runs automatically).
+Codename One does **not** ship with the full JDK. The Java code you write in `common/` is cross-compiled by ParparVM (iOS) and TeaVM (web), and runs on Android against a hand-curated JDK subset. If you call a class or method that isn't in the subset, the cloud build fails the **bytecode compliance check** (`cn1:bytecode-compliance`, which the `process-classes` phase runs automatically).
 
 This document tells you (1) how to discover what *is* supported, and (2) where the IO and networking APIs differ from standard Java.
 
 ## How to discover the supported API
 
-The supported API surface is defined by two artifacts that the Codename One Maven plugin resolves from Maven Central. The `compliance-check` goal compares your compiled bytecode against both jars and fails on anything not present.
+The supported API surface is defined by two artifacts that the Codename One Maven plugin resolves from Maven Central. The `bytecode-compliance` goal compares your compiled bytecode against both jars and fails on anything not present.
 
 | Artifact | What's inside |
 | --- | --- |
