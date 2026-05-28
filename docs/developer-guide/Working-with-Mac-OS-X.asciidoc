@@ -122,7 +122,7 @@ Java source is shared with the iOS target; no separate Mac-specific code is requ
 
 ==== Local Build
 
-To generate an Xcode project locally that you can open and run on _My Mac_:
+To generate an Xcode project locally that you can open and run on the Mac:
 
 [source,shell]
 ----
@@ -135,7 +135,7 @@ The output is written to:
 target/<finalName>-mac-source/<MainClass>.xcodeproj
 ----
 
-Open the project in Xcode, select the _My Mac_ destination, and press Run. The resulting `.app` is identical in shape to one produced by the cloud build server.
+Open the project in Xcode, select the Mac Catalyst destination, and press Run. The resulting `.app` is identical in shape to one produced by the cloud build server.
 
 ==== Cloud Build
 
