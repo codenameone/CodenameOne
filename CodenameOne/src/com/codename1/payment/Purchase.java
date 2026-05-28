@@ -71,11 +71,7 @@ public abstract class Purchase {
     /// race nor the field assignment need synchronization.
     private static final List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks =
             new ArrayList<SuccessCallback<Boolean>>();
-    /// `receiptStore` is set and queried from off-EDT callers (the
-    /// `#subscribe(java.lang.String)` family and `#getReceiptStore()`
-    /// have no thread contract), hence `volatile` for safe
-    /// publication.
-    private volatile ReceiptStore receiptStore;
+    private ReceiptStore receiptStore;
     private List<Receipt> receipts;
     private Date receiptsRefreshTime;
 
@@ -151,6 +147,7 @@ public abstract class Purchase {
         if (!d.isEdt()) {
             final List<Receipt>[] out = new List[]{null};
             d.callSeriallyAndWait(new Runnable() {
+                @Override
                 public void run() {
                     out[0] = getReceipts();
                 }
@@ -466,6 +463,7 @@ public abstract class Purchase {
         if (!d.isEdt()) {
             final List<Receipt>[] out = new List[]{null};
             d.callSeriallyAndWait(new Runnable() {
+                @Override
                 public void run() {
                     out[0] = getPendingPurchases();
                 }
@@ -497,6 +495,7 @@ public abstract class Purchase {
     private void addPendingPurchase(final Receipt receipt) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     addPendingPurchase(receipt);
                 }
@@ -551,6 +550,7 @@ public abstract class Purchase {
         }
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     recordProcessedTransactionId(txId);
                 }
@@ -642,6 +642,7 @@ public abstract class Purchase {
     public final void synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     synchronizeReceipts(ifOlderThanMs, callback);
                 }
@@ -685,6 +686,7 @@ public abstract class Purchase {
     private void onSubmitReceiptComplete(final Receipt receipt, final Boolean submitSucceeded) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     onSubmitReceiptComplete(receipt, submitSucceeded);
                 }
@@ -719,6 +721,7 @@ public abstract class Purchase {
     private void onLoadReceiptsComplete(final Boolean fetchSucceeded) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     onLoadReceiptsComplete(fetchSucceeded);
                 }
@@ -741,6 +744,7 @@ public abstract class Purchase {
     private void postReceipt(final Receipt r) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     postReceipt(r);
                 }
@@ -807,6 +811,7 @@ public abstract class Purchase {
                 // re-dispatch state mutations to the EDT.
                 if (!Display.getInstance().isEdt()) {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             onSucess(value);
                         }
