@@ -182,6 +182,28 @@ jobs:
           key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
 
+      - name: Force GL backend for hellocodenameone
+        # IPhoneBuilder defaults ios.metal to true. The GL job exists to
+        # exercise the legacy OpenGL ES 2 path, so pin the hint to false
+        # explicitly. Mirror of the Metal-enabling step in build-ios-metal.
+        run: |
+          set -euo pipefail
+          SETTINGS=scripts/hellocodenameone/common/codenameone_settings.properties
+          if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
+            sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=false|' "$SETTINGS"
+          else
+            awk '
+              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
+                print
+                print "codename1.arg.ios.metal=false"
+                next
+              }
+              { print }
+            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+          fi
+          echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
+          grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
+
       - name: Build sample iOS app and compile workspace
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
