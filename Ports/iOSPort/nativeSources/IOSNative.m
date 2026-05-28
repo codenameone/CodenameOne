@@ -32,6 +32,7 @@
 #import "CN1Metalcompat.h"
 #endif
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
@@ -1540,18 +1541,40 @@ void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_T
 #if TARGET_OS_MACCATALYST
     if (@available(iOS 13.0, *)) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            // Step 1: trait-collection override. This propagates UIUserInterfaceStyle
+            // through UIKit descendants. It does NOT, by itself, redraw the AppKit
+            // titlebar -- that's owned by NSWindow on the host side -- but it keeps
+            // UIKit-rendered content (popovers, contextMenus, alerts) consistent.
             UIUserInterfaceStyle style = dark ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight;
             for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
                 if (![scene isKindOfClass:[UIWindowScene class]]) continue;
                 UIWindowScene *ws = (UIWindowScene *)scene;
                 for (UIWindow *w in ws.windows) {
-                    // Setting the window override propagates to UIKit
-                    // descendants. UINSSceneViewController bridges the
-                    // trait to the AppKit-side NSWindow, which redraws
-                    // the titlebar + traffic lights in the requested
-                    // appearance.
                     w.overrideUserInterfaceStyle = style;
                 }
+            }
+
+            // Step 2: bridge into AppKit and set NSWindow.appearance. The
+            // titlebar + traffic lights are drawn by the host NSWindow on
+            // the AppKit side, which UIKit's overrideUserInterfaceStyle
+            // does NOT reach. AppKit isn't linked into a Catalyst app, so
+            // we have to look up NSApplication / NSAppearance dynamically
+            // through the Objective-C runtime.
+            Class nsAppClass = NSClassFromString(@"NSApplication");
+            Class nsAppearanceClass = NSClassFromString(@"NSAppearance");
+            if (nsAppClass == nil || nsAppearanceClass == nil) {
+                return;
+            }
+            id sharedApp = [nsAppClass performSelector:@selector(sharedApplication)];
+            if (sharedApp == nil) return;
+            NSArray *nsWindows = [sharedApp performSelector:@selector(windows)];
+            if (nsWindows == nil) return;
+            NSString *appearanceName = dark ? @"NSAppearanceNameDarkAqua" : @"NSAppearanceNameAqua";
+            id appearance = ((id (*)(id, SEL, id))objc_msgSend)(nsAppearanceClass, @selector(appearanceNamed:), appearanceName);
+            if (appearance == nil) return;
+            for (id nsWindow in nsWindows) {
+                if (![nsWindow respondsToSelector:@selector(setAppearance:)]) continue;
+                ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setAppearance:), appearance);
             }
         });
     }
@@ -6162,7 +6185,20 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
                 }
 #ifdef __IPHONE_13_0
                 if (@available(iOS 13.0, *)) {
+                    // afterScreenUpdates:YES waits for the next screen
+                    // refresh before snapshotting. On Mac Catalyst CI
+                    // (headless macos-15) the refresh never fires, so
+                    // the completion handler never runs and the wait
+                    // below times out -- yielding a black body. Use NO
+                    // on Catalyst: the page is already loaded + DOM is
+                    // queried before this point (BrowserComponentScreen-
+                    // shotTest waits for onLoad + a JS round-trip), so
+                    // the current frame already has the rendered HTML.
+#if TARGET_OS_MACCATALYST
+                    config.afterScreenUpdates = NO;
+#else
                     config.afterScreenUpdates = YES;
+#endif
                 }
 #endif
                 __block UIImage *snapshotImage = nil;
