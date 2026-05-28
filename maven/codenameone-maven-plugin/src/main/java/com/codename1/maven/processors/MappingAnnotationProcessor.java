@@ -131,15 +131,44 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         for (FieldInfo f : cls.getFields()) {
             if (f.isStatic()) continue;
             if (f.getName().startsWith("this$")) continue; // inner-class outer ref
+            boolean useAccessor = false;
+            String getterName = null;
+            String setterName = null;
             if (!isRecord && !f.isPublic()) {
-                // POJO requires public fields; records have private final
-                // component fields and we walk them all (the accessor
-                // methods carry the same names).
-                continue;
+                // POJO with non-public field: try the JavaBeans path. A
+                // matching `getX()` (or `isX()` for booleans) plus a
+                // `setX(FieldType)` on the same class promotes the field
+                // to a first-class @Mapped target. Property / ListProperty
+                // fields only need the getter -- the field itself is not
+                // replaced, only its inner value mutated through .set(...) /
+                // .add(...).
+                PropertyTypeKind probeKind = PropertyTypeKind.of(f);
+                String getter = findGetter(cls, f, probeKind);
+                if (getter == null) {
+                    ctx.getLog().debug("cn1: @Mapped skipping private field "
+                            + f.getName() + " on " + cls.getBinaryName()
+                            + " (no matching getter/setter)");
+                    continue;
+                }
+                boolean needsSetter = !(probeKind.kind == PropertyTypeKind.Kind.PROPERTY
+                        || probeKind.kind == PropertyTypeKind.Kind.LIST_PROPERTY);
+                String setter = needsSetter ? findSetter(cls, f) : null;
+                if (needsSetter && setter == null) {
+                    ctx.getLog().debug("cn1: @Mapped skipping private field "
+                            + f.getName() + " on " + cls.getBinaryName()
+                            + " (no matching getter/setter)");
+                    continue;
+                }
+                useAccessor = true;
+                getterName = getter;
+                setterName = setter;
             }
             MappedField mf = new MappedField();
             mf.name = f.getName();
             mf.kind = PropertyTypeKind.of(f);
+            mf.useAccessor = useAccessor;
+            mf.getterName = getterName;
+            mf.setterName = setterName;
             if (isRecord) {
                 if (mf.kind.kind == PropertyTypeKind.Kind.PROPERTY
                         || mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
@@ -224,18 +253,26 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // ---------------------------------------------------------------
 
     /// Returns the Java expression that reads the field's current value
-    /// from the runtime instance `o`. POJOs use direct field access
-    /// (`o.name`); records use the synthesised accessor (`o.name()`).
+    /// from the runtime instance `o`. Records use the synthesised accessor
+    /// (`o.name()`); JavaBeans-style POJOs use their public getter
+    /// (`o.getName()` / `o.isFlag()`); plain POJOs use direct field access
+    /// (`o.name`).
     private static String readExpr(MappedField f, boolean isRecord) {
-        return isRecord ? "o." + f.name + "()" : "o." + f.name;
+        if (isRecord) return "o." + f.name + "()";
+        if (f.useAccessor) return "o." + f.getterName + "()";
+        return "o." + f.name;
     }
 
-    /// Returns the Java assignment target used to store a deserialised
-    /// value. POJOs write the field directly (`o.name`); records can't
-    /// mutate after construction, so we accumulate in a local of the
-    /// form `_name` and later pass them to the canonical constructor.
-    private static String writeTarget(MappedField f, boolean isRecord) {
-        return isRecord ? "_" + f.name : "o." + f.name;
+    /// Returns a full Java statement (terminated with `;`) that writes
+    /// `rhsExpr` into the field for the runtime instance `o`. Records
+    /// can't mutate after construction, so we accumulate in a local of
+    /// the form `_name` for later canonical-constructor invocation;
+    /// JavaBeans POJOs route through `o.setName(rhsExpr)`; plain POJOs
+    /// assign the field directly.
+    private static String writeStmt(MappedField f, boolean isRecord, String rhsExpr) {
+        if (isRecord) return "_" + f.name + " = " + rhsExpr + ";";
+        if (f.useAccessor) return "o." + f.setterName + "(" + rhsExpr + ");";
+        return "o." + f.name + " = " + rhsExpr + ";";
     }
 
     /// The literal Java initializer for a freshly-declared local of the
@@ -521,43 +558,42 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
     private static void emitFieldFromMap(StringBuilder sb, MappedField f, boolean isRecord) {
         String key = "\"" + escape(f.jsonName) + "\"";
-        String target = writeTarget(f, isRecord);
         sb.append("        {\n");
         sb.append("            Object _v = m.get(").append(key).append(");\n");
         sb.append("            if (_v != null) {\n");
         switch (f.kind.kind) {
             case STRING:
-                sb.append("                ").append(target).append(" = _v.toString();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "_v.toString()")).append("\n");
                 break;
             case INT:
-                sb.append("                ").append(target).append(" = ((Number) _v).intValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).intValue()")).append("\n");
                 break;
             case LONG:
-                sb.append("                ").append(target).append(" = ((Number) _v).longValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).longValue()")).append("\n");
                 break;
             case SHORT:
-                sb.append("                ").append(target).append(" = ((Number) _v).shortValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).shortValue()")).append("\n");
                 break;
             case BYTE:
-                sb.append("                ").append(target).append(" = ((Number) _v).byteValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).byteValue()")).append("\n");
                 break;
             case CHAR:
-                sb.append("                ").append(target).append(" = _v.toString().length() == 0 ? '\\0' : _v.toString().charAt(0);\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "_v.toString().length() == 0 ? '\\0' : _v.toString().charAt(0)")).append("\n");
                 break;
             case DOUBLE:
-                sb.append("                ").append(target).append(" = ((Number) _v).doubleValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).doubleValue()")).append("\n");
                 break;
             case FLOAT:
-                sb.append("                ").append(target).append(" = ((Number) _v).floatValue();\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "((Number) _v).floatValue()")).append("\n");
                 break;
             case BOOLEAN:
-                sb.append("                ").append(target).append(" = (_v instanceof Boolean) ? ((Boolean) _v).booleanValue() : Boolean.parseBoolean(_v.toString());\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "(_v instanceof Boolean) ? ((Boolean) _v).booleanValue() : Boolean.parseBoolean(_v.toString())")).append("\n");
                 break;
             case DATE:
-                sb.append("                ").append(target).append(" = new java.util.Date(((Number) _v).longValue());\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "new java.util.Date(((Number) _v).longValue())")).append("\n");
                 break;
             case BYTE_ARRAY:
-                sb.append("                ").append(target).append(" = com.codename1.util.Base64.decode(_v.toString().getBytes());\n");
+                sb.append("                ").append(writeStmt(f, isRecord, "com.codename1.util.Base64.decode(_v.toString().getBytes())")).append("\n");
                 break;
             case PROPERTY:
                 emitPropertySetFromJsonValue(sb, f, isRecord);
@@ -565,7 +601,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case REFERENCE:
                 sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
                 sb.append("                if (_nm != null && _v instanceof java.util.Map) {\n");
-                sb.append("                    ").append(target).append(" = (").append(f.kind.binaryName).append(") _nm.fromMap((java.util.Map) _v);\n");
+                sb.append("                    ").append(writeStmt(f, isRecord, "(" + f.kind.binaryName + ") _nm.fromMap((java.util.Map) _v)")).append("\n");
                 sb.append("                }\n");
                 break;
             case LIST: case LIST_PROPERTY:
@@ -578,7 +614,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<").append(f.kind.elementBinaryName).append("> _l = new java.util.ArrayList<").append(f.kind.elementBinaryName).append(">();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { _l.add((").append(f.kind.elementBinaryName).append(") _e); }\n");
-                        sb.append("                    ").append(target).append(" = _l;\n");
+                        sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
                     } else {
                         sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add((").append(f.kind.elementBinaryName).append(") _e); }\n");
@@ -587,7 +623,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<java.util.Date> _l = new java.util.ArrayList<java.util.Date>();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { _l.add(_e == null ? null : new java.util.Date(((Number) _e).longValue())); }\n");
-                        sb.append("                    ").append(target).append(" = _l;\n");
+                        sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
                     } else {
                         sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add(_e == null ? null : new java.util.Date(((Number) _e).longValue())); }\n");
@@ -599,7 +635,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                         sb.append("                    for (Object _e : (java.util.List) _v) {\n");
                         sb.append("                        if (_nm != null && _e instanceof java.util.Map) { _l.add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
                         sb.append("                    }\n");
-                        sb.append("                    ").append(target).append(" = _l;\n");
+                        sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
                     } else {
                         sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) {\n");
@@ -719,7 +755,6 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     }
 
     private static void emitFieldFromXml(StringBuilder sb, MappedField f, boolean isRecord) {
-        String target = writeTarget(f, isRecord);
         if (f.xmlAttribute) {
             sb.append("        {\n");
             sb.append("            String _s = root.getAttribute(\"").append(escape(f.xmlName)).append("\");\n");
@@ -738,10 +773,12 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                com.codename1.xml.Element _ch = (com.codename1.xml.Element) _kids.elementAt(_i);\n");
                 emitListElementFromXml(sb, f, "_ch", "_l");
                 sb.append("            }\n");
-                sb.append("            ").append(target).append(" = _l;\n");
+                sb.append("            ").append(writeStmt(f, isRecord, "_l")).append("\n");
                 break;
             case LIST_PROPERTY:
-                // Rejected upstream for records; always reads `o.name`.
+                // Rejected upstream for records; reads through `readExpr`
+                // which yields `o.name` for POJO public fields or
+                // `o.getName()` for JavaBeans accessor POJOs.
                 sb.append("            ").append(readExpr(f, isRecord)).append(".clear();\n");
                 sb.append("            for (int _i = 0; _i < _kids.size(); _i++) {\n");
                 sb.append("                com.codename1.xml.Element _ch = (com.codename1.xml.Element) _kids.elementAt(_i);\n");
@@ -753,7 +790,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                com.codename1.xml.Element _e = (com.codename1.xml.Element) _kids.elementAt(0);\n");
                 if (f.kind.kind == PropertyTypeKind.Kind.REFERENCE) {
                     sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
-                    sb.append("                if (_nm != null) ").append(target).append(" = (").append(f.kind.binaryName).append(") _nm.readXml(_e);\n");
+                    sb.append("                if (_nm != null) ").append(writeStmt(f, isRecord, "(" + f.kind.binaryName + ") _nm.readXml(_e)")).append("\n");
                 } else {
                     sb.append("                String _s = textOf(_e);\n");
                     sb.append("                if (_s != null) {\n");
@@ -823,33 +860,32 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     }
 
     private static void emitScalarFromString(StringBuilder sb, MappedField f, String src, boolean isRecord) {
-        String target = writeTarget(f, isRecord);
         // PROPERTY is rejected for records, but `read` keeps the helper safe
         // if it ever reaches the record path.
         String read = readExpr(f, isRecord);
         switch (f.kind.kind) {
             case STRING:
-                sb.append("                ").append(target).append(" = ").append(src).append(";\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, src)).append("\n"); break;
             case INT:
-                sb.append("                ").append(target).append(" = Integer.parseInt(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Integer.parseInt(" + src + ")")).append("\n"); break;
             case LONG:
-                sb.append("                ").append(target).append(" = Long.parseLong(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Long.parseLong(" + src + ")")).append("\n"); break;
             case SHORT:
-                sb.append("                ").append(target).append(" = Short.parseShort(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Short.parseShort(" + src + ")")).append("\n"); break;
             case BYTE:
-                sb.append("                ").append(target).append(" = Byte.parseByte(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Byte.parseByte(" + src + ")")).append("\n"); break;
             case CHAR:
-                sb.append("                ").append(target).append(" = ").append(src).append(".length() == 0 ? '\\0' : ").append(src).append(".charAt(0);\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, src + ".length() == 0 ? '\\0' : " + src + ".charAt(0)")).append("\n"); break;
             case DOUBLE:
-                sb.append("                ").append(target).append(" = Double.parseDouble(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Double.parseDouble(" + src + ")")).append("\n"); break;
             case FLOAT:
-                sb.append("                ").append(target).append(" = Float.parseFloat(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Float.parseFloat(" + src + ")")).append("\n"); break;
             case BOOLEAN:
-                sb.append("                ").append(target).append(" = Boolean.parseBoolean(").append(src).append(");\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "Boolean.parseBoolean(" + src + ")")).append("\n"); break;
             case DATE:
-                sb.append("                ").append(target).append(" = new java.util.Date(Long.parseLong(").append(src).append("));\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "new java.util.Date(Long.parseLong(" + src + "))")).append("\n"); break;
             case BYTE_ARRAY:
-                sb.append("                ").append(target).append(" = com.codename1.util.Base64.decode(").append(src).append(".getBytes());\n"); break;
+                sb.append("                ").append(writeStmt(f, isRecord, "com.codename1.util.Base64.decode(" + src + ".getBytes())")).append("\n"); break;
             case PROPERTY: {
                 String elem = f.kind.elementBinaryName;
                 if ("java.lang.String".equals(elem)) {
@@ -911,6 +947,88 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         return false;
     }
 
+    /// Finds a public, non-static, no-arg instance accessor returning the
+    /// field's declared type. Tries the JavaBeans variant first
+    /// (`getFirstName` for field `firstName`, `isActive` for boolean field
+    /// `active`), then the literal-prefix variant (`getURL` when the
+    /// field is `URL`). Returns the method name or null when no accessor
+    /// matches.
+    private static String findGetter(AnnotatedClass cls, FieldInfo f, PropertyTypeKind kind) {
+        String fieldName = f.getName();
+        String fieldDesc = f.getDescriptor();
+        boolean isBool = "Z".equals(fieldDesc) || "Ljava/lang/Boolean;".equals(fieldDesc);
+        String beanCap = capitalizeForBean(fieldName);
+        // Literal-prefix variant -- if `firstName` ⇒ already same as
+        // beanCap; for `URL` the literal is `URL` itself (no extra cap).
+        String[] capCandidates;
+        if (fieldName.equals(beanCap)) {
+            capCandidates = new String[] { beanCap };
+        } else {
+            capCandidates = new String[] { beanCap, fieldName };
+        }
+        for (String cap : capCandidates) {
+            if (isBool) {
+                String name = "is" + cap;
+                if (hasInstanceMethod(cls, name, "()" + fieldDesc)) return name;
+            }
+            String getter = "get" + cap;
+            if (hasInstanceMethod(cls, getter, "()" + fieldDesc)) return getter;
+        }
+        return null;
+    }
+
+    /// Finds a public, non-static setter `setX(FieldType)` on `cls`. The
+    /// return type is intentionally ignored (be lenient: builders that
+    /// return `this` count). Returns the method name or null when no
+    /// setter matches.
+    private static String findSetter(AnnotatedClass cls, FieldInfo f) {
+        String fieldName = f.getName();
+        String fieldDesc = f.getDescriptor();
+        String beanCap = capitalizeForBean(fieldName);
+        String[] capCandidates;
+        if (fieldName.equals(beanCap)) {
+            capCandidates = new String[] { beanCap };
+        } else {
+            capCandidates = new String[] { beanCap, fieldName };
+        }
+        String paramPrefix = "(" + fieldDesc + ")";
+        for (String cap : capCandidates) {
+            String name = "set" + cap;
+            for (MethodInfo m : cls.getMethods()) {
+                if (!name.equals(m.getName())) continue;
+                if (!m.isPublic() || m.isStatic() || m.isAbstract()) continue;
+                String d = m.getDescriptor();
+                if (d != null && d.startsWith(paramPrefix)) return name;
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasInstanceMethod(AnnotatedClass cls, String name, String descriptor) {
+        for (MethodInfo m : cls.getMethods()) {
+            if (!name.equals(m.getName())) continue;
+            if (!m.isPublic() || m.isStatic() || m.isAbstract()) continue;
+            if (descriptor.equals(m.getDescriptor())) return true;
+        }
+        return false;
+    }
+
+    /// JavaBeans capitalisation: lower-case first letter goes upper
+    /// (`firstName` ⇒ `FirstName`). When the first two letters are both
+    /// upper-case (e.g. `URL`) the name is left as-is so the literal
+    /// `getURL` is the primary candidate; the caller probes both.
+    private static String capitalizeForBean(String name) {
+        if (name == null || name.length() == 0) return name;
+        if (name.length() >= 2
+                && Character.isUpperCase(name.charAt(0))
+                && Character.isUpperCase(name.charAt(1))) {
+            // Already all-caps prefix -- leave alone (Beans Introspector
+            // does the same for `URL` → `URL`).
+            return name;
+        }
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
     private static String simpleName(String binary) {
         int dot = binary.lastIndexOf('.');
         return dot < 0 ? binary : binary.substring(dot + 1);
@@ -958,5 +1076,20 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         boolean xmlAttribute;
         boolean includeInJson;
         boolean includeInXml;
+        /// `true` when this POJO field is private but a public
+        /// `getX()`/`setX(...)` pair (or `isX()` for booleans) was found
+        /// on the same class. Reads route through the getter, writes
+        /// route through the setter. Records never set this flag --
+        /// records always use the synthesised component accessor and
+        /// the canonical constructor for writes.
+        boolean useAccessor;
+        /// `getFirstName` / `isActive` -- only populated when `useAccessor`
+        /// is `true`.
+        String getterName;
+        /// `setFirstName` -- only populated when `useAccessor` is `true`
+        /// AND the field is not a `Property` / `ListProperty` (those
+        /// mutate through their own `.set(...)` / `.add(...)` API; the
+        /// field reference itself is not replaced).
+        String setterName;
     }
 }
