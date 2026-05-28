@@ -8812,32 +8812,231 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void popClip(Object graphics) {
         checkEDT();
         Graphics2D g2d = getGraphics(graphics);
-        
+
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
+            if (g.clipStack.isEmpty()) {
+                throw new IllegalStateException(
+                        "popClip() called with no matching pushClip(). " +
+                        "The clip stack is empty -- popping it would corrupt the graphics state. " +
+                        "This is detected only by the simulator; on devices the same mistake can " +
+                        "manifest as drift or crashes after many frames (see issue #5058).");
+            }
             Shape oldClip = g.clipStack.pop();
-            
             g2d.setClip(oldClip);
         } else {
             synchronized(clipStack) {
-                if (clipStack.containsKey(graphics)) {
-                    Shape oldClip = clipStack.get(graphics).pop();
-                    if (oldClip != null) {
-                        g2d.setClip(oldClip);
-                    }
+                LinkedList<Shape> stack = clipStack.get(graphics);
+                if (stack == null || stack.isEmpty()) {
+                    throw new IllegalStateException(
+                            "popClip() called with no matching pushClip(). " +
+                            "The clip stack is empty -- popping it would corrupt the graphics state. " +
+                            "This is detected only by the simulator; on devices the same mistake can " +
+                            "manifest as drift or crashes after many frames (see issue #5058).");
+                }
+                Shape oldClip = stack.pop();
+                if (oldClip != null) {
+                    g2d.setClip(oldClip);
                 }
             }
         }
-        
     }
 
     private final Map<Object,LinkedList<Shape>> clipStack = new HashMap<Object,LinkedList<Shape>>();
-    
+
     @Override
     public void disposeGraphics(Object graphics) {
         synchronized(clipStack) {
             clipStack.remove(graphics);
         }
+        synchronized(paintScopes) {
+            paintScopes.remove(graphics);
+        }
+    }
+
+    /// Snapshot of Graphics2D state taken when a user paint scope begins.
+    /// Used by the simulator to detect components/painters that leak state
+    /// (clip push without pop, dangling translate, alpha change, etc.).
+    private static final class PaintScopeSnapshot {
+        final Object owner;
+        final int clipStackDepth;
+        final Shape clip;
+        final AffineTransform transform;
+        final java.awt.Color color;
+        final java.awt.Font font;
+        final java.awt.Composite composite;
+        PaintScopeSnapshot(Object owner, int clipStackDepth, Shape clip,
+                AffineTransform transform, java.awt.Color color,
+                java.awt.Font font, java.awt.Composite composite) {
+            this.owner = owner;
+            this.clipStackDepth = clipStackDepth;
+            this.clip = clip;
+            this.transform = transform;
+            this.color = color;
+            this.font = font;
+            this.composite = composite;
+        }
+    }
+
+    private final Map<Object,LinkedList<PaintScopeSnapshot>> paintScopes =
+            new HashMap<Object,LinkedList<PaintScopeSnapshot>>();
+
+    /// When true (default) the simulator validates that every user paint scope
+    /// (`Component.paint`, `Component.paintBackground`, `Painter.paint`,
+    /// `Form.paintGlass`, glass pane) leaves the Graphics in the same state it
+    /// found it. Set system property `cn1.disable.paint.scope.checks=true` to
+    /// turn the validation off (the begin/end hooks become no-ops).
+    private final boolean paintScopeChecksEnabled =
+            !Boolean.getBoolean("cn1.disable.paint.scope.checks");
+
+    private int clipStackDepth(Object graphics) {
+        if (graphics instanceof NativeScreenGraphics) {
+            return ((NativeScreenGraphics) graphics).clipStack.size();
+        }
+        synchronized (clipStack) {
+            LinkedList<Shape> stack = clipStack.get(graphics);
+            return stack == null ? 0 : stack.size();
+        }
+    }
+
+    private void trimClipStack(Object graphics, int targetDepth) {
+        if (graphics instanceof NativeScreenGraphics) {
+            LinkedList<Shape> stack = ((NativeScreenGraphics) graphics).clipStack;
+            while (stack.size() > targetDepth) {
+                stack.pop();
+            }
+        } else {
+            synchronized (clipStack) {
+                LinkedList<Shape> stack = clipStack.get(graphics);
+                if (stack != null) {
+                    while (stack.size() > targetDepth) {
+                        stack.pop();
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void beginPaintScope(Object graphics, Object owner) {
+        if (!paintScopeChecksEnabled) {
+            return;
+        }
+        Graphics2D g2d = getGraphics(graphics);
+        PaintScopeSnapshot snap = new PaintScopeSnapshot(
+                owner,
+                clipStackDepth(graphics),
+                g2d.getClip(),
+                new AffineTransform(g2d.getTransform()),
+                g2d.getColor(),
+                g2d.getFont(),
+                g2d.getComposite());
+        synchronized (paintScopes) {
+            LinkedList<PaintScopeSnapshot> stack = paintScopes.get(graphics);
+            if (stack == null) {
+                stack = new LinkedList<PaintScopeSnapshot>();
+                paintScopes.put(graphics, stack);
+            }
+            stack.push(snap);
+        }
+    }
+
+    @Override
+    public void endPaintScope(Object graphics, Object owner) {
+        if (!paintScopeChecksEnabled) {
+            return;
+        }
+        PaintScopeSnapshot snap;
+        synchronized (paintScopes) {
+            LinkedList<PaintScopeSnapshot> stack = paintScopes.get(graphics);
+            if (stack == null || stack.isEmpty()) {
+                Log.p("paint-scope: endPaintScope without matching begin for "
+                        + describe(owner));
+                return;
+            }
+            snap = stack.pop();
+        }
+        if (snap.owner != owner) {
+            Log.p("paint-scope: mismatched begin/end (begin=" + describe(snap.owner)
+                    + ", end=" + describe(owner) + ")");
+        }
+        Graphics2D g2d = getGraphics(graphics);
+        StringBuilder diffs = null;
+
+        int depthNow = clipStackDepth(graphics);
+        if (depthNow != snap.clipStackDepth) {
+            diffs = appendDiff(diffs, "clip stack depth " + snap.clipStackDepth
+                    + " -> " + depthNow + " (unmatched pushClip/popClip)");
+            trimClipStack(graphics, snap.clipStackDepth);
+        }
+        // Transform must be restored before the clip comparison: getClip()
+        // returns the clip in current user-space, so a different transform
+        // makes the same device-space clip look different.
+        if (!g2d.getTransform().equals(snap.transform)) {
+            diffs = appendDiff(diffs, "transform not restored " + snap.transform
+                    + " -> " + g2d.getTransform());
+            g2d.setTransform(snap.transform);
+        }
+        if (!sameShape(g2d.getClip(), snap.clip)) {
+            diffs = appendDiff(diffs, "clip rect not restored");
+            g2d.setClip(snap.clip);
+        }
+        if (!equalsNullSafe(g2d.getColor(), snap.color)) {
+            diffs = appendDiff(diffs, "color not restored " + snap.color
+                    + " -> " + g2d.getColor());
+            g2d.setColor(snap.color);
+        }
+        if (!equalsNullSafe(g2d.getFont(), snap.font)) {
+            diffs = appendDiff(diffs, "font not restored");
+            g2d.setFont(snap.font);
+        }
+        if (!equalsNullSafe(g2d.getComposite(), snap.composite)) {
+            diffs = appendDiff(diffs, "composite/alpha not restored");
+            g2d.setComposite(snap.composite);
+        }
+
+        if (diffs != null) {
+            Log.p("paint-scope: " + describe(snap.owner)
+                    + " did not restore Graphics state: " + diffs
+                    + ". State has been auto-restored for the simulator; on device "
+                    + "this would persist into the next paint (see issue #5058).");
+        }
+    }
+
+    private static StringBuilder appendDiff(StringBuilder b, String diff) {
+        if (b == null) {
+            return new StringBuilder(diff);
+        }
+        return b.append("; ").append(diff);
+    }
+
+    private static boolean equalsNullSafe(Object a, Object b) {
+        return a == null ? b == null : a.equals(b);
+    }
+
+    private static boolean sameShape(Shape a, Shape b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        java.awt.Rectangle ra = a.getBounds();
+        java.awt.Rectangle rb = b.getBounds();
+        return ra.equals(rb);
+    }
+
+    private static String describe(Object owner) {
+        if (owner == null) {
+            return "<null>";
+        }
+        if (owner instanceof com.codename1.ui.Component) {
+            com.codename1.ui.Component c = (com.codename1.ui.Component) owner;
+            String name = c.getName();
+            return name != null ? c.getClass().getName() + "[" + name + "]"
+                    : c.getClass().getName();
+        }
+        return owner.getClass().getName();
     }
     
     
