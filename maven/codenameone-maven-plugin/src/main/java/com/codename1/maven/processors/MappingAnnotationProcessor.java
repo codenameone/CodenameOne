@@ -98,12 +98,13 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
         if (cls.isSynthetic()) return;
         if (cls.getClassAnnotation(MAPPED_DESC) == null) return;
-        if (cls.isAbstract() || cls.isInterface()) {
+        boolean isRecord = cls.isRecord();
+        if (!isRecord && (cls.isAbstract() || cls.isInterface())) {
             ctx.error(cls, "@Mapped requires a concrete class; "
                     + cls.getBinaryName() + " is abstract or an interface");
             return;
         }
-        if (!hasPublicNoArgConstructor(cls)) {
+        if (!isRecord && !hasPublicNoArgConstructor(cls)) {
             ctx.error(cls, "@Mapped class " + cls.getBinaryName()
                     + " must declare a public no-arg constructor for fromJson / fromXml");
             return;
@@ -117,6 +118,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         mc.mapperBinaryName = (mc.packageName.length() == 0)
                 ? mc.mapperSimpleName
                 : mc.packageName + "." + mc.mapperSimpleName;
+        mc.isRecord = isRecord;
 
         AnnotationValues xmlRoot = cls.getClassAnnotation(XML_ROOT_DESC);
         if (xmlRoot != null) {
@@ -129,13 +131,24 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         for (FieldInfo f : cls.getFields()) {
             if (f.isStatic()) continue;
             if (f.getName().startsWith("this$")) continue; // inner-class outer ref
-            if (!f.isPublic()) {
-                // Skip silently. JavaBeans-style accessors are a v2 enhancement.
+            if (!isRecord && !f.isPublic()) {
+                // POJO requires public fields; records have private final
+                // component fields and we walk them all (the accessor
+                // methods carry the same names).
                 continue;
             }
             MappedField mf = new MappedField();
             mf.name = f.getName();
             mf.kind = PropertyTypeKind.of(f);
+            if (isRecord) {
+                if (mf.kind.kind == PropertyTypeKind.Kind.PROPERTY
+                        || mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
+                    ctx.error(cls, "@Mapped record " + mc.binaryName
+                            + " cannot use Property / ListProperty for component "
+                            + mf.name + " -- records are immutable");
+                    continue;
+                }
+            }
             mf.jsonName = mf.name;
             mf.xmlName = mf.name;
             mf.xmlAttribute = false;
@@ -210,6 +223,64 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // Source generation
     // ---------------------------------------------------------------
 
+    /// Returns the Java expression that reads the field's current value
+    /// from the runtime instance `o`. POJOs use direct field access
+    /// (`o.name`); records use the synthesised accessor (`o.name()`).
+    private static String readExpr(MappedField f, boolean isRecord) {
+        return isRecord ? "o." + f.name + "()" : "o." + f.name;
+    }
+
+    /// Returns the Java assignment target used to store a deserialised
+    /// value. POJOs write the field directly (`o.name`); records can't
+    /// mutate after construction, so we accumulate in a local of the
+    /// form `_name` and later pass them to the canonical constructor.
+    private static String writeTarget(MappedField f, boolean isRecord) {
+        return isRecord ? "_" + f.name : "o." + f.name;
+    }
+
+    /// The literal Java initializer for a freshly-declared local of the
+    /// given kind -- used when seeding the per-component locals that
+    /// feed a record's canonical constructor.
+    private static String defaultLiteral(PropertyTypeKind k) {
+        switch (k.kind) {
+            case INT: case SHORT: case BYTE: case CHAR: return "0";
+            case LONG: return "0L";
+            case DOUBLE: return "0.0";
+            case FLOAT: return "0.0f";
+            case BOOLEAN: return "false";
+            default: return "null";
+        }
+    }
+
+    /// The Java type literal used to declare a local variable carrying
+    /// the field's value (records-only: the locals are later fed to the
+    /// canonical constructor in declaration order).
+    private static String fieldType(MappedField f) {
+        switch (f.kind.kind) {
+            case STRING:     return "String";
+            case INT:        return "int";
+            case LONG:       return "long";
+            case SHORT:      return "short";
+            case BYTE:       return "byte";
+            case CHAR:       return "char";
+            case DOUBLE:     return "double";
+            case FLOAT:      return "float";
+            case BOOLEAN:    return "boolean";
+            case DATE:       return "java.util.Date";
+            case BYTE_ARRAY: return "byte[]";
+            case REFERENCE:  return f.kind.binaryName;
+            case LIST:       return "java.util.List<" + f.kind.elementBinaryName + ">";
+            // PROPERTY / LIST_PROPERTY are rejected upstream for records;
+            // include a safe fallback so the helper can't NPE if it's ever
+            // reached from a non-record path.
+            case PROPERTY:
+            case LIST_PROPERTY:
+                return f.kind.binaryName;
+            default:
+                return "Object";
+        }
+    }
+
     private static String generateMapperSource(MappedClass mc) {
         StringBuilder sb = new StringBuilder(2048);
         if (mc.packageName.length() > 0) {
@@ -241,27 +312,48 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("        return \"").append(escape(mc.xmlRootName)).append("\";\n");
         sb.append("    }\n\n");
 
-        // toMap()
+        boolean isRecord = mc.isRecord;
+
+        // toMap() -- reads are identical in shape regardless of record-ness;
+        // `readExpr` picks between `o.name` (POJO) and `o.name()` (record).
         sb.append("    public java.util.Map<String, Object> toMap(").append(mc.binaryName).append(" o) {\n");
         sb.append("        java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<String, Object>();\n");
         sb.append("        if (o == null) return m;\n");
         for (MappedField f : mc.fields) {
             if (!f.includeInJson) continue;
-            emitFieldToMap(sb, f);
+            emitFieldToMap(sb, f, isRecord);
         }
         sb.append("        return m;\n");
         sb.append("    }\n\n");
 
-        // fromMap()
+        // fromMap() -- POJO mutates an instance in-place; record accumulates
+        // per-component locals and feeds them to the canonical constructor.
         sb.append("    public ").append(mc.binaryName)
                 .append(" fromMap(java.util.Map<String, Object> m) {\n");
-        sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
-        sb.append("        if (m == null) return o;\n");
-        for (MappedField f : mc.fields) {
-            if (!f.includeInJson) continue;
-            emitFieldFromMap(sb, f);
+        if (isRecord) {
+            for (MappedField f : mc.fields) {
+                sb.append("        ").append(fieldType(f)).append(" _")
+                        .append(f.name).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
+            }
+            sb.append("        if (m == null) return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+            for (MappedField f : mc.fields) {
+                if (!f.includeInJson) continue;
+                emitFieldFromMap(sb, f, true);
+            }
+            sb.append("        return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+        } else {
+            sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
+            sb.append("        if (m == null) return o;\n");
+            for (MappedField f : mc.fields) {
+                if (!f.includeInJson) continue;
+                emitFieldFromMap(sb, f, false);
+            }
+            sb.append("        return o;\n");
         }
-        sb.append("        return o;\n");
         sb.append("    }\n\n");
 
         // writeXml()
@@ -270,20 +362,37 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("        if (o == null) return;\n");
         for (MappedField f : mc.fields) {
             if (!f.includeInXml) continue;
-            emitFieldToXml(sb, f);
+            emitFieldToXml(sb, f, isRecord);
         }
         sb.append("    }\n\n");
 
-        // readXml()
+        // readXml() -- same fork as fromMap.
         sb.append("    public ").append(mc.binaryName)
                 .append(" readXml(com.codename1.xml.Element root) {\n");
-        sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
-        sb.append("        if (root == null) return o;\n");
-        for (MappedField f : mc.fields) {
-            if (!f.includeInXml) continue;
-            emitFieldFromXml(sb, f);
+        if (isRecord) {
+            for (MappedField f : mc.fields) {
+                sb.append("        ").append(fieldType(f)).append(" _")
+                        .append(f.name).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
+            }
+            sb.append("        if (root == null) return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+            for (MappedField f : mc.fields) {
+                if (!f.includeInXml) continue;
+                emitFieldFromXml(sb, f, true);
+            }
+            sb.append("        return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+        } else {
+            sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
+            sb.append("        if (root == null) return o;\n");
+            for (MappedField f : mc.fields) {
+                if (!f.includeInXml) continue;
+                emitFieldFromXml(sb, f, false);
+            }
+            sb.append("        return o;\n");
         }
-        sb.append("        return o;\n");
         sb.append("    }\n\n");
 
         // textOf helper -- inlined per-mapper to keep each generated class
@@ -301,6 +410,22 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// Appends `new pkg.Type(_a, _b, ...)` to `sb`, where the args are the
+    /// per-component locals declared at the top of a record `fromMap` /
+    /// `readXml`. Order tracks `mc.fields` which is the class-file
+    /// declaration order, identical to the canonical constructor's
+    /// parameter order.
+    private static void appendRecordCtorCall(StringBuilder sb, MappedClass mc) {
+        sb.append("new ").append(mc.binaryName).append("(");
+        boolean first = true;
+        for (MappedField f : mc.fields) {
+            if (!first) sb.append(", ");
+            sb.append("_").append(f.name);
+            first = false;
+        }
+        sb.append(")");
     }
 
     private static String generateBootstrapSource(Iterable<MappedClass> classes) {
@@ -333,31 +458,32 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // toMap field-emit helpers
     // ---------------------------------------------------------------
 
-    private static void emitFieldToMap(StringBuilder sb, MappedField f) {
+    private static void emitFieldToMap(StringBuilder sb, MappedField f, boolean isRecord) {
         String key = "\"" + escape(f.jsonName) + "\"";
+        String read = readExpr(f, isRecord);
         switch (f.kind.kind) {
             case STRING: case INT: case LONG: case SHORT: case BYTE: case CHAR:
             case DOUBLE: case FLOAT: case BOOLEAN:
-                sb.append("        m.put(").append(key).append(", o.").append(f.name).append(");\n");
+                sb.append("        m.put(").append(key).append(", ").append(read).append(");\n");
                 return;
             case DATE:
-                sb.append("        m.put(").append(key).append(", o.").append(f.name)
-                        .append(" == null ? null : Long.valueOf(o.").append(f.name).append(".getTime()));\n");
+                sb.append("        m.put(").append(key).append(", ").append(read)
+                        .append(" == null ? null : Long.valueOf(").append(read).append(".getTime()));\n");
                 return;
             case BYTE_ARRAY:
-                sb.append("        m.put(").append(key).append(", o.").append(f.name)
-                        .append(" == null ? null : com.codename1.util.Base64.encode(o.").append(f.name).append("));\n");
+                sb.append("        m.put(").append(key).append(", ").append(read)
+                        .append(" == null ? null : com.codename1.util.Base64.encode(").append(read).append("));\n");
                 return;
             case PROPERTY:
-                sb.append("        m.put(").append(key).append(", o.").append(f.name).append(".get());\n");
+                sb.append("        m.put(").append(key).append(", ").append(read).append(".get());\n");
                 return;
             case LIST: case LIST_PROPERTY:
                 sb.append("        {\n");
                 sb.append("            java.util.ArrayList<Object> _l = new java.util.ArrayList<Object>();\n");
                 if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
-                    sb.append("            java.util.List _src = o.").append(f.name).append(";\n");
+                    sb.append("            java.util.List _src = ").append(read).append(";\n");
                 } else {
-                    sb.append("            java.util.List _src = o.").append(f.name).append(".asList();\n");
+                    sb.append("            java.util.List _src = ").append(read).append(".asList();\n");
                 }
                 sb.append("            if (_src != null) {\n");
                 sb.append("                for (Object _e : _src) {\n");
@@ -376,7 +502,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 return;
             case REFERENCE:
                 sb.append("        {\n");
-                sb.append("            Object _v = o.").append(f.name).append(";\n");
+                sb.append("            Object _v = ").append(read).append(";\n");
                 sb.append("            if (_v == null) { m.put(").append(key).append(", null); }\n");
                 sb.append("            else {\n");
                 sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
@@ -393,73 +519,78 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // fromMap field-emit helpers
     // ---------------------------------------------------------------
 
-    private static void emitFieldFromMap(StringBuilder sb, MappedField f) {
+    private static void emitFieldFromMap(StringBuilder sb, MappedField f, boolean isRecord) {
         String key = "\"" + escape(f.jsonName) + "\"";
+        String target = writeTarget(f, isRecord);
         sb.append("        {\n");
         sb.append("            Object _v = m.get(").append(key).append(");\n");
         sb.append("            if (_v != null) {\n");
         switch (f.kind.kind) {
             case STRING:
-                sb.append("                o.").append(f.name).append(" = _v.toString();\n");
+                sb.append("                ").append(target).append(" = _v.toString();\n");
                 break;
             case INT:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).intValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).intValue();\n");
                 break;
             case LONG:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).longValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).longValue();\n");
                 break;
             case SHORT:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).shortValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).shortValue();\n");
                 break;
             case BYTE:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).byteValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).byteValue();\n");
                 break;
             case CHAR:
-                sb.append("                o.").append(f.name).append(" = _v.toString().length() == 0 ? '\\0' : _v.toString().charAt(0);\n");
+                sb.append("                ").append(target).append(" = _v.toString().length() == 0 ? '\\0' : _v.toString().charAt(0);\n");
                 break;
             case DOUBLE:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).doubleValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).doubleValue();\n");
                 break;
             case FLOAT:
-                sb.append("                o.").append(f.name).append(" = ((Number) _v).floatValue();\n");
+                sb.append("                ").append(target).append(" = ((Number) _v).floatValue();\n");
                 break;
             case BOOLEAN:
-                sb.append("                o.").append(f.name).append(" = (_v instanceof Boolean) ? ((Boolean) _v).booleanValue() : Boolean.parseBoolean(_v.toString());\n");
+                sb.append("                ").append(target).append(" = (_v instanceof Boolean) ? ((Boolean) _v).booleanValue() : Boolean.parseBoolean(_v.toString());\n");
                 break;
             case DATE:
-                sb.append("                o.").append(f.name).append(" = new java.util.Date(((Number) _v).longValue());\n");
+                sb.append("                ").append(target).append(" = new java.util.Date(((Number) _v).longValue());\n");
                 break;
             case BYTE_ARRAY:
-                sb.append("                o.").append(f.name).append(" = com.codename1.util.Base64.decode(_v.toString().getBytes());\n");
+                sb.append("                ").append(target).append(" = com.codename1.util.Base64.decode(_v.toString().getBytes());\n");
                 break;
             case PROPERTY:
-                emitPropertySetFromJsonValue(sb, f);
+                emitPropertySetFromJsonValue(sb, f, isRecord);
                 break;
             case REFERENCE:
                 sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
                 sb.append("                if (_nm != null && _v instanceof java.util.Map) {\n");
-                sb.append("                    o.").append(f.name).append(" = (").append(f.kind.binaryName).append(") _nm.fromMap((java.util.Map) _v);\n");
+                sb.append("                    ").append(target).append(" = (").append(f.kind.binaryName).append(") _nm.fromMap((java.util.Map) _v);\n");
                 sb.append("                }\n");
                 break;
             case LIST: case LIST_PROPERTY:
+                // LIST_PROPERTY mutates o.field.clear()/add(...) -- safe for
+                // POJO path only (records reject LIST_PROPERTY upstream). For
+                // a record's LIST we materialize a local _l and assign it to
+                // the per-component local that later feeds the canonical ctor.
                 sb.append("                if (_v instanceof java.util.List) {\n");
                 if (isScalarBinary(f.kind.elementBinaryName)) {
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<").append(f.kind.elementBinaryName).append("> _l = new java.util.ArrayList<").append(f.kind.elementBinaryName).append(">();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { _l.add((").append(f.kind.elementBinaryName).append(") _e); }\n");
-                        sb.append("                    o.").append(f.name).append(" = _l;\n");
+                        sb.append("                    ").append(target).append(" = _l;\n");
                     } else {
-                        sb.append("                    o.").append(f.name).append(".clear();\n");
-                        sb.append("                    for (Object _e : (java.util.List) _v) { o.").append(f.name).append(".add((").append(f.kind.elementBinaryName).append(") _e); }\n");
+                        sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
+                        sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add((").append(f.kind.elementBinaryName).append(") _e); }\n");
                     }
                 } else if ("java.util.Date".equals(f.kind.elementBinaryName)) {
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<java.util.Date> _l = new java.util.ArrayList<java.util.Date>();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { _l.add(_e == null ? null : new java.util.Date(((Number) _e).longValue())); }\n");
-                        sb.append("                    o.").append(f.name).append(" = _l;\n");
+                        sb.append("                    ").append(target).append(" = _l;\n");
                     } else {
-                        sb.append("                    o.").append(f.name).append(".clear();\n");
-                        sb.append("                    for (Object _e : (java.util.List) _v) { o.").append(f.name).append(".add(_e == null ? null : new java.util.Date(((Number) _e).longValue())); }\n");
+                        sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
+                        sb.append("                    for (Object _e : (java.util.List) _v) { ").append(readExpr(f, isRecord)).append(".add(_e == null ? null : new java.util.Date(((Number) _e).longValue())); }\n");
                     }
                 } else {
                     sb.append("                    com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.elementBinaryName).append(".class);\n");
@@ -468,11 +599,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                         sb.append("                    for (Object _e : (java.util.List) _v) {\n");
                         sb.append("                        if (_nm != null && _e instanceof java.util.Map) { _l.add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
                         sb.append("                    }\n");
-                        sb.append("                    o.").append(f.name).append(" = _l;\n");
+                        sb.append("                    ").append(target).append(" = _l;\n");
                     } else {
-                        sb.append("                    o.").append(f.name).append(".clear();\n");
+                        sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) {\n");
-                        sb.append("                        if (_nm != null && _e instanceof java.util.Map) { o.").append(f.name).append(".add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
+                        sb.append("                        if (_nm != null && _e instanceof java.util.Map) { ").append(readExpr(f, isRecord)).append(".add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
                         sb.append("                    }\n");
                     }
                 }
@@ -485,27 +616,31 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("        }\n");
     }
 
-    private static void emitPropertySetFromJsonValue(StringBuilder sb, MappedField f) {
+    private static void emitPropertySetFromJsonValue(StringBuilder sb, MappedField f, boolean isRecord) {
+        // PROPERTY fields are rejected upstream for records; read through
+        // `readExpr` anyway so the helper is safe if it ever runs in the
+        // record path.
+        String prop = readExpr(f, isRecord);
         String elem = f.kind.elementBinaryName;
         if ("java.lang.String".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(_v.toString());\n");
+            sb.append("                ").append(prop).append(".set(_v.toString());\n");
         } else if ("java.lang.Integer".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(Integer.valueOf(((Number) _v).intValue()));\n");
+            sb.append("                ").append(prop).append(".set(Integer.valueOf(((Number) _v).intValue()));\n");
         } else if ("java.lang.Long".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(Long.valueOf(((Number) _v).longValue()));\n");
+            sb.append("                ").append(prop).append(".set(Long.valueOf(((Number) _v).longValue()));\n");
         } else if ("java.lang.Double".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(Double.valueOf(((Number) _v).doubleValue()));\n");
+            sb.append("                ").append(prop).append(".set(Double.valueOf(((Number) _v).doubleValue()));\n");
         } else if ("java.lang.Float".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(Float.valueOf(((Number) _v).floatValue()));\n");
+            sb.append("                ").append(prop).append(".set(Float.valueOf(((Number) _v).floatValue()));\n");
         } else if ("java.lang.Boolean".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set((_v instanceof Boolean) ? (Boolean) _v : Boolean.valueOf(_v.toString()));\n");
+            sb.append("                ").append(prop).append(".set((_v instanceof Boolean) ? (Boolean) _v : Boolean.valueOf(_v.toString()));\n");
         } else if ("java.util.Date".equals(elem)) {
-            sb.append("                o.").append(f.name).append(".set(new java.util.Date(((Number) _v).longValue()));\n");
+            sb.append("                ").append(prop).append(".set(new java.util.Date(((Number) _v).longValue()));\n");
         } else {
             // Nested Property<T> where T is another mapped type.
             sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(elem).append(".class);\n");
             sb.append("                if (_nm != null && _v instanceof java.util.Map) {\n");
-            sb.append("                    o.").append(f.name).append(".set((").append(elem).append(") _nm.fromMap((java.util.Map) _v));\n");
+            sb.append("                    ").append(prop).append(".set((").append(elem).append(") _nm.fromMap((java.util.Map) _v));\n");
             sb.append("                }\n");
         }
     }
@@ -514,11 +649,12 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // XML helpers
     // ---------------------------------------------------------------
 
-    private static void emitFieldToXml(StringBuilder sb, MappedField f) {
+    private static void emitFieldToXml(StringBuilder sb, MappedField f, boolean isRecord) {
+        String read = readExpr(f, isRecord);
         if (f.xmlAttribute) {
             sb.append("        {\n");
             sb.append("            String _s = ");
-            emitScalarToString(sb, f);
+            emitScalarToString(sb, f, isRecord);
             sb.append(";\n");
             sb.append("            if (_s != null) root.setAttribute(\"").append(escape(f.xmlName)).append("\", _s);\n");
             sb.append("        }\n");
@@ -530,7 +666,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case PROPERTY:
                 sb.append("        {\n");
                 sb.append("            String _s = ");
-                emitScalarToString(sb, f);
+                emitScalarToString(sb, f, isRecord);
                 sb.append(";\n");
                 sb.append("            if (_s != null) {\n");
                 sb.append("                com.codename1.xml.Element _e = new com.codename1.xml.Element(\"").append(escape(f.xmlName)).append("\");\n");
@@ -541,11 +677,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("        }\n");
                 return;
             case REFERENCE:
-                sb.append("        if (o.").append(f.name).append(" != null) {\n");
+                sb.append("        if (").append(read).append(" != null) {\n");
                 sb.append("            com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
                 sb.append("            if (_nm != null) {\n");
                 sb.append("                com.codename1.xml.Element _e = new com.codename1.xml.Element(\"").append(escape(f.xmlName)).append("\");\n");
-                sb.append("                _nm.writeXml(o.").append(f.name).append(", _e);\n");
+                sb.append("                _nm.writeXml(").append(read).append(", _e);\n");
                 sb.append("                root.addChild(_e);\n");
                 sb.append("            }\n");
                 sb.append("        }\n");
@@ -553,9 +689,9 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case LIST: case LIST_PROPERTY:
                 sb.append("        {\n");
                 if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
-                    sb.append("            java.util.List _src = o.").append(f.name).append(";\n");
+                    sb.append("            java.util.List _src = ").append(read).append(";\n");
                 } else {
-                    sb.append("            java.util.List _src = o.").append(f.name).append(".asList();\n");
+                    sb.append("            java.util.List _src = ").append(read).append(".asList();\n");
                 }
                 sb.append("            if (_src != null) {\n");
                 sb.append("                for (Object _e : _src) {\n");
@@ -582,12 +718,13 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
     }
 
-    private static void emitFieldFromXml(StringBuilder sb, MappedField f) {
+    private static void emitFieldFromXml(StringBuilder sb, MappedField f, boolean isRecord) {
+        String target = writeTarget(f, isRecord);
         if (f.xmlAttribute) {
             sb.append("        {\n");
             sb.append("            String _s = root.getAttribute(\"").append(escape(f.xmlName)).append("\");\n");
             sb.append("            if (_s != null) {\n");
-            emitScalarFromString(sb, f, "_s");
+            emitScalarFromString(sb, f, "_s", isRecord);
             sb.append("            }\n");
             sb.append("        }\n");
             return;
@@ -601,13 +738,14 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                com.codename1.xml.Element _ch = (com.codename1.xml.Element) _kids.elementAt(_i);\n");
                 emitListElementFromXml(sb, f, "_ch", "_l");
                 sb.append("            }\n");
-                sb.append("            o.").append(f.name).append(" = _l;\n");
+                sb.append("            ").append(target).append(" = _l;\n");
                 break;
             case LIST_PROPERTY:
-                sb.append("            o.").append(f.name).append(".clear();\n");
+                // Rejected upstream for records; always reads `o.name`.
+                sb.append("            ").append(readExpr(f, isRecord)).append(".clear();\n");
                 sb.append("            for (int _i = 0; _i < _kids.size(); _i++) {\n");
                 sb.append("                com.codename1.xml.Element _ch = (com.codename1.xml.Element) _kids.elementAt(_i);\n");
-                emitListElementFromXml(sb, f, "_ch", "o." + f.name);
+                emitListElementFromXml(sb, f, "_ch", readExpr(f, isRecord));
                 sb.append("            }\n");
                 break;
             default:
@@ -615,11 +753,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                com.codename1.xml.Element _e = (com.codename1.xml.Element) _kids.elementAt(0);\n");
                 if (f.kind.kind == PropertyTypeKind.Kind.REFERENCE) {
                     sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
-                    sb.append("                if (_nm != null) o.").append(f.name).append(" = (").append(f.kind.binaryName).append(") _nm.readXml(_e);\n");
+                    sb.append("                if (_nm != null) ").append(target).append(" = (").append(f.kind.binaryName).append(") _nm.readXml(_e);\n");
                 } else {
                     sb.append("                String _s = textOf(_e);\n");
                     sb.append("                if (_s != null) {\n");
-                    emitScalarFromString(sb, f, "_s");
+                    emitScalarFromString(sb, f, "_s", isRecord);
                     sb.append("                }\n");
                 }
                 sb.append("            }\n");
@@ -658,24 +796,25 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
     }
 
-    private static void emitScalarToString(StringBuilder sb, MappedField f) {
+    private static void emitScalarToString(StringBuilder sb, MappedField f, boolean isRecord) {
+        String read = readExpr(f, isRecord);
         switch (f.kind.kind) {
             case STRING:
-                sb.append("o.").append(f.name); break;
+                sb.append(read); break;
             case INT: case LONG: case SHORT: case BYTE: case CHAR:
             case DOUBLE: case FLOAT: case BOOLEAN:
-                sb.append("String.valueOf(o.").append(f.name).append(")"); break;
+                sb.append("String.valueOf(").append(read).append(")"); break;
             case DATE:
-                sb.append("o.").append(f.name).append(" == null ? null : String.valueOf(o.").append(f.name).append(".getTime())"); break;
+                sb.append(read).append(" == null ? null : String.valueOf(").append(read).append(".getTime())"); break;
             case BYTE_ARRAY:
-                sb.append("o.").append(f.name).append(" == null ? null : com.codename1.util.Base64.encode(o.").append(f.name).append(")"); break;
+                sb.append(read).append(" == null ? null : com.codename1.util.Base64.encode(").append(read).append(")"); break;
             case PROPERTY:
-                sb.append("o.").append(f.name).append(".get() == null ? null : ");
+                sb.append(read).append(".get() == null ? null : ");
                 String elem = f.kind.elementBinaryName;
                 if ("java.util.Date".equals(elem)) {
-                    sb.append("String.valueOf(((java.util.Date) o.").append(f.name).append(".get()).getTime())");
+                    sb.append("String.valueOf(((java.util.Date) ").append(read).append(".get()).getTime())");
                 } else {
-                    sb.append("String.valueOf(o.").append(f.name).append(".get())");
+                    sb.append("String.valueOf(").append(read).append(".get())");
                 }
                 break;
             default:
@@ -683,48 +822,52 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
     }
 
-    private static void emitScalarFromString(StringBuilder sb, MappedField f, String src) {
+    private static void emitScalarFromString(StringBuilder sb, MappedField f, String src, boolean isRecord) {
+        String target = writeTarget(f, isRecord);
+        // PROPERTY is rejected for records, but `read` keeps the helper safe
+        // if it ever reaches the record path.
+        String read = readExpr(f, isRecord);
         switch (f.kind.kind) {
             case STRING:
-                sb.append("                o.").append(f.name).append(" = ").append(src).append(";\n"); break;
+                sb.append("                ").append(target).append(" = ").append(src).append(";\n"); break;
             case INT:
-                sb.append("                o.").append(f.name).append(" = Integer.parseInt(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Integer.parseInt(").append(src).append(");\n"); break;
             case LONG:
-                sb.append("                o.").append(f.name).append(" = Long.parseLong(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Long.parseLong(").append(src).append(");\n"); break;
             case SHORT:
-                sb.append("                o.").append(f.name).append(" = Short.parseShort(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Short.parseShort(").append(src).append(");\n"); break;
             case BYTE:
-                sb.append("                o.").append(f.name).append(" = Byte.parseByte(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Byte.parseByte(").append(src).append(");\n"); break;
             case CHAR:
-                sb.append("                o.").append(f.name).append(" = ").append(src).append(".length() == 0 ? '\\0' : ").append(src).append(".charAt(0);\n"); break;
+                sb.append("                ").append(target).append(" = ").append(src).append(".length() == 0 ? '\\0' : ").append(src).append(".charAt(0);\n"); break;
             case DOUBLE:
-                sb.append("                o.").append(f.name).append(" = Double.parseDouble(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Double.parseDouble(").append(src).append(");\n"); break;
             case FLOAT:
-                sb.append("                o.").append(f.name).append(" = Float.parseFloat(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Float.parseFloat(").append(src).append(");\n"); break;
             case BOOLEAN:
-                sb.append("                o.").append(f.name).append(" = Boolean.parseBoolean(").append(src).append(");\n"); break;
+                sb.append("                ").append(target).append(" = Boolean.parseBoolean(").append(src).append(");\n"); break;
             case DATE:
-                sb.append("                o.").append(f.name).append(" = new java.util.Date(Long.parseLong(").append(src).append("));\n"); break;
+                sb.append("                ").append(target).append(" = new java.util.Date(Long.parseLong(").append(src).append("));\n"); break;
             case BYTE_ARRAY:
-                sb.append("                o.").append(f.name).append(" = com.codename1.util.Base64.decode(").append(src).append(".getBytes());\n"); break;
+                sb.append("                ").append(target).append(" = com.codename1.util.Base64.decode(").append(src).append(".getBytes());\n"); break;
             case PROPERTY: {
                 String elem = f.kind.elementBinaryName;
                 if ("java.lang.String".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(").append(src).append(");\n");
+                    sb.append("                ").append(read).append(".set(").append(src).append(");\n");
                 } else if ("java.lang.Integer".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(Integer.valueOf(").append(src).append("));\n");
+                    sb.append("                ").append(read).append(".set(Integer.valueOf(").append(src).append("));\n");
                 } else if ("java.lang.Long".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(Long.valueOf(").append(src).append("));\n");
+                    sb.append("                ").append(read).append(".set(Long.valueOf(").append(src).append("));\n");
                 } else if ("java.lang.Double".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(Double.valueOf(").append(src).append("));\n");
+                    sb.append("                ").append(read).append(".set(Double.valueOf(").append(src).append("));\n");
                 } else if ("java.lang.Float".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(Float.valueOf(").append(src).append("));\n");
+                    sb.append("                ").append(read).append(".set(Float.valueOf(").append(src).append("));\n");
                 } else if ("java.lang.Boolean".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(Boolean.valueOf(").append(src).append("));\n");
+                    sb.append("                ").append(read).append(".set(Boolean.valueOf(").append(src).append("));\n");
                 } else if ("java.util.Date".equals(elem)) {
-                    sb.append("                o.").append(f.name).append(".set(new java.util.Date(Long.parseLong(").append(src).append(")));\n");
+                    sb.append("                ").append(read).append(".set(new java.util.Date(Long.parseLong(").append(src).append(")));\n");
                 } else {
-                    sb.append("                o.").append(f.name).append(".set((").append(elem).append(") ").append(src).append(");\n");
+                    sb.append("                ").append(read).append(".set((").append(elem).append(") ").append(src).append(");\n");
                 }
                 break;
             }
@@ -800,6 +943,10 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         String mapperBinaryName;
         String mapperSimpleName;
         String xmlRootName;
+        /// `true` for Java 17+ records. Drives accessor-style reads
+        /// (`o.name()` vs `o.name`) and canonical-constructor writes
+        /// (`new T(_a, _b, ...)` vs `o.a = ...; o.b = ...`).
+        boolean isRecord;
         final List<MappedField> fields = new ArrayList<MappedField>();
     }
 
