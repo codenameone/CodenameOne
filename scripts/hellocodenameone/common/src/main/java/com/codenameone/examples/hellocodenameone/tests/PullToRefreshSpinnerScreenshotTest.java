@@ -8,9 +8,15 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Hashtable;
 
 /// Captures the modern pull-to-refresh arc spinner across six frames during
-/// its continuous-spin phase. `modernSpinStartTime` reads
+/// its continuous-spin phase. The painter only takes the modern path when
+/// `pullToRefreshModernBool` is true, so the test layers that constant onto
+/// the active theme (the same flag the new iOS / Android native themes set
+/// by default). `modernSpinStartTime` reads
 /// [com.codename1.ui.animations.AnimationTime] (which the harness advances
 /// per frame), so each cell renders the arc at a different rotation angle.
 public class PullToRefreshSpinnerScreenshotTest extends AbstractAnimationScreenshotTest {
@@ -26,6 +32,14 @@ public class PullToRefreshSpinnerScreenshotTest extends AbstractAnimationScreens
     @Override
     protected void prepareCapture(int frameWidth, int frameHeight) {
         super.prepareCapture(frameWidth, frameHeight);
+
+        // Overlay the modern theme constants so DefaultLookAndFeel
+        // picks the arc-spinner path. `addThemeProps` keeps the rest
+        // of the theme untouched and matches what the iOS Modern /
+        // Android Material native themes ship by default.
+        Hashtable<String, Object> overlay = new Hashtable<String, Object>();
+        overlay.put("@pullToRefreshModernBool", "true");
+        UIManager.getInstance().addThemeProps(overlay);
 
         host = new Form("PullToRefresh", new BorderLayout());
         host.setWidth(frameWidth);
@@ -50,24 +64,18 @@ public class PullToRefreshSpinnerScreenshotTest extends AbstractAnimationScreens
         host.layoutContainer();
 
         // Pin the container in the "task running" state so the painter
-        // draws the continuous-spin arc. scrollY is shifted negative by
-        // the pull-to-refresh height so the indicator centre lands inside
-        // the visible viewport.
+        // draws the continuous-spin arc.
         scrollHost.putClientProperty("$pullToRelease", "updating");
     }
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        // Render the host form into an offscreen image so the form's own
-        // background paints first; then overlay the pull-to-refresh painter
-        // via the standard paintPullToRefresh() entry point so we exercise
-        // the exact code path the simulator and devices hit at runtime.
         Image frame = Image.createImage(width, height, 0xfff0f4f8);
         Graphics fg = frame.getGraphics();
         host.paintComponent(fg, true);
-        // Force-render the indicator on top -- paintComponent will skip the
-        // pull painter when scrollY >= 0, but the spinner state is what we
-        // want to capture.
+        // paintComponent skips the pull painter when scrollY >= 0; render
+        // the indicator directly so the spinner is always visible in the
+        // captured grid cell.
         scrollHost.getUIManager().getLookAndFeel().drawPullToRefresh(fg, scrollHost, true);
         g.drawImage(frame, 0, 0);
         frame.dispose();
@@ -75,6 +83,9 @@ public class PullToRefreshSpinnerScreenshotTest extends AbstractAnimationScreens
 
     @Override
     protected void finishCapture() {
+        // Reset the theme so the next test in the suite isn't carrying
+        // the modern flag.
+        UIManager.getInstance().refreshTheme();
         host = null;
         scrollHost = null;
         super.finishCapture();
