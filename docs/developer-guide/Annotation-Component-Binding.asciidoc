@@ -195,7 +195,7 @@ subscribers fire as expected. Both styles can sit on the same class.
 The same `@Bind` field can carry validation annotations that are wired
 into a `com.codename1.ui.validation.Validator`. The validator is built
 by the generated binder at the moment you call `Binders.bind(...)` and
-is reachable via `Binding#getValidator()` -- so the same auto-generated
+is reachable via `Binding#getValidator()` -- so the same generated
 plumbing that pushes model values into components also installs the
 constraints that gate them.
 
