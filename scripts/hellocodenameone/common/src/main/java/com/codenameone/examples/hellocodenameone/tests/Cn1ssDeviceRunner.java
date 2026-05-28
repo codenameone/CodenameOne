@@ -55,12 +55,12 @@ import com.codenameone.examples.hellocodenameone.tests.accessibility.Accessibili
 
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Per-test deadline cap. The historical 10s HTML5 cap dates back to
-    // a 150s browser-lifetime budget; the current CI budget is 1740s
-    // (CN1_JS_BROWSER_LIFETIME_SECONDS), so even a worst-case 30s per
-    // test only burns ~15 min for the full suite. The bump to 30s is
-    // required by DualAppearanceBaseTest subclasses: each test runs
-    // light + dark phases serially and each phase pays
+    // Per-test deadline cap. The 10s HTML5 default keeps already-
+    // hanging tests (LightweightPickerButtons, ToastBarTopPosition
+    // hitting the canvasContextWipe noCanvas path) from eating the
+    // 1740s suite-level budget. DualAppearanceBaseTest subclasses
+    // override this via {@link BaseTest#getTimeoutMs()} because they
+    // run light + dark phases serially and each phase pays
     // registerReadyCallback's 1500ms UITimer + wait_for_ui_settle
     // (up to ~800ms) + capture/encode + chunked emit, so the
     // bytecode-translated path easily clears 10s on shared GHA
@@ -69,15 +69,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // - the late dark emit then captured whatever form happened to
     // be on the canvas at that moment (visible symptom:
     // ToolbarTheme_dark.png showed "TabsTheme / light"). iOS /
-    // Android / JavaSE still get 30s; matching that on HTML5 keeps
-    // the cap consistent across ports and only matters for
-    // genuinely stuck tests, which the suite-level timeout still
-    // catches.
-    private static final int TEST_TIMEOUT_MS_HTML5 = 30000;
+    // Android / JavaSE keep their wider 30s cap because they don't
+    // share the JS port's canvas-hang failure mode.
+    private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
-    private static int testTimeoutMs() {
+    private static int testTimeoutMs(BaseTest testClass) {
+        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
+        // phases serially, each paying registerReadyCallback's 1500ms + settle
+        // + capture). Other tests stay at the tighter HTML5 default so a hung
+        // test doesn't eat the suite-level budget.
+        if ("HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof DualAppearanceBaseTest) {
+            return TEST_TIMEOUT_MS_NATIVE;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;
@@ -291,7 +297,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
-            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs());
+            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
     }
 
