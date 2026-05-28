@@ -189,9 +189,114 @@ resolved accessors. A `Property<T, ?>` field is read through `get()`
 and written through `set()` -- so existing `PropertyChangeListener`
 subscribers fire as expected. Both styles can sit on the same class.
 
-=== Validation
+[[annotation-binding-validation,Validation Annotations]]
+=== Validation annotations
 
-The annotation processor fails the build when:
+The same `@Bind` field can carry validation annotations that are wired
+into a `com.codename1.ui.validation.Validator`. The validator is built
+by the generated binder at the moment you call `Binders.bind(...)` and
+is reachable via `Binding#getValidator()` -- so the same generated
+plumbing that pushes model values into components also installs the
+constraints that gate them.
+
+[cols="1,2,3", options="header"]
+|===
+| Annotation                | Maps to                                      | Notes
+| `@Required`               | `LengthConstraint(1)`                         | "Field must be non-empty."
+| `@Length(min = N)`        | `LengthConstraint(N, message)`                | Minimum string length.
+| `@Regex(pattern = ..., message = ...)` | `RegexConstraint(pattern, message)`        | Same dialect as `com.codename1.util.regex.RE`.
+| `@Email`                  | `RegexConstraint.validEmail(message)`         | The standard email regex (also accepts empty -- stack with `@Required`).
+| `@Url`                    | `RegexConstraint.validURL(message)`           | `http` / `https` / `ftp` / `file` schemes.
+| `@Numeric(decimal = ..., min = ..., max = ..., message = ...)` | `NumericConstraint(...)` | Bounds are inclusive; default range is unbounded.
+| `@ExistIn({...})`         | `ExistInConstraint(values, caseSensitive, message)` | Whitelist of allowed string values.
+| `@Validate(MyConstraint.class)` | `new MyConstraint()`                    | Escape hatch -- the class must have a public no-arg constructor and implement `Constraint`.
+|===
+
+Multiple annotations on the same field are combined into a
+`GroupConstraint` (first failure wins), matching the behaviour of
+`Validator.addConstraint(Component, Constraint...)`.
+
+[source,java]
+----
+package com.example;
+
+import com.codename1.annotations.*;
+import com.codename1.binding.BindAttr;
+
+@Bindable
+public class SignupModel {
+
+    @Bind(name = "userField")
+    @Required
+    @Length(min = 3, message = "User name too short")
+    private String user;
+
+    @Bind(name = "emailField")
+    @Required
+    @Email                                                          // <1>
+    private String email;
+
+    @Bind(name = "ageField")
+    @Numeric(min = 13, max = 120, message = "Age 13-120")           // <2>
+    private String age;                                             // <3>
+
+    @Bind(name = "roleField")
+    @ExistIn({ "admin", "editor", "viewer" })
+    private String role;
+
+    @Bind(name = "phoneField")
+    @Validate(PhoneConstraint.class)                                // <4>
+    private String phone;
+
+    // ... getters / setters omitted for brevity
+}
+----
+<1> `@Required @Email` is the canonical "mandatory address" pair. The
+    standard email regex accepts the empty string as "not yet an
+    address," so `@Required` is what enforces presence.
+<2> Inclusive bounds. Omit either side to remove that side of the
+    range (defaults are negative / positive infinity).
+<3> The field's static type is `String` because the user types the
+    digits into a `TextField` -- the binder runs `Integer.parseInt`
+    only when committing the value back through the JavaBeans setter
+    for an `int` target.
+<4> `PhoneConstraint` is a hand-written
+    `com.codename1.ui.validation.Constraint` with a public no-argument
+    constructor. The generated binder instantiates it once per
+    `bind()` call.
+
+After binding, drive validation through the returned handle:
+
+[source,java]
+----
+LoginModel model = new LoginModel();
+Binding b = Binders.bind(model, form);
+
+// Auto-disable a submit button until everything is valid.
+Button submit = (Button) form.findByName("submitButton");
+b.getValidator().addSubmitButtons(submit);
+
+// Live feedback as the user types (static toggle on the Validator
+// class -- one switch flips the behaviour for every validator in the
+// app):
+Validator.setValidateOnEveryKey(true);
+
+// Programmatic gate before saving:
+if (b.getValidator().isValid()) {
+    repository.save(model);
+}
+----
+
+`Binding#getValidator()` never returns `null` -- when the model has no
+validation annotations the validator is empty and `isValid()` returns
+`true`. The validator owns the listener and emblem plumbing on the
+matching components; calling `addSubmitButtons` after `bind` is the
+typical pattern.
+
+=== Build-time validation
+
+In addition to the runtime constraints above, the annotation processor
+itself fails the build when:
 
 * `@Bind` is applied to a field with no accessible read path -- the
   field must be public, declare a JavaBeans `getX` / `isX` getter, or
@@ -202,6 +307,7 @@ The annotation processor fails the build when:
 * `@Bind(name=...)` is empty.
 * The field's static type isn't supported (raw collections, opaque
   references that aren't `@Bindable` themselves, ...).
+* `@Regex` is missing a pattern, or `@ExistIn` is missing values.
 
 Errors are accumulated so a single build run reports every offending
 field at once.

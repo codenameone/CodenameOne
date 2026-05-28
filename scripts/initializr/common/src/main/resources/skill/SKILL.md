@@ -24,6 +24,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, web).
 - `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.
+- `references/binding-and-validation.md` — `@Bindable` / `@Bind` annotation binding **and** annotation-driven validation (`@Required`, `@Length`, `@Regex`, `@Email`, `@Url`, `@Numeric`, `@ExistIn`, `@Validate`). Read this whenever you see one of those annotations, wire a model to a form, or need to gate a submit button on validation.
 - `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
 - `references/html-css-cheatsheet.md` — Converting common HTML/CSS snippets to CN1 components + CSS.
@@ -282,6 +283,7 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | If the user asks for... | Open this reference |
 | --- | --- |
 | "Add a screen with a list / form / dialog" | `references/ui-components.md` |
+| "Wire this form to a model" / "Validate this form" / `@Bindable`, `@Required`, `@Email`, ... | `references/binding-and-validation.md` |
 | "Make this look like X" / CSS tweaks | `references/css.md` |
 | "Port this from Swing" / Swing idioms | `references/swing-comparison.md` |
 | "I have HTML/CSS, convert it" | `references/html-css-cheatsheet.md` |

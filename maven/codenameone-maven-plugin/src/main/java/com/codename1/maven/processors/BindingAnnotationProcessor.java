@@ -36,6 +36,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.io.File;
 import java.io.IOException;
@@ -95,10 +96,33 @@ import java.util.TreeMap;
 ///   be triggered explicitly via `Binding#refresh()`.
 ///
 /// The processor fails the build when none of the three resolves.
+///
+/// #### Validation annotations
+///
+/// Alongside `@Bind`, a field may carry any of `@Required`, `@Length`,
+/// `@Regex`, `@Email`, `@Url`, `@Numeric`, `@ExistIn`, `@Validate`. The
+/// generator builds a `com.codename1.ui.validation.Validator` in the
+/// `bind()` method, calls `addConstraint(component, constraints...)` once
+/// per annotated field, and exposes the validator through
+/// `Binding#getValidator()`. Multiple validation annotations on the same
+/// field are combined under a `GroupConstraint` (first failure wins), so
+/// `@Required @Email` on a single field reads naturally.
 public final class BindingAnnotationProcessor extends AbstractAnnotationProcessor {
 
     public static final String BINDABLE_DESC = "Lcom/codename1/annotations/Bindable;";
     public static final String BIND_DESC = "Lcom/codename1/annotations/Bind;";
+
+    /// Field-level validation annotations consumed by the binder generator.
+    /// Each one maps to a single `com.codename1.ui.validation.Constraint`
+    /// installed on the matching component via `Validator.addConstraint`.
+    static final String REQUIRED_DESC = "Lcom/codename1/annotations/Required;";
+    static final String LENGTH_DESC = "Lcom/codename1/annotations/Length;";
+    static final String REGEX_DESC = "Lcom/codename1/annotations/Regex;";
+    static final String EMAIL_DESC = "Lcom/codename1/annotations/Email;";
+    static final String URL_DESC = "Lcom/codename1/annotations/Url;";
+    static final String NUMERIC_DESC = "Lcom/codename1/annotations/Numeric;";
+    static final String EXIST_IN_DESC = "Lcom/codename1/annotations/ExistIn;";
+    static final String VALIDATE_DESC = "Lcom/codename1/annotations/Validate;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.BinderBootstrap";
     static final String BOOTSTRAP_SIMPLE = "BinderBootstrap";
@@ -181,6 +205,7 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
             if (!resolveAccessors(bf, f, cls, explicitGetter, explicitSetter, ctx)) {
                 continue;
             }
+            collectValidationAnnotations(bf, f, cls, ctx);
             bc.fields.add(bf);
         }
         // @Bindable with no @Bind fields is accepted -- the generated
@@ -274,6 +299,119 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
             }
         }
         return true;
+    }
+
+    /// Reads each validation annotation (`@Required`, `@Length`, `@Regex`,
+    /// `@Email`, `@Url`, `@Numeric`, `@ExistIn`, `@Validate`) off `field` and
+    /// appends a `Validation` spec to `bf` for every one found. The order is
+    /// preserved -- the generated binder hands them to
+    /// `Validator.addConstraint(Component, Constraint...)` in declaration
+    /// order, and a `GroupConstraint` makes the first failing constraint
+    /// win.
+    private static void collectValidationAnnotations(BoundField bf, FieldInfo field,
+                                                      AnnotatedClass cls, ProcessorContext ctx) {
+        AnnotationValues a;
+
+        a = field.getAnnotation(REQUIRED_DESC);
+        if (a != null) {
+            Validation v = new Validation(ValidationKind.REQUIRED);
+            v.message = a.getStringOrDefault("message", "");
+            bf.validations.add(v);
+        }
+
+        a = field.getAnnotation(LENGTH_DESC);
+        if (a != null) {
+            Validation v = new Validation(ValidationKind.LENGTH);
+            v.intArg = a.getIntOrDefault("min", 1);
+            v.message = a.getStringOrDefault("message", "");
+            bf.validations.add(v);
+        }
+
+        a = field.getAnnotation(REGEX_DESC);
+        if (a != null) {
+            String pattern = a.getStringOrDefault("pattern", "");
+            if (pattern.length() == 0) {
+                ctx.error(cls, "@Regex on " + cls.getBinaryName() + "." + field.getName()
+                        + " requires a non-empty pattern");
+            } else {
+                Validation v = new Validation(ValidationKind.REGEX);
+                v.stringArg = pattern;
+                v.message = a.getStringOrDefault("message", "Invalid value");
+                bf.validations.add(v);
+            }
+        }
+
+        a = field.getAnnotation(EMAIL_DESC);
+        if (a != null) {
+            Validation v = new Validation(ValidationKind.EMAIL);
+            v.message = a.getStringOrDefault("message", "");
+            bf.validations.add(v);
+        }
+
+        a = field.getAnnotation(URL_DESC);
+        if (a != null) {
+            Validation v = new Validation(ValidationKind.URL);
+            v.message = a.getStringOrDefault("message", "");
+            bf.validations.add(v);
+        }
+
+        a = field.getAnnotation(NUMERIC_DESC);
+        if (a != null) {
+            Validation v = new Validation(ValidationKind.NUMERIC);
+            v.boolArg = a.getBoolOrDefault("decimal", false);
+            v.doubleMin = doubleOrDefault(a, "min", Double.NEGATIVE_INFINITY);
+            v.doubleMax = doubleOrDefault(a, "max", Double.POSITIVE_INFINITY);
+            v.message = a.getStringOrDefault("message", "");
+            bf.validations.add(v);
+        }
+
+        a = field.getAnnotation(EXIST_IN_DESC);
+        if (a != null) {
+            List<String> values = new ArrayList<String>();
+            Object raw = a.get("value");
+            if (raw instanceof List) {
+                for (Object item : (List<?>) raw) {
+                    if (item instanceof String) {
+                        values.add((String) item);
+                    }
+                }
+            }
+            if (values.isEmpty()) {
+                ctx.error(cls, "@ExistIn on " + cls.getBinaryName() + "." + field.getName()
+                        + " requires at least one allowed value");
+            } else {
+                Validation v = new Validation(ValidationKind.EXIST_IN);
+                v.stringArrayArg = values.toArray(new String[0]);
+                v.boolArg = a.getBoolOrDefault("caseSensitive", false);
+                v.message = a.getStringOrDefault("message", "");
+                bf.validations.add(v);
+            }
+        }
+
+        a = field.getAnnotation(VALIDATE_DESC);
+        if (a != null) {
+            Object raw = a.get("value");
+            String binaryName = null;
+            if (raw instanceof Type) {
+                binaryName = ((Type) raw).getClassName();
+            }
+            if (binaryName == null || binaryName.length() == 0) {
+                ctx.error(cls, "@Validate on " + cls.getBinaryName() + "." + field.getName()
+                        + " must name a Constraint class");
+            } else {
+                Validation v = new Validation(ValidationKind.CUSTOM);
+                v.stringArg = binaryName;
+                bf.validations.add(v);
+            }
+        }
+    }
+
+    private static double doubleOrDefault(AnnotationValues a, String key, double defaultValue) {
+        Object v = a.get(key);
+        if (v instanceof Number) {
+            return ((Number) v).doubleValue();
+        }
+        return defaultValue;
     }
 
     private static MethodInfo findMethod(AnnotatedClass cls, String name, String descriptor) {
@@ -464,12 +602,25 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("    public com.codename1.binding.Binding bind(final ").append(bc.binaryName)
                 .append(" model, final com.codename1.ui.Container container) {\n");
         sb.append("        final java.util.ArrayList<com.codename1.ui.events.ActionListener> _disposers = new java.util.ArrayList<com.codename1.ui.events.ActionListener>();\n");
+        sb.append("        final com.codename1.ui.validation.Validator _validator = new com.codename1.ui.validation.Validator();\n");
 
         // Resolve each component once.
         for (int i = 0; i < bc.fields.size(); i++) {
             BoundField f = bc.fields.get(i);
             sb.append("        final com.codename1.ui.Component _c").append(i)
                     .append(" = _findByName(container, \"").append(escape(f.componentName)).append("\");\n");
+        }
+
+        // Wire validation annotations into the Validator. Constraints are
+        // added in declaration order; multiple constraints on a single
+        // component compose into a GroupConstraint via the varargs overload
+        // (first failure wins).
+        for (int i = 0; i < bc.fields.size(); i++) {
+            BoundField f = bc.fields.get(i);
+            if (f.validations.isEmpty()) {
+                continue;
+            }
+            emitValidationWireUp(sb, f, i);
         }
 
         // refresh() pushes model -> components inside an update region.
@@ -518,6 +669,7 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("                for (com.codename1.ui.events.ActionListener _d : _disposers) _d.actionPerformed(null);\n");
         sb.append("                _disposers.clear();\n");
         sb.append("            }\n");
+        sb.append("            public com.codename1.ui.validation.Validator getValidator() { return _validator; }\n");
         sb.append("            public String modelTypeName() { return _typeName; }\n");
         sb.append("            public boolean matches(Object o) { return o == _modelRef; }\n");
         sb.append("        };\n");
@@ -693,6 +845,97 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
         }
     }
 
+    /// Emits validator wire-up for the component at index `i`. Generates a
+    /// guarded block that constructs each `Constraint` and hands them to
+    /// `Validator.addConstraint(Component, Constraint...)`.
+    private static void emitValidationWireUp(StringBuilder sb, BoundField f, int i) {
+        sb.append("        if (_c").append(i).append(" != null) {\n");
+        sb.append("            _validator.addConstraint(_c").append(i);
+        for (Validation v : f.validations) {
+            sb.append(", ");
+            emitConstraintExpr(sb, v);
+        }
+        sb.append(");\n");
+        sb.append("        }\n");
+    }
+
+    private static void emitConstraintExpr(StringBuilder sb, Validation v) {
+        switch (v.kind) {
+            case REQUIRED:
+                // LengthConstraint(1, message) -- value required (non-empty).
+                if (v.message.length() == 0) {
+                    sb.append("new com.codename1.ui.validation.LengthConstraint(1)");
+                } else {
+                    sb.append("new com.codename1.ui.validation.LengthConstraint(1, \"")
+                            .append(escape(v.message)).append("\")");
+                }
+                break;
+            case LENGTH:
+                if (v.message.length() == 0) {
+                    sb.append("new com.codename1.ui.validation.LengthConstraint(")
+                            .append(v.intArg).append(")");
+                } else {
+                    sb.append("new com.codename1.ui.validation.LengthConstraint(")
+                            .append(v.intArg).append(", \"").append(escape(v.message)).append("\")");
+                }
+                break;
+            case REGEX:
+                sb.append("new com.codename1.ui.validation.RegexConstraint(\"")
+                        .append(escape(v.stringArg)).append("\", \"")
+                        .append(escape(v.message)).append("\")");
+                break;
+            case EMAIL:
+                if (v.message.length() == 0) {
+                    sb.append("com.codename1.ui.validation.RegexConstraint.validEmail()");
+                } else {
+                    sb.append("com.codename1.ui.validation.RegexConstraint.validEmail(\"")
+                            .append(escape(v.message)).append("\")");
+                }
+                break;
+            case URL:
+                if (v.message.length() == 0) {
+                    sb.append("com.codename1.ui.validation.RegexConstraint.validURL()");
+                } else {
+                    sb.append("com.codename1.ui.validation.RegexConstraint.validURL(\"")
+                            .append(escape(v.message)).append("\")");
+                }
+                break;
+            case NUMERIC:
+                String msg = v.message.length() == 0 ? "null" : "\"" + escape(v.message) + "\"";
+                sb.append("new com.codename1.ui.validation.NumericConstraint(")
+                        .append(v.boolArg).append(", ")
+                        .append(doubleLiteral(v.doubleMin)).append(", ")
+                        .append(doubleLiteral(v.doubleMax)).append(", ")
+                        .append(msg).append(")");
+                break;
+            case EXIST_IN:
+                String msgX = v.message.length() == 0 ? "null" : "\"" + escape(v.message) + "\"";
+                sb.append("new com.codename1.ui.validation.ExistInConstraint(new String[]{");
+                for (int k = 0; k < v.stringArrayArg.length; k++) {
+                    if (k > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append('"').append(escape(v.stringArrayArg[k])).append('"');
+                }
+                sb.append("}, ").append(v.boolArg).append(", ").append(msgX).append(")");
+                break;
+            case CUSTOM:
+                // v.stringArg is the binary name of the Constraint implementation.
+                sb.append("new ").append(v.stringArg).append("()");
+                break;
+        }
+    }
+
+    private static String doubleLiteral(double d) {
+        if (Double.isNaN(d)) {
+            return "Double.NaN";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "Double.POSITIVE_INFINITY" : "Double.NEGATIVE_INFINITY";
+        }
+        return Double.toString(d);
+    }
+
     private static String boolExpr(BoundField f, String modelExpr) {
         if (f.kind.kind == PropertyTypeKind.Kind.PROPERTY
                 && "java.lang.Boolean".equals(f.kind.elementBinaryName)) {
@@ -838,5 +1081,30 @@ public final class BindingAnnotationProcessor extends AbstractAnnotationProcesso
         String getterDescriptor;
         String setter;          // null means direct field assignment
         String setterDescriptor;
+        final List<Validation> validations = new ArrayList<Validation>();
+    }
+
+    /// The kind of constraint a validation annotation maps to. Each kind
+    /// drives one `case` of the generator switch in `emitConstraintExpr`.
+    enum ValidationKind {
+        REQUIRED, LENGTH, REGEX, EMAIL, URL, NUMERIC, EXIST_IN, CUSTOM
+    }
+
+    /// Parsed view of a single validation annotation occurrence on a
+    /// `@Bind` field. Only the fields relevant to the chosen `kind` are
+    /// populated; the others stay at their defaults.
+    static final class Validation {
+        final ValidationKind kind;
+        String message = "";
+        int intArg;
+        boolean boolArg;
+        double doubleMin;
+        double doubleMax;
+        String stringArg;
+        String[] stringArrayArg;
+
+        Validation(ValidationKind kind) {
+            this.kind = kind;
+        }
     }
 }
