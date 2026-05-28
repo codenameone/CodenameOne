@@ -624,15 +624,14 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
             int start = i;
             char c = args.charAt(i);
             if (c == '*') { out.add("*"); i++; continue; }
-            int sign = 0;
-            if (c == '+' || c == '-') { sign = 1; i++; if (i >= args.length()) break; c = args.charAt(i); }
+            if (c == '+' || c == '-') { i++; if (i >= args.length()) break; c = args.charAt(i); }
             while (c == '[') { i++; if (i >= args.length()) break; c = args.charAt(i); }
             if (c == 'L' || c == 'T') {
                 i = skipReferenceTypeSignature(args, i);
             } else {
                 i++;
             }
-            out.add(args.substring(start + (sign > 0 ? 0 : 0), i));
+            out.add(args.substring(start, i));
         }
         return out;
     }
