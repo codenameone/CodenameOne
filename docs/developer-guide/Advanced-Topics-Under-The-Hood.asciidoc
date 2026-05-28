@@ -442,6 +442,12 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.testFlight
 |Boolean true/false defaults to false and works only for pro accounts. Enables the testflight support in the release binaries for easy beta testing. Notice that the IDE plugin has a "Test Flight" check box you *should* use under the iOS section.
 
+|ios.metal
+|Boolean true/false defaults to true. Selects the Metal rendering backend (`CAMetalLayer`) over the legacy OpenGL ES 2 path (`CAEAGLLayer`). Metal is the supported iOS graphics API; OpenGL ES is deprecated. Set to `false` to opt out if you hit a Metal-only rendering regression. See link:#_metal_renderer[Working with iOS / Metal renderer] for details.
+
+|ios.metal.colorSpace
+|Selects the `CAMetalLayer.colorspace` for the Metal renderer. Accepts `sRGB` (default), `displayP3`, `deviceRGB`, `linearSRGB`, `extendedSRGB`, `extendedLinearSRGB`, or `none`. Has no effect when `ios.metal=false`. See link:#_choosing_a_color_space_for_the_metal_renderer[Working with iOS / Choosing a color space] for the full table.
+
 |ios.generateSplashScreens
 |Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
 
@@ -1692,6 +1698,7 @@ ios.locationUsageDescription
 ios.bundleVersion
 ios.objC
 ios.testFlight
+ios.metal
 desktop.width
 desktop.height
 desktop.adaptToRetina
