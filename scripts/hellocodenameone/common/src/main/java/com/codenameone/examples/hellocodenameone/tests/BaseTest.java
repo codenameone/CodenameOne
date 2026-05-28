@@ -57,15 +57,7 @@ public abstract class BaseTest extends AbstractTest {
         boolean animating = (am != null && am.isAnimating())
                 || Display.getInstance().isInTransition();
         if (!animating || waitedMs >= 5000) {
-            // Force a fresh paint of the current form -- the Metal layer on
-            // Mac Catalyst CI can lag one form behind because no display
-            // link drives present. Mark the entire form dirty then bounce
-            // off the EDT so the paint cycle actually runs before the
-            // snapshot. UITimer adds a final settle so dispatch_sync of
-            // flushBuffer to main can complete.
-            form.repaint();
-            UITimer.timer(300, false, form, () ->
-                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, BaseTest.this::done));
+            Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName, BaseTest.this::done);
             return;
         }
         UITimer.timer(50, false, form, () -> awaitAnimationsThenScreenshot(form, imageName, waitedMs + 50));

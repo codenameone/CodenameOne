@@ -77,6 +77,31 @@ interface Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
+
+        // Mac native: Display.screenshot() reads through the Metal display
+        // layer, whose drawable lags the EDT's view of the current form by
+        // one or more frames on headless macos-15 (no display link drives
+        // present). The result is chart-bar.png ending up with chart-cubic-
+        // line content, ButtonTheme_light captured mid-slide, etc. Bypass
+        // the display layer entirely by painting the form into an off-
+        // screen mutable image -- the pixels are written synchronously, no
+        // Metal drawable race -- and feed that to the encoder. Other ports
+        // (iOS device, Android, JavaScript, JavaSE simulator) keep the
+        // native screenshot path because their Display.screenshot() is
+        // reliable and the off-screen path can't capture native peers
+        // (BrowserComponent, video, etc.) that live outside the CN1
+        // paint pipeline.
+        if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
+            try {
+                Image off = Image.createImage(width, height);
+                current.paintComponent(off.getGraphics(), true);
+                emitImageScreenshot(safeName, off, width, height);
+            } finally {
+                complete(onComplete);
+            }
+            return;
+        }
+
         Display.getInstance().screenshot(screen -> {
             if (screen == null) {
                 println("CN1SS:ERR:test=" + safeName + " message=Screenshot callback returned null");
