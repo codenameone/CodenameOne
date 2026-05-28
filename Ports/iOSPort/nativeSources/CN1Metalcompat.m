@@ -755,13 +755,81 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
 // the failure rather than papering over it with a different pipeline
 // that would silently mask the bug.
 
+// Returns the effective screen-pixel scale baked into the current
+// transform. The vertex shader applies `projection * modelView *
+// transform * pos`; projection / modelView are stable per frame and
+// expressed in framebuffer units, so any *additional* scaling comes
+// from `currentTransform`. For text rendering we want to know that
+// effective scale up front so the glyph atlas can rasterise at the
+// matching pixel size; otherwise the atlas glyph art (rasterised at
+// font.pointSize) is sampled through a stretched quad and the glyph
+// turns into a smear at every `g.setTransform(scale)` site -- e.g.
+// the SVG transcoder painting `<text>` under a viewBox-to-display
+// scale, which is the most visible offender.
+//
+// Pulls a uniform scale by averaging the magnitudes of the two basis
+// vectors of the upper-left 2x2 (sx along the X column, sy along the
+// Y column). Shear-only or pure-rotation matrices return 1 because
+// both column magnitudes stay at 1; pure scale returns the scale.
+// We do *not* try to handle non-uniform scale separately -- the
+// glyph atlas slot key is one float (pointSize), so even if the
+// SVG draws with sx != sy we have to pick one. Going with the
+// geometric mean keeps the rasterised glyph close to either bound
+// and the residual GPU stretch only kicks in along the dimension
+// that's farther from the mean.
+static inline float currentTransformGlyphScale(void) {
+    float c0x = currentTransform.columns[0].x;
+    float c0y = currentTransform.columns[0].y;
+    float c1x = currentTransform.columns[1].x;
+    float c1y = currentTransform.columns[1].y;
+    float sx = sqrtf(c0x * c0x + c0y * c0y);
+    float sy = sqrtf(c1x * c1x + c1y * c1y);
+    float s = (sx + sy) * 0.5f;
+    // Reject NaN / inf / non-positive values: any of those would
+    // poison `font.pointSize * s` below and produce a UIFont with
+    // bad metrics that hangs the CTLine layout. `isfinite` is true
+    // only for finite numbers; treat anything else as "use unscaled
+    // font" by returning 1.0 (the `useScaledFont` gate at the call
+    // site clears that to the fast path).
+    if (!isfinite(s) || s <= 0.0f) return 1.0f;
+    // Cap at 8x to keep the atlas from rasterising absurdly large
+    // bitmaps for a runaway transform; well past 8x the difference
+    // between "atlas-perfect" and "sampled-and-filtered" is below
+    // what the user can see anyway.
+    if (s < 1.0f) s = 1.0f;     // No down-rasterising; 1px atlas is fine for downscale.
+    if (s > 8.0f) s = 8.0f;
+    return s;
+}
+
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
-    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
+    // CoreText shapes glyphs and the atlas rasterises them at font.pointSize
+    // — but the active Graphics transform may be scaling the whole drawing
+    // up before the framebuffer write. If we hand the shader a quad sized to
+    // the unscaled glyph and let the transform stretch it on the GPU, the
+    // result is a smeared/blurry glyph (Codename One's SVG transcoder paints
+    // viewBox-relative text through `g.setTransform(scale*translate)`, so the
+    // screen scale is routinely 2x-4x). Detect the scale baked into
+    // `currentTransform` and rasterise the atlas at the effective pixel size
+    // so the shader transform produces a 1:1 sample. We then divide the
+    // returned glyph metrics back down by the same factor so the vertex
+    // coords stay in unscaled space — the GPU re-applies `currentTransform`
+    // for free and the final on-screen position matches the unscaled path.
+    float glyphScale = currentTransformGlyphScale();
+    BOOL useScaledFont = (glyphScale > 1.01f);
+    UIFont *renderFont = useScaledFont
+        ? [font fontWithSize:font.pointSize * glyphScale]
+        : font;
+    if (renderFont == nil) {
+        renderFont = font;
+        useScaledFont = NO;
+    }
+
+    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:renderFont];
     if (atlas == nil) {
         NSLog(@"CN1MetalDrawString: no atlas available for font %@ pt=%g; string skipped",
-              font.fontName, (double)font.pointSize);
+              renderFont.fontName, (double)renderFont.pointSize);
         return;
     }
 
@@ -774,7 +842,7 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // fresh form, which surfaced as the TL panel of graphics-draw-string-
     // decorated rendering larger/wider glyphs than TR/BL/BR despite
     // identical Java state.
-    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: font };
+    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: renderFont };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
@@ -798,7 +866,14 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // (not CTFontGetAscent) is intentional — UIKit's metric is what
     // drawAtPoint references and the values can disagree slightly across
     // fonts.
+    //
+    // Use the ORIGINAL font's ascender (and the original pointSize) so the
+    // baseline lands where the caller-side framework expects, even when we
+    // upscaled the atlas. The atlas-internal metrics (renderFont) reflect
+    // the rasterised size; we divide them by `glyphScale` below to bring
+    // them back into caller-side coords.
     float baselineY = (float)y + (float)font.ascender;
+    float invScale = useScaledFont ? (1.0f / glyphScale) : 1.0f;
 
     simd_float4 colorV = premultipliedColor(color, alpha);
     int textureW = atlas.textureWidth;
@@ -838,11 +913,24 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
             //   bbox-left-on-screen  = x + posX + bearingX
             //   bbox-top-on-screen   = baselineY - posY - (bearingY + bbox.height)
             // Slot extends 1px above and to the left of the bbox.
-            float gx = (float)x + (float)posPtr[i].x + slot.bearingX - 1.0f;
-            float gy = baselineY - (float)posPtr[i].y
-                       - (slot.bearingY + slot.bboxHeight) - 1.0f;
-            float gw = (float)slot.width;
-            float gh = (float)slot.height;
+            //
+            // When the atlas was rasterised at the upscaled size, the
+            // CoreText positions and slot metrics are in renderFont-pixel
+            // space (which is glyphScale times the caller-side pixel space).
+            // Divide each one back down by glyphScale so the emitted vertex
+            // coords live in caller-side space — the vertex shader will
+            // re-apply currentTransform (the same scale we factored out) and
+            // produce a quad of the correct on-screen size, sampling
+            // 1:1 against the now-matching atlas.
+            float posX = (float)posPtr[i].x * invScale;
+            float posY = (float)posPtr[i].y * invScale;
+            float bearingX = slot.bearingX * invScale;
+            float bearingY = slot.bearingY * invScale;
+            float bboxHeight = slot.bboxHeight * invScale;
+            float gx = (float)x + posX + bearingX - invScale;
+            float gy = baselineY - posY - (bearingY + bboxHeight) - invScale;
+            float gw = (float)slot.width * invScale;
+            float gh = (float)slot.height * invScale;
 
             float vertices[8] = {
                 gx,        gy,

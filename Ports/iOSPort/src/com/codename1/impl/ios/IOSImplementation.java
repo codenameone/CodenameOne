@@ -1735,8 +1735,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         Rectangle bounds = shape.getBounds();
         if ( shape.isRectangle() || bounds.getWidth() <= 0 || bounds.getHeight() <= 0){
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
-        } else if (shape.isPolygon()) {
-            int pointsSize = shape.getPointsSize();
+            return;
+        }
+        // Curved clips (anything containing QUADTO / CUBICTO) get
+        // flattened first so the polygon path below sees real polyline
+        // vertices instead of interleaved control / anchor pairs. Without
+        // this, setClip(circularPath) reaches the native side as 17 raw
+        // floats that include 8 outside-the-curve control points, and
+        // the triangle-fan stencil writer turns the circle into the
+        // visible "triangle clip" on gradient_circle.svg and
+        // clipped_badge.svg (see SVGStaticScreenshotTest).
+        ClipShape polyShape = flattenClipShapeIfNeeded(shape);
+        if (polyShape.isPolygon()) {
+            int pointsSize = polyShape.getPointsSize();
             // Reallocate when the buffer doesn't EXACTLY match -- previously
             // this only reallocated when undersized, so a smaller polygon
             // reused a larger buffer and the trailing slots retained the
@@ -1749,23 +1760,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (polygonPointsBuffer == null || polygonPointsBuffer.length != pointsSize) {
                 polygonPointsBuffer = new float[pointsSize];
             }
-            shapeToPolygon(shape, polygonPointsBuffer);
+            shapeToPolygon(polyShape, polygonPointsBuffer);
             nativeInstance.setNativeClippingPolygonGlobal(polygonPointsBuffer);
         } else {
-            
+            // The path didn't reduce to a polygon (still has multiple
+            // disjoint sub-paths or other oddities). Fall back to the
+            // alpha-mask Renderer; on the GL backend this paints the
+            // shape into the stencil, on the Metal backend the texture
+            // handle isn't compatible with MTLTexture and the bounding
+            // box is used as a coarse fallback (see ClipRect.m).
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
             if ( mask == null ){
                 mask = (TextureAlphaMask)this.createAlphaMask(shape, null);
                 textureCache.add(shape, null, mask);
             }
-            
+
            if ( mask != null ){
-               //Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
                 nativeInstance.setNativeClippingMaskGlobal(mask.getTextureName(), mask.getBounds().getX(), mask.getBounds().getY(), mask.getBounds().getWidth(), mask.getBounds().getHeight());
             } else {
                Log.p("Failed to create texture mask for clipping region");
             }
-            
+
         }
     }
 
@@ -2317,7 +2332,184 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("shapeToPolygon requires out array at least the size of the points in the polygon.  Requires "+size+" but found "+pointsOut.length);
         }
         shape.getPoints(pointsOut);
-        
+
+    }
+
+    // Reusable buffer for flattening curves into a polyline GeneralPath
+    // before handing the clip down to the native polygon path. Reused
+    // across clip applications to avoid per-frame allocation.
+    private GeneralPath flattenedClipPath;
+    private ClipShape flattenedClipShape;
+
+    /// Walks `src` and builds a polyline GeneralPath in `dst` by replacing
+    /// every QUADTO / CUBICTO with a chain of straight LINETO segments
+    /// produced by midpoint subdivision. The native iOS clip pipeline
+    /// (GL ES2 FillPolygon and Metal CN1MetalApplyPolygonStencilClip) both
+    /// consume their input as a flat polygon: the only points they look
+    /// at are the (x, y) pairs in the buffer. When the source path is a
+    /// curve (e.g. a circle built from arc() emits 8 quadTos) the raw
+    /// points buffer contains alternating control / anchor pairs, and the
+    /// stencil writer treats every control point as a real polygon
+    /// vertex. The result is the degenerate "triangle clip" described in
+    /// the SVG tests on gradient_circle.svg / clipped_badge.svg. Flatten
+    /// first so only true vertices survive.
+    private void flattenShapeToPolyline(Shape src, GeneralPath dst) {
+        dst.reset();
+        PathIterator it = src.getPathIterator();
+        dst.setWindingRule(it.getWindingRule());
+        float[] coords = new float[6];
+        float curX = 0f, curY = 0f, moveX = 0f, moveY = 0f;
+        while (!it.isDone()) {
+            int seg = it.currentSegment(coords);
+            switch (seg) {
+                case PathIterator.SEG_MOVETO:
+                    dst.moveTo(coords[0], coords[1]);
+                    curX = moveX = coords[0];
+                    curY = moveY = coords[1];
+                    break;
+                case PathIterator.SEG_LINETO:
+                    dst.lineTo(coords[0], coords[1]);
+                    curX = coords[0];
+                    curY = coords[1];
+                    break;
+                case PathIterator.SEG_QUADTO:
+                    flattenQuadInto(dst, curX, curY, coords[0], coords[1], coords[2], coords[3], 0);
+                    curX = coords[2];
+                    curY = coords[3];
+                    break;
+                case PathIterator.SEG_CUBICTO:
+                    flattenCubicInto(dst, curX, curY,
+                            coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], 0);
+                    curX = coords[4];
+                    curY = coords[5];
+                    break;
+                case PathIterator.SEG_CLOSE:
+                    dst.closePath();
+                    curX = moveX;
+                    curY = moveY;
+                    break;
+            }
+            it.next();
+        }
+    }
+
+    // Squared distance threshold (in user-space units) for the
+    // subdivision flatness test. 0.25 px is well below 1 device pixel
+    // even after the typical retina upscale and matches the precision of
+    // the alpha-mask Renderer used by the rest of the iOS port.
+    private static final float FLATTEN_TOLERANCE_SQ = 0.25f * 0.25f;
+    // Safety cap on the recursion depth. 18 = 2^18 sub-segments which is
+    // far past anything a real SVG path needs; the flatness test should
+    // always converge well before this.
+    private static final int FLATTEN_MAX_DEPTH = 18;
+
+    private static void flattenQuadInto(GeneralPath dst,
+                                        float x0, float y0,
+                                        float x1, float y1,
+                                        float x2, float y2,
+                                        int depth) {
+        // Distance from the control point to the chord P0-P2. For a
+        // quadratic Bezier the maximum deviation between the curve and
+        // its chord is bounded by half the control-point-to-chord
+        // distance, so testing the control point against the threshold
+        // is a safe (slightly conservative) flatness criterion.
+        float dx = x2 - x0;
+        float dy = y2 - y0;
+        float lenSq = dx * dx + dy * dy;
+        float distSq;
+        if (lenSq < 1e-6f) {
+            distSq = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
+        } else {
+            float cross = (x1 - x0) * dy - (y1 - y0) * dx;
+            distSq = (cross * cross) / lenSq;
+        }
+        if (distSq <= FLATTEN_TOLERANCE_SQ || depth >= FLATTEN_MAX_DEPTH) {
+            dst.lineTo(x2, y2);
+            return;
+        }
+        float mx1 = (x0 + x1) * 0.5f, my1 = (y0 + y1) * 0.5f;
+        float mx2 = (x1 + x2) * 0.5f, my2 = (y1 + y2) * 0.5f;
+        float mx = (mx1 + mx2) * 0.5f, my = (my1 + my2) * 0.5f;
+        flattenQuadInto(dst, x0, y0, mx1, my1, mx, my, depth + 1);
+        flattenQuadInto(dst, mx, my, mx2, my2, x2, y2, depth + 1);
+    }
+
+    private static void flattenCubicInto(GeneralPath dst,
+                                         float x0, float y0,
+                                         float x1, float y1,
+                                         float x2, float y2,
+                                         float x3, float y3,
+                                         int depth) {
+        // Max distance from either inner control point to the chord
+        // P0-P3. A cubic curve never strays farther than its furthest
+        // control point from its chord, so the larger of the two
+        // perpendicular distances is a conservative flatness bound.
+        float dx = x3 - x0;
+        float dy = y3 - y0;
+        float lenSq = dx * dx + dy * dy;
+        float d1Sq, d2Sq;
+        if (lenSq < 1e-6f) {
+            d1Sq = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
+            d2Sq = (x2 - x0) * (x2 - x0) + (y2 - y0) * (y2 - y0);
+        } else {
+            float c1 = (x1 - x0) * dy - (y1 - y0) * dx;
+            float c2 = (x2 - x0) * dy - (y2 - y0) * dx;
+            d1Sq = (c1 * c1) / lenSq;
+            d2Sq = (c2 * c2) / lenSq;
+        }
+        float distSq = d1Sq > d2Sq ? d1Sq : d2Sq;
+        if (distSq <= FLATTEN_TOLERANCE_SQ || depth >= FLATTEN_MAX_DEPTH) {
+            dst.lineTo(x3, y3);
+            return;
+        }
+        float mx01 = (x0 + x1) * 0.5f, my01 = (y0 + y1) * 0.5f;
+        float mx12 = (x1 + x2) * 0.5f, my12 = (y1 + y2) * 0.5f;
+        float mx23 = (x2 + x3) * 0.5f, my23 = (y2 + y3) * 0.5f;
+        float mxA = (mx01 + mx12) * 0.5f, myA = (my01 + my12) * 0.5f;
+        float mxB = (mx12 + mx23) * 0.5f, myB = (my12 + my23) * 0.5f;
+        float mx = (mxA + mxB) * 0.5f, my = (myA + myB) * 0.5f;
+        flattenCubicInto(dst, x0, y0, mx01, my01, mxA, myA, mx, my, depth + 1);
+        flattenCubicInto(dst, mx, my, mxB, myB, mx23, my23, x3, y3, depth + 1);
+    }
+
+    // True if the path has only MOVETO / LINETO / CLOSE segments, i.e.
+    // it is already a polyline and flattening would just copy it.
+    private boolean isAlreadyFlat(Shape s) {
+        if (s instanceof ClipShape && ((ClipShape) s).isRect()) {
+            return true;
+        }
+        PathIterator it = s.getPathIterator();
+        float[] coords = new float[6];
+        while (!it.isDone()) {
+            int seg = it.currentSegment(coords);
+            if (seg == PathIterator.SEG_QUADTO || seg == PathIterator.SEG_CUBICTO) {
+                return false;
+            }
+            it.next();
+        }
+        return true;
+    }
+
+    // Flatten if necessary and return the ClipShape that should be sent
+    // through the native polygon clip path. When the input is already a
+    // polyline (the common case for rectangular clipRect intersections
+    // built by NativeGraphics.clipRect) the input is returned as-is. The
+    // returned ClipShape is reused across calls (not shared with the
+    // input), so callers must finish reading from it before the next
+    // clip is applied.
+    private ClipShape flattenClipShapeIfNeeded(ClipShape src) {
+        if (isAlreadyFlat(src)) {
+            return src;
+        }
+        if (flattenedClipPath == null) {
+            flattenedClipPath = new GeneralPath();
+        }
+        flattenShapeToPolyline(src, flattenedClipPath);
+        if (flattenedClipShape == null) {
+            flattenedClipShape = new ClipShape();
+        }
+        flattenedClipShape.setShape(flattenedClipPath, null);
+        return flattenedClipShape;
     }
     /*
     public void drawConvexPolygon(Object graphics, Shape shape, Stroke stroke, int color, int alpha){
@@ -5027,18 +5219,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         void setNativeClipping(ClipShape shape){
-            
+
             if (shape.isRect()) {
                 shape.getBounds(reusableRect);
                 setNativeClippingMutable(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
-                
+
             } else {
-                int commandsLen = shape.getTypesSize();
-                int pointsLen = shape.getPointsSize();
+                // The native side (setNativeClippingShapeMutableImpl in
+                // CodenameOne_GLViewController.m) ignores the commands
+                // array and treats every (x, y) pair in the points buffer
+                // as a polygon vertex. For a path with curves that means
+                // control points appear as polygon vertices, producing
+                // the SVG "triangle clip" symptom for gradient_circle.svg
+                // and clipped_badge.svg. Flatten on the Java side so the
+                // points buffer contains only true polyline vertices.
+                ClipShape polyShape = flattenClipShapeIfNeeded(shape);
+                int commandsLen = polyShape.getTypesSize();
+                int pointsLen = polyShape.getPointsSize();
                 byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
                 float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
-                shape.getTypes(commandsArr);
-                shape.getPoints(pointsArr);
+                polyShape.getTypes(commandsArr);
+                polyShape.getPoints(pointsArr);
                 nativeInstance.setNativeClippingMutable(commandsLen, commandsArr, pointsLen, pointsArr);
             }
         }
