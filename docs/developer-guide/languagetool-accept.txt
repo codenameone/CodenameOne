@@ -530,3 +530,15 @@ webauthn
 # dictionary.
 [Dd]ao
 [Dd]aos
+
+# -----------------------------------------------------------------------------
+# AI / LLM provider, product, and model names used in the AI, Chat UI, and
+# Speech chapter. LanguageTool's en_US dictionary either doesn't recognise
+# these or mis-spells them.
+# -----------------------------------------------------------------------------
+Ollama
+[Vv]LLM
+[Ll]lama
+[Aa]nthropic
+SAPI
+espeak

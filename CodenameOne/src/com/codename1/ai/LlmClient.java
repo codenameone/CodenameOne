@@ -58,15 +58,16 @@ public abstract class LlmClient {
     // uses.
     //
     // Versions reflect the providers' production REST shapes as of
-    // mid-2026:
-    //   - OpenAI Chat Completions    -- /v1            (stable)
-    //   - Anthropic Messages         -- /v1            (stable)
-    //   - Google Gemini (native)     -- /v1beta        (only path
-    //     that exposes streaming generateContent and tool calls today)
-    //   - Ollama OpenAI-compat shim  -- /v1
+    // mid-2026. Anthropic and Gemini both publish an OpenAI-compatible
+    // `/chat/completions` endpoint, which is what this client targets
+    // -- one shared wire format, three providers.
+    //   - OpenAI Chat Completions       -- /v1
+    //   - Anthropic Messages compat     -- /v1
+    //   - Google Gemini OpenAI compat   -- /v1beta/openai
+    //   - Ollama OpenAI-compat shim     -- /v1
     public static final String DEFAULT_OPENAI_URL    = "https://api.openai.com/v1";
     public static final String DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com/v1";
-    public static final String DEFAULT_GEMINI_URL    = "https://generativelanguage.googleapis.com/v1beta";
+    public static final String DEFAULT_GEMINI_URL    = "https://generativelanguage.googleapis.com/v1beta/openai";
     public static final String DEFAULT_OLLAMA_URL    = "http://localhost:11434/v1";
 
     private String baseUrl;

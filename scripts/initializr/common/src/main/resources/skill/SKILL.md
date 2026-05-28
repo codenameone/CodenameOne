@@ -33,6 +33,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/mobile-adaptability.md` — Density-independent units (mm), `convertToPixels`, `LayeredLayout` for responsive design, `Display.isTablet()`, font scaling.
 - `references/native-interfaces.md` — Authoring native interfaces for iOS/Android/JavaScript/Desktop with `cn1:generate-native-interfaces` and platform callbacks.
 - `references/cn1libs.md` — Creating, packaging, and consuming Codename One libraries (Maven and legacy `.cn1lib`).
+- `references/ai-and-speech.md` — LLM client (`com.codename1.ai`), `ChatView`, `SpeechRecognizer`, `TextToSpeech`, non-prompting `SecureStorage` overloads, the ML Kit cn1libs, and the simulator's offline Ollama redirect. Read this when the user asks for chat, voice, embeddings, image generation, barcode/document/face detection, or wants to store an LLM API key.
 - `references/snapshot-builds.md` — Edge case: compiling against a Codename One SNAPSHOT from git.
 - `references/debugging.md` — `jdb`-attach workflow for an agent: start the simulator paused, set breakpoints, dump locals, drive the session non-interactively from a script.
 - `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?". Run with `java tools/<Name>.java <args>`.
@@ -292,6 +293,10 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Why does the compliance check fail" / Java/IO/networking | `references/java-api-subset.md` |
 | "I need to call a native iOS/Android/JS/desktop API" | `references/native-interfaces.md` |
 | "How do I create / consume a cn1lib" | `references/cn1libs.md` |
+| "Add a chatbot" / "Integrate OpenAI/Ollama/Anthropic" / "Stream LLM tokens" / "Generate an image" / "Embed text" | `references/ai-and-speech.md` |
+| "Read voice input" / "Speak text aloud" / "Add a voice button to my chat" | `references/ai-and-speech.md` |
+| "Scan a barcode" / "Detect a face" / "Crop a document photo" via ML Kit | `references/ai-and-speech.md` |
+| "Store an LLM API key" / non-prompting SecureStorage | `references/ai-and-speech.md` |
 | "Build against a Codename One SNAPSHOT from git" | `references/snapshot-builds.md` |
 | "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
 | Quick yes/no check: "is this `java.*` class supported", "does my `theme.css` compile" | `tools/` directory — `java tools/IsApiSupported.java <class>` / `java tools/IsCssValid.java <file>` |
