@@ -203,7 +203,7 @@ A grid of the static SVGs from the hellocodenameone fixture, rendered through th
 
 ![Static SVGs rendered by the build-time transcoder on iOS Metal: filled star, gradient-filled circle, path arrow, rounded button, two stroked wave paths, gradient-filled PRO badge, clipped badge](/blog/build-time-codegen/svg-static.png)
 
-### Sizing in millimeters is the important knob
+### Sizing in millimeters
 
 The SVG transcoder's most useful feature is also the one most easily missed: **size every SVG in millimeters from CSS**. SVGs in the wild routinely declare odd `width` / `height` attributes (a 1024×1024 export of a 24×24 icon, no dimensions at all, design-pixel values from one specific framework). Pinning the rendered size in millimeters sidesteps all of that.
 
@@ -232,7 +232,9 @@ The transcoder is a `maven/svg-transcoder/` module that parses SVG with `javax.x
 
 SMIL animations are supported in the same pipeline: `<animate>`, `<animateTransform>` (`translate`, `scale`, `rotate`), and `<set>`. Time values interpolate against wall-clock time on every paint, with `from` / `to` / `values` / `begin` / `dur` / `repeatCount` / `fill="freeze"` honoured.
 
-Explicit non-coverage in v1: SVG `text`, masks / clip-paths, filters, radial-gradient paint (falls back to first stop colour), CSS keyframe animations.
+Text and clip-path landed in the [follow-up PR for the static SVG fixtures](https://github.com/codenameone/CodenameOne/pull/5056), and both are visible in the screenshot above (the "Codename One / build-time SVG" wordmark in the rounded button, the "PRO" badge text, and the clip-path-shaped rounded-corner badge underneath). `<text>` and `<tspan>` work with single-style fills and transforms; `<clipPath>` referenced via `clip-path="url(#id)"` works against `rect`, `circle`, and `path` clip shapes (nested clip refs are ignored).
+
+What is still not supported: SVG `filter` primitives, `<mask>` (treated as a clip, so alpha masking falls back to opaque), `<radialGradient>` (falls back to the first-stop colour), and CSS-in-SVG (style rules inside the SVG document; the transcoder reads presentation attributes and the inline `style="..."` attribute, but a `<style>` element with selectors is not parsed).
 
 **If you hit an SVG that does not transcode the way you expect**, please open an issue at [github.com/codenameone/CodenameOne/issues](https://github.com/codenameone/CodenameOne/issues) and **attach the source file**. The fastest way to extend the coverage is for us to run the failing case through the test fixtures and watch the output. Every SVG we ship test goldens for started as somebody else's "this doesn't render right" report.
 
