@@ -782,13 +782,20 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
 
 
-        int availableHeight = getLayeredPane(f).getParent().getHeight();
-        if (availableHeight == 0) {
-            availableHeight = CN.getDisplayHeight();
-        }
-        int availableWidth = getLayeredPane(f).getParent().getWidth();
-        if (availableWidth == 0) {
-            availableWidth = CN.getDisplayWidth();
+        // Layered-pane parent can be momentarily detached when a previous
+        // formMode dialog was disposed (cleanupLayer removes the inner pane
+        // from its parent while the form may still be mid-animation, see
+        // #5069). Fall back to display dimensions instead of NPE'ing.
+        Container layeredParent = getLayeredPane(f).getParent();
+        int availableHeight = CN.getDisplayHeight();
+        int availableWidth = CN.getDisplayWidth();
+        if (layeredParent != null) {
+            if (layeredParent.getHeight() != 0) {
+                availableHeight = layeredParent.getHeight();
+            }
+            if (layeredParent.getWidth() != 0) {
+                availableWidth = layeredParent.getWidth();
+            }
         }
         int width = Math.min(availableWidth, prefWidth);
         setWidth(width);
