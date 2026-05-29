@@ -1,5 +1,5 @@
 ---
-title: Build-Time Codegen: Router, ORM, Mappers, Binder, SVG / Lottie
+title: "Build-Time Codegen: Router, ORM, Mappers, Binder, SVG / Lottie"
 slug: build-time-codegen
 url: /blog/build-time-codegen/
 date: '2026-06-03'
