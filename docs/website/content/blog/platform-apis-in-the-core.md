@@ -246,69 +246,233 @@ view.setInputListener(userText -> {
 
 ### The AI cn1libs
 
-A set of opt-in AI cn1libs ships alongside the core LLM stack. Each one packages a specific capability (a Google ML Kit feature, a TensorFlow Lite runtime, a local Whisper transcription engine, an on-device Stable Diffusion model) along with the iOS frameworks, Android Gradle dependencies, plist usage strings, and permissions that capability needs. The full list, with the native dependency each one resolves to, is:
+The core LLM stack is paired with a set of opt-in cn1libs that wrap specific on-device capabilities: Google ML Kit features, the TensorFlow Lite runtime, a local Whisper transcription engine, and an on-device Stable Diffusion model. Thirteen new cn1libs ship this release.
 
-| cn1lib | What it gives you |
-|---|---|
-| `cn1-ai-mlkit-text` | ML Kit text recognition (OCR from photos or live camera). |
-| `cn1-ai-mlkit-barcode` | ML Kit barcode and QR scanning. |
-| `cn1-ai-mlkit-face` | ML Kit face detection with landmarks and contours. |
-| `cn1-ai-mlkit-labeling` | ML Kit image labelling ("what is in this picture"). |
-| `cn1-ai-mlkit-translate` | ML Kit on-device translation between supported languages. |
-| `cn1-ai-mlkit-smartreply` | ML Kit Smart Reply suggestions for short messages. |
-| `cn1-ai-mlkit-langid` | ML Kit on-device language identification. |
-| `cn1-ai-mlkit-pose` | ML Kit pose detection (body landmarks). |
-| `cn1-ai-mlkit-segmentation` | ML Kit selfie segmentation (person / background mask). |
-| `cn1-ai-mlkit-docscan` | ML Kit Document Scanner; iOS also pulls in `VisionKit`. |
-| `cn1-ai-tflite` | TensorFlow Lite interpreter. Bring your own model. |
-| `cn1-ai-whisper` | On-device Whisper transcription via a bundled `libwhisper.a`. |
-| `cn1-ai-stablediffusion` | On-device Stable Diffusion. Core ML on iOS, ONNX runtime on Android. |
+These cn1libs are not yet listed in the Codename One Preferences cn1lib picker, so for the moment they are added by hand. Drop the matching dependency block into your project's `common/pom.xml` and rebuild. The build-time scanner does the rest: the iOS pod or Swift Package, the Android Gradle dependency, the plist usage strings (`NSCameraUsageDescription` for the vision libraries, `NSSpeechRecognitionUsageDescription` for Whisper, etc.), and the Android permissions (`android.permission.RECORD_AUDIO` for audio capture) are all injected automatically the first time the scanner sees the matching class on the classpath.
 
-Adding any of them to a project is the same path as any other cn1lib. From Codename One Preferences → cn1libs, tick the one you want and refresh; the next build links the right native pieces in. The build-time `AiDependencyTable` in the Maven plugin handles the rest: the iOS pod or Swift Package, the Android Gradle dependency, the plist usage strings (`NSCameraUsageDescription` for the vision libraries, `NSSpeechRecognitionUsageDescription` for Whisper, etc.), and the Android permissions (`android.permission.RECORD_AUDIO` for audio capture) are all injected by the scanner the first time it sees the matching class on the classpath.
+For each cn1lib below, the dependency block is identical in shape; only the `<artifactId>` changes. The shared pattern is:
 
-A typical use looks like the rest of the framework. Reading a barcode:
+```xml
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId><!-- cn1lib artifact id from below --></artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+```
+
+#### `cn1-ai-mlkit-text`: text recognition (OCR)
+
+**TL;DR.** Pull printed or handwritten text out of an image (a photo of a page, a sign, a receipt) entirely on-device.
+
+**Platforms.** iOS bridges to `GoogleMLKit/TextRecognition`. Android bridges to `com.google.mlkit:text-recognition`. The JavaSE simulator returns an unsupported error.
+
+**Use cases.** Receipt scanning, sign translation pipelines (combine with `cn1-ai-mlkit-translate`), accessibility tools that read printed text aloud, automated form ingestion.
 
 ```java
-new BarcodeScanner()
-    .scan()
-    .onResult((barcode, err) -> {
-        if (err != null) return;
-        Log.p("Scanned " + barcode.format() + ": " + barcode.value());
+byte[] jpeg = capturePhotoBytes();
+TextRecognizer.recognize(jpeg).onResult((text, err) -> {
+    if (err == null) Log.p("OCR: " + text);
+});
+```
+
+#### `cn1-ai-mlkit-barcode`: barcode and QR scanning
+
+**TL;DR.** Decodes QR, EAN, UPC, Data Matrix, PDF417, and the rest of the common 1D / 2D code families from a captured image.
+
+**Platforms.** iOS bridges to `MLKitBarcodeScanning`. Android bridges to `com.google.mlkit:barcode-scanning`. The JavaSE simulator returns an unsupported error.
+
+**Use cases.** Inventory scanning, ticket / boarding-pass readers, QR-driven onboarding flows, retail loyalty cards.
+
+```java
+byte[] jpeg = capturePhotoBytes();
+BarcodeScanner.scan(jpeg).onResult((codes, err) -> {
+    if (err == null) {
+        for (String code : codes) Log.p("Found: " + code);
+    }
+});
+```
+
+#### `cn1-ai-mlkit-face`: face detection
+
+**TL;DR.** Returns bounding boxes for human faces detected in an image. Each face is reported as a packed `int[4]` (`x`, `y`, `width`, `height`).
+
+**Platforms.** iOS bridges to `MLKitFaceDetection`. Android bridges to `com.google.mlkit:face-detection`.
+
+**Use cases.** Auto-crop a contact photo, mosaic / blur bystanders in a group shot, drive a face-tracked overlay for AR-lite filters.
+
+```java
+FaceDetector.detect(jpeg).onResult((boxes, err) -> {
+    if (err != null) return;
+    for (int i = 0; i < boxes.length; i += 4) {
+        Log.p("face at " + boxes[i] + "," + boxes[i + 1] + " "
+                + boxes[i + 2] + "x" + boxes[i + 3]);
+    }
+});
+```
+
+#### `cn1-ai-mlkit-labeling`: image labelling
+
+**TL;DR.** "What is in this picture." Returns a list of descriptive labels for the image content.
+
+**Platforms.** iOS bridges to `MLKitImageLabeling`. Android bridges to `com.google.mlkit:image-labeling`.
+
+**Use cases.** Auto-tagging uploaded photos, content moderation pre-filters, content-based image search.
+
+```java
+ImageLabeler.label(jpeg).onResult((labels, err) -> {
+    if (err == null) Log.p("labels: " + String.join(", ", labels));
+});
+```
+
+#### `cn1-ai-mlkit-translate`: on-device translation
+
+**TL;DR.** Translate short text between supported language pairs entirely on-device; no server round-trip, no API key, works offline.
+
+**Platforms.** iOS bridges to `MLKitTranslate`. Android bridges to `com.google.mlkit:translate`. Languages are identified by their ISO 639-1 codes (`en`, `fr`, `es`, ...).
+
+**Use cases.** Offline travel assistants, chat translation, accessibility readers for foreign signage (combine with `cn1-ai-mlkit-text`).
+
+```java
+Translator.translate("Where is the train station?", "en", "fr")
+    .onResult((fr, err) -> {
+        if (err == null) Log.p(fr);   // "Où est la gare ?"
     });
 ```
 
-Detecting text in an image:
+#### `cn1-ai-mlkit-smartreply`: short reply suggestions
+
+**TL;DR.** Generates short suggested replies for chat conversations, similar to Gmail's Smart Reply chips.
+
+**Platforms.** iOS bridges to `MLKitSmartReply`. Android bridges to `com.google.mlkit:smart-reply`. The input is a JSON array of `{role, message, timestamp, userId}` objects.
+
+**Use cases.** A "quick reply" row above the keyboard in your in-app chat, response suggestions in a CRM inbox.
 
 ```java
-new TextRecognizer()
-    .recognize(Image.createFromCapturedPhoto(photoPath))
-    .onResult((result, err) -> {
-        if (err != null) return;
-        for (TextBlock block : result.blocks()) {
-            Log.p(block.text());
-        }
+String thread = "[{\"role\":\"remote\",\"message\":\"See you at 6?\","
+              + "\"timestamp\":" + System.currentTimeMillis() + ","
+              + "\"userId\":\"u42\"}]";
+
+SmartReply.suggest(thread).onResult((suggestions, err) -> {
+    if (err == null) {
+        for (String s : suggestions) Log.p("suggestion: " + s);
+    }
+});
+```
+
+#### `cn1-ai-mlkit-langid`: language identification
+
+**TL;DR.** Returns the most likely ISO 639-1 code for a given text, or `und` (undetermined) when the input is too short or ambiguous.
+
+**Platforms.** iOS bridges to `MLKitLanguageID`. Android bridges to `com.google.mlkit:language-id`.
+
+**Use cases.** Auto-route a customer-support message to the right team, pick the correct TTS voice for an arbitrary string, pre-screen input before running an expensive translate.
+
+```java
+LanguageIdentifier.identify("Bonjour le monde").onResult((code, err) -> {
+    if (err == null) Log.p(code);   // "fr"
+});
+```
+
+#### `cn1-ai-mlkit-pose`: pose detection
+
+**TL;DR.** Returns 33 skeletal landmarks per detected pose as a packed `float[3 * 33]` (`x`, `y`, `confidence` triples).
+
+**Platforms.** iOS bridges to `MLKitPoseDetection`. Android bridges to `com.google.mlkit:pose-detection`.
+
+**Use cases.** Fitness apps with form correction, dance / yoga timing analysis, gesture-driven controls.
+
+```java
+PoseDetector.detect(jpeg).onResult((landmarks, err) -> {
+    if (err != null || landmarks.length < 99) return;
+    float noseX = landmarks[0], noseY = landmarks[1], noseConf = landmarks[2];
+    Log.p("nose at (" + noseX + ", " + noseY + ") conf=" + noseConf);
+});
+```
+
+#### `cn1-ai-mlkit-segmentation`: selfie segmentation
+
+**TL;DR.** Returns a per-pixel mask separating the person in the foreground from the background as `byte[width * height]` (`0` = background, `255` = foreground).
+
+**Platforms.** iOS bridges to `MLKitSegmentationSelfie`. Android bridges to `com.google.mlkit:segmentation-selfie`.
+
+**Use cases.** Background replacement for video calls, sticker / portrait-mode effects, blur-the-background privacy filters.
+
+```java
+SelfieSegmenter.segment(jpeg).onResult((mask, err) -> {
+    if (err == null) applyBackgroundReplacement(mask);
+});
+```
+
+#### `cn1-ai-mlkit-docscan`: document scanner
+
+**TL;DR.** Detects a rectangular document in a photo, perspective-corrects it, and writes the cropped JPEG to a temporary file. Returns the file path.
+
+**Platforms.** iOS uses Apple's VisionKit + Core Image rectangle detection (no extra pod). Android uses `com.google.android.gms:play-services-mlkit-document-scanner`.
+
+**Use cases.** "Scan to PDF" flows, expense apps that capture receipts, contract signing flows, ID-document capture.
+
+```java
+DocumentScanner.scanToFile(jpeg).onResult((path, err) -> {
+    if (err == null) uploadDocument(path);
+});
+```
+
+#### `cn1-ai-tflite`: TensorFlow Lite interpreter
+
+**TL;DR.** A general-purpose on-device inference engine. Bring your own `.tflite` model and run it against a float32 input tensor.
+
+**Platforms.** iOS uses `TensorFlowLiteSwift` (Pods or Swift Package). Android uses `org.tensorflow:tensorflow-lite` + `tensorflow-lite-support`.
+
+**Use cases.** Any custom on-device ML model your team trains or pulls from TF Hub. Image classification, simple regression, recommendation pre-filters.
+
+```java
+byte[] modelBytes = Util.readFully(Display.getInstance().getResourceAsStream(null, "/model.tflite"));
+float[] input = featureVector();
+Interpreter.run(modelBytes, input).onResult((output, err) -> {
+    if (err == null) Log.p("model returned " + output.length + " values");
+});
+```
+
+#### `cn1-ai-whisper`: speech-to-text via whisper.cpp
+
+**TL;DR.** On-device transcription of a 16 kHz mono WAV file using a `ggml`-format Whisper model. The cn1lib bundles `libwhisper.a`.
+
+**Platforms.** iOS uses the Accelerate framework; Android uses a JNI build of the same `whisper.cpp` core. Models (e.g. `ggml-base.bin`) are not bundled; ship the one your app expects under the app's resources or download on first launch.
+
+**Use cases.** Voice notes, accessibility transcription, offline dictation, podcast indexing.
+
+```java
+String modelPath = SecureStorage.getFilePath("ggml-base.bin");
+String audioPath = recordWavToFile();
+WhisperRecognizer.transcribe(modelPath, audioPath)
+    .onResult((text, err) -> {
+        if (err == null) Log.p("heard: " + text);
     });
 ```
 
-Translating a sentence on-device:
+#### `cn1-ai-stablediffusion`: on-device image generation
+
+**TL;DR.** Generates a JPEG from a text prompt using a bundled Stable Diffusion model. Multi-gigabyte payload, **local build only**.
+
+**Platforms.** iOS uses Core ML pipelines compiled from the bundled model. Android uses ONNX Runtime. Both configurations exceed the cloud build server's 2 GB upload limit, so this cn1lib triggers the `cn1.ai.requiresBigUpload` guard and the cloud build aborts with a "build this one locally" message. Add it to a project you build via `mvn cn1:buildAndroid` / `mvn cn1:buildIosXcodeProject` on the developer machine.
+
+**Use cases.** Avatar generation in apps where shipping to a cloud API is undesirable (offline-first apps, regulated industries, privacy-sensitive products).
 
 ```java
-new Translator(Language.ENGLISH, Language.FRENCH)
-    .translate("Codename One")
-    .onResult((translated, err) -> { /* "Codename One" :) */ });
+StableDiffusion.generate("a teal hot-air balloon over Lisbon, watercolour",
+                         512, 512, /* steps */ 25)
+    .onResult((jpeg, err) -> {
+        if (err == null) display(Image.createImage(jpeg, 0, jpeg.length));
+    });
 ```
 
-### Why are these cn1libs and not part of the core?
+### Why these are cn1libs and not part of the core
 
-A fair question given the opening framing of this post. If "fundamental device APIs should be in the core", why does AI ship with thirteen cn1libs?
+The core gets the AI plumbing every app that adopts AI at all wants: the LLM client, streaming, the chat UI, the secure storage primitive for credentials, the simulator Ollama redirect for offline iteration.
 
-The split is intentional. The core gets the AI plumbing that almost every app that uses AI at all wants: the LLM client, the streaming, the chat UI, the secure storage primitive for credentials, the simulator Ollama redirect for offline iteration. Those are general-purpose; an app that adopts AI at all picks those up.
+The cn1libs above are specialised verticals. Barcode scanning, document scanning, face detection, smart reply, pose detection, on-device translation, transcription, on-device image generation, each is genuinely useful, but only for some apps. They also each bring a non-trivial native dependency. The Google ML Kit Android frameworks are large; the iOS pods carry their own weight; the bundled `libwhisper.a` and the Stable Diffusion model are big. Pulling all of them into core would tax every app whether the feature is used or not.
 
-The cn1libs are specialised verticals. Barcode scanning, document scanning, face detection, smart reply, pose detection, on-device translation, on-device speech transcription, on-device image generation; each is genuinely useful but only for some apps. They also each bring a non-trivial native dependency (Google ML Kit Android frameworks are large; the iOS pods add their own weight; the bundled Whisper static library and the on-device Stable Diffusion model are big), and the cost of carrying every one of them in core would land on every app whether it used the feature or not.
-
-A small subset (the on-device Stable Diffusion model, in particular) is also flagged with a `cn1.ai.requiresBigUpload` marker in `AiDependencyTable`. The cloud build server aborts pre-upload with a friendly "build this one locally" message because the multi-gigabyte payload does not fit inside the usual build-server timeouts. That kind of opt-in does not belong in a dependency that every app inherits.
-
-The bootstrapping script `scripts/create-ai-cn1lib.sh` generates a new AI cn1lib repo from the archetype with a Maven Central publish workflow, so if you have a model that fits a niche the framework does not yet ship, the path to a published cn1lib is one command.
+The Stable Diffusion cn1lib in particular is large enough that the cloud build server cannot accept the upload at all (it trips the 2 GB pre-upload guard). That kind of opt-in does not belong in a dependency every app inherits.
 
 The corresponding chapter, including the full `LlmClient` API table, the `ChatView` reference, the `SecureStorage` overloads, the simulator Ollama redirect, and the full cn1lib coverage, is at [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech) in the developer guide.
 
