@@ -4,15 +4,13 @@ slug: platform-apis-in-the-core
 url: /blog/platform-apis-in-the-core/
 date: '2026-06-01'
 author: Shai Almog
-description: A com.codename1.ai package with LlmClient, ChatView, streaming, tool calls, and a simulator Ollama redirect. A modern OAuth / OIDC stack that runs through the system browser and includes Sign in with Apple, Google, Microsoft, Auth0, Firebase, and WebAuthn passkeys. Built-in WiFi / Bonjour / USB and share-sheet result callbacks alongside. Deep tutorials and a note on why the ML Kit AI features stayed in cn1libs.
-feed_html: '<img src="https://www.codenameone.com/blog/platform-apis-in-the-core.jpg" alt="AI, OAuth, And Other Platform APIs In The Core" /> A com.codename1.ai package with LlmClient and ChatView, a modern OAuth / OIDC stack with WebAuthn passkeys, plus built-in WiFi / Bonjour / USB and share-sheet result callbacks. Deep tutorials and a note on why ML Kit stayed in cn1libs.'
+description: Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions (WiFi / connectivity, share-sheet result callbacks) alongside.
+feed_html: '<img src="https://www.codenameone.com/blog/platform-apis-in-the-core.jpg" alt="AI, OAuth, And Other Platform APIs In The Core" /> Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions alongside.'
 ---
 
 ![AI, OAuth, And Other Platform APIs In The Core](/blog/platform-apis-in-the-core.jpg)
 
 This is the second follow-up to [Friday's release post](/blog/metal-default-new-build-cloud-and-a-new-format/). It covers the platform APIs that moved into the framework core this release. There are two headline pieces (AI / LLM and the modern OAuth / OIDC stack), and two smaller pieces (WiFi / connectivity and share-sheet result callbacks). This continues the direction the previous release set when we moved NFC, biometrics, and cryptography into the framework core. The full background on that earlier set is in [NFC, Crypto, Biometrics, And A New Build Cloud](/blog/nfc-crypto-biometrics-and-build-cloud/).
-
-The order below mirrors how much code each section is likely to change in your app. AI first, OAuth / OIDC second, the smaller items at the end.
 
 ## AI: a first-class LLM client and a ChatView component
 
@@ -41,7 +39,7 @@ client.chat(req).onResult((resp, err) -> {
 });
 ```
 
-`LlmClient.openai(...)`, `LlmClient.anthropic(...)`, `LlmClient.gemini(...)`, `LlmClient.ollama(...)`, and `LlmClient.openAiCompatible(baseUrl, apiKey)` are the factories. OpenAI has the fully implemented native client today. The same client drives Ollama, vLLM, and llama.cpp because their wire formats are OpenAI-compatible. Anthropic and Gemini compile and register, but their native clients are still in flight; they throw a clear error pointing you at the OpenAI-compat shim until the native ones land.
+`LlmClient.openai(...)`, `LlmClient.anthropic(...)`, `LlmClient.gemini(...)`, `LlmClient.ollama(...)`, and `LlmClient.openAiCompatible(baseUrl, apiKey)` are the factories. All five are fully implemented native clients. The OpenAI client also drives Ollama, vLLM, llama.cpp, and any other endpoint that speaks the OpenAI wire format, so most local-model stacks plug in through `LlmClient.openAiCompatible(...)` without a separate driver.
 
 ### Streaming chat (what you actually want for chat UIs)
 
@@ -147,14 +145,37 @@ simulator.cn1.ai.simulatorRedirect=auto
 
 (The `simulator.` prefix scopes the property to the JavaSE simulator path.) Then run Ollama locally with whichever model your code expects (`ollama run llama3.2` or similar) and your existing `LlmClient.openai(...)` calls go to localhost.
 
-### SecureStorage non-prompting overloads
+### How to handle API keys
 
-Small thing that matters more than it sounds: the existing biometric-gated `SecureStorage.get / set / remove(account, options...)` methods got new single-argument overloads that do not prompt for biometrics. The reason is LLM API keys. You read them on every network call; you cannot prompt the user for Face ID every time. The new overloads store the key behind the keychain / keystore protection class without the user-presence gate. Existing biometric-gated calls keep working.
+A direct word on credentials before any of the above sees production. LLM provider API keys (OpenAI, Anthropic, Gemini, your Auth0 / Firebase configs) are bearer tokens with a budget attached. **They must never be checked into source control, embedded in your app binary, or hard-coded in code.** A leaked key can be extracted from any APK or IPA in minutes and used to drain your account.
+
+The correct shape is to fetch the key from your own backend over an authenticated request, then store it on the device using the platform's keychain / keystore. The framework provides both pieces:
+
+- `com.codename1.crypto.SecureStorage` (from the [previous release](/blog/nfc-crypto-biometrics-and-build-cloud/#cryptography--pr-4994)) is the cross-platform wrapper over iOS Keychain Services and Android `EncryptedSharedPreferences`. Values are encrypted at rest using the platform's hardware-backed protection class where one is available.
+- This release adds single-argument `get / set / remove(account, ...)` overloads next to the existing biometric-gated methods. The new overloads store the value without a per-read Face ID / Touch ID prompt, which is what you want for an LLM API key (you read it on every network call; a biometric prompt every time is not workable). The biometric-gated methods are still there for credentials you do want to gate per use.
+
+A reasonable shape:
 
 ```java
-SecureStorage.set("openai_api_key", apiKey);   // no prompt
-String key = SecureStorage.get("openai_api_key");
+private static AsyncResource<String> getOpenAiKey() {
+    String cached = SecureStorage.get("openai_api_key");
+    if (cached != null) {
+        return AsyncResource.complete(cached);
+    }
+    return Rest.get(myServer + "/v1/credentials/openai")
+               .bearerToken(userSessionToken())
+               .fetchAsString()
+               .onResult((key, err) -> {
+                   if (err == null) {
+                       SecureStorage.set("openai_api_key", key);
+                   }
+               });
+}
 ```
+
+Your server gates the credential request behind the user's session, your app caches the result on the keychain, and the key never sits anywhere a reverse-engineering pass could find it. If your server rotates the key, invalidate the cache and refetch.
+
+Existing biometric-gated `SecureStorage` calls keep working unchanged. The new overloads are additive.
 
 ### ChatView: a ready-made streaming chat UI
 
@@ -162,75 +183,134 @@ String key = SecureStorage.get("openai_api_key");
 
 ```java
 ChatView view = new ChatView();
-view.bindToLlm(LlmClient.openai(SecureStorage.get("openai_api_key")),
-               new ChatRequest.Builder()
-                       .model("gpt-4o-mini")
-                       .system("You are a friendly tutor for Codename One developers.")
-                       .build());
+getOpenAiKey().onResult((key, err) -> {
+    view.bindToLlm(LlmClient.openai(key),
+                   new ChatRequest.Builder()
+                           .model("gpt-4o-mini")
+                           .system("You are a friendly tutor for "
+                                   + "Codename One developers.")
+                           .build());
+});
 
 Form f = new Form("Chat", new BorderLayout());
 f.add(BorderLayout.CENTER, view);
 f.show();
 ```
 
-The on-screen shape that comes out of that is the standard messaging layout:
+The result is a standard mobile chat layout, picked up from whichever native theme the project uses:
 
-```
-+---------------------------------------+
-|   Chat                                |
-+---------------------------------------+
-|                                       |
-|  +-------------------------+          |
-|  | Hi! How can I help?     |          |  <- assistant bubble
-|  +-------------------------+          |
-|                                       |
-|              +----------------------+ |
-|              | What is a Form?      | |  <- user bubble
-|              +----------------------+ |
-|                                       |
-|  +------------------------------+     |
-|  | A Form is the top-level UI…  |     |  <- streaming
-|  +------------------------------+     |
-|                                       |
-+---------------------------------------+
-| Type your message…           [ Send ] |  <- ChatInput
-+---------------------------------------+
-```
+![ChatView running against gpt-4o-mini, showing assistant and user bubbles plus a streaming response and the bottom input bar](/blog/platform-apis-in-the-core/chatview.png)
 
-`appendToLastMessage(...)` is the entry point if you want to drive the streaming yourself (the binding above already does it for you). It marshals through `callSerially` so deltas land on the EDT in order.
-
-### Speech and TTS
-
-Two new core APIs land alongside the LLM surface:
+If you want more control than `bindToLlm(...)` gives you (custom message styling, a "thinking" placeholder, hand-rolled retry, persistence to your own model class), drive the view by hand:
 
 ```java
-TextToSpeech.getInstance().speak("Hello, world.");
+ChatView view = new ChatView();
+ConversationStore store = ConversationStore.open("tutor-thread");
+view.setMessages(store.load());
 
-SpeechRecognizer rec = SpeechRecognizer.getInstance();
-if (!rec.isSupported()) {
-    fallbackToTyping();
-    return;
-}
-rec.recognize().onResult((text, err) -> {
-    if (err == null) sendChatMessage(text);
+LlmClient client = LlmClient.openai(apiKeyFromKeychain);
+
+view.setInputListener(userText -> {
+    ChatMessage userMsg = ChatMessage.user(userText);
+    view.appendMessage(userMsg);
+    store.append(userMsg);
+
+    ChatMessage assistant = ChatMessage.assistant("");
+    view.appendMessage(assistant);
+
+    ChatRequest req = new ChatRequest.Builder()
+            .model("gpt-4o-mini")
+            .messages(store.load())
+            .build();
+
+    client.chatStream(req, new ChatStreamListener() {
+        @Override
+        public void onDelta(ChatDelta d) {
+            view.appendToLastMessage(d.contentDelta());
+        }
+        @Override
+        public void onComplete(ChatResponse fin) {
+            store.append(ChatMessage.assistant(view.lastMessage().content()));
+            view.setInputEnabled(true);
+        }
+        @Override
+        public void onError(Throwable t) {
+            view.appendToLastMessage(" [error: " + t.getMessage() + "]");
+            view.setInputEnabled(true);
+        }
+    });
 });
 ```
 
-The platform plan is iOS routed through `SFSpeechRecognizer` and `AVSpeechSynthesizer`, Android through `android.speech.*` and the `TextToSpeech` engine. The native bridges are tracked follow-ups (they need on-device testing before they ship). The simulator already has a best-effort TTS via `say` on macOS, `espeak` on Linux, SAPI on Windows; recognition stays unsupported in the simulator unless you add the `cn1-ai-whisper` cn1lib.
+`appendToLastMessage(...)` is the streaming entry point; it marshals through `callSerially` so deltas land on the EDT in order. `ConversationStore` persists the thread (the default backing is `Storage`; pluggable via a custom implementation if you would rather keep it in SQLite or push it to your server).
 
-### Why are the ML Kit features still cn1libs?
+### The AI cn1libs
 
-A fair question given the opening framing of this post. If "fundamental device APIs should be in the core", why does AI ship with a set of cn1libs (`cn1-ai-mlkit-barcode`, `cn1-ai-mlkit-docscan`, `cn1-ai-mlkit-face`, `cn1-ai-whisper`, `cn1-ai-stablediffusion`) rather than rolling all of those into `com.codename1.ai` too?
+A set of opt-in AI cn1libs ships alongside the core LLM stack. Each one packages a specific capability (a Google ML Kit feature, a TensorFlow Lite runtime, a local Whisper transcription engine, an on-device Stable Diffusion model) along with the iOS frameworks, Android Gradle dependencies, plist usage strings, and permissions that capability needs. The full list, with the native dependency each one resolves to, is:
 
-The split is intentional. The core gets the things every modern app benefits from: a way to talk to an LLM, a chat UI, speech in / speech out, the storage primitive for API keys. Those are the building blocks the same way `Display` and `Form` are; an app that wants AI features at all wants those.
+| cn1lib | What it gives you |
+|---|---|
+| `cn1-ai-mlkit-text` | ML Kit text recognition (OCR from photos or live camera). |
+| `cn1-ai-mlkit-barcode` | ML Kit barcode and QR scanning. |
+| `cn1-ai-mlkit-face` | ML Kit face detection with landmarks and contours. |
+| `cn1-ai-mlkit-labeling` | ML Kit image labelling ("what is in this picture"). |
+| `cn1-ai-mlkit-translate` | ML Kit on-device translation between supported languages. |
+| `cn1-ai-mlkit-smartreply` | ML Kit Smart Reply suggestions for short messages. |
+| `cn1-ai-mlkit-langid` | ML Kit on-device language identification. |
+| `cn1-ai-mlkit-pose` | ML Kit pose detection (body landmarks). |
+| `cn1-ai-mlkit-segmentation` | ML Kit selfie segmentation (person / background mask). |
+| `cn1-ai-mlkit-docscan` | ML Kit Document Scanner; iOS also pulls in `VisionKit`. |
+| `cn1-ai-tflite` | TensorFlow Lite interpreter. Bring your own model. |
+| `cn1-ai-whisper` | On-device Whisper transcription via a bundled `libwhisper.a`. |
+| `cn1-ai-stablediffusion` | On-device Stable Diffusion. Core ML on iOS, ONNX runtime on Android. |
 
-The ML Kit cn1libs are specialised verticals. Barcode scanning, document scanning, and face detection are each useful but only for some apps. They each bring a non-trivial native dependency (Google ML Kit on Android is large; the iOS Vision-framework wrappers add their own weight; the on-device Stable Diffusion model is gigabytes), and the cost of carrying every one of them in core would land on every app whether it used them or not.
+Adding any of them to a project is the same path as any other cn1lib. From Codename One Preferences → cn1libs, tick the one you want and refresh; the next build links the right native pieces in. The build-time `AiDependencyTable` in the Maven plugin handles the rest: the iOS pod or Swift Package, the Android Gradle dependency, the plist usage strings (`NSCameraUsageDescription` for the vision libraries, `NSSpeechRecognitionUsageDescription` for Whisper, etc.), and the Android permissions (`android.permission.RECORD_AUDIO` for audio capture) are all injected by the scanner the first time it sees the matching class on the classpath.
 
-Two of the optional libraries also fall into a "big upload" category that the cloud build server cannot handle within its usual timeouts. `cn1-ai-stablediffusion` bundles a multi-gigabyte model; the `AiDependencyTable` in the Maven plugin flags those with a `cn1.ai.requiresBigUpload` marker and the cloud build aborts pre-upload with a friendly "build this one locally" message. That kind of opt-in does not belong in a framework dependency that every app inherits.
+A typical use looks like the rest of the framework. Reading a barcode:
 
-So the rule we ended up with is: anything that is "AI plumbing" goes in core (the client, the streaming, the chat UI, speech, key storage). Anything that is a "model bundled with native glue for one specific use case" is a cn1lib. The bootstrapping script `scripts/create-ai-cn1lib.sh` generates a new AI cn1lib repo from the archetype with a publish workflow, so if you have a model that fits an opinion the framework does not ship yet, the path to a published cn1lib is one command.
+```java
+new BarcodeScanner()
+    .scan()
+    .onResult((barcode, err) -> {
+        if (err != null) return;
+        Log.p("Scanned " + barcode.format() + ": " + barcode.value());
+    });
+```
 
-The corresponding chapter, including the full `LlmClient` API table, the `ChatView` reference, the speech bridges, the `SecureStorage` overloads, the simulator Ollama redirect, and the cn1lib coverage, is at [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech) in the developer guide.
+Detecting text in an image:
+
+```java
+new TextRecognizer()
+    .recognize(Image.createFromCapturedPhoto(photoPath))
+    .onResult((result, err) -> {
+        if (err != null) return;
+        for (TextBlock block : result.blocks()) {
+            Log.p(block.text());
+        }
+    });
+```
+
+Translating a sentence on-device:
+
+```java
+new Translator(Language.ENGLISH, Language.FRENCH)
+    .translate("Codename One")
+    .onResult((translated, err) -> { /* "Codename One" :) */ });
+```
+
+### Why are these cn1libs and not part of the core?
+
+A fair question given the opening framing of this post. If "fundamental device APIs should be in the core", why does AI ship with thirteen cn1libs?
+
+The split is intentional. The core gets the AI plumbing that almost every app that uses AI at all wants: the LLM client, the streaming, the chat UI, the secure storage primitive for credentials, the simulator Ollama redirect for offline iteration. Those are general-purpose; an app that adopts AI at all picks those up.
+
+The cn1libs are specialised verticals. Barcode scanning, document scanning, face detection, smart reply, pose detection, on-device translation, on-device speech transcription, on-device image generation; each is genuinely useful but only for some apps. They also each bring a non-trivial native dependency (Google ML Kit Android frameworks are large; the iOS pods add their own weight; the bundled Whisper static library and the on-device Stable Diffusion model are big), and the cost of carrying every one of them in core would land on every app whether it used the feature or not.
+
+A small subset (the on-device Stable Diffusion model, in particular) is also flagged with a `cn1.ai.requiresBigUpload` marker in `AiDependencyTable`. The cloud build server aborts pre-upload with a friendly "build this one locally" message because the multi-gigabyte payload does not fit inside the usual build-server timeouts. That kind of opt-in does not belong in a dependency that every app inherits.
+
+The bootstrapping script `scripts/create-ai-cn1lib.sh` generates a new AI cn1lib repo from the archetype with a Maven Central publish workflow, so if you have a model that fits a niche the framework does not yet ship, the path to a published cn1lib is one command.
+
+The corresponding chapter, including the full `LlmClient` API table, the `ChatView` reference, the `SecureStorage` overloads, the simulator Ollama redirect, and the full cn1lib coverage, is at [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech) in the developer guide.
 
 ## OAuth and OIDC: the modern identity stack
 
@@ -407,13 +487,45 @@ btn.setShareResultListener(result -> {
 
 iOS routes through `UIActivityViewController.completionWithItemsHandler`; Android through `Intent.createChooser` with an `IntentSender` callback (API 22+). The framework normalises the platform values into `SHARED_TO(packageName)`, `DISMISSED`, or `FAILED`.
 
-The same PR also lands an `IOSShareExtensionBuilder` in the Maven plugin that emits a complete `.ios.appext` bundle (Info.plist, App Group entitlements, a minimal `ShareViewController.swift`, the matching `buildSettings.properties`) so apps that want to *receive* shared content from other apps no longer need to bootstrap an extension target in Xcode by hand.
+### Appearing in other apps' share menus
 
-## What ties this together
+The other half of sharing is the inverse direction: not "let the user share *from* your app", but "let your app *receive* content other apps share". If a user is in Safari, Photos, or Mail and taps the share icon, your app should be able to appear as a target there alongside Messages, WhatsApp, and Instagram. On iOS that requires a separate Share Extension target inside the `.ipa`, with its own bundle, its own `Info.plist`, an App Group string that links it to the host app, and a `ShareViewController` that handles the incoming payload. Historically the recommendation was to bootstrap that target by hand in Xcode, copy the resulting files into the Codename One project under `ios/app_extensions/`, and let the build server's extractor consume them. It worked, but it was a workflow most teams put off because the setup is fiddly.
 
-Every API in this batch flips a single per-feature flag (`usesOidc`, `usesAppleSignIn`, `usesWebAuthn`, `usesAi`, plus the existing WiFi / Bonjour / Hotspot defines) that drives framework linking, entitlement injection, plist injection, and Objective-C conditional compilation. Apps that do not reference the new APIs do not pay for them at App Store review time, and the binaries do not even contain the platform calls. That is the same pattern we shipped for NFC and biometrics in the previous release, and it is what makes "these APIs are part of the core" sustainable; the cost only lands on the apps that actually use them.
+The same PR ships an `IOSShareExtensionBuilder` Mojo that does all of that for you. A typical setup is one Maven command and a one-time configuration block:
 
-The companion cloud build server changes (BuildDaemon mirrors) ship together so local builds and cloud builds match.
+```xml
+<plugin>
+  <groupId>com.codenameone</groupId>
+  <artifactId>codenameone-maven-plugin</artifactId>
+  <configuration>
+    <iosShareExtension>
+      <bundleIdentifier>com.example.myapp.share</bundleIdentifier>
+      <displayName>MyApp</displayName>
+      <appGroup>group.com.example.myapp</appGroup>
+      <acceptedContent>
+        <content>PUBLIC_URL</content>
+        <content>PUBLIC_IMAGE</content>
+        <content>PUBLIC_TEXT</content>
+      </acceptedContent>
+    </iosShareExtension>
+  </configuration>
+</plugin>
+```
+
+Run `mvn cn1:generate-ios-share-extension` and the Mojo writes a complete `.ios.appext` bundle into `ios/app_extensions/`: the `Info.plist` with the right `NSExtension` activation rules for the content types you declared, the App Group entitlement, a minimal `ShareViewController.swift` that lands the payload in the App Group's `UserDefaults(suiteName:)`, and the matching `buildSettings.properties`. The result feeds straight into the existing `IPhoneBuilder.extractAppExtensions` pipeline, so apps that already have a hand-rolled extension keep working unchanged.
+
+On the host-app side you read the payload on launch:
+
+```java
+// Anywhere after Display.init has run
+String shared = Storage.getInstance()
+        .readObject("ios.shareExtension.lastPayload");
+if (shared != null) {
+    handleSharedPayload(shared);
+}
+```
+
+After the next cloud or local build, your app appears in the iOS share sheet for the content types you declared. No Xcode work, no hand-rolled plist, no App Group string typed in three places. The build-time tooling owns it.
 
 ## Wrapping up
 
