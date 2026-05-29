@@ -97,6 +97,61 @@ class InteractionDialogTest extends UITestBase {
         dialog.dispose();
     }
 
+    @FormTest
+    void disposeWithoutAnimationSchedulesFormRepaint() {
+        // Regression for #5067: with setAnimateShow(false) +
+        // setFormMode(true), dispose() removed the dialog from the form
+        // tree but never asked the form to repaint, so the previously
+        // painted dialog pixels stayed on screen until something else
+        // (scrolling, hover) forced a redraw. dispose() -> remove()
+        // triggers the recursive deinitialize() path, which runs
+        // cleanupLayer() and detaches the layered pane wrapper before
+        // the outer dispose gets to call pp.revalidate(). By then pp
+        // has no Form in its parent chain, so the revalidate never
+        // bubbles up to a Form.repaint(). dispose() must trigger a
+        // form-level revalidate after cleanupLayer so the next paint
+        // cycle clears the old dialog pixels. NB: this test requires a
+        // shown form so the recursive deinitialize path actually fires
+        // -- with just setCurrentForm the dialog isn't initialized and
+        // dispose hits a different (working) code path that masks the
+        // bug.
+        RepaintCountingForm form = new RepaintCountingForm();
+        form.show();
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimateShow(false);
+        dialog.setFormMode(true);
+        dialog.setDisposeWhenPointerOutOfBounds(false);
+        Rectangle rect = new Rectangle(0, 0, 50, 50);
+        dialog.showPopupDialog(rect);
+        assertTrue(dialog.isShowing(), "dialog should be on the layered pane before dispose");
+
+        // Reset the counter so we only observe repaint() calls triggered
+        // by dispose itself, not the ones from show.
+        form.repaintCount = 0;
+
+        dialog.dispose();
+
+        assertFalse(dialog.isShowing(), "dispose must detach the dialog from the form tree");
+        assertTrue(form.repaintCount > 0,
+                "#5067: dispose() must trigger a form repaint so the old dialog pixels "
+                        + "are cleared without needing scroll/hover to force a redraw; "
+                        + "observed " + form.repaintCount + " calls");
+    }
+
+    private static class RepaintCountingForm extends Form {
+        int repaintCount;
+
+        RepaintCountingForm() {
+            super(new BorderLayout());
+        }
+
+        @Override
+        public void repaint() {
+            repaintCount++;
+            super.repaint();
+        }
+    }
+
     @Test
     void showPopupDialogStraddlingMidlineDoesNotOverlapTarget() {
         // Regression for #5028: when the anchor rect straddles the

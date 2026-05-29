@@ -441,6 +441,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
                 pp.revalidate();
                 cleanupLayer(f);
+                // remove() above triggers the recursive deinitialize()
+                // path which already runs cleanupLayer() and detaches the
+                // layered pane wrapper, so by the time pp.revalidate()
+                // runs pp has no Form in its parent chain and never
+                // bubbles a repaint up to the form. The animateShow path
+                // is masked because the animation itself drives a paint
+                // cycle. Without it, dispose() can leave the old dialog
+                // pixels on screen until something else (scroll, hover)
+                // forces a redraw (#5067). Force a form-level revalidate
+                // so the next paint cycle clears those pixels.
+                f.revalidateWithAnimationSafety();
             } else {
                 p.remove();
             }

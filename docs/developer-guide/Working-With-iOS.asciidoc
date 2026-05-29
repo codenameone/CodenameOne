@@ -177,10 +177,24 @@ NOTE: This is supported for pro users as part of the crash protection feature.
 To take advantage of that capability use the build hint `ios.testFlight=true` and then submit the app to the store for
 beta testing. Make sure to use a release build target.
 
+=== Metal renderer
+
+// vale-skip: Microsoft.Avoid: "rendering backend" is Apple's term of art for an alternate Metal/OpenGL rendering pipeline, not a back-end server.
+iOS builds use the Metal rendering backend by default. The Metal pipeline drives a `CAMetalLayer`, replacing the legacy OpenGL ES 2 path on `CAEAGLLayer`. OpenGL ES is deprecated on iOS and Metal is the supported graphics API going forward, so new projects pick it up automatically.
+
+To opt out and fall back to the OpenGL ES 2 backend, set the build hint:
+
+[source]
+-----
+codename1.arg.ios.metal=false
+-----
+
+If you hit a rendering regression after the default flip, opting out with `ios.metal=false` is a safe escape hatch, but please file an issue with a reproducer so the Metal path can be fixed.
+
 === Choosing a color space for the Metal renderer
 
 // vale-skip: Microsoft.Avoid: "rendering backend" is Apple's term of art for an alternate Metal/OpenGL rendering pipeline, not a back-end server.
-When the Metal rendering backend is enabled with `ios.metal=true`, the `CAMetalLayer` is configured with the sRGB color space by default. This matches the behavior of the legacy OpenGL ES 2 backend on `CAEAGLLayer`: CG-rasterized images and gradients (which are tagged `DeviceRGB` in their `CGBitmapContext`) end up displayed with the same brightness on both backends.
+With the Metal renderer (the default), the `CAMetalLayer` is configured with the sRGB color space. This matches the behavior of the legacy OpenGL ES 2 backend on `CAEAGLLayer`: CG-rasterized images and gradients (which are tagged `DeviceRGB` in their `CGBitmapContext`) end up displayed with the same brightness on both backends.
 
 // vale-skip: Microsoft.Adverbs: "strictly device-RGB" is a precise color-pipeline qualifier (excluding sRGB conversion), not a softener.
 For most apps the default is the right choice. Apps that need a different color profile -- for example, wide-gamut artwork that should be displayed in Display P3, or a strictly device-RGB pipeline that matches a custom rendering toolchain -- can override the choice with the `ios.metal.colorSpace` build hint:
@@ -212,7 +226,7 @@ For most apps the default is the right choice. Apps that need a different color 
 |===
 
 // vale-skip: Microsoft.Avoid: "OpenGL ES 2 backend" names the alternate rendering pipeline, not a server.
-NOTE: The hint only takes effect when `ios.metal=true`. With the OpenGL ES 2 backend the layer is `CAEAGLLayer` and the color space is fixed by the system.
+NOTE: The hint only takes effect on the Metal backend (the default). If you have opted out with `ios.metal=false`, the layer is `CAEAGLLayer` and the color space is fixed by the system.
 
 === Accessing insecure URLs
 

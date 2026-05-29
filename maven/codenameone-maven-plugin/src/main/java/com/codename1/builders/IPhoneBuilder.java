@@ -290,7 +290,7 @@ public class IPhoneBuilder extends Executor {
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
-        useMetal = "true".equals(request.getArg("ios.metal", "false"));
+        useMetal = "true".equals(request.getArg("ios.metal", "true"));
 
         // macNative: extend this iOS build to also produce a native Mac slice.
         // All Mac-specific work is delegated to MacNativeBuilder; this builder
@@ -299,7 +299,7 @@ public class IPhoneBuilder extends Executor {
         macNativeBuilder.parseHints(request);
         if (macNativeBuilder.isEnabled()) {
             // The Mac slice cannot link OpenGL ES; force Metal on regardless of
-            // the ios.metal hint. (Metal becomes the default soon anyway.)
+            // the ios.metal hint. (Already on by default now, but defensive.)
             useMetal = true;
             // Catalyst requires iOS 13.1+ -> macOS 10.15+.
             addMinDeploymentTarget(macNativeBuilder.getIosMinDeploymentTarget());
