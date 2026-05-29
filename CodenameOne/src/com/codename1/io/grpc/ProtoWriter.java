@@ -161,13 +161,13 @@ public final class ProtoWriter {
     public void writeFloat(int field, float value) throws IOException {
         if (value == 0.0f) return;
         writeTag(field, WIRE_I32);
-        writeFixed32(Float.floatToRawIntBits(value));
+        writeFixed32(Float.floatToIntBits(value));
     }
 
     public void writeDouble(int field, double value) throws IOException {
         if (value == 0.0d) return;
         writeTag(field, WIRE_I64);
-        writeFixed64(Double.doubleToRawLongBits(value));
+        writeFixed64(Double.doubleToLongBits(value));
     }
 
     public void writeString(int field, String value) throws IOException {

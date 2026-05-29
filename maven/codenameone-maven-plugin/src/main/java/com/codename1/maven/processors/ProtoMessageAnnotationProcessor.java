@@ -433,8 +433,8 @@ public final class ProtoMessageAnnotationProcessor extends AbstractAnnotationPro
             case INT64: sb.append("                _sub.writeVarint64(").append(e).append(".get(_i));\n"); break;
             case SINT64: sb.append("                _sub.writeVarint64(com.codename1.io.grpc.ProtoWriter.zigZag64(").append(e).append(".get(_i)));\n"); break;
             case FIXED64: sb.append("                _sub.writeFixed64(").append(e).append(".get(_i));\n"); break;
-            case FLOAT: sb.append("                _sub.writeFixed32(Float.floatToRawIntBits(").append(e).append(".get(_i)));\n"); break;
-            case DOUBLE: sb.append("                _sub.writeFixed64(Double.doubleToRawLongBits(").append(e).append(".get(_i)));\n"); break;
+            case FLOAT: sb.append("                _sub.writeFixed32(Float.floatToIntBits(").append(e).append(".get(_i)));\n"); break;
+            case DOUBLE: sb.append("                _sub.writeFixed64(Double.doubleToLongBits(").append(e).append(".get(_i)));\n"); break;
             case BOOL: sb.append("                _sub.writeVarint32(").append(e).append(".get(_i) ? 1 : 0);\n"); break;
             case ENUM: sb.append("                _sub.writeVarint32(").append(e).append(".get(_i).number);\n"); break;
             default: break;

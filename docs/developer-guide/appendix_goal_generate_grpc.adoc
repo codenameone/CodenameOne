@@ -123,7 +123,7 @@ The runtime speaks **gRPC-Web binary**
 mobile / browser variant of gRPC supported by Envoy, the official
 `grpcweb` Go proxy, and the gRPC-Web filter in modern gRPC server
 implementations.  Plain HTTP/2 gRPC requires trailers that
-`ConnectionRequest` does not expose; gRPC-Web carries `grpc-status`
+`ConnectionRequest` doesn't expose; gRPC-Web carries `grpc-status`
 in a synthetic trailer frame in the response body instead.
 
 A successful call:
