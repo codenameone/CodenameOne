@@ -3,7 +3,6 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -70,15 +69,13 @@ public class PullToRefreshSpinnerScreenshotTest extends AbstractAnimationScreens
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
-        Image frame = Image.createImage(width, height, 0xfff0f4f8);
-        Graphics fg = frame.getGraphics();
-        host.paintComponent(fg, true);
-        // paintComponent skips the pull painter when scrollY >= 0; render
-        // the indicator directly so the spinner is always visible in the
-        // captured grid cell.
-        scrollHost.getUIManager().getLookAndFeel().drawPullToRefresh(fg, scrollHost, true);
-        g.drawImage(frame, 0, 0);
-        frame.dispose();
+        // The host form's paint chain renders the modern arc spinner
+        // because the container carries `$pullToRelease=updating`. A
+        // second explicit drawPullToRefresh call would stack a duplicate
+        // indicator at a different y (the painter offsets by the host's
+        // title-bar height during the regular paint and skips that offset
+        // when called directly), so leave the form to render it once.
+        host.paintComponent(g, true);
     }
 
     @Override

@@ -2386,17 +2386,35 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             startAngle = 90;                  // top of the circle
         }
 
+        // Material 3 spec: the arc sits on a white circular disc with a
+        // soft drop shadow. Without the disc the arc is invisible against
+        // a same-colour backdrop, so paint the disc + shadow first and
+        // then the arc on top.
+        final int discPad = Math.max(2, strokePx + 1);
+        final int discRadius = radius + discPad;
+        final int discDiameter = discRadius * 2;
+        final int shadowOffset = Math.max(1, strokePx);
+
         int oldColor = g.getColor();
         int oldAlpha = g.getAlpha();
         try {
-            g.setColor(modernIndicatorColor());
+            // Soft drop shadow: three concentric translucent black discs
+            // offset down emulate a small Gaussian blur in pure CN1
+            // Graphics (which doesn't expose a real shadow filter).
+            g.setColor(0x000000);
+            for (int i = 0; i < 3; i++) {
+                int extra = 2 - i;
+                int r = discRadius + extra;
+                g.setAlpha(28);
+                g.fillArc(cx - r, cy - r + shadowOffset, 2 * r, 2 * r, 0, 360);
+            }
+            // White disc backdrop.
+            g.setColor(0xffffff);
             g.setAlpha(255);
-            // CN1 doesn't expose stroke width on the basic drawArc; emulate a
-            // thick stroke by drawing the arc at the diameter and then
-            // erasing the inner circle with a smaller filled arc in the
-            // same color over the cmp's painted background... but a simpler
-            // approach is to draw N concentric arcs offset by 1px each.
-            // The visible width is `strokePx`.
+            g.fillArc(cx - discRadius, cy - discRadius, discDiameter, discDiameter, 0, 360);
+            // Arc itself -- N concentric arcs offset by 1px each emulate a
+            // thick stroke (CN1 Graphics has no stroke-width on drawArc).
+            g.setColor(modernIndicatorColor());
             for (int i = 0; i < strokePx; i++) {
                 g.drawArc(boxX + i, boxY + i, diameter - 2 * i, diameter - 2 * i, startAngle, sweep);
             }
