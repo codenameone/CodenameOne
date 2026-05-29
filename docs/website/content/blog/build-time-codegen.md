@@ -200,7 +200,9 @@ The practical effect is that the kind of code that historically required reflect
 
 ## Wrapping up
 
-That closes out the post series for this release cycle. The May 29 weekly index is [here](/blog/metal-default-new-build-cloud-and-a-new-format/); the next weekly index lands on Friday in the same short format.
+That closes out the post series for this release cycle. The next weekly index lands on Friday in the same short format.
+
+Back to the [weekly index](/blog/metal-default-new-build-cloud-and-a-new-format/).
 
 ---
 
