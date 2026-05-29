@@ -23,6 +23,8 @@ include::appendix_goal_generate_gui_sources.adoc[]
 
 include::appendix_goal_generate_native_interfaces.adoc[]
 
+include::appendix_goal_generate_openapi.adoc[]
+
 include::appendix_goal_guibuilder.adoc[]
 
 include::appendix_goal_generate_archetype.adoc[]

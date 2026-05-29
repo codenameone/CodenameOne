@@ -113,7 +113,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java_version }}
-          distribution: 'zulu'
+          distribution: 'temurin'
       - name: Set JDK_HOME
         if: matrix.id != 'default'
         run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV

@@ -1379,6 +1379,47 @@ you would need to convert the processed image back to an encoded image so it can
 
 If you need to download the file instantly and not wait for the image to appear before download initiates you can explicitly invoke the `fetch()` method which will asynchronously fetch the image from the network. Notice that the downloading will still take time so the placeholder is still required.
 
+===== Authenticated image URLs — `RequestDecorator`
+
+The standard `createToStorage` path doesn't expose the underlying
+`ConnectionRequest`, so attaching an `Authorization` header (or any
+other custom header / cookie / timeout) requires the `RequestDecorator`
+hook. Two ways to install one:
+
+[source,java]
+----
+// Global default -- applied to every URLImage download from this point on.
+// The most common case is "all our images sit behind the same bearer
+// token", which has its own shorthand:
+URLImage.setDefaultBearerToken(Preferences.get("auth.token", null));
+
+// Or the explicit form, which can attach any header / cookie / timeout:
+URLImage.setDefaultRequestDecorator(req ->
+        req.addRequestHeader("Authorization", "Bearer " + token));
+----
+
+For per-image overrides (for example one endpoint needs an extra API-version
+header on top of the global bearer token), use the
+`createToStorage(placeholder, key, url, adapter, RequestDecorator)`
+overload. Per-instance decorators run *after* the global default so they
+can override or augment whatever the default set:
+
+[source,java]
+----
+URLImage profilePic = URLImage.createToStorage(
+        placeholder,
+        "profile-" + userId,
+        baseUrl + "/users/" + userId + "/picture",
+        URLImage.RESIZE_SCALE_TO_FILL,
+        req -> req.addRequestHeader("X-API-Version", "2"));
+----
+
+When a decorator is installed (global or per-call), `URLImage` skips the
+default `Util.downloadImageToStorage` path and builds a
+`ConnectionRequest` inline so the decorator can inspect / mutate it
+before it's queued. The legacy path remains the default for back-compat
+when no decorator is set.
+
 ===== Mask adapter
 
 A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:

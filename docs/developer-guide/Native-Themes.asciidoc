@@ -7,7 +7,7 @@ ramps, and state-specific styles are all reachable from your own
 `theme.css` and from runtime API.
 
 The legacy iOS 7 (iOS) and Holo Light (Android) themes remain the
-default so existing apps see no behaviour change.
+default so existing apps see no behavior change.
 
 === Selecting a theme
 
@@ -417,7 +417,7 @@ differently from the other. They're still safe to override; you
 just want to know which platform's screen the override is going to
 land on.
 
-iOS-only behaviour:
+iOS-only behavior:
 
 * `Toolbar`, `TitleArea`, `Title` paint over the status-bar area.
   iOS reserves room above for the notch / status bar; in your
@@ -428,14 +428,14 @@ iOS-only behaviour:
   ramp + chevron). Compare against Material 3's denser list-item
   pattern.
 
-Android-only behaviour:
+Android-only behavior:
 
 * `Toolbar` doesn't paint over the system status bar; the native
   Android status bar handles that.
 * `Tabs` use Material 3 top tabs (flat, underline-by-color). iOS
   modern renders Tabs as a bottom-anchored pill group via the
   `tabPlacementInt` constant - that constant is intentionally only
-  set in the iOS theme so behaviour stays consistent on each
+  set in the iOS theme so behavior stays consistent on each
   platform.
 
 === Switching CheckBox / RadioButton glyphs
@@ -499,6 +499,37 @@ top).
 
 |`@tabsFillRowsBool`, `@tabsGridBool`
 |Distribute tabs evenly across the bar.
+
+|`@tabsAnimatedIndicatorBool`
+|`true` paints a thin colored underline below the currently selected
+tab and tweens its `x` / `width` between tabs on selection change. Both
+modern themes set this to `true`. Off in the framework default; opt-in
+for legacy themes by setting it explicitly.
+
+|`@tabsAnimatedIndicatorDurationInt`
+|Duration of the indicator tween in milliseconds (default `200`,
+matching Material 3's `NavigationBar` spec).
+
+|`@tabsAnimatedIndicatorThicknessMm`
+|Indicator underline thickness in millimetres (default `1`).
+
+|`@pullToRefreshModernBool`
+|`true` switches the pull-to-refresh visual from the legacy
+rotating-arrow + text Label stack to a thin circular arc spinner
+painted directly via `Graphics.drawArc`. The arc sweep grows from 0°
+to ~330° proportional to the user's pull, then spins continuously
+once the refresh task fires. Both modern themes set this to `true`.
+Color comes from the `TabIndicator` UIID's fg (consistent with the
+animated tab indicator), falling back to the Title fg if unset.
+
+|`@pullToRefreshIndicatorDiameterMm`
+|Outer diameter of the modern arc spinner in millimetres (default `8`).
+Drives the gesture threshold too -- the user must pull this distance
+plus a small margin to fire the refresh task.
+
+|`@pullToRefreshIndicatorStrokeMm`
+|Stroke thickness of the modern arc spinner in millimetres (default
+`0.6`).
 
 |`@darkModeBool`
 |`true` enables `$DarkUIID` resolution when the app is in dark

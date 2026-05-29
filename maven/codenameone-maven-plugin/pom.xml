@@ -65,7 +65,10 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
+            <!-- compile scope (was test) so the OpenAPI codegen mojo can use
+                 com.codename1.io.JSONParser to parse spec documents. The
+                 plugin already ships the codenameone-designer (jar-with-deps)
+                 above so the additional surface area is small. -->
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>

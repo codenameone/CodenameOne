@@ -90,6 +90,13 @@ public final class AnnotatedClass {
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
     public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }
 
+    /// `true` when the class file's `ACC_RECORD` flag is set (Java 16+ record).
+    /// Inlined as a constant so this code keeps compiling against ASM versions
+    /// that predate `Opcodes.ACC_RECORD`.
+    public boolean isRecord() { return (access & ACC_RECORD) != 0; }
+
+    private static final int ACC_RECORD = 0x10000;
+
     /// Class-level annotations, keyed by JVM descriptor.
     public Map<String, AnnotationValues> getClassAnnotations() { return annotations; }
 

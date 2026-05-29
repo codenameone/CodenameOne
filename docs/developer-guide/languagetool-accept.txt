@@ -282,6 +282,14 @@ untarring
 url
 intrinsics
 obfuscator
+unobfuscated
+Petstore
+Swagger
+Api
+tween
+tweens
+tweened
+tweening
 resizability
 movability
 Thaana

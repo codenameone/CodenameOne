@@ -17,6 +17,8 @@
 
 package java.util;
 
+import java.util.function.Predicate;
+
 
 /**
  * {@code Collection} is the root of the collection hierarchy. It defines operations on
@@ -313,4 +315,23 @@ public interface Collection<E> extends java.lang.Iterable<E> {
      *                stored in the type of the specified array.
      */
     public <T> T[] toArray(T[] array);
+
+    /**
+     * Removes all of the elements of this collection that satisfy the given
+     * predicate. Returns {@code true} if any elements were removed.
+     */
+    default boolean removeIf(Predicate<? super E> filter) {
+        if (filter == null) {
+            throw new NullPointerException();
+        }
+        boolean removed = false;
+        Iterator<E> it = iterator();
+        while (it.hasNext()) {
+            if (filter.test(it.next())) {
+                it.remove();
+                removed = true;
+            }
+        }
+        return removed;
+    }
 }

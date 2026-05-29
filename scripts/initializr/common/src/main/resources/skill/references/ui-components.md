@@ -64,6 +64,19 @@ form.add(BorderLayout.CENTER, col);
 
 **Note on `ComboBox`**: It exists but is **not recommended** in CN1. The dropdown rendering is awkward on touch screens and behaves inconsistently across platforms. Use `Picker` (set `pickerType` to `Display.PICKER_TYPE_STRINGS` for a string-list picker) — it opens a native sheet on iOS, a Material dialog on Android, and a normal popup in the simulator. `ComboBox` is kept only for legacy ports of Swing apps.
 
+### Package locations — don't trust autocomplete to find these
+
+A few components live in package paths that don't match where you'd guess from the type name. Importing from the wrong package gives `cannot find symbol` and the IDE will helpfully offer to import the (deprecated or non-existent) sibling.
+
+| Component | Package |
+| --- | --- |
+| `Label`, `Button`, `TextField`, `TextArea`, `Form`, `Container`, `TextComponent`, `Dialog`, `Tabs`, `CheckBox`, `RadioButton`, `Slider`, `List` | `com.codename1.ui` |
+| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion` | `com.codename1.components` |
+| `Picker` | `com.codename1.ui.spinner` |
+| `InfiniteContainer` | `com.codename1.ui` (despite being a "component") |
+
+When in doubt, `find CodenameOne/src -name "<ClassName>.java"` from the framework checkout — much faster than guessing which sub-package is current.
+
 ## Container is structural — don't style its UIID
 
 `Container` is the layout glue between visible components, **not** a styled component itself. The default `Container` UIID must remain transparent with **0 padding / 0 margin / no border**.
@@ -442,6 +455,20 @@ nextForm.setTransitionInAnimator(CommonTransitions.createFade(200));
 In most CN1 codebases the **default transition** is set globally via theme constants (`formTransitionIn`, `formTransitionOut`, `formTransitionInImage`, `formTransitionOutImage`) — the native theme typically defines a platform-appropriate default (iOS-style horizontal slide on iOS, Material slide on Android). You usually only call `setTransitionOutAnimator` / `setTransitionInAnimator` to **override** that default for a specific navigation step, not to define one from scratch.
 
 `CommonTransitions` exposes slide / fade / cover / uncover / dialog / empty transitions. `MorphTransition.create(durationMs).morph(sourceCmp, targetCmp)` animates a specific source component into a specific destination component across forms — great for "tap a card to expand it into the full screen".
+
+#### `MorphTransition.snapshotMode(boolean)`
+
+Opt into snapshot-mode when the live-paint morph leaks off-viewport children (source inside a scrolling parent) or renders dynamic content (video, `BrowserComponent`):
+
+```java
+MorphTransition morph = MorphTransition.create(300).snapshotMode(true).morph("card");
+nextForm.setTransitionInAnimator(morph);
+nextForm.show();
+```
+
+#### Tabs animated indicator and modern pull-to-refresh
+
+`Tabs` has a sliding underline indicator and `addPullToRefresh` has an arc-spinner — both on by default in the modern iOS / Android themes, so apps inherit them with no extra setup. Override via `Tabs.setAnimatedIndicator(boolean)` or the `tabsAnimatedIndicatorBool` / `pullToRefreshModernBool` theme constants when needed.
 
 ### Ongoing per-component animation: `Component.animate()` + `registerAnimated`
 
