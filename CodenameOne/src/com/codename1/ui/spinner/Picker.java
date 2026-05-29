@@ -622,7 +622,7 @@ public class Picker extends Button {
 
                     Component next = null;
                     Form f = getComponentForm();
-                    if (f != null) {
+                    if (f != null && Picker.this.isTraversable()) {
                         if (command == COMMAND_NEXT) {
                             next = f.getNextComponent(Picker.this);
                         } else if (command == COMMAND_PREV) {
@@ -791,7 +791,7 @@ public class Picker extends Button {
                 //        getNextFocusDown() != null ? getNextFocusDown() :
                 //        null;
                 ListIterator<Component> traversalIt = getComponentForm().getTabIterator(Picker.this);
-                if (traversalIt.hasNext()) {
+                if (Picker.this.isTraversable() && traversalIt.hasNext()) {
                     nextButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
                     // Javascript port needs to know that this button is going to try to
                     // focus a text field (possibly) so that it can prepare the text field
@@ -812,7 +812,7 @@ public class Picker extends Button {
 
                 Button prevButton = null;
 
-                if (traversalIt.hasPrevious()) {
+                if (Picker.this.isTraversable() && traversalIt.hasPrevious()) {
                     prevButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
 
                     // Javascript port needs to know that this button is going to try to
