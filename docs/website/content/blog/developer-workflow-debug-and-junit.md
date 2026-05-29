@@ -61,7 +61,7 @@ flowchart LR
     ADB -- "JDWP over USB or Wi-Fi" --> Device["Android device<br/>or emulator<br/><i>Dalvik / ART</i>"]
 {{< /mermaid >}}
 
-There is one capability difference worth knowing up front: on Android the same `adb`-attached session can drop into native C / C++ via Android Studio's LLDB alongside the JDWP attach, so if you have native code in a cn1lib you can step through that too. On iOS the JDWP attach is Java-only; if you also want to step through native Objective-C, you need Xcode in parallel.
+A capability difference between the two platforms worth knowing up front: on Android, a native interface's `Impl` class is regular Java, so the JDWP attach steps through it the same way it steps through any other class in your project. On iOS the `Impl` is Objective-C, which JDWP does not speak, so you cannot step through it from the IDE. You can still step through the Codename One framework code and your own Java up to and through the native-interface call, and you can inspect the value the call returns; the body of the Objective-C method is the only thing that is opaque from the JDWP side. Attach Xcode in parallel if you need to step through the Objective-C as well.
 
 ### Tutorial: IntelliJ + iOS
 
@@ -80,7 +80,7 @@ ios.onDeviceDebug.waitForAttach=true
 
 `ios.onDeviceDebug=true` flips the iOS build into the instrumented variant. The other three configure the proxy connection.
 
-The fourth hint, `ios.onDeviceDebug.waitForAttach=true`, is the **block-on-load** option, and we recommend leaving it on. With it enabled, the iOS app shows a "Waiting for debugger" overlay at launch and does not progress past `Display.init` until the proxy issues its first resume. The recommendation is mostly about making the on-device-debug variant visible. If somebody on the team launches the app on a device and it sits on "Waiting for debugger" they immediately know what kind of build they have, instead of being confused by an app that does nothing.
+The fourth hint, `ios.onDeviceDebug.waitForAttach=true`, is the **block-on-load** option, and we recommend leaving it on. With it enabled, the iOS app shows a "Waiting for debugger" overlay at launch and does not progress past `Display.init` until the proxy issues its first resume. The recommendation is mostly about making the on-device-debug variant visible. Without the overlay it is easy to launch an on-device-debug build expecting the debugger to attach and not realise it is silently waiting for a proxy that is not running, and it is also easy to mistake an on-device-debug build for a regular build and then be surprised when it does not perform as smoothly as the release variant. The overlay rules out both of those.
 
 For a physical iPhone the `proxyHost` value should be the laptop's LAN IP (run `ifconfig | grep "inet "` to find it) rather than `127.0.0.1`. The iOS Simulator can always use `127.0.0.1`.
 
@@ -88,7 +88,7 @@ For a physical iPhone the `proxyHost` value should be the laptop's LAN IP (run `
 
 Either path works:
 
-- Local Xcode build (`mvn cn1:buildIosXcodeProject`) and then run from Xcode. This is the fastest iteration loop.
+- Local Xcode build (`mvn cn1:buildIosXcodeProject`) and then run from Xcode.
 - Cloud build for a real device (`mvn cn1:buildIosOnDeviceDebug`) and install the resulting `.ipa`.
 
 Both produce an iOS binary instrumented for on-device debugging because the build hint is set.
@@ -142,7 +142,7 @@ For wireless `adb`, pass `-Dcn1.android.onDeviceDebug.wireless=<ip:port>` and th
 
 Switch to **CN1 Attach Android** and click 🐞 Debug. IntelliJ connects to `localhost:5005`. Set breakpoints anywhere; they fire when exercised.
 
-Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework or inside the Android port resolve to the right files. If you have native C / C++ that you also want to step through, Android Studio's LLDB attaches to the same process alongside this JDWP session and gives you the C view next to the Java view.
+Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework or inside the Android port resolve to the right files. On Android, **native interfaces are themselves Java**, so a breakpoint inside the `Impl` class of your own native interface fires just like a breakpoint anywhere else in your code; you can step through the implementation, inspect locals, and evaluate expressions the same way.
 
 The dev guide has the full reference, including the wireless-pairing flows, the VS Code and Eclipse equivalents, and a troubleshooting section: [iOS on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_ios) and [Android on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_android).
 
@@ -162,7 +162,7 @@ Both styles coexist in the same project under `common/src/test/java`. You pick p
 
 ### A minimal test
 
-Tests live in `common/src/test/java`. A minimal example:
+Tests live in `common/src/test/java`. The shape most apps want is one that boots the project's app class through the same `init` / `start` sequence the simulator uses, then asserts against the form the app actually opens:
 
 ```java
 package com.example.myapp;
@@ -182,20 +182,34 @@ class GreetingFormTest {
     @Test
     @RunOnEdt
     void formShowsExpectedTitle() {
-        new Form("Hello").show();
+        MyAppName app = new MyAppName();
+        app.init(null);
+        app.start();
 
-        assertEquals("Hello", Display.getInstance().getCurrent().getTitle());
+        assertEquals("Hi World", Display.getInstance().getCurrent().getTitle());
         assertTrue(CN.isEdt(), "@RunOnEdt method runs on the Codename One EDT");
     }
 }
 ```
 
-Run it the standard JUnit way:
+That is more useful than constructing a `Form` directly in the test because it exercises the same startup path the simulator runs. The assertions check the form your app opens, not a form the test wrote.
+
+The natural way to run it is from the IntelliJ gutter. Click the green ▶ icon next to the class declaration:
+
+![IntelliJ gutter run menu showing Run, Debug, Run with Coverage for GreetingFormTest](/blog/developer-workflow-debug-and-junit/intellij-gutter-run-menu.png)
+
+The results land in the standard Run tool window:
+
+![IntelliJ test results showing GreetingFormTest passed, 1 test total, 520 ms](/blog/developer-workflow-debug-and-junit/intellij-test-results.png)
+
+Click the green icon next to a specific `@Test` method to run just that method. The same flow works in VS Code's Test Explorer and in Eclipse's JUnit view.
+
+If you prefer the command line:
 
 ```
-mvn -pl javase test                                           # all JUnit + cn1:test
-mvn -pl javase test -Dtest=GreetingFormTest                   # one class
-mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle
+mvn -Ptest test                                  # run the JUnit suite
+mvn -Ptest test -Dtest=GreetingFormTest          # one class
+mvn -Ptest test -Dtest=GreetingFormTest#formShowsExpectedTitle
 ```
 
 `@CodenameOneTest` is the class-level entry point. It wires the simulator extension into the JUnit Jupiter lifecycle, boots `Display.init(null)` once per JVM (idempotent, so subsequent classes share the same `Display`), and skips the class with a `TestAbortedException` if the JVM is genuinely headless (so CI runners that have no display do not poison the rest of the run).
