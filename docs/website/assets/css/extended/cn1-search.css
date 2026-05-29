@@ -50,6 +50,18 @@ body.light .cn1-search-input {
   color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
 }
 
+.cn1-search-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.78));
+}
+
+.cn1-search-note a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .cn1-search-results {
   margin-top: 0.9rem;
   display: grid;
