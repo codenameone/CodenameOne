@@ -4,17 +4,17 @@ slug: build-time-codegen
 url: /blog/build-time-codegen/
 date: '2026-06-03'
 author: Shai Almog
-description: A reusable bytecode AnnotationProcessor SPI in the Maven plugin, the declarative router that is its first consumer, a SQLite ORM, JSON / XML mappers, a component binder with validation, the Immich-port baseline that drove the ORM design, and a build-time SVG / Lottie transcoder that emits Codename One Image subclasses for every asset.
-feed_html: '<img src="https://www.codenameone.com/blog/build-time-codegen.jpg" alt="Build-Time Codegen: Router, ORM, Mappers, Binder, SVG / Lottie" /> A reusable bytecode AnnotationProcessor SPI, the declarative router that is its first consumer, ORM + mappers + binder + validation, the Immich-port baseline, and a build-time SVG / Lottie transcoder.'
+description: A reusable bytecode AnnotationProcessor SPI in the Maven plugin, the declarative router that is its first consumer, a SQLite ORM, JSON / XML mappers, a component binder with validation, the baseline additions surfaced by porting a substantial mobile client app onto Codename One, and a build-time SVG / Lottie transcoder that emits Codename One Image subclasses for every asset.
+feed_html: '<img src="https://www.codenameone.com/blog/build-time-codegen.jpg" alt="Build-Time Codegen: Router, ORM, Mappers, Binder, SVG / Lottie" /> A reusable bytecode AnnotationProcessor SPI, the declarative router that is its first consumer, ORM + mappers + binder + validation, the porting-exercise baseline additions, and a build-time SVG / Lottie transcoder.'
 ---
 
 ![Build-Time Codegen: Router, ORM, Mappers, Binder, SVG / Lottie](/blog/build-time-codegen.jpg)
 
-This is the architectural post for the week. The Saturday post was about how you iterate; Monday's post was about new platform APIs; today's post is about a shape of code that several PRs in this release share, that explains why a lot of the new APIs work the way they do, and that I think will shape how Codename One projects look over the next few years.
+This is the architectural post for the week. The Saturday post was about how you iterate; Monday's post was about new platform APIs; today's post is about a shape of code that several PRs in this release share, that explains why a lot of the new APIs work the way they do, and that should shape how Codename One projects look over the next few years.
 
-The shape is **build-time codegen**. A reusable bytecode `AnnotationProcessor` SPI in the Maven plugin, the declarative router that is its first concrete consumer, then a SQLite ORM, JSON / XML mappers, and a component binder (all built on the same SPI), plus the build-time SVG / Lottie transcoders that ship in the same release for related reasons. The grab-bag PR from the Immich Flutter port lives here too because the ORM and mapping work share the porting exercise that drove it.
+The shape is **build-time codegen**. A reusable bytecode `AnnotationProcessor` SPI in the Maven plugin, the declarative router that is its first concrete consumer, then a SQLite ORM, JSON / XML mappers, and a component binder (all built on the same SPI), plus the build-time SVG / Lottie transcoders that ship in the same release for related reasons. The grab-bag PR from a recent porting exercise (a substantial mobile client app ported onto Codename One) lives here too because the ORM and mapping work share the porting exercise that drove it.
 
-Six PRs make up this post: [#5037](https://github.com/codenameone/CodenameOne/pull/5037) (router + annotation SPI), [#5047](https://github.com/codenameone/CodenameOne/pull/5047) (ORM + mappers + binder), [#5062](https://github.com/codenameone/CodenameOne/pull/5062) (validation), [#5055](https://github.com/codenameone/CodenameOne/pull/5055) (Immich-port baseline), [#5042](https://github.com/codenameone/CodenameOne/pull/5042) and [#5066](https://github.com/codenameone/CodenameOne/pull/5066) (SVG / Lottie), plus [#5049](https://github.com/codenameone/CodenameOne/pull/5049) (Metal / Android rendering fixes that fell out of the SVG screenshot tests).
+Six PRs make up this post: [#5037](https://github.com/codenameone/CodenameOne/pull/5037) (router + annotation SPI), [#5047](https://github.com/codenameone/CodenameOne/pull/5047) (ORM + mappers + binder), [#5062](https://github.com/codenameone/CodenameOne/pull/5062) (validation), [#5055](https://github.com/codenameone/CodenameOne/pull/5055) (porting-exercise baseline additions), [#5042](https://github.com/codenameone/CodenameOne/pull/5042) and [#5066](https://github.com/codenameone/CodenameOne/pull/5066) (SVG / Lottie), plus [#5049](https://github.com/codenameone/CodenameOne/pull/5049) (Metal / Android rendering fixes that fell out of the SVG screenshot tests).
 
 ## Bytecode codegen, not source-text codegen
 
@@ -47,7 +47,7 @@ public class UserDetailForm extends Form {
 
 `Router.navigate("/users/42")` resolves the path, instantiates `UserDetailForm`, and shows it. The build-time processor validates that the annotated class extends `Form`, that the path starts with `/`, that the constructor is accessible, that there are no duplicate patterns. Anything off the rails fails the build with a class name and a reason, not at runtime with a stack trace.
 
-The rest of the router surface is what has become table stakes in modern client routing: route guards (run before navigation completes; can cancel or redirect), redirects, per-tab navigation stacks (`TabsForm`, where each tab keeps its own back stack), location listeners (anything in the app can subscribe to "the route changed"), and a `Form.setPopGuard(PopGuard)` analogue to Flutter's `PopScope` (intercept hardware back, toolbar back, or `Router.pop()` with a chance to ask "are you sure?"). `Sheet.showForResult()` returns an `AsyncResource<T>` that auto-cancels with `null` if the user dismisses the sheet.
+The rest of the router surface is the kind of thing that has become table stakes in modern client routing: route guards (run before navigation completes; can cancel or redirect), redirects, per-tab navigation stacks (`TabsForm`, where each tab keeps its own back stack), location listeners (anything in the app can subscribe to "the route changed"), and a `Form.setPopGuard(PopGuard)` hook to intercept hardware back, toolbar back, or `Router.pop()` with a chance to ask "are you sure?". `Sheet.showForResult()` returns an `AsyncResource<T>` that auto-cancels with `null` if the user dismisses the sheet.
 
 ### Deep links
 
@@ -126,9 +126,9 @@ The new `BindAttr` enum lets `@Bind` target a specific attribute of the componen
 
 Three new dev-guide chapters: [Annotation-JSON-XML-Mapping.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Annotation-JSON-XML-Mapping.asciidoc), [Annotation-Component-Binding.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Annotation-Component-Binding.asciidoc), and [Annotation-SQLite-ORM.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Annotation-SQLite-ORM.asciidoc).
 
-## The Immich-port baseline
+## The porting-exercise baseline
 
-[PR #5055](https://github.com/codenameone/CodenameOne/pull/5055) ships as "Improvements to baseline based on porting exercise" and the porting exercise was real: Immich, the Flutter mobile client, into Codename One. The port is still compiling cleanly through every change in that PR; the additions worth pulling out:
+[PR #5055](https://github.com/codenameone/CodenameOne/pull/5055) ships as "Improvements to baseline based on porting exercise". The porting exercise was real: a substantial third-party mobile client onto Codename One. The port is still compiling cleanly through every change in that PR; the additions worth pulling out:
 
 **Java subset additions.** Eleven Java 8 default methods on `Map` (`getOrDefault`, `putIfAbsent`, `remove(K, V)`, `replace(K, V)` / `replace(K, V, V)`, `forEach`, `replaceAll`, `computeIfAbsent`, `computeIfPresent`, `compute`, `merge`); `BiFunction`; `Iterable.forEach(Consumer)`, `Collection.removeIf(Predicate)`, `List.replaceAll(UnaryOperator)`, `List.sort(Comparator)`. All four primitive atomics: `AtomicReference`, `AtomicInteger`, `AtomicLong`, `AtomicBoolean`. Standard Java 8 surface that was simply missing.
 
@@ -196,11 +196,11 @@ If your app uses `setClip(GeneralPath)` or paints text under a non-uniform trans
 
 The thread across all six PRs is the same pattern: **emit Java at build time, validate at build time, fail fast with a class name and a reason, R8 / ParparVM rename the generated code together with the rest of the app**. The router uses it to register `@Route` classes. The ORM uses it to generate typed DAOs. The mappers use it to generate typed JSON / XML readers and writers. The binder uses it to wire fields to components. The SVG and Lottie transcoders use it to turn declarative graphics into Java classes that render through the shape API.
 
-The practical effect is that the kind of code that historically required reflection at runtime (with all the obfuscation hazards and surprise allocations that come with that) now happens once at build time and produces direct, dead-code-eliminable, rename-safe symbol references. That is the shape I think Codename One projects are going to look more and more like over the next year.
+The practical effect is that the kind of code that historically required reflection at runtime (with all the obfuscation hazards and surprise allocations that come with that) now happens once at build time and produces direct, dead-code-eliminable, rename-safe symbol references. That is the shape Codename One projects are going to look more and more like over the next year.
 
 ## Wrapping up
 
-That closes out the post series for this release cycle. The May 29 weekly index is [here](/blog/metal-default-new-build-cloud-and-a-new-format/); the next weekly index is the one I will publish on Friday in the same short format.
+That closes out the post series for this release cycle. The May 29 weekly index is [here](/blog/metal-default-new-build-cloud-and-a-new-format/); the next weekly index lands on Friday in the same short format.
 
 ---
 
