@@ -1,107 +1,275 @@
 ---
-title: Developer Workflow: On-Device Debugging And JUnit 5
+title: On-Device Debugging And JUnit 5
 slug: developer-workflow-debug-and-junit
 url: /blog/developer-workflow-debug-and-junit/
 date: '2026-05-30'
 author: Shai Almog
-description: JDWP-based on-device debugging for ParparVM iOS apps and Android apps, so jdb / IntelliJ / VS Code / Eclipse / NetBeans attach straight to the device or simulator. Plus standard JUnit 5 @Test methods against the JavaSE simulator, with annotations for the visual configuration (@Theme, @DarkMode, @LargerText, @Orientation, @RTL).
-feed_html: '<img src="https://www.codenameone.com/blog/developer-workflow-debug-and-junit.jpg" alt="Developer Workflow: On-Device Debugging And JUnit 5" /> JDWP-based on-device debugging for ParparVM iOS and Android, plus standard JUnit 5 @Test methods against the JavaSE simulator with annotations for the visual configuration.'
+description: A walk-through of the new JDWP-based on-device debugging pipeline for ParparVM iOS apps and Android apps, with a step-by-step IntelliJ tutorial for each. Plus a short tutorial on the new standard JUnit 5 integration against the JavaSE simulator, with annotations for the visual configuration.
+feed_html: '<img src="https://www.codenameone.com/blog/developer-workflow-debug-and-junit.jpg" alt="On-Device Debugging And JUnit 5" /> A walk-through of the new JDWP-based on-device debugging pipeline for ParparVM iOS apps and Android apps, with a step-by-step IntelliJ tutorial for each, and a short tutorial on the new standard JUnit 5 integration against the JavaSE simulator.'
 ---
 
-![Developer Workflow: On-Device Debugging And JUnit 5](/blog/developer-workflow-debug-and-junit.jpg)
+![On-Device Debugging And JUnit 5](/blog/developer-workflow-debug-and-junit.jpg)
 
-Two things this post. Both are about how you iterate on a Codename One app rather than what the app itself does, and both are the kind of change you only notice the impact of after a week of working with them in place. The first is one we have wanted for a long time: on-device debugging that actually treats Java as Java. The second is JUnit 5 as a first-class test framework against the simulator.
+This is the first follow-up to [Friday's release post](/blog/metal-default-new-build-cloud-and-a-new-format/) and it covers the two changes from this release that affect how you iterate on a Codename One app rather than what the app itself does. On-device debugging that treats Java as Java on a real iPhone or a real Android device, and standard JUnit 5 against the JavaSE simulator. The first is the one we have been wanting for a long time, and is the one that takes the most explaining, so most of the post is about it.
 
 ## On-device debugging that treats Java as Java
 
-Codename One has always supported on-device debugging in the strict technical sense. You could attach Xcode to a `.ipa`, you could attach Android Studio to a running APK, you could read the native call stack, you could step through Objective-C or the C ParparVM emits. What you could not do is set a breakpoint in `MyForm.java`, hit it on a real iPhone, and inspect a Java field on a Java object as a Java object. The bridge between "this is the Java code you wrote" and "this is what is actually running on the silicon" got chopped in two by the translation step, and the only way back across the gap was to read C and translate it in your head.
+Codename One has always supported on-device debugging in the strict technical sense. You could attach Xcode to a `.ipa`, you could attach Android Studio to a running APK, you could read the native call stack, you could step through Objective-C or the C that ParparVM emits. What you could not do was set a breakpoint in `MyForm.java`, hit it on a real iPhone, and inspect a Java field on a Java object as a Java object. You also could not debug an iOS app without a Mac in the loop somewhere, because the only debugger that understood the binary was Xcode. The translation step between the Java you wrote and the C that ParparVM produces left no way back across the gap on the device.
 
-[PR #4999](https://github.com/codenameone/CodenameOne/pull/4999) (iOS) and [PR #5012](https://github.com/codenameone/CodenameOne/pull/5012) (Android) close the gap. As of this week you can attach `jdb`, IntelliJ IDEA, VS Code, Eclipse, or NetBeans (anything that speaks JDWP) to a Codename One app running on:
+[PR #4999](https://github.com/codenameone/CodenameOne/pull/4999) (iOS) and [PR #5012](https://github.com/codenameone/CodenameOne/pull/5012) (Android) close that gap. As of this week any JDWP-speaking debugger (IntelliJ IDEA, `jdb`, VS Code's Java Debugger, Eclipse, NetBeans) can attach to a Codename One app and treat the running process as a JVM.
 
-- a real iPhone connected over USB,
-- a real iPhone over Wi-Fi after pairing,
-- the iOS Simulator,
+Supported targets:
+
+**iOS**
+
+- the iOS Simulator under Xcode (any host),
+- a real iPhone reached over Wi-Fi from a Mac on the same network.
+
+iOS still needs a Mac somewhere in the pipeline because the actual `.ipa` is built by Xcode (locally or via the build server). The Mac is where the bits come from. Once they are on the device, the IDE attaches over Wi-Fi from any machine that can reach the device's IP.
+
+**Android**
+
+- the Android emulator,
 - a real Android phone over USB,
-- a real Android phone over wireless `adb`,
-- the Android emulator.
+- a real Android phone over wireless `adb`.
 
-You then set a breakpoint in your Java source, hit it, see the locals as Java values, walk the stack as Java frames, inspect instance fields as Java fields, and invoke methods on live Java objects. The same workflow you have on the simulator, on the device, with nothing in the middle pretending to be something else.
+Android does not need a Mac because Dalvik / ART already speak JDWP natively. The `adb` tool does the rest.
 
-If you would rather just *try* it, the developer guide has the step-by-step under [On-Device-Debugging.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/On-Device-Debugging.asciidoc) for iOS and [On-Device-Debugging-Android.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/On-Device-Debugging-Android.asciidoc) for Android. The rest of this section is how it is wired.
+### What it looks like
 
-### iOS, in three pieces
+A breakpoint inside an iOS app, hit on the iOS Simulator next to IntelliJ IDEA:
 
-The iOS half is structural because ParparVM translates Java bytecode to C and the operating system has no idea any of it ever was Java. The PR adds three independent pieces that together carry Java semantics across the gap:
+![IntelliJ stopped at a breakpoint inside a Codename One iOS app, with locals and the running simulator visible](/blog/developer-workflow-debug-and-junit/intellij-debugger-on-device.png)
 
-1. **Translator instrumentation.** When you set `cn1.onDeviceDebug=true` the ParparVM translator emits side-tables next to every method (locals address arrays, variable names, line tables, per-class field offset tables, per-method invoke thunks) plus a `cn1-symbols.txt` sidecar that names every class, method, line, local, and field. Release builds are unaffected; the whole thing is gated by a `CN1_ON_DEVICE_DEBUG` preprocessor define so when the hint is off there is no extra code in the binary.
-2. **Device runtime.** A new `cn1_debugger.{h,m}` is compiled into debug builds. It dials out to a desktop proxy over TCP and services a wire protocol from a listener thread. The fast path through the `__CN1_DEBUG_INFO` hook when nothing is attached is a single load and predicted-not-taken branch (`__builtin_expect(cn1DebuggerActive, 0)`), so the cost of having the instrumentation present is in the noise. When something *is* attached, suspend / resume yields the GC bit so paused threads do not block collection; `dup2`-based capture forwards `stdout` and `stderr` into the IDE console; method invocation is queued on the suspended Java thread so it runs in a valid `tsd` context, and the underlying call is wrapped in `setjmp` so an uncaught throw round-trips back as a typed exception instead of `longjmp`-ing past `suspendCurrent`.
-3. **Desktop proxy.** `maven/cn1-debug-proxy/` is a minimum-viable JDWP server that translates between our custom wire protocol and standard JDWP. It is the piece that lets *any* JDWP-speaking IDE attach: from the IDE's point of view it is just talking to a JVM. Coverage includes the parts you actually use day to day: `VirtualMachine.*`, `ReferenceType.*`, `ClassType.InvokeMethod`, `Method.LineTable` / `VariableTable`, `ObjectReference.GetValues` / `InvokeMethod`, `ArrayReference.Length` / `GetValues`, `StringReference.Value`, `ThreadReference.*`, `StackFrame.*`, the full `EventRequest` parser with all twelve JDWP modifier kinds, and the `Event.Composite` events that come back.
+The same Debug tool window you use for any other Java project. Frames panel on the left has the full Java call stack. The Variables panel shows `this` and the locals as Java values, with the same drill-down you would get on a regular JVM. The simulator on the right is the real iOS app, paused at the breakpoint, waiting for the next step.
 
-The generated archetype includes two IntelliJ run configurations in an *On-Device Debug* folder: *CN1 iOS On-Device Debug* (Maven), which builds the debug `.ipa` with the right hints, installs it, and starts the proxy; and *CN1 Attach iOS* (Remote JVM Debug, `localhost:5005`), which is the second click that hooks IntelliJ to the proxy. Two clicks. Same flow for VS Code and Eclipse using their respective remote-JVM-debug profiles pointed at `localhost:5005`.
+### How the pieces fit together
 
-### Android, in much less code
+On iOS the dataflow is:
 
-Dalvik and ART already speak JDWP, which is the reason the Android PR is much smaller. No proxy and no instrumentation; just orchestration:
+```
+   IntelliJ <--JDWP--> CN1 Debug Proxy <--CN1 wire protocol--> iOS app
+   (any host)          (your laptop)                          (Wi-Fi or
+                                                              iOS Simulator)
+```
 
-- A new build hint `android.onDeviceDebug=true` flips the manifest to `debuggable="true"` and disables R8 / Proguard for the debug build. Release builds are unaffected.
-- A new `cn1:android-on-device-debugging` Mojo locates `adb`, optionally `adb connect`s a wireless device, installs the APK, sets the debug-app for wait-for-attach, launches the Activity, forwards JDWP onto `localhost:5005`, and streams `logcat --pid=<pid>` into the console with a `[device]` prefix.
-- A `cn1:buildAndroidOnDeviceDebug` wrapper forces the hint and triggers the standard `android-device` cloud build, so the same workflow works against cloud-built APKs without you having to remember the flag.
-- Two IntelliJ run configurations in the same *On-Device Debug* folder as the iOS pair: *CN1 Android On-Device Debug* (Maven) and *CN1 Attach Android* (Remote JVM Debug, `localhost:5005`).
+The CN1 Debug Proxy is a small Java process you run on your laptop. It binds two TCP ports: one for the iOS app to dial into, one that speaks standard JDWP for the IDE. The IDE thinks it is attached to a normal remote JVM. The iOS app thinks it is talking to a debug proxy. The proxy translates between the two and walks the ParparVM struct layout so Java fields, Java method calls, and Java values round-trip cleanly in both directions.
 
-Wireless debugging works through both the Android 11+ `adb pair` flow and the legacy `adb tcpip` flow. Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework resolve to the right file the same way they would for user code. JNI / NDK code is intentionally out of scope; if you have an NDK component you want to step through alongside the Java half, Android Studio's LLDB attaches to the same process alongside this JDWP session.
+On Android the proxy is unnecessary. Dalvik / ART implement JDWP themselves, so IntelliJ attaches directly to the device through `adb`'s JDWP forwarder:
 
-### The thing that surprised us
+```
+   IntelliJ <--JDWP via adb forward--> Android device / emulator
+```
 
-The lack of on-device debugging had silently shaped the way Codename One code gets written, and we did not realise the extent of it until we sat down with the new pipeline in front of us. The implicit assumption "this will only ever be debuggable in the simulator" is one of those things that bends a workflow without you noticing. You start putting platform-specific code behind feature flags so you can exercise it in the simulator. You stop writing test code that depends on real-device state because there is no way to put a breakpoint in it on the device. You reach for `Log.p("got here: " + value)` because the friction of anything more elaborate is too high.
+The Maven plugin's new `cn1:android-on-device-debugging` goal does the `adb` orchestration and the port forwarding for you.
 
-The first run on a real iPhone with the new pipeline made this very concrete. A breakpoint inside the iOS native callback path of a feature we have been working on for weeks. The breakpoint hit. The locals were Java locals. The IDE evaluated an expression on a live Java object on a real iPhone and the result came back as a `String`. That sounds banal. It is the kind of thing you take for granted on a JVM, and after fifteen years of Codename One, seeing it on the device for the first time was a genuinely strange moment.
+There is one capability difference worth knowing up front: on Android the same `adb`-attached session can drop into native C / C++ via Android Studio's LLDB alongside the JDWP attach, so if you have native code in a cn1lib you can step through that too. On iOS the JDWP attach is Java-only; if you also want to step through native Objective-C, you need Xcode in parallel.
 
-None of this changes the recommendation that you do most of your iteration in the JavaSE simulator. That is still by a large margin the fastest loop. The on-device path is what you reach for when the bug is platform-specific, when it only happens on a real radio, when it only reproduces against real Touch ID hardware, when it only shows up under iOS's memory pressure. The kind of bug that previously sent you reaching for `Log.p` and a rebuild loop.
+### Tutorial: IntelliJ + iOS
+
+The Codename One archetype now generates two run configurations under an *On-Device Debug* folder in the IntelliJ run-config dropdown: **CN1 Debug Proxy** and **CN1 Attach iOS**. The tutorial below assumes a project generated from the [Initializr](/initializr/) recently enough to have those. If you have an older project, the [iOS on-device debugging chapter](https://www.codenameone.com/developer-guide/#_on_device_debugging_ios) of the developer guide has the run-configuration XML to drop into `.idea/runConfigurations/`.
+
+**1. Enable the build hints.**
+
+Open `common/codenameone_settings.properties` and uncomment the four lines the archetype generated:
+
+```
+ios.onDeviceDebug=true
+ios.onDeviceDebug.proxyHost=127.0.0.1
+ios.onDeviceDebug.proxyPort=55333
+ios.onDeviceDebug.waitForAttach=true
+```
+
+`ios.onDeviceDebug=true` flips the iOS build into the instrumented variant. The other three configure the proxy connection.
+
+The fourth hint, `ios.onDeviceDebug.waitForAttach=true`, is the **block-on-load** option, and we recommend leaving it on. With it enabled, the iOS app shows a "Waiting for debugger" overlay at launch and does not progress past `Display.init` until the proxy issues its first resume. The recommendation is mostly about making the on-device-debug variant visible. If somebody on the team launches the app on a device and it sits on "Waiting for debugger" they immediately know what kind of build they have, instead of being confused by an app that does nothing.
+
+For a physical iPhone the `proxyHost` value should be the laptop's LAN IP (run `ifconfig | grep "inet "` to find it) rather than `127.0.0.1`. The iOS Simulator can always use `127.0.0.1`.
+
+**2. Build the iOS app.**
+
+Either path works:
+
+- Local Xcode build (`mvn cn1:buildIosXcodeProject`) and then run from Xcode. This is the fastest iteration loop.
+- Cloud build for a real device (`mvn cn1:buildIosOnDeviceDebug`) and install the resulting `.ipa`.
+
+Both produce an iOS binary instrumented for on-device debugging because the build hint is set.
+
+**3. Start the proxy.**
+
+In IntelliJ, pick **CN1 Debug Proxy** from the run-config dropdown and click the green ▶ Run button (not the bug icon; Debug on this config would attach IntelliJ to the proxy itself, which is not what you want). The Run tool window shows:
+
+```
+On-device-debug proxy starting:
+  symbols : .../cn1-symbols.txt
+  device  : listening on tcp://0.0.0.0:55333
+  jdwp    : listening on tcp://0.0.0.0:8000
+[device] listening on port 55333 for ParparVM app to dial in
+[jdwp]   listening on port 8000 for debugger (jdb) to attach
+```
+
+When the `[jdwp]` line appears, the proxy is ready.
+
+**4. Attach the debugger.**
+
+Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000` and opens its standard Debug tool window. You can now set breakpoints anywhere in your Java code or in the framework.
+
+**5. Launch the app.**
+
+Launch the iOS app under the iOS Simulator (from Xcode) or on the tethered device. With `waitForAttach=true` it pauses at the "Waiting for debugger" overlay until the proxy issues its first resume. Hit Resume on the IntelliJ Debug toolbar; the app proceeds, your breakpoints fire as the app exercises them.
+
+**The proxy's Run window is also your device console.** Anything the app writes to `System.out`, `Log.p`, `printf`, or `NSLog` from native code is forwarded to the proxy and printed in the **CN1 Debug Proxy** Run window with a `[device]` prefix. This is genuinely useful and is one fewer thing you need Xcode for. The caveat is that the forwarding starts when the proxy connection is established, so output written during the very first millisecond of process launch (before `Display.init`) is not always captured. If you need every byte from `t=0`, attach Xcode's console for that specific run.
+
+### Tutorial: IntelliJ + Android
+
+Android is simpler because the proxy is not needed. The archetype generates two run configurations under the same *On-Device Debug* folder: **CN1 Android On-Device Debug** (Maven, builds and installs the APK and forwards JDWP) and **CN1 Attach Android** (Remote JVM Debug at `localhost:5005`).
+
+**1. Enable the build hint.**
+
+In `common/codenameone_settings.properties`:
+
+```
+android.onDeviceDebug=true
+```
+
+This single hint flips the manifest to `debuggable="true"` and turns R8 / Proguard off for this build. Release builds without the hint are unaffected.
+
+**2. Run CN1 Android On-Device Debug.**
+
+Picks up the hint, builds the APK, installs it on the connected device or emulator, sets the debug-app for wait-for-attach, launches the Activity, forwards JDWP to `localhost:5005`, and streams `logcat --pid=<pid>` into the Run window with a `[device]` prefix.
+
+For wireless `adb`, pass `-Dcn1.android.onDeviceDebug.wireless=<ip:port>` and the goal will `adb connect` before installing. Both the Android 11+ `adb pair` flow and the legacy `adb tcpip` flow work.
+
+**3. Attach the debugger.**
+
+Switch to **CN1 Attach Android** and click 🐞 Debug. IntelliJ connects to `localhost:5005`. Set breakpoints anywhere; they fire when exercised.
+
+Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework or inside the Android port resolve to the right files. If you have native C / C++ that you also want to step through, Android Studio's LLDB attaches to the same process alongside this JDWP session and gives you the C view next to the Java view.
+
+The dev guide has the full reference, including the wireless-pairing flows, the VS Code and Eclipse equivalents, and a troubleshooting section: [iOS on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_ios) and [Android on-device debugging](https://www.codenameone.com/developer-guide/#_on_device_debugging_android).
+
+### When to use it (and when not to)
+
+For most bugs the JavaSE simulator is still by a large margin the fastest loop. Reach for on-device debugging when the bug is platform-specific: ParparVM-specific threading, an iOS-only layout glitch under the modern native theme, a real-radio Bluetooth interaction, a Touch ID gate, an Android-only manifest interaction, anything that only reproduces under iOS background memory pressure. The kind of bug that previously sent you reaching for `Log.p` and a rebuild loop. That bug now has a debugger pointed at it.
 
 ## JUnit 5 against the simulator
 
-The matching change on the test side is [PR #5032](https://github.com/codenameone/CodenameOne/pull/5032). For years the recommended way to test a Codename One app was the `AbstractTest` / `DeviceRunner` framework. It works, it runs on the device, and it is the right answer when you want a true on-device integration test. It is also a framework you have to learn instead of one most Java developers already know.
+The other change in this release is the new JUnit 5 integration in the JavaSE port ([PR #5032](https://github.com/codenameone/CodenameOne/pull/5032)).
 
-The new package is `com.codename1.testing.junit`, and it lives in the JavaSE port. That last detail is important: it is simulator-only by design. The reason is the upside. Simulator tests run on a real JVM, so they get full reflection, real `java.lang.reflect`, real `java.util.concurrent` (the whole thing, not the subset), and the entire Mockito / AssertJ / WireMock / Testcontainers ecosystem just works.
+To be clear about what this is: it is **standard JUnit 5**. There is no fork of JUnit in `com.codename1.testing.junit`. That package holds a small set of annotations and a `CodenameOneExtension` that plugs into the regular JUnit Jupiter lifecycle. You write `@Test` methods using `org.junit.jupiter.api.Test`, you assert with `org.junit.jupiter.api.Assertions`, and your IDE's native test runner picks them up the way it does on any other Java project.
+
+Why a separate integration at all? The legacy `com.codename1.testing.AbstractTest` framework, driven by the `cn1:test` Maven goal, still exists and is still the only way to run tests on a real iOS or Android device (JUnit Jupiter is not available on ParparVM). The trade-off is that `AbstractTest` tests have to compile under the Codename One device subset, with no reflection, no `java.net.http`, no `java.nio.file`, no Mockito, no AssertJ, no `assertThrows`. JUnit-style tests run only on the JavaSE simulator JVM, but the JVM is a regular JVM, so reflection, Mockito, AssertJ, and parameterised tests are all available.
+
+Both styles coexist in the same project under `common/src/test/java`. You pick per test class. The runners discover disjoint sets (`cn1:test` looks for `UnitTest` implementers; Surefire looks for `@Test` methods), so a `mvn install` runs both passes in the same phase without overlap.
+
+### A minimal test
+
+Tests live in `common/src/test/java`. A minimal example:
 
 ```java
+package com.example.myapp;
+
+import com.codename1.testing.junit.CodenameOneTest;
+import com.codename1.testing.junit.RunOnEdt;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 @CodenameOneTest
-@SimulatorProperty(name = "feature.flag", value = "on")
 class GreetingFormTest {
 
     @Test
     @RunOnEdt
-    @LargerText(scale = 1.6f)
-    @DarkMode
-    void formStillFitsAtAccessibilityScaleInDark() {
-        Form f = new GreetingForm();
-        f.show();
+    void formShowsExpectedTitle() {
+        new Form("Hello").show();
+
         assertEquals("Hello", Display.getInstance().getCurrent().getTitle());
+        assertTrue(CN.isEdt(), "@RunOnEdt method runs on the Codename One EDT");
     }
 }
 ```
 
-`@CodenameOneTest` is the entry point: a meta-`@ExtendWith` that wires the simulator extension into the JUnit 5 lifecycle. The extension boots Display lazily on the first test that needs it and keeps the simulator warm for the rest of the JVM, so subsequent tests do not pay the startup cost again. Cross-test state cleanup is your responsibility (`@AfterEach`) by design; the extension never resets state you did not explicitly ask for.
+Run it the standard JUnit way:
 
-The runtime knobs are individual annotations: `@RunOnEdt` runs the test body on the Codename One Event Dispatch Thread; `@SimulatorProperty(name=..., value=...)` (and the container `@SimulatorProperties`) sets a `Display.setProperty(...)` for the duration of the test. The visual ones are `@Theme(...)`, `@DarkMode`, `@LargerText(scale=...)`, `@Orientation(...)`, `@RTL`. All of those resolve method-level over class-level, are applied in a single batched setup on the EDT, and are followed by exactly one theme refresh. The end result is that the test body sees the simulator in the configuration you asked for with no flicker, no double-refresh, no leakage into the next test.
+```
+mvn -pl javase test                                           # all JUnit + cn1:test
+mvn -pl javase test -Dtest=GreetingFormTest                   # one class
+mvn -pl javase test -Dtest=GreetingFormTest#formShowsExpectedTitle
+```
 
-### Why JUnit specifically
+`@CodenameOneTest` is the class-level entry point. It wires the simulator extension into the JUnit Jupiter lifecycle, boots `Display.init(null)` once per JVM (idempotent, so subsequent classes share the same `Display`), and skips the class with a `TestAbortedException` if the JVM is genuinely headless (so CI runners that have no display do not poison the rest of the run).
 
-The honest answer is that JUnit 5 is the lingua franca of Java testing in 2026 and Codename One's previous testing story was a dialect we asked you to learn instead. The new annotation set is a thin layer over JUnit, not a parallel framework: `@Test` is still `org.junit.jupiter.api.Test`; assertions are still `Assertions.assertEquals`; the failure rendering in your IDE is the same one you see on every other project; CI integrations (Surefire, Maven Failsafe, IntelliJ test runner, GitHub Actions test reporters) recognise it without configuration.
+`@RunOnEdt` dispatches the test body through `CN.callSerially`, which is what you want any time the body touches UI state. It rethrows the body's exceptions on the JUnit thread so the stack trace stays clickable in the IDE. Place it on the method for one test, on the class to apply to every test.
 
-The other half of the answer is reflection. Running on the simulator (a regular JVM with no bytecode rewriting) means tests can do things the on-device test runner deliberately cannot, because it tracks the iOS / Android subset. Reflective access to private fields. Mockito-style proxy generation. AssertJ's recursive comparison. Reading a JVM system property the framework would not normally expose. If your test relies on those, run it under JUnit. If you specifically want to validate device-only behaviour (the real iOS keyboard, the real Android share intent, the real platform clipboard), keep using `AbstractTest`.
+### A couple more common cases
 
-`junit-jupiter` moves from `test` scope to `provided` scope in the JavaSE port's POM. The reason is that the support classes (the extension, the annotations) need to compile against JUnit, but we did not want the JUnit dependency leaking onto the simulator runtime classpath for apps that do not opt in. Apps that want JUnit tests declare `junit-jupiter` in their own `test` scope; apps that do not are unaffected.
+A test that exercises a plain validator, with no UI involved at all:
 
-## Why the two changes pair
+```java
+@CodenameOneTest
+class EmailValidatorTest {
 
-These two PRs ship in the same release on purpose. JUnit gives you a way to express the test you want to run; the on-device debugger gives you a way to step through what actually happens when you run it on the device. Together they push the dev loop closer to what it looks like on a regular JVM application: tests, breakpoints, REPL-grade interrogation of a running process. The simulator was always close to that; the device used to be far from it; now both are close. That is the thing worth getting used to.
+    @Test
+    void rejectsEmptyString() {
+        assertFalse(new EmailValidator().isValid(""));
+    }
+
+    @Test
+    void acceptsCommonAddress() {
+        assertTrue(new EmailValidator().isValid("name@example.com"));
+    }
+}
+```
+
+This is the "pure model code" shape. No `@RunOnEdt`, no UI, runs on the JUnit worker thread, fast.
+
+A test of a form under a specific visual configuration:
+
+```java
+@CodenameOneTest
+class GreetingFormVisualTest {
+
+    @Test
+    @RunOnEdt
+    @DarkMode
+    @LargerText(scale = 1.6f)
+    void titleStillFitsInDarkModeAtAccessibilityScale() {
+        new GreetingForm().show();
+
+        Form current = Display.getInstance().getCurrent();
+        assertEquals("Hello", current.getTitle());
+        assertTrue(current.getPreferredW() <= Display.getInstance().getDisplayWidth());
+    }
+}
+```
+
+The visual-config annotations (`@Theme`, `@DarkMode`, `@LargerText`, `@Orientation`, `@RTL`) apply on the EDT in one batch, followed by a single theme refresh, so the test body sees the simulator in the exact configuration you asked for without flicker.
+
+A test that injects a custom property for the duration of one method:
+
+```java
+@Test
+@RunOnEdt
+@SimulatorProperty(name = "feature.flag", value = "on")
+void newCodePathRunsWhenFlagIsOn() {
+    // Display.getProperty("feature.flag", "off") returns "on" here
+    runFeature();
+    assertEquals("expected", Display.getInstance().getCurrent().getTitle());
+}
+```
+
+Class-level `@SimulatorProperty` applies to every method in the class. Method-level overrides class-level. Use the container `@SimulatorProperties` for more than one (the package source level rules out `@Repeatable`).
+
+The full reference, including the dependency-block YAML for `common/pom.xml` and `javase/pom.xml` and the `@Theme` / `@Orientation` / `@RTL` details, is at [Testing with JUnit 5](https://www.codenameone.com/developer-guide/#_testing_with_junit_5) in the developer guide.
 
 ## Wrapping up
 
-Two pieces of paving that should quietly compound over the next few months. The on-device debugger is the one we expect to change behaviour the most, because once it is part of the loop you stop reaching for `Log.p` for the kinds of investigations where a breakpoint and a thread dump are the right tool.
+That is the workflow half of this release. The next post is on Monday and covers the new platform APIs that moved into the core this week: AI and OIDC are the headline pieces, with WiFi / connectivity and a few smaller items alongside them.
 
-Monday's post covers the run of new platform APIs that moved into the core this week: WiFi, OIDC + passkeys, share-sheet callbacks, and the new AI / LLM package.
+Back to the [weekly index](/blog/metal-default-new-build-cloud-and-a-new-format/).
 
 ---
 
