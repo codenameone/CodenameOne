@@ -177,7 +177,9 @@ public final class GrpcWeb {
     private static int[] parseTrailerStatus(String trailer) {
         // Lines are CRLF-separated; the spec allows LF too.
         int idx = indexOfHeader(trailer, "grpc-status");
-        if (idx < 0) { return new int[]{GrpcResponse.STATUS_UNKNOWN}; }
+        if (idx < 0) {
+            return new int[]{GrpcResponse.STATUS_UNKNOWN};
+        }
         int eol = endOfLine(trailer, idx);
         String value = trailer.substring(idx, eol).trim();
         try {
@@ -189,7 +191,9 @@ public final class GrpcWeb {
 
     private static String trailerMessage(String trailer) {
         int idx = indexOfHeader(trailer, "grpc-message");
-        if (idx < 0) { return null; }
+        if (idx < 0) {
+            return null;
+        }
         int eol = endOfLine(trailer, idx);
         return trailer.substring(idx, eol).trim();
     }
@@ -216,8 +220,12 @@ public final class GrpcWeb {
             }
             // Skip CRLF / LF.
             i = eol;
-            if (i < n && trailer.charAt(i) == '\r') { i++; }
-            if (i < n && trailer.charAt(i) == '\n') { i++; }
+            if (i < n && trailer.charAt(i) == '\r') {
+                i++;
+            }
+            if (i < n && trailer.charAt(i) == '\n') {
+                i++;
+            }
         }
         return -1;
     }
@@ -276,7 +284,9 @@ public final class GrpcWeb {
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof GrpcConnection)) { return false; }
+            if (!(o instanceof GrpcConnection)) {
+                return false;
+            }
             GrpcConnection that = (GrpcConnection) o;
             return super.equals(o)
                     && failed == that.failed
