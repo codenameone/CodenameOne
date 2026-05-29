@@ -45,7 +45,7 @@ public @interface ProtoField {
     /// `int64` / `uint32` / `uint64` (varint). `SINT` matches
     /// `sint32` / `sint64` (ZigZag-encoded varint). `FIXED` matches
     /// `fixed32` / `fixed64` / `sfixed32` / `sfixed64` (fixed-width).
-    public enum WireKind {
+    enum WireKind {
         DEFAULT, SINT, FIXED
     }
 }

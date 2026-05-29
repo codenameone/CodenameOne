@@ -51,7 +51,7 @@ public final class ProtoReader {
     /// returns 0 when the stream is at EOF. Generated codecs use
     /// the 0 sentinel as the loop exit condition.
     public int readTag() throws IOException {
-        if (isAtEnd()) return 0;
+        if (isAtEnd()) { return 0; }
         return readVarint32();
     }
 
@@ -188,12 +188,12 @@ public final class ProtoReader {
     }
 
     private int readByte() throws IOException {
-        if (pos >= limit) throw new EOFException("Unexpected end of protobuf stream");
+        if (pos >= limit) { throw new EOFException("Unexpected end of protobuf stream"); }
         return buf[pos++] & 0xFF;
     }
 
     private void ensure(int n) throws IOException {
-        if (n < 0) throw new IOException("Negative length");
+        if (n < 0) { throw new IOException("Negative length"); }
         if (pos + n > limit) {
             throw new EOFException("Truncated protobuf stream: need " + n
                     + " more bytes but " + (limit - pos) + " remaining");
@@ -226,7 +226,7 @@ public final class ProtoReader {
         int read = 0;
         while (read < n) {
             int r = in.read(out, read, n - read);
-            if (r < 0) throw new EOFException();
+            if (r < 0) { throw new EOFException(); }
             read += r;
         }
         return out;

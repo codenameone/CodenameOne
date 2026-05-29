@@ -104,79 +104,79 @@ public final class ProtoWriter {
     // emit code is one line.
 
     public void writeInt32(int field, int value) throws IOException {
-        if (value == 0) return;
+        if (value == 0) { return; }
         writeTag(field, WIRE_VARINT);
         writeVarint32(value);
     }
 
     public void writeInt64(int field, long value) throws IOException {
-        if (value == 0L) return;
+        if (value == 0L) { return; }
         writeTag(field, WIRE_VARINT);
         writeVarint64(value);
     }
 
     public void writeUInt32(int field, int value) throws IOException {
-        if (value == 0) return;
+        if (value == 0) { return; }
         writeTag(field, WIRE_VARINT);
         // uint32 is encoded as unsigned varint -- mask to 32 bits.
         writeVarint64(value & 0xFFFFFFFFL);
     }
 
     public void writeUInt64(int field, long value) throws IOException {
-        if (value == 0L) return;
+        if (value == 0L) { return; }
         writeTag(field, WIRE_VARINT);
         writeVarint64(value);
     }
 
     public void writeSInt32(int field, int value) throws IOException {
-        if (value == 0) return;
+        if (value == 0) { return; }
         writeTag(field, WIRE_VARINT);
         writeVarint64(zigZag32(value) & 0xFFFFFFFFL);
     }
 
     public void writeSInt64(int field, long value) throws IOException {
-        if (value == 0L) return;
+        if (value == 0L) { return; }
         writeTag(field, WIRE_VARINT);
         writeVarint64(zigZag64(value));
     }
 
     public void writeFixed32Field(int field, int value) throws IOException {
-        if (value == 0) return;
+        if (value == 0) { return; }
         writeTag(field, WIRE_I32);
         writeFixed32(value);
     }
 
     public void writeFixed64Field(int field, long value) throws IOException {
-        if (value == 0L) return;
+        if (value == 0L) { return; }
         writeTag(field, WIRE_I64);
         writeFixed64(value);
     }
 
     public void writeBool(int field, boolean value) throws IOException {
-        if (!value) return;
+        if (!value) { return; }
         writeTag(field, WIRE_VARINT);
         out.write(1);
     }
 
     public void writeFloat(int field, float value) throws IOException {
-        if (value == 0.0f) return;
+        if (value == 0.0f) { return; }
         writeTag(field, WIRE_I32);
         writeFixed32(Float.floatToIntBits(value));
     }
 
     public void writeDouble(int field, double value) throws IOException {
-        if (value == 0.0d) return;
+        if (value == 0.0d) { return; }
         writeTag(field, WIRE_I64);
         writeFixed64(Double.doubleToLongBits(value));
     }
 
     public void writeString(int field, String value) throws IOException {
-        if (value == null || value.length() == 0) return;
+        if (value == null || value.length() == 0) { return; }
         writeBytes(field, utf8(value));
     }
 
     public void writeBytes(int field, byte[] value) throws IOException {
-        if (value == null || value.length == 0) return;
+        if (value == null || value.length == 0) { return; }
         writeTag(field, WIRE_LEN);
         writeVarint32(value.length);
         out.write(value);
@@ -186,7 +186,7 @@ public final class ProtoWriter {
     /// field. Generated codecs call into [ProtoCodecs#lookup(Class)]
     /// to find the nested codec.
     public <T> void writeMessage(int field, T value, ProtoCodec<T> codec) throws IOException {
-        if (value == null) return;
+        if (value == null) { return; }
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         ProtoWriter sub = new ProtoWriter(buf);
         codec.write(sub, value);
@@ -201,7 +201,7 @@ public final class ProtoWriter {
     /// repeated entries).
     public <T> void writeMessageList(int field, java.util.List<T> values,
                                      ProtoCodec<T> codec) throws IOException {
-        if (values == null || values.isEmpty()) return;
+        if (values == null || values.isEmpty()) { return; }
         for (int i = 0, n = values.size(); i < n; i++) {
             writeMessage(field, values.get(i), codec);
         }
@@ -210,10 +210,10 @@ public final class ProtoWriter {
     /// Writes a `repeated` field of strings (one tag + length prefix
     /// per element).
     public void writeStringList(int field, java.util.List<String> values) throws IOException {
-        if (values == null || values.isEmpty()) return;
+        if (values == null || values.isEmpty()) { return; }
         for (int i = 0, n = values.size(); i < n; i++) {
             String v = values.get(i);
-            if (v == null) continue;
+            if (v == null) { continue; }
             byte[] body = utf8(v);
             writeTag(field, WIRE_LEN);
             writeVarint32(body.length);
@@ -224,7 +224,7 @@ public final class ProtoWriter {
     /// Writes a packed `repeated int32` field (proto3 default packing
     /// for scalar lists).
     public void writePackedInt32(int field, java.util.List<Integer> values) throws IOException {
-        if (values == null || values.isEmpty()) return;
+        if (values == null || values.isEmpty()) { return; }
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         ProtoWriter sub = new ProtoWriter(buf);
         for (int i = 0, n = values.size(); i < n; i++) {
@@ -239,7 +239,7 @@ public final class ProtoWriter {
 
     /// Writes a packed `repeated int64` field.
     public void writePackedInt64(int field, java.util.List<Long> values) throws IOException {
-        if (values == null || values.isEmpty()) return;
+        if (values == null || values.isEmpty()) { return; }
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         ProtoWriter sub = new ProtoWriter(buf);
         for (int i = 0, n = values.size(); i < n; i++) {
