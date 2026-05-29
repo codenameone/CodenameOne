@@ -40,6 +40,26 @@
     [window release];
 #endif
 
+#if TARGET_OS_MACCATALYST
+    // Mac Catalyst window-size determinism for CI screenshot tests:
+    // macos-15 runners (and SwiftUI auto-fit on the iPhone/iPad sim too)
+    // hand the scene a slightly different window height each launch
+    // (observed 1024x685, 1024x684, 1024x681 across three CI runs in a
+    // row), which makes the strict-pixel screenshot comparison
+    // permanently mismatch. Pin the window to an exact 1024x685 via the
+    // sizeRestrictions API so every launch produces byte-identical
+    // captures. Min == max forces the user can't resize either; for the
+    // headless CI use case that's the right trade-off.
+    if (@available(macCatalyst 13.0, *)) {
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (ws.sizeRestrictions != nil) {
+            CGSize fixed = CGSizeMake(1024.0, 685.0);
+            ws.sizeRestrictions.minimumSize = fixed;
+            ws.sizeRestrictions.maximumSize = fixed;
+        }
+    }
+#endif
+
     UIOpenURLContext *urlContext = [connectionOptions.URLContexts anyObject];
     if (urlContext != nil) {
         [appDelegate cn1OpenURL:[UIApplication sharedApplication] url:urlContext.URL sourceApplication:urlContext.options.sourceApplication annotation:urlContext.options.annotation];
