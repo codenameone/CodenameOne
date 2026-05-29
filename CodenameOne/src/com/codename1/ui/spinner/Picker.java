@@ -596,7 +596,6 @@ public class Picker extends Button {
                     currentSpinner = null;
                 }
                 restoreContentPane();
-                dlg.disposeToTheBottom();
                 if (command == COMMAND_CANCEL) {
                     // Roll back any setX calls made while the popup was showing
                     // (e.g. a custom "+7 days" button) so getDate() returns the
@@ -609,6 +608,7 @@ public class Picker extends Button {
                     preEditValue = null;
                     preEditDateValueExplicitlySet = false;
                     updateValue();
+                    dlg.disposeToTheBottom();
                 } else {
                     preEditValue = null;
                     preEditDateValueExplicitlySet = false;
@@ -629,9 +629,17 @@ public class Picker extends Button {
                             next = f.getPreviousComponent(Picker.this);
                         }
                     }
-                    if (next != null) {
-                        next.requestFocus();
-                        next.startEditingAsync();
+                    final Component nextToEdit = next;
+                    if (nextToEdit != null) {
+                        dlg.disposeToTheBottom(new Runnable() {
+                            @Override
+                            public void run() {
+                                nextToEdit.requestFocus();
+                                nextToEdit.startEditingAsync();
+                            }
+                        });
+                    } else {
+                        dlg.disposeToTheBottom();
                     }
                 }
             }
