@@ -277,7 +277,7 @@ public class IPhoneBuilder extends Executor {
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
-        useMetal = "true".equals(request.getArg("ios.metal", "false"));
+        useMetal = "true".equals(request.getArg("ios.metal", "true"));
         log("Request Args: ");
         log("-----------------");
         for (String arg : request.getArgs()) {
