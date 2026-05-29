@@ -79,7 +79,8 @@ Use this page to quickly navigate the most important parts of the Codename One w
 
 ## Account and Cloud Dashboard
 
-- [Dashboard (Secure)](https://cloud.codenameone.com/secure/index.html)
+- [Dashboard (Console)](https://cloud.codenameone.com/console/index.html)
+- [Dashboard (Legacy)](https://cloud.codenameone.com/secure/index.html)
 - [Build App (Legacy Dashboard Entry)](https://cloud.codenameone.com/buildapp/index.html)
 - [My Account](/my-account/)
 - [Login / Build Cloud Account](https://cloud.codenameone.com)
