@@ -1,5 +1,6 @@
 package com.codename1.maven;
 
+import com.codename1.lottie.transcoder.LottieTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder.GeneratedClass;
 
@@ -33,17 +34,25 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Scans an application module for SVG files, transcodes each into a
+ * Scans an application module for vector animation files (SVG and
+ * Lottie / Bodymovin JSON), transcodes each into a
  * {@code com.codename1.ui.GeneratedSVGImage} subclass under
  * {@code target/generated-sources/svg}, and emits a registry class that
  * installs each transcoded image into a Resources instance (and the global
  * fallback) under its source filename.
  *
  * <h3>Source layout</h3>
- * SVG files are picked up from both {@code src/main/css/} and
- * {@code src/main/svg/}. Drop your SVGs next to the CSS file that references
- * them; the mojo finds them either way. Theme CSS keeps the natural
- * {@code background: url(spinner.svg);} reference.
+ * Files are picked up from format-specific directories plus the shared
+ * {@code src/main/css/} directory so designers can drop assets next to the
+ * theme CSS that references them:
+ * <ul>
+ *   <li>{@code src/main/svg/} -- {@code *.svg}</li>
+ *   <li>{@code src/main/lottie/} -- {@code *.json}, {@code *.lottie}</li>
+ *   <li>{@code src/main/css/} -- either of the above</li>
+ * </ul>
+ * Theme CSS keeps the natural {@code background: url(spinner.svg);}
+ * reference for SVG, and the same {@code url(...)} syntax resolves
+ * {@code .json} / {@code .lottie} at runtime.
  *
  * <h3>CSS hints</h3>
  * For each {@code url(*.svg)} occurrence the mojo also looks at the rule's
@@ -67,7 +76,31 @@ import java.util.regex.Pattern;
         requiresDependencyCollection = ResolutionScope.NONE)
 public class TranscodeSVGMojo extends AbstractCN1Mojo {
 
-    private static final String[] DEFAULT_SVG_DIRS = { "src/main/svg", "src/main/css" };
+    private static final String[] DEFAULT_SVG_DIRS = {
+            "src/main/svg",
+            "src/main/lottie",
+            "src/main/css"
+    };
+
+    /** Recognized vector source extensions plus the format key the file
+     *  parses as. Order matters only when multiple extensions could match
+     *  the same bytes -- they cannot here. */
+    private enum VectorFormat {
+        SVG(".svg"),
+        LOTTIE_JSON(".json"),
+        LOTTIE_PACK(".lottie");
+
+        final String ext;
+        VectorFormat(String ext) { this.ext = ext; }
+
+        static VectorFormat fromFilename(String name) {
+            String lower = name.toLowerCase();
+            for (VectorFormat f : values()) {
+                if (lower.endsWith(f.ext)) return f;
+            }
+            return null;
+        }
+    }
 
     private static final String DEFAULT_PACKAGE = "com.codename1.generated.svg";
 
@@ -136,15 +169,22 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         packageDir.mkdirs();
         for (File svg : svgs) {
             String resourceName = svg.getName();
+            VectorFormat fmt = VectorFormat.fromFilename(resourceName);
+            if (fmt == null) {
+                // locateSvgs() already filtered to recognized extensions;
+                // defensive guard for future format additions.
+                continue;
+            }
             String className = uniqueClassName(SVGTranscoder.classNameFor(resourceName), usedClassNames);
             usedClassNames.add(className);
             File outFile = new File(packageDir, className + ".java");
             if (outFile.exists() && outFile.lastModified() >= svg.lastModified()) {
-                getLog().debug("SVG transcoder up-to-date for " + svg.getName());
+                getLog().debug("Vector transcoder up-to-date for " + svg.getName());
             } else {
-                getLog().info("Transcoding SVG " + svg.getName() + " -> " + className + ".java");
+                getLog().info("Transcoding " + fmt.name() + " " + svg.getName()
+                        + " -> " + className + ".java");
                 try {
-                    SVGTranscoder.transcode(svg, svgPackage, className, outFile);
+                    transcodeByFormat(fmt, svg, svgPackage, className, outFile);
                 } catch (IOException ex) {
                     throw new MojoExecutionException("Failed to transcode " + svg, ex);
                 }
@@ -200,9 +240,12 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         float heightMm;
     }
 
-    /** Scans theme CSS files for {@code url(*.svg)} together with the
-     *  enclosing rule's {@code cn1-source-dpi} / {@code cn1-svg-width} /
-     *  {@code cn1-svg-height}. Returns a map of svgFilename -> CssHint. */
+    /** Scans theme CSS files for {@code url(*.svg|*.json|*.lottie)}
+     *  together with the enclosing rule's {@code cn1-source-dpi} /
+     *  {@code cn1-svg-width} / {@code cn1-svg-height}. Returns a map of
+     *  filename -> CssHint. The CSS hint vocabulary is the SVG transcoder's
+     *  -- the same {@code cn1-svg-width} property sizes Lottie outputs too
+     *  because both share the {@code GeneratedSVGImage} base. */
     private Map<String, CssHint> scanCssHints() throws MojoExecutionException {
         Map<String, CssHint> result = new HashMap<String, CssHint>();
         File cssDir = new File(project.getBasedir(), "src/main/css");
@@ -213,7 +256,7 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         collectCss(cssDir, cssFiles);
         Pattern blockPattern = Pattern.compile("\\{([^}]*)\\}", Pattern.DOTALL);
         Pattern svgUrlPattern = Pattern.compile(
-                "url\\(\\s*['\"]?\\s*([^'\")\\s]+?\\.svg)\\s*['\"]?\\s*\\)",
+                "url\\(\\s*['\"]?\\s*([^'\")\\s]+?\\.(?:svg|json|lottie))\\s*['\"]?\\s*\\)",
                 Pattern.CASE_INSENSITIVE);
         Pattern dpiPattern = Pattern.compile(
                 "cn1-source-dpi\\s*:\\s*([\\w-]+)\\s*;?",
@@ -365,9 +408,25 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         for (File f : entries) {
             if (f.isDirectory()) {
                 collect(f, out);
-            } else if (f.getName().toLowerCase().endsWith(".svg")) {
+            } else if (VectorFormat.fromFilename(f.getName()) != null) {
                 out.add(f);
             }
+        }
+    }
+
+    private static void transcodeByFormat(VectorFormat fmt, File src,
+                                          String pkg, String className, File outFile) throws IOException {
+        switch (fmt) {
+            case SVG:
+                SVGTranscoder.transcode(src, pkg, className, outFile);
+                break;
+            case LOTTIE_JSON:
+            case LOTTIE_PACK:
+                // .lottie (dotLottie ZIP) needs an extra archive-extract step
+                // we don't perform here yet -- the parser treats the bytes as
+                // a JSON document. Drop a plain Lottie JSON for now.
+                LottieTranscoder.transcode(src, pkg, className, outFile);
+                break;
         }
     }
 
