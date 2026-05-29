@@ -631,6 +631,9 @@ public class Picker extends Button {
                     }
                     final Component nextToEdit = next;
                     if (nextToEdit != null) {
+                        // Defer focus/edit until dispose completes so the next native editor
+                        // (e.g. Android EditText overlay) is positioned against the restored
+                        // content-pane geometry, not the picker's transient layout.
                         dlg.disposeToTheBottom(new Runnable() {
                             @Override
                             public void run() {
