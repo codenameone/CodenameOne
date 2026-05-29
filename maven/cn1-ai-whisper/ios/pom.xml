@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-whisper-ios</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-whisper-ios</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

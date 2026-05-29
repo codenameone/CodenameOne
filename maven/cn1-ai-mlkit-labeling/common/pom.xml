@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-labeling-common</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-labeling-common</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-pose-android</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-pose-android</name>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>

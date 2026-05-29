@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-tflite-lib</artifactId>
     <packaging>pom</packaging>
+    <name>Codename One AI: cn1-ai-tflite-lib</name>
 
     <dependencies>
         <dependency>

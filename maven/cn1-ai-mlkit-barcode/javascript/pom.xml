@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-barcode-javascript</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-barcode-javascript</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-translate-lib</artifactId>
     <packaging>pom</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-translate-lib</name>
 
     <dependencies>
         <dependency>
