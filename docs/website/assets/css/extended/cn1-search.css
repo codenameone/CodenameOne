@@ -101,8 +101,22 @@ body.light .cn1-search-result {
   color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.85));
 }
 
+.cn1-search-result__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .cn1-search-result__url {
   font-size: 0.8rem;
   text-decoration: none;
   color: var(--cn1-course-link, #afc1ff);
+}
+
+.cn1-search-result__date {
+  font-size: 0.78rem;
+  color: var(--cn1-course-soft-text, rgba(217, 228, 255, 0.7));
+  white-space: nowrap;
 }

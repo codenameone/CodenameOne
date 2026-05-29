@@ -59,6 +59,34 @@
     return snippet;
   };
 
+  // Multiplicative recency boost applied to Lunr's relevance score.
+  // Today: 2.0x. Decays with a ~3yr half-life, floored at 0.5x.
+  // Effect: a recent post easily overtakes a similarly-relevant ancient one,
+  // but a clearly-better old match still wins over a weak recent match.
+  // Undated pages get a neutral 1.0x so non-blog content ranks naturally.
+  const RECENCY_MAX_BOOST = 2.0;
+  const RECENCY_MIN_BOOST = 0.5;
+  const RECENCY_HALF_LIFE_MS = 3 * 365.25 * 24 * 3600 * 1000;
+  const NOW_MS = Date.now();
+
+  const recencyBoost = (dateStr) => {
+    if (!dateStr) return 1.0;
+    const t = Date.parse(dateStr);
+    if (Number.isNaN(t)) return 1.0;
+    const age = NOW_MS - t;
+    if (age <= 0) return RECENCY_MAX_BOOST;
+    const boost = RECENCY_MAX_BOOST * Math.exp(-age / RECENCY_HALF_LIFE_MS);
+    return Math.max(RECENCY_MIN_BOOST, boost);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    const t = Date.parse(dateStr);
+    if (Number.isNaN(t)) return "";
+    const d = new Date(t);
+    return d.toISOString().slice(0, 10);
+  };
+
   const renderResults = (matches, query) => {
     if (!query.trim()) {
       resultsEl.innerHTML = "";
@@ -78,11 +106,18 @@
       const doc = docsById.get(match.ref);
       if (!doc) return "";
       const snippet = makeSnippet(doc.content || "", query);
+      const dateLabel = formatDate(doc.date);
+      const dateHtml = dateLabel
+        ? `<span class="cn1-search-result__date">${escapeHtml(dateLabel)}</span>`
+        : "";
       return `
         <article class="cn1-search-result">
           <h2><a href="${escapeHtml(doc.url)}">${escapeHtml(doc.title)}</a></h2>
           <p>${escapeHtml(snippet)}</p>
-          <a class="cn1-search-result__url" href="${escapeHtml(doc.url)}">${escapeHtml(doc.url)}</a>
+          <div class="cn1-search-result__meta">
+            <a class="cn1-search-result__url" href="${escapeHtml(doc.url)}">${escapeHtml(doc.url)}</a>
+            ${dateHtml}
+          </div>
         </article>
       `;
     }).join("\n");
@@ -112,6 +147,12 @@
         results = [];
       }
     }
+
+    results.forEach((r) => {
+      const doc = docsById.get(r.ref);
+      r.adjustedScore = (r.score || 0) * recencyBoost(doc && doc.date);
+    });
+    results.sort((a, b) => b.adjustedScore - a.adjustedScore);
 
     renderResults(results, query);
   };
