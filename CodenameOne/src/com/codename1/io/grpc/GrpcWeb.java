@@ -274,6 +274,26 @@ public final class GrpcWeb {
         private int failedCode;
         private String failedMessage;
 
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof GrpcConnection)) return false;
+            GrpcConnection that = (GrpcConnection) o;
+            return super.equals(o)
+                    && failed == that.failed
+                    && failedCode == that.failedCode
+                    && (respCodec == null ? that.respCodec == null : respCodec.equals(that.respCodec))
+                    && (callback == null ? that.callback == null : callback.equals(that.callback))
+                    && (failedMessage == null ? that.failedMessage == null : failedMessage.equals(that.failedMessage));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (respCodec == null ? 0 : respCodec.hashCode());
+            result = 31 * result + (callback == null ? 0 : callback.hashCode());
+            return result;
+        }
+
         GrpcConnection(ProtoCodec respCodec, OnComplete callback) {
             this.respCodec = respCodec;
             this.callback = callback;
