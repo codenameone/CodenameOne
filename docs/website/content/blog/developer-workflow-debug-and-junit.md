@@ -10,11 +10,11 @@ feed_html: '<img src="https://www.codenameone.com/blog/developer-workflow-debug-
 
 ![Developer Workflow: On-Device Debugging And JUnit 5](/blog/developer-workflow-debug-and-junit.jpg)
 
-Two things this post. Both are about how you iterate on a Codename One app rather than what the app itself does, and both are the kind of change that you only notice the impact of after a week of working with them in place. The first is the one I have personally been wanting for the longest: on-device debugging that actually treats Java as Java. The second is JUnit 5 as a first-class test framework against the simulator.
+Two things this post. Both are about how you iterate on a Codename One app rather than what the app itself does, and both are the kind of change you only notice the impact of after a week of working with them in place. The first is one we have wanted for a long time: on-device debugging that actually treats Java as Java. The second is JUnit 5 as a first-class test framework against the simulator.
 
 ## On-device debugging that treats Java as Java
 
-Codename One has always supported on-device debugging in the strict technical sense. You could attach Xcode to a `.ipa`, you could attach Android Studio to a running APK, you could read the native call stack, you could step through Objective-C or the C ParparVM emits. What you could not do is set a breakpoint in `MyForm.java`, hit it on a real iPhone, and inspect a Java field on a Java object as a Java object. The bridge between "this is the Java code I wrote" and "this is what is actually running on the silicon" got chopped in two by the translation step, and the only way back across the gap was to read C and translate it in your head.
+Codename One has always supported on-device debugging in the strict technical sense. You could attach Xcode to a `.ipa`, you could attach Android Studio to a running APK, you could read the native call stack, you could step through Objective-C or the C ParparVM emits. What you could not do is set a breakpoint in `MyForm.java`, hit it on a real iPhone, and inspect a Java field on a Java object as a Java object. The bridge between "this is the Java code you wrote" and "this is what is actually running on the silicon" got chopped in two by the translation step, and the only way back across the gap was to read C and translate it in your head.
 
 [PR #4999](https://github.com/codenameone/CodenameOne/pull/4999) (iOS) and [PR #5012](https://github.com/codenameone/CodenameOne/pull/5012) (Android) close the gap. As of this week you can attach `jdb`, IntelliJ IDEA, VS Code, Eclipse, or NetBeans (anything that speaks JDWP) to a Codename One app running on:
 
@@ -50,11 +50,11 @@ Dalvik and ART already speak JDWP, which is the reason the Android PR is much sm
 
 Wireless debugging works through both the Android 11+ `adb pair` flow and the legacy `adb tcpip` flow. Source resolution covers both the `codenameone-core` and `codenameone-android` sources jars, so breakpoints inside the framework resolve to the right file the same way they would for user code. JNI / NDK code is intentionally out of scope; if you have an NDK component you want to step through alongside the Java half, Android Studio's LLDB attaches to the same process alongside this JDWP session.
 
-### The thing that surprised me
+### The thing that surprised us
 
-What surprised me is how much the lack of on-device debugging had silently shaped the way I wrote code. The implicit assumption "this will only ever be debuggable in the simulator" is one of those things that bends a workflow without your noticing. You start putting platform-specific code behind feature flags so you can exercise it in the simulator. You stop writing test code that depends on real-device state because there is no way to put a breakpoint in it on the device. You start writing `Log.p("got here: " + value)` because the friction of anything more elaborate is too high.
+The lack of on-device debugging had silently shaped the way Codename One code gets written, and we did not realise the extent of it until we sat down with the new pipeline in front of us. The implicit assumption "this will only ever be debuggable in the simulator" is one of those things that bends a workflow without you noticing. You start putting platform-specific code behind feature flags so you can exercise it in the simulator. You stop writing test code that depends on real-device state because there is no way to put a breakpoint in it on the device. You reach for `Log.p("got here: " + value)` because the friction of anything more elaborate is too high.
 
-I noticed the pattern only when I sat down with the new pipeline on a real iPhone and put a breakpoint inside the iOS native callback path of a feature I have been working on for weeks. The breakpoint hit. The locals were Java locals. I evaluated an expression on a live Java object on a real iPhone and watched the result come back as a `String`. That sounds banal. It is the kind of thing you take for granted on a JVM, and after fifteen years of Codename One, doing it on the device for the first time was a genuinely strange moment.
+The first run on a real iPhone with the new pipeline made this very concrete. A breakpoint inside the iOS native callback path of a feature we have been working on for weeks. The breakpoint hit. The locals were Java locals. The IDE evaluated an expression on a live Java object on a real iPhone and the result came back as a `String`. That sounds banal. It is the kind of thing you take for granted on a JVM, and after fifteen years of Codename One, seeing it on the device for the first time was a genuinely strange moment.
 
 None of this changes the recommendation that you do most of your iteration in the JavaSE simulator. That is still by a large margin the fastest loop. The on-device path is what you reach for when the bug is platform-specific, when it only happens on a real radio, when it only reproduces against real Touch ID hardware, when it only shows up under iOS's memory pressure. The kind of bug that previously sent you reaching for `Log.p` and a rebuild loop.
 
@@ -99,7 +99,7 @@ These two PRs ship in the same release on purpose. JUnit gives you a way to expr
 
 ## Wrapping up
 
-Two pieces of paving that I think will quietly compound over the next few months. The on-device debugger is the one I expect to change behaviour the most, because once it is part of the loop you stop reaching for `Log.p` for the kinds of investigations where a breakpoint and a thread dump are the right tool.
+Two pieces of paving that should quietly compound over the next few months. The on-device debugger is the one we expect to change behaviour the most, because once it is part of the loop you stop reaching for `Log.p` for the kinds of investigations where a breakpoint and a thread dump are the right tool.
 
 Monday's post covers the run of new platform APIs that moved into the core this week: WiFi, OIDC + passkeys, share-sheet callbacks, and the new AI / LLM package.
 
