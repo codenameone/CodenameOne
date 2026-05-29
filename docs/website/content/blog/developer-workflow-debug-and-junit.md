@@ -22,10 +22,10 @@ Supported targets:
 
 **iOS**
 
-- the iOS Simulator under Xcode (any host),
-- a real iPhone reached over Wi-Fi from a Mac on the same network.
+- the iOS Simulator (requires a Mac, because the iOS Simulator only runs on a Mac),
+- a real iPhone reached over Wi-Fi from the developer machine on the same network.
 
-iOS still needs a Mac somewhere in the pipeline because the actual `.ipa` is built by Xcode (locally or via the build server). The Mac is where the bits come from. Once they are on the device, the IDE attaches over Wi-Fi from any machine that can reach the device's IP.
+**You do not need a local Mac to debug on a real iPhone.** The Codename One build cloud runs the iOS build for you and produces a signed `.ipa`; install it on your iPhone the usual way (TestFlight, ad-hoc, or the standard Build Cloud install link), and the JDWP attach over Wi-Fi works from a Linux or Windows IDE just as well as from a Mac. The Mac is only required for the *local* Xcode build path and for running the iOS Simulator.
 
 **Android**
 
@@ -33,7 +33,7 @@ iOS still needs a Mac somewhere in the pipeline because the actual `.ipa` is bui
 - a real Android phone over USB,
 - a real Android phone over wireless `adb`.
 
-Android does not need a Mac because Dalvik / ART already speak JDWP natively. The `adb` tool does the rest.
+The Android attach uses standard `adb`, so you need the Android SDK platform tools installed on the developer machine. Those are available on macOS, Linux, and Windows, so any of the three is fine for Android debugging.
 
 ### What it looks like
 
@@ -45,23 +45,21 @@ The same Debug tool window you use for any other Java project. Frames panel on t
 
 ### How the pieces fit together
 
-On iOS the dataflow is:
+On iOS the IDE never talks to the device directly. The CN1 Debug Proxy is a small Java process you run on your developer machine. It binds two TCP ports: one for the iOS app to dial into using the CN1 wire protocol, and one that speaks standard JDWP for the IDE. The IDE sees a normal remote JVM. The iOS app sees a debug proxy. The proxy translates between the two and walks the ParparVM struct layout so Java fields, method calls, and values round-trip cleanly in both directions.
 
-```
-   IntelliJ <--JDWP--> CN1 Debug Proxy <--CN1 wire protocol--> iOS app
-   (any host)          (your laptop)                          (Wi-Fi or
-                                                              iOS Simulator)
-```
+{{< mermaid >}}
+flowchart LR
+    IDE["IntelliJ IDEA<br/><i>any OS</i>"] -- "JDWP<br/>(localhost:8000)" --> Proxy["CN1 Debug Proxy<br/><i>your dev machine</i>"]
+    Proxy -- "CN1 wire protocol<br/>(Wi-Fi or loopback)" --> App["Codename One iOS app<br/><i>real iPhone or iOS Simulator</i>"]
+{{< /mermaid >}}
 
-The CN1 Debug Proxy is a small Java process you run on your laptop. It binds two TCP ports: one for the iOS app to dial into, one that speaks standard JDWP for the IDE. The IDE thinks it is attached to a normal remote JVM. The iOS app thinks it is talking to a debug proxy. The proxy translates between the two and walks the ParparVM struct layout so Java fields, Java method calls, and Java values round-trip cleanly in both directions.
+On Android the proxy is unnecessary. Dalvik / ART implement JDWP themselves, so IntelliJ attaches directly to the device through `adb`'s built-in JDWP forwarder. The Maven plugin's new `cn1:android-on-device-debugging` goal does the `adb` orchestration and the port forwarding for you.
 
-On Android the proxy is unnecessary. Dalvik / ART implement JDWP themselves, so IntelliJ attaches directly to the device through `adb`'s JDWP forwarder:
-
-```
-   IntelliJ <--JDWP via adb forward--> Android device / emulator
-```
-
-The Maven plugin's new `cn1:android-on-device-debugging` goal does the `adb` orchestration and the port forwarding for you.
+{{< mermaid >}}
+flowchart LR
+    IDE["IntelliJ IDEA<br/><i>macOS / Linux / Windows</i>"] -- "JDWP<br/>(localhost:5005)" --> ADB["adb forward<br/><i>your dev machine</i>"]
+    ADB -- "JDWP over USB or Wi-Fi" --> Device["Android device<br/>or emulator<br/><i>Dalvik / ART</i>"]
+{{< /mermaid >}}
 
 There is one capability difference worth knowing up front: on Android the same `adb`-attached session can drop into native C / C++ via Android Studio's LLDB alongside the JDWP attach, so if you have native code in a cn1lib you can step through that too. On iOS the JDWP attach is Java-only; if you also want to step through native Objective-C, you need Xcode in parallel.
 
