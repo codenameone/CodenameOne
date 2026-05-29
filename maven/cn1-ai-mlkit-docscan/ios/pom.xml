@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-docscan-ios</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-docscan-ios</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

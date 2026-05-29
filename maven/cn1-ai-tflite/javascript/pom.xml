@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-tflite-javascript</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-tflite-javascript</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

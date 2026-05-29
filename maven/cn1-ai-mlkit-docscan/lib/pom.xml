@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-docscan-lib</artifactId>
     <packaging>pom</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-docscan-lib</name>
 
     <dependencies>
         <dependency>

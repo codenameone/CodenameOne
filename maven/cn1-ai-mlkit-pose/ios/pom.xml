@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-pose-ios</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-pose-ios</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>
