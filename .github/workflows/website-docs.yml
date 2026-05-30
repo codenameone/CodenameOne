@@ -131,6 +131,11 @@ jobs:
           WEBSITE_INCLUDE_DEVGUIDE: "true"
           WEBSITE_INCLUDE_INITIALIZR: "auto"
           WEBSITE_INCLUDE_PLAYGROUND: "auto"
+          # PR previews build with future-dated posts visible so reviewers
+          # can read posts staged for later in the week. Production deploys
+          # (push to master) keep the default so future posts only appear
+          # on their actual date.
+          HUGO_BUILD_FUTURE: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
