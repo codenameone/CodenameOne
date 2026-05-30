@@ -3839,7 +3839,21 @@ public class Component implements Animation, StyleListener, Editable {
                 if (hideInLandscape && !Display.INSTANCE.isPortrait()) {
                     preferredSize = new Dimension(0, 0);
                 } else {
-                    preferredSize = calcPreferredSize();
+                    // Copy values rather than retain the reference returned by
+                    // calcPreferredSize(). Otherwise, subclasses whose
+                    // calcPreferredSize() returns a shared Dimension (e.g.
+                    // ContainerList.Entry returning the renderer's own
+                    // preferredSize field) cause every "cached" preferredSize
+                    // to point at the same instance, so a single re-measure of
+                    // the renderer silently mutates every previously-measured
+                    // entry. See #1363.
+                    Dimension calculated = calcPreferredSize();
+                    if (preferredSize == null) {
+                        preferredSize = new Dimension(calculated.getWidth(), calculated.getHeight());
+                    } else {
+                        preferredSize.setWidth(calculated.getWidth());
+                        preferredSize.setHeight(calculated.getHeight());
+                    }
                     if (preferredSizeStr != null) {
                         Component.parsePreferredSize(preferredSizeStr, preferredSize);
                     }
