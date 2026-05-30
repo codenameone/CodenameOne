@@ -65,6 +65,7 @@ import java.io.IOException;
 ///
 /// 8.1
 public final class Camera {
+    private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;
 
     private Camera() { }
@@ -106,9 +107,11 @@ public final class Camera {
             throw new IllegalArgumentException("CameraInfo must not be null");
         }
         if (opts == null) opts = new CameraSessionOptions();
-        if (active != null && !active.isClosed()) {
-            throw new IllegalStateException(
-                "Only one CameraSession may be open at a time. Close the existing session first.");
+        synchronized (ACTIVE_LOCK) {
+            if (active != null && !active.isClosed()) {
+                throw new IllegalStateException(
+                    "Only one CameraSession may be open at a time. Close the existing session first.");
+            }
         }
         CameraImpl impl = newImpl();
         if (impl == null) {
@@ -120,8 +123,10 @@ public final class Camera {
             try { impl.close(); } catch (Throwable t) { Log.e(t); }
             throw new RuntimeException("Could not open camera " + info.getId(), e);
         }
-        active = new CameraSession(impl, info, opts);
-        return active;
+        synchronized (ACTIVE_LOCK) {
+            active = new CameraSession(impl, info, opts);
+            return active;
+        }
     }
 
     /// Request runtime permission for camera (and optionally microphone). The
@@ -157,6 +162,8 @@ public final class Camera {
     }
 
     static void clearActive(CameraSession s) {
-        if (active == s) active = null;
+        synchronized (ACTIVE_LOCK) {
+            if (active == s) active = null;
+        }
     }
 }
