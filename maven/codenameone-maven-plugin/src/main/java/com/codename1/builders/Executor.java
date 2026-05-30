@@ -2045,6 +2045,15 @@ public abstract class Executor {
         if (projectHasBootstrap(sourceZip, "cn1app/DaoBootstrap.class")) {
             sb.append(indent).append("new cn1app.DaoBootstrap();\n");
         }
+        if (projectHasBootstrap(sourceZip, "cn1app/RestClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.RestClientBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/ProtoBootstrap.class")) {
+            sb.append(indent).append("new cn1app.ProtoBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/GrpcClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.GrpcClientBootstrap();\n");
+        }
         return sb.toString();
     }
 
