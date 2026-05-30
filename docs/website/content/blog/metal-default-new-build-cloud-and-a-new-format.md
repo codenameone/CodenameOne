@@ -14,6 +14,8 @@ This week's release post looks different on purpose. The Friday omnibus has been
 
 So from this week onwards the Friday post is the short one. A quick set of headline items, a "what is coming next" list, and that is it. The specific features get their own posts over the following days, with their own slugs, their own searchable titles, and their own discussion threads. The weekly post lives at the top of the homepage as the index; the deeper posts back-link to it; and you can read whichever ones are actually relevant to your project.
 
+**Important:** it seems that if developer mode is on in your device you might get an information dialog on the right side of your UI. [This issue](https://github.com/codenameone/CodenameOne/issues/5108) explains how you can turn it off.
+
 If you only have thirty seconds, here is what changed this week.
 
 ## Metal is the default on iOS
