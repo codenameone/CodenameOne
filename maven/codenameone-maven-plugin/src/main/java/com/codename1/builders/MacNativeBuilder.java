@@ -74,6 +74,7 @@ class MacNativeBuilder {
     private String signingStyle;       // automatic | manual
     private String signingIdentityAppStore;
     private String signingIdentityDeveloperID;
+    private String fixedWindowSize;            // "<W>x<H>" or empty for native default
 
     MacNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
@@ -114,6 +115,10 @@ class MacNativeBuilder {
                 "macNative.signingIdentity.appStore", "Apple Distribution");
         signingIdentityDeveloperID = request.getArg(
                 "macNative.signingIdentity.developerID", "Developer ID Application");
+        // Opt-in deterministic window size for headless screenshot CI.
+        // Format "WxH", e.g., "1024x685". Empty/unset preserves the
+        // default user-resizable Catalyst window.
+        fixedWindowSize = request.getArg("macNative.fixedWindowSize", "").trim();
     }
 
     /**
@@ -453,8 +458,15 @@ class MacNativeBuilder {
                 .append("  bs['INFOPLIST_KEY_LSApplicationCategoryType'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(appCategory)).append("'\n")
                 .append("  bs['INFOPLIST_KEY_NSHumanReadableCopyright'] = '")
-                .append(IPhoneBuilder.escapeRubyStr(copyright)).append("'\n")
-                .append("  bs['CODE_SIGN_ENTITLEMENTS'] = '")
+                .append(IPhoneBuilder.escapeRubyStr(copyright)).append("'\n");
+        if (fixedWindowSize != null && !fixedWindowSize.isEmpty()) {
+            // Custom Info.plist key consumed by CodenameOne_GLSceneDelegate
+            // to lock the Catalyst window's sizeRestrictions. Off when the
+            // hint is unset so production apps keep a resizable window.
+            s.append("  bs['INFOPLIST_KEY_CN1MacFixedWindowSize'] = '")
+                    .append(IPhoneBuilder.escapeRubyStr(fixedWindowSize)).append("'\n");
+        }
+        s.append("  bs['CODE_SIGN_ENTITLEMENTS'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(entitlementsPath)).append("'\n")
                 .append("  bs['CODE_SIGN_STYLE'] = '")
                 .append(manualSigning ? "Manual" : "Automatic").append("'\n");

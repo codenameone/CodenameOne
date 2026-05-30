@@ -41,21 +41,30 @@
 #endif
 
 #if TARGET_OS_MACCATALYST
-    // Mac Catalyst window-size determinism for CI screenshot tests:
-    // macos-15 runners (and SwiftUI auto-fit on the iPhone/iPad sim too)
-    // hand the scene a slightly different window height each launch
-    // (observed 1024x685, 1024x684, 1024x681 across three CI runs in a
-    // row), which makes the strict-pixel screenshot comparison
-    // permanently mismatch. Pin the window to an exact 1024x685 via the
-    // sizeRestrictions API so every launch produces byte-identical
-    // captures. Min == max forces the user can't resize either; for the
-    // headless CI use case that's the right trade-off.
+    // Opt-in deterministic window sizing for screenshot CI. Read a
+    // "<W>x<H>" value from the CN1MacFixedWindowSize Info.plist key --
+    // the macNative.fixedWindowSize build hint plumbs the user's
+    // setting through there. Absent or unparseable -> normal Mac
+    // resize behaviour (production apps are unaffected). Setting it
+    // pins both the minimum and maximum scene size so every launch
+    // produces a byte-identical window for strict-pixel comparison.
     if (@available(macCatalyst 13.0, *)) {
-        UIWindowScene *ws = (UIWindowScene *)scene;
-        if (ws.sizeRestrictions != nil) {
-            CGSize fixed = CGSizeMake(1024.0, 685.0);
-            ws.sizeRestrictions.minimumSize = fixed;
-            ws.sizeRestrictions.maximumSize = fixed;
+        NSString *fixedSpec = [[NSBundle mainBundle]
+                objectForInfoDictionaryKey:@"CN1MacFixedWindowSize"];
+        if ([fixedSpec isKindOfClass:[NSString class]] && fixedSpec.length > 0) {
+            NSArray<NSString *> *parts = [fixedSpec componentsSeparatedByString:@"x"];
+            if (parts.count == 2) {
+                CGFloat w = [parts[0] doubleValue];
+                CGFloat h = [parts[1] doubleValue];
+                if (w > 0 && h > 0) {
+                    UIWindowScene *ws = (UIWindowScene *)scene;
+                    if (ws.sizeRestrictions != nil) {
+                        CGSize fixed = CGSizeMake(w, h);
+                        ws.sizeRestrictions.minimumSize = fixed;
+                        ws.sizeRestrictions.maximumSize = fixed;
+                    }
+                }
+            }
         }
     }
 #endif

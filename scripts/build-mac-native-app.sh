@@ -133,6 +133,11 @@ ensure_setting "codename1.arg.macNative.distribution" \
     "${MAC_NATIVE_DISTRIBUTION:-both}"
 ensure_setting "codename1.arg.macNative.appCategory" \
     "${MAC_NATIVE_APP_CATEGORY:-public.app-category.developer-tools}"
+# Pin the Catalyst window size deterministically so the screenshot
+# CI's strict-pixel comparison stays stable across runs. Off by
+# default for real apps -- only the screenshot sample sets this.
+ensure_setting "codename1.arg.macNative.fixedWindowSize" \
+    "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
 
 bma_log "macNative.* hints in codenameone_settings.properties:"
 grep -n 'codename1\.arg\.macNative' "$CN1_SETTINGS_FILE" || true
