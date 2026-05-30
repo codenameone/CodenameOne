@@ -23,25 +23,19 @@
 
 package java.io;
 
-/**
- * Signals that an attempt to open the file denoted by a specified pathname
- * has failed. Thrown by FileInputStream and similar constructors and by
- * APIs that wrap them when the requested file does not exist, is a
- * directory rather than a regular file, or is otherwise inaccessible.
- *
- * See: java.io.FileInputStream, java.io.IOException
- */
+/// Signals that an attempt to open the file denoted by a specified pathname
+/// has failed. Thrown by FileInputStream and similar constructors and by
+/// APIs that wrap them when the requested file does not exist, is a
+/// directory rather than a regular file, or is otherwise inaccessible.
+///
+/// See: java.io.FileInputStream, java.io.IOException
 public class FileNotFoundException extends java.io.IOException {
-    /**
-     * Constructs a FileNotFoundException with null as its error detail message.
-     */
+    /// Constructs a FileNotFoundException with null as its error detail message.
     public FileNotFoundException() {
     }
 
-    /**
-     * Constructs a FileNotFoundException with the specified detail message.
-     * @param s the detail message
-     */
+    /// Constructs a FileNotFoundException with the specified detail message.
+    /// @param s the detail message
     public FileNotFoundException(String s) {
         super(s);
     }

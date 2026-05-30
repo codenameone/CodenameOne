@@ -23,12 +23,10 @@
 
 package java.io;
 
-/**
- * Signals that an attempt to open the file denoted by a specified pathname
- * has failed.
- *
- * See: java.io.FileInputStream, java.io.IOException
- */
+/// Signals that an attempt to open the file denoted by a specified pathname
+/// has failed.
+///
+/// See: java.io.FileInputStream, java.io.IOException
 public class FileNotFoundException extends java.io.IOException {
     public FileNotFoundException() {
     }
