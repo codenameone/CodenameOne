@@ -65,8 +65,23 @@ jobs:
       # suite were timing out before any tests could be diff'd. 1200s
       # absorbs the variance without re-introducing the
       # silently-dropped-test workaround.
-      CN1_JS_TIMEOUT_SECONDS: "1800"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
+      #
+      # Bumped again from 1800s to 2700s (45 min) after PR #5125's
+      # DualAppearance safety nets unblocked the 14 modern-theme tests
+      # introduced by #5054. On the GHA shared runners every test in
+      # that batch eats ~16-20s wall (light + dark phases, each paying
+      # a 1500ms registerReadyCallback + triple callSerially + chunked
+      # PNG emit, plus the canvas-accumulation slowdown that's well-
+      # documented under chartDocStaleness). With the previously-
+      # silent tests now actually running, total walks past 30 min;
+      # 45 min absorbs the worst case without leaving the job runner-
+      # bound (the GitHub Actions job timeout is 6h, well above this).
+      # CN1_JS_BROWSER_LIFETIME_SECONDS stays 60s shy of the bash
+      # wait so the in-page CN1_JS_BROWSER_LIFETIME sentinel fires
+      # before the outer timeout and we get a graceful suite shutdown
+      # with artifacts uploaded.
+      CN1_JS_TIMEOUT_SECONDS: "2700"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "2640"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""

@@ -323,23 +323,42 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // subsequent tests in the suite (legacy screenshots matching
         // pre-change goldens) see exactly the state they had before
         // this test ran.
-        Display.getInstance().setDarkMode(null);
-        if (useModernTheme()) {
-            // UIManager.initFirstTheme loads /theme.res (the app's
-            // compiled theme.css). With includeNativeBool=true in its
-            // constants it triggers Display.installNativeTheme() -
-            // Holo Light / iPhoneTheme per the platform's legacy default -
-            // and then layers the user's UIID overrides on top. This
-            // recreates the original startup theme state, which
-            // Display.installNativeTheme alone doesn't (it drops the
-            // user's font / padding / colour overrides).
-            UIManager.initFirstTheme("/theme");
+        //
+        // Wrapped in try/finally so a throw inside ``setDarkMode``,
+        // ``initFirstTheme`` or ``refreshTheme`` still lifts the gate
+        // and calls done(). On JS port the refreshTheme call walks the
+        // form hierarchy and re-paints; under the canvas-accumulation
+        // tail that re-paint can hit the host-bridge ``Missing JS
+        // member createElement`` cascade and throw on the EDT. Without
+        // the finally block, the throw would skip ``bothPhasesComplete
+        // = true`` and the test would hang on its gated done() for the
+        // remainder of the suite budget. With it, the next test
+        // inherits whatever theme state the throw left behind (the
+        // teardown is best-effort cleanup) but at least the suite
+        // advances.
+        try {
+            Display.getInstance().setDarkMode(null);
+            if (useModernTheme()) {
+                // UIManager.initFirstTheme loads /theme.res (the app's
+                // compiled theme.css). With includeNativeBool=true in its
+                // constants it triggers Display.installNativeTheme() -
+                // Holo Light / iPhoneTheme per the platform's legacy default -
+                // and then layers the user's UIID overrides on top. This
+                // recreates the original startup theme state, which
+                // Display.installNativeTheme alone doesn't (it drops the
+                // user's font / padding / colour overrides).
+                UIManager.initFirstTheme("/theme");
+            }
+            UIManager.getInstance().refreshTheme();
+        } catch (Throwable t) {
+            logDiag("CN1SS:WARN:test=" + baseName() + " dual_appearance_finish_failed=" + t);
+            t.printStackTrace();
+        } finally {
+            // Lift the gate before calling done() so the overridden
+            // done() above lets the call through this time.
+            bothPhasesComplete = true;
+            done();
         }
-        UIManager.getInstance().refreshTheme();
-        // Lift the gate before calling done() so the overridden
-        // done() above lets the call through this time.
-        bothPhasesComplete = true;
-        done();
     }
 
     private void installModernThemeIfRequested() {
