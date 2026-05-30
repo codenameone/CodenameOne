@@ -73,20 +73,35 @@ public class IOSCameraImpl extends CameraImpl {
     @Override
     public CameraInfo[] enumerateCameras() {
         String packed = IOSImplementation.nativeInstance.cn1CameraEnumerate();
-        if (packed == null || packed.isEmpty()) return new CameraInfo[0];
-        // packed: "id|facing|hasFlash|hasAutoFocus;id|facing|..."
-        String[] entries = packed.split(";");
-        CameraInfo[] out = new CameraInfo[entries.length];
-        for (int i = 0; i < entries.length; i++) {
-            String[] f = entries[i].split("\\|");
-            if (f.length < 4) continue;
-            CameraFacing facing = "front".equals(f[1]) ? CameraFacing.FRONT
-                                : "back".equals(f[1])  ? CameraFacing.BACK
+        if (packed == null || packed.length() == 0) return new CameraInfo[0];
+        // packed: "id|facing|hasFlash|hasAutoFocus;id|facing|...". String.split
+        // isn't available on the iOS ParparVM, so we walk the string manually.
+        java.util.List<String> entries = splitChar(packed, ';');
+        java.util.List<CameraInfo> out = new java.util.ArrayList<CameraInfo>(entries.size());
+        for (int i = 0; i < entries.size(); i++) {
+            java.util.List<String> f = splitChar(entries.get(i), '|');
+            if (f.size() < 4) continue;
+            CameraFacing facing = "front".equals(f.get(1)) ? CameraFacing.FRONT
+                                : "back".equals(f.get(1))  ? CameraFacing.BACK
                                 : CameraFacing.EXTERNAL;
-            out[i] = new CameraInfo(f[0], facing,
+            out.add(new CameraInfo(f.get(0), facing,
                     new Dimension[0], new Dimension[0],
-                    "1".equals(f[2]), "1".equals(f[3]));
+                    "1".equals(f.get(2)), "1".equals(f.get(3))));
         }
+        return out.toArray(new CameraInfo[out.size()]);
+    }
+
+    private static java.util.List<String> splitChar(String s, char sep) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int start = 0;
+        int len = s.length();
+        for (int i = 0; i < len; i++) {
+            if (s.charAt(i) == sep) {
+                out.add(s.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(s.substring(start));
         return out;
     }
 

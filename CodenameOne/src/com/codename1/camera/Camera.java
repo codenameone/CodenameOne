@@ -107,23 +107,27 @@ public final class Camera {
             throw new IllegalArgumentException("CameraInfo must not be null");
         }
         if (opts == null) opts = new CameraSessionOptions();
+        // The check-and-set has to be atomic to keep SpotBugs happy and to
+        // honour the "one open session at a time" contract under
+        // concurrent open() calls. The native impl.open() call below runs
+        // under the lock as well -- it's a foreground operation that the
+        // user kicked off, contention is essentially zero, and we'd rather
+        // serialise the rare race than ship a TOCTOU bug.
         synchronized (ACTIVE_LOCK) {
             if (active != null && !active.isClosed()) {
                 throw new IllegalStateException(
                     "Only one CameraSession may be open at a time. Close the existing session first.");
             }
-        }
-        CameraImpl impl = newImpl();
-        if (impl == null) {
-            throw new IllegalStateException("Camera is not supported on this platform.");
-        }
-        try {
-            impl.open(info.getId(), opts);
-        } catch (IOException e) {
-            try { impl.close(); } catch (Throwable t) { Log.e(t); }
-            throw new RuntimeException("Could not open camera " + info.getId(), e);
-        }
-        synchronized (ACTIVE_LOCK) {
+            CameraImpl impl = newImpl();
+            if (impl == null) {
+                throw new IllegalStateException("Camera is not supported on this platform.");
+            }
+            try {
+                impl.open(info.getId(), opts);
+            } catch (IOException e) {
+                try { impl.close(); } catch (Throwable t) { Log.e(t); }
+                throw new RuntimeException("Could not open camera " + info.getId(), e);
+            }
             active = new CameraSession(impl, info, opts);
             return active;
         }
