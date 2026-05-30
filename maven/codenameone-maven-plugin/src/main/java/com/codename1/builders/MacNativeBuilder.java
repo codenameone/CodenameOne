@@ -459,13 +459,6 @@ class MacNativeBuilder {
                 .append(IPhoneBuilder.escapeRubyStr(appCategory)).append("'\n")
                 .append("  bs['INFOPLIST_KEY_NSHumanReadableCopyright'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(copyright)).append("'\n");
-        if (fixedWindowSize != null && !fixedWindowSize.isEmpty()) {
-            // Custom Info.plist key consumed by CodenameOne_GLSceneDelegate
-            // to lock the Catalyst window's sizeRestrictions. Off when the
-            // hint is unset so production apps keep a resizable window.
-            s.append("  bs['INFOPLIST_KEY_CN1MacFixedWindowSize'] = '")
-                    .append(IPhoneBuilder.escapeRubyStr(fixedWindowSize)).append("'\n");
-        }
         s.append("  bs['CODE_SIGN_ENTITLEMENTS'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(entitlementsPath)).append("'\n")
                 .append("  bs['CODE_SIGN_STYLE'] = '")
@@ -547,6 +540,22 @@ class MacNativeBuilder {
             throw ex;
         } catch (Exception ex) {
             throw new BuildException("Failed to apply macNative Xcode settings via xcodeproj", ex);
+        }
+
+        // Custom Info.plist keys (e.g. CN1MacFixedWindowSize) -- INFOPLIST_KEY_*
+        // build settings only flow through for Apple-defined keys, so for our
+        // own keys we patch the generated Info.plist directly.
+        if (fixedWindowSize != null && !fixedWindowSize.isEmpty()) {
+            File infoPlist = new File(tmpFile,
+                    "dist/" + mainClass + "-src/" + mainClass + "-Info.plist");
+            String injection = "<key>CN1MacFixedWindowSize</key>\n"
+                    + "    <string>" + fixedWindowSize + "</string>\n"
+                    + "    </dict>\n</plist>";
+            try {
+                owner.replaceInFile(infoPlist, "</dict>\n</plist>", injection);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to inject CN1MacFixedWindowSize into Info.plist", ex);
+            }
         }
     }
 
