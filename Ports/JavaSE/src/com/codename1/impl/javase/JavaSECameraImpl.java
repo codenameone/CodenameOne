@@ -52,9 +52,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -181,17 +178,23 @@ public class JavaSECameraImpl extends CameraImpl {
         final int quality = opts.getJpegQuality();
         final String customPath = opts.getFilePath();
         final AsyncResource<CapturedPhoto> out = result;
-        ensureScheduler().execute(() -> {
-            try {
-                BufferedImage img = renderFrame(w, h, true);
-                byte[] jpeg = encodeJpeg(img, quality);
-                String path = customPath != null ? customPath : tempPath("photo", ".jpg");
-                writeBytes(path, jpeg);
-                CapturedPhoto cp = new CapturedPhoto(jpeg, path, w, h);
-                Display.getInstance().callSerially(() -> out.complete(cp));
-            } catch (Throwable t) {
-                Log.e(t);
-                Display.getInstance().callSerially(() -> out.error(t));
+        ensureScheduler().execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    BufferedImage img = renderFrame(w, h, true);
+                    byte[] jpeg = encodeJpeg(img, quality);
+                    String path = customPath != null ? customPath : tempPath("photo", ".jpg");
+                    writeBytes(path, jpeg);
+                    final CapturedPhoto cp = new CapturedPhoto(jpeg, path, w, h);
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override public void run() { out.complete(cp); }
+                    });
+                } catch (final Throwable t) {
+                    Log.e(t);
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override public void run() { out.error(t); }
+                    });
+                }
             }
         });
     }
@@ -213,7 +216,10 @@ public class JavaSECameraImpl extends CameraImpl {
         final String path = activeVideoPath;
         activeVideoPath = null;
         if (result != null) {
-            Display.getInstance().callSerially(() -> result.complete(path));
+            final AsyncResource<String> out = result;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override public void run() { out.complete(path); }
+            });
         }
     }
 
@@ -268,7 +274,9 @@ public class JavaSECameraImpl extends CameraImpl {
         ScheduledExecutorService s = ensureScheduler();
         if (frameTask != null) frameTask.cancel(false);
         long periodMs = Math.max(33, 1000L / Math.max(1, fpsCap));
-        frameTask = s.scheduleAtFixedRate(this::tick, 0, periodMs, TimeUnit.MILLISECONDS);
+        frameTask = s.scheduleAtFixedRate(new Runnable() {
+            @Override public void run() { tick(); }
+        }, 0, periodMs, TimeUnit.MILLISECONDS);
     }
 
     private void restartScheduler() {
@@ -298,9 +306,11 @@ public class JavaSECameraImpl extends CameraImpl {
                     ? options.getPreviewHeight() : DEFAULT_PREVIEW_H;
             BufferedImage img = renderFrame(w, h, false);
             currentFrame = img;
-            JPanel p = previewPanel;
+            final JPanel p = previewPanel;
             if (p != null) {
-                javax.swing.SwingUtilities.invokeLater(p::repaint);
+                javax.swing.SwingUtilities.invokeLater(new Runnable() {
+                    @Override public void run() { p.repaint(); }
+                });
             }
             FrameListener l = frameListener;
             if (l == null) return;
@@ -327,27 +337,35 @@ public class JavaSECameraImpl extends CameraImpl {
         String src = System.getProperty(SOURCE_PROP);
         if (src == null || src.isEmpty()) return;
         try {
-            Path p = Paths.get(src);
-            if (Files.isDirectory(p)) {
-                try (java.util.stream.Stream<Path> stream = Files.list(p)) {
-                    stream.sorted()
-                          .filter(f -> {
-                              String n = f.getFileName().toString().toLowerCase();
-                              return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png");
-                          })
-                          .forEach(f -> {
-                              try (InputStream in = Files.newInputStream(f)) {
-                                  BufferedImage img = ImageIO.read(in);
-                                  if (img != null) sourceFrames.add(img);
-                              } catch (IOException e) {
-                                  Log.e(e);
-                              }
-                          });
+            File f = new File(src);
+            if (f.isDirectory()) {
+                File[] entries = f.listFiles();
+                if (entries != null) {
+                    java.util.Arrays.sort(entries);
+                    for (File entry : entries) {
+                        String n = entry.getName().toLowerCase();
+                        if (n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png")) {
+                            InputStream in = null;
+                            try {
+                                in = new java.io.FileInputStream(entry);
+                                BufferedImage img = ImageIO.read(in);
+                                if (img != null) sourceFrames.add(img);
+                            } catch (IOException e) {
+                                Log.e(e);
+                            } finally {
+                                if (in != null) { try { in.close(); } catch (IOException ignored) { } }
+                            }
+                        }
+                    }
                 }
-            } else if (Files.isRegularFile(p)) {
-                try (InputStream in = Files.newInputStream(p)) {
+            } else if (f.isFile()) {
+                InputStream in = null;
+                try {
+                    in = new java.io.FileInputStream(f);
                     BufferedImage img = ImageIO.read(in);
                     if (img != null) sourceFrames.add(img);
+                } finally {
+                    if (in != null) { try { in.close(); } catch (IOException ignored) { } }
                 }
             }
         } catch (Throwable t) {
