@@ -302,7 +302,11 @@ public class Slider extends Label implements ActionSource {
         return value;
     }
 
-    private void setProgressInternal(int value) {
+    /// Internal slider-value updater used by drag/keyboard/setProgress paths.
+    /// Exposed as `protected` so subclasses (e.g. range-slider style multi-
+    /// thumb sliders) can route their own input through the same value-set +
+    /// repaint pipeline as the built-in handlers. See #1523.
+    protected void setProgressInternal(int value) {
         this.value = value;
         if (renderValueOnTop || renderPercentageOnTop) {
             super.setText(formattedValue(value));
