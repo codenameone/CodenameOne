@@ -1431,7 +1431,32 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
                 seedPass.colorAttachments[0].texture = tex;
                 seedPass.colorAttachments[0].loadAction = MTLLoadActionLoad;
                 seedPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+                // Pipelines in CN1MetalPipelineCache declare
+                // stencilAttachmentPixelFormat=Stencil8 (polygon-clip #3921),
+                // so every pass that binds one must attach a Stencil8 texture
+                // or Metal aborts in setRenderPipelineState: with a pixel-
+                // format mismatch (issue #5103). The seed draw never engages
+                // the stencil test, so a throwaway clear-on-load attachment
+                // is sufficient.
+                id<MTLTexture> seedStencilTex = nil;
+                MTLTextureDescriptor *seedStencilDesc = [MTLTextureDescriptor
+                    texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+                    width:(NSUInteger)width height:(NSUInteger)height mipmapped:NO];
+                seedStencilDesc.usage = MTLTextureUsageRenderTarget;
+                seedStencilDesc.storageMode = MTLStorageModePrivate;
+                seedStencilTex = [device newTextureWithDescriptor:seedStencilDesc];
+                if (seedStencilTex != nil) {
+                    seedPass.stencilAttachment.texture = seedStencilTex;
+                    seedPass.stencilAttachment.loadAction = MTLLoadActionClear;
+                    seedPass.stencilAttachment.storeAction = MTLStoreActionDontCare;
+                    seedPass.stencilAttachment.clearStencil = 0;
+                }
                 id<MTLRenderCommandEncoder> seedEnc = [setupCb renderCommandEncoderWithDescriptor:seedPass];
+#ifndef CN1_USE_ARC
+                // renderCommandEncoderWithDescriptor: retains attachments for
+                // the duration of the encoded pass; drop our +1 now.
+                [seedStencilTex release];
+#endif
                 [seedEnc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
                 [seedEnc setRenderPipelineState:seedState];
 
