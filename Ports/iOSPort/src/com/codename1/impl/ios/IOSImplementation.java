@@ -114,6 +114,7 @@ import com.codename1.util.Simd;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.util.Collections;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 
@@ -8520,7 +8521,15 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openInputStream(Object connection) throws IOException {
         if(connection instanceof String) {
-            BufferedInputStream o = new BufferedInputStream(new NSFileInputStream((String)connection), (String)connection);
+            // Match openFileInputStream(String): if the path is missing, throw
+            // a FileNotFoundException instead of silently opening an empty
+            // NSFileInputStream (which Apple's fileHandleForReadingAtPath:
+            // returns when the file does not exist). See #1502.
+            String path = (String) connection;
+            if(!nativeInstance.fileExists(path)) {
+                throw new FileNotFoundException("File not found: " + path);
+            }
+            BufferedInputStream o = new BufferedInputStream(new NSFileInputStream(path), path);
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
@@ -8912,7 +8921,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public InputStream openFileInputStream(String file) throws IOException {
         file = unfile(file);
         if(!nativeInstance.fileExists(file)) {
-            throw new IOException("File not found: " + file);
+            // FileNotFoundException is more precise than IOException and
+            // matches what FileInputStream throws on JavaSE, so callers can
+            // distinguish "missing" from other I/O errors. See #1502.
+            throw new FileNotFoundException("File not found: " + file);
         }
         return new BufferedInputStream(new NSFileInputStream(file), file);
     }
