@@ -115,6 +115,56 @@ class AiDependencyTableTest {
     }
 
     @Test
+    void cameraEntryInjectsAvFoundationAndCameraXGradleDeps() {
+        // Referencing any class in com.codename1.camera.* must auto-inject
+        // the iOS frameworks, iOS plist usage descriptions, Android
+        // permissions, and the four CameraX Gradle dependencies that the
+        // AndroidCameraImpl reflection layer resolves at runtime.
+        List<AiDependencyTable.Entry> hits = AiDependencyTable.matchesFor(
+                "com/codename1/camera/Camera");
+        assertEquals(1, hits.size(), "expected the camera entry to fire");
+        AiDependencyTable.Entry e = hits.get(0);
+
+        // iOS side
+        assertTrue(e.iosFrameworks().contains("AVFoundation"));
+        assertTrue(e.iosFrameworks().contains("CoreMedia"));
+        assertTrue(e.iosFrameworks().contains("CoreVideo"));
+        assertNotNull(findPlistDefault(e, "NSCameraUsageDescription"));
+        assertNotNull(findPlistDefault(e, "NSMicrophoneUsageDescription"));
+        assertTrue(e.iosPods().isEmpty(),
+                "Camera uses AVFoundation framework, not a pod");
+
+        // Android side
+        assertTrue(e.androidPermissions().contains("android.permission.CAMERA"));
+        assertTrue(e.androidPermissions().contains("android.permission.RECORD_AUDIO"));
+        assertTrue(e.androidFeatures().contains("android.hardware.camera"));
+
+        boolean cameraCore = false, camera2 = false, lifecycle = false,
+                view = false, video = false;
+        for (String gav : e.androidGradleDeps()) {
+            if (gav.startsWith("androidx.camera:camera-core:")) cameraCore = true;
+            if (gav.startsWith("androidx.camera:camera-camera2:")) camera2 = true;
+            if (gav.startsWith("androidx.camera:camera-lifecycle:")) lifecycle = true;
+            if (gav.startsWith("androidx.camera:camera-view:")) view = true;
+            if (gav.startsWith("androidx.camera:camera-video:")) video = true;
+        }
+        assertTrue(cameraCore, "missing androidx.camera:camera-core gradle dep");
+        assertTrue(camera2,    "missing androidx.camera:camera-camera2 gradle dep");
+        assertTrue(lifecycle,  "missing androidx.camera:camera-lifecycle gradle dep");
+        assertTrue(view,       "missing androidx.camera:camera-view gradle dep");
+        assertTrue(video,      "missing androidx.camera:camera-video gradle dep");
+    }
+
+    @Test
+    void cameraEntryFiresOnAnySubpackageClass() {
+        // The prefix matcher must hit any class inside com.codename1.camera,
+        // not just the entry point.
+        assertEquals(1, AiDependencyTable.matchesFor("com/codename1/camera/CameraView").size());
+        assertEquals(1, AiDependencyTable.matchesFor("com/codename1/camera/CameraSession").size());
+        assertEquals(1, AiDependencyTable.matchesFor("com/codename1/camera/internal/Foo").size());
+    }
+
+    @Test
     void tfliteHasBothPodAndSpmSpec() {
         // TFLite is published as both a CocoaPod and a Swift Package.
         // The table records both so projects can route the dep
