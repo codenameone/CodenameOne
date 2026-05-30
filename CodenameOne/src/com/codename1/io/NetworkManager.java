@@ -885,6 +885,44 @@ public final class NetworkManager {
         return getCurrentNetworkType() != NETWORK_TYPE_NONE;
     }
 
+    /// Issues a blocking HTTP HEAD request to `url` and returns whether the
+    /// server responded within `timeoutMillis`. Any response — including 4xx
+    /// or 5xx — is treated as a successful ping (the network round-trip
+    /// completed). Only socket errors, DNS failures, and timeouts return
+    /// false.
+    ///
+    /// Use this for reachability probes against a known endpoint when
+    /// [#isConnected] (a fast device-side network-type check) isn't strong
+    /// enough. Must not be invoked from the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the URL to probe; typically a small static endpoint
+    ///
+    /// - `timeoutMillis`: maximum time to wait for the request to complete; pass
+    /// 0 to use the connection's default timeout
+    ///
+    /// #### Returns
+    ///
+    /// true if the server responded, false on timeout, DNS, or socket error
+    public boolean ping(String url, int timeoutMillis) {
+        if (url == null) {
+            throw new IllegalArgumentException("url is null");
+        }
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setUrl(url);
+        cr.setPost(false);
+        cr.setHttpMethod("HEAD");
+        cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
+        if (timeoutMillis > 0) {
+            cr.setTimeout(timeoutMillis);
+            cr.setReadTimeout(timeoutMillis);
+        }
+        addToQueueAndWait(cr);
+        return cr.getResponseCode() > 0;
+    }
+
     /// Registers `l` to be notified when the device's active network type
     /// changes (WiFi <-> Cellular <-> None <-> ...). The listener is invoked
     /// on the EDT. Safe to call multiple times with the same listener; only
