@@ -8228,7 +8228,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// {@link #isAlwaysTensile()} dependency on {@link #isScrollableX()}.
     /// Used by {@link Container#isScrollableX()} so the X axis can honour
     /// {@code setAlwaysTensile(true)} (matching {@link Container#isScrollableY()})
-    /// without recursing through {@code isAlwaysTensile()} -&gt; {@code isScrollableX()}.
+    /// without recursing through {@code isAlwaysTensile()} -> {@code isScrollableX()}.
     boolean alwaysTensileFlag() {
         return alwaysTensile;
     }
