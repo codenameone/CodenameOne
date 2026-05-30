@@ -6218,6 +6218,23 @@ public class CSSTheme {
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
+            // Prefer RoundRectBorder for the simple border-radius case
+            // (no border-image, no compound per-side borders). The JS
+            // port's CSSBorder.paintBorderBackground calls
+            // g.fillShape(p) directly against the main canvas, which
+            // doesn't actually render on the cooperative-scheduler
+            // worker-side bridge (visible symptom: Dialog / TextField /
+            // ChatBubble UIIDs show no rounded background, only their
+            // children render). RoundRectBorder.paintBorderBackground
+            // routes through createTargetImage + drawImage on the same
+            // path that already works for cn1-pill-border (Button), so
+            // switching dispatch fixes Dialog without changing iOS /
+            // Android pixels (RoundRectBorder produces a visually-
+            // equivalent rounded rect there).
+            if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()
+                    && !b.hasBorderImage() && !b.hasUnequalBorders()) {
+                return createRoundRectBorder(styles);
+            }
             if (b.canBeAchievedWithCSSBorder(styles) && (b.hasBorderImage() || b.hasUnequalBorders() || b.hasBorderRadius()) ) {
                 return createCSSBorder(styles);
             }

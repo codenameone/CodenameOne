@@ -55,27 +55,35 @@ import com.codenameone.examples.hellocodenameone.tests.accessibility.Accessibili
 
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Per-test deadline cap. On the JavaScript port the overall CI browser
-    // lifetime is only ~150s, so a stuck test mustn't eat the whole budget;
-    // the tight 10s cap kept the suite from being blocked by the rare hung
-    // form (e.g. KotlinUiTest's missing cn1lib). iOS / Android / JavaSE
-    // run with much longer wall budgets so a per-test cap of 30s is safe -
-    // it only matters for genuinely stuck tests, and 30s leaves headroom
-    // for theme captures whose chunked-log emission is rate-limited (Android
-    // throttles 500-byte chunks at 30ms each to keep logcat from dropping
-    // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
-    // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
-    // even on a healthy device). The 30s figure also covers the iOS Metal
-    // port's mutable rendering, which allocates a temp UIImage + MTLTexture
-    // per round-rect / arc / gradient call (the CG-rasterise-then-DrawImage
-    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
-    // simulators legitimately blow past the 10s budget while still making
-    // forward progress.
+    // Per-test deadline cap. The 10s HTML5 default keeps already-
+    // hanging tests (LightweightPickerButtons, ToastBarTopPosition
+    // hitting the canvasContextWipe noCanvas path) from eating the
+    // 1740s suite-level budget. DualAppearanceBaseTest subclasses
+    // override this via {@link BaseTest#getTimeoutMs()} because they
+    // run light + dark phases serially and each phase pays
+    // registerReadyCallback's 1500ms UITimer + wait_for_ui_settle
+    // (up to ~800ms) + capture/encode + chunked emit, so the
+    // bytecode-translated path easily clears 10s on shared GHA
+    // runners. At 10s the dark phase's emit fired AFTER the test had
+    // already timed out and the runner had advanced to the next test
+    // - the late dark emit then captured whatever form happened to
+    // be on the canvas at that moment (visible symptom:
+    // ToolbarTheme_dark.png showed "TabsTheme / light"). iOS /
+    // Android / JavaSE keep their wider 30s cap because they don't
+    // share the JS port's canvas-hang failure mode.
     private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
-    private static int testTimeoutMs() {
+    private static int testTimeoutMs(BaseTest testClass) {
+        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
+        // phases serially, each paying registerReadyCallback's 1500ms + settle
+        // + capture). Other tests stay at the tighter HTML5 default so a hung
+        // test doesn't eat the suite-level budget.
+        if ("HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof DualAppearanceBaseTest) {
+            return TEST_TIMEOUT_MS_NATIVE;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;
@@ -289,7 +297,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
-            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs());
+            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
     }
 
@@ -306,7 +314,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         // the 300s end-marker deadline. Keep all skip lookups inline to avoid
         // triggering the same static-init failure path.
         return isJsSkippedNativeTest(testName)
-                || isJsSkippedThemeTest(testName)
                 || isJsSkippedAnimationTest(testName)
                 || isJsSkippedScreenshotTest(testName);
     }
@@ -325,31 +332,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // route through CodenameOneImplementation overrides; the
                 // JavaScript port doesn't yet provide a crypto bridge.
                 || "CryptoApiTest".equals(testName);
-    }
-
-    private static boolean isJsSkippedThemeTest(String testName) {
-        // The native-theme fidelity tests (each emits a light+dark PNG pair)
-        // matter for iOS/Android/JavaSE where the user actually looks at
-        // visual output. The JS port run has a tight 150s browser-lifetime
-        // budget that doesn't accommodate another 13 x 2 captures; skip them
-        // here. Re-enable selectively when we move the JS port to a
-        // longer-lived harness.
-        return "ButtonThemeScreenshotTest".equals(testName)
-                || "TextFieldThemeScreenshotTest".equals(testName)
-                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
-                || "SwitchThemeScreenshotTest".equals(testName)
-                || "PickerThemeScreenshotTest".equals(testName)
-                || "ToolbarThemeScreenshotTest".equals(testName)
-                || "TabsThemeScreenshotTest".equals(testName)
-                || "MultiButtonThemeScreenshotTest".equals(testName)
-                || "ListThemeScreenshotTest".equals(testName)
-                || "DialogThemeScreenshotTest".equals(testName)
-                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
-                || "SpanLabelThemeScreenshotTest".equals(testName)
-                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName)
-                || "CssGradientsScreenshotTest".equals(testName)
-                || "CssFilterBlurScreenshotTest".equals(testName);
     }
 
     private static boolean isJsSkippedAnimationTest(String testName) {

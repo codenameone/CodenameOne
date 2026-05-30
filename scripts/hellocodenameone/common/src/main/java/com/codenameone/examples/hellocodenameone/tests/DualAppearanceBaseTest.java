@@ -101,11 +101,40 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         annotations.add(new Annotation(c, legend));
     }
 
+    /// Gates {@link #done()} until {@link #finish()} runs. The JS-port
+    /// emit fallback (`cn1ssEmitCurrentFormScreenshotDom` in port.js)
+    /// force-calls done() on the active test after the per-emit
+    /// completion runnable returns. For a single-phase test that's
+    /// the safety net that finalises the test; for DualAppearance
+    /// the light-phase completion only async-kicks-off the dark
+    /// phase (form.show() returns before paint), so the force-done
+    /// would finalise the test before the dark capture fires - the
+    /// runner then advances to the next test, and the late dark
+    /// emit captures whatever form happens to be on the canvas at
+    /// that moment (visible symptom: ListTheme_dark.png showed
+    /// "DialogTheme / light"; PickerTheme_dark.png showed Toolbar;
+    /// 7 of 16 modern-theme tests produced no captures at all
+    /// because they sat in the gap behind the polluting late emit).
+    /// finish() flips this gate so the natural done() chain works.
+    private volatile boolean bothPhasesComplete;
+
     @Override
     public boolean runTest() {
         installModernThemeIfRequested();
         runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
         return true;
+    }
+
+    @Override
+    protected synchronized void done() {
+        if (!bothPhasesComplete) {
+            // Premature done() call (e.g. JS-port force-done after the
+            // light emit's completion runnable returned). Stay
+            // not-done so the test runner keeps polling until the
+            // dark phase finishes and finish() flips the gate below.
+            return;
+        }
+        super.done();
     }
 
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
@@ -240,6 +269,9 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             UIManager.initFirstTheme("/theme");
         }
         UIManager.getInstance().refreshTheme();
+        // Lift the gate before calling done() so the overridden
+        // done() above lets the call through this time.
+        bothPhasesComplete = true;
         done();
     }
 
@@ -307,6 +339,16 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         }
         if ("and".equals(platform)) {
             return "/AndroidMaterialTheme.res";
+        }
+        // The JavaScript port reports its platform as "HTML5"; it
+        // publishes ``cn1.modernThemeResource`` from HTML5Implementation's
+        // installNativeTheme() based on the detected browser OS
+        // (iOS/Mac -> iOSModernTheme.res, anything else ->
+        // AndroidMaterialTheme.res), which is the same selection
+        // logic this test would otherwise have to duplicate.
+        String published = Display.getInstance().getProperty("cn1.modernThemeResource", null);
+        if (published != null && published.length() > 0) {
+            return published;
         }
         return null;
     }

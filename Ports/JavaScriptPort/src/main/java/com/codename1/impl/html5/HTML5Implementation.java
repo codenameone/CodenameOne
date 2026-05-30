@@ -2816,60 +2816,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void installNativeTheme(){
     	try {
-            // Prefer the modern native theme when explicitly requested via
-            // ios.themeMode / and.themeMode (legacy alias: cn1.androidTheme)
-            // / nativeTheme (legacy alias: cn1.nativeTheme) /
-            // javascript.native.theme. If no hint is set we keep the
-            // pre-existing JS-port default (iOS 7 / Holo Light) since the JS
-            // bundle may not include the modern .res files
-            // (scripts/build-native-themes.sh has to have mirrored them
-            // before the JS bundle was produced).
-            String defaultTheme = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
-            Display d = Display.getInstance();
-            String iosMode = d.getProperty("ios.themeMode", null);
-            String androidMode = d.getProperty("and.themeMode",
-                    d.getProperty("cn1.androidTheme", null));
-            String shared = d.getProperty("nativeTheme",
-                    d.getProperty("cn1.nativeTheme", null));
-            if (isAndroid_()) {
-                if (androidMode == null && shared != null) {
-                    if ("modern".equalsIgnoreCase(shared)) {
-                        androidMode = "material";
-                    } else if ("legacy".equalsIgnoreCase(shared)) {
-                        androidMode = "hololight";
-                    }
-                }
-                if (androidMode != null) {
-                    androidMode = androidMode.toLowerCase();
-                    if ("material".equals(androidMode) || "modern".equals(androidMode) || "auto".equals(androidMode)) {
-                        defaultTheme = "/AndroidMaterialTheme.res";
-                    } else if ("legacy".equals(androidMode)) {
-                        defaultTheme = "/androidTheme.res";
-                    } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
-                        defaultTheme = "/android_holo_light.res";
-                    }
-                }
-            } else {
-                if (iosMode == null && shared != null) {
-                    if ("modern".equalsIgnoreCase(shared)) {
-                        iosMode = "modern";
-                    } else if ("legacy".equalsIgnoreCase(shared)) {
-                        iosMode = "ios7";
-                    }
-                }
-                if (iosMode != null) {
-                    iosMode = iosMode.toLowerCase();
-                    if ("modern".equals(iosMode) || "liquid".equals(iosMode) || "auto".equals(iosMode)) {
-                        defaultTheme = "/iOSModernTheme.res";
-                    } else if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
-                        defaultTheme = "/iPhoneTheme.res";
-                    }
-                }
-            }
-            String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", defaultTheme);
+            // Pick the .res to load based on the build hints and the
+            // detected browser OS. The JS-port default stays on the
+            // pre-existing legacy theme (Holo Light when the user agent
+            // is Android, iOS 7 on everything else) so legacy
+            // screenshot baselines remain comparable. Apps that want
+            // the modern Liquid Glass / Material 3 theme can opt in
+            // via ios.themeMode / and.themeMode / nativeTheme (legacy
+            // aliases: cn1.androidTheme / cn1.nativeTheme) /
+            // javascript.native.theme, including the new "auto" value
+            // that picks iOS modern for iOS/Mac browsers and Material
+            // 3 elsewhere.
+            String resolved = resolveNativeThemeResource();
+            // Publish the detected modern-theme resource so screenshot
+            // tests (DualAppearanceBaseTest) can install the same
+            // platform-appropriate theme on the JS port without
+            // duplicating the OS-detection logic.
+            String modern = isIOSLikeBrowser() ? "/iOSModernTheme.res" : "/AndroidMaterialTheme.res";
+            Display.getInstance().setProperty("cn1.modernThemeResource", modern);
             Resources r;
             try {
-                r = Resources.open(nativeTheme);
+                r = Resources.open(resolved);
             } catch (Throwable notFound) {
                 // Fall back to the legacy theme if the chosen .res isn't in
                 // the JS bundle (partial build, missing mirror step, etc.).
@@ -2888,6 +2855,104 @@ public class HTML5Implementation extends CodenameOneImplementation {
             Log.e(ex);
         }
         return;
+    }
+
+    /**
+     * iOS/Mac browsers should pick up the iOS Liquid Glass theme;
+     * every other browser (Android, Windows, Linux, Chrome OS) gets
+     * the Android Material 3 theme. The legacy default split was
+     * Android vs. "everything else falls back to iOS"; for the modern
+     * native theme the more useful split is iOS-family vs. everyone
+     * else because Windows and Linux desktops match Material 3 better
+     * than Liquid Glass.
+     */
+    private static boolean isIOSLikeBrowser() {
+        return isIOS() || isMac();
+    }
+
+    /**
+     * Resolves the native-theme .res path from build hints + detected
+     * browser OS. Recognised hints (highest to lowest precedence):
+     *  - {@code javascript.native.theme}: explicit res path override.
+     *  - {@code ios.themeMode}: auto/modern/liquid/ios7/flat/legacy/
+     *    iphone. Applied to iOS/Mac browsers only.
+     *  - {@code and.themeMode}: auto/material/modern/hololight/holo/
+     *    legacy. Applied when the browser is not iOS/Mac. Alias:
+     *    {@code cn1.androidTheme}.
+     *  - {@code nativeTheme}: modern/auto/legacy. Maps onto the iOS
+     *    or Android branch based on the detected browser OS. Alias:
+     *    {@code cn1.nativeTheme}. The new {@code auto} value triggers
+     *    OS-based selection: iOS/Mac browsers get the Liquid Glass
+     *    theme, everything else gets Material 3.
+     *
+     * <p>With no hint set, the JS port keeps the pre-existing default
+     * (Android Holo Light when the user agent is Android, iOS 7
+     * everywhere else - identical to the historical legacy split) so
+     * existing JS screenshot baselines remain comparable. Apps that
+     * want the modern Liquid Glass / Material 3 theme can opt in by
+     * setting {@code nativeTheme=auto} or {@code nativeTheme=modern}
+     * (or the platform-specific {@code ios.themeMode} /
+     * {@code and.themeMode}). The {@code cn1.modernThemeResource}
+     * runtime property published by {@link #installNativeTheme()}
+     * always points at the OS-appropriate modern .res so screenshot
+     * tests can install it regardless of the configured default.
+     */
+    private static String resolveNativeThemeResource() {
+        Display d = Display.getInstance();
+        String explicit = d.getProperty("javascript.native.theme", null);
+        if (explicit != null && explicit.length() > 0) {
+            return explicit;
+        }
+        String shared = d.getProperty("nativeTheme", d.getProperty("cn1.nativeTheme", null));
+        // Auto-detected branch chooses Liquid Glass on iOS/Mac and
+        // Material 3 elsewhere. Used for any "modern"/"auto" path.
+        boolean iosLike = isIOSLikeBrowser();
+        if (iosLike) {
+            String iosMode = d.getProperty("ios.themeMode", null);
+            if (iosMode == null && shared != null) {
+                if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+                    iosMode = "modern";
+                } else if ("legacy".equalsIgnoreCase(shared)) {
+                    iosMode = "ios7";
+                }
+            }
+            if (iosMode != null) {
+                iosMode = iosMode.toLowerCase();
+                if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
+                    return "/iPhoneTheme.res";
+                }
+                if ("ios7".equals(iosMode) || "flat".equals(iosMode)) {
+                    return "/iOS7Theme.res";
+                }
+                // modern / liquid / auto / anything else -> modern theme
+                return "/iOSModernTheme.res";
+            }
+            // No iOS hint - keep the pre-existing JS-port default.
+            return "/iOS7Theme.res";
+        }
+        String androidMode = d.getProperty("and.themeMode", d.getProperty("cn1.androidTheme", null));
+        if (androidMode == null && shared != null) {
+            if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+                androidMode = "material";
+            } else if ("legacy".equalsIgnoreCase(shared)) {
+                androidMode = "hololight";
+            }
+        }
+        if (androidMode != null) {
+            androidMode = androidMode.toLowerCase();
+            if ("legacy".equals(androidMode)) {
+                return "/androidTheme.res";
+            }
+            if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
+                return "/android_holo_light.res";
+            }
+            // material / modern / auto / anything else -> modern theme
+            return "/AndroidMaterialTheme.res";
+        }
+        // No Android hint - keep the pre-existing JS-port default,
+        // which routes Android user agents to Holo Light and every
+        // other non-iOS browser (Linux/Windows/Chrome OS) to iOS 7.
+        return isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
     }
 
     @Override

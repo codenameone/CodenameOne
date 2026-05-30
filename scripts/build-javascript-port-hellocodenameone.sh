@@ -64,6 +64,22 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_PARPARVM_BUILD:-0}" != "1" ]
   mvn -B -f "$REPO_ROOT/maven/pom.xml" -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 fi
 
+# Mirror the modern native themes (iOSModernTheme.res /
+# AndroidMaterialTheme.res) into Ports/JavaScriptPort/src/main/webapp/
+# assets so the bundle picks them up when JavascriptBundleWriter copies
+# webapp/assets/* into the served output. The mirror files are
+# gitignored build artefacts, so without this step a fresh checkout
+# would silently fall back to iOS7Theme.res / android_holo_light.res
+# at runtime.
+if [ "${SKIP_NATIVE_THEMES_BUILD:-0}" != "1" ]; then
+  if [ -x "$REPO_ROOT/scripts/build-native-themes.sh" ]; then
+    bj_log "Compiling native themes (iOS Modern / Android Material) for JS bundle"
+    "$REPO_ROOT/scripts/build-native-themes.sh"
+  else
+    bj_log "WARNING: scripts/build-native-themes.sh missing - modern themes won't be in bundle"
+  fi
+fi
+
 if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; then
   bj_log "Building HelloCodenameOne common module and compile-scope dependencies"
   mkdir -p "$HOME/.codenameone"

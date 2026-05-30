@@ -58,9 +58,12 @@ final class BuildHintSchemaDefaults {
         // Group.
         set("{{@nativeTheme}}.label", "Native Theme");
         set("{{@nativeTheme}}.description",
-                "Controls the Codename One look & feel on iOS and Android. "
-                + "Modern themes are generated from CSS under native-themes/; "
-                + "legacy themes remain selectable via the values below.");
+                "Controls the Codename One look & feel on iOS, Android, and "
+                + "the JavaScript port (browser OS auto-detection: iOS/Mac "
+                + "browsers get the iOS theme, everything else gets the "
+                + "Android theme). Modern themes are generated from CSS "
+                + "under native-themes/; legacy themes remain selectable "
+                + "via the values below.");
 
         // Cross-platform meta hint.
         set("{{#nativeTheme#nativeTheme}}.label", "Shared override");
