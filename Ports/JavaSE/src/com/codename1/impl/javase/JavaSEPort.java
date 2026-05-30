@@ -8892,6 +8892,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     private final boolean paintScopeChecksEnabled =
             !Boolean.getBoolean("cn1.disable.paint.scope.checks");
 
+    /// Tracks `(owner-class, leak-kinds)` signatures already reported so a
+    /// leaky component logs once per session instead of every repaint
+    /// (issue #5102). The set is unbounded but its growth is bounded by the
+    /// number of distinct leak shapes in the running app, which is small.
+    private final java.util.Set<String> reportedPaintScopeLeaks =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
     private int clipStackDepth(Object graphics) {
         if (graphics instanceof NativeScreenGraphics) {
             return ((NativeScreenGraphics) graphics).clipStack.size();
@@ -8965,11 +8972,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         Graphics2D g2d = getGraphics(graphics);
         StringBuilder diffs = null;
+        StringBuilder kinds = null;
 
         int depthNow = clipStackDepth(graphics);
         if (depthNow != snap.clipStackDepth) {
             diffs = appendDiff(diffs, "clip stack depth " + snap.clipStackDepth
                     + " -> " + depthNow + " (unmatched pushClip/popClip)");
+            kinds = appendDiff(kinds, "clipStackDepth");
             trimClipStack(graphics, snap.clipStackDepth);
         }
         // Transform must be restored before the clip comparison: getClip()
@@ -8978,31 +8987,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (!g2d.getTransform().equals(snap.transform)) {
             diffs = appendDiff(diffs, "transform not restored " + snap.transform
                     + " -> " + g2d.getTransform());
+            kinds = appendDiff(kinds, "transform");
             g2d.setTransform(snap.transform);
         }
         if (!sameShape(g2d.getClip(), snap.clip)) {
             diffs = appendDiff(diffs, "clip rect not restored");
+            kinds = appendDiff(kinds, "clipRect");
             g2d.setClip(snap.clip);
         }
         if (!equalsNullSafe(g2d.getColor(), snap.color)) {
             diffs = appendDiff(diffs, "color not restored " + snap.color
                     + " -> " + g2d.getColor());
+            kinds = appendDiff(kinds, "color");
             g2d.setColor(snap.color);
         }
         if (!equalsNullSafe(g2d.getFont(), snap.font)) {
             diffs = appendDiff(diffs, "font not restored");
+            kinds = appendDiff(kinds, "font");
             g2d.setFont(snap.font);
         }
         if (!equalsNullSafe(g2d.getComposite(), snap.composite)) {
             diffs = appendDiff(diffs, "composite/alpha not restored");
+            kinds = appendDiff(kinds, "composite");
             g2d.setComposite(snap.composite);
         }
 
         if (diffs != null) {
-            Log.p("paint-scope: " + describe(snap.owner)
-                    + " did not restore Graphics state: " + diffs
-                    + ". State has been auto-restored for the simulator; on device "
-                    + "this would persist into the next paint (see issue #5058).");
+            // Dedup per (owner-class, leak-kinds): a leaky component fires every
+            // paint, which used to flood the EDT log (issue #5102). One warning
+            // per signature is enough -- the diff text is identical anyway.
+            String signature = ownerClass(snap.owner) + "|" + kinds;
+            if (reportedPaintScopeLeaks.add(signature)) {
+                Log.p("paint-scope: " + describe(snap.owner)
+                        + " did not restore Graphics state: " + diffs
+                        + ". State has been auto-restored for the simulator; on device "
+                        + "this would persist into the next paint (see issue #5058)."
+                        + " Further occurrences of this leak shape are suppressed.");
+            }
         }
     }
 
@@ -9011,6 +9032,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return new StringBuilder(diff);
         }
         return b.append("; ").append(diff);
+    }
+
+    private static String ownerClass(Object owner) {
+        return owner == null ? "<null>" : owner.getClass().getName();
     }
 
     private static boolean equalsNullSafe(Object a, Object b) {
