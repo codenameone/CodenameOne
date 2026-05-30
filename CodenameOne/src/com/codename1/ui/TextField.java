@@ -1939,11 +1939,12 @@ public class TextField extends TextArea {
     /// {@inheritDoc}
     @Override
     public void setAlignment(int align) {
-        if (align == Component.CENTER) {
-            throw new IllegalArgumentException("CENTER alignment is not supported in TextField.");
-        } else {
-            super.setAlignment(align);
-        }
+        // CENTER alignment used to throw IllegalArgumentException here, blocking
+        // a common request (centred numeric fields, PIN entry, score widgets,
+        // etc.). The rendering pipeline already handles CENTER via the parent
+        // TextArea.setAlignment which just routes to Style.setAlignment, so
+        // accept it and delegate. See #1511.
+        super.setAlignment(align);
     }
 
     /// {@inheritDoc}
