@@ -91,6 +91,15 @@ public class Calendar extends Container implements ActionSource {
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
     private long SELECTED_DAY = -1;
+    /// The exact millis the caller passed to {@link #setDate(Date)} /
+    /// {@link #setSelectedDate(Date)}, before the day-cell-comparison
+    /// normalisation in MonthView.setSelectedDay. Used by {@link #getDate()}
+    /// so that the time-of-day round-trips. -1 means "no user-supplied date,
+    /// fall back to the normalised SELECTED_DAY". See #1515.
+    private long originalSelectedDay = -1;
+    /// The exact millis the caller passed to {@link #setCurrentDate(Date)}.
+    /// See {@link #originalSelectedDay}.
+    private long originalCurrentDay = -1;
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
 
@@ -296,6 +305,10 @@ public class Calendar extends Container implements ActionSource {
     ///
     /// the date object matching the current selection
     public Date getDate() {
+        // Preserve the caller's original time-of-day when possible. See #1515.
+        if (originalSelectedDay >= 0) {
+            return new Date(originalSelectedDay);
+        }
         return new Date(mv.getSelectedDay());
     }
 
@@ -305,6 +318,8 @@ public class Calendar extends Container implements ActionSource {
     ///
     /// - `d`: new date
     public void setDate(Date d) {
+        originalSelectedDay = d.getTime();
+        originalCurrentDay = d.getTime();
         mv.setSelectedDay(d.getTime());
         mv.setCurrentDay(SELECTED_DAY, true);
         componentChanged();
@@ -342,6 +357,7 @@ public class Calendar extends Container implements ActionSource {
     ///
     /// - `d`: the selected day
     public void setSelectedDate(Date d) {
+        originalSelectedDay = d.getTime();
         mv.setSelectedDay(d.getTime());
         mv.setCurrentDay(SELECTED_DAY, true);
         componentChanged();
@@ -353,6 +369,10 @@ public class Calendar extends Container implements ActionSource {
     ///
     /// the currently viewed date
     public Date getCurrentDate() {
+        // Preserve the caller's original time-of-day when possible. See #1515.
+        if (originalCurrentDay >= 0) {
+            return new Date(originalCurrentDay);
+        }
         return new Date(mv.getCurrentDay());
     }
 
@@ -363,6 +383,7 @@ public class Calendar extends Container implements ActionSource {
     ///
     /// - `d`: the date to set the calendar view on.
     public void setCurrentDate(Date d) {
+        originalCurrentDay = d.getTime();
         mv.setCurrentDay(d.getTime(), true);
         componentChanged();
     }
@@ -1341,6 +1362,13 @@ public class Calendar extends Container implements ActionSource {
                             setDayUIID(components[iter], "CalendarSelectedDay");
 
                             SELECTED_DAY = dates[iter];
+                            // A user tap supplies only the day, so the
+                            // hour/minute information from a prior
+                            // setDate(Date) call is no longer authoritative.
+                            // Clear the cached original so getDate() falls
+                            // back to the day-cell normalised value. See #1515.
+                            Calendar.this.originalSelectedDay = -1;
+                            Calendar.this.originalCurrentDay = -1;
                             selected = components[iter];
                         }
                         fireActionEvent();
