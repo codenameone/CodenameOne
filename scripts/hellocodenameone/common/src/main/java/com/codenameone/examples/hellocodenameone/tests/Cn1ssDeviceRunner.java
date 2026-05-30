@@ -253,6 +253,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
+            new FileSystemStorageOpenInputStreamMissingTest(),
             new MutableImageReadbackTest()
     };
 
