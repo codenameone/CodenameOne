@@ -1936,16 +1936,12 @@ public class TextField extends TextArea {
         this.leftAndRightEditingTrigger = leftAndRightEditingTrigger;
     }
 
-    /// {@inheritDoc}
-    @Override
-    public void setAlignment(int align) {
-        // CENTER alignment used to throw IllegalArgumentException here, blocking
-        // a common request (centred numeric fields, PIN entry, score widgets,
-        // etc.). The rendering pipeline already handles CENTER via the parent
-        // TextArea.setAlignment which just routes to Style.setAlignment, so
-        // accept it and delegate. See #1511.
-        super.setAlignment(align);
-    }
+    // setAlignment(int) used to be overridden here purely to throw
+    // IllegalArgumentException for Component.CENTER. That block is gone; the
+    // override is no longer needed because the parent TextArea.setAlignment
+    // already routes to Style.setAlignment and the rendering pipeline handles
+    // CENTER identically to LEFT/RIGHT. Removing the override also keeps PMD
+    // happy (UselessOverridingMethod). See #1511.
 
     /// {@inheritDoc}
     @Override
