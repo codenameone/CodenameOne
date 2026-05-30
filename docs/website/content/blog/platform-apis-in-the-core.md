@@ -2,7 +2,7 @@
 title: AI, OAuth, And Other Platform APIs In The Core
 slug: platform-apis-in-the-core
 url: /blog/platform-apis-in-the-core/
-date: '2026-06-01'
+date: '2026-05-31'
 author: Shai Almog
 description: Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions (WiFi / connectivity, share-sheet result callbacks) alongside.
 feed_html: '<img src="https://www.codenameone.com/blog/platform-apis-in-the-core.jpg" alt="AI, OAuth, And Other Platform APIs In The Core" /> Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions alongside.'
@@ -105,7 +105,7 @@ The shape mirrors the OpenAI function-calling contract one for one, so anything 
 
 ### Embeddings
 
-`LlmClient.embed(...)` returns a vector for any input string. Useful for similarity search against a local SQLite store ([Wednesday's post](/blog/build-time-codegen/) will cover the new ORM that pairs with this):
+`LlmClient.embed(...)` returns a vector for any input string. Useful for similarity search against a local SQLite store ([tomorrow's post](/blog/build-time-codegen/) will cover the new ORM that pairs with this):
 
 ```java
 EmbeddingRequest er = new EmbeddingRequest.Builder()
@@ -693,7 +693,7 @@ After the next cloud or local build, your app appears in the iOS share sheet for
 
 ## Wrapping up
 
-The next post is on Wednesday and covers the architectural change in this release: a build-time bytecode annotation framework, the declarative router that is its first consumer, the SQLite ORM and JSON / XML mappers and component binder built on the same SPI, and the build-time SVG / Lottie transcoder that ships in the same release for related reasons.
+[Tomorrow's post](/blog/build-time-codegen/) covers the architectural change in this release: a build-time bytecode annotation framework, the declarative router that is its first consumer, the SQLite ORM and JSON / XML mappers and component binder built on the same SPI, and the build-time SVG / Lottie transcoder that ships in the same release for related reasons.
 
 Back to the [weekly index](/blog/metal-default-new-build-cloud-and-a-new-format/).
 
