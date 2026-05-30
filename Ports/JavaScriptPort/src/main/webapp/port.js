@@ -1141,7 +1141,19 @@ bindNative([
   // (Sheet/SheetSlide/Toast/CssGradients/themes) to flake-hang.
   if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
           && win.__cn1CachedDocWrapper.__class) {
-    return win.__cn1CachedDocWrapper;
+    // Additional sanity check: the wrapper may have a valid ``__class``
+    // but a broken ``__cn1HostRef`` (the documented NUMBER_FOR_OBJECT
+    // value=667 case where the host-bridge returns the JS Number 667
+    // — viewport height — instead of a Document). The earlier check
+    // only invalidates on ``!__class``, but a Number-flavour ref still
+    // carries a class. Validate the host ref is a real object before
+    // returning the cached wrapper.
+    const cachedRef = win.__cn1CachedDocWrapper.__cn1HostRef;
+    if (cachedRef != null && typeof cachedRef === "object") {
+      return win.__cn1CachedDocWrapper;
+    }
+    // Broken host ref — invalidate and re-fetch.
+    try { win.__cn1CachedDocWrapper = null; } catch (_e) {}
   }
   if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
           && !win.__cn1CachedDocWrapper.__class) {
@@ -3683,6 +3695,35 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     || null;
   if (forcedTimeoutReason != null) {
     emitDiagLine("PARPAR:DIAG:FALLBACK:key=FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":HIT");
+    // Force-timeout reasons like ``canvasContextWipe`` indicate the
+    // host-bridge document/canvas wrappers are in a bad state — the
+    // very condition that made the test unrunnable. The cached
+    // ``__cn1CachedDocWrapper`` set at lines ~1142 may still point at
+    // a wrapper whose underlying host receiver returns garbage (the
+    // documented "NUMBER_FOR_OBJECT value=667" case where
+    // ``window.getDocument()`` resolves to the JS Number 667).
+    // Existing invalidation triggers on ``!wrapper.__class``, but the
+    // 667-flavour wrapper has a class — its host-ref is broken. The
+    // next test (e.g. ButtonThemeScreenshotTest right after
+    // ToastBarTopPositionScreenshotTest's ``canvasContextWipe`` skip)
+    // then hangs on ``Missing JS member createElement for host
+    // receiver`` thrown out of its first canvas-creating paint.
+    // Blowing the cache here forces the next ``getDocument()`` lookup
+    // to round-trip through the host bridge, which has a much higher
+    // chance of returning a sane Document.
+    try {
+      const winRef = (typeof global !== "undefined" && global)
+        || (typeof globalThis !== "undefined" && globalThis)
+        || (typeof window !== "undefined" && window)
+        || null;
+      if (winRef && winRef.__cn1CachedDocWrapper) {
+        winRef.__cn1CachedDocWrapper = null;
+        emitDiagLine("PARPAR:DIAG:FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":docWrapperInvalidated");
+      }
+    } catch (_invalidateErr) {
+      // Best-effort cleanup; never let the invalidation throw block the
+      // forced finalize path.
+    }
     try {
       const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
       if (typeof finalizeMethod === "function") {
