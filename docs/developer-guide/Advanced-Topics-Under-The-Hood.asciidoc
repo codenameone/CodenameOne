@@ -536,7 +536,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>…</dict>` of the generated entitlements plist. Use for entitlements Codename One doesn't expose individually.
 
 |macNative.fixedWindowSize
-|Mac Native builds only. Opt-in. Format `<width>x<height>` (e.g. `1024x685`). When set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is freely resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
+|Mac Native builds only. Opt-in. Format `<width>x<height>` — for example `1024x685`. When set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
 
 |desktop.width
 |Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.
