@@ -625,13 +625,31 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"
 
+  # Thread Metal validation env vars (if set in the caller's environment)
+  # through to the launched app via simctl --setenv. Empty when neither
+  # MTL_DEBUG_LAYER nor MTL_DEBUG_LAYER_ERROR_MODE is set, so non-Metal
+  # local runs are unaffected. CI's Metal job sets both at the step level
+  # so iOS render-pass/pipeline-state mismatches (issue #5103) abort the
+  # app immediately instead of producing undefined behaviour off-CI.
+  LAUNCH_ENV_ARGS=()
+  if [ -n "${MTL_DEBUG_LAYER:-}" ]; then
+    LAUNCH_ENV_ARGS+=( "--setenv" "MTL_DEBUG_LAYER=${MTL_DEBUG_LAYER}" )
+    ri_log "Forwarding MTL_DEBUG_LAYER=${MTL_DEBUG_LAYER} to simulator app"
+  fi
+  if [ -n "${MTL_DEBUG_LAYER_ERROR_MODE:-}" ]; then
+    LAUNCH_ENV_ARGS+=( "--setenv" "MTL_DEBUG_LAYER_ERROR_MODE=${MTL_DEBUG_LAYER_ERROR_MODE}" )
+    ri_log "Forwarding MTL_DEBUG_LAYER_ERROR_MODE=${MTL_DEBUG_LAYER_ERROR_MODE} to simulator app"
+  fi
+
   launch_simulator_app() {
     local target="$1"
     local attempt=1
     local max_attempts=5
     while true; do
       local output
-      if output="$(xcrun simctl launch "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
+      # "${LAUNCH_ENV_ARGS[@]+"${LAUNCH_ENV_ARGS[@]}"}" is the bash-3.2-safe
+      # idiom for expanding an array that may be empty under set -u.
+      if output="$(xcrun simctl launch "${LAUNCH_ENV_ARGS[@]+"${LAUNCH_ENV_ARGS[@]}"}" "$target" "$BUNDLE_IDENTIFIER" 2>&1)"; then
         printf '%s\n' "$output" >> "$LAUNCH_LOG"
         return 0
       fi
