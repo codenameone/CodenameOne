@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Regression tests for
  * <a href="https://github.com/codenameone/CodenameOne/issues/1399">#1399</a>
- * — a scrollable Container whose content is smaller than the container itself
+ * -- a scrollable Container whose content is smaller than the container itself
  * should still produce scroll feedback when the user explicitly opts in via
  * {@link Component#setAlwaysTensile(boolean)} (the workaround documented in
  * the 2015 issue thread). The Y axis has always honoured {@code alwaysTensile}
