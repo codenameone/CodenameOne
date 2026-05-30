@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-whisper-lib</artifactId>
     <packaging>pom</packaging>
+    <name>Codename One AI: cn1-ai-whisper-lib</name>
 
     <dependencies>
         <dependency>

@@ -146,8 +146,19 @@ public class Lifecycle {
     /// Callback when the app is destroyed
     public void destroy() {
     }
-
-    /// The current form within the application lifecycle which possibly differs from the one in the implementation
+    
+    /// Returns the form currently stored by this `Lifecycle` instance for
+    /// application resume handling.
+    ///
+    /// In most application code, use `CN.getCurrentForm()` instead, as it returns
+    /// the form that is actually displayed on the screen. This method is only useful
+    /// when subclassing `Lifecycle` and you need to inspect or customize the form
+    /// remembered by `stop()` and restored by `start()`, which may differ from the
+    /// form currently displayed by the Codename One implementation.
+    ///
+    /// #### Returns
+    ///
+    /// the form stored in this lifecycle, or `null` if no form has been stored
     protected Form getCurrentForm() {
         return current;
     }

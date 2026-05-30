@@ -228,7 +228,12 @@ static void installSignalHandlers() {
 - (void)cn1ApplicationDidEnterBackground
 {
  #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
-    [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
+    // Hide the view controller's root view rather than just the EAGL/Metal
+    // surface. Once a peer component is added with paintPeersBehindEnabled,
+    // the controller's view is a newRoot containing both eaglView and the
+    // peerComponentsLayer (BrowserComponent's WKWebView lives in the latter)
+    // -- hiding only eaglView leaves peers visible in the app-switcher snapshot.
+    [CodenameOne_GLViewController instance].view.hidden = YES;
     cn1IsHiddenInBackground = YES;
 #endif
     if(editingComponent != nil) {
@@ -251,7 +256,7 @@ static void installSignalHandlers() {
 - (void)cn1ApplicationWillEnterForeground
 {
     if (cn1IsHiddenInBackground) {
-        [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
+        [CodenameOne_GLViewController instance].view.hidden = NO;
     }
     // Clear before updateCanvas: viewWillTransitionToSize: and
     // didRotateFromInterfaceOrientation: use this to skip propagation during

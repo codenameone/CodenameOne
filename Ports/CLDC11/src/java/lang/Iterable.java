@@ -17,6 +17,7 @@
 package java.lang;
 
 import java.util.Iterator;
+import java.util.function.Consumer;
 
 /// Objects of classes that implement this interface can be used within a
 /// `foreach` statement.
@@ -32,4 +33,10 @@ public interface Iterable<T> {
     ///
     /// An `Iterator` instance.
     Iterator<T> iterator();
+
+    /// Performs the given action for each element of the `Iterable`.
+    /// Stubbed in the CLDC11 subset; the actual implementation comes
+    /// from the platform's JDK at runtime.
+    default void forEach(Consumer<? super T> action) {
+    }
 }

@@ -82,6 +82,25 @@
         "url": "https://dzone.com/content/3655800/edit.html",
         "syndicated_at": "2026-05-22T15:02:38+00:00"
       }
+    },
+    "nfc-crypto-biometrics-and-build-cloud": {
+      "devto": {
+        "id": 3778808,
+        "url": "https://dev.to/codenameone/nfc-crypto-biometrics-and-a-new-build-cloud-119j",
+        "syndicated_at": "2026-05-29T14:01:41+00:00"
+      },
+      "foojay": {
+        "id": 124003,
+        "url": "https://foojay.io/wp-admin/post.php?post=124003&action=edit",
+        "preview_url": "https://foojay.io/?p=124003",
+        "featured_media_id": 124002,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-05-29T14:02:56+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/b7dab4277d90/edit",
+        "syndicated_at": "2026-05-29T15:01:20+00:00"
+      }
     }
   }
 }

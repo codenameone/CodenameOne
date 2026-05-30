@@ -7280,7 +7280,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         for (String bootstrap : new String[] {
                 "cn1app.MapperBootstrap",
                 "cn1app.BinderBootstrap",
-                "cn1app.DaoBootstrap"}) {
+                "cn1app.DaoBootstrap",
+                "cn1app.RestClientBootstrap",
+                "cn1app.ProtoBootstrap",
+                "cn1app.GrpcClientBootstrap"}) {
             try {
                 Class.forName(bootstrap).newInstance();
             } catch (ClassNotFoundException ignored) {

@@ -62,6 +62,7 @@
         <module>factory</module>
         <module>css-compiler</module>
         <module>svg-transcoder</module>
+        <module>lottie-transcoder</module>
         <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>
@@ -119,6 +120,11 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-svg-transcoder</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-lottie-transcoder</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

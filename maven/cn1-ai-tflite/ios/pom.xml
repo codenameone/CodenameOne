@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-tflite-ios</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-tflite-ios</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

@@ -282,6 +282,14 @@ untarring
 url
 intrinsics
 obfuscator
+unobfuscated
+Petstore
+Swagger
+Api
+tween
+tweens
+tweened
+tweening
 resizability
 movability
 Thaana
@@ -542,3 +550,12 @@ Ollama
 [Aa]nthropic
 SAPI
 espeak
+
+# Protocol Buffers / gRPC technical terms used in the generate-grpc
+# appendix and the @ProtoMessage / @GrpcClient runtime docs. "protobuf"
+# is the de-facto short form of "Protocol Buffers"; "varint" is the
+# Protocol Buffers variable-length integer encoding; "enums" is the
+# plural form of the Java keyword.
+[Pp]rotobuf
+[Vv]arint
+[Ee]nums

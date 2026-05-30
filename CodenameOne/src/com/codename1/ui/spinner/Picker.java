@@ -596,7 +596,6 @@ public class Picker extends Button {
                     currentSpinner = null;
                 }
                 restoreContentPane();
-                dlg.disposeToTheBottom();
                 if (command == COMMAND_CANCEL) {
                     // Roll back any setX calls made while the popup was showing
                     // (e.g. a custom "+7 days" button) so getDate() returns the
@@ -609,6 +608,7 @@ public class Picker extends Button {
                     preEditValue = null;
                     preEditDateValueExplicitlySet = false;
                     updateValue();
+                    dlg.disposeToTheBottom();
                 } else {
                     preEditValue = null;
                     preEditDateValueExplicitlySet = false;
@@ -622,16 +622,27 @@ public class Picker extends Button {
 
                     Component next = null;
                     Form f = getComponentForm();
-                    if (f != null) {
+                    if (f != null && Picker.this.isTraversable()) {
                         if (command == COMMAND_NEXT) {
                             next = f.getNextComponent(Picker.this);
                         } else if (command == COMMAND_PREV) {
                             next = f.getPreviousComponent(Picker.this);
                         }
                     }
-                    if (next != null) {
-                        next.requestFocus();
-                        next.startEditingAsync();
+                    final Component nextToEdit = next;
+                    if (nextToEdit != null) {
+                        // Defer focus/edit until dispose completes so the next native editor
+                        // (e.g. Android EditText overlay) is positioned against the restored
+                        // content-pane geometry, not the picker's transient layout.
+                        dlg.disposeToTheBottom(new Runnable() {
+                            @Override
+                            public void run() {
+                                nextToEdit.requestFocus();
+                                nextToEdit.startEditingAsync();
+                            }
+                        });
+                    } else {
+                        dlg.disposeToTheBottom();
                     }
                 }
             }
@@ -791,7 +802,7 @@ public class Picker extends Button {
                 //        getNextFocusDown() != null ? getNextFocusDown() :
                 //        null;
                 ListIterator<Component> traversalIt = getComponentForm().getTabIterator(Picker.this);
-                if (traversalIt.hasNext()) {
+                if (Picker.this.isTraversable() && traversalIt.hasNext()) {
                     nextButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
                     // Javascript port needs to know that this button is going to try to
                     // focus a text field (possibly) so that it can prepare the text field
@@ -812,7 +823,7 @@ public class Picker extends Button {
 
                 Button prevButton = null;
 
-                if (traversalIt.hasPrevious()) {
+                if (Picker.this.isTraversable() && traversalIt.hasPrevious()) {
                     prevButton = new Button("", isTablet ? "PickerButtonTablet" : "PickerButton");
 
                     // Javascript port needs to know that this button is going to try to

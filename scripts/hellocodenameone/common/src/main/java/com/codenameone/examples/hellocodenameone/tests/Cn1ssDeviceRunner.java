@@ -100,6 +100,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new UncoverHorizontalTransitionTest(),
             new FadeTransitionTest(),
             new FlipTransitionTest(),
+            new MorphTransitionTest(),
+            new MorphTransitionScrolledSourceTest(),
+            new MorphTransitionSnapshotTest(),
+            new TabsAnimatedIndicatorScreenshotTest(),
+            new PullToRefreshSpinnerScreenshotTest(),
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
@@ -220,6 +225,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // AnimationTime so the captured frame is deterministic.
             new SVGStaticScreenshotTest(),
             new SVGAnimatedScreenshotTest(),
+            // Build-time Lottie transcoder -- same pipeline as SVG, lowers
+            // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
+            new LottieAnimatedScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -356,6 +364,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || "UncoverHorizontalTransitionTest".equals(testName)
                 || "FadeTransitionTest".equals(testName)
                 || "FlipTransitionTest".equals(testName)
+                || "MorphTransitionTest".equals(testName)
+                || "MorphTransitionScrolledSourceTest".equals(testName)
+                || "MorphTransitionSnapshotTest".equals(testName)
+                || "TabsAnimatedIndicatorScreenshotTest".equals(testName)
+                || "PullToRefreshSpinnerScreenshotTest".equals(testName)
                 || "AnimateLayoutScreenshotTest".equals(testName)
                 || "AnimateHierarchyScreenshotTest".equals(testName)
                 || "AnimateUnlayoutScreenshotTest".equals(testName)
@@ -385,6 +398,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // on top of the current suite; revisit when that budget is bumped.
                 || "SVGStaticScreenshotTest".equals(testName)
                 || "SVGAnimatedScreenshotTest".equals(testName)
+                || "LottieAnimatedScreenshotTest".equals(testName)
                 || "MainScreenScreenshotTest".equals(testName)
                 || "SheetScreenshotTest".equals(testName)
                 || "StatusBarTapDiagnosticScreenshotTest".equals(testName)

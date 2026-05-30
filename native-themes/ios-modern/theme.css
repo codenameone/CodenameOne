@@ -66,6 +66,22 @@
        Themes painting a flush full-width tab strip leave this true (the
        framework default) so the tab strip itself reserves the inset. */
     tabsSafeAreaBool: false;
+    /* iOS 26 NavigationBar-style sliding indicator: a thin coloured
+       underline that tweens between tabs when the user changes
+       selection. Off by default in the framework (so existing apps
+       don't suddenly animate); on by default in the modern native
+       theme. Duration 200ms matches Material 3's reference. */
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;
+    tabsAnimatedIndicatorThicknessMm: 1;
+    /* Modern arc-spinner pull-to-refresh. Replaces the legacy
+       rotating-arrow + text stack with a thin circular arc whose sweep
+       grows as the user pulls, then spins continuously while the
+       refresh task is running. Color is pulled from the TabIndicator
+       UIID's fg (already accent-tinted in this theme). */
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;
+    pullToRefreshIndicatorStrokeMm: "0.6";
     /* Route the Tab icon's styling through a separate UIID. FontImage
        copies the Button's bgColor/transparency into the rendered glyph
        image; over the cn1-pill-border selected pill that paints a
@@ -322,6 +338,11 @@ UnselectedTab { cn1-derive: Tab; color: #000000; }
    square inside the pill. Color (light/dark) inherits from the parent
    Tab via Style.fgColor at icon-render time. */
 TabIcon { background-color: transparent; padding: 0; margin: 0; }
+
+/* TabIndicator: color reference read by Tabs.paintAnimatedIndicator()
+   for the sliding underline. The actual drawing is done in Java; this
+   UIID only contributes the foreground colour. */
+TabIndicator { color: var(--accent-color, #007aff); background-color: transparent; padding: 0; margin: 0; }
 TabIcon.selected { background-color: transparent; }
 TabIcon.pressed { background-color: transparent; }
 
@@ -562,6 +583,9 @@ PopupContent {
     TabIcon { color: #ffffff; background-color: transparent; }
     TabIcon.selected { color: #ffffff; background-color: transparent; }
     TabIcon.pressed { color: #ffffff; background-color: transparent; }
+
+    /* Animated indicator inherits the dark-mode accent. */
+    TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
 
     SideNavigationPanel { background-color: #000000; }
     SideCommand { color: #ffffff; }

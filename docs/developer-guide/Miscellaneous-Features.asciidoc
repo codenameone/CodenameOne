@@ -460,7 +460,7 @@ cn1_icon_<lang>[_<country>].png
 
 Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons); the build resizes it to every target density. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants. At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
 
-===== Android behaviour
+===== Android behavior
 
 On Android the build generates locale-qualified drawable resources at every density so the platform picks the right icon automatically based on the device's current locale:
 
@@ -471,7 +471,7 @@ No code changes are required—Android's resource framework switches icons when 
 
 When you supply a region-qualified icon (such as `cn1_icon_ar_AE.png`) without a matching language-only variant, the build also emits the *default* (non-localized) icon into `drawable-<lang>/` and the matching `mipmap-*-<lang>/` directories. This barrier is required because Android's resource resolver (API 24+) walks every child of the parent locale when it can't find an exact or parent-language match, and would otherwise pick `ar-rAE` for, say, an `ar-PK` device. The barrier short-circuits that lookup so only devices whose region matches the supplied variant receive the localized icon. If you also ship a language-only file (for example `cn1_icon_ar.png`) it's used as the barrier instead, so you keep full control of the fallback icon for Arabic speakers outside AE.
 
-===== iOS behaviour
+===== iOS behavior
 
 iOS doesn't localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
 
@@ -480,7 +480,7 @@ iOS doesn't localize launcher icons natively, so Codename One wires up https://d
 * The `CodenameOne_GLAppDelegate` is patched to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch. The delegate reads `[NSLocale preferredLanguages]`, tries the full `<lang>_<COUNTRY>` key first, then falls back to the language-only key, and clears the alternate icon (reverting to the default) if no variant matches.
 * The injection is idempotent and runs before the `ios.afterFinishLaunching` hook, so any custom code you supply via that build hint is unaffected.
 
-NOTE: IOS displays a system alert the first time an app switches to an alternate icon. This is platform-standard behaviour—Codename One can't suppress it.
+NOTE: IOS displays a system alert the first time an app switches to an alternate icon. This is platform-standard behavior—Codename One can't suppress it.
 
 ===== Tips and troubleshooting
 
@@ -1201,8 +1201,54 @@ hi.getContentPane().addPullToRefresh(() -> {
 hi.show();
 ----
 
+`setPullToRefresh(Runnable)` is provided as a more discoverable alias for the
+same single-task slot -- both names route to the same field, and a second
+call replaces whatever runnable was previously registered.
+
 .Pull to refresh demo
 image::img/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
+
+==== Modern arc-spinner pull-to-refresh
+
+The legacy pull-to-refresh visual is the classic "rotating arrow + text"
+stack. Modern Material 3 / iOS apps instead show a thin circular arc
+that grows as the user pulls and spins once the task fires. This is
+shipped as an opt-in path via the `pullToRefreshModernBool` theme
+constant; the iOS Modern and Android Material themes enable it by
+default so apps shipping against those themes get the spec-accurate
+look without any extra wiring.
+
+To enable in a custom theme:
+
+[source,css]
+----
+#Constants {
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;       /* 8mm circle           */
+    pullToRefreshIndicatorStrokeMm: "0.6";     /* 0.6mm stroke thickness */
+}
+
+TabIndicator {
+    /* The pull-to-refresh arc shares its color with the animated tab
+       indicator -- both follow the brand's accent. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+----
+
+Behavior:
+
+* During the pull gesture the arc sweep grows from 0° to ~330°
+ proportional to how far the user has pulled past the threshold.
+* When the refresh task fires the arc rotates continuously at ~360°/sec
+ until the task completes.
+* All sizing is in millimetres so the indicator stays physical-size-accurate
+ across device densities; no rasterized images involved.
+
+The legacy `addPullToRefresh` API is unchanged -- the same `Runnable` is
+invoked at the same moment; only the visual rendering differs.
 
 === Running 3rd party apps using display's execute
 

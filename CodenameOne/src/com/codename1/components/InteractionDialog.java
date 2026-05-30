@@ -84,6 +84,9 @@ public class InteractionDialog extends Container implements AbstractDialog {
     private boolean repositionAnimation = true;
     private boolean disposed;
     private boolean disposeWhenPointerOutOfBounds;
+    private int animationSpeed = -1;
+    private Runnable showAnimationSetup;
+    private Runnable disposeAnimationSetup;
 
     /// Whether the interaction dialog uses the form layered pane of the regular layered pane
     private boolean formMode;
@@ -259,6 +262,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return title;
     }
 
+    private int resolveAnimationSpeed() {
+        if (animationSpeed >= 0) {
+            return animationSpeed;
+        }
+        return getUIManager().getThemeConstant("interactionDialogSpeedInt", 400);
+    }
+
     private void cleanupLayer(Form f) {
         if (formMode) {
             Container c = f.getFormLayeredPane(InteractionDialog.class, true);
@@ -327,7 +337,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
             getParent().setWidth(getWidth());
             getParent().setHeight(getHeight());
 
-            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
+            getLayeredPane(f).animateLayout(resolveAnimationSpeed());
         }
     }
 
@@ -371,9 +381,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
         getLayeredPane(f).addComponent(BorderLayout.center(this));
         if (animateShow) {
-            int x = left + (f.getWidth() - right - left) / 2;
-            int y = top + (f.getHeight() - bottom - top) / 2;
-            if (repositionAnimation) {
+            if (showAnimationSetup != null) {
+                showAnimationSetup.run();
+            } else if (repositionAnimation) {
+                int x = left + (f.getWidth() - right - left) / 2;
+                int y = top + (f.getHeight() - bottom - top) / 2;
                 getParent().setX(x);
                 getParent().setY(y);
                 getParent().setWidth(1);
@@ -386,7 +398,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 getParent().setWidth(getWidth());
                 getParent().setHeight(getHeight());
             }
-            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
+            getLayeredPane(f).animateLayout(resolveAnimationSpeed());
         } else {
             //getLayeredPane(f).revalidate();
             f.revalidateWithAnimationSafety();
@@ -423,13 +435,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
             Form f = p.getComponentForm();
             if (f != null) {
                 if (animateShow) {
-                    if (repositionAnimation) {
+                    if (disposeAnimationSetup != null) {
+                        disposeAnimationSetup.run();
+                    } else if (repositionAnimation) {
                         setX(getX() + getWidth() / 2);
                         setY(getY() + getHeight() / 2);
                         setWidth(1);
                         setHeight(1);
                     }
-                    p.animateUnlayoutAndWait(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 100);
+                    p.animateUnlayoutAndWait(resolveAnimationSpeed(), 100);
                 }
                 Container pp = getLayeredPane(f);
                 remove();
@@ -542,7 +556,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 }
 
                 if (animateShow) {
-                    p.animateUnlayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400), 255, new Runnable() {
+                    p.animateUnlayout(resolveAnimationSpeed(), 255, new Runnable() {
                         @Override
                         public void run() {
                             if (p.getParent() != null) {
@@ -587,7 +601,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return getParent() != null;
     }
 
-    /// Indicates whether show/dispose should be animated or not
+    /// Indicates whether show/dispose should be animated or not. When true (the default)
+    /// the dialog animates into view on `#show(int, int, int, int)` and out on
+    /// `#dispose()` over `interactionDialogSpeedInt` (default 400ms). When false, both
+    /// transitions are immediate. This flag also gates `#isRepositionAnimation()`:
+    /// the grow/shrink behavior of `repositionAnimation` only takes effect when
+    /// `animateShow` is true.
     ///
     /// #### Returns
     ///
@@ -596,13 +615,113 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return animateShow;
     }
 
-    /// Indicates whether show/dispose should be animated or not
+    /// Indicates whether show/dispose should be animated or not. When true (the default)
+    /// the dialog animates into view on `#show(int, int, int, int)` and out on
+    /// `#dispose()` over `interactionDialogSpeedInt` (default 400ms). When false, both
+    /// transitions are immediate. This flag also gates `#setRepositionAnimation(boolean)`:
+    /// the grow/shrink behavior of `repositionAnimation` only takes effect when
+    /// `animateShow` is true.
     ///
     /// #### Parameters
     ///
     /// - `animateShow`: the animateShow to set
     public void setAnimateShow(boolean animateShow) {
         this.animateShow = animateShow;
+    }
+
+    /// Duration in milliseconds used by the show, dispose and resize animations.
+    /// When set to a non-negative value this overrides the
+    /// `interactionDialogSpeedInt` theme constant. The default is -1 which means
+    /// "defer to the theme constant" (which itself defaults to 400ms).
+    ///
+    /// #### Returns
+    ///
+    /// the animation speed in ms, or -1 if the theme constant is used
+    public int getAnimationSpeed() {
+        return animationSpeed;
+    }
+
+    /// Sets the duration in milliseconds used by the show, dispose and resize
+    /// animations, overriding the `interactionDialogSpeedInt` theme constant. Pass
+    /// any value &lt; 0 (typically -1) to revert to the theme constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `animationSpeed`: animation duration in ms, or a value &lt; 0 to defer to the theme constant
+    public void setAnimationSpeed(int animationSpeed) {
+        this.animationSpeed = animationSpeed;
+    }
+
+    /// Callback invoked just before the show animation runs to position the dialog
+    /// parent at the animation start state. When set, this replaces the default
+    /// `#setRepositionAnimation(boolean)` behavior (grow from a 1x1 point at the
+    /// center, or stay at full size). Inside the callback, manipulate
+    /// `getParent()` bounds (`setX`/`setY`/`setWidth`/`setHeight`) to define
+    /// where the dialog should animate from. The animation will then interpolate
+    /// the layered pane layout to the dialog's final bounds. Pass `null` (the
+    /// default) to use the built-in show animation.
+    ///
+    /// This callback only fires when `#isAnimateShow()` is true.
+    ///
+    /// This hook is the recommended workaround when using popup dialogs that
+    /// render a pointing-arrow border (`#showPopupDialog(com.codename1.ui.Component)`).
+    /// With the built-in "grow from 1x1" animation the dialog is too small for
+    /// the arrow image to render until the animation completes; providing a
+    /// translate-from-edge setup keeps the dialog at full size for the entire
+    /// animation so the arrow is visible throughout. For example, to slide in
+    /// from off-screen below:
+    ///
+    /// ```java
+    /// dlg.setShowAnimationSetup(() -> {
+    ///     Container parent = dlg.getParent();
+    ///     parent.setY(Display.getInstance().getDisplayHeight());
+    /// });
+    /// ```
+    ///
+    /// #### Returns
+    ///
+    /// the show animation setup callback or null
+    public Runnable getShowAnimationSetup() {
+        return showAnimationSetup;
+    }
+
+    /// Sets a callback that positions the dialog parent at the animation start
+    /// state, overriding the default show animation. See `#getShowAnimationSetup()`
+    /// for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `showAnimationSetup`: callback or null to use the built-in show animation
+    public void setShowAnimationSetup(Runnable showAnimationSetup) {
+        this.showAnimationSetup = showAnimationSetup;
+    }
+
+    /// Callback invoked just before the dispose animation runs to position the
+    /// dialog at the animation end state. When set, this replaces the default
+    /// `#setRepositionAnimation(boolean)` behavior (shrink to a 1x1 point at the
+    /// dialog center). Inside the callback, manipulate the dialog bounds
+    /// (`setX`/`setY`/`setWidth`/`setHeight`) to define where the dialog should
+    /// animate to. Pass `null` (the default) to use the built-in dispose
+    /// animation.
+    ///
+    /// This callback only fires when `#isAnimateShow()` is true.
+    ///
+    /// #### Returns
+    ///
+    /// the dispose animation setup callback or null
+    public Runnable getDisposeAnimationSetup() {
+        return disposeAnimationSetup;
+    }
+
+    /// Sets a callback that positions the dialog at the animation end state,
+    /// overriding the default dispose animation. See `#getDisposeAnimationSetup()`
+    /// for details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `disposeAnimationSetup`: callback or null to use the built-in dispose animation
+    public void setDisposeAnimationSetup(Runnable disposeAnimationSetup) {
+        this.disposeAnimationSetup = disposeAnimationSetup;
     }
 
     private void installPointerOutOfBoundsListeners() {
@@ -793,13 +912,20 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
 
 
-        int availableHeight = getLayeredPane(f).getParent().getHeight();
-        if (availableHeight == 0) {
-            availableHeight = CN.getDisplayHeight();
-        }
-        int availableWidth = getLayeredPane(f).getParent().getWidth();
-        if (availableWidth == 0) {
-            availableWidth = CN.getDisplayWidth();
+        // Layered-pane parent can be momentarily detached when a previous
+        // formMode dialog was disposed (cleanupLayer removes the inner pane
+        // from its parent while the form may still be mid-animation, see
+        // #5069). Fall back to display dimensions instead of NPE'ing.
+        Container layeredParent = getLayeredPane(f).getParent();
+        int availableHeight = CN.getDisplayHeight();
+        int availableWidth = CN.getDisplayWidth();
+        if (layeredParent != null) {
+            if (layeredParent.getHeight() != 0) {
+                availableHeight = layeredParent.getHeight();
+            }
+            if (layeredParent.getWidth() != 0) {
+                availableWidth = layeredParent.getWidth();
+            }
         }
         int width = Math.min(availableWidth, prefWidth);
         setWidth(width);
@@ -982,7 +1108,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return getContentPane().getStyle();
     }
 
-    /// Repositions the component so the animation will "grow/shrink" when showing/disposing
+    /// Controls the "grow from center / shrink to center" effect used by the
+    /// show/dispose animation. When true (the default), `#show(int, int, int, int)`
+    /// collapses the dialog to a 1x1 point at the center of its target bounds and
+    /// the layered pane's animation interpolates from that point out to the full
+    /// dialog size. `#dispose()` performs the reverse, shrinking the dialog to a
+    /// point before removal. When false, the dialog keeps its full size for the
+    /// duration of the animation (only the layered pane's layout transition runs,
+    /// which is typically not visible for a dialog whose bounds do not change).
+    ///
+    /// This flag has no effect when `#isAnimateShow()` is false, since the
+    /// show/dispose animation is skipped entirely in that case.
     ///
     /// #### Returns
     ///
@@ -991,7 +1127,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return repositionAnimation;
     }
 
-    /// Repositions the component so the animation will "grow/shrink" when showing/disposing
+    /// Controls the "grow from center / shrink to center" effect used by the
+    /// show/dispose animation. When true (the default), `#show(int, int, int, int)`
+    /// collapses the dialog to a 1x1 point at the center of its target bounds and
+    /// the layered pane's animation interpolates from that point out to the full
+    /// dialog size. `#dispose()` performs the reverse, shrinking the dialog to a
+    /// point before removal. When false, the dialog keeps its full size for the
+    /// duration of the animation (only the layered pane's layout transition runs,
+    /// which is typically not visible for a dialog whose bounds do not change).
+    ///
+    /// This flag has no effect when `#isAnimateShow()` is false, since the
+    /// show/dispose animation is skipped entirely in that case.
     ///
     /// #### Parameters
     ///
@@ -1000,7 +1146,25 @@ public class InteractionDialog extends Container implements AbstractDialog {
         this.repositionAnimation = repositionAnimation;
     }
 
-    /// Whether the interaction dialog uses the form layered pane of the regular layered pane
+    /// Selects which layered pane hosts the dialog.
+    ///
+    /// When false (the default), the dialog is added to `Form#getLayeredPane()`,
+    /// which sits above the form's content pane but below the title area, side
+    /// menu, and status bar. This is the right choice for most dialogs that
+    /// interact with content pane components, and is the historical behavior of
+    /// `InteractionDialog`.
+    ///
+    /// When true, the dialog is added to `Form#getFormLayeredPane(Class, boolean)`,
+    /// which sits above the entire form including the title area and side menu.
+    /// Use this when the dialog needs to overlay or point at a component that
+    /// lives outside the content pane (for example a title bar button or an item
+    /// in the side menu). `#showPopupDialog(Component)` enables this
+    /// automatically when it detects that the target component is not inside the
+    /// form's content pane.
+    ///
+    /// In short, leave this at the default unless you observe the dialog being
+    /// clipped by the title/side menu or you are pointing at a component outside
+    /// the content pane.
     ///
     /// #### Returns
     ///
@@ -1009,7 +1173,25 @@ public class InteractionDialog extends Container implements AbstractDialog {
         return formMode;
     }
 
-    /// Whether the interaction dialog uses the form layered pane of the regular layered pane
+    /// Selects which layered pane hosts the dialog.
+    ///
+    /// When false (the default), the dialog is added to `Form#getLayeredPane()`,
+    /// which sits above the form's content pane but below the title area, side
+    /// menu, and status bar. This is the right choice for most dialogs that
+    /// interact with content pane components, and is the historical behavior of
+    /// `InteractionDialog`.
+    ///
+    /// When true, the dialog is added to `Form#getFormLayeredPane(Class, boolean)`,
+    /// which sits above the entire form including the title area and side menu.
+    /// Use this when the dialog needs to overlay or point at a component that
+    /// lives outside the content pane (for example a title bar button or an item
+    /// in the side menu). `#showPopupDialog(Component)` enables this
+    /// automatically when it detects that the target component is not inside the
+    /// form's content pane.
+    ///
+    /// In short, leave this at the default unless you observe the dialog being
+    /// clipped by the title/side menu or you are pointing at a component outside
+    /// the content pane.
     ///
     /// #### Parameters
     ///
@@ -1024,7 +1206,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // no-op for InteractionDialog. Dialog sounds are specific to Dialog/Form internals.
     }
 
-    /// {@inheritDoc}
+    /// No-op for `InteractionDialog`. Transitions are not supported; the show
+    /// and dispose animations are governed by `#setAnimateShow(boolean)` and
+    /// `#setRepositionAnimation(boolean)` and run on the host layered pane
+    /// rather than as a Form-level transition. The method is provided only to
+    /// satisfy the `AbstractDialog` contract.
     @Override
     public void setTransitions(Transition transition) {
     }

@@ -18,6 +18,7 @@ SKIP_PREFIXES = (
     "/tags/",
     "/categories/",
     "/page/",
+    "/developer-guide/",
 )
 
 WS_RE = re.compile(r"\s+")
@@ -56,6 +57,23 @@ def extract_main_content(html_doc: str) -> str:
     return clean_html_text(chunk)
 
 
+DATE_META_RE = re.compile(
+    r"<meta\s+property=[\"']article:(?:published|modified)_time[\"']\s+content=[\"']([^\"']+)[\"']",
+    re.I,
+)
+DATE_JSONLD_RE = re.compile(r"\"datePublished\"\s*:\s*\"([^\"]+)\"")
+
+
+def extract_date(html_doc: str) -> str:
+    m = DATE_META_RE.search(html_doc)
+    if m:
+        return m.group(1)
+    m = DATE_JSONLD_RE.search(html_doc)
+    if m:
+        return m.group(1)
+    return ""
+
+
 def file_to_url(path: Path) -> str:
     rel = path.relative_to(PUBLIC_DIR)
     if rel.name == "index.html":
@@ -70,7 +88,6 @@ def should_skip_url(url: str) -> bool:
 
 def build_index() -> Dict[str, object]:
     docs: List[Dict[str, str]] = []
-    idx = 0
 
     for html_file in sorted(PUBLIC_DIR.rglob("*.html")):
         if html_file.name != "index.html":
@@ -83,25 +100,45 @@ def build_index() -> Dict[str, object]:
         doc = html_file.read_text(encoding="utf-8", errors="ignore")
         title = extract_title(doc)
         content = extract_main_content(doc)
+        date = extract_date(doc)
 
         if not content or len(content) < 80:
             continue
 
         docs.append(
             {
-                "id": str(idx),
                 "title": title,
                 "url": url,
+                "date": date,
                 "content": content,
             }
         )
-        idx += 1
+
+    # Newest first; undated pages sort to the end. Tie-break on URL for stable output.
+    docs.sort(key=lambda d: (
+        1 if not d["date"] else 0,
+        -_date_sort_key(d["date"]),
+        d["url"],
+    ))
+
+    for i, d in enumerate(docs):
+        d["id"] = str(i)
 
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "count": len(docs),
         "docs": docs,
     }
+
+
+def _date_sort_key(value: str) -> float:
+    """Return a numeric sort key for an ISO-8601 date string; 0 if unparseable."""
+    try:
+        # Python 3.11+ parses trailing "Z" natively; older parses "+00:00" form.
+        normalized = value.replace("Z", "+00:00")
+        return datetime.fromisoformat(normalized).timestamp()
+    except ValueError:
+        return 0.0
 
 
 def main() -> int:

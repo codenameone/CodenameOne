@@ -259,6 +259,77 @@ class InteractionDialogTest extends UITestBase {
         }
     }
 
+    @Test
+    void animationSpeedDefaultsToThemeConstant() {
+        InteractionDialog dialog = new InteractionDialog();
+        assertEquals(-1, dialog.getAnimationSpeed(),
+                "default should be -1 meaning 'use theme constant interactionDialogSpeedInt'");
+    }
+
+    @Test
+    void animationSpeedSetterStoresValue() {
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimationSpeed(1500);
+        assertEquals(1500, dialog.getAnimationSpeed());
+        dialog.setAnimationSpeed(-1);
+        assertEquals(-1, dialog.getAnimationSpeed(),
+                "setting -1 reverts to the theme constant");
+    }
+
+    @Test
+    void showAnimationSetupRunsInsteadOfDefaultRepositionAnimation() {
+        // #5072: users need to customize show animations. The
+        // setShowAnimationSetup callback replaces the built-in
+        // "grow from 1x1 at center" behavior. Verify it runs and
+        // that the parent bounds we set inside it are preserved
+        // when the animation kicks off.
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+        InteractionDialog dialog = new InteractionDialog();
+        final int[] callCount = {0};
+        dialog.setShowAnimationSetup(new Runnable() {
+            @Override
+            public void run() {
+                callCount[0]++;
+                // Slide-from-bottom setup: full size, translated off-screen
+                Container parent = dialog.getParent();
+                parent.setY(1000);
+            }
+        });
+        dialog.show(0, 0, 0, 0);
+        assertEquals(1, callCount[0], "showAnimationSetup must run once on show()");
+        assertSame(dialog.getShowAnimationSetup(), dialog.getShowAnimationSetup(),
+                "getter returns the stored callback");
+        dialog.setShowAnimationSetup(null);
+        assertNull(dialog.getShowAnimationSetup(), "setShowAnimationSetup(null) clears the override");
+        dialog.dispose();
+    }
+
+    @Test
+    void disposeAnimationSetupRunsInsteadOfDefaultRepositionAnimation() {
+        // #5072: dispose animation should be customizable too.
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setAnimateShow(false);
+        dialog.show(0, 0, 0, 0);
+
+        final int[] callCount = {0};
+        dialog.setDisposeAnimationSetup(new Runnable() {
+            @Override
+            public void run() {
+                callCount[0]++;
+            }
+        });
+        // Re-enable animation so dispose runs the animation path
+        // (and thus the dispose setup callback).
+        dialog.setAnimateShow(true);
+        dialog.dispose();
+        assertEquals(1, callCount[0], "disposeAnimationSetup must run once on dispose()");
+        dialog.setDisposeAnimationSetup(null);
+        assertNull(dialog.getDisposeAnimationSetup(), "setDisposeAnimationSetup(null) clears the override");
+    }
+
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);

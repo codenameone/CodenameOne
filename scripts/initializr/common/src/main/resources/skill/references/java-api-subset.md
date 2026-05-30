@@ -74,6 +74,7 @@ When in doubt, list the jar (top of this file) and search the jar's class listin
 | `java.util.logging.*` | **Not supported.** | `com.codename1.io.Log` (`Log.p(message)`, `Log.e(throwable)`, `Log.sendLog()` to upload). |
 | `java.util.regex` | **Not supported.** | For simple matching use `String.matches(...)` / `String.split(...)` / `String.replace(...)` — these are present and use a simplified pattern syntax under the hood. For real PCRE-style regex, look for a regex cn1lib or write the matcher by hand. |
 | `java.lang.invoke.*`, `java.lang.module.*` | **Forbidden.** | Don't generate code at runtime. |
+| `java.util.concurrent.atomic.AtomicLongArray`, `AtomicIntegerArray`, `AtomicReferenceArray`, `LongAdder`, `LongAccumulator` | **Forbidden** in the runtime subset. `AtomicReference`, `AtomicInteger`, `AtomicLong`, `AtomicBoolean` are all supported. | For atomic arrays, hand-roll a `synchronized` wrapper around a regular `int[]` / `long[]`. For high-throughput counters where `LongAdder`'s contention-splitting matters, use `synchronized` + a long field; the contention pattern that motivates `LongAdder` is rarely a bottleneck on mobile. |
 
 ## Resource files are a flat namespace
 
@@ -329,6 +330,93 @@ Rest.post("https://api.example.com/items")
 
 Use `Rest` for ~95% of REST API work. The `fetchAs*` methods marshal into `byte[]`, `String`, `Map`, `JSONArray`, or `PropertyBusinessObject` and always invoke the callback on the EDT.
 
+For **top-level JSON arrays** (`[{...}, {...}]`) use `fetchAsJsonList(OnComplete<Response<List>>)` -- it parses through the same `JSONParser` (which internally wraps top-level arrays under a synthetic `"root"` key) and hands you the unwrapped `List` directly.
+
+### Typed responses — `fetchAsMapped` / `fetchAsMappedList`
+
+Once a DTO is `@Mapped`-annotated (see *Build-time POJO binding* below), use `fetchAsMapped(Class<T>, callback)` instead of `fetchAsJsonMap` — the callback receives the typed object directly:
+
+```java
+@Mapped public class Pet {
+    @JsonProperty("id")        public long id;
+    @JsonProperty("name")      public String name;
+    @JsonProperty("photoUrls") public List<String> photoUrls;
+}
+
+Rest.get(baseUrl + "/pet/" + petId)
+    .header("Authorization", "Bearer " + token)
+    .acceptJson()
+    .fetchAsMapped(Pet.class, response -> {
+        Pet pet = response.getResponseData();   // already typed
+        renderPet(pet);
+    });
+
+// List variant for endpoints returning a top-level JSON array of DTOs:
+Rest.get(baseUrl + "/albums")
+    .acceptJson()
+    .fetchAsMappedList(Album.class, response -> {
+        List<Album> albums = response.getResponseData();
+    });
+```
+
+If no `Mapper<T>` is registered for `Class<T>` (typical cause: the class isn't `@Mapped`, or the `process-annotations` Mojo didn't run), the callback completes with `null` data and a normal response code — inspect `response.getResponseCode()` to differentiate "server error" from "no mapper registered".
+
+For **bulk REST clients** (an existing OpenAPI 3.x spec, dozens of endpoints), use the `cn1:generate-openapi` Maven goal — it emits `@Mapped` records / classes per schema and one `@RestClient`-annotated interface per OpenAPI tag into `common/src/main/java`. The annotation processors run on the next compile and write the wire impls into generated-sources, so the implementation isn't part of the project source. Call sites instantiate via the generated `<Tag>Api.of(baseUrl)` static factory.
+
+### Writing JSON — `JSONWriter`
+
+For ad-hoc request bodies use `com.codename1.io.JSONWriter`. Two access modes:
+
+```java
+// One-shot: pass any Map / List / String / Number / Boolean / null tree
+String json = JSONWriter.toJson(Map.of("name", "ada", "values", List.of(1, 2, 3)));
+
+// Fluent builder for tiny request bodies (faster to read than a Map literal):
+String body = JSONWriter.object()
+        .put("email", email)
+        .put("password", password)
+        .toJson();
+
+// Streaming variants for large outputs:
+JSONWriter.toJson(value, writer);
+JSONWriter.toJson(value, outputStream);   // UTF-8
+```
+
+For *typed* DTO serialization (POJOs annotated with `@Mapped`), use `com.codename1.mapping.Mappers#toJson` from the build-time binding framework instead. `JSONWriter` is for untyped maps/lists.
+
+### Authenticated image URLs — `URLImage.RequestDecorator`
+
+`URLImage.createToStorage(placeholder, key, url, adapter)` is the standard CN1 idiom for lazy network-loaded images cached to `Storage`. When the URL is behind a bearer token (or any other custom header), use the decorator hook:
+
+```java
+// Global: one line at app boot, applies to every URLImage from then on
+URLImage.setDefaultBearerToken(Preferences.get("auth.token", null));
+
+// Or the explicit form:
+URLImage.setDefaultRequestDecorator(req ->
+    req.addRequestHeader("Authorization", "Bearer " + token));
+
+// Per-image: pass a decorator at construction time. Runs *after* the
+// global default so it can override.
+URLImage.createToStorage(placeholder, cacheKey, url,
+        URLImage.RESIZE_SCALE_TO_FILL,
+        req -> req.addRequestHeader("X-API-Version", "2"));
+```
+
+For one-off image fetches without `URLImage`'s caching (e.g. preloading neighbours in an asset viewer where you stream bytes straight into `Storage`), drop to a raw `ConnectionRequest` with `readResponse(InputStream)` overridden:
+
+```java
+ConnectionRequest req = new ConnectionRequest(url) {
+    @Override protected void readResponse(InputStream in) throws IOException {
+        try (OutputStream os = Storage.getInstance().createOutputStream(cacheKey)) {
+            Util.copy(in, os);
+        }
+    }
+};
+req.addRequestHeader("Authorization", "Bearer " + token);
+NetworkManager.getInstance().addToQueue(req);
+```
+
 ### What about `HttpClient` / `URLConnection` / `OkHttp`?
 
 `java.net.http.HttpClient` and standard `java.net.URLConnection` aren't in the subset. OkHttp pulls in Android-only deps. **Use `ConnectionRequest` or `Rest` instead.**
@@ -346,6 +434,32 @@ try (InputStream is = conn.getInputStream()) {
 ```
 
 This is a portability shim, not a feature-complete replacement. Prefer `Rest` for new code.
+
+### OAuth 2.0 / OpenID Connect — `OidcClient`
+
+For modern sign-in flows (Google, Apple, Microsoft Entra, Auth0, Okta, Keycloak — anything that publishes `.well-known/openid-configuration`), use `com.codename1.io.oidc.OidcClient`. It drives the **system browser** — `ASWebAuthenticationSession` on iOS, Custom Tabs on Android, the user's default browser on desktop/web — which is the only flow Apple/Google/Microsoft/Facebook still accept. PKCE S256 is mandatory, refresh-token rotation is first-class, ID-token claims are surfaced via `getClaim(String)`, and tokens persist through a pluggable `TokenStore`.
+
+```java
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+
+OidcClient.discover("https://accounts.google.com").ready(client -> {
+    client.setClientId("YOUR_CLIENT_ID")
+          .setRedirectUri("com.example.app:/oauth2redirect")
+          .setScopes("openid", "email", "profile");
+    client.authorize().ready((OidcTokens tokens) -> {
+        String access = tokens.getAccessToken();
+        String email  = (String) tokens.getClaim("email");
+        Preferences.set("auth.token", access);
+    });
+});
+```
+
+The pre-existing `com.codename1.io.Oauth2` and `com.codename1.social.Login` classes are kept for source compatibility but **deprecated** — they use an in-app `BrowserComponent` WebView which the major IdPs now reject. New code should use `OidcClient`.
+
+Companion classes in `com.codename1.io.oidc`: `OidcConfiguration` (endpoints + supported scopes), `OidcTokens` (access / id / refresh tokens + claim accessors), `PkceChallenge`, `SystemBrowser` (the per-platform browser driver), `TokenStore` (defaults to `Preferences`), `OidcException`.
+
+For raw HTTP server-push (Server-Sent Events / long-poll), use `ConnectionRequest` with `readResponse(InputStream)` overridden to consume the stream incrementally — the same pattern as the authenticated-image loader above.
 
 ### TLS, redirects, gzip
 

@@ -163,7 +163,9 @@ public class DateFormatSymbols implements Cloneable {
 	public String[] getShortWeekdays() {
 		synchronized (this) {
 			if (shortWeekdays == null) {
-				shortWeekdays = createShortforms(getWeekdays(), L10N_WEEKDAY_SHORTNAME);
+				// Pass the English WEEKDAYS so resource-bundle lookups use the
+				// documented WEEKDAY_SHORTNAME_<EnglishDay> key. See #1243.
+				shortWeekdays = createShortforms(WEEKDAYS, L10N_WEEKDAY_SHORTNAME);
 			}
 		}
 		return shortWeekdays;

@@ -1570,7 +1570,7 @@ public class UIManager {
     /// styles, but components already shown on a form continue to render
     /// with the Font instances they captured before the call. To apply the
     /// new sizes to a live form, invoke `refreshTheme()` on it (typically
-    /// `Form.getCurrentForm().refreshTheme()`) after calling this method.
+    /// `CN.getCurrentForm().refreshTheme()`) after calling this method.
     ///
     /// #### Parameters
     ///

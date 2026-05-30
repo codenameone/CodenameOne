@@ -22,10 +22,10 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 
 - `references/build-and-run.md` — Local vs cloud builds, JDK matrix, Maven goals, `codenameone_settings.properties`, running the simulator, building for iOS/Android/Web, automated (Enterprise) cloud builds in CI.
 - `references/build-hints.md` — Curated index of `codename1.arg.*` build hints (iOS, Android, push, web).
-- `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
+- `references/java-api-subset.md` — How to inspect the supported Java API subset, IO (`Storage`, `FileSystemStorage`), networking (`ConnectionRequest`, `Rest`), OAuth/OpenID Connect (`OidcClient`), WebSockets (cn1lib), concurrency, dates, SQLite. **Read this whenever the compliance check fails or when you reach for a `java.*` API.**
 - `references/ui-components.md` — Form, Toolbar, Container layouts (Border/Box/Flow/Grid/Layered), common components, navigation, dialogs.
 - `references/binding-and-validation.md` — `@Bindable` / `@Bind` annotation binding **and** annotation-driven validation (`@Required`, `@Length`, `@Regex`, `@Email`, `@Url`, `@Numeric`, `@ExistIn`, `@Validate`). Read this whenever you see one of those annotations, wire a model to a form, or need to gate a submit button on validation.
-- `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants.
+- `references/css.md` — CSS capabilities and (important) **limitations**. Selectors, supported properties, 9-patch borders, theme constants, and the build-time vector transcoder that compiles SVG and Lottie / Bodymovin JSON referenced via `url(...)` into `GeneratedSVGImage` subclasses.
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
 - `references/html-css-cheatsheet.md` — Converting common HTML/CSS snippets to CN1 components + CSS.
 - `references/android-to-cn1.md` — Porting Android (XML + Kotlin/Java) screens to Codename One.

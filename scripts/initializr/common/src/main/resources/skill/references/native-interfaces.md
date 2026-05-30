@@ -32,7 +32,8 @@ public interface GpsBridge extends NativeInterface {
 Constraints on the interface:
 
 - Must extend `com.codename1.system.NativeInterface`.
-- All method parameters and return values must be **primitives**, `String`, `byte[]`, or `PeerComponent` (for native UI views). No arbitrary Java objects, no collections, no `Object`. This is because the bridge must marshal across language boundaries.
+- All method parameters and return values must be one of: **primitives** (`int`, `long`, `double`, `float`, `boolean`, `char`, `byte`, `short`), `String`, **primitive arrays** (`byte[]`, `int[]`, `long[]`, `double[]`, `float[]`, `boolean[]`, `char[]`, `short[]`), `String[]`, or `PeerComponent` (for native UI views). No arbitrary Java objects, no collections, no `Object`. This is because the bridge must marshal across language boundaries.
+- **iOS array-marshalling caveat**: the iOS bridge maps **every** Java array (regardless of element type) to `NSData*` on the Objective-C side. That means an `int[]` parameter arrives as a byte buffer the native code must read by hand; a `String[]` arrives serialized as bytes the native code must deserialize itself. Plain `byte[]` is the lossless case; `int[]` / `long[]` / `double[]` are usable for fixed-format payloads (typically by treating them as little-endian byte streams); `String[]` is best avoided on iOS until the per-component-type marshalling lands. Per-platform notes for Android (JNI-style direct arrays) and JavaScript (JS arrays) are different — those marshal element-wise as you'd expect.
 - Callbacks from native code back to Java go through a *separate* mechanism — see *Callbacks* below.
 
 `NativeInterface` itself exposes a built-in `isSupported()` method (every native interface inherits it). Implementations should return `true` if the platform can serve the calls, `false` otherwise — callers branch on `bridge.isSupported()` before invoking real methods.

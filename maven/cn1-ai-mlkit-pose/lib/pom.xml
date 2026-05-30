@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-mlkit-pose-lib</artifactId>
     <packaging>pom</packaging>
+    <name>Codename One AI: cn1-ai-mlkit-pose-lib</name>
 
     <dependencies>
         <dependency>

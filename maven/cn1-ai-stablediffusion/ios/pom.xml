@@ -12,6 +12,7 @@
 
     <artifactId>cn1-ai-stablediffusion-ios</artifactId>
     <packaging>jar</packaging>
+    <name>Codename One AI: cn1-ai-stablediffusion-ios</name>
 
     <build>
         <sourceDirectory>src/main/dummy</sourceDirectory>

@@ -1,0 +1,38 @@
+{{/*
+  Mermaid diagram shortcode.
+
+  Usage:
+    {{< mermaid >}}
+    flowchart LR
+        A[IDE] -->|JDWP| B[CN1 Debug Proxy]
+        B -->|wire protocol| C[iOS app]
+    {{< /mermaid >}}
+
+  The loader is inlined here (rather than gated from a footer partial)
+  because the PaperMod footer is rendered with partialCached, which would
+  cache a single result across every page sharing the same layout / kind.
+  Multiple shortcodes on one page emit multiple loader scripts; the
+  __cn1MermaidLoaded guard makes initialisation idempotent.
+*/}}
+<div class="cn1-mermaid mermaid">
+{{- .Inner | safeHTML -}}
+</div>
+<script>
+(function () {
+  if (window.__cn1MermaidLoaded) return;
+  window.__cn1MermaidLoaded = true;
+  var s = document.createElement("script");
+  s.type = "module";
+  s.textContent =
+    'import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";' +
+    'var prefersDark = document.body.classList.contains("dark")' +
+    ' || window.matchMedia("(prefers-color-scheme: dark)").matches;' +
+    'mermaid.initialize({' +
+    '  startOnLoad: true,' +
+    '  theme: prefersDark ? "dark" : "default",' +
+    '  securityLevel: "loose",' +
+    '  fontFamily: "Poppins, system-ui, sans-serif"' +
+    '});';
+  document.head.appendChild(s);
+})();
+</script>

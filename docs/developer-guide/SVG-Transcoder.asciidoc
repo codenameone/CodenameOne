@@ -1,10 +1,19 @@
-= Build-Time SVG Images
+= Build-Time Vector & Animation Images
 :source-highlighter: highlight.js
 
-The build-time SVG transcoder lets you author UI icons and
-illustrations as SVG and have them rendered as native Codename One
-`Image` instances on every platform (iOS, Android, JavaSE simulator,
-JavaScript) without shipping a runtime SVG parser.
+The build-time vector transcoder lets you author UI icons and
+illustrations as SVG or Lottie / Bodymovin JSON and have them rendered
+as native Codename One `Image` instances on every platform (iOS,
+Android, JavaSE simulator, JavaScript) without shipping a runtime SVG
+or Lottie parser.
+
+Both formats share the same pipeline: each source file is lowered into
+the SVG transcoder's model, the same `JavaCodeGenerator` emits a
+`com.codename1.ui.GeneratedSVGImage` subclass, and the same
+`SVGRegistry` makes the result available via
+`Resources.getImage("name.<ext>")`. The rest of this guide therefore
+covers SVG in detail; Lottie gets its own section at the end that only
+calls out the parts that differ.
 
 == Motivation
 
@@ -202,15 +211,90 @@ with `Timeline`, you must register the image with a `Form`'s animation
 manager (or set it as a `Component.setIcon` with `isAnimation()` true)
 for the repaint loop to tick the SMIL clock.
 
+== Lottie animations
+
+Lottie / Bodymovin JSON files are picked up by the same `transcode-svg`
+goal. Drop them next to your CSS (or under `src/main/lottie/`) and the
+Lottie parser lowers each one into the SVG model -- so everything in
+the previous sections (sizing keys, registry, theme `url(...)` lookup,
+`Resources.getImage(...)`, the per-port wiring) applies unchanged:
+
+[source]
+----
+src/main/css/
+  theme.css
+  spinner.json     <-- Lottie/Bodymovin export
+----
+
+[source,css]
+----
+SpinnerStyle {
+    background: url(spinner.json);
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
+    bg-type: image_scaled_fit;
+}
+----
+
+[source,java]
+----
+Image spin = Resources.getGlobalResources().getImage("spinner.json");
+// or by stem, like a multi-image:
+Image spin2 = Resources.getGlobalResources().getImage("spinner");
+----
+
+`.lottie` (dotLottie ZIP) files are accepted alongside `.json` for
+forward compatibility, but the archive container isn't yet extracted
+-- export your animation as a plain Bodymovin JSON for now.
+
+=== Lottie feature coverage
+
+The parser targets the subset of Bodymovin a "spinner" or "pulse"
+animation typically uses. Anything outside the subset is dropped
+without warning so a file with mixed coverage still produces a renderable
+class:
+
+|===
+| Feature | Status
+
+| Shape layers (`ty:4`) with grouped `rc` / `el` / `sh` primitives | Full
+| Solid color layers (`ty:1`) | Rendered as a filled rect
+| Shape fills (`fl`) and strokes (`st`) -- solid colors | Full
+| Layer transform (anchor, position, scale, rotation, opacity) -- static | Full
+| Animated rotation / position / scale -- 2 keyframes | Full (loops indefinitely over the comp duration)
+| Animated colors / opacity | Collapsed to the first keyframe
+| Bezier easing on keyframes | Linear interpolation (easing curves ignored)
+| Multi-keyframe properties (3+) | Collapsed to first vs. last (matches the SVG codegen's `from`/`to` model)
+| Trim path (`tm`), repeater (`rp`), merge (`mm`), rounded corners (`rd`) | Ignored
+| Gradient fills (`gf`) / gradient strokes (`gs`) | Ignored
+| Text layers, image layers, precomp, mattes, expressions | Ignored
+|===
+
+For animations that need higher fidelity than the subset above, export
+the relevant frame as an SVG and use the SVG transcoder path directly
+-- the runtime classes are identical.
+
 == Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::
-  The transcoder didn't run, or it ran with zero SVGs. Confirm the SVG
-  lives under `src/main/css/` (or `src/main/svg/`) and that the
-  `transcode-svg` goal is bound in the project POM. For arbitrary
-  Resources bundles loaded outside the global slot, call
+  The transcoder didn't run, or it ran with zero source files. Confirm
+  the asset lives under `src/main/css/` (or `src/main/svg/` /
+  `src/main/lottie/` for the dedicated dirs) and that the
+  `transcode-svg` goal is bound in the project POM. The same goal
+  handles `.svg`, `.json`, and `.lottie` -- one goal, both formats.
+  For arbitrary Resources bundles loaded outside the global slot, call
   `com.codename1.ui.util.Resources.registerGeneratedImage(name, image)`
-  yourself with a fresh `new com.codename1.generated.svg.YourSvg(widthMm, heightMm)`.
+  yourself with a fresh
+  `new com.codename1.generated.svg.YourAsset(widthMm, heightMm)`.
+
+Lottie animation looks frozen or starts halfway through::
+  The Lottie parser collapses each animated property's keyframe array
+  to its first and last value, then loops indefinitely over the
+  composition's duration. Animations with three or more keyframes on
+  the same property therefore play as a straight first-to-last
+  interpolation. Re-export the comp split into two-keyframe segments
+  or use an SVG/SMIL export for that animation if you need exact
+  keyframe playback.
 
 SVG looks the wrong size::
   Switch the rule to `cn1-svg-width` / `cn1-svg-height` in millimeters.

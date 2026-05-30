@@ -17,6 +17,10 @@
 
 package java.util;
 
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 
 /// A `Map` is a data structure consisting of a set of keys and values
 /// in which each key is mapped to a single value.  The class of the objects
@@ -290,4 +294,83 @@ public interface Map<K,V> {
     ///
     /// a collection of the values contained in this map.
     public Collection<V> values();
+
+    // ---- Java 8 default methods. ----
+    //
+    // Stubbed in the CLDC11 subset; the actual implementations come
+    // from the platform's JDK at runtime (Android JDK on Android,
+    // vm/JavaAPI on ParparVM, the host JDK in the JavaSE simulator).
+
+    /// Returns the value to which the specified key is mapped, or
+    /// `defaultValue` if this map contains no mapping for the key.
+    default V getOrDefault(Object key, V defaultValue) {
+        return null;
+    }
+
+    /// If the specified key is not already associated with a value (or is
+    /// mapped to `null`) associates it with the given value and returns
+    /// `null`, else returns the current value.
+    default V putIfAbsent(K key, V value) {
+        return null;
+    }
+
+    /// Removes the entry for the specified key only if it is currently
+    /// mapped to the specified value.
+    default boolean remove(Object key, Object value) {
+        return false;
+    }
+
+    /// Replaces the entry for the specified key only if currently mapped
+    /// to the specified value.
+    default boolean replace(K key, V oldValue, V newValue) {
+        return false;
+    }
+
+    /// Replaces the entry for the specified key only if it is currently
+    /// mapped to some value.
+    default V replace(K key, V value) {
+        return null;
+    }
+
+    /// Performs the given action for each entry in this map.
+    default void forEach(BiConsumer<? super K, ? super V> action) {
+    }
+
+    /// Replaces each entry's value with the result of invoking the given
+    /// function on that entry.
+    default void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+    }
+
+    /// If the specified key is not already associated with a value (or
+    /// is mapped to `null`), attempts to compute its value using the
+    /// given mapping function and enters it into this map unless
+    /// `null`.
+    default V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
+        return null;
+    }
+
+    /// If the value for the specified key is present and non-null,
+    /// attempts to compute a new mapping given the key and its current
+    /// mapped value.
+    default V computeIfPresent(K key,
+            BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        return null;
+    }
+
+    /// Attempts to compute a mapping for the specified key and its
+    /// current mapped value (or `null` if there is no current mapping).
+    default V compute(K key,
+            BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+        return null;
+    }
+
+    /// If the specified key is not already associated with a value or
+    /// is associated with `null`, associates it with the given non-null
+    /// value. Otherwise, replaces the associated value with the result
+    /// of the given remapping function, or removes if the result is
+    /// `null`.
+    default V merge(K key, V value,
+            BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+        return null;
+    }
 }
