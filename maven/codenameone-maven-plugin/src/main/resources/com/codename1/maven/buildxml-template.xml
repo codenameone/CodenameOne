@@ -62,7 +62,15 @@ This the Ant build script used by the CN1BuildMojo for sending to the build serv
     <!-- Mac native: builds a native macOS app on the cloud build server. Routes
          through the same iOS pipeline as ios-device with the macNative.enabled
          build hint set, so the server-side IPhoneBuilder emits a Mac Catalyst
-         project alongside the iOS slice. Local equivalent: mac-source. -->
+         project alongside the iOS slice. Local equivalent: mac-source.
+
+         Apple requires distinct certificates / provisioning profiles for Mac
+         distribution (Mac App Distribution / Developer ID Application vs the
+         iOS iPhone Distribution certificate), so the cert / provision / appid
+         settings come from a separate codename1.mac.* family and are NOT
+         reused from codename1.ios.*. The Apple Developer Team ID itself can
+         stay shared (single account) and is read via macNative.teamId which
+         falls back to ios.release.teamId. -->
     <target name="mac-os-x-native" depends="">
         <property name="mac.targetType" value="iphone"/>
         <codeNameOne
@@ -75,10 +83,10 @@ This the Ant build script used by the CN1BuildMojo for sending to the build serv
                 vendor="${codename1.vendor}"
                 subtitle="${codename1.secondaryTitle}"
                 targetType="${mac.targetType}"
-                certificate="${codename1.ios.release.certificate}"
-                certPassword="${codename1.ios.release.certificatePassword}"
-                provisioningProfile="${codename1.ios.release.provision}"
-                appid="${codename1.ios.appid}"
+                certificate="${codename1.mac.certificate}"
+                certPassword="${codename1.mac.certificatePassword}"
+                provisioningProfile="${codename1.mac.provision}"
+                appid="${codename1.mac.appid}"
                 automated="${automated}"
         />
     </target>
