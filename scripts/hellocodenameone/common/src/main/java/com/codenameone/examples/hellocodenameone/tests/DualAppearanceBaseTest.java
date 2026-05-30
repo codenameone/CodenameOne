@@ -3,6 +3,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.components.SpanLabel;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -118,26 +119,92 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     /// finish() flips this gate so the natural done() chain works.
     private volatile boolean bothPhasesComplete;
 
+    /// Wall-clock fallback ceiling per appearance phase, in ms. The
+    /// emit chain has many EDT links (onShowCompleted →
+    /// registerReadyCallback's 1500ms UITimer → triple
+    /// callSerially → emitCurrentFormScreenshot →
+    /// Display.screenshot → chunked emit → onComplete) and any
+    /// uncaught throw in the middle silently breaks the chain — the
+    /// EDT error handler logs it, but the test's done() never fires
+    /// and the suite hangs on the SUITE:FINISHED wait. JS-port
+    /// runtime errors that bypass Java's catch (e.g. the
+    /// host-bridge ``NUMBER_FOR_OBJECT recovery=substituted-null''
+    /// path that lands an NPE inside the screenshot callback) hit
+    /// this pattern routinely under the canvas-accumulation tail.
+    /// The fallback schedules a forced advance after this many
+    /// milliseconds; if the natural chain fires first the fallback
+    /// no-ops (idempotent via the per-phase guard flag below).
+    private static final int PHASE_FALLBACK_TIMEOUT_MS = 8000;
+
     @Override
     public boolean runTest() {
-        installModernThemeIfRequested();
-        runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
-        return true;
+        // Wrap the whole runTest body in a Throwable catch. The lambdaBridge
+        // in port.js catches a synchronous throw out of runTest and routes
+        // it through ``fail(message)``, which calls done(). Without the
+        // !isFailed() escape in our done() override below, that done() would
+        // be swallowed by the bothPhasesComplete gate and the suite would
+        // sit on the test for the full SUITE:FINISHED budget waiting for a
+        // completion that can never come. Calling fail() explicitly here
+        // covers the case where installModernThemeIfRequested or
+        // runAppearance throws before the test even reaches the light
+        // emit's completion runnable.
+        try {
+            installModernThemeIfRequested();
+            runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
+            return true;
+        } catch (Throwable t) {
+            System.out.println("CN1SS:ERR:test=" + baseName() + " dual_appearance_runTest_failed=" + t);
+            t.printStackTrace();
+            fail(String.valueOf(t));
+            return false;
+        }
     }
 
     @Override
     protected synchronized void done() {
-        if (!bothPhasesComplete) {
+        if (!bothPhasesComplete && !isFailed()) {
             // Premature done() call (e.g. JS-port force-done after the
             // light emit's completion runnable returned). Stay
             // not-done so the test runner keeps polling until the
             // dark phase finishes and finish() flips the gate below.
+            //
+            // The isFailed() escape is required so that a fail() call
+            // (e.g. from runTest's Throwable catch, or the port.js
+            // lambdaBridge's catch routing a runtime throw through
+            // BaseTest.fail) can actually finalize the test. Without
+            // it, fail() -> done() -> swallow, and the suite hangs
+            // waiting for the dark phase that will never run.
             return;
         }
         super.done();
     }
 
-    private void runAppearance(boolean dark, final String suffix, final Runnable next) {
+    private void runAppearance(boolean dark, final String suffix, final Runnable rawNext) {
+        // Idempotent wrapper + wall-clock fallback. The natural emit chain
+        // calls rawNext once when the screenshot completes; the fallback
+        // schedules a forced call after PHASE_FALLBACK_TIMEOUT_MS so a
+        // silently-broken chain doesn't hang the test. Whichever fires
+        // first wins; the other is swallowed by the ran[] guard.
+        final boolean[] ran = new boolean[]{false};
+        final Runnable next = () -> {
+            synchronized (ran) {
+                if (ran[0]) {
+                    return;
+                }
+                ran[0] = true;
+            }
+            rawNext.run();
+        };
+        CN.setTimeout(PHASE_FALLBACK_TIMEOUT_MS, () -> {
+            synchronized (ran) {
+                if (ran[0]) {
+                    return;
+                }
+            }
+            logDiag("CN1SS:WARN:test=" + baseName() + " dual_appearance_phase=" + suffix
+                    + " emit_chain_stalled_force_advance=" + PHASE_FALLBACK_TIMEOUT_MS + "ms");
+            next.run();
+        });
         Display.getInstance().setDarkMode(dark);
         // UIManager caches resolved Style objects per UIID; without this call
         // the next lookup returns the Style that was resolved while the other

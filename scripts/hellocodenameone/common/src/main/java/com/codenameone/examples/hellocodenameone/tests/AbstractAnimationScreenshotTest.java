@@ -58,7 +58,25 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         } catch (Throwable t) {
             System.out.println("CN1SS:ERR:test=" + getImageName() + " animation_grid_failed=" + t);
             t.printStackTrace();
-            grid = Image.createImage(width, height, 0xff202020);
+            // The placeholder createImage routes through the same
+            // HTML5Implementation.createMutableImage path that just failed,
+            // so it can throw the identical createCanvas NPE (the JS port's
+            // canvas-staleness bug under accumulated suite pressure). When
+            // it does, the original catch path swallows it via finally and
+            // we never reach emitImage, leaving done() uncalled and the
+            // suite to time out on the SUITE:FINISHED wait. Treat a failed
+            // placeholder as ``no image'' and pass null - emitImage already
+            // handles that by emitting a placeholder marker via
+            // emitPlaceholderScreenshot and still calling the onComplete
+            // runnable.
+            try {
+                grid = Image.createImage(width, height, 0xff202020);
+            } catch (Throwable t2) {
+                System.out.println("CN1SS:ERR:test=" + getImageName()
+                        + " animation_grid_placeholder_failed=" + t2);
+                t2.printStackTrace();
+                grid = null;
+            }
         } finally {
             AnimationTime.reset();
         }
