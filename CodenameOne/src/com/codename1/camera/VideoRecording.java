@@ -35,14 +35,14 @@ import com.codename1.util.AsyncResource;
 public final class VideoRecording {
     private final CameraImpl impl;
     private final String requestedPath;
-    private final long startNanos;
+    private final long startMillis;
     private volatile boolean stopped;
 
     /// Used by platform implementations.
     public VideoRecording(CameraImpl impl, String requestedPath) {
         this.impl = impl;
         this.requestedPath = requestedPath;
-        this.startNanos = System.nanoTime();
+        this.startMillis = System.currentTimeMillis();
     }
 
     /// Stop recording without waiting for the file to be finalized.
@@ -66,7 +66,7 @@ public final class VideoRecording {
     }
 
     public long getElapsedMillis() {
-        return (System.nanoTime() - startNanos) / 1000000L;
+        return System.currentTimeMillis() - startMillis;
     }
 
     public boolean isRecording() { return !stopped; }
