@@ -401,6 +401,52 @@ public final class Graphics {
         return impl.getClipHeight(nativeGraphics);
     }
 
+    /// Returns true if the given rectangle (in the current Graphics coordinate
+    /// space, with the active translation applied) intersects the current clip
+    /// rectangle, i.e. anything drawn into it would be at least partially
+    /// visible.
+    ///
+    /// Use this to skip work for off-screen draws — typical case is a zoomed
+    /// canvas where most images fall outside the visible window and should
+    /// not be decoded or scaled.
+    ///
+    /// ```java
+    /// if (g.isVisible(x, y, w, h)) {
+    ///     g.drawImage(image, x, y, w, h);
+    /// }
+    /// ```
+    ///
+    /// Note: shape-clipped graphics ([#setClip(Shape)]) and arbitrary
+    /// affine transforms fall back to the bounding rectangle of the clip;
+    /// this matches the precision actually used by the platform draw calls.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: left edge of the rectangle
+    ///
+    /// - `y`: top edge of the rectangle
+    ///
+    /// - `w`: width of the rectangle
+    ///
+    /// - `h`: height of the rectangle
+    ///
+    /// #### Returns
+    ///
+    /// true if the rectangle intersects the current clip
+    public boolean isVisible(int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        int cx = getClipX();
+        int cy = getClipY();
+        int cw = getClipWidth();
+        int ch = getClipHeight();
+        if (cw <= 0 || ch <= 0) {
+            return false;
+        }
+        return x < cx + cw && y < cy + ch && x + w > cx && y + h > cy;
+    }
+
     /// Clips the given rectangle by intersecting with the current clipping region, this
     /// method can thus only shrink the clipping region and never increase it.
     ///

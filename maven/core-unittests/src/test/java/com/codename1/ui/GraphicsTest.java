@@ -97,6 +97,41 @@ class GraphicsTest extends UITestBase {
     }
 
     @FormTest
+    void testIsVisibleReturnsTrueWhenRectInsideClip() {
+        implementation.setClip(nativeGraphics, 10, 20, 100, 100);
+        assertTrue(graphics.isVisible(15, 25, 5, 5));
+    }
+
+    @FormTest
+    void testIsVisibleReturnsTrueWhenRectIntersectsClip() {
+        implementation.setClip(nativeGraphics, 10, 20, 100, 100);
+        assertTrue(graphics.isVisible(5, 18, 20, 20));
+    }
+
+    @FormTest
+    void testIsVisibleReturnsFalseWhenRectOutsideClip() {
+        implementation.setClip(nativeGraphics, 10, 20, 100, 100);
+        assertFalse(graphics.isVisible(200, 200, 10, 10));
+        assertFalse(graphics.isVisible(0, 0, 5, 10));
+    }
+
+    @FormTest
+    void testIsVisibleAccountsForTranslation() {
+        implementation.setClip(nativeGraphics, 50, 50, 100, 100);
+        graphics.translate(50, 50);
+        assertTrue(graphics.isVisible(10, 10, 5, 5));
+        assertFalse(graphics.isVisible(-10, -10, 5, 5));
+    }
+
+    @FormTest
+    void testIsVisibleHandlesDegenerateRect() {
+        implementation.setClip(nativeGraphics, 0, 0, 100, 100);
+        assertFalse(graphics.isVisible(10, 10, 0, 10));
+        assertFalse(graphics.isVisible(10, 10, 10, 0));
+        assertFalse(graphics.isVisible(10, 10, -5, 5));
+    }
+
+    @FormTest
     void testGetClipAccountsForTranslation() {
         implementation.setClip(nativeGraphics, 15, 25, 30, 40);
         graphics.translate(5, 5);
