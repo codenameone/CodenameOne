@@ -3001,10 +3001,16 @@ public class Component implements Animation, StyleListener, Editable {
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             g.translate(-scrollX, -scrollY);
+            int sColor = g.getColor();
+            int sAlpha = g.getAlpha();
+            Font sFont = g.getFont();
             Display.impl.beginPaintScope(g.getGraphics(), this);
             try {
                 paint(g);
             } finally {
+                g.setColor(sColor);
+                g.setAlpha(sAlpha);
+                g.setFont(sFont);
                 Display.impl.endPaintScope(g.getGraphics(), this);
             }
             g.translate(scrollX, scrollY);
@@ -3012,10 +3018,16 @@ public class Component implements Animation, StyleListener, Editable {
                 paintScrollbars(g);
             }
         } else {
+            int sColor = g.getColor();
+            int sAlpha = g.getAlpha();
+            Font sFont = g.getFont();
             Display.impl.beginPaintScope(g.getGraphics(), this);
             try {
                 paint(g);
             } finally {
+                g.setColor(sColor);
+                g.setAlpha(sAlpha);
+                g.setFont(sFont);
                 Display.impl.endPaintScope(g.getGraphics(), this);
             }
         }
@@ -3405,17 +3417,29 @@ public class Component implements Animation, StyleListener, Editable {
                 rect.getSize().setWidth(par.getWidth());
                 rect.getSize().setHeight(par.getHeight());
             }
+            int sColor = g.getColor();
+            int sAlpha = g.getAlpha();
+            Font sFont = g.getFont();
             Display.impl.beginPaintScope(g.getGraphics(), p);
             try {
                 p.paint(g, rect);
             } finally {
+                g.setColor(sColor);
+                g.setAlpha(sAlpha);
+                g.setFont(sFont);
                 Display.impl.endPaintScope(g.getGraphics(), p);
             }
         }
+        int sColor = g.getColor();
+        int sAlpha = g.getAlpha();
+        Font sFont = g.getFont();
         Display.impl.beginPaintScope(g.getGraphics(), par);
         try {
             par.paintBackground(g);
         } finally {
+            g.setColor(sColor);
+            g.setAlpha(sAlpha);
+            g.setFont(sFont);
             Display.impl.endPaintScope(g.getGraphics(), par);
         }
         ((Container) par).paintIntersecting(g, c, x, y, w, h, false, 0);
@@ -3490,17 +3514,29 @@ public class Component implements Animation, StyleListener, Editable {
         }
         if (getStyle().getBgPainter() != null) {
             Painter bp = getStyle().getBgPainter();
+            int sColor = g.getColor();
+            int sAlpha = g.getAlpha();
+            Font sFont = g.getFont();
             Display.impl.beginPaintScope(g.getGraphics(), bp);
             try {
                 bp.paint(g, bounds);
             } finally {
+                g.setColor(sColor);
+                g.setAlpha(sAlpha);
+                g.setFont(sFont);
                 Display.impl.endPaintScope(g.getGraphics(), bp);
             }
         }
+        int sColor = g.getColor();
+        int sAlpha = g.getAlpha();
+        Font sFont = g.getFont();
         Display.impl.beginPaintScope(g.getGraphics(), this);
         try {
             paintBackground(g);
         } finally {
+            g.setColor(sColor);
+            g.setAlpha(sAlpha);
+            g.setFont(sFont);
             Display.impl.endPaintScope(g.getGraphics(), this);
         }
         paintRippleEffect(g);
@@ -5117,10 +5153,16 @@ public class Component implements Animation, StyleListener, Editable {
 
         g.translate(-getX(), -getY());
         paintComponentBackground(g);
+        int sColor = g.getColor();
+        int sAlpha = g.getAlpha();
+        Font sFont = g.getFont();
         Display.impl.beginPaintScope(g.getGraphics(), this);
         try {
             paint(g);
         } finally {
+            g.setColor(sColor);
+            g.setAlpha(sAlpha);
+            g.setFont(sFont);
             Display.impl.endPaintScope(g.getGraphics(), this);
         }
         if (isBorderPainted()) {
@@ -5168,10 +5210,16 @@ public class Component implements Animation, StyleListener, Editable {
 
         g.translate(-getX(), -getY());
         paintComponentBackground(g);
+        int sColor = g.getColor();
+        int sAlpha = g.getAlpha();
+        Font sFont = g.getFont();
         Display.impl.beginPaintScope(g.getGraphics(), this);
         try {
             paint(g);
         } finally {
+            g.setColor(sColor);
+            g.setAlpha(sAlpha);
+            g.setFont(sFont);
             Display.impl.endPaintScope(g.getGraphics(), this);
         }
         if (isBorderPainted()) {
