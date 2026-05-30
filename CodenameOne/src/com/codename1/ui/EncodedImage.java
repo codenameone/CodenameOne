@@ -86,6 +86,7 @@ public class EncodedImage extends Image {
     private Object cache;
     private Image hardCache;
     private int locked;
+    private boolean disposed;
 
     private EncodedImage(byte[][] imageData) {
         super(null);
@@ -347,6 +348,43 @@ public class EncodedImage extends Image {
         hardCache = null;
     }
 
+    /// Releases the decoded image cache and the encoded byte data backing this
+    /// instance. After dispose, attempting to draw or query this image will
+    /// throw [IllegalStateException]. Intended for tight memory budgets where
+    /// the caller knows the image is no longer needed; see [Image#dispose].
+    @Override
+    public void dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        if (hardCache != null) {
+            try {
+                hardCache.dispose();
+            } catch (Throwable ignored) {
+            }
+            hardCache = null;
+        }
+        if (cache != null) {
+            Image cached = (Image) Display.getInstance().extractHardRef(cache);
+            if (cached != null) {
+                try {
+                    cached.dispose();
+                } catch (Throwable ignored) {
+                }
+            }
+            cache = null;
+        }
+        imageData = null;
+        locked = 0;
+        super.dispose();
+    }
+
+    /// Returns true if [#dispose] has been called on this image.
+    public boolean isDisposed() {
+        return disposed;
+    }
+
     /// Returns the byte array data backing the image allowing the image to be stored
     /// and discarded completely from RAM.
     ///
@@ -354,6 +392,9 @@ public class EncodedImage extends Image {
     ///
     /// byte array used to create the image, e.g. encoded PNG, JPEG etc.
     public byte[] getImageData() {
+        if (disposed) {
+            throw new IllegalStateException("EncodedImage was disposed");
+        }
         if (imageData.length == 1) {
             return imageData[0];
         }
@@ -383,7 +424,9 @@ public class EncodedImage extends Image {
     }
 
     private Image getInternalImpl() {
-
+        if (disposed) {
+            throw new IllegalStateException("EncodedImage was disposed");
+        }
         if (imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
             hardCache = null;
             cache = null;
