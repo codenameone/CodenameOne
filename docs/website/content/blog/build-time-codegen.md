@@ -2,7 +2,7 @@
 title: "OpenAPI, ORM, SVG and Lottie"
 slug: build-time-codegen
 url: /blog/build-time-codegen/
-date: '2026-06-03'
+date: '2026-06-01'
 author: Shai Almog
 description: An OpenAPI 3.x client generator that turns a spec into typed Codename One code, a JPA-shaped SQLite ORM, JAXB-shaped JSON / XML mappers, build-time SVG and Lottie transcoders, plus a declarative router and deep-link API. All ride on the same build-time codegen pipeline.
 feed_html: '<img src="https://www.codenameone.com/blog/build-time-codegen.jpg" alt="OpenAPI, ORM, SVG and Lottie" /> An OpenAPI client generator, a JPA-shaped SQLite ORM, JAXB-shaped JSON / XML mappers, build-time SVG / Lottie transcoders, and a declarative router with deep links. All on the same build-time codegen pipeline.'
@@ -10,7 +10,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/build-time-codegen.jpg" a
 
 ![OpenAPI, ORM, SVG and Lottie](/blog/build-time-codegen.jpg)
 
-This is the third follow-up to [Friday's release post](/blog/metal-default-new-build-cloud-and-a-new-format/). Saturday's was about how you iterate; Monday's was about new platform APIs in the core; today's is about a run of pieces that change how you write the structural parts of an app.
+This is the third follow-up to [Friday's release post](/blog/metal-default-new-build-cloud-and-a-new-format/). Saturday's was about how you iterate; yesterday's was about new platform APIs in the core; today's is about a run of pieces that change how you write the structural parts of an app.
 
 The pieces are an OpenAPI client generator, a SQLite ORM, JSON and XML mappers, a component binder with validation, build-time SVG and Lottie transcoders, and a declarative router with deep links. All ride on a single **build-time codegen pipeline**: a Maven-plugin pass that reads annotations or declarative source files at build time and emits typed Java that compiles into your binary. No reflection, no service loader, no `Class.forName`. The "How it works" section at the end of this post covers the codegen plumbing once you have seen what it powers.
 
