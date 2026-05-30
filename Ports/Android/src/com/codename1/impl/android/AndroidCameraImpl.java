@@ -307,7 +307,7 @@ public class AndroidCameraImpl extends CameraImpl {
                     "androidx.camera.core.Preview$SurfaceProvider");
             clsPreview.getMethod("setSurfaceProvider", surfaceProviderCls)
                     .invoke(preview, surfaceProvider);
-            return Display.getInstance().getImplementation().createNativePeer(previewView);
+            return PeerComponent.create(previewView);
         } catch (Throwable t) {
             Log.e(TAG, "Could not create preview view", t);
             return null;

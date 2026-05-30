@@ -149,7 +149,7 @@ public class HTML5CameraImpl extends CameraImpl {
     @Override
     public PeerComponent createPreviewPeer() {
         if (video == null) return null;
-        return Display.getInstance().getImplementation().createNativePeer(video);
+        return PeerComponent.create(video);
     }
 
     @Override
