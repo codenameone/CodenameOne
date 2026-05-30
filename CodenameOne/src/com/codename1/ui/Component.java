@@ -8224,6 +8224,15 @@ public class Component implements Animation, StyleListener, Editable {
         return alwaysTensile && !isScrollableX() || (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode());
     }
 
+    /// Raw view of the {@code alwaysTensile} flag, without the
+    /// {@link #isAlwaysTensile()} dependency on {@link #isScrollableX()}.
+    /// Used by {@link Container#isScrollableX()} so the X axis can honour
+    /// {@code setAlwaysTensile(true)} (matching {@link Container#isScrollableY()})
+    /// without recursing through {@code isAlwaysTensile()} → {@code isScrollableX()}.
+    boolean alwaysTensileFlag() {
+        return alwaysTensile;
+    }
+
     /// Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
     ///
     /// #### Parameters
