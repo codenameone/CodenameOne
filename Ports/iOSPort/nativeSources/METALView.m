@@ -121,23 +121,29 @@ extern BOOL isRetinaBug();
     }
 }
 
-//The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
-- (id)initWithCoder:(NSCoder*)coder
-{
-    self = [super initWithCoder:coder];
-    if (self) {
-        self.clearsContextBeforeDrawing = NO;
-        if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
-            if(isRetinaBug()) {
-                self.contentScaleFactor = 1.0;
-            } else {
-                self.contentScaleFactor = [[UIScreen mainScreen] scale];
-            }
+// Shared Metal device + command-queue setup invoked by both the NIB-
+// instantiated path (initWithCoder:) and the programmatic-instantiation
+// path (initWithFrame:). The Mac Catalyst slice goes through
+// initWithFrame: because IBAgent-macOS-UIKit can't compile the iOS
+// view-controller XIB and CodenameOne_GLAppDelegate falls back to
+// passing nil to initWithNibName:. Without this shared setup the
+// CAMetalLayer's device stays nil, CN1MetalSetDeviceAndCommandQueue
+// is never published, and CN1MetalGlyphAtlas+atlasForFont: returns nil
+// for every font -- which is exactly the "no atlas available" failure
+// the Mac CI surfaced.
+- (void)cn1SetupMetal {
+    self.clearsContextBeforeDrawing = NO;
+    if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
+        if(isRetinaBug()) {
+            self.contentScaleFactor = 1.0;
+        } else {
+            self.contentScaleFactor = [[UIScreen mainScreen] scale];
         }
-        CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
-        metalLayer.device = MTLCreateSystemDefaultDevice();
-        metalLayer.opaque = TRUE;
-        metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    }
+    CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
+    metalLayer.device = MTLCreateSystemDefaultDevice();
+    metalLayer.opaque = TRUE;
+    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         // framebufferOnly must be NO: presentFramebuffer blits screenTexture
         // into the drawable via copyFromTexture:toTexture:, and Metal's blit
         // validation aborts ("destinationTexture must not be a framebufferOnly
@@ -204,17 +210,41 @@ extern BOOL isRetinaBug();
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
 
-        // Drop the glyph atlas + text cache + gradient cache on memory
-        // pressure. Pipeline state cache stays — those are precious to
-        // rebuild and small. The screen texture also stays; updateFrame-
-        // BufferSize: handles its replacement on resize.
-        [[NSNotificationCenter defaultCenter]
-            addObserver:self
-               selector:@selector(memoryWarning)
-                   name:UIApplicationDidReceiveMemoryWarningNotification
-                 object:nil];
-    }
+    // Drop the glyph atlas + text cache + gradient cache on memory
+    // pressure. Pipeline state cache stays — those are precious to
+    // rebuild and small. The screen texture also stays; updateFrame-
+    // BufferSize: handles its replacement on resize.
+    [[NSNotificationCenter defaultCenter]
+        addObserver:self
+           selector:@selector(memoryWarning)
+               name:UIApplicationDidReceiveMemoryWarningNotification
+             object:nil];
+}
 
+//The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
+- (id)initWithCoder:(NSCoder*)coder
+{
+    self = [super initWithCoder:coder];
+    if (self) {
+        [self cn1SetupMetal];
+    }
+    return self;
+}
+
+// Programmatic instantiation. Used on Mac Catalyst (and any future
+// platform where the iOS XIB is unavailable): CodenameOne_GLView-
+// Controller's loadView allocates a METALView via initWithFrame:
+// instead of loading from the NIB. Without this override the
+// UIView default initWithFrame: runs, which skips cn1SetupMetal and
+// leaves CN1MetalDevice() returning nil for the lifetime of the
+// process -- the runtime failure mode that surfaced in CI as "no
+// atlas available for font" on every CN1MetalDrawString call.
+- (id)initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        [self cn1SetupMetal];
+    }
     return self;
 }
 

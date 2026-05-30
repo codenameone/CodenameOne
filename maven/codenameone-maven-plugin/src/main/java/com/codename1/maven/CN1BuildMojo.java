@@ -311,8 +311,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return null;
     }
 
+    public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
+
     private boolean isLocalBuildTarget(String buildTarget) {
-        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget));
+        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget));
     }
 
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
@@ -596,6 +600,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 automated = false;
                 if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    // mac-source rides the iOS pipeline with the macNative.enabled
+                    // build hint forced on. The IPhoneBuilder delegates Mac-specific
+                    // emission to MacNativeBuilder when that hint is set.
+                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("javascript")) {
@@ -604,6 +614,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
             } else {
+                // Cloud-builds route through a remote build server; for the Mac
+                // native target we set the same macNative.enabled hint here so
+                // the server-side IPhoneBuilder takes the Mac branch.
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                }
                 if (automated) {
                     getLog().debug("Attempting to start hyper beam stream the build log to the console");
                     hyperBeamThread.start();
@@ -740,6 +756,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private File getGeneratedIOSProjectSourceDirectory() {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
+    }
+
+    private File getGeneratedMacProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-mac-source");
+    }
+
+    private boolean isMacNativeBuild(Properties props) {
+        return "true".equalsIgnoreCase(props.getProperty("codename1.arg.macNative.enabled", "false"));
     }
 
     private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
@@ -974,9 +998,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
 
-        if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
+        boolean macNativeBuild = isMacNativeBuild(props);
 
-            File generatedProject = getGeneratedIOSProjectSourceDirectory();
+        if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+
+            File generatedProject = macNativeBuild
+                    ? getGeneratedMacProjectSourceDirectory()
+                    : getGeneratedIOSProjectSourceDirectory();
             getLog().info("Generating Xcode Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -1002,7 +1030,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         IPhoneBuilder e = new IPhoneBuilder();
         e.setLogger(getLog());
-        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "ios-build");
+        File buildDirectory = new File(tmpProjectDir,
+                "dist" + File.separator + (macNativeBuild ? "mac-build" : "ios-build"));
         e.setBuildDirectory(buildDirectory);
 
         e.setCodenameOneJar(codenameOneJar);
@@ -1064,9 +1093,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 throw new MojoExecutionException("iOS build failed");
             }
 
-            if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
+            if ((BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
-                File output = getGeneratedIOSProjectSourceDirectory();
+                File output = macNativeBuild
+                        ? getGeneratedMacProjectSourceDirectory()
+                        : getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Xcode Project to "+output);

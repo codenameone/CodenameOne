@@ -119,10 +119,22 @@ static void installSignalHandlers() {
 - (CodenameOne_GLViewController *)cn1EnsureViewController
 {
     if (self.viewController == nil) {
-#ifdef CN1_USE_ARC
-        self.viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+        // The iOS XIB-based instantiation breaks under Mac Catalyst on
+        // Xcode 26: IBAgent-macOS-UIKit crashes compiling the GL/Metal
+        // view-controller XIBs, so the file is excluded from the Mac
+        // slice via EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]. Pass nil as
+        // the NIB name on Mac so UIViewController synthesises a plain
+        // UIView; the Metal layer is attached programmatically further
+        // down the init chain, so the XIB's IBOutlet wiring isn't needed.
+#if TARGET_OS_MACCATALYST
+        NSString *cn1NibName = nil;
 #else
-        CodenameOne_GLViewController *viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+        NSString *cn1NibName = @"CodenameOne_GLViewController";
+#endif
+#ifdef CN1_USE_ARC
+        self.viewController = [[CodenameOne_GLViewController alloc] initWithNibName:cn1NibName bundle:nil];
+#else
+        CodenameOne_GLViewController *viewController = [[CodenameOne_GLViewController alloc] initWithNibName:cn1NibName bundle:nil];
         self.viewController = viewController;
         [viewController release];
 #endif

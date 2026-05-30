@@ -42,25 +42,40 @@ float currentScaleY = 1;
 -(void)execute {
 #ifdef CN1_USE_METAL
     {
-        GLKMatrix4 scaleM = GLKMatrix4MakeScale(x, y, 0);
-        CN1MetalSetTransform(GLKMatrix4Multiply(CN1MetalGetTransform(), scaleM));
+        // Avoid GLKMatrix4MakeScale / GLKMatrix4Multiply so this path
+        // compiles for the Mac Catalyst slice (no GLKit math symbols
+        // available there). The matrix algebra below is equivalent to:
+        //   CN1MetalSetTransform(GLKMatrix4Multiply(
+        //       CN1MetalGetTransform(), GLKMatrix4MakeScale(x, y, 0)));
+        GLKMatrix4 cur = CN1MetalGetTransform();
+        // m' = cur * diag(x, y, 0, 1). Column-major: scaling the i-th
+        // column of `cur` by the i-th diagonal entry of the scale matrix.
+        GLKMatrix4 result;
+        for (int i = 0; i < 4; i++) {
+            result.m[0*4 + i] = cur.m[0*4 + i] * x;
+            result.m[1*4 + i] = cur.m[1*4 + i] * y;
+            result.m[2*4 + i] = cur.m[2*4 + i] * 0;
+            result.m[3*4 + i] = cur.m[3*4 + i];
+        }
+        CN1MetalSetTransform(result);
         currentScaleX = x;
         currentScaleY = y;
         return;
     }
-#endif
+#else
 #ifdef USE_ES2
     GLKMatrix4 scale = GLKMatrix4MakeScale(x, y, 0);
     glSetTransformES2(GLKMatrix4Multiply(glGetTransformES2(), scale));
-    
+
 #else
     _glScalef(x, y, 0);
-    
+
     GLErrorLog;
     [ClipRect updateClipToScale];
 #endif
     currentScaleX = x;
     currentScaleY = y;
+#endif // !CN1_USE_METAL
 }
 
 #ifndef CN1_USE_ARC

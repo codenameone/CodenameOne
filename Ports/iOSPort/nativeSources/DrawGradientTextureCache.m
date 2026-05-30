@@ -128,8 +128,10 @@ static int MAX_CACHE_SIZE = 5;
 #ifndef CN1_USE_ARC
     [lastAccess release];
 #endif
+#ifndef CN1_USE_METAL
     glDeleteTextures(1, &textureName);
     GLErrorLog;
+#endif
 #ifndef CN1_USE_ARC
     [super dealloc];
 #endif

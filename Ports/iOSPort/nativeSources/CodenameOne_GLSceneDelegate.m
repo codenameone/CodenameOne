@@ -40,6 +40,35 @@
     [window release];
 #endif
 
+#if TARGET_OS_MACCATALYST
+    // Opt-in deterministic window sizing for screenshot CI. Read a
+    // "<W>x<H>" value from the CN1MacFixedWindowSize Info.plist key --
+    // the macNative.fixedWindowSize build hint plumbs the user's
+    // setting through there. Absent or unparseable -> normal Mac
+    // resize behaviour (production apps are unaffected). Setting it
+    // pins both the minimum and maximum scene size so every launch
+    // produces a byte-identical window for strict-pixel comparison.
+    if (@available(macCatalyst 13.0, *)) {
+        NSString *fixedSpec = [[NSBundle mainBundle]
+                objectForInfoDictionaryKey:@"CN1MacFixedWindowSize"];
+        if ([fixedSpec isKindOfClass:[NSString class]] && fixedSpec.length > 0) {
+            NSArray<NSString *> *parts = [fixedSpec componentsSeparatedByString:@"x"];
+            if (parts.count == 2) {
+                CGFloat w = [parts[0] doubleValue];
+                CGFloat h = [parts[1] doubleValue];
+                if (w > 0 && h > 0) {
+                    UIWindowScene *ws = (UIWindowScene *)scene;
+                    if (ws.sizeRestrictions != nil) {
+                        CGSize fixed = CGSizeMake(w, h);
+                        ws.sizeRestrictions.minimumSize = fixed;
+                        ws.sizeRestrictions.maximumSize = fixed;
+                    }
+                }
+            }
+        }
+    }
+#endif
+
     UIOpenURLContext *urlContext = [connectionOptions.URLContexts anyObject];
     if (urlContext != nil) {
         [appDelegate cn1OpenURL:[UIApplication sharedApplication] url:urlContext.URL sourceApplication:urlContext.options.sourceApplication annotation:urlContext.options.annotation];

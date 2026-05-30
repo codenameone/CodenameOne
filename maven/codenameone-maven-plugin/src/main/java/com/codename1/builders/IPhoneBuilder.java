@@ -51,6 +51,13 @@ import java.util.regex.Pattern;
  */
 public class IPhoneBuilder extends Executor {
     private boolean useMetal;
+
+    // macNative.enabled=true switches this iOS build to also emit a native Mac
+    // variant of the same app. All Mac-specific code lives in MacNativeBuilder
+    // (same package). The underlying Apple technology is Mac Catalyst, but
+    // that is an implementation detail -- never surfaced in hint names.
+    private final MacNativeBuilder macNativeBuilder = new MacNativeBuilder(this);
+
     private boolean enableGalleryMultiselect;
     private boolean usePhotoKitForMultigallery;
     private boolean enableWKWebView, disableUIWebView;
@@ -182,6 +189,12 @@ public class IPhoneBuilder extends Executor {
     private static String escapeRuby(String input) {
         return input.replace("\\", "\\\\").replace("'", "\\'");
     }
+
+    /** Package-private accessor so {@link MacNativeBuilder} (separate file in
+     *  the same package) can use the same escaping helper. */
+    static String escapeRubyStr(String input) {
+        return escapeRuby(input);
+    }
     
     @Override
     protected String getDeviceIdCode() {
@@ -278,6 +291,24 @@ public class IPhoneBuilder extends Executor {
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "true"));
+
+        // macNative: extend this iOS build to also produce a native Mac slice.
+        // All Mac-specific work is delegated to MacNativeBuilder; this builder
+        // only flips a few iOS-side knobs (Metal forced on, minimum deployment
+        // target floor, Ruby xcodeproj gem required) when Mac is enabled.
+        macNativeBuilder.parseHints(request);
+        if (macNativeBuilder.isEnabled()) {
+            // The Mac slice cannot link OpenGL ES; force Metal on regardless of
+            // the ios.metal hint. (Already on by default now, but defensive.)
+            useMetal = true;
+            // Catalyst requires iOS 13.1+ -> macOS 10.15+.
+            addMinDeploymentTarget(macNativeBuilder.getIosMinDeploymentTarget());
+            // Mac requires the iPad device family. iphone-only is incompatible.
+            macNativeBuilder.validateProjectType(request);
+            // Ruby + xcodeproj gem is unconditionally required for the Mac slice.
+            ensureXcodeprojInstalled();
+        }
+
         log("Request Args: ");
         log("-----------------");
         for (String arg : request.getArgs()) {
@@ -1503,6 +1534,38 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
                 }
+
+                // The generated .m imports "<X>Impl.h" -- the Objective-C
+                // class the user is expected to provide as their native
+                // implementation. When no such class exists for this app
+                // (native interfaces pulled in transitively from a CN1
+                // library, the app never instantiates them), the build
+                // still needs an @interface in scope so the .m compiles.
+                // Generate a tiny placeholder iff the user hasn't dropped
+                // their own copy alongside the project sources. The peer
+                // class itself stays absent at runtime, which is fine: any
+                // call into this native interface from Java would have
+                // failed to resolve a peer regardless.
+                File implHeader = new File(resDir, classNameWithUnderscores + "Impl.h");
+                if (!implHeader.exists()) {
+                    String guard = classNameWithUnderscores.toUpperCase() + "_IMPL_H";
+                    String hStub = "#ifndef " + guard + "\n"
+                            + "#define " + guard + "\n"
+                            + "// Auto-generated placeholder: the native interface "
+                            + currentNative.getName() + " has no user-provided\n"
+                            + "// Objective-C implementation in this project. The CN1\n"
+                            + "// runtime returns nil from cn1_createNativeInterfacePeer\n"
+                            + "// in that case; calls into the peer no-op silently.\n"
+                            + "#import <Foundation/Foundation.h>\n"
+                            + "@interface " + classNameWithUnderscores + "Impl : NSObject\n"
+                            + "@end\n"
+                            + "#endif\n";
+                    try (FileOutputStream out = new FileOutputStream(implHeader)) {
+                        out.write(hStub.getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        throw new BuildException("Error while generating placeholder header for "+currentNative, ex);
+                    }
+                }
             }
         }
         String javacPath = System.getProperty("java.home") + "/../bin/javac";
@@ -2154,17 +2217,30 @@ public class IPhoneBuilder extends Executor {
             debug("Building using addLibs="+addLibs);
             stopwatch.split("Prepare ParparVM");
             try {
-                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-Dcn1.onDeviceDebug=" + onDeviceDebug, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
-                        "-jar", parparVMCompilerJar, "ios",
-                        classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";" +
-                                buildinRes.getAbsolutePath(),
-                        tmpFile.getAbsolutePath(),
-                        request.getMainClass(),
-                        request.getPackageName(),
-                        request.getDisplayName(),
-                        buildVersion,
-                        request.getArg("ios.project_type", "ios"), // one of: ios, iphone, ipad
-                        addLibs)) {
+                List<String> parparCmd = new ArrayList<String>();
+                parparCmd.add("java");
+                parparCmd.add("-DsaveUnitTests=" + isUnitTestMode());
+                parparCmd.add("-DfieldNullChecks=" + fieldNullChecks);
+                parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
+                parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
+                parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
+                if (macNativeBuilder.isEnabled()) {
+                    parparCmd.add(macNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                parparCmd.add("-Xmx384m");
+                parparCmd.add("-jar");
+                parparCmd.add(parparVMCompilerJar);
+                parparCmd.add("ios");
+                parparCmd.add(classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
+                        + buildinRes.getAbsolutePath());
+                parparCmd.add(tmpFile.getAbsolutePath());
+                parparCmd.add(request.getMainClass());
+                parparCmd.add(request.getPackageName());
+                parparCmd.add(request.getDisplayName());
+                parparCmd.add(buildVersion);
+                parparCmd.add(request.getArg("ios.project_type", "ios")); // ios, iphone, ipad
+                parparCmd.add(addLibs);
+                if (!exec(userDir, env, 420000, parparCmd.toArray(new String[0]))) {
                     return false;
                 }
             } catch (Exception ex) {
@@ -2764,9 +2840,22 @@ public class IPhoneBuilder extends Executor {
                 addLocalizedIconsBuildSetting(pbxprojFile);
 
                 String teamId = request.getArg("ios.teamId", "");
+                // injectDevelopmentTeam anchors on `SDKROOT = iphoneos;`, which only
+                // matches the project-level XCBuildConfiguration. That stays correct
+                // for the iOS slice. The Mac slice's team is routed by
+                // MacNativeBuilder.applyXcodeSettings via a [sdk=macosx*] key,
+                // so this regex injection is intentionally NOT broadened.
                 injectDevelopmentTeam(pbxprojFile,
                         request.getArg("ios.debug.teamId", teamId),
                         request.getArg("ios.release.teamId", teamId));
+
+                if (macNativeBuilder.isEnabled()) {
+                    File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    macNativeBuilder.writeEntitlements(request, appSrcDir);
+                    macNativeBuilder.writeStubHeaders(appSrcDir);
+                    macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                    macNativeBuilder.writeExportOptions(request, new File(tmpFile, "dist"));
+                }
 
             } catch (Exception ex) {
                 throw new BuildException("Failed to inject into plist");
@@ -4078,7 +4167,9 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    private String sanitizeTeamId(String raw, String hint) {
+    /** Package-private so {@link MacNativeBuilder} can validate its own
+     *  {@code macNative.teamId} hint with the same regex as the iOS team. */
+    String sanitizeTeamId(String raw, String hint) {
         if (raw == null) {
             return "";
         }
@@ -4092,6 +4183,7 @@ public class IPhoneBuilder extends Executor {
         }
         return trimmed;
     }
+
 
     private void addLocalizedIconsBuildSetting(File pbx) throws IOException {
         if (localizedIcons.isEmpty()) {
@@ -4160,6 +4252,10 @@ public class IPhoneBuilder extends Executor {
             if (legacyLaunchImages.exists()) {
                 delTree(legacyLaunchImages);
             }
+        }
+
+        if (macNativeBuilder.isEnabled()) {
+            macNativeBuilder.writeAppIconset(new File(appSrcDir, "Images.xcassets"), icon512);
         }
     }
 

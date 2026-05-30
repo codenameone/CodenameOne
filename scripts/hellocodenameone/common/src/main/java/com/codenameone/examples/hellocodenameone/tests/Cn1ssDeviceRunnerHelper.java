@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.io.Log;
@@ -11,6 +12,7 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
@@ -55,43 +57,11 @@ interface Cn1ssDeviceRunnerHelper {
             complete(onComplete);
             return;
         }
+        int width = Math.max(1, image.getWidth());
+        int height = Math.max(1, image.getHeight());
         try {
-            ImageIO io = ImageIO.getImageIO();
-            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
-                emitPlaceholderScreenshot(safeName);
-                return;
-            }
-            int width = Math.max(1, image.getWidth());
-            int height = Math.max(1, image.getHeight());
-            if (Display.getInstance().isSimulator()) {
-                io.save(image, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
-            }
-            ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
-            io.save(image, pngOut, ImageIO.FORMAT_PNG, 1f);
-            byte[] pngBytes = pngOut.toByteArray();
-            String hash = fnv1a64Hex(pngBytes);
-            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
-                    + " png_fnv1a64=" + hash);
-            String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
-            if (previous != null) {
-                println("CN1SS:WARN:test=" + safeName
-                        + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
-            }
-            emitChannel(pngBytes, safeName, "");
-
-            byte[] preview = encodePreview(io, image, safeName);
-            if (preview != null && preview.length > 0) {
-                emitChannel(preview, safeName, PREVIEW_CHANNEL);
-            } else {
-                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
-            }
-        } catch (IOException ex) {
-            println("CN1SS:ERR:test=" + safeName + " message=" + ex);
-            Log.e(ex);
-            emitPlaceholderScreenshot(safeName);
+            emitImageScreenshot(safeName, image, width, height);
         } finally {
-            image.dispose();
             complete(onComplete);
         }
     }
@@ -107,6 +77,31 @@ interface Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
+
+        // Mac native: Display.screenshot() reads through the Metal display
+        // layer, whose drawable lags the EDT's view of the current form by
+        // one or more frames on headless macos-15 (no display link drives
+        // present). The result is chart-bar.png ending up with chart-cubic-
+        // line content, ButtonTheme_light captured mid-slide, etc. Bypass
+        // the display layer entirely by painting the form into an off-
+        // screen mutable image -- the pixels are written synchronously, no
+        // Metal drawable race -- and feed that to the encoder. Other ports
+        // (iOS device, Android, JavaScript, JavaSE simulator) keep the
+        // native screenshot path because their Display.screenshot() is
+        // reliable and the off-screen path can't capture native peers
+        // (BrowserComponent, video, etc.) that live outside the CN1
+        // paint pipeline.
+        if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
+            try {
+                Image off = Image.createImage(width, height);
+                current.paintComponent(off.getGraphics(), true);
+                emitImageScreenshot(safeName, off, width, height);
+            } finally {
+                complete(onComplete);
+            }
+            return;
+        }
+
         Display.getInstance().screenshot(screen -> {
             if (screen == null) {
                 println("CN1SS:ERR:test=" + safeName + " message=Screenshot callback returned null");
@@ -114,45 +109,108 @@ interface Cn1ssDeviceRunnerHelper {
                 complete(onComplete);
                 return;
             }
-            Image screenshot = screen;
             try {
-                ImageIO io = ImageIO.getImageIO();
-                if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                    println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
-                    emitPlaceholderScreenshot(safeName);
-                    return;
-                }
-                if(Display.getInstance().isSimulator()) {
-                    io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
-                }
-                ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
-                io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
-                byte[] pngBytes = pngOut.toByteArray();
-                String hash = fnv1a64Hex(pngBytes);
-                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
-                        + " png_fnv1a64=" + hash);
-                String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
-                if (previous != null) {
-                    println("CN1SS:WARN:test=" + safeName
-                            + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
-                }
-                emitChannel(pngBytes, safeName, "");
-
-                byte[] preview = encodePreview(io, screenshot, safeName);
-                if (preview != null && preview.length > 0) {
-                    emitChannel(preview, safeName, PREVIEW_CHANNEL);
-                } else {
-                    println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
-                }
-            } catch (IOException ex) {
-                println("CN1SS:ERR:test=" + safeName + " message=" + ex);
-                Log.e(ex);
-                emitPlaceholderScreenshot(safeName);
+                emitImageScreenshot(safeName, screen, width, height);
             } finally {
-                screenshot.dispose();
                 complete(onComplete);
             }
         });
+    }
+
+    // Shared PNG-encode path. On Mac native (isDesktop() && !isSimulator())
+    // writes the PNG straight to FileSystemStorage and emits a CN1SS:FILE:
+    // line with the absolute path; the runner script reads it directly. The
+    // base64-chunked log path on Mac is fragile (large CN1SS:CHUNK lines
+    // dropped sporadically under load, the host log buffer rate-limits)
+    // and offers no advantage on Mac because the test process and the
+    // runner share the local filesystem. Everywhere else (iOS device,
+    // iOS simulator, Android) keep the chunk-streamed path.
+    private static void emitImageScreenshot(String safeName, Image screenshot, int width, int height) {
+        try {
+            ImageIO io = ImageIO.getImageIO();
+            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                emitPlaceholderScreenshot(safeName);
+                return;
+            }
+            if (Display.getInstance().isSimulator()) {
+                io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
+            }
+            if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
+                emitFileScreenshot(safeName, screenshot, io);
+                return;
+            }
+            ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
+            io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+            byte[] pngBytes = pngOut.toByteArray();
+            String hash = fnv1a64Hex(pngBytes);
+            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+                    + " png_fnv1a64=" + hash);
+            String previous = Cn1ssHashTracker.recordAndCheck(hash, safeName);
+            if (previous != null) {
+                println("CN1SS:WARN:test=" + safeName
+                        + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
+            }
+            emitChannel(pngBytes, safeName, "");
+
+            byte[] preview = encodePreview(io, screenshot, safeName);
+            if (preview != null && preview.length > 0) {
+                emitChannel(preview, safeName, PREVIEW_CHANNEL);
+            } else {
+                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+            }
+        } catch (IOException ex) {
+            println("CN1SS:ERR:test=" + safeName + " message=" + ex);
+            Log.e(ex);
+            emitPlaceholderScreenshot(safeName);
+        } finally {
+            screenshot.dispose();
+        }
+    }
+
+    /// Save the PNG (and a JPEG preview) into the app's filesystem and
+    /// announce their paths in the log. The runner copies these files
+    /// directly, sidestepping the CN1SS:CHUNK base64 channel. Used on Mac
+    /// native, where the app process and the test driver share a local
+    /// filesystem and `os_log` rate-limits the chunked output.
+    private static void emitFileScreenshot(String safeName, Image screenshot, ImageIO io) throws IOException {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String dir = fs.getAppHomePath();
+        if (dir == null || dir.length() == 0) {
+            throw new IOException("FileSystemStorage.getAppHomePath() returned empty path");
+        }
+        // CN1's getAppHomePath returns a path with trailing separator on
+        // some platforms and without on others; normalise.
+        if (!dir.endsWith("/")) {
+            dir = dir + "/";
+        }
+        String outDir = dir + "cn1ss-screenshots/";
+        fs.mkdir(outDir);
+        String pngPath = outDir + safeName + ".png";
+        OutputStream pngOut = fs.openOutputStream(pngPath);
+        try {
+            io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+        } finally {
+            pngOut.close();
+        }
+        long pngBytes = fs.getLength(pngPath);
+        println("CN1SS:FILE:test=" + safeName + " channel= path=" + pngPath
+                + " bytes=" + pngBytes);
+
+        byte[] preview = encodePreview(io, screenshot, safeName);
+        if (preview != null && preview.length > 0) {
+            String previewPath = outDir + safeName + ".jpg";
+            OutputStream previewOut = fs.openOutputStream(previewPath);
+            try {
+                previewOut.write(preview);
+            } finally {
+                previewOut.close();
+            }
+            println("CN1SS:FILE:test=" + safeName + " channel=" + PREVIEW_CHANNEL
+                    + " path=" + previewPath + " bytes=" + preview.length);
+        } else {
+            println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+        }
     }
 
     static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {

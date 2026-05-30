@@ -30,6 +30,7 @@
 #endif
 
 #ifdef USE_ES2
+#ifndef CN1_USE_METAL
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -274,6 +275,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
 }
 
 
+#endif // !CN1_USE_METAL
 #endif
 
 @implementation DrawTextureAlphaMask

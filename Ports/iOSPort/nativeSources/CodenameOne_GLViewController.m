@@ -181,6 +181,14 @@ static void updateDisplayMetricsFromView(UIView *view) {
 // screenSizeChanged event between stop and start (issue #4767).
 static CGSize cn1OrientationCorrectSize(UIView *view) {
     CGSize size = view.bounds.size;
+#if TARGET_OS_MACCATALYST
+    // Mac Catalyst windows are user-resizable and don't have a true device
+    // orientation; the scene's interfaceOrientation is hard-coded to portrait
+    // even when the window is landscape, which would trip the swap logic
+    // below and publish the swapped size to the EDT. Trust the view bounds
+    // as-is on Mac.
+    return size;
+#else
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
     if (@available(iOS 13.0, *)) {
         UIWindowScene *scene = view.window.windowScene;
@@ -197,6 +205,7 @@ static CGSize cn1OrientationCorrectSize(UIView *view) {
     }
 #endif
     return size;
+#endif
 }
 BOOL forceSlideUpField;
 
@@ -1408,10 +1417,15 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_flo
 {
 #ifdef USE_ES2
     //    dispatch_async(dispatch_get_main_queue(), ^{
-    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                              b0,b1,b2,b3,
-                                              c0,c1,c2,c3,
-                                              d0,d1,d2,d3);
+    // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
+    // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
+    // helper so the Mac Catalyst slice compiles without GLKit math symbols.
+    GLKMatrix4 m = (GLKMatrix4){ {
+        a0, b0, c0, d0,
+        a1, b1, c1, d1,
+        a2, b2, c2, d2,
+        a3, b3, c3, d3
+    } };
     
     SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
     [CodenameOne_GLViewController upcoming:f];
@@ -1434,10 +1448,15 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
     {
         GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
         if (target == nil) return;
-        GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                                  b0,b1,b2,b3,
-                                                  c0,c1,c2,c3,
-                                                  d0,d1,d2,d3);
+        // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
+        // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
+        // helper so the Mac Catalyst slice compiles without GLKit math symbols.
+        GLKMatrix4 m = (GLKMatrix4){ {
+            a0, b0, c0, d0,
+            a1, b1, c1, d1,
+            a2, b2, c2, d2,
+            a3, b3, c3, d3
+        } };
         SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:originX originY:originY];
         [f setTarget:target];
         [CodenameOne_GLViewController upcoming:f];
@@ -1450,10 +1469,15 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___fl
 #ifdef USE_ES2
     POOL_BEGIN();
     currentMutableTransformSet = NO;
-    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
-                                              b0,b1,b2,b3,
-                                              c0,c1,c2,c3,
-                                              d0,d1,d2,d3);
+    // Equivalent to GLKMatrix4MakeAndTranspose(a..., b..., c..., d...):
+    // input is row-major; GLKMatrix4 stores column-major. Avoid the GLKit
+    // helper so the Mac Catalyst slice compiles without GLKit math symbols.
+    GLKMatrix4 m = (GLKMatrix4){ {
+        a0, b0, c0, d0,
+        a1, b1, c1, d1,
+        a2, b2, c2, d2,
+        a3, b3, c3, d3
+    } };
     CATransform3D output;
     GLfloat glMatrix[16];
     CGFloat caMatrix[16];
@@ -2418,6 +2442,71 @@ static CodenameOne_GLViewController *sharedSingleton;
     return currentMutableTransform;
 }
 
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+// On Mac Catalyst the iOS XIB never compiles (IBAgent-macOS-UIKit crashes
+// on it under Xcode 26), so CodenameOne_GLAppDelegate.m passes nil to
+// initWithNibName: and the default loadView would hand us a plain
+// UIView. The rendering pipeline expects [eaglView] to find a METALView
+// in self.view or its subviews; without one CN1MetalSetDeviceAndCommand-
+// Queue never runs and CN1MetalGlyphAtlas+atlasForFont: returns nil for
+// every font ("no atlas available" on every CN1MetalDrawString). Build
+// the METALView programmatically and set it as the controller's view.
+- (void)loadView {
+    CGRect screen = [UIScreen mainScreen].bounds;
+    if (CGRectIsEmpty(screen)) {
+        screen = CGRectMake(0, 0, 1024, 684);
+    }
+    METALView *rv = [[METALView alloc] initWithFrame:screen];
+    rv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.view = rv;
+#ifndef CN1_USE_ARC
+    [rv release];
+#endif
+}
+
+// Mac Catalyst routinely fires layoutSubviews several times per second
+// while the window is being laid out (Catalyst's UINSView host bridge
+// negotiates size with NSWindow on the AppKit side, then echoes that
+// back into UIKit through repeated layoutIfNeeded passes). Re-emitting
+// screenSizeChanged on every cycle reallocated CN1Metal mutable
+// textures faster than the GC could reclaim them -- a CI run sat at
+// 70+ GB resident memory after a minute. The guard here debounces:
+// fire screenSizeChanged at most once per ~250 ms, and only when the
+// observed size actually differs by more than one pixel from the
+// previously reported size. The displayLink isn't running in this
+// port (CADisplayLink is commented out -- see startAnimation), so we
+// rely on this hook to keep the Metal layer in sync with the host
+// window when the user resizes. Skipping it means form.show() after
+// the first frame stops triggering a repaint of the GL view (every
+// subsequent screenshot captures whatever the GL view was last asked
+// to paint, which is usually the previous test's form).
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.view == nil) return;
+    CGSize sz = self.view.bounds.size;
+    int newW = (int)(sz.width * scaleValue);
+    int newH = (int)(sz.height * scaleValue);
+    if (newW <= 0 || newH <= 0) return;
+    int dw = newW - displayWidth;
+    int dh = newH - displayHeight;
+    if (dw < 0) dw = -dw;
+    if (dh < 0) dh = -dh;
+    if (dw <= 1 && dh <= 1) {
+        return;
+    }
+    static NSTimeInterval lastFire = 0;
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    if (lastFire != 0 && (now - lastFire) < 0.25) {
+        return;
+    }
+    lastFire = now;
+    displayWidth = newW;
+    displayHeight = newH;
+    screenSizeChanged(displayWidth, displayHeight);
+}
+
+#endif
+
 #ifdef INCLUDE_MOPUB
 @synthesize adView;
 - (void)viewDidLoad {
@@ -2618,6 +2707,29 @@ extern void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MUL
 bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+    // Reapply displayWidth / displayHeight once the view is attached to
+    // its window. The AppDelegate seeds them from [UIScreen mainScreen].bounds
+    // which on Mac Catalyst is the full Mac display (e.g., 1470x956), not
+    // the app window (1024x768 by default). Without this update the form
+    // lays out for the full screen but renders into the window-sized
+    // framebuffer. Doing this in viewDidLayoutSubviews instead caused a
+    // runaway form-relayout loop (observed locally: 70+ GB resident memory
+    // after a minute) -- layoutSubviews fires repeatedly during normal
+    // Catalyst window updates and re-triggering screenSizeChanged on every
+    // cycle re-allocated Metal mutable-image textures faster than the GC
+    // could reclaim them.
+    if (self.view != nil) {
+        CGSize sz = self.view.bounds.size;
+        int newW = (int)(sz.width * scaleValue);
+        int newH = (int)(sz.height * scaleValue);
+        if (newW > 0 && newH > 0 && (displayWidth != newW || displayHeight != newH)) {
+            displayWidth = newW;
+            displayHeight = newH;
+            screenSizeChanged(displayWidth, displayHeight);
+        }
+    }
+#endif
     [self becomeFirstResponder];
     [self updateCanvas:animated];
     // Re-install / bring the status-bar tap proxy to the front. Native peers
@@ -2948,7 +3060,10 @@ EAGLView* lastFoundEaglView;
 
 - (void)awakeFromNib
 {
-#ifdef USE_ES2
+#if defined(USE_ES2) && !defined(CN1_USE_METAL)
+    // CN1transformMatrix/version + cn1CompareMatrices live in CN1ES2compat.m
+    // which is excluded from the Mac Catalyst slice. Skip them on Metal —
+    // CN1Metalcompat manages its own transform state.
     if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
         CN1transformMatrix = GLKMatrix4Identity;
         CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
@@ -2962,11 +3077,18 @@ EAGLView* lastFoundEaglView;
     }
     sharedSingleton = self;
     [self initVars];
+#ifdef CN1_USE_METAL
+    // Metal builds never create an EAGLContext; the METALView owns its own
+    // MTLDevice / MTLCommandQueue. EAGLContext is unavailable on Mac
+    // Catalyst (OpenGLES.framework is absent from the macOS SDK) so we
+    // route around it entirely.
+    self.context = nil;
+#else
 #ifdef USE_ES2
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 #else
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    
+
     if (!aContext) {
         aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
     }
@@ -2975,12 +3097,13 @@ EAGLView* lastFoundEaglView;
         CN1Log(@"Failed to create ES context");
     else if (![EAGLContext setCurrentContext:aContext])
         CN1Log(@"Failed to set ES context current");
-    
+
 	self.context = aContext;
 #ifndef CN1_USE_ARC
     [aContext release];
 #endif
-	
+#endif // !CN1_USE_METAL
+
 #ifndef CN1_USE_METAL
     // METALView has no GL context. Under CN1_USE_METAL this call is a no-op.
     [[self eaglView] setContext:context];
@@ -2997,8 +3120,15 @@ EAGLView* lastFoundEaglView;
     animationFrameInterval = 1;
     self.displayLink = nil;
     
+#ifdef CN1_USE_METAL
+    // Metal builds don't query GL extensions; the OES_draw_texture fast
+    // path is GL-only. Default to true so behaviour matches a typical
+    // device GL response.
+    drawTextureSupported = YES;
+#else
     const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
     drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
+#endif
     //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
     
     // register for keyboard notifications
@@ -3073,24 +3203,33 @@ EAGLView* lastFoundEaglView;
 
         
         GLErrorLog;
-        
+
+#ifndef CN1_USE_METAL
+        // The _glScalef / _glTranslatef pair flips the splash image into the
+        // GL Y-up coordinate system used by DrawImage. On Metal builds the
+        // projection flip is handled inside CN1MetalBeginFrame so the
+        // manual setup is unnecessary; the helpers themselves live in
+        // CN1ES2compat.m which is excluded from the Mac Catalyst slice.
         _glScalef(xScale, -1, 1);
         GLErrorLog;
         _glTranslatef(0, -he, 0);
         GLErrorLog;
-        
+#endif
+
         [dr execute];
 #ifndef CN1_USE_ARC
         [gl release];
         [dr release];
 #endif
-        
+
+#ifndef CN1_USE_METAL
         _glTranslatef(0, he, 0);
         GLErrorLog;
-        
+
         _glScalef(xScale, -1, 1);
         GLErrorLog;
-        
+#endif
+
         [[self eaglView] presentFramebuffer];
         GLErrorLog;
     }
@@ -3260,19 +3399,23 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)dealloc
 {
+#ifndef CN1_USE_METAL
     if (program) {
         glDeleteProgram(program);
         program = 0;
     }
-    
+#endif
+
+#ifndef CN1_USE_METAL
     // Tear down context.
     if ([EAGLContext currentContext] == context)
         [EAGLContext setCurrentContext:nil];
-    
+#endif
+
 #ifndef CN1_USE_ARC
     [context release];
 #endif
-    
+
 #ifdef INCLUDE_MOPUB
     self.adView = nil;
 #endif
@@ -3318,15 +3461,19 @@ BOOL prefersStatusBarHidden = NO;
 - (void)viewDidUnload
 {
 	[super viewDidUnload];
-	
+
+#ifndef CN1_USE_METAL
     if (program) {
         glDeleteProgram(program);
         program = 0;
     }
-    
+#endif
+
+#ifndef CN1_USE_METAL
     // Tear down context.
     if ([EAGLContext currentContext] == context)
         [EAGLContext setCurrentContext:nil];
+#endif
 	self.context = nil;
 }
 
@@ -3613,10 +3760,16 @@ BOOL prefersStatusBarHidden = NO;
         if([currentTarget count] > 0) {
             [ClipRect setDrawRect:rect];
             //CN1Log(@"Clipping rect to: %i, %i, %i %i", (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height );
+#ifndef CN1_USE_METAL
+            // _glScalef / _glTranslatef expand into glScalefES2 / glTranslatefES2
+            // which live in CN1ES2compat.m (excluded for Mac Catalyst). On
+            // Metal builds the projection flip is handled by CN1MetalBeginFrame
+            // / METALView so this manual setup is unnecessary.
             _glScalef(1, -1, 1);
             GLErrorLog;
             _glTranslatef(0, -displayHeight, 0);
             GLErrorLog;
+#endif // !CN1_USE_METAL
             
             /*if(((int)rect.size.width) != displayWidth || ((int)rect.size.height) != displayHeight) {
              glScissor(rect.origin.x, displayHeight - rect.origin.y - rect.size.height, rect.size.width, rect.size.height);
@@ -3674,11 +3827,13 @@ BOOL prefersStatusBarHidden = NO;
 #ifndef CN1_USE_ARC
             [cp release];
 #endif
+#ifndef CN1_USE_METAL
         	_glTranslatef(0, displayHeight, 0);
             GLErrorLog;
             _glScalef(1, -1, 1);
             GLErrorLog;
-            
+#endif
+
             [DrawGradientTextureCache flushDeleted];
             [DrawStringTextureCache flushDeleted];
             if(firstTime) {
@@ -3755,20 +3910,27 @@ BOOL prefersStatusBarHidden = NO;
 
 - (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file
 {
+#ifdef CN1_USE_METAL
+    // The legacy ES1 shader compilation path is unused on the Metal
+    // backend (CN1Metalcompat / CN1MetalShaders.metal handle everything).
+    // Gating the body keeps the Mac Catalyst slice free of OpenGL symbols.
+    (void)shader; (void)type; (void)file;
+    return FALSE;
+#else
     GLint status;
     const GLchar *source;
-    
+
     source = (GLchar *)[[NSString stringWithContentsOfFile:file encoding:NSUTF8StringEncoding error:nil] UTF8String];
     if (!source)
     {
         CN1Log(@"Failed to load vertex shader");
         return FALSE;
     }
-    
+
     *shader = glCreateShader(type);
     glShaderSource(*shader, 1, &source, NULL);
     glCompileShader(*shader);
-    
+
 #if defined(DEBUG)
     GLint logLength;
     glGetShaderiv(*shader, GL_INFO_LOG_LENGTH, &logLength);
@@ -3780,23 +3942,28 @@ BOOL prefersStatusBarHidden = NO;
         free(log);
     }
 #endif
-    
+
     glGetShaderiv(*shader, GL_COMPILE_STATUS, &status);
     if (status == 0)
     {
         glDeleteShader(*shader);
         return FALSE;
     }
-    
+
     return TRUE;
+#endif
 }
 
 - (BOOL)linkProgram:(GLuint)prog
 {
+#ifdef CN1_USE_METAL
+    (void)prog;
+    return FALSE;
+#else
     GLint status;
-    
+
     glLinkProgram(prog);
-    
+
 #if defined(DEBUG)
     GLint logLength;
     glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
@@ -3808,18 +3975,23 @@ BOOL prefersStatusBarHidden = NO;
         free(log);
     }
 #endif
-    
+
     glGetProgramiv(prog, GL_LINK_STATUS, &status);
     if (status == 0)
         return FALSE;
-    
+
     return TRUE;
+#endif
 }
 
 - (BOOL)validateProgram:(GLuint)prog
 {
+#ifdef CN1_USE_METAL
+    (void)prog;
+    return FALSE;
+#else
     GLint logLength, status;
-    
+
     glValidateProgram(prog);
     glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
     if (logLength > 0)
@@ -3829,22 +4001,26 @@ BOOL prefersStatusBarHidden = NO;
         CN1Log(@"Program validate log:\n%s", log);
         free(log);
     }
-    
+
     glGetProgramiv(prog, GL_VALIDATE_STATUS, &status);
     if (status == 0)
         return FALSE;
-    
+
     return TRUE;
+#endif
 }
 
 - (BOOL)loadShaders
 {
+#ifdef CN1_USE_METAL
+    return FALSE;
+#else
     GLuint vertShader, fragShader;
     NSString *vertShaderPathname, *fragShaderPathname;
-    
+
     // Create shader program.
     program = glCreateProgram();
-    
+
     // Create and compile vertex shader.
     vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
     if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname])
@@ -3852,7 +4028,7 @@ BOOL prefersStatusBarHidden = NO;
         CN1Log(@"Failed to compile vertex shader");
         return FALSE;
     }
-    
+
     // Create and compile fragment shader.
     fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
     if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname])
@@ -3860,23 +4036,23 @@ BOOL prefersStatusBarHidden = NO;
         CN1Log(@"Failed to compile fragment shader");
         return FALSE;
     }
-    
+
     // Attach vertex shader to program.
     glAttachShader(program, vertShader);
-    
+
     // Attach fragment shader to program.
     glAttachShader(program, fragShader);
-    
+
     // Bind attribute locations.
     // This needs to be done prior to linking.
     glBindAttribLocation(program, ATTRIB_VERTEX, "position");
     glBindAttribLocation(program, ATTRIB_COLOR, "color");
-    
+
     // Link program.
     if (![self linkProgram:program])
     {
         CN1Log(@"Failed to link program: %d", program);
-        
+
         if (vertShader)
         {
             glDeleteShader(vertShader);
@@ -3892,20 +4068,21 @@ BOOL prefersStatusBarHidden = NO;
             glDeleteProgram(program);
             program = 0;
         }
-        
+
         return FALSE;
     }
-    
+
     // Get uniform locations.
     uniforms[UNIFORM_TRANSLATE] = glGetUniformLocation(program, "translate");
-    
+
     // Release vertex and fragment shaders.
     if (vertShader)
         glDeleteShader(vertShader);
     if (fragShader)
         glDeleteShader(fragShader);
-    
+
     return TRUE;
+#endif
 }
 
 

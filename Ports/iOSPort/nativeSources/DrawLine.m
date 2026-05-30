@@ -27,6 +27,7 @@
 #import "CN1Metalcompat.h"
 #endif
 #ifdef USE_ES2
+#ifndef CN1_USE_METAL
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
@@ -92,6 +93,7 @@ static GLuint getOGLProgram(){
     return program;
 }
 
+#endif // !CN1_USE_METAL
 #endif
 @implementation DrawLine
 
