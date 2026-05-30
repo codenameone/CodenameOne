@@ -420,6 +420,16 @@ jobs:
           CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
           CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
+          # Enable Apple's Metal API Validation in the simulator. Catches
+          # render-pass / pipeline-state mismatches at the moment they
+          # happen (issue #5103: stencil pixel-format mismatch shipped in
+          # four consecutive 7.0.x releases because no test exercised the
+          # validation layer). assert mode crashes the app on the first
+          # validation error -- the missed CN1SS:SUITE:FINISHED marker
+          # then fails this step. run-ios-ui-tests.sh forwards both vars
+          # to the launched app via simctl --setenv.
+          MTL_DEBUG_LAYER: '1'
+          MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

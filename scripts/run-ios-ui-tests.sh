@@ -625,6 +625,24 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"
 
+  # Thread Metal validation env vars (if set in the caller's environment)
+  # through to the launched app. simctl on Xcode 26 does NOT take a
+  # --setenv flag (`xcrun simctl help launch` confirms); the documented
+  # mechanism is exporting SIMCTL_CHILD_<NAME>=<value> in the shell that
+  # invokes simctl, which the launch helper unwraps into <NAME>=<value>
+  # for the child. CI's Metal job sets MTL_DEBUG_LAYER /
+  # MTL_DEBUG_LAYER_ERROR_MODE at the step level so iOS render-pass /
+  # pipeline-state mismatches (issue #5103) abort the app immediately
+  # instead of producing undefined behaviour off-CI.
+  if [ -n "${MTL_DEBUG_LAYER:-}" ]; then
+    export SIMCTL_CHILD_MTL_DEBUG_LAYER="${MTL_DEBUG_LAYER}"
+    ri_log "Forwarding MTL_DEBUG_LAYER=${MTL_DEBUG_LAYER} to simulator app (via SIMCTL_CHILD_)"
+  fi
+  if [ -n "${MTL_DEBUG_LAYER_ERROR_MODE:-}" ]; then
+    export SIMCTL_CHILD_MTL_DEBUG_LAYER_ERROR_MODE="${MTL_DEBUG_LAYER_ERROR_MODE}"
+    ri_log "Forwarding MTL_DEBUG_LAYER_ERROR_MODE=${MTL_DEBUG_LAYER_ERROR_MODE} to simulator app (via SIMCTL_CHILD_)"
+  fi
+
   launch_simulator_app() {
     local target="$1"
     local attempt=1
