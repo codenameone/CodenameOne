@@ -74,12 +74,16 @@ public class ComponentTreeInspector extends JPanel {
 
         @Override
         public void paint(Graphics g, Rectangle rect) {
-            g.setAlpha(30);
-            g.setColor(0xff0000);
-            
-            g.fillRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
-            
-            g.setAlpha(255);
+            int oldColor = g.getColor();
+            int oldAlpha = g.getAlpha();
+            try {
+                g.setAlpha(30);
+                g.setColor(0xff0000);
+                g.fillRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            } finally {
+                g.setAlpha(oldAlpha);
+                g.setColor(oldColor);
+            }
         }
         
     }
