@@ -1467,10 +1467,6 @@ public class BytecodeMethod implements SignatureSet {
         }
     }
 
-    public void appendMethodCSharp(StringBuilder b) {
-        // todo
-    }
-
     /**
      * @return the methodName
      */

@@ -101,7 +101,7 @@ We would like to improve the performance of the VM further while keeping source/
 Currently VM crashes arn't graceful, it should be pretty easy to extract VM state and log it to a file that can be used on next launch. Since most of the code related to the stack tracking is in C it should be accessible and easy to log this on a crash.
 
 #### Ports
-When we started this work we envisioned a C# compilation target as well. However, we eventually decided to go with iKVM for the Windows 10 port. It might be interesting to port to other platforms and embedded platforms.
+When we started this work we envisioned a C# compilation target as well. That target was never completed and has since been removed. The portable `clean` C target (CMake/LLVM) is the basis for desktop ports. It might be interesting to port to other platforms and embedded platforms.
 
 ## The Name
 

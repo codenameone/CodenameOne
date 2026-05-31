@@ -51,13 +51,6 @@ public class ByteCodeTranslator {
                 return "m";
             }
         },
-        OUTPUT_TYPE_CSHARP {
-            @Override
-            public String extension() {
-                return "cs";
-            }
-
-        },
         OUTPUT_TYPE_CLEAN {
             @Override
             public String extension() {
@@ -151,7 +144,7 @@ public class ByteCodeTranslator {
         }
         
         if(args.length != 9) {
-            System.out.println("We accept 9 arguments output type (ios, csharp, clean, javascript), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
+            System.out.println("We accept 9 arguments output type (ios, clean, javascript), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
             System.exit(1);
             return;
         }
@@ -166,14 +159,16 @@ public class ByteCodeTranslator {
             System.out.println("Generating Unit Tests");
             ByteCodeClass.setSaveUnitTests(true);
         }
+        boolean recognizedOutputType = true;
         if(args[0].equalsIgnoreCase("ios")) {
             output = OutputType.OUTPUT_TYPE_IOS;
-        } else if(args[0].equalsIgnoreCase("csharp")) {
-            output = OutputType.OUTPUT_TYPE_CSHARP;
         } else if(args[0].equalsIgnoreCase("clean")) {
             output = OutputType.OUTPUT_TYPE_CLEAN;
         } else if(args[0].equalsIgnoreCase("javascript")) {
             output = OutputType.OUTPUT_TYPE_JAVASCRIPT;
+        } else {
+            // Unrecognized output type falls back to the plain copy-through default handler
+            recognizedOutputType = false;
         }
         String[] sourceDirectories = args[1].split(";");
         File[] sources = new File[sourceDirectories.length];
@@ -193,6 +188,10 @@ public class ByteCodeTranslator {
         }
         
         ByteCodeTranslator b = new ByteCodeTranslator();
+        if (!recognizedOutputType) {
+            handleDefaultOutput(b, sources, dest);
+            return;
+        }
         switch (output) {
             case OUTPUT_TYPE_IOS:
                 handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
@@ -246,6 +245,14 @@ public class ByteCodeTranslator {
         }
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), Files.newOutputStream(xmlvm.toPath()));
+
+        // Win32 POSIX compatibility shim. Always emitted; both files are gated on
+        // _WIN32 internally, so they compile to nothing on iOS/macOS/Linux and
+        // provide pthreads/usleep/gettimeofday on Windows (clang-cl / MSVC ABI).
+        File cn1WinCompatH = new File(srcRoot, "cn1_win_compat.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.h"), Files.newOutputStream(cn1WinCompatH.toPath()));
+        File cn1WinCompatC = new File(srcRoot, "cn1_win_compat.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_win_compat.c"), Files.newOutputStream(cn1WinCompatC.toPath()));
 
         Parser.writeOutput(srcRoot);
 
@@ -567,7 +574,9 @@ public class ByteCodeTranslator {
         try (Writer writer = new OutputStreamWriter(Files.newOutputStream(cmakeLists.toPath()), StandardCharsets.UTF_8)) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C)\n");
-            writer.append("set(CMAKE_C_STANDARD 99)\n");
+            // C11 for <stdatomic.h> (cn1_globals.h) and _Static_assert (Win32 shim);
+            // supported by clang/clang-cl, gcc and Xcode's clang alike.
+            writer.append("set(CMAKE_C_STANDARD 11)\n");
             writer.append("set(CN1_APP_SOURCE_ROOT \"")
                     .append(escapeCmakePath(srcRootPath))
                     .append("\")\n");

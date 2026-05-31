@@ -135,11 +135,29 @@ public class CompilerHelper {
         return null;
     }
 
-    private static String executableName(String base) {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+    public static boolean isWindows() {
+        return System.getProperty("os.name").toLowerCase().contains("win");
+    }
+
+    public static String executableName(String base) {
+        if (isWindows()) {
             return base + ".exe";
         }
         return base;
+    }
+
+    /**
+     * CMake configure flags selecting the C toolchain for the clean target. On
+     * Windows we drive LLVM via the MSVC ABI (clang-cl) through the Ninja
+     * generator, since the default Visual Studio generator would otherwise pick
+     * MSVC's cl.exe and place binaries under a Release/ subdirectory. Elsewhere
+     * we keep the existing clang invocation.
+     */
+    public static List<String> cmakeToolchainArgs() {
+        if (isWindows()) {
+            return Arrays.asList("-G", "Ninja", "-DCMAKE_C_COMPILER=clang-cl");
+        }
+        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_OBJC_COMPILER=clang");
     }
 
     public static List<CompilerConfig> getAvailableCompilers(String targetVersion) {
@@ -345,17 +363,16 @@ public class CompilerHelper {
             java.nio.file.Path buildDir = distDir.resolve("build");
             java.nio.file.Files.createDirectories(buildDir);
 
-            CleanTargetIntegrationTest.runCommand(Arrays.asList(
+            List<String> configure = new ArrayList<>(Arrays.asList(
                     "cmake",
                     "-S", distDir.toString(),
-                    "-B", buildDir.toString(),
-                    "-DCMAKE_C_COMPILER=clang",
-                    "-DCMAKE_OBJC_COMPILER=clang"
-            ), distDir);
+                    "-B", buildDir.toString()));
+            configure.addAll(cmakeToolchainArgs());
+            CleanTargetIntegrationTest.runCommand(configure, distDir);
 
             CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
-            java.nio.file.Path executable = buildDir.resolve("ExecutorApp");
+            java.nio.file.Path executable = buildDir.resolve(executableName("ExecutorApp"));
             String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
             return output.contains(expectedOutput);
 

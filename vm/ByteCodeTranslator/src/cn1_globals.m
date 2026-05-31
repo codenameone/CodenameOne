@@ -21,7 +21,9 @@
 #import <mach/mach_host.h>
 #else
 #include <time.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #define NSLog(...) printf(__VA_ARGS__); printf("\n")
 #endif
 
