@@ -219,6 +219,16 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             // them too so the backdrop reads edge-to-edge.
             form.getContentPane().getUnselectedStyle().setBgTransparency((byte) 0);
             form.getTitleArea().getUnselectedStyle().setBgTransparency((byte) 0);
+            // Render the backdrop texture now, before show(), so the
+            // mutable-image render happens off the screen paint pass. The
+            // form fills the display, so its paintBackground rect is the full
+            // display size - render at exactly that size so paint() hits the
+            // cached-blit fast path and never opens a nested mutable-image
+            // encoder during the screen render pass (the iOS Metal hang that
+            // dropped the suite from 122 to 107). See
+            // TextureBackdropPainter.prepare.
+            Display display = Display.getInstance();
+            backdrop.prepare(display.getDisplayWidth(), display.getDisplayHeight());
         }
         if (!annotations.isEmpty()) {
             form.setGlassPane(new AnnotationPainter(annotations, dark));
@@ -489,6 +499,32 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             this.dark = dark;
         }
 
+        /**
+         * Render the texture into the cached Image up front, OFF the paint
+         * pass. Call this on the EDT before the form is shown so that
+         * {@link #paint} only ever blits an already-finished bitmap.
+         *
+         * The mutable-image render (Image.createImage().getGraphics() + the
+         * scanline fill loop) opens its own render target. On the iOS Metal
+         * port, doing that from inside Form.paintBackground() - i.e. while
+         * the screen's render-command encoder is still open - nests a second
+         * encoder on the same command buffer and races the global active
+         * encoder. On CI that intermittently hung the renderer partway
+         * through the suite: the app stopped emitting after DialogTheme (the
+         * only textured-backdrop test) so that screenshot and every one
+         * after it came back missing, silently shrinking the run from 122
+         * captures to 107. Rendering here, before show(), keeps the
+         * mutable-image encoder entirely outside the screen render pass.
+         */
+        void prepare(int w, int h) {
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            if (cached == null || cached.getWidth() != w || cached.getHeight() != h) {
+                cached = renderTexture(w, h);
+            }
+        }
+
         @Override
         public void paint(Graphics g, Rectangle rect) {
             int x = rect.getX();
@@ -498,12 +534,30 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             if (w <= 0 || h <= 0) {
                 return;
             }
-            if (cached == null || cached.getWidth() != w || cached.getHeight() != h) {
-                cached = renderTexture(w, h);
-            }
-            if (cached != null) {
+            if (cached != null && cached.getWidth() == w && cached.getHeight() == h) {
                 g.drawImage(cached, x, y);
+                return;
             }
+            // Fallback only: prepare() did not cover this exact size (e.g. an
+            // orientation change between prepare and paint). Paint a plain
+            // solid base instead of rendering the mutable-image texture here -
+            // rendering it inside the screen paint pass is exactly the nested-
+            // encoder hang prepare() exists to avoid. The capture path always
+            // calls prepare() at the right size first, so this is only a
+            // safety net, never the screenshotted frame.
+            int oldColor = g.getColor();
+            int oldAlpha = g.getAlpha();
+            g.setAlpha(255);
+            g.setColor(baseColor());
+            g.fillRect(x, y, w, h);
+            g.setColor(oldColor);
+            g.setAlpha(oldAlpha);
+        }
+
+        private int baseColor() {
+            // Base fill - a neutral mid-tone so stripes have somewhere to
+            // sit. Dark mode uses a dark base, light uses a light base.
+            return dark ? 0x202030 : 0xf0e8f8;
         }
 
         private com.codename1.ui.Image renderTexture(int w, int h) {
@@ -513,7 +567,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
             // Base fill - a neutral mid-tone so stripes have somewhere
             // to sit. Dark mode uses a dark base, light uses a light base.
             ig.setAlpha(255);
-            ig.setColor(dark ? 0x202030 : 0xf0e8f8);
+            ig.setColor(baseColor());
             ig.fillRect(0, 0, w, h);
 
             // Diagonal stripes painted as rotated rectangles. 6mm-ish band
