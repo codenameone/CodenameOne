@@ -3723,6 +3723,23 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   if (global.console && typeof global.console.log === "function") {
     global.console.log("CN1SS:INFO:suite starting test=" + nativeTestName);
   }
+  // Suite-level wrapper invalidation: bump the generation at every test
+  // boundary so each test's first ``getDocument`` lookup re-fetches
+  // through the host bridge. Without this, host-bridge wrapper corruption
+  // (the documented NUMBER_FOR_OBJECT value=667 case) accumulates
+  // silently across the canvas-accumulation tail. ButtonTheme and
+  // TextFieldTheme finish cleanly when invalidation only fires on
+  // force-timeout, but CheckBoxRadio (2 tests later) inherits a stale
+  // wrapper because the gen counter doesn't bump between healthy tests.
+  // Per-test invalidation costs one extra ``jvm.invokeHostNative``
+  // round-trip on each test's first paint — negligible against the
+  // observed test budget — and eliminates the staleness window
+  // entirely.
+  try {
+    cn1ssDocWrapperInvalidateGen = (cn1ssDocWrapperInvalidateGen | 0) + 1;
+  } catch (_genErr) {
+    // Best-effort; never let a counter bump block the dispatch.
+  }
   const forcedTimeoutReason = cn1ssForcedTimeoutTestClasses[effectiveTestClassId]
     || cn1ssForcedTimeoutTestNames[nativeTestName]
     || null;
