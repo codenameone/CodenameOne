@@ -1139,6 +1139,17 @@ bindNative([
   // a re-fetch through the host bridge yields a fresh, well-formed
   // wrapper. This is also what causes the late-suite tests
   // (Sheet/SheetSlide/Toast/CssGradients/themes) to flake-hang.
+  // Suite-level invalidation request: when the runner force-times-out a
+  // test under ``canvasContextWipe`` (and similar host-bridge corruption
+  // reasons), it bumps ``cn1ssDocWrapperInvalidateGen`` so the next
+  // ``getDocument`` lookup re-fetches through the host bridge instead of
+  // inheriting the corrupted wrapper. See the
+  // ``cn1ssDocWrapperInvalidateGen`` bump in the
+  // ``Cn1ssDeviceRunner.lambdaBridge`` force-timeout handler below.
+  if (win && win.__cn1CachedDocWrapper
+          && win.__cn1CachedDocWrapperGen !== cn1ssDocWrapperInvalidateGen) {
+    try { win.__cn1CachedDocWrapper = null; } catch (_e) {}
+  }
   if (win && win.__cn1HostRef != null && win.__cn1CachedDocWrapper
           && win.__cn1CachedDocWrapper.__class) {
     // Additional sanity check: the wrapper may have a valid ``__class``
@@ -1172,7 +1183,13 @@ bindNative([
     }
     const docWrapper = jvm.wrapJsObject(hostResult, "com_codename1_html5_js_dom_HTMLDocument");
     jvm.enhanceJsWrapper(docWrapper, documentExtClass);
-    try { win.__cn1CachedDocWrapper = docWrapper; } catch (_e) {}
+    try {
+      win.__cn1CachedDocWrapper = docWrapper;
+      // Stamp the cache with the current invalidation generation so a
+      // suite-level invalidate request (force-timeout handler bumping
+      // ``cn1ssDocWrapperInvalidateGen``) makes the next lookup re-fetch.
+      win.__cn1CachedDocWrapperGen = cn1ssDocWrapperInvalidateGen;
+    } catch (_e) {}
     return docWrapper;
   }
   if (typeof jvm.invokeHostNative === "function" && (!win || !win.document)) {
@@ -3181,6 +3198,22 @@ const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hel
 // finalize at this deadline; with 48 tests and a 150s browser lifetime budget a
 // longer deadline cannot fit.
 const cn1ssTestTimeoutMs = 10000;
+// Generation counter for invalidating cached host-bridge wrappers (e.g.
+// ``__cn1CachedDocWrapper`` set by getDocument at ~line 1186) across
+// test boundaries. Bumped by the force-timeout handler in
+// ``runCn1ssResolvedTest`` whenever a test is skipped under
+// ``canvasContextWipe`` / similar wrapper-corruption reasons, so the
+// next test's first ``getDocument`` lookup re-fetches a fresh wrapper
+// through the host bridge instead of inheriting the stale one. The
+// cache check at ~line 1152 compares this counter to the wrapper's
+// stamped ``__cn1CachedDocWrapperGen`` and invalidates on mismatch.
+// Use ``var`` rather than ``let`` so the binding is hoisted (the
+// getDocument generator body at ~line 1150 references it, and the
+// bindNative registration runs before this declaration is reached in
+// the top-down script evaluation — though the generator body itself
+// only runs much later, var keeps the temporal-dead-zone risk away
+// from any reordering during minification or future hoisting changes).
+var cn1ssDocWrapperInvalidateGen = 0;
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
 // The translator numbers lambdas in their declaration order within the class.
@@ -3697,29 +3730,23 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     emitDiagLine("PARPAR:DIAG:FALLBACK:key=FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":HIT");
     // Force-timeout reasons like ``canvasContextWipe`` indicate the
     // host-bridge document/canvas wrappers are in a bad state — the
-    // very condition that made the test unrunnable. The cached
-    // ``__cn1CachedDocWrapper`` set at lines ~1142 may still point at
-    // a wrapper whose underlying host receiver returns garbage (the
-    // documented "NUMBER_FOR_OBJECT value=667" case where
-    // ``window.getDocument()`` resolves to the JS Number 667).
-    // Existing invalidation triggers on ``!wrapper.__class``, but the
-    // 667-flavour wrapper has a class — its host-ref is broken. The
-    // next test (e.g. ButtonThemeScreenshotTest right after
-    // ToastBarTopPositionScreenshotTest's ``canvasContextWipe`` skip)
-    // then hangs on ``Missing JS member createElement for host
-    // receiver`` thrown out of its first canvas-creating paint.
-    // Blowing the cache here forces the next ``getDocument()`` lookup
-    // to round-trip through the host bridge, which has a much higher
-    // chance of returning a sane Document.
+    // very condition that made the test unrunnable. Bump the suite-
+    // level invalidation generation so the next ``getDocument`` lookup
+    // re-fetches through the host bridge instead of returning the
+    // stale wrapper (whose ``__cn1HostRef`` may now be the JS Number
+    // 667 — viewport height — per the documented NUMBER_FOR_OBJECT
+    // value=667 host-bridge bug). Without this, the next test (e.g.
+    // ButtonThemeScreenshotTest right after ToastBarTopPositionScreen-
+    // shotTest's ``canvasContextWipe`` skip) hangs on ``Missing JS
+    // member createElement for host receiver`` thrown out of its first
+    // canvas-creating paint. The cache stores the wrapper on the
+    // Window Java-wrapper instance, not on globalThis, so we can't
+    // null it from here — but the getDocument check compares the
+    // stamped generation against this counter and invalidates on
+    // mismatch.
     try {
-      const winRef = (typeof global !== "undefined" && global)
-        || (typeof globalThis !== "undefined" && globalThis)
-        || (typeof window !== "undefined" && window)
-        || null;
-      if (winRef && winRef.__cn1CachedDocWrapper) {
-        winRef.__cn1CachedDocWrapper = null;
-        emitDiagLine("PARPAR:DIAG:FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":docWrapperInvalidated");
-      }
+      cn1ssDocWrapperInvalidateGen = (cn1ssDocWrapperInvalidateGen | 0) + 1;
+      emitDiagLine("PARPAR:DIAG:FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":docWrapperInvalidateGenBumped=" + cn1ssDocWrapperInvalidateGen);
     } catch (_invalidateErr) {
       // Best-effort cleanup; never let the invalidation throw block the
       // forced finalize path.
