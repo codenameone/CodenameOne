@@ -3514,6 +3514,21 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
+        // Constraint-aware background work / BackgroundTask map to BGTaskScheduler. The
+        // permitted identifiers are declared via ios.backgroundProcessingIds (comma list,
+        // default <packageName>.processing). Their presence implies the "processing"
+        // background mode.
+        String backgroundProcessingIds = request.getArg("ios.backgroundProcessingIds", null);
+        if (backgroundProcessingIds == null && "true".equals(request.getArg("ios.usesBackgroundProcessing", "false"))) {
+            backgroundProcessingIds = request.getPackageName() + ".processing";
+        }
+        if (backgroundProcessingIds != null && backgroundProcessingIds.trim().length() > 0) {
+            if (backgroundModesStr == null || !backgroundModesStr.contains("processing")) {
+                backgroundModesStr = (backgroundModesStr == null || backgroundModesStr.trim().length() == 0)
+                        ? "processing" : backgroundModesStr + ",processing";
+            }
+        }
+
         if (backgroundModesStr != null) {
             String[] backgroundModes = backgroundModesStr.split(",");
             if (!inject.contains("UIBackgroundModes")) {
@@ -3530,8 +3545,28 @@ public class IPhoneBuilder extends Executor {
                 inject += "</array>";
             } else {
                 throw new IOException("You cannot use both ios.background_modes build hint and use UIBackgroundModes in the ios.plistInject build hint.  Choose one or the other");
-                
+
             }
+        }
+
+        // BGTaskScheduler permitted identifiers (iOS 13+). Required or iOS throws when the
+        // app registers/submits a background processing task.
+        if (backgroundProcessingIds != null && backgroundProcessingIds.trim().length() > 0
+                && !inject.contains("BGTaskSchedulerPermittedIdentifiers")) {
+            inject += "\n<key>BGTaskSchedulerPermittedIdentifiers</key><array>";
+            for (String id : backgroundProcessingIds.split(",")) {
+                if (id.trim().length() > 0) {
+                    inject += "<string>" + id.trim() + "</string>";
+                }
+            }
+            inject += "</array>";
+        }
+
+        // Receive-shared-content: the host app reads the shared payload from this App Group
+        // suite (written by the share extension). See ios.shareAppGroup build hint.
+        String shareAppGroup = request.getArg("ios.shareAppGroup", null);
+        if (shareAppGroup != null && shareAppGroup.trim().length() > 0 && !inject.contains("CN1ShareAppGroup")) {
+            inject += "\n<key>CN1ShareAppGroup</key><string>" + shareAppGroup.trim() + "</string>";
         }
 
         BufferedReader infoReader = new BufferedReader(new InputStreamReader(

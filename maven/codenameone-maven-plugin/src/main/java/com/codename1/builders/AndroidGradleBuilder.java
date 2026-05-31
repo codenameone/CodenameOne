@@ -284,6 +284,8 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesBiometrics;
     private boolean usesNfc;
     private boolean usesNfcHce;
+    private boolean usesForegroundService;
+    private boolean usesSharedContent;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1301,6 +1303,13 @@ public class AndroidGradleBuilder extends Executor {
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
                             usesNfcHce = true;
                         }
+                    }
+
+                    if (cls.equals("com/codename1/background/ForegroundService")) {
+                        usesForegroundService = true;
+                    }
+                    if (cls.equals("com/codename1/share/SharedContent")) {
+                        usesSharedContent = true;
                     }
 
                     // OidcClient / SystemBrowser drive sign-in through
@@ -2399,6 +2408,48 @@ public class AndroidGradleBuilder extends Executor {
         String backgroundFetchService = "<service android:name=\"com.codename1.impl.android.BackgroundFetchHandler\" android:exported=\"false\" />\n"+
                 "<activity android:name=\"com.codename1.impl.android.CodenameOneBackgroundFetchActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n";
 
+        // Constraint-aware background work always registers the JobScheduler service
+        // (harmless when unused). The foreground service entry is emitted only when the
+        // app references com.codename1.background.ForegroundService.
+        String backgroundWorkService = "<service android:name=\"com.codename1.impl.android.CodenameOneJobService\" android:permission=\"android.permission.BIND_JOB_SERVICE\" android:exported=\"false\" />\n";
+        String foregroundServiceEntry = "";
+        if (usesForegroundService) {
+            foregroundServicePermission = true;
+            String foregroundServiceType = request.getArg("android.foregroundServiceType", "dataSync");
+            foregroundServiceEntry = "<service android:name=\"com.codename1.impl.android.CodenameOneForegroundService\" android:exported=\"false\" android:foregroundServiceType=\"" + foregroundServiceType + "\" />\n";
+        }
+
+        // Receive-shared-content: register the share receiver activity with SEND /
+        // SEND_MULTIPLE intent filters for the mime types named by android.shareFilter
+        // (comma separated). When the app references SharedContent but sets no explicit
+        // filter, fall back to text and any stream. Empty when the app does not opt in.
+        String shareFilterArg = request.getArg("android.shareFilter", "");
+        if ((shareFilterArg == null || shareFilterArg.trim().length() == 0) && usesSharedContent) {
+            shareFilterArg = "text/plain,*/*";
+        }
+        String shareReceiverActivity = "";
+        if (shareFilterArg != null && shareFilterArg.trim().length() > 0) {
+            StringBuilder dataLines = new StringBuilder();
+            for (String mime : shareFilterArg.split(",")) {
+                String m = mime.trim();
+                if (m.length() > 0) {
+                    dataLines.append("        <data android:mimeType=\"").append(m).append("\" />\n");
+                }
+            }
+            shareReceiverActivity = "<activity android:name=\"com.codename1.impl.android.CodenameOneShareReceiverActivity\" android:exported=\"true\" android:theme=\"@android:style/Theme.NoDisplay\" android:launchMode=\"singleTop\">\n"
+                    + "    <intent-filter>\n"
+                    + "        <action android:name=\"android.intent.action.SEND\" />\n"
+                    + "        <category android:name=\"android.intent.category.DEFAULT\" />\n"
+                    + dataLines
+                    + "    </intent-filter>\n"
+                    + "    <intent-filter>\n"
+                    + "        <action android:name=\"android.intent.action.SEND_MULTIPLE\" />\n"
+                    + "        <category android:name=\"android.intent.category.DEFAULT\" />\n"
+                    + dataLines
+                    + "    </intent-filter>\n"
+                    + "</activity>\n";
+        }
+
         // Host card emulation service is generated only when the classpath
         // scanner saw a HostCardEmulationService reference (or the developer
         // set the android.hceAids build hint). The matching apduservice.xml
@@ -2804,6 +2855,9 @@ public class AndroidGradleBuilder extends Executor {
                 + backgroundLocationReceiver
                 + mediabuttonReceiver
                 + backgroundFetchService
+                + backgroundWorkService
+                + foregroundServiceEntry
+                + shareReceiverActivity
                 + locationServices
                 + mediaService
                 + remoteControlService
@@ -2866,9 +2920,26 @@ public class AndroidGradleBuilder extends Executor {
                 + "            if(intent != null && intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationID\")){\n"
                 + "                String id = intent.getExtras().getString(\"LocalNotificationID\");\n"
                 + "                intent.removeExtra(\"LocalNotificationID\");\n"
+                + "                if(intent.getExtras() != null && intent.getExtras().containsKey(\"LocalNotificationActionId\")){\n"
+                + "                    com.codename1.push.PushContent.reset();\n"
+                + "                    String actionId = intent.getExtras().getString(\"LocalNotificationActionId\");\n"
+                + "                    com.codename1.push.PushContent.setActionId(actionId);\n"
+                + "                    com.codename1.push.PushContent.setActionTitle(intent.getExtras().getString(\"LocalNotificationActionTitle\"));\n"
+                + "                    intent.removeExtra(\"LocalNotificationActionId\");\n"
+                + "                    intent.removeExtra(\"LocalNotificationActionTitle\");\n"
+                + "                    if(com.codename1.impl.android.compat.app.RemoteInputWrapper.isSupported()){\n"
+                + "                        android.os.Bundle textExtras = com.codename1.impl.android.compat.app.RemoteInputWrapper.getResultsFromIntent(intent);\n"
+                + "                        if(textExtras != null){\n"
+                + "                            CharSequence cs = textExtras.getCharSequence(actionId + \"$Result\");\n"
+                + "                            if(cs != null){ com.codename1.push.PushContent.setTextResponse(cs.toString()); }\n"
+                + "                        }\n"
+                + "                    }\n"
+                + "                }\n"
                 + "                ((com.codename1.notifications.LocalNotificationCallback)i).localNotificationReceived(id);\n"
                 + "            }\n"
-                + "        }\n";
+                + "        }\n"
+                + "        com.codename1.impl.android.AndroidImplementation.setCurrentApplicationInstance(i);\n"
+                + "        com.codename1.impl.android.AndroidImplementation.deliverPendingSharedContent();\n";
 
 
         // Install the build-time-generated @Route dispatcher before the
