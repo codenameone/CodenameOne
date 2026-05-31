@@ -231,6 +231,25 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
     }
 
     @FormTest
+    void pingReturnsTrueWhenServerResponds() {
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse(
+                "http://example.com/health", 200, "OK", new byte[0]);
+        assertTrue(manager.ping("http://example.com/health", 5000));
+    }
+
+    @FormTest
+    void pingReturnsTrueOn404() {
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse(
+                "http://example.com/missing", 404, "Not Found", new byte[0]);
+        assertTrue(manager.ping("http://example.com/missing", 5000));
+    }
+
+    @Test
+    void pingNullUrlThrows() {
+        assertThrows(IllegalArgumentException.class, () -> manager.ping(null, 1000));
+    }
+
+    @FormTest
     void testAddToQueueAndWait() throws Exception {
         final ConnectionRequest req = new ConnectionRequest() {
             @Override
