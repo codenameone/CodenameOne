@@ -1,0 +1,141 @@
+== Desktop Integration
+
+Codename One is mobile-first, but the same app can run on the desktop: as a Java SE
+"`Run as desktop app`" / executable jar, and as a native macOS app via the local
+`mac-source` (Mac Catalyst) build target. By default a desktop build looks like a phone
+app in a window - a mobile-style `Toolbar` at the top of every `Form`, fading touch
+scrollbars, and commands tucked into a hamburger side menu.
+
+The desktop integration features make a desktop build *feel* like a desktop app:
+
+* A native window title bar that shows the `Form` title (instead of the in-app `Toolbar`).
+* A native menu bar populated from your `Command` objects, with per-command placement hints
+  (About, File, Edit, Quit, ...).
+* Interactive scrollbars - a draggable thumb, click-to-page on the track, and an
+  always-visible (rather than fading) scrollbar.
+
+These behaviors are *opt-in*. They are switched on by default for newly generated projects
+(both the Maven archetype and the start.codenameone.com initializr) and stay completely
+inert on phones/tablets - all of the new behavior is gated on `CN.isDesktop()`, so a mobile
+build of the same project is unaffected.
+
+=== Title-bar modes
+
+The window chrome is selected by the `desktop.titleBar` setting, which takes one of three values:
+
+[cols="1,4"]
+|===
+|`native` |Hide the CN1 `Toolbar`. The `Form` title goes into the OS window title bar and the
+toolbar's commands are bridged to a native menu bar. This is the default for newly generated apps.
+|`custom` |Undecorated window with a Codename One-drawn title bar - minimise / maximise / close
+caption buttons plus a draggable title region. Fully themeable (see <<desktop-theme-uiids>>).
+|`toolbar`|Legacy behavior - the in-app CN1 `Toolbar` is shown exactly as on mobile.
+|===
+
+==== Enabling it on the Java SE desktop build
+
+For the desktop (Java SE) target the mode is a build hint that the generated desktop launcher
+applies for you. In `codenameone_settings.properties`:
+
+[source,properties]
+-----
+codename1.arg.desktop.titleBar=native
+codename1.arg.desktop.interactiveScrollbars=true
+-----
+
+Newly generated projects already contain these lines. The generated `<MainName>Stub` reads them
+at startup, so no code is required. Because the stub is the desktop entry point, the settings only
+ever take effect on the desktop.
+
+==== Enabling it on the macOS (Mac Catalyst) build
+
+The local `mac-source` build runs through ParparVM and the iOS port, where the chrome is provided
+by native `UIWindowScene` / `UIMenuBuilder` code. There it is read as a runtime property and
+defaults to `toolbar`, so existing Catalyst apps are unaffected. Opt in from your app before the
+first `Form` is shown:
+
+[source,java]
+-----
+Display.getInstance().setProperty("desktop.titleBar", "native");
+Display.getInstance().setProperty("desktop.interactiveScrollbars", "true");
+-----
+
+NOTE: The native title bar and native menu bar on macOS require iOS 13 / macOS 10.15 (Catalyst)
+or newer. On a phone/tablet iOS build these properties are ignored.
+
+=== Native menu bar and command placement hints
+
+When the `Toolbar` is hidden (`native` or `custom` mode), the commands you add through the
+`Toolbar` / `Form` command API are bridged to the platform's native menu bar - a Swing `JMenuBar`
+(which becomes the macOS screen menu) on the Java SE build, and a `UIMenuBuilder` menu on Catalyst.
+Selecting a menu item runs the command's `actionPerformed` on the Codename One EDT, exactly as a
+button press would.
+
+By default every command lands under a single *Commands* menu. To place commands into the
+conventional desktop menus, tag them with a desktop-menu hint using `Command.setDesktopMenu(String)`
+and the `Command.DESKTOP_MENU_*` constants:
+
+[source,java]
+-----
+Form hi = new Form("My App", BoxLayout.y());
+
+Command about = new Command("About My App");
+about.setDesktopMenu(Command.DESKTOP_MENU_ABOUT);   // application menu
+
+Command open = new Command("Open File...");
+open.setDesktopMenu(Command.DESKTOP_MENU_FILE);     // File menu
+
+Command quit = new Command("Quit");
+quit.setDesktopMenu(Command.DESKTOP_MENU_QUIT);     // application menu
+
+hi.addCommand(about);
+hi.addCommand(open);
+hi.addCommand(quit);
+hi.show();
+-----
+
+The recognised values are (case-insensitive):
+
+[cols="1,3"]
+|===
+|`DESKTOP_MENU_APP`, `DESKTOP_MENU_ABOUT`, `DESKTOP_MENU_PREFERENCES`, `DESKTOP_MENU_QUIT`
+|Placed in the application menu (the macOS app menu / a leading menu).
+|`DESKTOP_MENU_FILE`, `DESKTOP_MENU_EDIT`, `DESKTOP_MENU_VIEW`, `DESKTOP_MENU_WINDOW`, `DESKTOP_MENU_HELP`
+|Placed in the matching standard top-level menu.
+|Any other string |Becomes a top-level menu with that literal title.
+|Unset |Grouped under a default *Commands* menu.
+|===
+
+Each port maps the hint to its native structure: on Catalyst the command is inserted into the real
+`UIMenuApplication` / `UIMenuFile` / `UIMenuEdit` / ... menus; on the Java SE build a top-level
+`JMenu` is created per hint group.
+
+TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it is inert on platforms that
+don't have a native menu bar - it's safe to set it unconditionally in shared code.
+
+=== Interactive scrollbars
+
+Enabling `desktop.interactiveScrollbars` turns the scrollbar from a fading touch indicator into a
+desktop-style control: the thumb can be grabbed and dragged, clicking the track pages toward the
+pointer, and the scrollbar stays visible rather than fading out. This is a cross-platform core
+feature driven by the `interactiveScrollBool` theme constant, which the desktop ports inject only
+when `CN.isDesktop()` is true. Mouse-wheel scrolling continues to work as before.
+
+[#desktop-theme-uiids]
+=== Theme UIIDs
+
+When interactive scrollbars or the custom title bar are active, the desktop chrome is styled through
+dedicated UIIDs so the mobile `Scroll` / `ScrollThumb` styling is never affected:
+
+[cols="1,3"]
+|===
+|`DesktopScroll`, `DesktopScrollThumb`, `DesktopHorizontalScroll`, `DesktopHorizontalScrollThumb`
+|The interactive desktop scrollbar track and thumb. The horizontal-/vertical-scroll UIID's padding
+sets the scrollbar gutter width.
+|`WindowTitleBar`, `WindowDragArea` |The `custom`-mode title-bar container and its draggable title region.
+|`WindowMinButton`, `WindowMaxButton`, `WindowCloseButton` |The `custom`-mode caption buttons.
+|===
+
+The modern native themes ship platform-conventional defaults for these UIIDs (macOS-style in the iOS
+theme, Material-style in the Android theme); see <<native-modern-themes>>. Override them in your
+app's `theme.css` like any other UIID.
