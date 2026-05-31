@@ -154,6 +154,8 @@ public class Form extends Container {
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
+    /// The title label of the CN1-drawn custom desktop window chrome, when in "custom" mode
+    private Label customWindowTitleLabel;
     /// A text component that will receive focus and start editing immediately as the form is shown
     private TextArea editOnShow;
     private int overrideInvisibleAreaUnderVKB = -1;
@@ -840,6 +842,86 @@ public class Form extends Container {
             return toolbar;
         }
         return titleArea;
+    }
+
+    /// Returns the configured desktop title-bar mode ({@code native}, {@code custom} or
+    /// {@code toolbar}). Sourced from the implementation (desktop ports report the real mode;
+    /// everything else returns {@code toolbar}).
+    String getDesktopTitleBarMode() {
+        return Display.impl.getDesktopTitleBarMode();
+    }
+
+    /// Indicates that this form runs on the desktop in a title-bar mode that hides the CN1
+    /// Toolbar in favor of the native window chrome (native OS title bar or a custom CN1-drawn
+    /// title bar) and bridges commands to a native menu bar. Inert (false) on mobile because
+    /// {@link Display#isDesktop()} is false and the theme constant is absent.
+    boolean isDesktopNativeChrome() {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        String m = getDesktopTitleBarMode();
+        return "native".equals(m) || "custom".equals(m);
+    }
+
+    /// Builds the CN1-drawn title bar for the {@code custom} desktop chrome mode: a draggable
+    /// title region plus minimize / maximize / close caption buttons that drive the native
+    /// (undecorated) window through the implementation hooks. Themed via the {@code WindowTitleBar},
+    /// {@code WindowDragArea} and {@code Window*Button} UIIDs. Invoked from the toolbar's menu-bar
+    /// initialization when the mode is {@code custom}.
+    void installCustomWindowChrome() {
+        Container bar = new Container(new BorderLayout());
+        bar.setUIID("WindowTitleBar");
+
+        Label titleLabel = new Label(getTitle() == null ? "" : getTitle());
+        titleLabel.setUIID("WindowDragArea");
+        titleLabel.addPointerPressedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
+            }
+        });
+        titleLabel.addPointerDraggedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Display.impl.dragNativeWindow(evt.getX(), evt.getY());
+            }
+        });
+        customWindowTitleLabel = titleLabel;
+        bar.add(BorderLayout.CENTER, titleLabel);
+
+        Button close = new Button();
+        close.setUIID("WindowCloseButton");
+        close.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Display.impl.closeNativeWindow();
+            }
+        });
+        Button min = new Button();
+        min.setUIID("WindowMinButton");
+        min.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Display.impl.minimizeNativeWindow();
+            }
+        });
+        Button max = new Button();
+        max.setUIID("WindowMaxButton");
+        max.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Display.impl.toggleMaximizeNativeWindow();
+            }
+        });
+
+        Container buttons = new Container(new com.codename1.ui.layouts.BoxLayout(com.codename1.ui.layouts.BoxLayout.X_AXIS));
+        // macOS-style ordering: close, minimize, maximize on the leading edge
+        buttons.add(close);
+        buttons.add(min);
+        buttons.add(max);
+        bar.add(BorderLayout.WEST, buttons);
+
+        addComponentToForm(BorderLayout.NORTH, bar);
     }
 
     @Override
@@ -1978,6 +2060,14 @@ public class Form extends Container {
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
+            // in desktop native-chrome mode the toolbar is detached (not painted); push the
+            // title to the native OS window and/or the CN1-drawn custom title bar instead
+            if (customWindowTitleLabel != null) {
+                customWindowTitleLabel.setText(title == null ? "" : title);
+            }
+            if (isDesktopNativeChrome() && Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
+                Display.getInstance().refreshNativeTitle();
+            }
             return;
         }
 
@@ -2622,6 +2712,9 @@ public class Form extends Container {
         dragged = null;
         if (Display.getInstance().isNativeCommands()) {
             Display.impl.setNativeCommands(menuBar.getCommands());
+        } else if (isDesktopNativeChrome() && toolbar != null) {
+            // bridge the (hidden) toolbar's commands to the native desktop menu bar
+            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
         }
         if (getParent() != null) {
             Form f = getParent().getComponentForm();

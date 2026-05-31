@@ -36,7 +36,7 @@
 
 @class CodenameOne_GLViewController;
 
-@interface CodenameOne_GLAppDelegate : NSObject <UIApplicationDelegate
+@interface CodenameOne_GLAppDelegate : UIResponder <UIApplicationDelegate
 #ifdef CN1_INCLUDE_NOTIFICATIONS
 ,UNUserNotificationCenterDelegate
 #endif

@@ -311,6 +311,29 @@ public class Component implements Animation, StyleListener, Editable {
     private Rectangle painterBounds;
     private int scrollX;
     private int scrollY;
+    // Last painted geometry of the interactive (desktop) scrollbar, stored component-local
+    // by LookAndFeel.drawScroll so pointer handling can hit-test the thumb/track. Width 0
+    // means "not yet painted". Only populated when LookAndFeel.isInteractiveScroll() is on.
+    private int scrollThumbX;
+    private int scrollThumbY;
+    private int scrollThumbW;
+    private int scrollThumbH;
+    private int scrollTrackX;
+    private int scrollTrackY;
+    private int scrollTrackW;
+    private int scrollTrackH;
+    private int hScrollThumbX;
+    private int hScrollThumbY;
+    private int hScrollThumbW;
+    private int hScrollThumbH;
+    private int hScrollTrackX;
+    private int hScrollTrackY;
+    private int hScrollTrackW;
+    private int hScrollTrackH;
+    // Active interactive-scrollbar drag state and the pointer offset within the thumb at grab time
+    private boolean draggingScrollThumbY;
+    private boolean draggingScrollThumbX;
+    private int scrollThumbGrabOffset;
     private boolean sizeRequestedByUser = false;
     private Dimension preferredSize;
     private boolean scrollSizeRequestedByUser = false;
@@ -5490,6 +5513,11 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
 
+        if (lead.draggingScrollThumbY || lead.draggingScrollThumbX) {
+            lead.dragScrollThumb(x, y);
+            return;
+        }
+
         if (lead.pointerDraggedListeners != null && lead.pointerDraggedListeners.hasListeners()) {
             lead.pointerDraggedListeners.fireActionEvent(new ActionEvent(lead, ActionEvent.Type.PointerDrag, x, y));
         }
@@ -5794,6 +5822,9 @@ public class Component implements Animation, StyleListener, Editable {
     public void pointerPressed(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.dragActivated = false;
+        if (leadParent.handleInteractiveScrollPress(x, y)) {
+            return;
+        }
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
@@ -5843,6 +5874,14 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `y`: the pointer y coordinate
     public void pointerReleased(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.draggingScrollThumbY || leadParent.draggingScrollThumbX) {
+            // releasing an interactive scrollbar grab must not start momentum/tensile
+            leadParent.draggingScrollThumbY = false;
+            leadParent.draggingScrollThumbX = false;
+            leadParent.dragActivated = false;
+            leadParent.repaint();
+            return;
+        }
         if (leadParent.inPinch) {
             leadParent.inPinch = false;
         }
@@ -5855,6 +5894,189 @@ public class Component implements Animation, StyleListener, Editable {
         }
         pointerReleaseImpl(x, y);
         leadParent.scrollOpacity = 0xff;
+    }
+
+    /// Records the painted geometry of the vertical interactive scrollbar so the pointer
+    /// handling code can hit-test the thumb and track. This is used internally by the
+    /// look and feel and should not be invoked by application code. Coordinates are
+    /// component-local (relative to this component's x/y).
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbX`: component-local x of the thumb
+    ///
+    /// - `thumbY`: component-local y of the thumb
+    ///
+    /// - `thumbW`: thumb width
+    ///
+    /// - `thumbH`: thumb height
+    ///
+    /// - `trackX`: component-local x of the track
+    ///
+    /// - `trackY`: component-local y of the track
+    ///
+    /// - `trackW`: track width
+    ///
+    /// - `trackH`: track height
+    public void setVerticalScrollBounds(int thumbX, int thumbY, int thumbW, int thumbH, int trackX, int trackY, int trackW, int trackH) {
+        scrollThumbX = thumbX;
+        scrollThumbY = thumbY;
+        scrollThumbW = thumbW;
+        scrollThumbH = thumbH;
+        scrollTrackX = trackX;
+        scrollTrackY = trackY;
+        scrollTrackW = trackW;
+        scrollTrackH = trackH;
+    }
+
+    /// Records the painted geometry of the horizontal interactive scrollbar. Used internally
+    /// by the look and feel, see `#setVerticalScrollBounds(int, int, int, int, int, int, int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbX`: component-local x of the thumb
+    ///
+    /// - `thumbY`: component-local y of the thumb
+    ///
+    /// - `thumbW`: thumb width
+    ///
+    /// - `thumbH`: thumb height
+    ///
+    /// - `trackX`: component-local x of the track
+    ///
+    /// - `trackY`: component-local y of the track
+    ///
+    /// - `trackW`: track width
+    ///
+    /// - `trackH`: track height
+    public void setHorizontalScrollBounds(int thumbX, int thumbY, int thumbW, int thumbH, int trackX, int trackY, int trackW, int trackH) {
+        hScrollThumbX = thumbX;
+        hScrollThumbY = thumbY;
+        hScrollThumbW = thumbW;
+        hScrollThumbH = thumbH;
+        hScrollTrackX = trackX;
+        hScrollTrackY = trackY;
+        hScrollTrackW = trackW;
+        hScrollTrackH = trackH;
+    }
+
+    /// Handles a pointer press on an interactive (desktop) scrollbar. Returns true if the
+    /// press was consumed by the scrollbar (grabbing the thumb or paging the track), in
+    /// which case the regular press handling is skipped. Inert unless the look and feel
+    /// has interactive scrollbars enabled and the scrollbar has been painted at least once.
+    private boolean handleInteractiveScrollPress(int x, int y) {
+        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
+            return false;
+        }
+        if (isScrollableY() && isScrollVisible() && scrollThumbW > 0) {
+            int absX = getAbsoluteX();
+            int absY = getAbsoluteY();
+            int thumbTop = absY + scrollThumbY;
+            int thumbLeft = absX + scrollThumbX;
+            if (x >= thumbLeft && x < thumbLeft + scrollThumbW && y >= thumbTop && y < thumbTop + scrollThumbH) {
+                draggingScrollThumbY = true;
+                scrollThumbGrabOffset = y - thumbTop;
+                return true;
+            }
+            int trackTop = absY + scrollTrackY;
+            int trackLeft = absX + scrollTrackX;
+            if (x >= trackLeft && x < trackLeft + scrollTrackW && y >= trackTop && y < trackTop + scrollTrackH) {
+                pageScroll(true, y < thumbTop);
+                return true;
+            }
+        }
+        if (isScrollableX() && isScrollVisible() && hScrollThumbW > 0) {
+            int absX = getAbsoluteX();
+            int absY = getAbsoluteY();
+            int thumbLeft = absX + hScrollThumbX;
+            int thumbTop = absY + hScrollThumbY;
+            if (x >= thumbLeft && x < thumbLeft + hScrollThumbW && y >= thumbTop && y < thumbTop + hScrollThumbH) {
+                draggingScrollThumbX = true;
+                scrollThumbGrabOffset = x - thumbLeft;
+                return true;
+            }
+            int trackLeft = absX + hScrollTrackX;
+            int trackTop = absY + hScrollTrackY;
+            if (x >= trackLeft && x < trackLeft + hScrollTrackW && y >= trackTop && y < trackTop + hScrollTrackH) {
+                pageScroll(false, x < thumbLeft);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Pages the scroll position by roughly one viewport toward the pointer when the track
+    /// (rather than the thumb) of an interactive scrollbar is clicked.
+    private void pageScroll(boolean vertical, boolean towardsStart) {
+        if (vertical) {
+            int max = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
+            if (max < 0) {
+                max = 0;
+            }
+            int target = getScrollY() + (towardsStart ? -getHeight() : getHeight());
+            target = Math.max(0, Math.min(target, max));
+            if (isSmoothScrolling()) {
+                startTensile(getScrollY(), target, true);
+            } else {
+                setScrollY(target);
+                repaint();
+            }
+        } else {
+            int max = getScrollDimension().getWidth() - getWidth();
+            if (max < 0) {
+                max = 0;
+            }
+            int target = getScrollX() + (towardsStart ? -getWidth() : getWidth());
+            target = Math.max(0, Math.min(target, max));
+            if (isSmoothScrolling()) {
+                startTensile(getScrollX(), target, false);
+            } else {
+                setScrollX(target);
+                repaint();
+            }
+        }
+    }
+
+    /// Maps the current pointer position to a scroll offset while the user drags an
+    /// interactive scrollbar thumb. The mapping is the inverse of the thumb positioning
+    /// performed by the look and feel, and the resulting offset is clamped to the scrollable
+    /// range so a thumb drag never overscrolls.
+    private void dragScrollThumb(int x, int y) {
+        if (draggingScrollThumbY) {
+            int travel = scrollTrackH - scrollThumbH;
+            if (travel <= 0) {
+                return;
+            }
+            int trackTop = getAbsoluteY() + scrollTrackY;
+            int thumbTop = y - scrollThumbGrabOffset - trackTop;
+            thumbTop = Math.max(0, Math.min(thumbTop, travel));
+            int max = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
+            if (max < 0) {
+                max = 0;
+            }
+            setScrollY((int) (((float) thumbTop / (float) travel) * max));
+            repaint();
+        } else if (draggingScrollThumbX) {
+            int travel = hScrollTrackW - hScrollThumbW;
+            if (travel <= 0) {
+                return;
+            }
+            int trackLeft = getAbsoluteX() + hScrollTrackX;
+            int thumbLeft = x - scrollThumbGrabOffset - trackLeft;
+            thumbLeft = Math.max(0, Math.min(thumbLeft, travel));
+            int max = getScrollDimension().getWidth() - getWidth();
+            if (max < 0) {
+                max = 0;
+            }
+            setScrollX((int) (((float) thumbLeft / (float) travel) * max));
+            repaint();
+        }
+    }
+
+    /// Indicates whether an interactive scrollbar thumb is currently being dragged.
+    /// Package visibility for unit tests in this package; not part of the public API.
+    boolean isInteractiveScrollThumbGrabbed() {
+        return draggingScrollThumbY || draggingScrollThumbX;
     }
 
     /// Indicates whether tensile drag (dragging beyond the boundry of the component and

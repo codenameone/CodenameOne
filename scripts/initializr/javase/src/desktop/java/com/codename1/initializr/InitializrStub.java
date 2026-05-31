@@ -51,6 +51,9 @@ public class InitializrStub implements Runnable, WindowListener {
     private static final boolean APP_ADAPT_TO_RETINA = true;
     private static final boolean APP_RESIZEABLE = true;
     private static final boolean APP_FULLSCREEN = false;
+    // Desktop integration defaults: "native" OS title bar + native menu bar, interactive scrollbars.
+    private static final String APP_DESKTOP_TITLEBAR = "native";
+    private static final boolean APP_DESKTOP_INTERACTIVE_SCROLLBARS = true;
     public static final String BUILD_KEY = "";
     public static final String PACKAGE_NAME = "";
     public static final String BUILT_BY_USER = "";
@@ -83,6 +86,10 @@ public class InitializrStub implements Runnable, WindowListener {
         JavaSEPort.setShowEDTViolationStacks(false);
         JavaSEPort.setShowEDTWarnings(false);
         JavaSEPort.setFullScreen(APP_FULLSCREEN);
+
+        // Desktop integration: only takes effect when running on the desktop (CN.isDesktop()).
+        JavaSEPort.setDesktopTitleBarMode(APP_DESKTOP_TITLEBAR);
+        JavaSEPort.setDesktopInteractiveScrollbars(APP_DESKTOP_INTERACTIVE_SCROLLBARS);
 
         if(fontFaces != null) {
             JavaSEPort.setFontFaces(fontFaces[0], fontFaces[1], fontFaces[2]);
@@ -130,6 +137,10 @@ public class InitializrStub implements Runnable, WindowListener {
         } else {
             frm.setLocationByPlatform(true);
             frm.setResizable(APP_RESIZEABLE);
+            // custom desktop chrome draws its own title bar on an undecorated window
+            if ("custom".equals(APP_DESKTOP_TITLEBAR)) {
+                frm.setUndecorated(true);
+            }
             int w = APP_WIDTH;
             int h = APP_HEIGHT;
 
