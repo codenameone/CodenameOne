@@ -97,6 +97,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
@@ -151,6 +152,9 @@ import com.codename1.notifications.NotificationChannelBuilder;
 import com.codename1.notifications.NotificationPermissionCallback;
 import com.codename1.notifications.NotificationPermissionRequest;
 import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
 import com.codename1.payment.Purchase;
 import com.codename1.push.PushAction;
 import com.codename1.push.PushActionCategory;
@@ -11245,6 +11249,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
+        // carry the configured content intent as a template so the publisher can build
+        // a distinct per-action PendingIntent (with the action id and any remote input)
+        if (!notif.getActions().isEmpty()) {
+            notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_CONTENT_TEMPLATE, contentIntent);
+        }
 
 
         PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
@@ -11521,6 +11530,236 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (ClassNotFoundException notAvailable) {
             com.codename1.io.Log.p("Firebase Cloud Messaging is not available; topic '" + topic
                     + "' subscription must be handled server side");
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return true;
+    }
+
+    private static SharedContent pendingSharedContent;
+
+    /// Delivers shared content received from another app. If the CN1 app instance is
+    /// running it is dispatched immediately on the EDT; otherwise it is held until the app
+    /// finishes starting and `#deliverPendingSharedContent()` is invoked.
+    static void deliverSharedContent(SharedContent content) {
+        if (content == null) {
+            return;
+        }
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        if (app != null && Display.isInitialized()) {
+            dispatchSharedContent(app, content);
+        } else {
+            pendingSharedContent = content;
+        }
+    }
+
+    /// Invoked once the app has started to flush any shared content that arrived before the
+    /// app instance existed.
+    public static void deliverPendingSharedContent() {
+        SharedContent c = pendingSharedContent;
+        pendingSharedContent = null;
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        if (c != null && app != null) {
+            dispatchSharedContent(app, c);
+        }
+    }
+
+    private static void dispatchSharedContent(final Object app, final SharedContent content) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                try {
+                    java.lang.reflect.Method m = app.getClass().getMethod("onReceivedSharedContent", SharedContent.class);
+                    m.invoke(app, content);
+                } catch (NoSuchMethodException noMethod) {
+                    // app does not handle shared content
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        });
+    }
+
+    // ---- Constraint-aware background work (JobScheduler) ----
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 21;
+    }
+
+    private static int jobIdFor(String id) {
+        return (id.hashCode() & 0x7fffffff) % 1000000 + 1000;
+    }
+
+    @Override
+    public void scheduleBackgroundWork(WorkRequest request) {
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            android.content.ComponentName component =
+                    new android.content.ComponentName(getContext(), CodenameOneJobService.class);
+            android.app.job.JobInfo.Builder builder =
+                    new android.app.job.JobInfo.Builder(jobIdFor(request.getId()), component);
+
+            if (request.isRequiresUnmeteredNetwork()) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_UNMETERED);
+            } else if (request.isRequiresNetwork()) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_ANY);
+            }
+            builder.setRequiresCharging(request.isRequiresCharging());
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                builder.setRequiresDeviceIdle(request.isRequiresIdle());
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                builder.setRequiresBatteryNotLow(request.isRequiresBatteryNotLow());
+            }
+            if (request.isPeriodic()) {
+                builder.setPeriodic(Math.max(15 * 60 * 1000L, request.getMinIntervalMillis()));
+            } else {
+                if (request.getInitialDelayMillis() > 0) {
+                    builder.setMinimumLatency(request.getInitialDelayMillis());
+                }
+                builder.setOverrideDeadline(Math.max(request.getInitialDelayMillis(), 0) + 60 * 60 * 1000L);
+            }
+
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(CodenameOneJobService.EXTRA_WORKER_CLASS, request.getWorkerClass());
+            extras.putString(CodenameOneJobService.EXTRA_WORK_ID, request.getId());
+            for (java.util.Map.Entry<String, String> e : request.getInputData().entrySet()) {
+                extras.putString(CodenameOneJobService.INPUT_PREFIX + e.getKey(), e.getValue());
+            }
+            builder.setExtras(extras);
+            scheduler.schedule(builder.build());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            scheduler.cancel(jobIdFor(workId));
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 21;
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        if (android.os.Build.VERSION.SDK_INT < 21 || task == null) {
+            return;
+        }
+        try {
+            CodenameOneJobService.registerProcessingRunnable(id, task);
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            android.content.ComponentName component =
+                    new android.content.ComponentName(getContext(), CodenameOneJobService.class);
+            android.app.job.JobInfo.Builder builder =
+                    new android.app.job.JobInfo.Builder(jobIdFor("proc-" + id), component);
+            if (requiresNetwork) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_ANY);
+            }
+            builder.setRequiresCharging(requiresPower);
+            long delay = earliestBeginEpochMs <= 0 ? 0 : Math.max(0, earliestBeginEpochMs - System.currentTimeMillis());
+            if (delay > 0) {
+                builder.setMinimumLatency(delay);
+            }
+            builder.setOverrideDeadline(delay + 60 * 60 * 1000L);
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(CodenameOneJobService.EXTRA_PROCESSING_ID, id);
+            builder.setExtras(extras);
+            scheduler.schedule(builder.build());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        CodenameOneJobService.unregisterProcessingRunnable(id);
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            scheduler.cancel(jobIdFor("proc-" + id));
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    // ---- Foreground service ----
+
+    @Override
+    public boolean isForegroundServiceSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
+        int token = CodenameOneForegroundService.registerTask(task, handle, channelId, title, body, iconName);
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_START);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, token);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_CHANNEL, channelId);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TITLE, title);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_BODY, body);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_ICON, iconName);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                getContext().startForegroundService(intent);
+            } else {
+                getContext().startService(intent);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return Integer.valueOf(token);
+    }
+
+    @Override
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_UPDATE);
+            if (nativeHandle instanceof Integer) {
+                intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, ((Integer) nativeHandle).intValue());
+            }
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TITLE, title);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_BODY, body);
+            getContext().startService(intent);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void stopForegroundService(Object nativeHandle) {
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_STOP);
+            if (nativeHandle instanceof Integer) {
+                intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, ((Integer) nativeHandle).intValue());
+            }
+            getContext().startService(intent);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }

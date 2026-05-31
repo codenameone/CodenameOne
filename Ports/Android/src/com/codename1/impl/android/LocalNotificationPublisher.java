@@ -35,6 +35,8 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.codename1.background.BackgroundFetch;
+import com.codename1.impl.android.compat.app.NotificationCompatWrapper;
+import com.codename1.impl.android.compat.app.RemoteInputWrapper;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.ui.Display;
 import java.io.IOException;
@@ -51,6 +53,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
     public static String NOTIFICATION = "notification";
     public static String NOTIFICATION_INTENT = "notification-intent";
     public static String BACKGROUND_FETCH_INTENT = "background-fetch-intent";
+    public static String NOTIFICATION_CONTENT_TEMPLATE = "notification-content-template";
 
     public void onReceive(Context context, Intent intent) {
         //Fire the notification to the display
@@ -76,7 +79,8 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
                 Log.d("Codename One", "BackgroundFetch intent was null");
             }
         } else {
-            Notification notification = createAndroidNotification(context, notif, content);
+            Intent contentTemplate = extras.getParcelable(NOTIFICATION_CONTENT_TEMPLATE);
+            Notification notification = createAndroidNotification(context, notif, content, contentTemplate);
             notification.when = System.currentTimeMillis();
             try{
                 int notifId = Integer.parseInt(notif.getId());
@@ -88,7 +92,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         }
     }
 
-    private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {
+    private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content, Intent contentTemplate) {
         Context ctx = context;
         int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
         int icon = ctx.getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
@@ -171,6 +175,45 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
             try {
                 builder.getClass().getMethod("setChannelId", String.class).invoke(builder, localNotif.getChannelId());
             } catch (Throwable ignore) {
+            }
+        }
+
+        // action buttons (with optional inline quick-reply text input)
+        if (!localNotif.getActions().isEmpty() && contentTemplate != null) {
+            int requestCode = 1;
+            for (LocalNotification.Action a : localNotif.getActions()) {
+                Intent actionIntent = (Intent) contentTemplate.clone();
+                actionIntent.putExtra("LocalNotificationActionId", a.getId());
+                actionIntent.putExtra("LocalNotificationActionTitle", a.getTitle() == null ? "" : a.getTitle());
+                // make the per-action intent unique so the PendingIntents don't collide
+                actionIntent.setData(android.net.Uri.parse("http://codenameone.com/a?LocalNotificationID="
+                        + android.net.Uri.encode(localNotif.getId()) + "&action=" + android.net.Uri.encode(a.getId())));
+                PendingIntent actionPending = AndroidImplementation.createMutablePendingIntent(context, requestCode++, actionIntent);
+                int iconId;
+                try {
+                    iconId = Integer.parseInt(a.getIcon());
+                } catch (Exception ex) {
+                    iconId = 0;
+                }
+                try {
+                    if (NotificationCompatWrapper.ActionWrapper.BuilderWrapper.isSupported()) {
+                        NotificationCompatWrapper.ActionWrapper.BuilderWrapper actionBuilder =
+                                new NotificationCompatWrapper.ActionWrapper.BuilderWrapper(iconId, a.getTitle(), actionPending);
+                        if (a.isTextInput() && RemoteInputWrapper.isSupported()) {
+                            RemoteInputWrapper.BuilderWrapper remoteInputBuilder =
+                                    new RemoteInputWrapper.BuilderWrapper(a.getId() + "$Result");
+                            if (a.getTextInputPlaceholder() != null) {
+                                remoteInputBuilder.setLabel(a.getTextInputPlaceholder());
+                            }
+                            actionBuilder.addRemoteInput(remoteInputBuilder.build());
+                        }
+                        new NotificationCompatWrapper.BuilderWrapper(builder).addAction(actionBuilder.build());
+                    } else {
+                        builder.addAction(iconId, a.getTitle(), actionPending);
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
         }
 

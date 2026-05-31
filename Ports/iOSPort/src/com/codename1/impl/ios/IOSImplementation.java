@@ -90,6 +90,13 @@ import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.BackgroundWorker;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.push.PushAction;
 import com.codename1.push.PushActionCategory;
@@ -9186,6 +9193,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public static void setMainClass(Object main) {
+        setCurrentApplicationInstance(main);
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
         }
@@ -10184,25 +10192,229 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
    
     public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
-        
-        nativeInstance.sendLocalNotification(
-                n.getId(),
-                n.getAlertTitle(),
-                n.getAlertBody(),
-                n.getAlertSound(),
-                n.getBadgeNumber(),
-                firstTime,
-                repeat,
-                n.isForeground()
-        );
-        
-       
+        boolean enriched = !n.getActions().isEmpty() || n.getGroupId() != null
+                || n.isTimeSensitive() || (n.getAlertImage() != null && n.getAlertImage().length() > 0);
+        if (enriched) {
+            String categoryId = null;
+            String actionsEncoded = null;
+            if (!n.getActions().isEmpty()) {
+                categoryId = "cn1-ln-" + n.getId();
+                StringBuilder sb = new StringBuilder();
+                for (LocalNotification.Action a : n.getActions()) {
+                    if (sb.length() > 0) {
+                        sb.append('');
+                    }
+                    sb.append(nullToEmpty(a.getId())).append('')
+                      .append(nullToEmpty(a.getTitle())).append('')
+                      .append(nullToEmpty(a.getTextInputPlaceholder())).append('')
+                      .append(nullToEmpty(a.getTextInputButtonText()));
+                }
+                actionsEncoded = sb.toString();
+            }
+            nativeInstance.sendLocalNotification2(
+                    n.getId(), n.getAlertTitle(), n.getAlertBody(), n.getAlertSound(),
+                    n.getBadgeNumber(), firstTime, repeat, n.isForeground(),
+                    categoryId, n.getGroupId(), n.isTimeSensitive(), n.getAlertImage(), actionsEncoded);
+        } else {
+            nativeInstance.sendLocalNotification(
+                    n.getId(),
+                    n.getAlertTitle(),
+                    n.getAlertBody(),
+                    n.getAlertSound(),
+                    n.getBadgeNumber(),
+                    firstTime,
+                    repeat,
+                    n.isForeground()
+            );
+        }
     }
 
-   
-    
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
     public void cancelLocalNotification(String id) {
          nativeInstance.cancelLocalNotification(id);
+    }
+
+    // ---- notification permission ----
+
+    private static NotificationPermissionCallback pendingNotificationPermissionCallback;
+
+    @Override
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        pendingNotificationPermissionCallback = callback;
+        nativeInstance.requestNotificationPermission(request == null ? 7 : request.toAuthorizationOptionsMask());
+    }
+
+    /// Invoked from native once the authorization request resolves.
+    public static void notificationPermissionResult(final boolean granted, final int authLevel) {
+        final NotificationPermissionCallback cb = pendingNotificationPermissionCallback;
+        pendingNotificationPermissionCallback = null;
+        if (cb != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    cb.notificationPermissionResult(new NotificationPermissionResult(granted, authLevel));
+                }
+            });
+        }
+    }
+
+    // ---- constraint-aware background work / processing (BGTaskScheduler) ----
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return nativeInstance.isBackgroundProcessingSupported();
+    }
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return nativeInstance.isBackgroundProcessingSupported();
+    }
+
+    @Override
+    public void scheduleBackgroundWork(WorkRequest request) {
+        // persist worker class and input so the work can be reconstructed after a cold launch
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_CLASS_" + request.getId(), request.getWorkerClass());
+        StringBuilder input = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : request.getInputData().entrySet()) {
+            if (input.length() > 0) {
+                input.append('');
+            }
+            input.append(e.getKey()).append('').append(e.getValue());
+        }
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_INPUT_" + request.getId(), input.toString());
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_PERIODIC_" + request.getId(), request.isPeriodic());
+        double earliest = (System.currentTimeMillis() + Math.max(0, request.getInitialDelayMillis())) / 1000.0;
+        nativeInstance.submitBackgroundProcessingTask(request.getId(), earliest,
+                request.isRequiresNetwork() || request.isRequiresUnmeteredNetwork(), request.isRequiresCharging());
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        nativeInstance.cancelBackgroundTask(workId);
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        if (task != null) {
+            backgroundProcessingRunnables.put(id, task);
+        }
+        double earliest = earliestBeginEpochMs <= 0 ? System.currentTimeMillis() / 1000.0 : earliestBeginEpochMs / 1000.0;
+        nativeInstance.submitBackgroundProcessingTask(id, earliest, requiresNetwork, requiresPower);
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        backgroundProcessingRunnables.remove(id);
+        nativeInstance.cancelBackgroundTask(id);
+    }
+
+    private static final java.util.Map<String, Runnable> backgroundProcessingRunnables = new java.util.HashMap<String, Runnable>();
+
+    /// Invoked from the BGTaskScheduler launch handler. Runs the worker (reconstructed from
+    /// persisted state) or a live processing runnable for the given identifier.
+    public static void runBackgroundProcessing(final String id) {
+        Runnable live = backgroundProcessingRunnables.remove(id);
+        if (live != null) {
+            try {
+                live.run();
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+            return;
+        }
+        String workerClass = com.codename1.io.Preferences.get("$$CN1_BGWORK_CLASS_" + id, null);
+        if (workerClass == null) {
+            return;
+        }
+        try {
+            Class<?> cls = Class.forName(workerClass);
+            BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
+            java.util.Map<String, String> input = new java.util.HashMap<String, String>();
+            String enc = com.codename1.io.Preferences.get("$$CN1_BGWORK_INPUT_" + id, "");
+            if (enc != null && enc.length() > 0) {
+                for (String pair : enc.split("")) {
+                    int idx = pair.indexOf('');
+                    if (idx >= 0) {
+                        input.put(pair.substring(0, idx), pair.substring(idx + 1));
+                    }
+                }
+            }
+            final boolean periodic = com.codename1.io.Preferences.get("$$CN1_BGWORK_PERIODIC_" + id, false);
+            worker.performWork(id, input, System.currentTimeMillis() + 25000, new com.codename1.util.Callback<Boolean>() {
+                public void onSucess(Boolean value) {
+                    if (periodic) {
+                        // resubmit to approximate periodic behavior on iOS
+                        instance.nativeInstance.submitBackgroundProcessingTask(id, (System.currentTimeMillis() + 60000) / 1000.0, false, false);
+                    }
+                }
+                public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                    com.codename1.io.Log.e(err);
+                }
+            });
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void subscribeToPushTopic(String topic) {
+        com.codename1.io.Log.p("Push topics are not supported on iOS APNs; topic '" + topic
+                + "' must be handled server side");
+    }
+
+    @Override
+    public void unsubscribeFromPushTopic(String topic) {
+        com.codename1.io.Log.p("Push topics are not supported on iOS APNs; topic '" + topic
+                + "' must be handled server side");
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return true;
+    }
+
+    /// Invoked from native (on app activation) with the JSON payload written by the share
+    /// extension. Parses it into a SharedContent and dispatches to the app.
+    public static void fireSharedContentFromNative(String json) {
+        if (json == null || json.length() == 0) {
+            return;
+        }
+        try {
+            com.codename1.io.JSONParser parser = new com.codename1.io.JSONParser();
+            java.util.Map parsed = parser.parseJSON(new java.io.StringReader(json));
+            SharedContent.Builder b = SharedContent.builder();
+            Object subject = parsed.get("subject");
+            if (subject instanceof String) {
+                b.subject((String) subject);
+            }
+            Object items = parsed.get("items");
+            if (items instanceof java.util.List) {
+                for (Object o : (java.util.List) items) {
+                    if (!(o instanceof java.util.Map)) {
+                        continue;
+                    }
+                    java.util.Map item = (java.util.Map) o;
+                    String kind = (String) item.get("kind");
+                    String value = (String) item.get("value");
+                    if ("url".equals(kind)) {
+                        b.addUrl(value);
+                    } else if ("image".equals(kind)) {
+                        b.addImage(null, value, null);
+                    } else if ("file".equals(kind)) {
+                        b.addFile(null, value, null);
+                    } else {
+                        b.addText(value);
+                    }
+                }
+            }
+            if (instance != null) {
+                instance.fireSharedContentReceived(b.build());
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
     }
 
     

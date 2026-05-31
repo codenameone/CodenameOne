@@ -708,7 +708,33 @@ public final class IOSNative {
     
     native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground);
 
+    /// Enriched local notification scheduling carrying actions, grouping, time-sensitive
+    /// flag and an image attachment. actionsEncoded packs the actions as
+    /// idtitleplaceholderbutton records separated by .
+    native void sendLocalNotification2(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground, String categoryId, String threadId, boolean timeSensitive, String imageAttachmentPath, String actionsEncoded);
+
     native void cancelLocalNotification(String id);
+
+    /// Requests notification authorization with the given UNAuthorizationOptions mask. The
+    /// result is delivered asynchronously to IOSImplementation.notificationPermissionResult.
+    native void requestNotificationPermission(int optionsMask);
+
+    /// Registers a BGTaskScheduler processing task identifier. Must be called before
+    /// application:didFinishLaunchingWithOptions: returns.
+    native void registerBackgroundProcessingTask(String identifier);
+
+    /// Submits a BGProcessingTaskRequest for the given identifier.
+    native void submitBackgroundProcessingTask(String identifier, double earliestBeginEpochSeconds, boolean requiresNetwork, boolean requiresPower);
+
+    /// Cancels a pending BGTaskScheduler request by identifier.
+    native void cancelBackgroundTask(String identifier);
+
+    /// True if BGTaskScheduler (iOS 13+) is available.
+    native boolean isBackgroundProcessingSupported();
+
+    /// Reads and clears any shared content payload written by the share extension into the
+    /// shared App Group user defaults. Returns a JSON string or null if there is none.
+    native String getPendingSharedContent(String appGroupId);
 
     // --- Biometrics (LocalAuthentication.framework) -------------------------
 

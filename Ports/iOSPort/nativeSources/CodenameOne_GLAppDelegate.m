@@ -444,7 +444,20 @@ static void installSignalHandlers() {
 #endif
 
     //afterDidFinishLaunchingWithOptionsMarkerEntry
-    
+
+    // Register BGTaskScheduler processing identifiers declared in the Info.plist
+    // BGTaskSchedulerPermittedIdentifiers array. This must run before this method returns.
+    if (@available(iOS 13.0, *)) {
+        NSArray *permitted = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"BGTaskSchedulerPermittedIdentifiers"];
+        if ([permitted isKindOfClass:[NSArray class]]) {
+            for (id idObj in permitted) {
+                if ([idObj isKindOfClass:[NSString class]]) {
+                    com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (NSString*)idObj));
+                }
+            }
+        }
+    }
+
 #ifdef INCLUDE_FACEBOOK_CONNECT
     return [[FBSDKApplicationDelegate sharedInstance] application:application
                                     didFinishLaunchingWithOptions:launchOptions];
@@ -540,6 +553,16 @@ static void installSignalHandlers() {
      */
     //[self.viewController startAnimation];
     [self cn1ApplicationDidBecomeActive];
+
+    // Deliver any content shared into the app via the share extension. The shared App
+    // Group name is written into the Info.plist by the build (CN1ShareAppGroup).
+    NSString *shareGroup = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1ShareAppGroup"];
+    if ([shareGroup isKindOfClass:[NSString class]] && [shareGroup length] > 0) {
+        JAVA_OBJECT json = com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG shareGroup));
+        if (json != JAVA_NULL) {
+            com_codename1_impl_ios_IOSImplementation_fireSharedContentFromNative___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG json);
+        }
+    }
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application
