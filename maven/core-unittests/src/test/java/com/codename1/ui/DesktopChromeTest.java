@@ -11,10 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies the desktop window-chrome behavior added to {@link Form}/{@link Toolbar}: in the
- * {@code native} and {@code custom} desktop title-bar modes the CN1 Toolbar is detached (no
- * title strip painted), the form title is still tracked, and the toolbar's commands are bridged
- * to the native menu bar. The legacy {@code toolbar} mode and mobile remain unchanged.
+ * Verifies the desktop window-chrome behavior added to {@link Form}/{@link Toolbar}: the
+ * {@code native} mode detaches the CN1 Toolbar (no strip painted) and bridges its commands to the
+ * native menu bar; the {@code custom} mode keeps the Toolbar attached so it acts as the window's
+ * title bar (undecorated window) while still bridging the commands to the native menu bar. The
+ * legacy {@code toolbar} mode and mobile remain unchanged.
  */
 class DesktopChromeTest extends UITestBase {
 
@@ -44,15 +45,21 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
-    void customModeInstallsTitleBarChrome() {
+    void customModeKeepsToolbarAsTitleBarAndBridgesCommands() {
         desktopMode("custom");
         Form f = new Form("Custom");
+        Command save = new Command("Save");
+        f.addCommand(save);
         f.show();
         DisplayTest.flushEdt();
 
-        assertNull(f.getToolbar().getParent(), "toolbar itself is never attached in custom mode");
-        assertTrue(containsUiid(f, "WindowTitleBar"), "custom mode must install a WindowTitleBar");
-        assertTrue(containsUiid(f, "WindowCloseButton"), "custom mode must add a close caption button");
+        // the visible Toolbar IS the window title bar in custom mode, so it stays attached/painted
+        assertNotNull(f.getToolbar().getParent(), "in custom mode the toolbar is shown as the title bar");
+        assertEquals("Custom", f.getTitle(), "title is tracked and shown by the toolbar title bar");
+
+        Vector bridged = implementation.getLastNativeCommands();
+        assertNotNull(bridged, "commands must also be bridged to the native menu bar");
+        assertTrue(bridged.contains(save), "the side-menu command must be in the native menu set");
     }
 
     @FormTest
@@ -65,18 +72,5 @@ class DesktopChromeTest extends UITestBase {
         DisplayTest.flushEdt();
 
         assertNotNull(f.getToolbar().getParent(), "in toolbar mode the toolbar is shown as today");
-    }
-
-    private boolean containsUiid(Container root, String uiid) {
-        for (int i = 0; i < root.getComponentCount(); i++) {
-            Component c = root.getComponentAt(i);
-            if (uiid.equals(c.getUIID())) {
-                return true;
-            }
-            if (c instanceof Container && containsUiid((Container) c, uiid)) {
-                return true;
-            }
-        }
-        return false;
     }
 }

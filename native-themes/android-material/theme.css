@@ -361,43 +361,6 @@ DesktopHorizontalScrollThumb {
     margin: 0;
 }
 
-/* Custom undecorated-window title bar + flat Material caption buttons */
-WindowTitleBar {
-    background-color: #fef7ff;
-    color: #1d1b20;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
-}
-WindowDragArea {
-    background-color: #fef7ff;
-    color: #49454f;
-    padding: 1mm;
-    margin: 0;
-    font-family: "native:MainBold";
-    text-align: center;
-}
-WindowMinButton {
-    background-color: transparent;
-    color: #1d1b20;
-    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
-    margin: 0;
-}
-WindowMinButton.pressed { background-color: #e7e0ec; }
-WindowMaxButton {
-    background-color: transparent;
-    color: #1d1b20;
-    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
-    margin: 0;
-}
-WindowMaxButton.pressed { background-color: #e7e0ec; }
-WindowCloseButton {
-    background-color: transparent;
-    color: #1d1b20;
-    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
-    margin: 0;
-}
-WindowCloseButton.pressed { background-color: #b3261e; color: #ffffff; }
-
 /* Material 3 top tabs: flat surface with selected tab underlined by
    color rather than a pill fill. No border-radius here -
    combining it with a visible border would drop into the 9-piece
@@ -609,20 +572,12 @@ PopupContent {
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 
-    /* Desktop chrome (Material) dark overrides. cn1-background-type is
+    /* Desktop scrollbar (Material) dark overrides. cn1-background-type is
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: #2b2930; }
     DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: #2b2930; }
     DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
-    WindowTitleBar { background-color: #141218; color: #e6e0e9; }
-    WindowDragArea { background-color: #141218; color: #cac4d0; }
-    WindowMinButton { background-color: transparent; color: #e6e0e9; }
-    WindowMinButton.pressed { background-color: #2b2930; }
-    WindowMaxButton { background-color: transparent; color: #e6e0e9; }
-    WindowMaxButton.pressed { background-color: #2b2930; }
-    WindowCloseButton { background-color: transparent; color: #e6e0e9; }
-    WindowCloseButton.pressed { background-color: #b3261e; color: #ffffff; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }

@@ -27,8 +27,10 @@ The window chrome is selected by the `desktop.titleBar` setting, which takes one
 |===
 |`native` |Hide the CN1 `Toolbar`. The `Form` title goes into the OS window title bar and the
 toolbar's commands are bridged to a native menu bar. This is the default for newly generated apps.
-|`custom` |Undecorated window with a Codename One-drawn title bar - minimise / maximise / close
-caption buttons plus a draggable title region. Fully themeable (see <<desktop-theme-uiids>>).
+|`custom` |Undecorated window (no OS title bar) where the CN1 `Toolbar` itself acts as the window's
+title bar: it shows the `Form` title and side menu, dragging it moves the window, and the window is
+resized by dragging its edges. The commands are bridged to the native menu bar *and* remain in the
+toolbar's side menu.
 |`toolbar`|Legacy behavior - the in-app CN1 `Toolbar` is shown exactly as on mobile.
 |===
 
@@ -124,18 +126,17 @@ when `CN.isDesktop()` is true. Mouse-wheel scrolling continues to work as before
 [#desktop-theme-uiids]
 === Theme UIIDs
 
-When interactive scrollbars or the custom title bar are active, the desktop chrome is styled through
-dedicated UIIDs so the mobile `Scroll` / `ScrollThumb` styling is never affected:
+When interactive scrollbars are active, the desktop scrollbar is styled through dedicated UIIDs so the
+mobile `Scroll` / `ScrollThumb` styling is never affected:
 
 [cols="1,3"]
 |===
 |`DesktopScroll`, `DesktopScrollThumb`, `DesktopHorizontalScroll`, `DesktopHorizontalScrollThumb`
 |The interactive desktop scrollbar track and thumb. The horizontal-/vertical-scroll UIID's padding
 sets the scrollbar gutter width.
-|`WindowTitleBar`, `WindowDragArea` |The `custom`-mode title-bar container and its draggable title region.
-|`WindowMinButton`, `WindowMaxButton`, `WindowCloseButton` |The `custom`-mode caption buttons.
 |===
 
 The modern native themes ship platform-conventional defaults for these UIIDs (macOS-style in the iOS
 theme, Material-style in the Android theme); see <<native-modern-themes>>. Override them in your
-app's `theme.css` like any other UIID.
+app's `theme.css` like any other UIID. In `custom` mode the title bar is just the regular CN1
+`Toolbar`, so it is themed through the usual `Toolbar` / `Title` UIIDs.

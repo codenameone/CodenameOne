@@ -24,8 +24,6 @@ package com.codename1.impl.javase;
 
 import com.codename1.testing.junit.CodenameOneTest;
 import com.codename1.ui.Command;
-import com.codename1.ui.Component;
-import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Toolbar;
@@ -61,7 +59,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *   <li><b>native</b> mode: the form title reaches the OS window title bar, the toolbar commands
  *       are bridged to a real {@link JMenuBar}, and triggering the menu item runs the Codename One
  *       command through the AWT&rarr;CN1 thread hop.</li>
- *   <li><b>custom</b> mode: Codename One installs its own title-bar chrome (close caption button).</li>
+ *   <li><b>custom</b> mode: the CN1 Toolbar stays attached as the window's title bar, the OS window
+ *       is undecorated, and the commands are also bridged to the native {@link JMenuBar}.</li>
  * </ul>
  * Screenshot tests cannot see native window chrome, so these assertions read the JFrame directly.
  * Requires a graphical display; skipped on a headless JVM (the extension also aborts there).
@@ -177,7 +176,7 @@ public class DesktopChromeUITest {
     }
 
     @Test
-    public void customModeInstallsCn1TitleBarChrome() throws Exception {
+    public void customModeKeepsToolbarAsTitleBarUndecoratedAndBridgesCommands() throws Exception {
         assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
         assumeTrue(Display.getInstance().isDesktop(), "needs the desktop port (no skin)");
 
@@ -192,23 +191,40 @@ public class DesktopChromeUITest {
                 Toolbar.setGlobalToolbar(true);
 
                 Form f = new Form("CustomChrome");
+                f.addCommand(new Command("Save"));
                 f.show();
                 shown.set(f);
             }
         });
         flushAwt();
 
-        final AtomicBoolean hasTitleBar = new AtomicBoolean(false);
-        final AtomicBoolean hasCloseButton = new AtomicBoolean(false);
+        // the visible Toolbar acts as the window title bar, so it stays attached/painted
+        final AtomicBoolean toolbarAttached = new AtomicBoolean(false);
         runOnCn1AndWait(new Runnable() {
             @Override
             public void run() {
-                hasTitleBar.set(containsUiid(shown.get(), "WindowTitleBar"));
-                hasCloseButton.set(containsUiid(shown.get(), "WindowCloseButton"));
+                toolbarAttached.set(shown.get().getToolbar().getParent() != null);
             }
         });
-        assertTrue(hasTitleBar.get(), "custom mode must install a CN1 WindowTitleBar");
-        assertTrue(hasCloseButton.get(), "custom mode must add a close caption button");
+        assertTrue(toolbarAttached.get(), "custom mode keeps the toolbar attached as the window title bar");
+
+        final JFrame frame = cn1Frame();
+        assertNotNull(frame, "the desktop port must own a JFrame");
+
+        final AtomicBoolean undecorated = new AtomicBoolean(false);
+        final AtomicReference<JMenuItem> saveItem = new AtomicReference<JMenuItem>();
+        SwingUtilities.invokeAndWait(new Runnable() {
+            @Override
+            public void run() {
+                undecorated.set(frame.isUndecorated());
+                JMenuBar mb = frame.getJMenuBar();
+                if (mb != null) {
+                    saveItem.set(findMenuItem(mb, "Save"));
+                }
+            }
+        });
+        assertTrue(undecorated.get(), "custom mode undecorates the OS window so the toolbar is the title bar");
+        assertNotNull(saveItem.get(), "custom mode must also bridge the command to the native menu bar");
     }
 
     // ---- helpers ----
@@ -281,18 +297,5 @@ public class DesktopChromeUITest {
             }
         }
         return null;
-    }
-
-    private boolean containsUiid(Container root, String uiid) {
-        for (int i = 0; i < root.getComponentCount(); i++) {
-            Component c = root.getComponentAt(i);
-            if (uiid.equals(c.getUIID())) {
-                return true;
-            }
-            if (c instanceof Container && containsUiid((Container) c, uiid)) {
-                return true;
-            }
-        }
-        return false;
     }
 }

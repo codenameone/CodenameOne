@@ -320,43 +320,6 @@ DesktopHorizontalScrollThumb {
     margin: 0;
 }
 
-/* Custom undecorated-window title bar + traffic-light caption buttons */
-WindowTitleBar {
-    background-color: #f6f6f6;
-    color: #000000;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
-}
-WindowDragArea {
-    background-color: #f6f6f6;
-    color: #3c3c43;
-    padding: 1mm;
-    margin: 0;
-    font-family: "native:MainBold";
-    text-align: center;
-}
-WindowCloseButton {
-    background-color: #ff5f57;
-    color: #ff5f57;
-    cn1-background-type: cn1-pill-border;
-    padding: 1.5mm;
-    margin: 1mm;
-}
-WindowMinButton {
-    background-color: #febc2e;
-    color: #febc2e;
-    cn1-background-type: cn1-pill-border;
-    padding: 1.5mm;
-    margin: 1mm;
-}
-WindowMaxButton {
-    background-color: #28c840;
-    color: #28c840;
-    cn1-background-type: cn1-pill-border;
-    padding: 1.5mm;
-    margin: 1mm;
-}
-
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
    hugging the bottom edge, with individual tabs rendered as
    transparent hits inside it. cn1-pill-border draws a true pill;
@@ -630,17 +593,12 @@ PopupContent {
     BackCommand { color: var(--accent-color-dark, #0a84ff); }
     TitleCommand { color: var(--accent-color-dark, #0a84ff); }
 
-    /* Desktop chrome (macOS) dark overrides. cn1-background-type must be
-       re-declared so the round/pill primitive carries into dark mode. */
+    /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
+       re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: transparent; }
     DesktopScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: transparent; }
     DesktopHorizontalScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
-    WindowTitleBar { background-color: #2c2c2e; color: #ffffff; }
-    WindowDragArea { background-color: #2c2c2e; color: #ebebf5; }
-    WindowCloseButton { background-color: #ff5f57; color: #ff5f57; cn1-background-type: cn1-pill-border; }
-    WindowMinButton { background-color: #febc2e; color: #febc2e; cn1-background-type: cn1-pill-border; }
-    WindowMaxButton { background-color: #28c840; color: #28c840; cn1-background-type: cn1-pill-border; }
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: #1c1c1e; }

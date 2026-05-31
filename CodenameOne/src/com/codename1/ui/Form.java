@@ -33,7 +33,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
@@ -155,8 +154,6 @@ public class Form extends Container {
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
-    /// The title label of the CN1-drawn custom desktop window chrome, when in "custom" mode
-    private Label customWindowTitleLabel;
     /// A text component that will receive focus and start editing immediately as the form is shown
     private TextArea editOnShow;
     private int overrideInvisibleAreaUnderVKB = -1;
@@ -852,10 +849,9 @@ public class Form extends Container {
         return Display.impl.getDesktopTitleBarMode();
     }
 
-    /// Indicates that this form runs on the desktop in a title-bar mode that hides the CN1
-    /// Toolbar in favor of the native window chrome (native OS title bar or a custom CN1-drawn
-    /// title bar) and bridges commands to a native menu bar. Inert (false) on mobile because
-    /// {@link Display#isDesktop()} is false and the theme constant is absent.
+    /// Indicates that this form runs on the desktop in a title-bar mode that bridges the Toolbar's
+    /// commands to a native menu bar ({@code native} or {@code custom}). Inert (false) on mobile
+    /// because {@link Display#isDesktop()} is false and the theme constant is absent.
     boolean isDesktopNativeChrome() {
         if (!Display.getInstance().isDesktop()) {
             return false;
@@ -864,70 +860,20 @@ public class Form extends Container {
         return "native".equals(m) || "custom".equals(m);
     }
 
-    /// Builds the CN1-drawn title bar for the {@code custom} desktop chrome mode: a draggable
-    /// title region plus minimize / maximize / close caption buttons that drive the native
-    /// (undecorated) window through the implementation hooks. Themed via the {@code WindowTitleBar},
-    /// {@code WindowDragArea} and {@code Window*Button} UIIDs. Invoked from the toolbar's menu-bar
-    /// initialization when the mode is {@code custom}.
-    void installCustomWindowChrome() {
-        Container bar = new Container(new BorderLayout());
-        bar.setUIID("WindowTitleBar");
-
-        Label titleLabel = new Label(getTitle() == null ? "" : getTitle());
-        titleLabel.setUIID("WindowDragArea");
-        titleLabel.addPointerPressedListener(new WindowChromeAction(WindowChromeAction.DRAG_START));
-        titleLabel.addPointerDraggedListener(new WindowChromeAction(WindowChromeAction.DRAG_MOVE));
-        customWindowTitleLabel = titleLabel;
-        bar.add(BorderLayout.CENTER, titleLabel);
-
-        Button close = new Button();
-        close.setUIID("WindowCloseButton");
-        close.addActionListener(new WindowChromeAction(WindowChromeAction.CLOSE));
-        Button min = new Button();
-        min.setUIID("WindowMinButton");
-        min.addActionListener(new WindowChromeAction(WindowChromeAction.MINIMIZE));
-        Button max = new Button();
-        max.setUIID("WindowMaxButton");
-        max.addActionListener(new WindowChromeAction(WindowChromeAction.MAXIMIZE));
-
-        Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
-        // macOS-style ordering: close, minimize, maximize on the leading edge
-        buttons.add(close);
-        buttons.add(min);
-        buttons.add(max);
-        bar.add(BorderLayout.WEST, buttons);
-
-        addComponentToForm(BorderLayout.NORTH, bar);
+    /// Indicates the {@code native} desktop title-bar mode, where the CN1 Toolbar is hidden entirely:
+    /// the form title goes into the real OS window title bar and the commands are bridged to a native
+    /// menu bar. Inert (false) on mobile.
+    boolean isDesktopHideToolbar() {
+        return Display.getInstance().isDesktop() && "native".equals(getDesktopTitleBarMode());
     }
 
-    /// Listener for the custom desktop title-bar controls. A single named (static) class drives the
-    /// undecorated-window operations through the implementation hooks, keyed by the action constant.
-    private static final class WindowChromeAction implements ActionListener {
-        static final int MINIMIZE = 0;
-        static final int MAXIMIZE = 1;
-        static final int CLOSE = 2;
-        static final int DRAG_START = 3;
-        static final int DRAG_MOVE = 4;
-        private final int action;
-
-        WindowChromeAction(int action) {
-            this.action = action;
-        }
-
-        @Override
-        public void actionPerformed(ActionEvent evt) {
-            if (action == MINIMIZE) {
-                Display.impl.minimizeNativeWindow();
-            } else if (action == MAXIMIZE) {
-                Display.impl.toggleMaximizeNativeWindow();
-            } else if (action == CLOSE) {
-                Display.impl.closeNativeWindow();
-            } else if (action == DRAG_START) {
-                Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
-            } else if (action == DRAG_MOVE) {
-                Display.impl.dragNativeWindow(evt.getX(), evt.getY());
-            }
-        }
+    /// Indicates the {@code custom} desktop title-bar mode, where the CN1 Toolbar stays visible and
+    /// acts as the window's title bar: the OS window is undecorated (no native title area), the
+    /// Toolbar is the drag handle that moves the window, the window is resized by dragging its edges,
+    /// and the commands appear both in the native menu bar and in the Toolbar's side menu. Inert
+    /// (false) on mobile.
+    boolean isDesktopToolbarTitle() {
+        return Display.getInstance().isDesktop() && "custom".equals(getDesktopTitleBarMode());
     }
 
     @Override
@@ -2066,12 +2012,9 @@ public class Form extends Container {
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
-            // in desktop native-chrome mode the toolbar is detached (not painted); push the
-            // title to the native OS window and/or the CN1-drawn custom title bar instead
-            if (customWindowTitleLabel != null) {
-                customWindowTitleLabel.setText(title == null ? "" : title);
-            }
-            if (isDesktopNativeChrome() && Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
+            // in desktop "native" mode the toolbar is hidden; push the title to the OS window title
+            // bar instead. In "custom" mode the (visible) toolbar shows the title itself.
+            if (isDesktopHideToolbar() && Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
                 Display.getInstance().refreshNativeTitle();
             }
             return;
