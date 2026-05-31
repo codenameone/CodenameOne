@@ -2549,14 +2549,14 @@ public class Toolbar extends Container {
     /// #### Returns
     ///
     /// a de-duplicated vector of all commands hosted by this toolbar
-    public java.util.Vector getAllNativeMenuCommands() {
-        java.util.Vector all = new java.util.Vector();
+    public Vector getAllNativeMenuCommands() {
+        Vector all = new Vector();
         addUniqueCommands(all, getLeftBarCommands());
         addUniqueCommands(all, getRightBarCommands());
         addUniqueCommands(all, getOverflowCommands());
         MenuBar mb = getMenuBar();
         if (mb != null) {
-            java.util.Vector side = mb.getCommands();
+            Vector side = mb.getCommands();
             if (side != null) {
                 for (int i = 0; i < side.size(); i++) {
                     Object c = side.elementAt(i);
@@ -2569,7 +2569,7 @@ public class Toolbar extends Container {
         return all;
     }
 
-    private void addUniqueCommands(java.util.Vector all, Iterable<Command> src) {
+    private void addUniqueCommands(Vector all, Iterable<Command> src) {
         if (src == null) {
             return;
         }

@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
@@ -889,7 +890,7 @@ public class Form extends Container {
         max.setUIID("WindowMaxButton");
         max.addActionListener(new WindowChromeAction(WindowChromeAction.MAXIMIZE));
 
-        Container buttons = new Container(new com.codename1.ui.layouts.BoxLayout(com.codename1.ui.layouts.BoxLayout.X_AXIS));
+        Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
         // macOS-style ordering: close, minimize, maximize on the leading edge
         buttons.add(close);
         buttons.add(min);
