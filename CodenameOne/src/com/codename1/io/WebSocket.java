@@ -46,7 +46,7 @@ import com.codename1.impl.WebSocketImpl;
 /// to touch UI from it.
 ///
 /// Use [isSupported] to check at runtime whether the current port supports
-/// WebSocket — older ports return `false` and [build] will throw on them.
+/// WebSocket -- older ports return `false` and [build] will throw on them.
 public final class WebSocket {
 
     /// Handler for the connection-established event.

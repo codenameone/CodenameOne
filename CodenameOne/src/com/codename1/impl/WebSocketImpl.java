@@ -59,7 +59,7 @@ public abstract class WebSocketImpl {
     /// the platform default.
     public abstract void connect(int connectTimeoutMs);
 
-    /// Close the connection. Idempotent — calling on an already-closed
+    /// Close the connection. Idempotent -- calling on an already-closed
     /// connection is a no-op.
     public abstract void close();
 
