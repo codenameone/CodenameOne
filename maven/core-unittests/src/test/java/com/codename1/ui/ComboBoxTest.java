@@ -70,6 +70,43 @@ class ComboBoxTest extends UITestBase {
     }
 
     @Test
+    void testPopupPlacementDefaultsToAuto() {
+        ComboBox<String> comboBox = new ComboBox<String>();
+        assertEquals(ComboBox.POPUP_PLACEMENT_AUTO, comboBox.getPopupPlacement());
+    }
+
+    @Test
+    void testPopupPlacementRoundTrip() {
+        ComboBox<String> comboBox = new ComboBox<String>();
+        comboBox.setPopupPlacement(ComboBox.POPUP_PLACEMENT_TOP_OF_FORM);
+        assertEquals(ComboBox.POPUP_PLACEMENT_TOP_OF_FORM, comboBox.getPopupPlacement());
+        comboBox.setPopupPlacement(ComboBox.POPUP_PLACEMENT_ABOVE);
+        assertEquals(ComboBox.POPUP_PLACEMENT_ABOVE, comboBox.getPopupPlacement());
+        comboBox.setPopupPlacement(ComboBox.POPUP_PLACEMENT_BELOW);
+        assertEquals(ComboBox.POPUP_PLACEMENT_BELOW, comboBox.getPopupPlacement());
+        comboBox.setPopupPlacement(ComboBox.POPUP_PLACEMENT_BOTTOM_OF_FORM);
+        assertEquals(ComboBox.POPUP_PLACEMENT_BOTTOM_OF_FORM, comboBox.getPopupPlacement());
+        comboBox.setPopupPlacement(ComboBox.POPUP_PLACEMENT_AUTO);
+        assertEquals(ComboBox.POPUP_PLACEMENT_AUTO, comboBox.getPopupPlacement());
+    }
+
+    @Test
+    void testPopupPlacementConstantsAreDistinct() {
+        int[] all = {
+                ComboBox.POPUP_PLACEMENT_AUTO,
+                ComboBox.POPUP_PLACEMENT_ABOVE,
+                ComboBox.POPUP_PLACEMENT_BELOW,
+                ComboBox.POPUP_PLACEMENT_TOP_OF_FORM,
+                ComboBox.POPUP_PLACEMENT_BOTTOM_OF_FORM
+        };
+        for (int i = 0; i < all.length; i++) {
+            for (int j = i + 1; j < all.length; j++) {
+                assertNotEquals(all[i], all[j], "constants must be distinct");
+            }
+        }
+    }
+
+    @Test
     void testMutableFlagsCanBeAdjustedPerInstance() {
         ComboBox<String> comboBox = new ComboBox<String>();
         comboBox.setIncludeSelectCancel(false);
