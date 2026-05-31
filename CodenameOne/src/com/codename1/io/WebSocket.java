@@ -141,9 +141,8 @@ public final class WebSocket {
                     } catch (Throwable swallow) {
                         // Last-ditch: a throwable from the user's error
                         // handler has nowhere else to go without
-                        // recursing into onError again. Drop it on the
-                        // floor.
-                        swallow.toString();
+                        // recursing into onError again. Log and drop it.
+                        Log.e(swallow);
                     }
                 }
             }
@@ -156,7 +155,7 @@ public final class WebSocket {
                         h.onError(self, wrapped);
                     } catch (Throwable swallow) {
                         // Same rationale as onError() above.
-                        swallow.toString();
+                        Log.e(swallow);
                     }
                 }
             }
