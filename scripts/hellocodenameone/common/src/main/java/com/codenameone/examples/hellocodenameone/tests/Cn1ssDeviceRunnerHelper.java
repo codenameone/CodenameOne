@@ -50,6 +50,12 @@ interface Cn1ssDeviceRunnerHelper {
     // appearance test (~14s for two captures).
     int DELAY_ANDROID = 50;
     int MAX_PREVIEW_BYTES = 20 * 1024;
+    // Standard, fixed port the host-side Cn1ssScreenshotServer listens on
+    // (scripts/lib/cn1ss.sh starts it with --port 8765). The runner does not
+    // inject the URL per-run; the device defaults to ws://HOST:8765 below so
+    // no platform-specific env/property plumbing is needed. Keep this value in
+    // sync with CN1SS_WS_PORT in scripts/lib/cn1ss.sh.
+    int CN1SS_WS_DEFAULT_PORT = 8765;
     String PREVIEW_CHANNEL = "PREVIEW";
     int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
 
@@ -534,16 +540,19 @@ final class Cn1ssWebSocketSink {
             unavailable = true;
             return false;
         }
-        // Display.getProperty() is the only property source the CN1
-        // bytecode-compliance check allows on the device runtime --
-        // java.lang.System#getProperty(String,String) is not in
-        // ParparVM's JavaAPI. Runner scripts feed cn1ss.websocket.url to
-        // Display.getProperty via the maven plugin's -Dproperty=...
-        // -> Display hint pass-through, which works on every port.
+        // A -Dcn1ss.websocket.url override still wins where the launcher can
+        // set Display properties (e.g. the JavaSE simulator via the maven
+        // plugin's -Dproperty=...). Everywhere else we don't inject anything:
+        // the host runs Cn1ssScreenshotServer on the fixed standard port and
+        // the device defaults to ws://HOST:CN1SS_WS_DEFAULT_PORT. HOST is the
+        // host loopback as seen from the app -- the Android emulator reaches
+        // it via 10.0.2.2, every other target (iOS simulator, Mac Catalyst,
+        // the browser, JavaSE) shares 127.0.0.1.
         String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
         if (url == null || url.length() == 0) {
-            unavailable = true;
-            return false;
+            String host = "and".equals(Display.getInstance().getPlatformName())
+                    ? "10.0.2.2" : "127.0.0.1";
+            url = "ws://" + host + ":" + Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT;
         }
         if (!WebSocket.isSupported()) {
             unavailable = true;

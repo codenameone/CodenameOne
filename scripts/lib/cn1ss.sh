@@ -144,8 +144,13 @@ cn1ss_start_ws_server() {
   fi
   local port_file
   port_file="$(mktemp)"
+  # Bind the fixed standard port (override with CN1SS_WS_BIND_PORT). The device
+  # runner defaults to ws://HOST:8765 with no per-run injection, so this must
+  # match CN1SS_WS_DEFAULT_PORT in Cn1ssDeviceRunnerHelper.java. CN1SS_WS_PORT
+  # (set below from the server's reported port) stays the captured bound port.
+  local bind_port="${CN1SS_WS_BIND_PORT:-8765}"
   "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" \
-    Cn1ssScreenshotServer --port 0 --out "$out_dir" \
+    Cn1ssScreenshotServer --port "$bind_port" --out "$out_dir" \
     >"$port_file" 2>&1 &
   CN1SS_WS_PID=$!
   # Wait for the server to print "CN1SS_SERVER_PORT=<n>" on the first line.

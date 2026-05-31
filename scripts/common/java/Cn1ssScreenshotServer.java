@@ -60,6 +60,10 @@ public class Cn1ssScreenshotServer {
         }
         Files.createDirectories(outDir);
         ServerSocket serverSocket = new ServerSocket();
+        // Reuse the address so the fixed standard port (8765) rebinds cleanly
+        // across back-to-back runs without tripping over a lingering
+        // TIME_WAIT socket from the previous suite.
+        serverSocket.setReuseAddress(true);
         serverSocket.bind(new InetSocketAddress("127.0.0.1", port));
         int boundPort = serverSocket.getLocalPort();
         System.out.println("CN1SS_SERVER_PORT=" + boundPort);
