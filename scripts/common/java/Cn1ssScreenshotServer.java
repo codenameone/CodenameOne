@@ -278,9 +278,14 @@ public class Cn1ssScreenshotServer {
             writeServerFrame(out, OP_TEXT, nack.getBytes(StandardCharsets.UTF_8));
             return;
         }
-        Path target = outDir.resolve(sanitised + ".png").normalize();
+        // Resolve against the absolute, normalised base and guard the exact
+        // Path that is later written (the Files.write sink below). Computing
+        // the containment check on a separately-derived value would leave the
+        // sink value unguarded as far as dataflow analysis is concerned, which
+        // is what CodeQL's java/path-injection flags.
         Path baseAbs = outDir.toAbsolutePath().normalize();
-        if (!target.toAbsolutePath().normalize().startsWith(baseAbs)) {
+        Path target = baseAbs.resolve(sanitised + ".png").normalize();
+        if (!target.startsWith(baseAbs)) {
             System.err.println("[Cn1ssScreenshotServer] rejected META with out-of-base path: "
                     + safeName + " -> " + target);
             String nack = "NACK rejected status=path_escape";
