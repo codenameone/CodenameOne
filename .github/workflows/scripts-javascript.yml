@@ -74,20 +74,19 @@ jobs:
       # PNG emit, plus the canvas-accumulation slowdown that's well-
       # documented under chartDocStaleness).
       #
-      # Bumped again from 2700s to 3600s (60 min) after observing
-      # large runner-speed variance on shared GHA hosts. Fast runners
-      # walk the 95-test suite in ~25-30s/test (~50 min total with
-      # safety nets); slow runners eat ~150s/test on the same code
-      # (the cooperative scheduler appears noisy-neighbour-sensitive
-      # on the worker thread). 60 min absorbs the slow case without
-      # spilling into the GitHub Actions job ceiling (default 6h)
-      # while still leaving room for the post-suite comparison +
-      # report-generation steps. CN1_JS_BROWSER_LIFETIME_SECONDS
-      # stays 60s shy of the bash wait so the in-page sentinel fires
-      # before the outer timeout and we get a graceful suite shutdown
-      # with artifacts uploaded.
-      CN1_JS_TIMEOUT_SECONDS: "3600"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "3540"
+      # Rolled back to 1800s (30 min) after the matching port.js
+      # ``themeBridgeStateExhausted`` / ``themeFormTeardownLeak``
+      # skips landed in this branch: with 13 of the 14 modern-theme
+      # tests parked, fast GHA runners finish SUITE:FINISHED in
+      # ~8 min (see run 26705115156). The longer budgets were
+      # protecting noisy-neighbour-slow runners (~150s/test) that
+      # never made it past the early animation suite either way
+      # — letting them grind for 60 min before timing out wastes CI
+      # cycles without adding coverage. 30 min fails fast on the
+      # slow case (retry instead) and is well under the GitHub
+      # Actions job ceiling.
+      CN1_JS_TIMEOUT_SECONDS: "1800"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
