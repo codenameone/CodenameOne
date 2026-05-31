@@ -115,8 +115,25 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     private static boolean defaultActAsSpinnerDialog;
     /// Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
     private static boolean defaultIncludeSelectCancel = true;
+    /// Popup placement: place the list adjacent to the combo box (default behavior:
+    /// above when the combo sits in the lower half of the form, below otherwise).
+    public static final int POPUP_PLACEMENT_AUTO = 0;
+
+    /// Popup placement: always anchor the list directly above the combo box.
+    public static final int POPUP_PLACEMENT_ABOVE = 1;
+
+    /// Popup placement: always anchor the list directly below the combo box.
+    public static final int POPUP_PLACEMENT_BELOW = 2;
+
+    /// Popup placement: pin the list to the top edge of the form.
+    public static final int POPUP_PLACEMENT_TOP_OF_FORM = 3;
+
+    /// Popup placement: pin the list to the bottom edge of the form.
+    public static final int POPUP_PLACEMENT_BOTTOM_OF_FORM = 4;
+
     private Image comboBoxImage;
     private boolean actAsSpinnerDialog = defaultActAsSpinnerDialog;
+    private int popupPlacement = POPUP_PLACEMENT_AUTO;
     /// Indicates whethe the soft buttons for select/cancel should appear for the combo box
     private boolean includeSelectCancel = defaultIncludeSelectCancel;
     private boolean showingPopupDialog;
@@ -448,13 +465,33 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             }
 
             if (listH < formHeight) {
-                // pop up or down?
-                if (top > formHeight / 2) {
-                    bottom = formHeight - top;
-                    top = top - listH;
-                } else {
-                    top += getHeight();
-                    bottom = formHeight - top - listH;
+                switch (popupPlacement) {
+                    case POPUP_PLACEMENT_ABOVE:
+                        bottom = formHeight - top;
+                        top = top - listH;
+                        break;
+                    case POPUP_PLACEMENT_BELOW:
+                        top += getHeight();
+                        bottom = formHeight - top - listH;
+                        break;
+                    case POPUP_PLACEMENT_TOP_OF_FORM:
+                        top = 0;
+                        bottom = formHeight - listH;
+                        break;
+                    case POPUP_PLACEMENT_BOTTOM_OF_FORM:
+                        bottom = 0;
+                        top = formHeight - listH;
+                        break;
+                    case POPUP_PLACEMENT_AUTO:
+                    default:
+                        if (top > formHeight / 2) {
+                            bottom = formHeight - top;
+                            top = top - listH;
+                        } else {
+                            top += getHeight();
+                            bottom = formHeight - top - listH;
+                        }
+                        break;
                 }
             } else {
                 top = 0;
@@ -624,5 +661,31 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /// - `actAsSpinnerDialog`: the actAsSpinnerDialog to set
     public void setActAsSpinnerDialog(boolean actAsSpinnerDialog) {
         this.actAsSpinnerDialog = actAsSpinnerDialog;
+    }
+
+    /// Returns the popup placement mode that controls where [#showPopupDialog]
+    /// anchors the list when the combo is tapped.
+    ///
+    /// #### Returns
+    ///
+    /// one of [#POPUP_PLACEMENT_AUTO], [#POPUP_PLACEMENT_ABOVE],
+    /// [#POPUP_PLACEMENT_BELOW], [#POPUP_PLACEMENT_TOP_OF_FORM],
+    /// [#POPUP_PLACEMENT_BOTTOM_OF_FORM].
+    public int getPopupPlacement() {
+        return popupPlacement;
+    }
+
+    /// Controls where the popup list is anchored relative to the combo box or
+    /// the parent form when the combo is tapped. Useful when the default
+    /// adjacent placement collides with the keyboard, a navigation bar, or
+    /// the iPhone notch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `popupPlacement`: one of [#POPUP_PLACEMENT_AUTO] (default),
+    /// [#POPUP_PLACEMENT_ABOVE], [#POPUP_PLACEMENT_BELOW],
+    /// [#POPUP_PLACEMENT_TOP_OF_FORM], [#POPUP_PLACEMENT_BOTTOM_OF_FORM]
+    public void setPopupPlacement(int popupPlacement) {
+        this.popupPlacement = popupPlacement;
     }
 }
