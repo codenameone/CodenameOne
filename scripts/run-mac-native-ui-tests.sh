@@ -151,6 +151,21 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Start the host-side WebSocket screenshot server on the fixed standard port.
+# The Mac Catalyst app runs on this host, so the device-runner defaults to
+# ws://127.0.0.1:8765 with no per-launch URL injection (see
+# Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT). Screenshots the app sends
+# land directly in $WS_RAW_DIR; if the WS transport delivers nothing (server
+# failed to start, app could not connect) the legacy file/chunk decode below
+# is used instead, so this is purely additive.
+WS_RAW_DIR="$SCREENSHOT_TMP_DIR/ws"
+mkdir -p "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  rm_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  rm_log "WebSocket screenshot server did not start; relying on file/chunk fallback"
+fi
+
 # Patch CN1SS_* placeholders in the shared scheme (the iOS pipeline does
 # this too -- the placeholders come from create-shared-scheme.py). Mac
 # binaries are launched outside Xcode, so the env vars are also exported
@@ -394,6 +409,33 @@ fi
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=0
 
+# The app has exited; stop the WebSocket server and adopt whatever it
+# received. The server wrote one <test>.png per delivered screenshot into
+# $WS_RAW_DIR. When WS delivered at least one image we use that set directly
+# and skip the legacy file/chunk decode entirely.
+cn1ss_stop_ws_server
+declare -a COMPARE_ENTRIES=()
+WS_DELIVERED=0
+if [ -d "${WS_RAW_DIR:-}" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_TMP_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  rm_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (legacy file/chunk decode skipped)"
+fi
+
+# Legacy file/chunk decode -- only when the WebSocket transport delivered
+# nothing (server failed to start, the app could not reach it, or os_log /
+# stdout capture is the only path available). Kept as a Phase 1 fallback;
+# removed once the WS transport is confirmed on every pipeline.
+if [ "$WS_DELIVERED" -eq 0 ]; then
+
 # Aggregate CN1SS sources in priority order: stdout (richest -- chunked
 # PNGs are emitted there) first, then the unified-log streams.
 # With `open --stdout PATH` the launched Catalyst binary writes printf
@@ -565,6 +607,7 @@ for test in "${TEST_NAMES[@]}"; do
     COMPARE_ENTRIES+=("${test}=${dest}")
   fi
 done
+fi  # end: legacy file/chunk decode (WS transport delivered nothing)
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
