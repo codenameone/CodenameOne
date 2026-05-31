@@ -72,6 +72,32 @@ ensure_dir "$REFERENCE_DIR"
 
 declare -a CN1SS_SOURCES=("BROWSER_LOG:$LOG_FILE")
 
+# WebSocket-first: run-javascript-browser-tests.sh starts a host-side WS server
+# and the browser app sends each screenshot as <test>.png into $CN1SS_WS_DIR.
+# The WebSocket transport frames every screenshot with an explicit per-test
+# META header, so it does not suffer the base64-over-console demux problems
+# (interleaved/misassigned chunks) the JS port hits under load. When WS
+# delivered images we use them directly and skip the log decode below.
+declare -a COMPARE_ENTRIES=()
+declare -a FAILED_TESTS=()
+declare -a TEST_NAMES=()
+WS_DELIVERED=0
+if [ -n "${CN1SS_WS_DIR:-}" ] && [ -d "$CN1SS_WS_DIR" ]; then
+  for ws_png in "$CN1SS_WS_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_RAW_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    TEST_NAMES+=("$ws_test")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  rj_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (base64 decode skipped)"
+else
+
 LOG_CHUNKS="$(cn1ss_count_chunks "$LOG_FILE")"
 LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"
 : "${LOG_CHUNKS:=0}"
@@ -158,6 +184,7 @@ for test in "${TEST_NAMES[@]}"; do
     fi
   fi
 done
+fi  # end: base64-over-console decode (WebSocket transport delivered nothing)
 
 decoded_count="${#COMPARE_ENTRIES[@]}"
 meaningful_decoded_count=0
