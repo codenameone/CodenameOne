@@ -47,6 +47,10 @@ class InteractiveScrollbarTest extends UITestBase {
         Container sc = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         sc.setScrollableY(true);
         sc.setSmoothScrolling(false);
+        // make the container itself handle the press: with the empty unit-test theme the scrollbar
+        // gutter has no width, so a press at the right edge would otherwise route to the child. In a
+        // real theme the reserved gutter routes the press to the container; focusable replicates that.
+        sc.setFocusable(true);
         Label tall = new Label("");
         tall.setPreferredSize(new Dimension(100, contentHeight));
         sc.add(tall);
