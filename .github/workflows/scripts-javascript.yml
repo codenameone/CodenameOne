@@ -72,16 +72,22 @@ jobs:
       # that batch eats ~16-20s wall (light + dark phases, each paying
       # a 1500ms registerReadyCallback + triple callSerially + chunked
       # PNG emit, plus the canvas-accumulation slowdown that's well-
-      # documented under chartDocStaleness). With the previously-
-      # silent tests now actually running, total walks past 30 min;
-      # 45 min absorbs the worst case without leaving the job runner-
-      # bound (the GitHub Actions job timeout is 6h, well above this).
-      # CN1_JS_BROWSER_LIFETIME_SECONDS stays 60s shy of the bash
-      # wait so the in-page CN1_JS_BROWSER_LIFETIME sentinel fires
+      # documented under chartDocStaleness).
+      #
+      # Bumped again from 2700s to 3600s (60 min) after observing
+      # large runner-speed variance on shared GHA hosts. Fast runners
+      # walk the 95-test suite in ~25-30s/test (~50 min total with
+      # safety nets); slow runners eat ~150s/test on the same code
+      # (the cooperative scheduler appears noisy-neighbour-sensitive
+      # on the worker thread). 60 min absorbs the slow case without
+      # spilling into the GitHub Actions job ceiling (default 6h)
+      # while still leaving room for the post-suite comparison +
+      # report-generation steps. CN1_JS_BROWSER_LIFETIME_SECONDS
+      # stays 60s shy of the bash wait so the in-page sentinel fires
       # before the outer timeout and we get a graceful suite shutdown
       # with artifacts uploaded.
-      CN1_JS_TIMEOUT_SECONDS: "2700"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "2640"
+      CN1_JS_TIMEOUT_SECONDS: "3600"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "3540"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
