@@ -3617,10 +3617,15 @@ public class Form extends Container {
             }
             cmp = LeadUtil.leadParentImpl(cmp);
 
-            LeadUtil.pointerDragged(cmp, x, y);
+            // Mirror the isEnabled() gate that pointerPressed and the
+            // sidemenu-drag branch above already apply: a disabled component
+            // must not receive drag events. See #1592.
+            if (cmp.isEnabled()) {
+                LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
-                stickyDrag = cmp;
+                if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
+                    stickyDrag = cmp;
+                }
             }
         }
     }
@@ -3687,10 +3692,15 @@ public class Form extends Container {
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
-            LeadUtil.pointerDragged(cmp, x, y);
+            // Mirror the isEnabled() gate that pointerPressed and the
+            // sidemenu-drag branch above already apply: a disabled component
+            // must not receive drag events. See #1592.
+            if (cmp.isEnabled()) {
+                LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
-                stickyDrag = cmp;
+                if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
+                    stickyDrag = cmp;
+                }
             }
         }
     }
