@@ -27,6 +27,7 @@ on:
 jobs:
   vm-tests-windows:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -100,12 +101,18 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
 
-      - name: Run ParparVM JVM tests
+      # Only the native-compilation tests are run here: this runner exists to
+      # prove the translated C compiles with clang-cl (LLVM) and executes on
+      # Windows, which is exactly what CleanTargetIntegrationTest does (translate
+      # Java -> C -> cmake/clang-cl build -> run the binary). The rest of the vm
+      # suite is platform-agnostic Java already covered by parparvm-tests.yml on
+      # Linux, and the JavaScript integration tests additionally require Node.
+      - name: Run ParparVM clean-target build on Windows (clang-cl)
         working-directory: vm
         shell: pwsh
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am -DexcludedGroups=benchmark
+          mvn -B test -pl tests -am -Dtest=CleanTargetIntegrationTest -DfailIfNoTests=false
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
