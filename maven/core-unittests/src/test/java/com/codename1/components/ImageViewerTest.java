@@ -2,11 +2,13 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 
@@ -186,6 +188,103 @@ class ImageViewerTest extends UITestBase {
         // If finished, image should be second.
     }
 
+    @FormTest
+    void verticalDragBubblesToScrollableParent() throws Exception {
+        Image image = Image.createImage(40, 40, 0xff112233);
+        ImageViewer viewer = new ImageViewer(image);
+        viewer.setAnimateZoom(false);
+
+        Container scrollable = new Container(BoxLayout.y());
+        scrollable.setScrollableY(true);
+        scrollable.add(viewer);
+        for (int i = 0; i < 20; i++) {
+            scrollable.add(new com.codename1.ui.Label("filler " + i));
+        }
+
+        Form f = new Form(new BorderLayout());
+        f.add(BorderLayout.CENTER, scrollable);
+        f.show();
+        f.setSize(new com.codename1.ui.geom.Dimension(240, 320));
+        f.layoutContainer();
+        f.revalidate();
+
+        viewer.setSize(new com.codename1.ui.geom.Dimension(240, 220));
+        viewer.setX(0);
+        viewer.setY(0);
+        viewer.pointerPressed(120, 110);
+        viewer.pointerDragged(120, 40);
+
+        assertTrue(getPrivateField(viewer, "delegatingDragToParent", Boolean.class),
+                "delegatingDragToParent must be set when vertical drag starts inside ImageViewer");
+
+        viewer.pointerDragged(120, 10);
+        viewer.pointerReleased(120, 10);
+
+        assertFalse(getPrivateField(viewer, "delegatingDragToParent", Boolean.class),
+                "delegatingDragToParent must reset on pointerReleased");
+    }
+
+    @FormTest
+    void horizontalDragInsideImageListSwipesNotBubbles() throws Exception {
+        Image a = Image.createImage(40, 40, 0xff112233);
+        Image b = Image.createImage(40, 40, 0xff445566);
+        DefaultListModel<Image> model = new DefaultListModel<>(a, b);
+        ImageViewer viewer = new ImageViewer();
+        viewer.setAnimateZoom(false);
+        viewer.setImageList(model);
+
+        Container scrollable = new Container(BoxLayout.y());
+        scrollable.setScrollableY(true);
+        scrollable.add(viewer);
+        for (int i = 0; i < 10; i++) {
+            scrollable.add(new com.codename1.ui.Label("filler " + i));
+        }
+
+        Form f = new Form(new BorderLayout());
+        f.add(BorderLayout.CENTER, scrollable);
+        f.show();
+        f.setSize(new com.codename1.ui.geom.Dimension(240, 320));
+        f.layoutContainer();
+        f.revalidate();
+
+        viewer.setSize(new com.codename1.ui.geom.Dimension(240, 220));
+        viewer.setX(0);
+        viewer.setY(0);
+
+        viewer.pointerPressed(200, 110);
+        viewer.pointerDragged(20, 110);
+
+        assertFalse(getPrivateField(viewer, "delegatingDragToParent", Boolean.class),
+                "horizontal drag must not delegate to parent");
+    }
+
+    @FormTest
+    void verticalDragWithNoScrollableAncestorStaysWithViewer() throws Exception {
+        Image image = Image.createImage(40, 40, 0xff112233);
+        ImageViewer viewer = new ImageViewer(image);
+        viewer.setAnimateZoom(false);
+
+        Container plain = new Container(BoxLayout.y());
+        plain.add(viewer);
+
+        Form f = new Form(new BorderLayout());
+        f.add(BorderLayout.CENTER, plain);
+        f.show();
+        f.setSize(new com.codename1.ui.geom.Dimension(240, 320));
+        f.layoutContainer();
+        f.revalidate();
+
+        viewer.setSize(new com.codename1.ui.geom.Dimension(240, 220));
+        viewer.setX(0);
+        viewer.setY(0);
+
+        viewer.pointerPressed(120, 110);
+        viewer.pointerDragged(120, 40);
+
+        assertFalse(getPrivateField(viewer, "delegatingDragToParent", Boolean.class),
+                "no scrollable ancestor means no delegation");
+    }
+
     @SuppressWarnings("unchecked")
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
@@ -193,6 +292,9 @@ class ImageViewerTest extends UITestBase {
         Object value = field.get(target);
         if (type == Float.class && value instanceof Number) {
             return (T) Float.valueOf(((Number) value).floatValue());
+        }
+        if (type == Boolean.class) {
+            return (T) Boolean.valueOf(((Boolean) value).booleanValue());
         }
         return (T) value;
     }
