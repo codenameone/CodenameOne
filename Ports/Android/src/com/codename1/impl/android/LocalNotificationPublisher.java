@@ -127,6 +127,53 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         }
         builder.setSmallIcon(smallIcon);
         builder.setContentIntent(content);
+
+        // grouping
+        if (localNotif.getGroupId() != null) {
+            builder.setGroup(localNotif.getGroupId());
+            builder.setGroupSummary(localNotif.isGroupSummary());
+        }
+        // ongoing (cannot be dismissed)
+        if (localNotif.isOngoing()) {
+            builder.setOngoing(true);
+        }
+        // progress bar
+        if (localNotif.getProgressMax() > 0 || localNotif.isProgressIndeterminate()) {
+            builder.setProgress(Math.max(1, localNotif.getProgressMax()), localNotif.getProgress(), localNotif.isProgressIndeterminate());
+        }
+        // full screen intent (high priority interruptions)
+        if (localNotif.isFullScreenIntent() && content != null) {
+            builder.setFullScreenIntent(content, true);
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH);
+        }
+        // time sensitive: Android has no exact equivalent, approximate with category + priority
+        if (localNotif.isTimeSensitive()) {
+            builder.setCategory(NotificationCompat.CATEGORY_MESSAGE);
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH);
+        }
+        // messaging (conversation) style
+        LocalNotification.MessagingStyle ms = localNotif.getMessagingStyle();
+        if (ms != null && !ms.getMessages().isEmpty()) {
+            NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(
+                    ms.getSelfDisplayName() == null ? "" : ms.getSelfDisplayName());
+            if (ms.getConversationTitle() != null) {
+                style.setConversationTitle(ms.getConversationTitle());
+            }
+            for (LocalNotification.MessagingStyle.Message m : ms.getMessages()) {
+                CharSequence sender = m.getSenderName();
+                style.addMessage(m.getText(), m.getTimestamp(), sender);
+            }
+            builder.setStyle(style);
+        }
+        // explicit channel id on the notification (Android O+), via reflection to stay
+        // compatible with the support library baseline
+        if (localNotif.getChannelId() != null) {
+            try {
+                builder.getClass().getMethod("setChannelId", String.class).invoke(builder, localNotif.getChannelId());
+            } catch (Throwable ignore) {
+            }
+        }
+
         AndroidImplementation.setNotificationChannel((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE), builder, context);
         String sound = localNotif.getAlertSound();
         if (sound != null && sound.length() > 0) {

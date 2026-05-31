@@ -22,6 +22,9 @@
  */
 package com.codename1.notifications;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /// Local notifications are user notifications that are scheduled by the app itself. They
 /// are very similar to push notifications, except that they originate locally, rather than
 /// remotely.
@@ -115,6 +118,19 @@ public class LocalNotification {
     private String alertSound = "";
     private String alertImage = "";
     private boolean foreground;
+
+    private String channelId;
+    private String groupId;
+    private boolean groupSummary;
+    private boolean fullScreenIntent;
+    private boolean timeSensitive;
+    private boolean ongoing;
+    private int progressMax;
+    private int progress;
+    private boolean progressIndeterminate;
+    private String customViewLayout;
+    private final List<Action> actions = new ArrayList<Action>();
+    private MessagingStyle messagingStyle;
 
     /// Gets the badge number to set for this notification.
     ///
@@ -267,6 +283,585 @@ public class LocalNotification {
     /// 7.0
     public void setForeground(boolean foreground) {
         this.foreground = foreground;
+    }
+
+    /// Gets the notification channel id this notification is posted to. Channels are an
+    /// Android concept; see `NotificationChannelBuilder`. On platforms without channels
+    /// this value is ignored.
+    ///
+    /// #### Returns
+    ///
+    /// the channel id, or null
+    public String getChannelId() {
+        return channelId;
+    }
+
+    /// Sets the notification channel id this notification is posted to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the channel id
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setChannelId(String channelId) {
+        this.channelId = channelId;
+        return this;
+    }
+
+    /// Convenience alias for `#setAlertSound(String)` that returns this notification for
+    /// chaining.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sound`: the alert sound file path
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setSound(String sound) {
+        setAlertSound(sound);
+        return this;
+    }
+
+    /// Gets the group id used to bundle related notifications together in the shade.
+    ///
+    /// #### Returns
+    ///
+    /// the group id, or null
+    public String getGroupId() {
+        return groupId;
+    }
+
+    /// Assigns this notification to a group. Notifications sharing a group id are
+    /// visually bundled. On iOS the group id maps to the notification thread identifier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: the group id
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setGroup(String groupId) {
+        this.groupId = groupId;
+        return this;
+    }
+
+    /// Returns true if this notification is the summary for its group.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a group summary
+    public boolean isGroupSummary() {
+        return groupSummary;
+    }
+
+    /// Marks this notification as the summary of its group (Android). The summary is the
+    /// single entry shown when the group is collapsed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupSummary`: true to make this notification the group summary
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setGroupSummary(boolean groupSummary) {
+        this.groupSummary = groupSummary;
+        return this;
+    }
+
+    /// Returns true if this notification should launch a full screen intent.
+    ///
+    /// #### Returns
+    ///
+    /// true if a full screen intent is requested
+    public boolean isFullScreenIntent() {
+        return fullScreenIntent;
+    }
+
+    /// Requests that this notification launch a full screen intent (Android), used for
+    /// high priority interruptions such as incoming calls or alarms. Ignored on platforms
+    /// that do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fullScreenIntent`: true to request a full screen intent
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setFullScreenIntent(boolean fullScreenIntent) {
+        this.fullScreenIntent = fullScreenIntent;
+        return this;
+    }
+
+    /// Returns true if this notification is marked time sensitive.
+    ///
+    /// #### Returns
+    ///
+    /// true if time sensitive
+    public boolean isTimeSensitive() {
+        return timeSensitive;
+    }
+
+    /// Marks this notification as time sensitive so it can break through Focus modes
+    /// (iOS) or be treated with elevated importance (Android). Requires the corresponding
+    /// permission to have been requested.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSensitive`: true to mark the notification time sensitive
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setTimeSensitive(boolean timeSensitive) {
+        this.timeSensitive = timeSensitive;
+        return this;
+    }
+
+    /// Returns true if this notification is ongoing.
+    ///
+    /// #### Returns
+    ///
+    /// true if ongoing
+    public boolean isOngoing() {
+        return ongoing;
+    }
+
+    /// Marks this notification as ongoing (Android), meaning it cannot be dismissed by
+    /// the user and represents background activity in progress. Ignored on platforms that
+    /// do not support it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ongoing`: true to make the notification ongoing
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setOngoing(boolean ongoing) {
+        this.ongoing = ongoing;
+        return this;
+    }
+
+    /// Returns the maximum value of the progress bar, or 0 if no progress bar is shown.
+    ///
+    /// #### Returns
+    ///
+    /// the progress maximum
+    public int getProgressMax() {
+        return progressMax;
+    }
+
+    /// Returns the current progress value.
+    ///
+    /// #### Returns
+    ///
+    /// the current progress
+    public int getProgress() {
+        return progress;
+    }
+
+    /// Shows a determinate progress bar on this notification (Android).
+    ///
+    /// #### Parameters
+    ///
+    /// - `max`: the maximum progress value
+    ///
+    /// - `current`: the current progress value
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setProgress(int max, int current) {
+        this.progressMax = max;
+        this.progress = current;
+        this.progressIndeterminate = false;
+        return this;
+    }
+
+    /// Returns true if the progress bar is indeterminate.
+    ///
+    /// #### Returns
+    ///
+    /// true if the progress bar is indeterminate
+    public boolean isProgressIndeterminate() {
+        return progressIndeterminate;
+    }
+
+    /// Shows an indeterminate (spinning) progress bar on this notification (Android).
+    ///
+    /// #### Parameters
+    ///
+    /// - `indeterminate`: true to show an indeterminate progress bar
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setIndeterminateProgress(boolean indeterminate) {
+        this.progressIndeterminate = indeterminate;
+        return this;
+    }
+
+    /// Gets the custom view layout name used to render this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the custom view layout name, or null
+    public String getCustomView() {
+        return customViewLayout;
+    }
+
+    /// Sets a custom view layout name for this notification. On Android this maps to a
+    /// RemoteViews layout bundled in the native resources. On iOS a custom view is
+    /// rendered by a notification content extension keyed by the notification category.
+    /// Ignored on platforms that do not support custom notification views.
+    ///
+    /// #### Parameters
+    ///
+    /// - `customViewLayout`: the layout name
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification setCustomView(String customViewLayout) {
+        this.customViewLayout = customViewLayout;
+        return this;
+    }
+
+    /// Adds an action button to this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `action`: the action to add
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addAction(Action action) {
+        actions.add(action);
+        return this;
+    }
+
+    /// Adds a simple action button to this notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the action id reported back when the user taps the action
+    ///
+    /// - `title`: the button label
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addAction(String id, String title) {
+        return addAction(new Action(id, title));
+    }
+
+    /// Adds a quick reply action with an inline text input field. When the user submits
+    /// a reply the entered text is reported back via `com.codename1.push.PushContent#getTextResponse()`
+    /// alongside the action id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the action id reported back when the user submits the reply
+    ///
+    /// - `title`: the button label
+    ///
+    /// - `placeholder`: placeholder text shown in the text input field
+    ///
+    /// - `replyButtonText`: the label for the send button
+    ///
+    /// #### Returns
+    ///
+    /// this notification for chaining
+    public LocalNotification addInputAction(String id, String title, String placeholder, String replyButtonText) {
+        Action a = new Action(id, title);
+        a.textInputPlaceholder = placeholder;
+        a.textInputButtonText = replyButtonText;
+        return addAction(a);
+    }
+
+    /// Returns the list of action buttons configured on this notification.
+    ///
+    /// #### Returns
+    ///
+    /// the actions, never null
+    public List<Action> getActions() {
+        return actions;
+    }
+
+    /// Configures this notification to render as a conversation (messaging style)
+    /// notification. Returns the `MessagingStyle` so messages can be added fluently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selfDisplayName`: the name representing the device user in the conversation
+    ///
+    /// #### Returns
+    ///
+    /// the messaging style for further configuration
+    public MessagingStyle asMessagingStyle(String selfDisplayName) {
+        this.messagingStyle = new MessagingStyle(selfDisplayName);
+        return this.messagingStyle;
+    }
+
+    /// Returns the messaging style configured on this notification, or null if this is
+    /// not a messaging style notification.
+    ///
+    /// #### Returns
+    ///
+    /// the messaging style, or null
+    public MessagingStyle getMessagingStyle() {
+        return messagingStyle;
+    }
+
+    /// A single action button attached to a local notification. An action may optionally
+    /// include an inline text input (quick reply) by setting a placeholder and reply
+    /// button text via `LocalNotification#addInputAction(String, String, String, String)`.
+    public static class Action {
+        private final String id;
+        private final String title;
+        private String icon;
+        private String textInputPlaceholder;
+        private String textInputButtonText;
+
+        /// Creates an action.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the action id reported back when the user taps the action
+        ///
+        /// - `title`: the button label
+        public Action(String id, String title) {
+            this.id = id;
+            this.title = title;
+        }
+
+        /// Creates an action with an icon.
+        ///
+        /// #### Parameters
+        ///
+        /// - `id`: the action id reported back when the user taps the action
+        ///
+        /// - `title`: the button label
+        ///
+        /// - `icon`: an icon name for the action (not supported on all platforms)
+        public Action(String id, String title, String icon) {
+            this.id = id;
+            this.title = title;
+            this.icon = icon;
+        }
+
+        /// Returns the action id.
+        ///
+        /// #### Returns
+        ///
+        /// the action id
+        public String getId() {
+            return id;
+        }
+
+        /// Returns the button label.
+        ///
+        /// #### Returns
+        ///
+        /// the title
+        public String getTitle() {
+            return title;
+        }
+
+        /// Returns the icon name.
+        ///
+        /// #### Returns
+        ///
+        /// the icon, or null
+        public String getIcon() {
+            return icon;
+        }
+
+        /// Returns the placeholder text for the inline text input, or null when the
+        /// action has no text input.
+        ///
+        /// #### Returns
+        ///
+        /// the text input placeholder, or null
+        public String getTextInputPlaceholder() {
+            return textInputPlaceholder;
+        }
+
+        /// Returns the label of the reply button for the inline text input, or null when
+        /// the action has no text input.
+        ///
+        /// #### Returns
+        ///
+        /// the reply button text, or null
+        public String getTextInputButtonText() {
+            return textInputButtonText;
+        }
+
+        /// Returns true if this action has an inline text input (quick reply).
+        ///
+        /// #### Returns
+        ///
+        /// true if this is a text input action
+        public boolean isTextInput() {
+            return textInputPlaceholder != null || textInputButtonText != null;
+        }
+    }
+
+    /// Describes a conversation (messaging style) notification. A messaging style
+    /// notification renders a sequence of chat messages, each attributed to a sender,
+    /// and is the recommended presentation for chat and messaging apps.
+    public static class MessagingStyle {
+        private final String selfDisplayName;
+        private String conversationTitle;
+        private boolean groupConversation;
+        private final List<Message> messages = new ArrayList<Message>();
+
+        /// Creates a messaging style.
+        ///
+        /// #### Parameters
+        ///
+        /// - `selfDisplayName`: the name representing the device user
+        public MessagingStyle(String selfDisplayName) {
+            this.selfDisplayName = selfDisplayName;
+        }
+
+        /// Sets the conversation title shown above the messages.
+        ///
+        /// #### Parameters
+        ///
+        /// - `t`: the conversation title
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle conversationTitle(String t) {
+            this.conversationTitle = t;
+            return this;
+        }
+
+        /// Marks the conversation as a group conversation (more than two participants).
+        ///
+        /// #### Parameters
+        ///
+        /// - `b`: true if this is a group conversation
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle groupConversation(boolean b) {
+            this.groupConversation = b;
+            return this;
+        }
+
+        /// Adds a message to the conversation.
+        ///
+        /// #### Parameters
+        ///
+        /// - `text`: the message text
+        ///
+        /// - `timestamp`: the message timestamp in milliseconds since the epoch
+        ///
+        /// - `senderName`: the display name of the sender, or null for the device user
+        ///
+        /// #### Returns
+        ///
+        /// this messaging style for chaining
+        public MessagingStyle addMessage(String text, long timestamp, String senderName) {
+            messages.add(new Message(text, timestamp, senderName));
+            return this;
+        }
+
+        /// Returns the name representing the device user.
+        ///
+        /// #### Returns
+        ///
+        /// the self display name
+        public String getSelfDisplayName() {
+            return selfDisplayName;
+        }
+
+        /// Returns the conversation title.
+        ///
+        /// #### Returns
+        ///
+        /// the conversation title, or null
+        public String getConversationTitle() {
+            return conversationTitle;
+        }
+
+        /// Returns true if this is a group conversation.
+        ///
+        /// #### Returns
+        ///
+        /// true if a group conversation
+        public boolean isGroupConversation() {
+            return groupConversation;
+        }
+
+        /// Returns the messages in the conversation.
+        ///
+        /// #### Returns
+        ///
+        /// the messages, never null
+        public List<Message> getMessages() {
+            return messages;
+        }
+
+        /// A single message within a messaging style notification.
+        public static class Message {
+            private final String text;
+            private final long timestamp;
+            private final String senderName;
+
+            /// Creates a message.
+            ///
+            /// #### Parameters
+            ///
+            /// - `text`: the message text
+            ///
+            /// - `timestamp`: the timestamp in milliseconds since the epoch
+            ///
+            /// - `senderName`: the sender display name, or null for the device user
+            public Message(String text, long timestamp, String senderName) {
+                this.text = text;
+                this.timestamp = timestamp;
+                this.senderName = senderName;
+            }
+
+            /// Returns the message text.
+            ///
+            /// #### Returns
+            ///
+            /// the text
+            public String getText() {
+                return text;
+            }
+
+            /// Returns the message timestamp.
+            ///
+            /// #### Returns
+            ///
+            /// the timestamp in milliseconds since the epoch
+            public long getTimestamp() {
+                return timestamp;
+            }
+
+            /// Returns the sender display name.
+            ///
+            /// #### Returns
+            ///
+            /// the sender name, or null for the device user
+            public String getSenderName() {
+                return senderName;
+            }
+        }
     }
 
 }

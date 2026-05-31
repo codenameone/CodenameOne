@@ -53,6 +53,13 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
 import com.codename1.share.ShareResult;
 import com.codename1.share.ShareResultListener;
 import com.codename1.payment.Purchase;
@@ -179,6 +186,29 @@ public abstract class CodenameOneImplementation {
     /// Set a task to be executed once the implementation is being destroyed
     public static void setOnExit(Runnable on) {
         onExit = on;
+    }
+
+    private static Object currentApplicationInstance;
+
+    /// Stores the running application's main class instance so the implementation can
+    /// dispatch lifecycle style callbacks (such as shared content delivery) to it. Set by
+    /// the platform port when it bootstraps the application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `app`: the application main class instance
+    public static void setCurrentApplicationInstance(Object app) {
+        currentApplicationInstance = app;
+    }
+
+    /// Returns the running application's main class instance, or null if it has not been
+    /// captured.
+    ///
+    /// #### Returns
+    ///
+    /// the application main class instance, or null
+    public static Object getCurrentApplicationInstance() {
+        return currentApplicationInstance;
     }
 
     /// Allows the system to register to receive push callbacks
@@ -10077,6 +10107,118 @@ public abstract class CodenameOneImplementation {
     }
 
     public void cancelLocalNotification(String notificationId) {
+    }
+
+    /// Requests permission to post notifications. The default implementation assumes the
+    /// platform has no permission model and immediately reports the permission as granted.
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        if (callback != null) {
+            callback.notificationPermissionResult(new NotificationPermissionResult(true, NotificationPermissionResult.AUTH_AUTHORIZED));
+        }
+    }
+
+    /// Registers a notification channel. No-op on platforms without channels.
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+    }
+
+    /// Deletes a notification channel. No-op on platforms without channels.
+    public void deleteNotificationChannel(String channelId) {
+    }
+
+    /// Creates a notification channel group. No-op on platforms without channels.
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+    }
+
+    /// Returns true if the platform can receive shared content from other apps.
+    public boolean isReceiveSharedContentSupported() {
+        return false;
+    }
+
+    /// Delivers shared content to the running application instance by reflectively
+    /// invoking onReceivedSharedContent on the main application object, if present. The
+    /// dispatch is performed on the EDT.
+    public void fireSharedContentReceived(final SharedContent content) {
+        final Object app = currentApplicationInstance;
+        if (app == null || content == null) {
+            return;
+        }
+        Runnable r = new Runnable() {
+            public void run() {
+                try {
+                    java.lang.reflect.Method m = app.getClass().getMethod("onReceivedSharedContent", SharedContent.class);
+                    m.invoke(app, content);
+                } catch (NoSuchMethodException noMethod) {
+                    // the app does not handle shared content; ignore
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            r.run();
+        } else {
+            Display.getInstance().callSerially(r);
+        }
+    }
+
+    /// Returns true if the platform supports constraint-aware background work.
+    public boolean isBackgroundWorkSupported() {
+        return false;
+    }
+
+    /// Schedules constraint-aware background work. No-op when unsupported.
+    public void scheduleBackgroundWork(WorkRequest request) {
+    }
+
+    /// Cancels previously scheduled background work. No-op when unsupported.
+    public void cancelBackgroundWork(String workId) {
+    }
+
+    /// Returns true if the platform supports foreground services.
+    public boolean isForegroundServiceSupported() {
+        return false;
+    }
+
+    /// Starts a foreground service. The default implementation runs the task on a thread
+    /// without a system notification and returns null.
+    public Object startForegroundService(String channelId, String title, String body, String iconName, final ForegroundService.Task task, final ForegroundService handle) {
+        if (task != null) {
+            new Thread(new Runnable() {
+                public void run() {
+                    task.run(handle);
+                }
+            }).start();
+        }
+        return null;
+    }
+
+    /// Updates the notification of a running foreground service. No-op by default.
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+    }
+
+    /// Stops a running foreground service. No-op by default.
+    public void stopForegroundService(Object nativeHandle) {
+    }
+
+    /// Returns true if the platform supports deferrable background processing tasks.
+    public boolean isBackgroundProcessingSupported() {
+        return false;
+    }
+
+    /// Schedules a deferrable background processing task. No-op when unsupported.
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+    }
+
+    /// Cancels a scheduled background processing task. No-op when unsupported.
+    public void cancelBackgroundProcessing(String id) {
+    }
+
+    /// Subscribes the device to a push topic. No-op when unsupported.
+    public void subscribeToPushTopic(String topic) {
+    }
+
+    /// Unsubscribes the device from a push topic. No-op when unsupported.
+    public void unsubscribeFromPushTopic(String topic) {
     }
 
     /// Gets the preferred time (in seconds) between background fetches.
