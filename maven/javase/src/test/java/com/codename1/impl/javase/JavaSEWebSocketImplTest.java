@@ -1,9 +1,6 @@
 package com.codename1.impl.javase;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.impl.WebSocketImpl;
-import com.codename1.io.Util;
-import com.codename1.io.WebSocket;
+import com.codename1.impl.WebSocketEventSink;
 import com.codename1.io.WebSocketState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -35,7 +31,13 @@ import java.util.concurrent.atomic.AtomicReference;
 /// minimal in-process RFC 6455 echo server. Validates the handshake, text +
 /// binary frames, fragmentation handling, and the close round-trip.
 ///
-/// Avoids lambdas because the JavaSE port is at -source 1.7.
+/// Tests the impl directly via its `WebSocketImpl` interface rather than
+/// going through the public `com.codename1.io.WebSocket` facade -- the
+/// facade requires a full `CodenameOneImplementation` instance and we
+/// don't want to spin up `JavaSEPort` (with its AWT / Swing wiring) for a
+/// loopback network test.
+///
+/// Avoids lambdas because the JavaSE port module is at -source 1.7.
 class JavaSEWebSocketImplTest {
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -47,7 +49,6 @@ class JavaSEWebSocketImplTest {
     void setUp() throws IOException {
         server = new EchoServer();
         server.start();
-        Util.setImplementation(new TestImpl());
     }
 
     @AfterEach
@@ -64,47 +65,44 @@ class JavaSEWebSocketImplTest {
         final CountDownLatch closed = new CountDownLatch(1);
         final AtomicInteger closeCode = new AtomicInteger();
 
-        WebSocket ws = WebSocket.build("ws://127.0.0.1:" + server.port() + "/")
-                .onConnect(new WebSocket.ConnectHandler() {
-                    @Override
-                    public void onConnect(WebSocket w) {
-                        connected.countDown();
-                    }
-                })
-                .onTextMessage(new WebSocket.TextHandler() {
-                    @Override
-                    public void onText(WebSocket w, String message) {
-                        texts.add(message);
-                    }
-                })
-                .onBinaryMessage(new WebSocket.BinaryHandler() {
-                    @Override
-                    public void onBinary(WebSocket w, byte[] message) {
-                        binaries.add(message);
-                    }
-                })
-                .onClose(new WebSocket.CloseHandler() {
-                    @Override
-                    public void onClose(WebSocket w, int code, String reason) {
-                        closeCode.set(code);
-                        closed.countDown();
-                    }
-                })
-                .onError(new WebSocket.ErrorHandler() {
-                    @Override
-                    public void onError(WebSocket w, Exception ex) {
-                        errored.set(ex);
-                    }
-                })
-                .connect();
+        JavaSEWebSocketImpl impl = new JavaSEWebSocketImpl(
+                "ws://127.0.0.1:" + server.port() + "/");
+        impl.setEventSink(new WebSocketEventSink() {
+            @Override
+            public void onConnect() {
+                connected.countDown();
+            }
+
+            @Override
+            public void onTextMessage(String message) {
+                texts.add(message);
+            }
+
+            @Override
+            public void onBinaryMessage(byte[] message) {
+                binaries.add(message);
+            }
+
+            @Override
+            public void onClose(int code, String reason) {
+                closeCode.set(code);
+                closed.countDown();
+            }
+
+            @Override
+            public void onError(Exception ex) {
+                errored.set(ex);
+            }
+        });
+        impl.connect(0);
 
         org.junit.jupiter.api.Assertions.assertTrue(
                 connected.await(3, TimeUnit.SECONDS), "handshake completes");
-        org.junit.jupiter.api.Assertions.assertEquals(WebSocketState.OPEN, ws.getReadyState());
+        org.junit.jupiter.api.Assertions.assertEquals(WebSocketState.OPEN, impl.getReadyState());
 
-        ws.send("hello");
+        impl.sendText("hello");
         byte[] bin = new byte[] { 1, 2, 3, 4, 5 };
-        ws.send(bin);
+        impl.sendBinary(bin);
 
         long deadline = System.currentTimeMillis() + 3000;
         while ((texts.size() == 0 || binaries.size() == 0)
@@ -114,11 +112,11 @@ class JavaSEWebSocketImplTest {
         org.junit.jupiter.api.Assertions.assertEquals("hello", texts.get(0));
         org.junit.jupiter.api.Assertions.assertArrayEquals(bin, binaries.get(0));
 
-        ws.close();
+        impl.close();
         org.junit.jupiter.api.Assertions.assertTrue(
                 closed.await(3, TimeUnit.SECONDS), "close round-trip completes");
         org.junit.jupiter.api.Assertions.assertEquals(1000, closeCode.get());
-        org.junit.jupiter.api.Assertions.assertEquals(WebSocketState.CLOSED, ws.getReadyState());
+        org.junit.jupiter.api.Assertions.assertEquals(WebSocketState.CLOSED, impl.getReadyState());
         org.junit.jupiter.api.Assertions.assertNull(errored.get(),
                 "no errors during normal session");
     }
@@ -128,20 +126,32 @@ class JavaSEWebSocketImplTest {
         final CountDownLatch connected = new CountDownLatch(1);
         final List<byte[]> received = new CopyOnWriteArrayList<byte[]>();
 
-        WebSocket ws = WebSocket.build("ws://127.0.0.1:" + server.port() + "/")
-                .onConnect(new WebSocket.ConnectHandler() {
-                    @Override
-                    public void onConnect(WebSocket w) {
-                        connected.countDown();
-                    }
-                })
-                .onBinaryMessage(new WebSocket.BinaryHandler() {
-                    @Override
-                    public void onBinary(WebSocket w, byte[] message) {
-                        received.add(message);
-                    }
-                })
-                .connect();
+        JavaSEWebSocketImpl impl = new JavaSEWebSocketImpl(
+                "ws://127.0.0.1:" + server.port() + "/");
+        impl.setEventSink(new WebSocketEventSink() {
+            @Override
+            public void onConnect() {
+                connected.countDown();
+            }
+
+            @Override
+            public void onTextMessage(String message) {
+            }
+
+            @Override
+            public void onBinaryMessage(byte[] message) {
+                received.add(message);
+            }
+
+            @Override
+            public void onClose(int code, String reason) {
+            }
+
+            @Override
+            public void onError(Exception ex) {
+            }
+        });
+        impl.connect(0);
         org.junit.jupiter.api.Assertions.assertTrue(connected.await(3, TimeUnit.SECONDS));
 
         // 200 KB triggers the MAX_FRAME_PAYLOAD fragmenter (65 KB).
@@ -149,26 +159,14 @@ class JavaSEWebSocketImplTest {
         for (int i = 0; i < big.length; i++) {
             big[i] = (byte) (i & 0xFF);
         }
-        ws.send(big);
+        impl.sendBinary(big);
 
         long deadline = System.currentTimeMillis() + 5000;
         while (received.isEmpty() && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
         org.junit.jupiter.api.Assertions.assertArrayEquals(big, received.get(0));
-        ws.close();
-    }
-
-    private static final class TestImpl extends CodenameOneImplementation {
-        @Override
-        public boolean isWebSocketSupported() {
-            return true;
-        }
-
-        @Override
-        public WebSocketImpl createWebSocketImpl(String url) {
-            return new JavaSEWebSocketImpl(url);
-        }
+        impl.close();
     }
 
     /// Tiny RFC 6455 echo server. Single-connection, no TLS, frames are

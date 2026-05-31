@@ -46,9 +46,9 @@ class WebSocketTest {
                 .connect();
 
         // Drive the mock impl through the lifecycle the real platform would.
-        mockImpl.sink().onConnect();
-        mockImpl.sink().onTextMessage("hello");
-        mockImpl.sink().onTextMessage("world");
+        mockImpl.testSink().onConnect();
+        mockImpl.testSink().onTextMessage("hello");
+        mockImpl.testSink().onTextMessage("world");
 
         assertEquals(1, connectCount.get());
         assertSame(ws, seenInOpen.get(), "handler receives the WebSocket instance");
@@ -63,7 +63,7 @@ class WebSocketTest {
                 .connect();
 
         byte[] payload = new byte[] { 1, 2, 3, 4 };
-        mockImpl.sink().onBinaryMessage(payload);
+        mockImpl.testSink().onBinaryMessage(payload);
 
         assertEquals(1, received.size());
         assertSame(payload, received.get(0));
@@ -80,7 +80,7 @@ class WebSocketTest {
                 })
                 .connect();
 
-        mockImpl.sink().onClose(1000, "normal");
+        mockImpl.testSink().onClose(1000, "normal");
 
         assertEquals(1000, code.get());
         assertEquals("normal", reason.get());
@@ -94,7 +94,7 @@ class WebSocketTest {
                 .connect();
 
         RuntimeException boom = new RuntimeException("boom");
-        mockImpl.sink().onError(boom);
+        mockImpl.testSink().onError(boom);
 
         assertSame(boom, caught.get());
     }
@@ -104,11 +104,11 @@ class WebSocketTest {
         WebSocket.build("ws://test").connect();
 
         // No NPEs even though no handler was registered.
-        mockImpl.sink().onConnect();
-        mockImpl.sink().onTextMessage("ignored");
-        mockImpl.sink().onBinaryMessage(new byte[0]);
-        mockImpl.sink().onClose(1000, "");
-        mockImpl.sink().onError(new RuntimeException("ignored"));
+        mockImpl.testSink().onConnect();
+        mockImpl.testSink().onTextMessage("ignored");
+        mockImpl.testSink().onBinaryMessage(new byte[0]);
+        mockImpl.testSink().onClose(1000, "");
+        mockImpl.testSink().onError(new RuntimeException("ignored"));
     }
 
     @Test
@@ -121,7 +121,7 @@ class WebSocketTest {
                 .onError((w, e) -> caught.set(e))
                 .connect();
 
-        mockImpl.sink().onTextMessage("x");
+        mockImpl.testSink().onTextMessage("x");
 
         assertTrue(caught.get() instanceof IllegalArgumentException,
                 "user-handler throwable surfaces via onError");
@@ -228,9 +228,12 @@ class WebSocketTest {
             return state;
         }
 
-        /// Test-only accessor for the sink so tests can fire events from
-        /// the platform side without going through a real network layer.
-        WebSocketEventSink sink() {
+        /// Test-only accessor exposing the parent's protected final
+        /// {@code sink()} so the test can fire events from the platform
+        /// side without going through a real network layer. Named
+        /// distinctly from the parent so we're not trying to override
+        /// the final method.
+        WebSocketEventSink testSink() {
             return super.sink();
         }
     }

@@ -265,6 +265,29 @@ public class Cn1ssScreenshotServer {
 
     private static void writeAndAck(String safeName, long expectedBytes, String expectedHash,
                                     byte[] pngBytes, OutputStream out) throws IOException {
+        // safeName came in over the wire on a META text frame. Even though
+        // the device-side helper restricts it to [A-Za-z0-9_.-] before
+        // sending, we cannot trust the wire format: a malicious or buggy
+        // peer could send "../../etc/passwd". Sanitise then verify the
+        // resolved path stays under outDir, matching CodeQL's
+        // java/path-injection guidance.
+        String sanitised = sanitiseFileNameComponent(safeName);
+        if (sanitised == null) {
+            System.err.println("[Cn1ssScreenshotServer] rejected META with unsafe test name: " + safeName);
+            String nack = "NACK rejected status=invalid_test_name";
+            writeServerFrame(out, OP_TEXT, nack.getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        Path target = outDir.resolve(sanitised + ".png").normalize();
+        Path baseAbs = outDir.toAbsolutePath().normalize();
+        if (!target.toAbsolutePath().normalize().startsWith(baseAbs)) {
+            System.err.println("[Cn1ssScreenshotServer] rejected META with out-of-base path: "
+                    + safeName + " -> " + target);
+            String nack = "NACK rejected status=path_escape";
+            writeServerFrame(out, OP_TEXT, nack.getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+
         String status = "ok";
         StringBuilder warn = new StringBuilder();
         if (expectedBytes >= 0 && expectedBytes != pngBytes.length) {
@@ -281,20 +304,49 @@ public class Cn1ssScreenshotServer {
             }
             warn.append("expected_hash=").append(expectedHash).append(",actual_hash=").append(actualHash);
         }
-        String prev = hashRegistry.putIfAbsent(actualHash, safeName);
-        if (prev != null && !prev.equals(safeName)) {
-            System.out.println("CN1SS:WARN:test=" + safeName
+        String prev = hashRegistry.putIfAbsent(actualHash, sanitised);
+        if (prev != null && !prev.equals(sanitised)) {
+            System.out.println("CN1SS:WARN:test=" + sanitised
                     + " duplicate_image_with=" + prev + " png_fnv1a64=" + actualHash);
         }
 
-        Path target = outDir.resolve(safeName + ".png");
         Files.write(target, pngBytes);
-        int count = receivedCount.incrementAndGet();
-        System.out.println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length
+        receivedCount.incrementAndGet();
+        System.out.println("CN1SS:INFO:test=" + sanitised + " png_bytes=" + pngBytes.length
                 + " png_fnv1a64=" + actualHash + " status=" + status
                 + (warn.length() == 0 ? "" : " warn=" + warn));
-        String ack = "ACK " + safeName + " status=" + status;
+        String ack = "ACK " + sanitised + " status=" + status;
         writeServerFrame(out, OP_TEXT, ack.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// Returns the input with every non-`[A-Za-z0-9_.-]` character replaced
+    /// by `_`, or null if the result is empty, equal to `.`, equal to `..`,
+    /// or contains any path-separator characters. This mirrors the
+    /// `sanitizeTestName` logic on the device side but is enforced again
+    /// here because the server cannot trust wire-format data.
+    private static String sanitiseFileNameComponent(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            boolean alnum = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+                    || (ch >= '0' && ch <= '9');
+            if (alnum || ch == '_' || ch == '.' || ch == '-') {
+                out.append(ch);
+            } else {
+                out.append('_');
+            }
+        }
+        String result = out.toString();
+        if (result.equals(".") || result.equals("..")) {
+            return null;
+        }
+        return result;
     }
 
     private static Map<String, String> parseMeta(String json) {
