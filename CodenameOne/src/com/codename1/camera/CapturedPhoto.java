@@ -47,14 +47,22 @@ public final class CapturedPhoto {
 
     /// JPEG-encoded bytes of the captured photo. Hand directly to the
     /// `com.codename1.ai.*` modules without re-reading from disk.
-    public byte[] getJpegBytes() { return jpegBytes; }
+    public byte[] getJpegBytes() {
+        return jpegBytes;
+    }
 
     /// FileSystemStorage path the JPEG was saved to. The file is in the
     /// application's private storage and persists until the app deletes it.
-    public String getFilePath() { return filePath; }
+    public String getFilePath() {
+        return filePath;
+    }
 
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
+    public int getWidth() {
+        return width;
+    }
+    public int getHeight() {
+        return height;
+    }
 
     /// Convenience: decode the JPEG bytes into a Codename One `Image`.
     public Image toImage() throws IOException {

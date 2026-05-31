@@ -54,23 +54,37 @@ public final class CameraFrame {
     /// JPEG-encoded bytes for this frame. Always non-null regardless of the
     /// requested `FrameFormat`; the framework encodes raw frames into JPEG
     /// on demand for AI module consumption.
-    public byte[] getJpegBytes() { return jpegBytes; }
+    public byte[] getJpegBytes() {
+        return jpegBytes;
+    }
 
     /// Raw pixel bytes in the format requested via
     /// `CameraSessionOptions#frameFormat(FrameFormat)`. `null` when the
     /// requested format was `FrameFormat#JPEG`.
-    public byte[] getRawBytes() { return rawBytes; }
+    public byte[] getRawBytes() {
+        return rawBytes;
+    }
 
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
+    public int getWidth() {
+        return width;
+    }
+    public int getHeight() {
+        return height;
+    }
 
     /// Clockwise rotation in degrees (0, 90, 180, 270) that should be applied
     /// to the bytes to display them upright.
-    public int getRotationDegrees() { return rotationDegrees; }
+    public int getRotationDegrees() {
+        return rotationDegrees;
+    }
 
     /// Monotonic timestamp in nanoseconds. Useful for measuring inter-frame
     /// intervals.
-    public long getTimestampNanos() { return timestampNanos; }
+    public long getTimestampNanos() {
+        return timestampNanos;
+    }
 
-    public FrameFormat getFormat() { return format; }
+    public FrameFormat getFormat() {
+        return format;
+    }
 }

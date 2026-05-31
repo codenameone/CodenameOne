@@ -50,18 +50,30 @@ public final class CameraInfo {
     }
 
     /// Opaque, platform-specific identifier. Stable for the lifetime of the process.
-    public String getId() { return id; }
+    public String getId() {
+        return id;
+    }
 
-    public CameraFacing getFacing() { return facing; }
+    public CameraFacing getFacing() {
+        return facing;
+    }
 
     /// Supported still-photo resolutions, largest first. May be empty on platforms
     /// (e.g. the JavaSE simulator) that don't expose a discrete list.
-    public Dimension[] getPhotoSizes() { return photoSizes; }
+    public Dimension[] getPhotoSizes() {
+        return photoSizes;
+    }
 
     /// Supported preview/frame-stream resolutions. May be empty on platforms that
     /// don't expose a discrete list.
-    public Dimension[] getPreviewSizes() { return previewSizes; }
+    public Dimension[] getPreviewSizes() {
+        return previewSizes;
+    }
 
-    public boolean hasFlash() { return hasFlash; }
-    public boolean hasAutoFocus() { return hasAutoFocus; }
+    public boolean hasFlash() {
+        return hasFlash;
+    }
+    public boolean hasAutoFocus() {
+        return hasAutoFocus;
+    }
 }

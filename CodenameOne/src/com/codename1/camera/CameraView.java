@@ -63,7 +63,9 @@ public final class CameraView extends Container {
         }
     }
 
-    public CameraSession getSession() { return session; }
+    public CameraSession getSession() {
+        return session;
+    }
 
     /// Whether to horizontally mirror the preview. Usually `true` for front
     /// cameras (matches the "mirror" feel users expect from a selfie view).
@@ -71,14 +73,20 @@ public final class CameraView extends Container {
         this.mirrored = m;
     }
 
-    public boolean isMirrored() { return mirrored; }
+    public boolean isMirrored() {
+        return mirrored;
+    }
 
     public void setScaleType(ScaleType s) {
         this.scaleType = s == null ? ScaleType.CROP : s;
     }
 
-    public ScaleType getScaleType() { return scaleType; }
+    public ScaleType getScaleType() {
+        return scaleType;
+    }
 
     /// Exposed for ports that need to update the preview node directly.
-    public PeerComponent getPreviewPeer() { return peer; }
+    public PeerComponent getPreviewPeer() {
+        return peer;
+    }
 }

@@ -90,7 +90,9 @@ public final class CameraSession implements AutoCloseable {
     }
 
     /// Backwards-compatible alias for `#setFrameListener(FrameListener)`.
-    public void addFrameListener(FrameListener l) { setFrameListener(l); }
+    public void addFrameListener(FrameListener l) {
+        setFrameListener(l);
+    }
 
     // Identity comparison is intentional: addFrameListener stores the
     // exact callback reference, removeFrameListener only removes the same
@@ -102,22 +104,36 @@ public final class CameraSession implements AutoCloseable {
         }
     }
 
-    public void setFlashMode(FlashMode m) { impl.setFlashMode(m); }
-    public void setZoom(float ratio) { impl.setZoom(ratio); }
+    public void setFlashMode(FlashMode m) {
+        impl.setFlashMode(m);
+    }
+    public void setZoom(float ratio) {
+        impl.setZoom(ratio);
+    }
 
     /// Request a focus operation at the normalized preview coordinate
     /// (`0.0` top-left, `1.0` bottom-right).
-    public void focus(float xNorm, float yNorm) { impl.focus(xNorm, yNorm); }
+    public void focus(float xNorm, float yNorm) {
+        impl.focus(xNorm, yNorm);
+    }
 
-    public CameraInfo getInfo() { return info; }
+    public CameraInfo getInfo() {
+        return info;
+    }
 
-    public CameraSessionOptions getOptions() { return options; }
+    public CameraSessionOptions getOptions() {
+        return options;
+    }
 
     /// Release the hardware but keep this session object alive. Pair with
     /// `#resume()`.
-    public void pause() { impl.pause(); }
+    public void pause() {
+        impl.pause();
+    }
 
-    public void resume() { impl.resume(); }
+    public void resume() {
+        impl.resume();
+    }
 
     /// Release the session. Idempotent.
     @Override
@@ -133,7 +149,11 @@ public final class CameraSession implements AutoCloseable {
         }
     }
 
-    public boolean isClosed() { return closed; }
+    public boolean isClosed() {
+        return closed;
+    }
 
-    CameraImpl getImpl() { return impl; }
+    CameraImpl getImpl() {
+        return impl;
+    }
 }

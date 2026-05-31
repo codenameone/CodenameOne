@@ -75,12 +75,28 @@ public final class CameraSessionOptions {
         return this;
     }
 
-    public int getPreviewWidth() { return previewWidth; }
-    public int getPreviewHeight() { return previewHeight; }
-    public int getPhotoWidth() { return photoWidth; }
-    public int getPhotoHeight() { return photoHeight; }
-    public FrameFormat getFrameFormat() { return frameFormat; }
-    public int getFrameMaxFps() { return frameMaxFps; }
-    public boolean isCaptureAudio() { return captureAudio; }
-    public boolean isStabilizationEnabled() { return enableStabilization; }
+    public int getPreviewWidth() {
+        return previewWidth;
+    }
+    public int getPreviewHeight() {
+        return previewHeight;
+    }
+    public int getPhotoWidth() {
+        return photoWidth;
+    }
+    public int getPhotoHeight() {
+        return photoHeight;
+    }
+    public FrameFormat getFrameFormat() {
+        return frameFormat;
+    }
+    public int getFrameMaxFps() {
+        return frameMaxFps;
+    }
+    public boolean isCaptureAudio() {
+        return captureAudio;
+    }
+    public boolean isStabilizationEnabled() {
+        return enableStabilization;
+    }
 }

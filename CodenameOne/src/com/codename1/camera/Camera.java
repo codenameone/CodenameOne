@@ -87,7 +87,11 @@ public final class Camera {
             CameraInfo[] out = probe.enumerateCameras();
             return out == null ? new CameraInfo[0] : out;
         } finally {
-            try { probe.close(); } catch (Throwable t) { Log.e(t); }
+            try {
+                probe.close();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
@@ -131,7 +135,11 @@ public final class Camera {
             try {
                 impl.open(info.getId(), opts);
             } catch (IOException e) {
-                try { impl.close(); } catch (Throwable t) { Log.e(t); }
+                try {
+                    impl.close();
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
                 throw new RuntimeException("Could not open camera " + info.getId(), e);
             }
             active = new CameraSession(impl, info, opts);
@@ -156,7 +164,11 @@ public final class Camera {
         } catch (Throwable t) {
             fireLater(callback, Boolean.FALSE);
         } finally {
-            try { impl.close(); } catch (Throwable t) { Log.e(t); }
+            try {
+                impl.close();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
@@ -165,7 +177,9 @@ public final class Camera {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
-            @Override public void run() { callback.onSucess(value); }
+            @Override public void run() {
+                callback.onSucess(value);
+            }
         });
     }
 

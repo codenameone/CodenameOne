@@ -75,10 +75,14 @@ public final class VideoRecording {
         return System.currentTimeMillis() - startMillis;
     }
 
-    public boolean isRecording() { return !stopped; }
+    public boolean isRecording() {
+        return !stopped;
+    }
 
     /// The file path that was requested when the recording started. The actual
     /// final path returned by `#stopAndAwait()` may differ slightly (different
     /// extension) depending on the platform's container format.
-    public String getRequestedPath() { return requestedPath; }
+    public String getRequestedPath() {
+        return requestedPath;
+    }
 }

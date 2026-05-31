@@ -57,8 +57,16 @@ public final class PhotoCaptureOptions {
         return this;
     }
 
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
-    public int getJpegQuality() { return jpegQuality; }
-    public String getFilePath() { return filePath; }
+    public int getWidth() {
+        return width;
+    }
+    public int getHeight() {
+        return height;
+    }
+    public int getJpegQuality() {
+        return jpegQuality;
+    }
+    public String getFilePath() {
+        return filePath;
+    }
 }
