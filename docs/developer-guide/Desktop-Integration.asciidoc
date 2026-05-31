@@ -14,9 +14,9 @@ The desktop integration features make a desktop build *feel* like a desktop app:
 * Interactive scrollbars - a draggable thumb, click-to-page on the track, and an
   always-visible (rather than fading) scrollbar.
 
-These behaviors are *opt-in*. They are switched on by default for newly generated projects
+These behaviors are *opt-in*. They're switched on by default for newly generated projects
 (both the Maven archetype and the start.codenameone.com initializr) and stay completely
-inert on phones/tablets - all of the new behavior is gated on `CN.isDesktop()`, so a mobile
+inert on phones/tablets - all the new behavior is gated on `CN.isDesktop()`, so a mobile
 build of the same project is unaffected.
 
 === Title-bar modes
@@ -50,7 +50,7 @@ ever take effect on the desktop.
 ==== Enabling it on the macOS (Mac Catalyst) build
 
 The local `mac-source` build runs through ParparVM and the iOS port, where the chrome is provided
-by native `UIWindowScene` / `UIMenuBuilder` code. There it is read as a runtime property and
+by native `UIWindowScene` / `UIMenuBuilder` code. There it's read as a runtime property and
 defaults to `toolbar`, so existing Catalyst apps are unaffected. Opt in from your app before the
 first `Form` is shown:
 
@@ -110,7 +110,7 @@ Each port maps the hint to its native structure: on Catalyst the command is inse
 `UIMenuApplication` / `UIMenuFile` / `UIMenuEdit` / ... menus; on the Java SE build a top-level
 `JMenu` is created per hint group.
 
-TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it is inert on platforms that
+TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it's inert on platforms that
 don't have a native menu bar - it's safe to set it unconditionally in shared code.
 
 === Interactive scrollbars
