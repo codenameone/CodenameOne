@@ -819,7 +819,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         super.setCurrentForm(f);
         syncMacWindowAppearance(f);
         syncMacDesktopChrome(f);
-        if (isNativeTitle() && f != null && !(f instanceof Dialog)) {
+        // Push the form title to the OS window for every desktop mode (unchanged from before); in
+        // "custom" mode the title bar is hidden so this is invisible but harmless.
+        if (isDesktop() && f != null && !(f instanceof Dialog)) {
             pushMacWindowTitle(f);
         }
     }
@@ -837,8 +839,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     private String lastMacChromeMode;
 
     /// Applies the desktop title-bar mode to the host macOS window chrome: the {@code custom} mode
-    /// undecorates the window (the CN1 Toolbar becomes the title bar), while {@code native}/{@code
-    /// toolbar} keep the standard titled window. No-op off the Mac desktop.
+    /// undecorates the window so the CN1 Toolbar becomes the title bar. The {@code native} and
+    /// {@code toolbar} modes leave the window chrome completely untouched, so existing Catalyst apps
+    /// are byte-for-byte unaffected. No-op off the Mac desktop.
     private void syncMacDesktopChrome(Form f) {
         if (f == null || !isDesktop()) {
             return;
@@ -848,7 +851,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         lastMacChromeMode = mode;
-        nativeInstance.setMacWindowUndecorated("custom".equals(mode));
+        // Only the "custom" mode touches the native window. Non-custom modes never call into the
+        // native chrome, preserving the exact prior window appearance for existing apps.
+        if ("custom".equals(mode)) {
+            nativeInstance.setMacWindowUndecorated(true);
+        }
     }
 
     @Override
@@ -864,7 +871,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void refreshNativeTitle() {
         Form f = getCurrentForm();
-        if (f != null && isNativeTitle() && !(f instanceof Dialog)) {
+        if (f != null && isDesktop() && !(f instanceof Dialog)) {
             pushMacWindowTitle(f);
         }
     }

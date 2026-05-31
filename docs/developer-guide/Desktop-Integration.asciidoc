@@ -34,8 +34,8 @@ toolbar's side menu.
 |`toolbar`|Legacy behavior - the in-app CN1 `Toolbar` is shown exactly as on mobile.
 |===
 
-The screenshots below show the same app (a "My Notes" list with File / Edit / View / Help commands)
-in each mode on macOS.
+The screenshots below show the same notes app, with File / Edit / View / Help commands, in each
+mode on macOS.
 
 .`native` mode: the `Form` title is in the OS window title bar, the commands populate the native menu bar, and there is no in-app `Toolbar`
 image::img/desktop-titlebar-native.png[Desktop native title-bar mode,scaledwidth=60%]
@@ -151,4 +151,4 @@ sets the scrollbar gutter width.
 The modern native themes ship platform-conventional defaults for these UIIDs (macOS-style in the iOS
 theme, Material-style in the Android theme); see <<native-modern-themes>>. Override them in your
 app's `theme.css` like any other UIID. In `custom` mode the title bar is just the regular CN1
-`Toolbar`, so it is themed through the usual `Toolbar` / `Title` UIIDs.
+`Toolbar`, so it's themed through the usual `Toolbar` / `Title` UIIDs.
