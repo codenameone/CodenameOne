@@ -16,7 +16,7 @@ import com.codename1.io.WebSocketState;
 
 /**
  * JavaScript port WebSocket implementation backed by the browser's native
- * `WebSocket` global. Uses TeaVM @JSBody / @JSFunctor for the bridge — no
+ * `WebSocket` global. Uses TeaVM @JSBody / @JSFunctor for the bridge -- no
  * shared-state map needed since each instance carries its own callback
  * closures into JS.
  */

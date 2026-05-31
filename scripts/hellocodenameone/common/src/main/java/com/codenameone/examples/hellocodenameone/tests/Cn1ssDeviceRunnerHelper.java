@@ -21,14 +21,14 @@ import java.util.Map;
 /// Device-side helper that ships screenshots to the host. Three transports,
 /// tried in priority order:
 ///
-///   1. WebSocket (`cn1ss.websocket.url` set) — ACK-paced, no os_log /
+///   1. WebSocket (`cn1ss.websocket.url` set) -- ACK-paced, no os_log /
 ///      logcat involvement. Works on every port that supports WebSocket
 ///      (iOS device, iOS simulator, Android, JavaSE, JS, Mac native).
 ///   2. CN1SS:FILE filesystem hand-off (Mac native: `isDesktop() &&
-///      !isSimulator()`) — writes PNG/JPEG to FileSystemStorage and emits
+///      !isSimulator()`) -- writes PNG/JPEG to FileSystemStorage and emits
 ///      a path marker the runner reads directly. Sidesteps os_log's
 ///      900-byte rate limiter on Mac Catalyst.
-///   3. CN1SS:CHUNK base64-over-stdout — universal fallback. Slow on
+///   3. CN1SS:CHUNK base64-over-stdout -- universal fallback. Slow on
 ///      Android (the 50ms/500-byte logcat throttle is here).
 ///
 /// Once every runner script launches Cn1ssScreenshotServer and injects
@@ -467,7 +467,7 @@ final class Cn1ssHashTracker {
 /// Singleton WebSocket sink. Lazily connects on first send. ACK pacing:
 /// after every binary upload, the sender thread blocks on a per-test latch
 /// that the WS onTextMessage handler releases when the host echoes back an
-/// `ACK <safeName>` text frame. ACK_TIMEOUT_MS is generous (10s) — the
+/// `ACK <safeName>` text frame. ACK_TIMEOUT_MS is generous (10s) -- the
 /// host writes the PNG to disk and ACKs immediately on LAN; if we hit the
 /// timeout something is genuinely broken and the test should fail loudly.
 ///

@@ -49,7 +49,7 @@ import javax.net.ssl.SSLSocketFactory;
  * Hand-rolled RFC 6455 WebSocket client used by the JavaSE simulator and
  * desktop ports. Runs over java.net.Socket / javax.net.ssl.SSLSocket so it
  * works on the JDK 8 build host that produces the Codename One core. The
- * same logic is duplicated in AndroidWebSocketImpl — the two ports cannot
+ * same logic is duplicated in AndroidWebSocketImpl -- the two ports cannot
  * share source because they're separate Maven modules; if you change one,
  * change the other.
  */
@@ -134,7 +134,7 @@ class JavaSEWebSocketImpl extends WebSocketImpl {
             s = new Socket();
         }
         s.connect(new InetSocketAddress(host, port), connectTimeoutMs);
-        // Allow blocking reads to be interruptible by setSoTimeout(0) — default already.
+        // Allow blocking reads to be interruptible by setSoTimeout(0) -- default already.
         this.socket = s;
         this.in = s.getInputStream();
         this.out = s.getOutputStream();

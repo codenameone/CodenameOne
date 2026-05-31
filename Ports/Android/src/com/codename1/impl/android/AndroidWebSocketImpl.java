@@ -48,11 +48,11 @@ import javax.net.ssl.SSLSocketFactory;
 /**
  * Hand-rolled RFC 6455 WebSocket client used by the Android port. Runs over
  * java.net.Socket / javax.net.ssl.SSLSocket. The same logic is duplicated in
- * JavaSEWebSocketImpl — the two ports cannot share source because they're
+ * JavaSEWebSocketImpl -- the two ports cannot share source because they're
  * separate Maven modules with different source levels; if you change one,
  * change the other.
  *
- * Compiled at Java 6 source level — no diamond operator, no try-with-resources,
+ * Compiled at Java 6 source level -- no diamond operator, no try-with-resources,
  * no multi-catch.
  */
 class AndroidWebSocketImpl extends WebSocketImpl {

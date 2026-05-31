@@ -21,7 +21,7 @@ import com.codename1.ui.util.Resources;
 import java.io.IOException;
 
 /// Mirrors WebSocketsSample but uses the core `com.codename1.io.WebSocket`
-/// API — no cn1lib dependency, no `//require` directive, no subclassing.
+/// API -- no cn1lib dependency, no `//require` directive, no subclassing.
 /// Each callback is wired as a lambda via the fluent setters.
 public class CoreWebSocketsSample {
 
