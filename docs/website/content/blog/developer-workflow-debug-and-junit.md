@@ -279,7 +279,7 @@ The full reference, including the dependency-block YAML for `common/pom.xml` and
 
 ## Wrapping up
 
-That is the workflow half of this release. The next post is on Monday and covers the new platform APIs that moved into the core this week: AI and OIDC are the headline pieces, with WiFi / connectivity and a few smaller items alongside them.
+That is the workflow half of this release. [Tomorrow's post](/blog/platform-apis-in-the-core/) covers the new platform APIs that moved into the core this week: AI and OAuth / OIDC are the headline pieces, with WiFi / connectivity and a few smaller items alongside them.
 
 Back to the [weekly index](/blog/metal-default-new-build-cloud-and-a-new-format/).
 
