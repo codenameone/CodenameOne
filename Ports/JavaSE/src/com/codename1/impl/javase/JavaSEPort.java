@@ -13227,6 +13227,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkCameraUsageDescription();
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new JavaSECameraImpl();
+    }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {

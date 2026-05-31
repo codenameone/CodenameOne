@@ -9960,6 +9960,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        Activity act = getActivity();
+        if (act == null) return null;
+        return new AndroidCameraImpl(act);
+    }
+
     // Deeper-network connectivity platform factories. Each returns a small
     // platform-specific class living under
     // com.codename1.impl.android.connectivity. Those classes are loaded

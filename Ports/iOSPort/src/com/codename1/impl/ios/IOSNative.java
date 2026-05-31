@@ -416,6 +416,24 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
+
+    // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
+    // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side
+    // routes static callbacks delivered from the capture queue.
+    native String cn1CameraEnumerate();
+    native long cn1CameraOpen(String cameraId, int previewW, int previewH, boolean captureAudio);
+    native long cn1CameraCreatePreviewView(long sessionPeer);
+    native void cn1CameraTakePhoto(long sessionPeer, int width, int height, int jpegQuality, String filePath, int callbackId);
+    native boolean cn1CameraStartVideo(long sessionPeer, String filePath, boolean captureAudio);
+    native void cn1CameraStopVideo(long sessionPeer, int callbackId);
+    native void cn1CameraSetFrameDelivery(long sessionPeer, boolean enabled, int maxFps);
+    native void cn1CameraSetFlash(long sessionPeer, int mode);
+    native void cn1CameraSetZoom(long sessionPeer, float ratio);
+    native void cn1CameraFocus(long sessionPeer, float xNorm, float yNorm);
+    native void cn1CameraPause(long sessionPeer);
+    native void cn1CameraResume(long sessionPeer);
+    native void cn1CameraClose(long sessionPeer);
+
     native void destroyAudioUnit(long peer);
 
     native long createAudioUnit(String path, int audioChannels, float sampleRate, float[] f);

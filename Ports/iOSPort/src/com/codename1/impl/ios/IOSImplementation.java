@@ -3701,6 +3701,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new IOSCameraImpl();
+    }
+
+    @Override
     public String [] getAvailableRecordingMimeTypes() {
         // All of these amount to the same thing.
         // We record in AAC format, wrapped in an mp4 container.

@@ -6771,6 +6771,15 @@ public abstract class CodenameOneImplementation {
     public void capturePhoto(ActionListener response) {
     }
 
+    /// Factory for the low-level `com.codename1.camera.Camera` API. Each call
+    /// returns a fresh per-session backend, or `null` on platforms that do not
+    /// implement the new API. Subclasses override to wire in their port.
+    ///
+    /// @hidden
+    public CameraImpl createCameraImpl() {
+        return null;
+    }
+
     /// Captures a screenshot of the screen.
     ///
     /// #### Returns
