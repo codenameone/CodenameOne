@@ -534,19 +534,13 @@ final class Cn1ssWebSocketSink {
             unavailable = true;
             return false;
         }
-        // Display.getProperty() reads from CN1 app properties (Display
-        // hints, build args); System.getProperty() picks up the simulator's
-        // -D flag. The runner scripts set both during transition; whichever
-        // resolves first wins.
+        // Display.getProperty() is the only property source the CN1
+        // bytecode-compliance check allows on the device runtime --
+        // java.lang.System#getProperty(String,String) is not in
+        // ParparVM's JavaAPI. Runner scripts feed cn1ss.websocket.url to
+        // Display.getProperty via the maven plugin's -Dproperty=...
+        // -> Display hint pass-through, which works on every port.
         String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
-        if (url == null || url.length() == 0) {
-            try {
-                url = System.getProperty("cn1ss.websocket.url", "");
-            } catch (Throwable ignored) {
-                // System.getProperty isn't safe to call on all CN1 platforms
-                // (browser sandbox, J2ME). Treat absence as "unset".
-            }
-        }
         if (url == null || url.length() == 0) {
             unavailable = true;
             return false;
