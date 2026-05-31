@@ -550,6 +550,16 @@ final class Cn1ssWebSocketSink {
         // the browser, JavaSE) shares 127.0.0.1.
         String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
         if (url == null || url.length() == 0) {
+            // The HTML5 port runs single-threaded on the browser event loop and
+            // forbids blocking calls (BlockingDisallowedException). This sink's
+            // connect/ACK handshake blocks the calling thread, so it cannot run
+            // there -- the JS pipeline keeps using the base64-over-console
+            // transport until a non-blocking async sink exists. Leaving the URL
+            // empty marks WS unavailable so emit falls through to that path.
+            if (Cn1ssDeviceRunnerHelper.isHtml5()) {
+                unavailable = true;
+                return false;
+            }
             String host = "and".equals(Display.getInstance().getPlatformName())
                     ? "10.0.2.2" : "127.0.0.1";
             url = "ws://" + host + ":" + Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT;
