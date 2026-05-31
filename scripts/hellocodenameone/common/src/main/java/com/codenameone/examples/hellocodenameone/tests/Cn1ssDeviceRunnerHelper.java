@@ -84,10 +84,13 @@ interface Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, image.getWidth());
         int height = Math.max(1, image.getHeight());
+        boolean async = false;
         try {
-            emitImageScreenshot(safeName, image, width, height);
+            async = emitImageScreenshot(safeName, image, width, height, onComplete);
         } finally {
-            complete(onComplete);
+            if (!async) {
+                complete(onComplete);
+            }
         }
     }
 
@@ -116,12 +119,15 @@ interface Cn1ssDeviceRunnerHelper {
         // (BrowserComponent, video, etc.) that live outside the CN1
         // paint pipeline.
         if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
+            boolean async = false;
             try {
                 Image off = Image.createImage(width, height);
                 current.paintComponent(off.getGraphics(), true);
-                emitImageScreenshot(safeName, off, width, height);
+                async = emitImageScreenshot(safeName, off, width, height, onComplete);
             } finally {
-                complete(onComplete);
+                if (!async) {
+                    complete(onComplete);
+                }
             }
             return;
         }
@@ -133,10 +139,13 @@ interface Cn1ssDeviceRunnerHelper {
                 complete(onComplete);
                 return;
             }
+            boolean async = false;
             try {
-                emitImageScreenshot(safeName, screen, width, height);
+                async = emitImageScreenshot(safeName, screen, width, height, onComplete);
             } finally {
-                complete(onComplete);
+                if (!async) {
+                    complete(onComplete);
+                }
             }
         });
     }
@@ -147,13 +156,19 @@ interface Cn1ssDeviceRunnerHelper {
     /// hand-off (Mac native) -> CN1SS:CHUNK base64-over-stdout (everywhere
     /// else). Once all runners launch Cn1ssScreenshotServer, paths 2 and 3
     /// disappear.
-    private static void emitImageScreenshot(String safeName, Image screenshot, int width, int height) {
+    /// Encodes and transports the screenshot. Returns true when the async
+    /// WebSocket path (JS port) has taken ownership of `onComplete` -- it will
+    /// be invoked from the ACK callback, so the caller must NOT call it. Returns
+    /// false for every synchronous path (native WS, file, base64), where the
+    /// caller advances the suite itself. `onComplete` may be null.
+    private static boolean emitImageScreenshot(String safeName, Image screenshot, int width, int height,
+                                               Runnable onComplete) {
         try {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 emitPlaceholderScreenshot(safeName);
-                return;
+                return false;
             }
             if (Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
@@ -170,15 +185,21 @@ interface Cn1ssDeviceRunnerHelper {
                         + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
             }
 
-            if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
-                // WS path handled it. Host generates previews from the PNG;
-                // skip the on-device preview encode to save cycles.
-                return;
+            if (isHtml5()) {
+                // JS cannot block on a monitor; use the async WS sink, which
+                // advances the suite from the ACK callback via onComplete.
+                if (Cn1ssWebSocketSink.trySendAsync(safeName, pngBytes, hash, onComplete)) {
+                    return true;
+                }
+                // WS unavailable on JS -- fall through to base64.
+            } else if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
+                // Native blocking WS handled it synchronously; caller completes.
+                return false;
             }
 
             if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
                 emitFileScreenshot(safeName, pngBytes, screenshot, io);
-                return;
+                return false;
             }
 
             emitChannel(pngBytes, safeName, "");
@@ -188,10 +209,12 @@ interface Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
             }
+            return false;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
             emitPlaceholderScreenshot(safeName);
+            return false;
         } finally {
             screenshot.dispose();
         }
@@ -359,7 +382,13 @@ interface Cn1ssDeviceRunnerHelper {
                 io.save(placeholder, pngOut, ImageIO.FORMAT_PNG, 1f);
                 byte[] pngBytes = pngOut.toByteArray();
                 println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length + " placeholder=1");
-                if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, fnv1a64Hex(pngBytes))) {
+                if (isHtml5()) {
+                    // Fire-and-forget on JS (no onComplete: the caller advances
+                    // the suite for placeholders).
+                    if (Cn1ssWebSocketSink.trySendAsync(safeName, pngBytes, fnv1a64Hex(pngBytes), null)) {
+                        return;
+                    }
+                } else if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, fnv1a64Hex(pngBytes))) {
                     return;
                 }
                 emitChannel(pngBytes, safeName, "");
@@ -490,7 +519,177 @@ final class Cn1ssWebSocketSink {
     private static volatile boolean attemptedConnect;
     private static volatile boolean unavailable;
 
+    // ---- Async path (JavaScript port) ----
+    // The JS port runs on the browser event loop and forbids blocking on a
+    // monitor (Object.wait throws BlockingDisallowedException, even off the
+    // EDT), so the blocking trySend/connect above cannot be used there. The
+    // async path never blocks: it connects, sends on open, and advances the
+    // sequential test suite from the ACK callback by invoking the per-test
+    // onComplete. ASYNC_IDLE -> ASYNC_CONNECTING -> ASYNC_OPEN / ASYNC_FAILED.
+    private static final int ASYNC_IDLE = 0;
+    private static final int ASYNC_CONNECTING = 1;
+    private static final int ASYNC_OPEN = 2;
+    private static final int ASYNC_FAILED = 3;
+    // TEMPORARY: the async WS path is wired and the host server is verified
+    // working (a plain WebSocket client connects, sends, and is ACKed), but on
+    // the JS port the core WebSocket.connect() chain is not yet reaching
+    // HTML5WebSocketImpl.connect() (the open/error/close events never fire), so
+    // the suite would stall per test waiting for the ACK. Until that is fixed,
+    // JS stays on the base64-over-console transport. Flip to true to re-enable
+    // the WebSocket transport on JS once the connect path is resolved; the
+    // native ports already use it (their blocking path, not this async one).
+    private static final boolean JS_ASYNC_WS_ENABLED = false;
+    private static int asyncState = ASYNC_IDLE;
+    private static WebSocket asyncSocket;
+    private static final Map<String, Runnable> asyncPending = new HashMap<String, Runnable>();
+    // The suite is sequential (each test waits for onComplete before the next),
+    // so at most one screenshot is in flight; this holds the single send that
+    // arrived while the socket was still connecting. {name, png, hash, onComplete}
+    private static Object[] asyncQueuedWhileConnecting;
+
     private Cn1ssWebSocketSink() {
+    }
+
+    /// The server URL: an explicit -Dcn1ss.websocket.url wins (JavaSE), else the
+    /// fixed standard port on the host loopback (10.0.2.2 from the Android
+    /// emulator, 127.0.0.1 elsewhere -- iOS sim, Mac Catalyst, the browser).
+    private static String resolveUrl() {
+        String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
+        if (url == null || url.length() == 0) {
+            String host = "and".equals(Display.getInstance().getPlatformName())
+                    ? "10.0.2.2" : "127.0.0.1";
+            url = "ws://" + host + ":" + Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT;
+        }
+        return url;
+    }
+
+    /// Non-blocking send for the JS port. Returns true when the WebSocket path
+    /// has taken ownership of completion (it will run onComplete from the ACK
+    /// callback, or immediately if the send fails); false when WS is
+    /// unavailable and the caller should fall back to the base64 transport.
+    static synchronized boolean trySendAsync(String safeName, byte[] pngBytes, String hashHex, Runnable onComplete) {
+        if (!JS_ASYNC_WS_ENABLED) {
+            return false; // JS falls back to base64 until the connect path is fixed
+        }
+        if (asyncState == ASYNC_FAILED) {
+            return false;
+        }
+        if (asyncState == ASYNC_IDLE) {
+            if (!WebSocket.isSupported()) {
+                asyncState = ASYNC_FAILED;
+                System.out.println("CN1SS:INFO:ws-sink-unavailable reason=not-supported");
+                return false;
+            }
+            connectAsync();
+        }
+        if (asyncState == ASYNC_OPEN) {
+            sendAsyncNow(safeName, pngBytes, hashHex, onComplete);
+            return true;
+        }
+        if (asyncState == ASYNC_CONNECTING) {
+            // Hold the single in-flight send until onConnect flushes it.
+            asyncQueuedWhileConnecting = new Object[] { safeName, pngBytes, hashHex, onComplete };
+            return true;
+        }
+        return false;
+    }
+
+    private static void connectAsync() {
+        asyncState = ASYNC_CONNECTING;
+        WebSocket ws = WebSocket.build(resolveUrl())
+                .onConnect(new WebSocket.ConnectHandler() {
+                    public void onConnect(WebSocket w) {
+                        asyncState = ASYNC_OPEN;
+                        flushQueuedAsync();
+                    }
+                })
+                .onTextMessage(new WebSocket.TextHandler() {
+                    public void onText(WebSocket w, String message) {
+                        handleAckAsync(message);
+                    }
+                })
+                .onClose(new WebSocket.CloseHandler() {
+                    public void onClose(WebSocket w, int code, String reason) {
+                        failAsync("closed:" + code);
+                    }
+                })
+                .onError(new WebSocket.ErrorHandler() {
+                    public void onError(WebSocket w, Exception ex) {
+                        failAsync("error:" + ex.getMessage());
+                    }
+                });
+        asyncSocket = ws;
+        ws.connect(0);
+    }
+
+    private static void sendAsyncNow(String name, byte[] png, String hash, Runnable onComplete) {
+        try {
+            String meta = "META {\"test\":\"" + name + "\",\"png_bytes\":"
+                    + png.length + ",\"png_fnv1a64\":\"" + hash + "\"}";
+            asyncSocket.send(meta);
+            asyncSocket.send(png);
+            if (onComplete != null) {
+                synchronized (asyncPending) {
+                    asyncPending.put(name, onComplete);
+                }
+            }
+        } catch (Throwable t) {
+            System.out.println("CN1SS:ERR:test=" + name + " message=ws-async-send-failed:" + t);
+            Log.e(t);
+            if (onComplete != null) {
+                onComplete.run(); // never stall the sequential suite
+            }
+        }
+    }
+
+    private static void flushQueuedAsync() {
+        Object[] q = asyncQueuedWhileConnecting;
+        asyncQueuedWhileConnecting = null;
+        if (q != null) {
+            sendAsyncNow((String) q[0], (byte[]) q[1], (String) q[2], (Runnable) q[3]);
+        }
+    }
+
+    private static void handleAckAsync(String text) {
+        if (text == null || !text.startsWith("ACK ")) {
+            return;
+        }
+        String body = text.substring(4).trim();
+        int sp = body.indexOf(' ');
+        String name = sp > 0 ? body.substring(0, sp) : body;
+        Runnable r;
+        synchronized (asyncPending) {
+            r = asyncPending.remove(name);
+        }
+        if (r != null) {
+            r.run(); // advance the suite to the next test
+        }
+    }
+
+    /// Connection failed or dropped: stop using WS and release every waiter so
+    /// the sequential suite proceeds. Missing screenshots then surface through
+    /// the host-side count guard rather than hanging the run.
+    private static void failAsync(String reason) {
+        boolean firstFailure = asyncState != ASYNC_FAILED;
+        asyncState = ASYNC_FAILED;
+        if (firstFailure) {
+            System.out.println("CN1SS:INFO:ws-sink-unavailable reason=" + reason);
+        }
+        Object[] q = asyncQueuedWhileConnecting;
+        asyncQueuedWhileConnecting = null;
+        if (q != null && q[3] != null) {
+            ((Runnable) q[3]).run();
+        }
+        java.util.List<Runnable> waiters = new java.util.ArrayList<Runnable>();
+        synchronized (asyncPending) {
+            waiters.addAll(asyncPending.values());
+            asyncPending.clear();
+        }
+        for (Runnable r : waiters) {
+            if (r != null) {
+                r.run();
+            }
+        }
     }
 
     static synchronized boolean trySend(String safeName, byte[] pngBytes, String hashHex) {
@@ -514,13 +713,7 @@ final class Cn1ssWebSocketSink {
             Log.e(t);
             return true; // WS path was attempted; don't fall through to chunks.
         }
-        final boolean[] ackedHolder = new boolean[1];
-        blockOffEdt(new Runnable() {
-            public void run() {
-                ackedHolder[0] = latch.await(ACK_TIMEOUT_MS);
-            }
-        });
-        boolean acked = ackedHolder[0];
+        boolean acked = latch.await(ACK_TIMEOUT_MS);
         synchronized (pending) {
             pending.remove(safeName);
         }
@@ -607,27 +800,23 @@ final class Cn1ssWebSocketSink {
                 });
         socket = ws;
         ws.connect(CONNECT_TIMEOUT_MS);
-        final long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS;
-        blockOffEdt(new Runnable() {
-            public void run() {
-                synchronized (connectGate) {
-                    while (!connected[0] && errReason[0] == null) {
-                        long remaining = deadline - System.currentTimeMillis();
-                        if (remaining <= 0) {
-                            errReason[0] = "connect-timeout";
-                            break;
-                        }
-                        try {
-                            connectGate.wait(remaining);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            errReason[0] = "interrupted";
-                            break;
-                        }
-                    }
+        long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS;
+        synchronized (connectGate) {
+            while (!connected[0] && errReason[0] == null) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    errReason[0] = "connect-timeout";
+                    break;
+                }
+                try {
+                    connectGate.wait(remaining);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    errReason[0] = "interrupted";
+                    break;
                 }
             }
-        });
+        }
         if (connected[0]) {
             return true;
         }
@@ -664,24 +853,6 @@ final class Cn1ssWebSocketSink {
                 e.getValue().release();
             }
             pending.clear();
-        }
-    }
-
-    /// Run a blocking wait without freezing the EDT. Screenshot emission runs
-    /// on the EDT (UI completion callbacks), and on the JavaScript port the
-    /// WebSocket's browser callbacks are dispatched on that same single event
-    /// loop -- so blocking the EDT to wait for connect/ACK would deadlock (the
-    /// callback that would release the wait can never run) and the port throws
-    /// BlockingDisallowedException. invokeAndBlock performs the wait on a
-    /// separate thread while pumping the event loop, so the WS callbacks still
-    /// fire and release it. On native ports the WS callbacks arrive on their own
-    /// background thread, so invokeAndBlock is simply a safe wrapper there.
-    private static void blockOffEdt(Runnable waitTask) {
-        Display display = Display.getInstance();
-        if (display.isEdt()) {
-            display.invokeAndBlock(waitTask);
-        } else {
-            waitTask.run();
         }
     }
 

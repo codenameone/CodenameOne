@@ -23,37 +23,24 @@ import com.codename1.io.WebSocketState;
 class HTML5WebSocketImpl extends WebSocketImpl {
 
     /// JSObject view of a browser WebSocket. Only the surface this class
-    /// actually uses is declared.
+    /// actually uses is declared. Listeners are attached with addEventListener
+    /// passing an @JSFunctor directly (the same pattern HTML5Media uses for its
+    /// media events) -- registering them by name inside a @JSBody script's
+    /// nested closure instead leaves the @JSFunctor params un-callable
+    /// ("onError is not a function") once the event fires asynchronously.
     private interface BrowserWebSocket extends JSObject {
         void send(String message);
         void send(ArrayBuffer data);
         void close(int code, String reason);
         int getReadyState();
+        void addEventListener(String type, EventCallback listener);
     }
 
+    /// A single browser event listener. The raw Event object is handed back so
+    /// its fields (data / code / reason) are read on the Java side.
     @JSFunctor
-    private interface OpenCallback extends JSObject {
-        void call();
-    }
-
-    @JSFunctor
-    private interface TextCallback extends JSObject {
-        void call(String message);
-    }
-
-    @JSFunctor
-    private interface BinaryCallback extends JSObject {
-        void call(ArrayBuffer data);
-    }
-
-    @JSFunctor
-    private interface CloseCallback extends JSObject {
-        void call(int code, String reason);
-    }
-
-    @JSFunctor
-    private interface ErrorCallback extends JSObject {
-        void call(String message);
+    private interface EventCallback extends JSObject {
+        void call(JSObject event);
     }
 
     private BrowserWebSocket ws;
@@ -68,46 +55,64 @@ class HTML5WebSocketImpl extends WebSocketImpl {
         // connectTimeoutMs is unused: browser WebSockets don't expose a
         // per-connect timeout. Users who need one should wrap connect()
         // with their own Display.callSerially-driven timer.
-        ws = createNative(
-                getUrl(),
-                new OpenCallback() {
-                    @Override
-                    public void call() {
-                        state = WebSocketState.OPEN;
-                        sink().onConnect();
-                    }
-                },
-                new TextCallback() {
-                    @Override
-                    public void call(String message) {
-                        sink().onTextMessage(message);
-                    }
-                },
-                new BinaryCallback() {
-                    @Override
-                    public void call(ArrayBuffer data) {
-                        sink().onBinaryMessage(toByteArray(data));
-                    }
-                },
-                new CloseCallback() {
-                    @Override
-                    public void call(int code, String reason) {
-                        state = WebSocketState.CLOSED;
-                        sink().onClose(code, reason == null ? "" : reason);
-                    }
-                },
-                new ErrorCallback() {
-                    @Override
-                    public void call(String message) {
-                        WebSocketState prev = state;
-                        state = WebSocketState.CLOSED;
-                        if (prev != WebSocketState.CLOSED) {
-                            sink().onError(new RuntimeException(message == null ? "WebSocket error" : message));
-                        }
-                    }
+        final BrowserWebSocket w = createSocket(getUrl());
+        ws = w;
+        w.addEventListener("open", new EventCallback() {
+            @Override
+            public void call(JSObject event) {
+                state = WebSocketState.OPEN;
+                sink().onConnect();
+            }
+        });
+        w.addEventListener("message", new EventCallback() {
+            @Override
+            public void call(JSObject event) {
+                if (eventDataIsString(event)) {
+                    sink().onTextMessage(eventDataAsString(event));
+                } else {
+                    sink().onBinaryMessage(toByteArray(eventDataAsBuffer(event)));
                 }
-        );
+            }
+        });
+        w.addEventListener("close", new EventCallback() {
+            @Override
+            public void call(JSObject event) {
+                state = WebSocketState.CLOSED;
+                sink().onClose(eventCode(event), eventReason(event));
+            }
+        });
+        w.addEventListener("error", new EventCallback() {
+            @Override
+            public void call(JSObject event) {
+                WebSocketState prev = state;
+                state = WebSocketState.CLOSED;
+                if (prev != WebSocketState.CLOSED) {
+                    sink().onError(new RuntimeException("WebSocket error"));
+                }
+            }
+        });
     }
+
+    @JSBody(params = {"url"}, script =
+            "var w = new WebSocket(url);\n"
+            + "w.binaryType = 'arraybuffer';\n"
+            + "return w;")
+    private static native BrowserWebSocket createSocket(String url);
+
+    @JSBody(params = {"e"}, script = "return (typeof e.data === 'string');")
+    private static native boolean eventDataIsString(JSObject e);
+
+    @JSBody(params = {"e"}, script = "return e.data;")
+    private static native String eventDataAsString(JSObject e);
+
+    @JSBody(params = {"e"}, script = "return e.data;")
+    private static native ArrayBuffer eventDataAsBuffer(JSObject e);
+
+    @JSBody(params = {"e"}, script = "return e.code|0;")
+    private static native int eventCode(JSObject e);
+
+    @JSBody(params = {"e"}, script = "return e.reason || '';")
+    private static native String eventReason(JSObject e);
 
     @Override
     public void close() {
@@ -154,26 +159,4 @@ class HTML5WebSocketImpl extends WebSocketImpl {
         }
         return out;
     }
-
-    @JSBody(
-            params = {"url", "onOpen", "onText", "onBinary", "onClose", "onError"},
-            script =
-                    "var w = new WebSocket(url);\n" +
-                    "w.binaryType = 'arraybuffer';\n" +
-                    "w.onopen = function() { onOpen(); };\n" +
-                    "w.onmessage = function(e) {\n" +
-                    "  if (typeof e.data === 'string') { onText(e.data); }\n" +
-                    "  else { onBinary(e.data); }\n" +
-                    "};\n" +
-                    "w.onclose = function(e) { onClose(e.code|0, e.reason || ''); };\n" +
-                    "w.onerror = function() { onError('WebSocket error'); };\n" +
-                    "return w;"
-    )
-    private static native BrowserWebSocket createNative(
-            String url,
-            OpenCallback onOpen,
-            TextCallback onText,
-            BinaryCallback onBinary,
-            CloseCallback onClose,
-            ErrorCallback onError);
 }
