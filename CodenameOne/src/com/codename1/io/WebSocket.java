@@ -79,16 +79,25 @@ public final class WebSocket {
     }
 
     private final WebSocketImpl impl;
+    // Handlers are assigned from the thread that configures the socket and
+    // read from the background dispatch thread, so they are volatile to
+    // publish writes across threads.
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile ConnectHandler connectHandler;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile TextHandler textHandler;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile BinaryHandler binaryHandler;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile CloseHandler closeHandler;
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile ErrorHandler errorHandler;
 
     private WebSocket(WebSocketImpl impl) {
         this.impl = impl;
         final WebSocket self = this;
         impl.setEventSink(new WebSocketEventSink() {
+            @Override
             public void onConnect() {
                 ConnectHandler h = connectHandler;
                 if (h != null) {
@@ -100,6 +109,7 @@ public final class WebSocket {
                 }
             }
 
+            @Override
             public void onTextMessage(String message) {
                 TextHandler h = textHandler;
                 if (h != null) {
@@ -111,6 +121,7 @@ public final class WebSocket {
                 }
             }
 
+            @Override
             public void onBinaryMessage(byte[] message) {
                 BinaryHandler h = binaryHandler;
                 if (h != null) {
@@ -122,6 +133,7 @@ public final class WebSocket {
                 }
             }
 
+            @Override
             public void onClose(int statusCode, String reason) {
                 CloseHandler h = closeHandler;
                 if (h != null) {
@@ -133,6 +145,7 @@ public final class WebSocket {
                 }
             }
 
+            @Override
             public void onError(Exception ex) {
                 ErrorHandler h = errorHandler;
                 if (h != null) {
