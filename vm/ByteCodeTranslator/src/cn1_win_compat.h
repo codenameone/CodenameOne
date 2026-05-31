@@ -20,8 +20,9 @@
 
 #ifdef _WIN32
 
-#include <time.h>   /* struct timespec (C11) */
+#include <time.h>   /* struct timespec (C11), localtime_s, _mkgmtime */
 #include <stdint.h>
+#include <stdlib.h> /* _putenv_s */
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,6 +90,26 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 /* --- <unistd.h> / <sys/time.h> replacements --- */
 int usleep(unsigned int usec);
 int gettimeofday(struct timeval* tv, void* tz);
+
+/* --- environment / time.h POSIX helpers absent from MSVC ---
+   Thin static-inline wrappers over the MSVC equivalents; used by the date /
+   timezone runtime in nativeMethods. */
+static __inline int setenv(const char* name, const char* value, int overwrite) {
+    (void)overwrite; /* the runtime always overwrites, which _putenv_s does */
+    return _putenv_s(name, value);
+}
+
+static __inline int unsetenv(const char* name) {
+    return _putenv_s(name, "");
+}
+
+static __inline time_t timegm(struct tm* tm) {
+    return _mkgmtime(tm);
+}
+
+static __inline struct tm* localtime_r(const time_t* timep, struct tm* result) {
+    return localtime_s(result, timep) == 0 ? result : (struct tm*)0;
+}
 
 #ifdef __cplusplus
 }
