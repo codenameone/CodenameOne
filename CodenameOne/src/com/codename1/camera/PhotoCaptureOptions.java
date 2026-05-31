@@ -40,8 +40,12 @@ public final class PhotoCaptureOptions {
 
     /// JPEG encoding quality 1-100. Default 90.
     public PhotoCaptureOptions jpegQuality(int q) {
-        if (q < 1) q = 1;
-        if (q > 100) q = 100;
+        if (q < 1) {
+            q = 1;
+        }
+        if (q > 100) {
+            q = 100;
+        }
         this.jpegQuality = q;
         return this;
     }

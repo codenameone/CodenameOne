@@ -80,7 +80,9 @@ public final class Camera {
     /// Enumerate cameras visible to the platform. May be empty.
     public static CameraInfo[] getCameras() {
         CameraImpl probe = newImpl();
-        if (probe == null) return new CameraInfo[0];
+        if (probe == null) {
+            return new CameraInfo[0];
+        }
         try {
             CameraInfo[] out = probe.enumerateCameras();
             return out == null ? new CameraInfo[0] : out;
@@ -94,8 +96,10 @@ public final class Camera {
     /// camera exists, the first available camera is returned.
     public static CameraInfo getDefault(CameraFacing facing) {
         CameraInfo[] all = getCameras();
-        for (int i = 0; i < all.length; i++) {
-            if (all[i].getFacing() == facing) return all[i];
+        for (CameraInfo c : all) {
+            if (c.getFacing() == facing) {
+                return c;
+            }
         }
         return all.length > 0 ? all[0] : null;
     }
@@ -106,7 +110,9 @@ public final class Camera {
         if (info == null) {
             throw new IllegalArgumentException("CameraInfo must not be null");
         }
-        if (opts == null) opts = new CameraSessionOptions();
+        if (opts == null) {
+            opts = new CameraSessionOptions();
+        }
         // The check-and-set has to be atomic to keep SpotBugs happy and to
         // honour the "one open session at a time" contract under
         // concurrent open() calls. The native impl.open() call below runs
@@ -155,7 +161,9 @@ public final class Camera {
     }
 
     private static void fireLater(final SuccessCallback<Boolean> callback, final Boolean value) {
-        if (callback == null) return;
+        if (callback == null) {
+            return;
+        }
         Display.getInstance().callSerially(new Runnable() {
             @Override public void run() { callback.onSucess(value); }
         });
@@ -165,9 +173,15 @@ public final class Camera {
         return Display.getInstance().getCameraBackend();
     }
 
+    // Identity comparison is intentional: only the exact CameraSession
+    // instance we returned from open() may clear the active slot, so
+    // PMD.CompareObjectsWithEquals doesn't apply.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     static void clearActive(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
-            if (active == s) active = null;
+            if (active == s) {
+                active = null;
+            }
         }
     }
 }

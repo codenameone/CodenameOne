@@ -36,6 +36,10 @@ public final class VideoRecording {
     private final CameraImpl impl;
     private final String requestedPath;
     private final long startMillis;
+    // volatile is intentional: stop() may be called from a background thread
+    // while isRecording() is polled from the EDT, and the publish/subscribe
+    // semantics are exactly what volatile provides.
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private volatile boolean stopped;
 
     /// Used by platform implementations.
@@ -48,7 +52,9 @@ public final class VideoRecording {
     /// Stop recording without waiting for the file to be finalized.
     /// Use `#stopAndAwait()` if you need the final file path.
     public void stop() {
-        if (stopped) return;
+        if (stopped) {
+            return;
+        }
         stopped = true;
         impl.stopVideoRecording(null);
     }

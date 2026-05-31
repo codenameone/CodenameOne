@@ -92,6 +92,10 @@ public final class CameraSession implements AutoCloseable {
     /// Backwards-compatible alias for `#setFrameListener(FrameListener)`.
     public void addFrameListener(FrameListener l) { setFrameListener(l); }
 
+    // Identity comparison is intentional: addFrameListener stores the
+    // exact callback reference, removeFrameListener only removes the same
+    // instance.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public void removeFrameListener(FrameListener l) {
         if (this.frameListener == l) {
             setFrameListener(null);
@@ -118,7 +122,9 @@ public final class CameraSession implements AutoCloseable {
     /// Release the session. Idempotent.
     @Override
     public void close() {
-        if (closed) return;
+        if (closed) {
+            return;
+        }
         closed = true;
         try {
             impl.close();
