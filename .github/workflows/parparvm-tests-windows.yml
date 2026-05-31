@@ -112,7 +112,7 @@ jobs:
         shell: pwsh
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am -Dtest=CleanTargetIntegrationTest -DfailIfNoTests=false
+          mvn -B test -pl tests -am -Dtest=CleanTargetIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
