@@ -337,6 +337,36 @@ cn1ss_post_pr_comment() {
   return $rc
 }
 
+# Count the "missing" screenshots in a comparison JSON, i.e. expected tests
+# that produced no image (status == "missing_actual"). This is the signal for
+# the screenshot-count regression this guard targets: when a test hangs or the
+# rendering pipeline crashes partway (e.g. the Metal DialogTheme hang), every
+# test from that point on is recorded as missing_actual instead of equal, so
+# the suite silently drops from 122 captures to 107. Counting *entries* would
+# miss this - the iOS harness still records all 122 names, just with 15 of them
+# flagged missing_actual - which is why a len(results) guard never caught it.
+# We count the missing ones directly instead.
+cn1ss_count_missing() {
+  local json="$1"
+  if [ -z "$json" ] || [ ! -s "$json" ]; then
+    # No comparison JSON at all means the suite produced nothing usable.
+    # Report a sentinel large enough to trip any tolerance so the caller
+    # fails loudly rather than treating "no data" as "nothing missing".
+    echo 999999
+    return
+  fi
+  python3 - "$json" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    results = data.get("results", []) if isinstance(data, dict) else []
+except Exception:
+    print(999999)
+    sys.exit(0)
+print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "missing_actual"))
+PY
+}
+
 # Shared function to generate report, compare screenshots, and post PR comment
 cn1ss_process_and_report() {
   local platform_title="$1"
@@ -449,6 +479,33 @@ cn1ss_process_and_report() {
     if [ -f "$summary_out" ] && (grep -q "^different|" "$summary_out" || grep -q "^error|" "$summary_out"); then
       cn1ss_log "FATAL: Screenshot mismatches or errors detected (CN1SS_FAIL_ON_MISMATCH=1)"
       return 15
+    fi
+
+    # Missing-screenshot regression guard. Every expected test must produce its
+    # screenshot; a test that runs but emits nothing is recorded as status
+    # "missing_actual". When a test hangs or the rendering pipeline crashes
+    # partway (the Metal DialogTheme hang), every test from that point on
+    # becomes missing_actual and the suite silently drops from 122 captures to
+    # 107 - all still listed, just unproduced. We fail when the number of
+    # missing screenshots exceeds CN1SS_ALLOWED_MISSING (default 0: no missing
+    # screenshots tolerated). A pipeline with a known, steady-state gap raises
+    # its own tolerance (e.g. the iOS jobs set CN1SS_ALLOWED_MISSING=2 for
+    # OrientationLock + MutableImageReadback, which do not render on either iOS
+    # backend). Set CN1SS_SKIP_COUNT_CHECK=1 to bypass while intentionally
+    # seeding a brand new reference set. Enforced on every pipeline that opts
+    # into strict mode (CN1SS_FAIL_ON_MISMATCH=1).
+    if [ "${CN1SS_SKIP_COUNT_CHECK:-0}" != "1" ]; then
+      local missing_count allowed_missing
+      missing_count=$(cn1ss_count_missing "$compare_json_out")
+      missing_count="${missing_count//[^0-9]/}"; : "${missing_count:=999999}"
+      allowed_missing="${CN1SS_ALLOWED_MISSING:-0}"
+      allowed_missing="${allowed_missing//[^0-9]/}"; : "${allowed_missing:=0}"
+      if [ "$missing_count" -gt "$allowed_missing" ]; then
+        cn1ss_log "FATAL: $missing_count screenshot(s) missing (no image produced) but only $allowed_missing tolerated (CN1SS_ALLOWED_MISSING)."
+        cn1ss_log "       A test failed to emit its screenshot - the suite likely hung or crashed before finishing. See the 'missing actual' entries above."
+        return 17
+      fi
+      cn1ss_log "Missing-screenshot check passed: $missing_count missing <= $allowed_missing tolerated."
     fi
   fi
 

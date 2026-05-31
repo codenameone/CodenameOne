@@ -212,6 +212,15 @@ jobs:
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests
+          # Strict screenshot gating: fail on any pixel mismatch and on more
+          # missing screenshots than the tolerance below. Enforced centrally
+          # in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # OrientationLock and MutableImageReadback do not render on the iOS
+          # GL backend - the steady-state healthy run reports exactly these
+          # two as missing. Tolerate those two; any further missing
+          # screenshot (a hang/crash dropping the tail of the suite) fails CI.
+          CN1SS_ALLOWED_MISSING: '2'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -420,6 +429,13 @@ jobs:
           CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
           CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
+          # Strict screenshot gating: fail on any pixel mismatch and on any
+          # missing screenshot. The Metal backend must produce the full
+          # baseline set; a test that hangs (e.g. the DialogTheme texture
+          # backdrop) drops every later capture and silently shrinks the
+          # suite from 122 to 107 - that now fails the job. No missing
+          # screenshots are tolerated. Enforced in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
           # Enable Apple's Metal API Validation in the simulator. Catches
           # render-pass / pipeline-state mismatches at the moment they
           # happen (issue #5103: stencil pixel-format mismatch shipped in

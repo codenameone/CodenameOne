@@ -199,6 +199,17 @@ jobs:
       - name: Run Mac native UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/mac-native-ui-tests
+          # Strict screenshot gating: fail on any pixel mismatch and on more
+          # missing screenshots than the tolerance below. Enforced centrally
+          # in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # MutableImageReadback and MorphTransitionSnapshot do not yet emit
+          # on the Mac native (Catalyst) backend while the port is maturing -
+          # the steady-state run reports exactly these two as missing.
+          # Tolerate those two; any further missing screenshot fails CI.
+          # Lower this to 0 as the port matures and those tests start
+          # producing output.
+          CN1SS_ALLOWED_MISSING: '2'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

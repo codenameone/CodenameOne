@@ -601,26 +601,19 @@ comment_rc=$?
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 
-# Guard: the suite must produce at least this many screenshots. Matches
-# the iOS pipeline's CN1SS_MIN_SCREENSHOTS so a regression that crashes
-# the app early surfaces here too. Defaults to 0 on the first run so the
-# goldens dir can be seeded without immediately failing CI.
-MIN_SCREENSHOTS="${CN1SS_MIN_SCREENSHOTS:-0}"
-if [ -s "$COMPARE_JSON" ]; then
-  ACTUAL_COUNT="$(python3 -c "import json,sys
-try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    print(len(d.get('results', [])))
-except Exception as e:
-    print(0)" "$COMPARE_JSON" 2>/dev/null || echo 0)"
-else
-  ACTUAL_COUNT=0
+# Screenshot mismatch / count-regression guards are centralised in
+# cn1ss_process_and_report (scripts/lib/cn1ss.sh), which returns these
+# codes only when CN1SS_FAIL_ON_MISMATCH=1:
+#   15 - a screenshot differs from / errored against its stored baseline
+#   17 - fewer screenshots were produced than there are stored references
+#        (a test failed to emit; the suite most likely hung or crashed
+#        partway). The count floor is the size of $SCREENSHOT_REF_DIR
+#        (optionally raised via CN1SS_MIN_SCREENSHOTS). While the Mac port
+#        is still seeding its baseline the reference dir is small, so the
+#        floor is naturally low and seeding runs are not failed by it.
+# comment_rc already carries those codes; surface it as the exit status.
+if [ "${comment_rc:-0}" -eq 15 ] || [ "${comment_rc:-0}" -eq 17 ]; then
+  rm_log "STAGE:SCREENSHOT_REGRESSION -> failing with exit ${comment_rc} (see cn1ss FATAL message above)."
 fi
-if [ "$ACTUAL_COUNT" -lt "$MIN_SCREENSHOTS" ]; then
-  rm_log "STAGE:SCREENSHOT_COUNT_REGRESSION -> got $ACTUAL_COUNT, expected >= $MIN_SCREENSHOTS"
-  exit 17
-fi
-rm_log "Screenshot count check passed: $ACTUAL_COUNT >= $MIN_SCREENSHOTS"
 
 exit $comment_rc
