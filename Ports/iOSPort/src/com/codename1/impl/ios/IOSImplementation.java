@@ -825,14 +825,20 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativeTitle() {
-        // On Mac Catalyst the form title belongs in the native window title bar and the
-        // commands belong in the native menu bar, so the CN1 Toolbar is suppressed.
-        return isDesktop();
+        // On Mac Catalyst, when the app opts into desktop native chrome, the form title belongs in
+        // the native window title bar and the CN1 Toolbar is suppressed. Opt-in only: defaults to
+        // the legacy toolbar so existing Catalyst apps are unaffected.
+        return isDesktop() && !"toolbar".equals(getDesktopTitleBarMode());
     }
 
     @Override
     public String getDesktopTitleBarMode() {
-        return isDesktop() ? "native" : "toolbar";
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as a
+        // Display property by the generated iOS stub. Default toolbar = unchanged legacy behavior.
+        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
     }
 
     @Override
@@ -1632,8 +1638,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (tp == null || !isDesktop()) {
             return;
         }
-        tp.put("@desktopTitleBarMode", "native");
-        tp.put("@interactiveScrollBool", "true");
+        // Opt-in via the desktop.interactiveScrollbars build hint; default off so existing Catalyst
+        // apps render scrollbars exactly as before.
+        if ("true".equalsIgnoreCase(Display.getInstance().getProperty("desktop.interactiveScrollbars", "false"))) {
+            tp.put("@interactiveScrollBool", "true");
+        }
     }
 
     private InputStream getResourceAsStream(String name) {
