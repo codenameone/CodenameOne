@@ -14980,6 +14980,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         ((SocketImpl)socket).writeToStream(data);
     }
 
+    @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new JavaSEWebSocketImpl(url);
+    }
+
     /**
      * Overriden to work well in the simulator
      */

@@ -9278,6 +9278,23 @@ public abstract class CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
     }
 
+    /// Indicates whether the underlying implementation supports the
+    /// [com.codename1.io.WebSocket] API. Ports that do not implement
+    /// WebSocket return false; the public `WebSocket.isSupported()` calls
+    /// through here.
+    public boolean isWebSocketSupported() {
+        return false;
+    }
+
+    /// Create a platform-specific `WebSocketImpl` bound to the given URL.
+    /// The returned impl is not yet connected; the public `WebSocket` facade
+    /// wires its event sink and calls `connect(int)`.
+    ///
+    /// @throws RuntimeException if the port does not support WebSocket.
+    public WebSocketImpl createWebSocketImpl(String url) {
+        throw new RuntimeException("WebSocket not supported on this platform");
+    }
+
     private void mkdirs(FileSystemStorage fs, String path) {
         int lastPos = path.lastIndexOf('/');
         if (lastPos >= 0) {

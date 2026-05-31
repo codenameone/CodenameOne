@@ -10722,6 +10722,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((SocketImpl)socket).writeToStream(data);
     }
 
+    @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new AndroidWebSocketImpl(url);
+    }
+
     //Begin new Graphics Work
     @Override
     public boolean isShapeSupported(Object graphics) {

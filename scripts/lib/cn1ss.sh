@@ -127,6 +127,57 @@ cn1ss_java_run() {
   "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" "$class_name" "$@"
 }
 
+# WebSocket screenshot server bootstrap. Starts Cn1ssScreenshotServer on
+# an ephemeral port; captures the bound port from its first stdout line so
+# the runner can hand it to the device via -Dcn1ss.websocket.url=...
+# Sets CN1SS_WS_PORT and CN1SS_WS_PID on success.
+cn1ss_start_ws_server() {
+  local out_dir="$1"
+  if [ -z "$out_dir" ]; then
+    cn1ss_log "cn1ss_start_ws_server: missing output dir"
+    return 1
+  fi
+  mkdir -p "$out_dir" 2>/dev/null || true
+  if [ -z "${CN1SS_JAVA_BIN:-}" ] || [ -z "${CN1SS_JAVA_CLASSPATH:-}" ]; then
+    cn1ss_log "cn1ss_start_ws_server: cn1ss_setup must be called first"
+    return 1
+  fi
+  local port_file
+  port_file="$(mktemp)"
+  "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" \
+    Cn1ssScreenshotServer --port 0 --out "$out_dir" \
+    >"$port_file" 2>&1 &
+  CN1SS_WS_PID=$!
+  # Wait for the server to print "CN1SS_SERVER_PORT=<n>" on the first line.
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if grep -q "^CN1SS_SERVER_PORT=" "$port_file" 2>/dev/null; then
+      CN1SS_WS_PORT="$(grep -m1 "^CN1SS_SERVER_PORT=" "$port_file" | cut -d'=' -f2)"
+      CN1SS_WS_LOG="$port_file"
+      cn1ss_log "Cn1ssScreenshotServer listening on port $CN1SS_WS_PORT (pid $CN1SS_WS_PID, log $port_file)"
+      return 0
+    fi
+    if ! kill -0 "$CN1SS_WS_PID" 2>/dev/null; then
+      cn1ss_log "Cn1ssScreenshotServer died before reporting a port:"
+      cat "$port_file" >&2
+      return 1
+    fi
+    sleep 0.2
+  done
+  cn1ss_log "Timed out waiting for Cn1ssScreenshotServer to bind a port"
+  kill "$CN1SS_WS_PID" 2>/dev/null || true
+  return 1
+}
+
+cn1ss_stop_ws_server() {
+  if [ -n "${CN1SS_WS_PID:-}" ]; then
+    kill "$CN1SS_WS_PID" 2>/dev/null || true
+    wait "$CN1SS_WS_PID" 2>/dev/null || true
+    cn1ss_log "Cn1ssScreenshotServer (pid $CN1SS_WS_PID) stopped"
+    unset CN1SS_WS_PID CN1SS_WS_PORT
+  fi
+}
+
 cn1ss_count_chunks() {
   local file="$1"
   local test="${2:-}"

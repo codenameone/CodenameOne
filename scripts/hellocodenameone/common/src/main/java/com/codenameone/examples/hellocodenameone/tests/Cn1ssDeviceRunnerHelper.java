@@ -1,9 +1,11 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
-import com.codename1.io.Log;
+import com.codename1.io.WebSocket;
+import com.codename1.io.WebSocketState;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -13,7 +15,24 @@ import com.codename1.util.Base64;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
+/// Device-side helper that ships screenshots to the host. Three transports,
+/// tried in priority order:
+///
+///   1. WebSocket (`cn1ss.websocket.url` set) — ACK-paced, no os_log /
+///      logcat involvement. Works on every port that supports WebSocket
+///      (iOS device, iOS simulator, Android, JavaSE, JS, Mac native).
+///   2. CN1SS:FILE filesystem hand-off (Mac native: `isDesktop() &&
+///      !isSimulator()`) — writes PNG/JPEG to FileSystemStorage and emits
+///      a path marker the runner reads directly. Sidesteps os_log's
+///      900-byte rate limiter on Mac Catalyst.
+///   3. CN1SS:CHUNK base64-over-stdout — universal fallback. Slow on
+///      Android (the 50ms/500-byte logcat throttle is here).
+///
+/// Once every runner script launches Cn1ssScreenshotServer and injects
+/// `cn1ss.websocket.url`, paths (2) and (3) are dead code and can go.
 interface Cn1ssDeviceRunnerHelper {
     int CHUNK_SIZE_ANDROID = 500;
     int CHUNK_SIZE_DEFAULT = 900;
@@ -77,7 +96,6 @@ interface Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
-
         // Mac native: Display.screenshot() reads through the Metal display
         // layer, whose drawable lags the EDT's view of the current form by
         // one or more frames on headless macos-15 (no display link drives
@@ -117,14 +135,12 @@ interface Cn1ssDeviceRunnerHelper {
         });
     }
 
-    // Shared PNG-encode path. On Mac native (isDesktop() && !isSimulator())
-    // writes the PNG straight to FileSystemStorage and emits a CN1SS:FILE:
-    // line with the absolute path; the runner script reads it directly. The
-    // base64-chunked log path on Mac is fragile (large CN1SS:CHUNK lines
-    // dropped sporadically under load, the host log buffer rate-limits)
-    // and offers no advantage on Mac because the test process and the
-    // runner share the local filesystem. Everywhere else (iOS device,
-    // iOS simulator, Android) keep the chunk-streamed path.
+    /// Encodes the PNG once, logs the size/hash/dupe diagnostics, then routes
+    /// to whichever transport is available. The transport priority is:
+    /// WebSocket (when `cn1ss.websocket.url` is set) -> CN1SS:FILE filesystem
+    /// hand-off (Mac native) -> CN1SS:CHUNK base64-over-stdout (everywhere
+    /// else). Once all runners launch Cn1ssScreenshotServer, paths 2 and 3
+    /// disappear.
     private static void emitImageScreenshot(String safeName, Image screenshot, int width, int height) {
         try {
             ImageIO io = ImageIO.getImageIO();
@@ -135,10 +151,6 @@ interface Cn1ssDeviceRunnerHelper {
             }
             if (Display.getInstance().isSimulator()) {
                 io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
-            }
-            if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
-                emitFileScreenshot(safeName, screenshot, io);
-                return;
             }
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
             io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
@@ -151,8 +163,19 @@ interface Cn1ssDeviceRunnerHelper {
                 println("CN1SS:WARN:test=" + safeName
                         + " duplicate_image_with=" + previous + " png_fnv1a64=" + hash);
             }
-            emitChannel(pngBytes, safeName, "");
 
+            if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
+                // WS path handled it. Host generates previews from the PNG;
+                // skip the on-device preview encode to save cycles.
+                return;
+            }
+
+            if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
+                emitFileScreenshot(safeName, pngBytes, screenshot, io);
+                return;
+            }
+
+            emitChannel(pngBytes, safeName, "");
             byte[] preview = encodePreview(io, screenshot, safeName);
             if (preview != null && preview.length > 0) {
                 emitChannel(preview, safeName, PREVIEW_CHANNEL);
@@ -173,7 +196,8 @@ interface Cn1ssDeviceRunnerHelper {
     /// directly, sidestepping the CN1SS:CHUNK base64 channel. Used on Mac
     /// native, where the app process and the test driver share a local
     /// filesystem and `os_log` rate-limits the chunked output.
-    private static void emitFileScreenshot(String safeName, Image screenshot, ImageIO io) throws IOException {
+    private static void emitFileScreenshot(String safeName, byte[] pngBytes,
+                                           Image screenshot, ImageIO io) throws IOException {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         String dir = fs.getAppHomePath();
         if (dir == null || dir.length() == 0) {
@@ -187,15 +211,14 @@ interface Cn1ssDeviceRunnerHelper {
         String outDir = dir + "cn1ss-screenshots/";
         fs.mkdir(outDir);
         String pngPath = outDir + safeName + ".png";
-        OutputStream pngOut = fs.openOutputStream(pngPath);
+        OutputStream pngFile = fs.openOutputStream(pngPath);
         try {
-            io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+            pngFile.write(pngBytes);
         } finally {
-            pngOut.close();
+            pngFile.close();
         }
-        long pngBytes = fs.getLength(pngPath);
         println("CN1SS:FILE:test=" + safeName + " channel= path=" + pngPath
-                + " bytes=" + pngBytes);
+                + " bytes=" + pngBytes.length);
 
         byte[] preview = encodePreview(io, screenshot, safeName);
         if (preview != null && preview.length > 0) {
@@ -330,6 +353,9 @@ interface Cn1ssDeviceRunnerHelper {
                 io.save(placeholder, pngOut, ImageIO.FORMAT_PNG, 1f);
                 byte[] pngBytes = pngOut.toByteArray();
                 println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length + " placeholder=1");
+                if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, fnv1a64Hex(pngBytes))) {
+                    return;
+                }
                 emitChannel(pngBytes, safeName, "");
             } finally {
                 placeholder.dispose();
@@ -419,8 +445,6 @@ final class Cn1ssHashTracker {
             if (hashHex.equals(hashes[i])) {
                 previous = tests[i];
                 if (safeName.equals(previous)) {
-                    // Same test re-captured (e.g. light->dark sequencing
-                    // chains through the same emitter); not a mixup.
                     return null;
                 }
                 break;
@@ -431,16 +455,228 @@ final class Cn1ssHashTracker {
             tests[count] = safeName;
             count++;
         } else {
-            // Ring-buffer-style: overwrite the oldest entry. We keep
-            // insertion order roughly via an arraycopy shift; dropping
-            // exactly MAX_TRACKED entries means each call to this branch
-            // moves up to 64 references, which is still well below the
-            // cost of the FNV-1a scan over a 70KB PNG.
             System.arraycopy(hashes, 1, hashes, 0, MAX_TRACKED - 1);
             System.arraycopy(tests, 1, tests, 0, MAX_TRACKED - 1);
             hashes[MAX_TRACKED - 1] = hashHex;
             tests[MAX_TRACKED - 1] = safeName;
         }
         return previous;
+    }
+}
+
+/// Singleton WebSocket sink. Lazily connects on first send. ACK pacing:
+/// after every binary upload, the sender thread blocks on a per-test latch
+/// that the WS onTextMessage handler releases when the host echoes back an
+/// `ACK <safeName>` text frame. ACK_TIMEOUT_MS is generous (10s) — the
+/// host writes the PNG to disk and ACKs immediately on LAN; if we hit the
+/// timeout something is genuinely broken and the test should fail loudly.
+///
+/// `trySend` returns true if the WS path successfully uploaded the PNG
+/// (or transiently failed after the connection was established), and false
+/// if WS is unavailable (no URL configured, unsupported platform, connect
+/// timed out). When trySend returns false the caller falls back to the
+/// CN1SS:FILE or CN1SS:CHUNK paths.
+final class Cn1ssWebSocketSink {
+    private static final int ACK_TIMEOUT_MS = 10_000;
+    private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final Map<String, AckLatch> pending = new HashMap<String, AckLatch>();
+    private static WebSocket socket;
+    private static volatile boolean attemptedConnect;
+    private static volatile boolean unavailable;
+
+    private Cn1ssWebSocketSink() {
+    }
+
+    static synchronized boolean trySend(String safeName, byte[] pngBytes, String hashHex) {
+        if (!ensureConnected()) {
+            return false;
+        }
+        AckLatch latch = new AckLatch();
+        synchronized (pending) {
+            pending.put(safeName, latch);
+        }
+        try {
+            String meta = "META {\"test\":\"" + safeName + "\",\"png_bytes\":"
+                    + pngBytes.length + ",\"png_fnv1a64\":\"" + hashHex + "\"}";
+            socket.send(meta);
+            socket.send(pngBytes);
+        } catch (Throwable t) {
+            synchronized (pending) {
+                pending.remove(safeName);
+            }
+            System.out.println("CN1SS:ERR:test=" + safeName + " message=ws-send-failed:" + t);
+            Log.e(t);
+            return true; // WS path was attempted; don't fall through to chunks.
+        }
+        boolean acked = latch.await(ACK_TIMEOUT_MS);
+        synchronized (pending) {
+            pending.remove(safeName);
+        }
+        if (!acked) {
+            System.out.println("CN1SS:ERR:test=" + safeName
+                    + " message=ws-ack-timeout-after-" + ACK_TIMEOUT_MS + "ms");
+        }
+        return true;
+    }
+
+    private static boolean ensureConnected() {
+        if (socket != null && socket.getReadyState() == WebSocketState.OPEN) {
+            return true;
+        }
+        if (unavailable) {
+            return false;
+        }
+        if (attemptedConnect) {
+            // Previous attempt completed but the socket is no longer open
+            // (closed/errored). Treat as unavailable for the rest of the
+            // run; the runner script's whole point of launching the WS
+            // server is that it stays up for the whole suite.
+            unavailable = true;
+            return false;
+        }
+        // Display.getProperty() reads from CN1 app properties (Display
+        // hints, build args); System.getProperty() picks up the simulator's
+        // -D flag. The runner scripts set both during transition; whichever
+        // resolves first wins.
+        String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
+        if (url == null || url.length() == 0) {
+            try {
+                url = System.getProperty("cn1ss.websocket.url", "");
+            } catch (Throwable ignored) {
+                // System.getProperty isn't safe to call on all CN1 platforms
+                // (browser sandbox, J2ME). Treat absence as "unset".
+            }
+        }
+        if (url == null || url.length() == 0) {
+            unavailable = true;
+            return false;
+        }
+        if (!WebSocket.isSupported()) {
+            unavailable = true;
+            System.out.println("CN1SS:INFO:ws-sink-unavailable reason=not-supported");
+            return false;
+        }
+        attemptedConnect = true;
+        return connect(url);
+    }
+
+    private static boolean connect(String url) {
+        final Object connectGate = new Object();
+        final boolean[] connected = new boolean[1];
+        final String[] errReason = new String[1];
+        WebSocket ws = WebSocket.build(url)
+                .onConnect(new WebSocket.ConnectHandler() {
+                    @Override
+                    public void onConnect(WebSocket w) {
+                        synchronized (connectGate) {
+                            connected[0] = true;
+                            connectGate.notifyAll();
+                        }
+                    }
+                })
+                .onTextMessage(new WebSocket.TextHandler() {
+                    @Override
+                    public void onText(WebSocket w, String message) {
+                        handleAck(message);
+                    }
+                })
+                .onClose(new WebSocket.CloseHandler() {
+                    @Override
+                    public void onClose(WebSocket w, int code, String reason) {
+                        drainPending();
+                    }
+                })
+                .onError(new WebSocket.ErrorHandler() {
+                    @Override
+                    public void onError(WebSocket w, Exception ex) {
+                        synchronized (connectGate) {
+                            errReason[0] = ex.getMessage();
+                            connectGate.notifyAll();
+                        }
+                        drainPending();
+                    }
+                });
+        socket = ws;
+        ws.connect(CONNECT_TIMEOUT_MS);
+        long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS;
+        synchronized (connectGate) {
+            while (!connected[0] && errReason[0] == null) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    errReason[0] = "connect-timeout";
+                    break;
+                }
+                try {
+                    connectGate.wait(remaining);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    errReason[0] = "interrupted";
+                    break;
+                }
+            }
+        }
+        if (connected[0]) {
+            return true;
+        }
+        unavailable = true;
+        socket = null;
+        System.out.println("CN1SS:INFO:ws-sink-unavailable reason=" + errReason[0]);
+        return false;
+    }
+
+    private static void handleAck(String text) {
+        if (text == null || !text.startsWith("ACK ")) {
+            return;
+        }
+        String body = text.substring(4).trim();
+        String testName;
+        int spaceIdx = body.indexOf(' ');
+        if (spaceIdx > 0) {
+            testName = body.substring(0, spaceIdx);
+        } else {
+            testName = body;
+        }
+        AckLatch latch;
+        synchronized (pending) {
+            latch = pending.get(testName);
+        }
+        if (latch != null) {
+            latch.release();
+        }
+    }
+
+    private static void drainPending() {
+        synchronized (pending) {
+            for (Map.Entry<String, AckLatch> e : pending.entrySet()) {
+                e.getValue().release();
+            }
+            pending.clear();
+        }
+    }
+
+    private static final class AckLatch {
+        private boolean released;
+
+        synchronized boolean await(long timeoutMs) {
+            long deadline = System.currentTimeMillis() + timeoutMs;
+            while (!released) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return false;
+                }
+                try {
+                    wait(remaining);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        synchronized void release() {
+            released = true;
+            notifyAll();
+        }
     }
 }

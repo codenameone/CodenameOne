@@ -10174,6 +10174,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new IOSWebSocketImpl(url);
+    }
+
+    @Override
     public void splitString(String source, char separator, ArrayList<String> out) {
         nativeInstance.splitString(source, separator, out);
     }

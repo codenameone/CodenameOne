@@ -9196,6 +9196,51 @@ void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY(CN1
     POOL_END();
 }
 
+#import "WebSocketImpl.h"
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = [[CN1WebSocketImpl alloc] initWithId:connectionId
+                                                              url:toNSString(CN1_THREAD_STATE_PASS_ARG url)];
+    POOL_END();
+    return (JAVA_LONG)impl;
+}
+
+void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl connectWithTimeoutMs:timeoutMs];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_closeWebSocketNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl closeConnection];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_sendWebSocketTextNative___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_OBJECT text) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl sendText:toNSString(CN1_THREAD_STATE_PASS_ARG text)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_sendWebSocketBinaryNative___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_OBJECT data) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl sendBinary:arrayToData(data)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_releaseWebSocketNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl release];
+    POOL_END();
+}
+
 
 // ---------------- ES2 Port ADDITION: Shape Drawing -------------------------------------
 
@@ -12592,4 +12637,8 @@ JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
     return com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, bits, outPub, outPriv, lengths);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
+    return com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, connectionId, url);
 }
