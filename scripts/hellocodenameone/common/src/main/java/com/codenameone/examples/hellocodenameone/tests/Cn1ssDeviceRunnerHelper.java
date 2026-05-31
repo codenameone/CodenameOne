@@ -497,7 +497,7 @@ final class Cn1ssWebSocketSink {
         if (!ensureConnected()) {
             return false;
         }
-        AckLatch latch = new AckLatch();
+        final AckLatch latch = new AckLatch();
         synchronized (pending) {
             pending.put(safeName, latch);
         }
@@ -514,7 +514,13 @@ final class Cn1ssWebSocketSink {
             Log.e(t);
             return true; // WS path was attempted; don't fall through to chunks.
         }
-        boolean acked = latch.await(ACK_TIMEOUT_MS);
+        final boolean[] ackedHolder = new boolean[1];
+        blockOffEdt(new Runnable() {
+            public void run() {
+                ackedHolder[0] = latch.await(ACK_TIMEOUT_MS);
+            }
+        });
+        boolean acked = ackedHolder[0];
         synchronized (pending) {
             pending.remove(safeName);
         }
@@ -550,16 +556,6 @@ final class Cn1ssWebSocketSink {
         // the browser, JavaSE) shares 127.0.0.1.
         String url = Display.getInstance().getProperty("cn1ss.websocket.url", "");
         if (url == null || url.length() == 0) {
-            // The HTML5 port runs single-threaded on the browser event loop and
-            // forbids blocking calls (BlockingDisallowedException). This sink's
-            // connect/ACK handshake blocks the calling thread, so it cannot run
-            // there -- the JS pipeline keeps using the base64-over-console
-            // transport until a non-blocking async sink exists. Leaving the URL
-            // empty marks WS unavailable so emit falls through to that path.
-            if (Cn1ssDeviceRunnerHelper.isHtml5()) {
-                unavailable = true;
-                return false;
-            }
             String host = "and".equals(Display.getInstance().getPlatformName())
                     ? "10.0.2.2" : "127.0.0.1";
             url = "ws://" + host + ":" + Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT;
@@ -611,23 +607,27 @@ final class Cn1ssWebSocketSink {
                 });
         socket = ws;
         ws.connect(CONNECT_TIMEOUT_MS);
-        long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS;
-        synchronized (connectGate) {
-            while (!connected[0] && errReason[0] == null) {
-                long remaining = deadline - System.currentTimeMillis();
-                if (remaining <= 0) {
-                    errReason[0] = "connect-timeout";
-                    break;
-                }
-                try {
-                    connectGate.wait(remaining);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    errReason[0] = "interrupted";
-                    break;
+        final long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS;
+        blockOffEdt(new Runnable() {
+            public void run() {
+                synchronized (connectGate) {
+                    while (!connected[0] && errReason[0] == null) {
+                        long remaining = deadline - System.currentTimeMillis();
+                        if (remaining <= 0) {
+                            errReason[0] = "connect-timeout";
+                            break;
+                        }
+                        try {
+                            connectGate.wait(remaining);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            errReason[0] = "interrupted";
+                            break;
+                        }
+                    }
                 }
             }
-        }
+        });
         if (connected[0]) {
             return true;
         }
@@ -664,6 +664,24 @@ final class Cn1ssWebSocketSink {
                 e.getValue().release();
             }
             pending.clear();
+        }
+    }
+
+    /// Run a blocking wait without freezing the EDT. Screenshot emission runs
+    /// on the EDT (UI completion callbacks), and on the JavaScript port the
+    /// WebSocket's browser callbacks are dispatched on that same single event
+    /// loop -- so blocking the EDT to wait for connect/ACK would deadlock (the
+    /// callback that would release the wait can never run) and the port throws
+    /// BlockingDisallowedException. invokeAndBlock performs the wait on a
+    /// separate thread while pumping the event loop, so the WS callbacks still
+    /// fire and release it. On native ports the WS callbacks arrive on their own
+    /// background thread, so invokeAndBlock is simply a safe wrapper there.
+    private static void blockOffEdt(Runnable waitTask) {
+        Display display = Display.getInstance();
+        if (display.isEdt()) {
+            display.invokeAndBlock(waitTask);
+        } else {
+            waitTask.run();
         }
     }
 
