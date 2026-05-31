@@ -589,7 +589,11 @@ public class ByteCodeTranslator {
     }
 
     private static String escapeCmakePath(String path) {
-        return path.replace("\\", "\\\\");
+        // Use forward slashes, which CMake accepts on every platform (including
+        // Windows). Emitting backslashes would make CMake treat sequences like
+        // "C:\Users" as invalid string escapes ('\U') when the globbed paths are
+        // expanded into add_executable/add_library.
+        return path.replace("\\", "/");
     }
     
     private static String getFileType(String s) {
