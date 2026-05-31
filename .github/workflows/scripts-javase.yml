@@ -57,6 +57,13 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
 
       - name: Run JavaSE simulator integration screenshot tests
+        env:
+          # Strict screenshot gating: fail on any pixel mismatch and on any
+          # missing screenshot (a test that ran but emitted nothing). The
+          # JavaSE simulator set is small and fully renderable, so no missing
+          # screenshots are tolerated. Enforced centrally in
+          # scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
         run: ./scripts/run-javase-simulator-integration-tests.sh
 
       - name: Upload JavaSE simulator artifacts
