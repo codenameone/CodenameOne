@@ -406,7 +406,7 @@ public final class Graphics {
     /// rectangle, i.e. anything drawn into it would be at least partially
     /// visible.
     ///
-    /// Use this to skip work for off-screen draws — typical case is a zoomed
+    /// Use this to skip work for off-screen draws - typical case is a zoomed
     /// canvas where most images fall outside the visible window and should
     /// not be decoded or scaled.
     ///
