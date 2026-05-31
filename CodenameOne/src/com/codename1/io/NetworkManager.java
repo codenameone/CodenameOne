@@ -886,8 +886,8 @@ public final class NetworkManager {
     }
 
     /// Issues a blocking HTTP HEAD request to `url` and returns whether the
-    /// server responded within `timeoutMillis`. Any response — including 4xx
-    /// or 5xx — is treated as a successful ping (the network round-trip
+    /// server responded within `timeoutMillis`. Any response - including 4xx
+    /// or 5xx - is treated as a successful ping (the network round-trip
     /// completed). Only socket errors, DNS failures, and timeouts return
     /// false.
     ///
