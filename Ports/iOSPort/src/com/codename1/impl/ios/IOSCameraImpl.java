@@ -64,7 +64,6 @@ public class IOSCameraImpl extends CameraImpl {
     private static final AtomicInteger NEXT_CB = new AtomicInteger(1);
 
     private long sessionPeer;
-    private CameraInfo info;
     private CameraSessionOptions options;
     private final AtomicBoolean listenerBusy = new AtomicBoolean();
     private volatile FrameListener frameListener;
@@ -112,8 +111,6 @@ public class IOSCameraImpl extends CameraImpl {
             // iOS handles camera permission inline at session-run time. We
             // can't synchronously probe; assume granted and let the actual
             // open fail later if the user denies.
-            this.info = new CameraInfo(cameraId, CameraFacing.BACK,
-                    new Dimension[0], new Dimension[0], false, false);
             return;
         }
         long peer = IOSImplementation.nativeInstance.cn1CameraOpen(
@@ -125,8 +122,6 @@ public class IOSCameraImpl extends CameraImpl {
             throw new IOException("Could not open iOS camera (id=" + cameraId + ")");
         }
         this.sessionPeer = peer;
-        this.info = new CameraInfo(cameraId, CameraFacing.BACK,
-                new Dimension[0], new Dimension[0], false, true);
         ACTIVE = this;
     }
 

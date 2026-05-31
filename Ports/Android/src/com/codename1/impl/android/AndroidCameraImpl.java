@@ -96,7 +96,6 @@ public class AndroidCameraImpl extends CameraImpl {
     private static Class<?> clsPreviewBuilder;
     private static Class<?> clsImageCapture;
     private static Class<?> clsImageCaptureBuilder;
-    private static Class<?> clsImageCaptureOnImageCapturedCallback;
     private static Class<?> clsImageAnalysis;
     private static Class<?> clsImageAnalysisBuilder;
     private static Class<?> clsImageAnalysisAnalyzer;
@@ -145,8 +144,6 @@ public class AndroidCameraImpl extends CameraImpl {
             clsPreviewBuilder = Class.forName("androidx.camera.core.Preview$Builder");
             clsImageCapture = Class.forName("androidx.camera.core.ImageCapture");
             clsImageCaptureBuilder = Class.forName("androidx.camera.core.ImageCapture$Builder");
-            clsImageCaptureOnImageCapturedCallback = Class.forName(
-                    "androidx.camera.core.ImageCapture$OnImageCapturedCallback");
             clsImageAnalysis = Class.forName("androidx.camera.core.ImageAnalysis");
             clsImageAnalysisBuilder = Class.forName("androidx.camera.core.ImageAnalysis$Builder");
             clsImageAnalysisAnalyzer = Class.forName("androidx.camera.core.ImageAnalysis$Analyzer");
@@ -320,97 +317,29 @@ public class AndroidCameraImpl extends CameraImpl {
             result.error(new IllegalStateException("Camera not opened"));
             return;
         }
-        // ImageCapture#takePicture(Executor, OnImageCapturedCallback)
-        try {
-            Object callback = Proxy.newProxyInstance(
-                    clsImageCaptureOnImageCapturedCallback.getClassLoader(),
-                    new Class<?>[] { clsImageCaptureOnImageCapturedCallback },
-                    new InvocationHandler() {
-                        @Override
-                        public Object invoke(Object proxy, Method m, Object[] args) {
-                            String name = m.getName();
-                            if ("onCaptureSuccess".equals(name)) {
-                                handlePhotoCaptured(args[0], opts, result);
-                                return null;
-                            }
-                            if ("onError".equals(name)) {
-                                final Throwable t = (Throwable) args[0];
-                                Display.getInstance().callSerially(new Runnable() {
-                                    @Override public void run() { result.error(t); }
-                                });
-                                return null;
-                            }
-                            return null;
-                        }
-                    });
-            // Anonymous proxy approach: Build an OnImageCapturedCallback subclass
-            // via Proxy. CameraX's API actually expects an abstract class, not an
-            // interface. Proxy can't subclass; we need to extend the abstract
-            // class. Use a small inner-class approach via the cgcheckedclassgen
-            // pattern, or fall back to reflection on the implementation. To
-            // keep this implementation compact and portable, we extend at
-            // runtime via a generated subclass loaded from a baked sub-class
-            // that the build server bundles into the user app jar.
-            //
-            // Until that is wired up, use the alternate takePicture(Executor,
-            // File, OnImageSavedCallback) signature which CameraX supports
-            // and which lets us pass an interface-style callback.
-            takePictureToFile(opts, result);
-            // suppress unused warning
-            if (callback == callback) { /* no-op */ }
-        } catch (Throwable t) {
-            result.error(t);
-        }
-    }
-
-    private void takePictureToFile(final PhotoCaptureOptions opts,
-                                   final AsyncResource<CapturedPhoto> result) {
+        // CameraX's in-memory OnImageCapturedCallback is an abstract class
+        // that java.lang.reflect.Proxy can't subclass. Use the to-file
+        // takePicture(OutputFileOptions, Executor, OnImageSavedCallback)
+        // overload instead -- OnImageSavedCallback is an interface, so Proxy
+        // works. We read the resulting JPEG back into memory before
+        // resolving the AsyncResource.
         try {
             final String filePath = opts.getFilePath() != null
                     ? opts.getFilePath()
                     : tempPhotoPath();
             final File outputFile = new File(absolutePath(filePath));
-            // Build OutputFileOptions
             Class<?> ofoBuilderCls = Class.forName(
                     "androidx.camera.core.ImageCapture$OutputFileOptions$Builder");
             Constructor<?> ofoCtor = ofoBuilderCls.getConstructor(File.class);
             Object ofoBuilder = ofoCtor.newInstance(outputFile);
             Object outputFileOptions = ofoBuilderCls.getMethod("build").invoke(ofoBuilder);
 
-            // Build OnImageSavedCallback (interface, so Proxy works)
             Class<?> savedCbCls = Class.forName(
                     "androidx.camera.core.ImageCapture$OnImageSavedCallback");
             Object savedCb = Proxy.newProxyInstance(savedCbCls.getClassLoader(),
                     new Class<?>[] { savedCbCls },
-                    new InvocationHandler() {
-                        @Override public Object invoke(Object p, Method m, Object[] a) {
-                            String n = m.getName();
-                            if ("onImageSaved".equals(n)) {
-                                Display.getInstance().callSerially(new Runnable() {
-                                    @Override public void run() {
-                                        try {
-                                            byte[] bytes = readAll(outputFile);
-                                            int[] wh = readJpegSize(bytes);
-                                            result.complete(new CapturedPhoto(
-                                                    bytes, filePath, wh[0], wh[1]));
-                                        } catch (Throwable t) {
-                                            result.error(t);
-                                        }
-                                    }
-                                });
-                                return null;
-                            }
-                            if ("onError".equals(n)) {
-                                final Throwable t = (Throwable) a[0];
-                                Display.getInstance().callSerially(new Runnable() {
-                                    @Override public void run() { result.error(t); }
-                                });
-                                return null;
-                            }
-                            return null;
-                        }
-                    });
-            // ImageCapture#takePicture(OutputFileOptions, Executor, OnImageSavedCallback)
+                    new ImageSavedHandler(outputFile, filePath, result));
+
             Class<?> ofoCls = Class.forName(
                     "androidx.camera.core.ImageCapture$OutputFileOptions");
             clsImageCapture.getMethod("takePicture", ofoCls, Executor.class, savedCbCls)
@@ -420,10 +349,46 @@ public class AndroidCameraImpl extends CameraImpl {
         }
     }
 
-    private void handlePhotoCaptured(Object imageProxy, PhotoCaptureOptions opts,
-                                     AsyncResource<CapturedPhoto> result) {
-        // Reserved for the in-memory path. Currently unused: see takePicture
-        // To-File path above. Kept around so the proxy callback compiles.
+    /// Static inner class so SpotBugs doesn't flag it as SIC_INNER_SHOULD_BE_STATIC_ANON
+    /// (and so we don't pin the AndroidCameraImpl instance for the duration of
+    /// a slow shutter / write).
+    private static final class ImageSavedHandler implements InvocationHandler {
+        private final File outputFile;
+        private final String filePath;
+        private final AsyncResource<CapturedPhoto> result;
+
+        ImageSavedHandler(File outputFile, String filePath, AsyncResource<CapturedPhoto> result) {
+            this.outputFile = outputFile;
+            this.filePath = filePath;
+            this.result = result;
+        }
+
+        @Override public Object invoke(Object p, Method m, Object[] a) {
+            String n = m.getName();
+            if ("onImageSaved".equals(n)) {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            byte[] bytes = readAll(outputFile);
+                            int[] wh = readJpegSize(bytes);
+                            result.complete(new CapturedPhoto(
+                                    bytes, filePath, wh[0], wh[1]));
+                        } catch (Throwable t) {
+                            result.error(t);
+                        }
+                    }
+                });
+                return null;
+            }
+            if ("onError".equals(n)) {
+                final Throwable t = (Throwable) a[0];
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override public void run() { result.error(t); }
+                });
+                return null;
+            }
+            return null;
+        }
     }
 
     @Override

@@ -409,7 +409,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 // still exist so ParparVM links cleanly -- they just return null/0 and
 // the Java side reports the platform as unsupported.
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate__(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CAMERA_USAGE
     NSString *s = [CN1Camera enumerateCameras];
@@ -419,7 +419,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate__(
 #endif
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_int_boolean(
+JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_int_boolean_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_OBJECT cameraId, JAVA_INT previewW, JAVA_INT previewH,
         JAVA_BOOLEAN captureAudio) {
@@ -439,7 +439,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_
 #endif
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraCreatePreviewView___long(
+JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraCreatePreviewView___long_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
 #ifdef INCLUDE_CAMERA_USAGE
 #ifndef CN1_USE_ARC
@@ -476,7 +476,7 @@ void com_codename1_impl_ios_IOSNative_cn1CameraTakePhoto___long_int_int_int_java
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1CameraStartVideo___long_java_lang_String_boolean(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1CameraStartVideo___long_java_lang_String_boolean_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer,
         JAVA_OBJECT filePath, JAVA_BOOLEAN captureAudio) {
 #ifdef INCLUDE_CAMERA_USAGE
