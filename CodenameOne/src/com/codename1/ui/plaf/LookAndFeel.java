@@ -983,13 +983,22 @@ public abstract class LookAndFeel {
 
     private void initScroll() {
         verticalScroll = new Label();
-        verticalScroll.setUIID("Scroll");
         horizontalScroll = new Label();
-        horizontalScroll.setUIID("HorizontalScroll");
         verticalScrollThumb = new Label();
-        verticalScrollThumb.setUIID("ScrollThumb");
         horizontalScrollThumb = new Label();
-        horizontalScrollThumb.setUIID("HorizontalScrollThumb");
+        if (interactiveScroll) {
+            // desktop scrollbars use dedicated UIIDs so the mobile Scroll/ScrollThumb styling is
+            // never affected and platform conventions can be themed separately
+            verticalScroll.setUIID("DesktopScroll");
+            horizontalScroll.setUIID("DesktopHorizontalScroll");
+            verticalScrollThumb.setUIID("DesktopScrollThumb");
+            horizontalScrollThumb.setUIID("DesktopHorizontalScrollThumb");
+        } else {
+            verticalScroll.setUIID("Scroll");
+            horizontalScroll.setUIID("HorizontalScroll");
+            verticalScrollThumb.setUIID("ScrollThumb");
+            horizontalScrollThumb.setUIID("HorizontalScrollThumb");
+        }
     }
 
     /// This method is a callback to the LookAndFeel when a theme is being
