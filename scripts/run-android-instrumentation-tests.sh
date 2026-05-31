@@ -84,6 +84,19 @@ fi
 
 cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
+# Start the host-side WebSocket screenshot server on the fixed standard port.
+# The Android emulator reaches the host loopback via 10.0.2.2, so the device-
+# runner defaults to ws://10.0.2.2:8765 with no per-launch injection. PNGs the
+# app sends land directly in $WS_RAW_DIR; if WS delivers nothing the legacy
+# logcat base64 decode below is used instead, so this is purely additive.
+WS_RAW_DIR="$SCREENSHOT_TMP_DIR/ws"
+ensure_dir "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  ra_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  ra_log "WebSocket screenshot server did not start; relying on logcat base64 fallback"
+fi
+
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
@@ -222,6 +235,31 @@ else
     ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
   fi
 fi
+
+# The instrumentation run has finished; stop the WS server and adopt whatever
+# it received. One <test>.png per delivered screenshot is in $WS_RAW_DIR. When
+# WS delivered at least one image we use that set and skip the legacy logcat
+# base64 decode entirely.
+cn1ss_stop_ws_server
+declare -a COMPARE_ENTRIES=()
+WS_DELIVERED=0
+if [ -d "${WS_RAW_DIR:-}" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_TMP_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  ra_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (logcat decode skipped)"
+fi
+
+# Legacy logcat base64 decode -- only when the WebSocket transport delivered
+# nothing. Kept as a Phase 1 fallback; removed once WS is confirmed everywhere.
+if [ "$WS_DELIVERED" -eq 0 ]; then
 
 declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")
 
@@ -570,6 +608,7 @@ for test in "${TEST_NAMES[@]}"; do
   [ -n "$dest" ] || continue
   COMPARE_ENTRIES+=("${test}=${dest}")
 done
+fi  # end: legacy logcat base64 decode (WS transport delivered nothing)
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"

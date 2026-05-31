@@ -187,6 +187,19 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Start the host-side WebSocket screenshot server on the fixed standard port.
+# The iOS simulator shares the host loopback, so the device-runner defaults to
+# ws://127.0.0.1:8765 with no per-launch URL injection. PNGs the app sends land
+# directly in $WS_RAW_DIR; if WS delivers nothing the legacy base64/syslog
+# decode below is used instead, so this is purely additive.
+WS_RAW_DIR="$SCREENSHOT_TMP_DIR/ws"
+mkdir -p "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  ri_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  ri_log "WebSocket screenshot server did not start; relying on base64 fallback"
+fi
+
 # Patch scheme env vars to point to our runtime dirs
 SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
 if [ ! -f "$SCHEME_FILE" ] && [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
@@ -774,6 +787,32 @@ if [ -n "$SIM_DEVICE_ID" ]; then
   xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 fi
 
+# The app has exited; stop the WS server and adopt whatever it received. One
+# <test>.png per delivered screenshot is in $WS_RAW_DIR. When WS delivered at
+# least one image we use that set directly and skip the legacy syslog/base64
+# decode entirely.
+cn1ss_stop_ws_server
+declare -a COMPARE_ENTRIES=()
+WS_DELIVERED=0
+if [ -d "${WS_RAW_DIR:-}" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_TMP_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  ri_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (legacy decode skipped)"
+fi
+
+# Legacy syslog/base64 decode -- only when the WebSocket transport delivered
+# nothing. Kept as a Phase 1 fallback; removed once WS is confirmed on every
+# pipeline.
+if [ "$WS_DELIVERED" -eq 0 ]; then
+
 declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
 
 LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
@@ -872,6 +911,7 @@ for test in "${TEST_NAMES[@]}"; do
     COMPARE_ENTRIES+=("${test}=${dest}")
   fi
 done
+fi  # end: legacy syslog/base64 decode (WS transport delivered nothing)
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
