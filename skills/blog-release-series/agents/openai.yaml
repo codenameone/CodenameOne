@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blog release series"
+  short_description: "Ship a weekly release blog plus follow-ups as one PR"
+  default_prompt: "Use $blog-release-series to author this week's release post plus its daily follow-ups as a single batch PR with preview support."
