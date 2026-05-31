@@ -10134,24 +10134,18 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// Delivers shared content to the running application instance by reflectively
-    /// invoking onReceivedSharedContent on the main application object, if present. The
+    /// Delivers shared content to the running application instance. onReceivedSharedContent
+    /// is defined on com.codename1.system.Lifecycle, so apps that handle shared content
+    /// extend Lifecycle; non-Lifecycle apps cannot override it and are skipped. The
     /// dispatch is performed on the EDT.
     public void fireSharedContentReceived(final SharedContent content) {
         final Object app = currentApplicationInstance;
-        if (app == null || content == null) {
+        if (content == null || !(app instanceof com.codename1.system.Lifecycle)) {
             return;
         }
         Runnable r = new Runnable() {
             public void run() {
-                try {
-                    java.lang.reflect.Method m = app.getClass().getMethod("onReceivedSharedContent", SharedContent.class);
-                    m.invoke(app, content);
-                } catch (NoSuchMethodException noMethod) {
-                    // the app does not handle shared content; ignore
-                } catch (Throwable t) {
-                    com.codename1.io.Log.e(t);
-                }
+                ((com.codename1.system.Lifecycle) app).onReceivedSharedContent(content);
             }
         };
         if (Display.getInstance().isEdt()) {

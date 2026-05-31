@@ -11264,7 +11264,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang
     return fromNSString(CN1_THREAD_STATE_PASS_ARG jsonString);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appGroupId) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appGroupId) {
     return com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_STATE_PASS_ARG me, appGroupId);
 }
 

@@ -11569,16 +11569,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static void dispatchSharedContent(final Object app, final SharedContent content) {
+        if (!(app instanceof com.codename1.system.Lifecycle)) {
+            return;
+        }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                try {
-                    java.lang.reflect.Method m = app.getClass().getMethod("onReceivedSharedContent", SharedContent.class);
-                    m.invoke(app, content);
-                } catch (NoSuchMethodException noMethod) {
-                    // app does not handle shared content
-                } catch (Throwable t) {
-                    com.codename1.io.Log.e(t);
-                }
+                ((com.codename1.system.Lifecycle) app).onReceivedSharedContent(content);
             }
         });
     }

@@ -30,6 +30,7 @@
 #import "CodenameOne_GLViewController.h"
 #import "CN1TapGestureRecognizer.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_impl_ios_IOSNative.h"
 #include "com_codename1_push_PushContent.h"
 #include "com_codename1_ui_Display.h"
 #ifdef NEW_CODENAME_ONE_VM
@@ -558,7 +559,7 @@ static void installSignalHandlers() {
     // Group name is written into the Info.plist by the build (CN1ShareAppGroup).
     NSString *shareGroup = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1ShareAppGroup"];
     if ([shareGroup isKindOfClass:[NSString class]] && [shareGroup length] > 0) {
-        JAVA_OBJECT json = com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG shareGroup));
+        JAVA_OBJECT json = com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG shareGroup));
         if (json != JAVA_NULL) {
             com_codename1_impl_ios_IOSImplementation_fireSharedContentFromNative___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG json);
         }

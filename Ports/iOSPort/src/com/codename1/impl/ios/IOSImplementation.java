@@ -10202,11 +10202,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 StringBuilder sb = new StringBuilder();
                 for (LocalNotification.Action a : n.getActions()) {
                     if (sb.length() > 0) {
-                        sb.append('');
+                        sb.append('\u0002');
                     }
-                    sb.append(nullToEmpty(a.getId())).append('')
-                      .append(nullToEmpty(a.getTitle())).append('')
-                      .append(nullToEmpty(a.getTextInputPlaceholder())).append('')
+                    sb.append(nullToEmpty(a.getId())).append('\u0001')
+                      .append(nullToEmpty(a.getTitle())).append('\u0001')
+                      .append(nullToEmpty(a.getTextInputPlaceholder())).append('\u0001')
                       .append(nullToEmpty(a.getTextInputButtonText()));
                 }
                 actionsEncoded = sb.toString();
@@ -10279,9 +10279,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         StringBuilder input = new StringBuilder();
         for (java.util.Map.Entry<String, String> e : request.getInputData().entrySet()) {
             if (input.length() > 0) {
-                input.append('');
+                input.append('\u0002');
             }
-            input.append(e.getKey()).append('').append(e.getValue());
+            input.append(e.getKey()).append('\u0001').append(e.getValue());
         }
         com.codename1.io.Preferences.set("$$CN1_BGWORK_INPUT_" + request.getId(), input.toString());
         com.codename1.io.Preferences.set("$$CN1_BGWORK_PERIODIC_" + request.getId(), request.isPeriodic());
@@ -10334,8 +10334,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             java.util.Map<String, String> input = new java.util.HashMap<String, String>();
             String enc = com.codename1.io.Preferences.get("$$CN1_BGWORK_INPUT_" + id, "");
             if (enc != null && enc.length() > 0) {
-                for (String pair : enc.split("")) {
-                    int idx = pair.indexOf('');
+                for (String pair : com.codename1.io.Util.split(enc, "\u0002")) {
+                    int idx = pair.indexOf('\u0001');
                     if (idx >= 0) {
                         input.put(pair.substring(0, idx), pair.substring(idx + 1));
                     }
