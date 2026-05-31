@@ -164,6 +164,12 @@ public final class IOSNative {
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
     // CN1) matches the app's dark/light theme. A no-op on iOS/iPadOS.
     native void setMacWindowDarkAppearance(boolean dark);
+
+    // Mac native (Catalyst): undecorate the host window for the "custom" desktop title-bar mode -
+    // hide the AppKit title bar (transparent + hidden title + full-size content view) so the CN1
+    // Toolbar acts as the window title bar, and make the window movable by its background so the
+    // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
+    native void setMacWindowUndecorated(boolean undecorated);
     
     native void setImageName(long nativeImage, String name);
     

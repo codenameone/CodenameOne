@@ -818,17 +818,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         super.setCurrentForm(f);
         syncMacWindowAppearance(f);
-        if (isDesktop() && f != null && !(f instanceof Dialog)) {
+        syncMacDesktopChrome(f);
+        if (isNativeTitle() && f != null && !(f instanceof Dialog)) {
             pushMacWindowTitle(f);
         }
     }
 
     @Override
     public boolean isNativeTitle() {
-        // On Mac Catalyst, when the app opts into desktop native chrome, the form title belongs in
-        // the native window title bar and the CN1 Toolbar is suppressed. Opt-in only: defaults to
-        // the legacy toolbar so existing Catalyst apps are unaffected.
-        return isDesktop() && !"toolbar".equals(getDesktopTitleBarMode());
+        // On Mac Catalyst, only the "native" desktop title-bar mode puts the form title into the OS
+        // window title bar (and hides the CN1 Toolbar). In "custom" mode the visible Toolbar is the
+        // title bar, so the OS title is not used. Opt-in only: defaults to toolbar (unchanged).
+        return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
+    // native call is only made when the mode actually changes.
+    private String lastMacChromeMode;
+
+    /// Applies the desktop title-bar mode to the host macOS window chrome: the {@code custom} mode
+    /// undecorates the window (the CN1 Toolbar becomes the title bar), while {@code native}/{@code
+    /// toolbar} keep the standard titled window. No-op off the Mac desktop.
+    private void syncMacDesktopChrome(Form f) {
+        if (f == null || !isDesktop()) {
+            return;
+        }
+        String mode = getDesktopTitleBarMode();
+        if (mode.equals(lastMacChromeMode)) {
+            return;
+        }
+        lastMacChromeMode = mode;
+        nativeInstance.setMacWindowUndecorated("custom".equals(mode));
     }
 
     @Override
@@ -844,7 +864,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void refreshNativeTitle() {
         Form f = getCurrentForm();
-        if (f != null && isDesktop() && !(f instanceof Dialog)) {
+        if (f != null && isNativeTitle() && !(f instanceof Dialog)) {
             pushMacWindowTitle(f);
         }
     }

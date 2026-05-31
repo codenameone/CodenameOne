@@ -34,6 +34,18 @@ toolbar's side menu.
 |`toolbar`|Legacy behavior - the in-app CN1 `Toolbar` is shown exactly as on mobile.
 |===
 
+The screenshots below show the same app (a "My Notes" list with File / Edit / View / Help commands)
+in each mode on macOS.
+
+.`native` mode: the `Form` title is in the OS window title bar, the commands populate the native menu bar, and there is no in-app `Toolbar`
+image::img/desktop-titlebar-native.png[Desktop native title-bar mode,scaledwidth=60%]
+
+.`custom` mode: the window is undecorated and the CN1 `Toolbar` (title + hamburger side menu) is the window's title bar; the commands are also in the native menu bar
+image::img/desktop-titlebar-custom.png[Desktop custom title-bar mode,scaledwidth=60%]
+
+.`toolbar` mode: the legacy look - the in-app `Toolbar` sits below a generic OS title bar and the commands live in the hamburger side menu
+image::img/desktop-titlebar-toolbar.png[Desktop legacy toolbar mode,scaledwidth=60%]
+
 ==== Enabling it on the Java SE desktop build
 
 For the desktop (Java SE) target the mode is a build hint that the generated desktop launcher
