@@ -4356,6 +4356,57 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
+    /// bar + native menu bar), {@code "custom"} (undecorated window with CN1-drawn chrome) or
+    /// {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"} by default; desktop
+    /// ports override this when running on the desktop. This is the authoritative source consulted
+    /// by `Form.isDesktopNativeChrome()` - more robust than a theme constant, which not all ports
+    /// propagate identically.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop title-bar mode, never null
+    public String getDesktopTitleBarMode() {
+        return "toolbar";
+    }
+
+    /// Minimizes the native desktop window when the application draws its own (custom mode)
+    /// window chrome on an undecorated window. No-op on platforms without a native window.
+    public void minimizeNativeWindow() {
+    }
+
+    /// Toggles the maximized state of the native desktop window when the application draws
+    /// its own (custom mode) window chrome. No-op on platforms without a native window.
+    public void toggleMaximizeNativeWindow() {
+    }
+
+    /// Closes the native desktop window when the application draws its own (custom mode)
+    /// window chrome. No-op on platforms without a native window.
+    public void closeNativeWindow() {
+    }
+
+    /// Begins dragging the native desktop window (custom mode title bar). The arguments are
+    /// absolute pointer coordinates at the start of the drag. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void startNativeWindowDrag(int x, int y) {
+    }
+
+    /// Continues dragging the native desktop window (custom mode title bar). The arguments
+    /// are the current absolute pointer coordinates. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void dragNativeWindow(int x, int y) {
+    }
+
     /// Exits the application...
     public void exitApplication() {
     }

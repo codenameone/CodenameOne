@@ -2541,6 +2541,45 @@ public class Toolbar extends Container {
         }
     }
 
+    /// Aggregates every command exposed by this toolbar - left bar, right bar, overflow
+    /// menu and side menu - into a single de-duplicated `Vector`. Used by the desktop port
+    /// to build the native menu bar when the toolbar is hidden in favor of native window
+    /// chrome. The returned commands must not be mutated.
+    ///
+    /// #### Returns
+    ///
+    /// a de-duplicated vector of all commands hosted by this toolbar
+    public Vector getAllNativeMenuCommands() {
+        Vector all = new Vector();
+        addUniqueCommands(all, getLeftBarCommands());
+        addUniqueCommands(all, getRightBarCommands());
+        addUniqueCommands(all, getOverflowCommands());
+        MenuBar mb = getMenuBar();
+        if (mb != null) {
+            Vector side = mb.getCommands();
+            if (side != null) {
+                for (int i = 0; i < side.size(); i++) {
+                    Object c = side.elementAt(i);
+                    if (c != null && !all.contains(c)) {
+                        all.addElement(c);
+                    }
+                }
+            }
+        }
+        return all;
+    }
+
+    private void addUniqueCommands(Vector all, Iterable<Command> src) {
+        if (src == null) {
+            return;
+        }
+        for (Command c : src) {
+            if (c != null && !all.contains(c)) {
+                all.addElement(c);
+            }
+        }
+    }
+
     /// Returns the associated SideMenuBar object of this Toolbar.
     ///
     /// #### Returns
@@ -3076,6 +3115,20 @@ public class Toolbar extends Container {
                 parent.removeComponentFromForm(ta);
             }
             super.initMenuBar(parent);
+            if (parent.isDesktopNativeChrome()) {
+                // desktop native/custom chrome: keep the Toolbar object (so the command API and
+                // command harvesting work) but never attach it to the form, so no title strip is
+                // painted. The title goes to the OS window and commands go to the native menu bar.
+                initialized = true;
+                setTitle(parent.getTitle());
+                if ("custom".equals(parent.getDesktopTitleBarMode())) {
+                    // custom mode draws its own CN1 title bar with caption buttons + drag region
+                    parent.installCustomWindowChrome();
+                }
+                parent.revalidate();
+                initTitleBarStatus();
+                return;
+            }
             if (layered) {
                 Container layeredPane = parent.getLayeredPane();
                 Container p = layeredPane.getParent();

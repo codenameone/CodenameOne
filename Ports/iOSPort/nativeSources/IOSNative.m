@@ -1608,6 +1608,32 @@ void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_T
 #endif
 }
 
+// Mac Catalyst: set the host window title bar text. On a Catalyst app the UIWindowScene.title
+// maps to the AppKit window title, so updating it here updates the visible title bar. No-op on
+// iOS phones/tablets (guarded by TARGET_OS_MACCATALYST and only ever called when isDesktop()).
+// Mac Catalyst native window-chrome bridge. The window-title and menu work (including re-applying
+// on scene activation) lives in CodenameOne_GLAppDelegate.m so the UIMenuBuilder override sits on a
+// UIResponder in the chain; these natives just forward to it.
+#if TARGET_OS_MACCATALYST
+extern void CN1SetMacWindowTitle(NSString* title);
+extern void CN1SetMacMenuLabels(NSArray* labels);
+#endif
+void com_codename1_impl_ios_IOSNative_setWindowTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
+#if TARGET_OS_MACCATALYST
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    CN1SetMacWindowTitle(t == nil ? @"" : t);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT namesNewlineJoined) {
+#if TARGET_OS_MACCATALYST
+    NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG namesNewlineJoined);
+    NSArray* labels = (joined == nil || joined.length == 0) ? @[] : [joined componentsSeparatedByString:@"\n"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1SetMacMenuLabels(labels);
+    });
+#endif
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);

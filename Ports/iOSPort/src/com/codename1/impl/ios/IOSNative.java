@@ -152,6 +152,14 @@ public final class IOSNative {
     native boolean isIOS7();
     native boolean isRunningOnMac();
 
+    // Mac native (Catalyst): set the host window title bar text from the current form title.
+    native void setWindowTitle(String title);
+
+    // Mac native (Catalyst): replace the application menu's CN1 command items. namesNewlineJoined
+    // holds the visible command labels separated by '\n'; selecting item i calls back into
+    // IOSImplementation.fireMacMenuCommand(i).
+    native void setNativeMenuCommands(String namesNewlineJoined);
+
     // Mac native: propagate the current form's brightness to the host
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
     // CN1) matches the app's dark/light theme. A no-op on iOS/iPadOS.
