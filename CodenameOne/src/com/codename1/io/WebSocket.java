@@ -138,8 +138,12 @@ public final class WebSocket {
                 if (h != null) {
                     try {
                         h.onError(self, ex);
-                    } catch (Throwable t) {
-                        // last-ditch: swallow to avoid recursion
+                    } catch (Throwable swallow) {
+                        // Last-ditch: a throwable from the user's error
+                        // handler has nowhere else to go without
+                        // recursing into onError again. Drop it on the
+                        // floor.
+                        swallow.toString();
                     }
                 }
             }
@@ -151,6 +155,8 @@ public final class WebSocket {
                     try {
                         h.onError(self, wrapped);
                     } catch (Throwable swallow) {
+                        // Same rationale as onError() above.
+                        swallow.toString();
                     }
                 }
             }
