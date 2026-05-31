@@ -71,10 +71,12 @@ public final class VideoRecording {
         return out;
     }
 
+    /// Milliseconds since the recording started.
     public long getElapsedMillis() {
         return System.currentTimeMillis() - startMillis;
     }
 
+    /// True until `#stop()` or `#stopAndAwait()` has been called.
     public boolean isRecording() {
         return !stopped;
     }

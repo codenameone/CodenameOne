@@ -36,12 +36,18 @@ public final class CameraSessionOptions {
     private boolean captureAudio = true;
     private boolean enableStabilization;
 
+    /// Requested preview / frame-stream resolution. The platform may snap
+    /// to its nearest supported size. Pass `0` for either dimension to let
+    /// the platform pick.
     public CameraSessionOptions previewSize(int width, int height) {
         this.previewWidth = width;
         this.previewHeight = height;
         return this;
     }
 
+    /// Requested still-photo resolution. The platform may snap to its
+    /// nearest supported size. Pass `0` for either dimension to use the
+    /// camera's default photo size.
     public CameraSessionOptions photoSize(int width, int height) {
         this.photoWidth = width;
         this.photoHeight = height;
@@ -75,27 +81,42 @@ public final class CameraSessionOptions {
         return this;
     }
 
+    /// Requested preview width, or `0` to let the platform pick.
     public int getPreviewWidth() {
         return previewWidth;
     }
+
+    /// Requested preview height, or `0` to let the platform pick.
     public int getPreviewHeight() {
         return previewHeight;
     }
+
+    /// Requested still-photo width, or `0` to use the camera default.
     public int getPhotoWidth() {
         return photoWidth;
     }
+
+    /// Requested still-photo height, or `0` to use the camera default.
     public int getPhotoHeight() {
         return photoHeight;
     }
+
+    /// Pixel format requested for `FrameListener` delivery.
     public FrameFormat getFrameFormat() {
         return frameFormat;
     }
+
+    /// Cap on frames-per-second delivered to listeners; `0` means uncapped.
     public int getFrameMaxFps() {
         return frameMaxFps;
     }
+
+    /// True if the session should request the microphone for video recording.
     public boolean isCaptureAudio() {
         return captureAudio;
     }
+
+    /// True if optical/electronic stabilization was requested.
     public boolean isStabilizationEnabled() {
         return enableStabilization;
     }

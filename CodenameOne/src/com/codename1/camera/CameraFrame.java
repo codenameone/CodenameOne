@@ -65,9 +65,12 @@ public final class CameraFrame {
         return rawBytes;
     }
 
+    /// Pixel width of the frame.
     public int getWidth() {
         return width;
     }
+
+    /// Pixel height of the frame.
     public int getHeight() {
         return height;
     }
@@ -84,6 +87,8 @@ public final class CameraFrame {
         return timestampNanos;
     }
 
+    /// Pixel format actually used for `#getRawBytes()`. JPEG bytes returned by
+    /// `#getJpegBytes()` are always JPEG-encoded regardless of this value.
     public FrameFormat getFormat() {
         return format;
     }

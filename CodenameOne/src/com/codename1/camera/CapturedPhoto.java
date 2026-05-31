@@ -57,9 +57,12 @@ public final class CapturedPhoto {
         return filePath;
     }
 
+    /// Pixel width of the captured photo.
     public int getWidth() {
         return width;
     }
+
+    /// Pixel height of the captured photo.
     public int getHeight() {
         return height;
     }

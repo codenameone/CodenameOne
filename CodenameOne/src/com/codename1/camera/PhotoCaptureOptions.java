@@ -57,15 +57,23 @@ public final class PhotoCaptureOptions {
         return this;
     }
 
+    /// Requested capture width, or `0` to use the camera default.
     public int getWidth() {
         return width;
     }
+
+    /// Requested capture height, or `0` to use the camera default.
     public int getHeight() {
         return height;
     }
+
+    /// JPEG encoding quality 1-100.
     public int getJpegQuality() {
         return jpegQuality;
     }
+
+    /// Configured destination FileSystemStorage path, or `null` if the
+    /// framework should pick a temp path.
     public String getFilePath() {
         return filePath;
     }

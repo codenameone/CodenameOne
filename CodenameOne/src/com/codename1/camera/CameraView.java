@@ -63,6 +63,7 @@ public final class CameraView extends Container {
         }
     }
 
+    /// The `CameraSession` backing this view.
     public CameraSession getSession() {
         return session;
     }
@@ -73,14 +74,18 @@ public final class CameraView extends Container {
         this.mirrored = m;
     }
 
+    /// True when the preview is horizontally mirrored.
     public boolean isMirrored() {
         return mirrored;
     }
 
+    /// How the live preview is fitted inside the component bounds.
+    /// Defaults to `ScaleType#CROP` (filling the view, cropping at edges).
     public void setScaleType(ScaleType s) {
         this.scaleType = s == null ? ScaleType.CROP : s;
     }
 
+    /// Current scale type. Defaults to `ScaleType#CROP`.
     public ScaleType getScaleType() {
         return scaleType;
     }

@@ -76,6 +76,8 @@ public abstract class CameraImpl {
     /// must drop frames silently when the previous invocation is still running.
     public abstract void setFrameListener(FrameListener listener, FrameFormat format, int maxFps);
 
+    /// Set the flash / torch mode. Implementations should be a no-op on
+    /// cameras without a flash.
     public abstract void setFlashMode(FlashMode mode);
 
     /// 1.0 = no zoom; values above 1.0 zoom in. Implementations clamp to
@@ -88,6 +90,8 @@ public abstract class CameraImpl {
     /// Release the underlying hardware but keep the session object usable.
     /// Followed by `#resume()` to re-acquire.
     public abstract void pause();
+
+    /// Re-acquire the hardware after a `#pause()`.
     public abstract void resume();
 
     /// Release all native resources for this session. Subsequent calls become

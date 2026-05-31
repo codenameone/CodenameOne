@@ -65,6 +65,9 @@ public final class CameraSession implements AutoCloseable {
         return takePhoto(new PhotoCaptureOptions());
     }
 
+    /// Capture a still photo using the given options (size, quality, file
+    /// path). The returned `AsyncResource` resolves on the EDT with the
+    /// captured photo, or fires its error callback if capture fails.
     public AsyncResource<CapturedPhoto> takePhoto(PhotoCaptureOptions opts) {
         AsyncResource<CapturedPhoto> out = new AsyncResource<CapturedPhoto>();
         impl.takePhoto(opts == null ? new PhotoCaptureOptions() : opts, out);
@@ -104,9 +107,14 @@ public final class CameraSession implements AutoCloseable {
         }
     }
 
+    /// Set the flash / torch behavior. No-op on cameras whose
+    /// `CameraInfo#hasFlash()` is false.
     public void setFlashMode(FlashMode m) {
         impl.setFlashMode(m);
     }
+
+    /// Set the zoom ratio where `1.0` is no zoom and values above `1.0`
+    /// zoom in. The platform implementation clamps to the supported range.
     public void setZoom(float ratio) {
         impl.setZoom(ratio);
     }
@@ -117,10 +125,13 @@ public final class CameraSession implements AutoCloseable {
         impl.focus(xNorm, yNorm);
     }
 
+    /// The `CameraInfo` for the physical camera this session is attached to.
     public CameraInfo getInfo() {
         return info;
     }
 
+    /// The options the session was opened with. Read-only snapshot; mutating
+    /// it after `Camera#open(CameraInfo, CameraSessionOptions)` has no effect.
     public CameraSessionOptions getOptions() {
         return options;
     }
@@ -131,6 +142,8 @@ public final class CameraSession implements AutoCloseable {
         impl.pause();
     }
 
+    /// Re-acquire the hardware after `#pause()`. No-op if the session is
+    /// already running.
     public void resume() {
         impl.resume();
     }
@@ -149,6 +162,7 @@ public final class CameraSession implements AutoCloseable {
         }
     }
 
+    /// True once `#close()` has been called on this session.
     public boolean isClosed() {
         return closed;
     }

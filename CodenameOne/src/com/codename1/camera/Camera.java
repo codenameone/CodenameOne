@@ -60,10 +60,6 @@ import java.io.IOException;
 ///         BarcodeScanner.scan(frame.getJpegBytes()).ready(codes -> { ... }));
 /// }
 /// ```
-///
-/// #### Since
-///
-/// 8.1
 public final class Camera {
     private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;

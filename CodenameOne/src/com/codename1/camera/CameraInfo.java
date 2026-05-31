@@ -54,6 +54,7 @@ public final class CameraInfo {
         return id;
     }
 
+    /// Direction this camera faces relative to the device screen.
     public CameraFacing getFacing() {
         return facing;
     }
@@ -70,9 +71,13 @@ public final class CameraInfo {
         return previewSizes;
     }
 
+    /// True if this camera has a flash/torch the application can drive
+    /// via `CameraSession#setFlashMode(FlashMode)`.
     public boolean hasFlash() {
         return hasFlash;
     }
+
+    /// True if this camera supports tap-to-focus / autofocus.
     public boolean hasAutoFocus() {
         return hasAutoFocus;
     }
