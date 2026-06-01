@@ -375,6 +375,62 @@
     return null;
   }
 
+  // Singletons that must never be released even if the worker reports them
+  // dead: their wrappers are cached for the life of the page. Defensive -- the
+  // display canvas is held by a long-lived Java field so its wrapper never
+  // dies, but guard it anyway.
+  function isProtectedHostRef(value) {
+    if (value == null) {
+      return false;
+    }
+    if (value === global || value === global.window) {
+      return true;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (doc && (value === doc || value === doc.body
+        || value === doc.documentElement || value === doc.head)) {
+      return true;
+    }
+    if (value.id === 'codenameone-canvas') {
+      return true;
+    }
+    return false;
+  }
+
+  // Drop host refs the worker reported as dead -- every worker-side wrapper for
+  // them was garbage-collected, so they are unreachable from the worker and
+  // safe to evict, letting the browser reclaim the element AND its multi-MB
+  // backing store. This is the host half of the host-ref leak fix (see
+  // parparvm_runtime.js); without it ``hostRefById`` grew unbounded and the
+  // late-suite canvas-accumulation thrash starved the worker<->host bridge.
+  //
+  // We release CANVASES ONLY. The GC signal already guarantees a reused canvas
+  // (still referenced by a live Java image) is never reported dead. Non-canvas
+  // refs (DOM nodes, events, the WebSocket) are left intact because some
+  // @JSBody natives stash a raw ``__jsValue`` host-ref marker that can outlive
+  // its wrapper -- dropping those produced "Missing host receiver for JSO
+  // bridge" errors and stalled the screenshot WebSocket send.
+  function releaseHostRefs(ids) {
+    if (!ids || !ids.length || !hostRefById) {
+      return;
+    }
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var value = hostRefById[id];
+      if (value == null || isProtectedHostRef(value) || !isCanvasLike(value)) {
+        continue;
+      }
+      delete hostRefById[id];
+      if (hostRefByObject && typeof hostRefByObject.delete === 'function') {
+        try {
+          hostRefByObject.delete(value);
+        } catch (weakErr) {
+          void weakErr;
+        }
+      }
+    }
+  }
+
   // Cache of worker-callback proxy functions keyed by the callback ID the
   // worker minted. addEventListener/removeEventListener parity needs the
   // *same* real function on both sides of the call, so we memoise here.
@@ -1904,6 +1960,10 @@
   function handleVmMessage(data, target) {
     global.__parparMessages.push(data);
     if (!data) {
+      return;
+    }
+    if (data.type === 'releaseHostRef') {
+      releaseHostRefs(data.ids);
       return;
     }
     if (data.type === 'host-call') {
