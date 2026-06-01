@@ -1399,29 +1399,70 @@ const jvm = {
         // previously-queued fire-and-forget ops first to keep
         // canvas state consistent.
         self.flushPendingFireAndForget();
-        const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+        // An object-returning bridge call (return class is a reference type)
+        // intermittently comes back as a NUMBER or an empty {} that lost its
+        // host-ref marker. Observed: ``getContext("2d")`` returning 375 and
+        // ``getDocument()`` returning 667/{} -- always the canvas/viewport
+        // width or height, i.e. a *transient* host-side race where the
+        // round-trip result is crossed with a concurrent getWidth/getHeight,
+        // not a permanent corruption (the same receiver resolves fine moments
+        // earlier and later in the run). Substituting null (the old recovery)
+        // turned that transient blip into a null/degraded receiver that the
+        // caller then busy-loops on (VIRTUAL_FAIL / NULL_RECEIVER), which is
+        // what hard-stalled the suite at ButtonTheme (#5145).
+        //
+        // For IDEMPOTENT reads -- any getter, plus getContext (returns the
+        // same context for a given canvas) -- we simply re-issue the call a
+        // few times. Each re-issue yields the scheduler (lets the crossed
+        // response and any queued ops drain), so the transient clears and we
+        // get the real object. We deliberately do NOT retry non-idempotent
+        // methods (createElement, appendChild, ...) where a re-issue could
+        // double-apply a side effect; those keep the substitute-null fallback.
+        const objectReturn = bridge.returnClass
+            && bridge.returnClass !== 'int' && bridge.returnClass !== 'byte'
+            && bridge.returnClass !== 'short' && bridge.returnClass !== 'char'
+            && bridge.returnClass !== 'long' && bridge.returnClass !== 'float'
+            && bridge.returnClass !== 'double' && bridge.returnClass !== 'boolean'
+            && bridge.returnClass !== 'void' && bridge.returnClass !== 'v';
+        // Idempotent reads (no host side effects, same result for same input)
+        // are safe to re-issue. Any getter qualifies; the listed methods are
+        // pure reads. Side-effecting methods (createElement, appendChild, ...)
+        // are intentionally excluded so a retry can never double-apply.
+        const idempotentRead = bridge.kind === 'getter'
+            || bridge.member === 'getContext'
+            || bridge.member === 'getBundledAssetAsDataURL'
+            || bridge.member === 'getImageData'
+            || bridge.member === 'measureText';
+        const isDegradedObject = function(r) {
+          if (!objectReturn) return false;
+          if (typeof r === 'number') return true;
+          return !!(r && typeof r === 'object' && !Array.isArray(r)
+              && r.__cn1HostRef == null
+              && Object.getOwnPropertyNames(r).length === 0);
+        };
+        let hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
           kind: bridge.kind,
           member: bridge.member,
           args: transferableArgs
         }]);
-        // canvasContextWipe RECOVERY: when hostResult is a NUMBER but
-        // the expected return class is an object type, substitute null.
-        // The downstream code would otherwise treat the number as a
-        // receiver and busy-loop on VIRTUAL_FAIL / NULL_RECEIVER.
-        // Returning null lets the caller's standard null-check path
-        // throw a clean NPE instead.
-        //
-        // Host-side root cause TBD (browser_bridge.js:670
-        // ``receiver[member]`` returning a number when it shouldn't).
-        // The NUMBER_LEAK diag captures it at the bridge boundary.
+        let jsoRetries = 0;
+        while (isDegradedObject(hostResult) && idempotentRead && jsoRetries < 4) {
+          jsoRetries++;
+          // Re-issue with all queued fire-and-forget ops flushed first so the
+          // host sees consistent state. The yield drains the crossed response.
+          self.flushPendingFireAndForget();
+          hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+            receiver: receiver,
+            receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
+            kind: bridge.kind,
+            member: bridge.member,
+            args: transferableArgs
+          }]);
+        }
         let workingHostResult = hostResult;
-        if (typeof hostResult === 'number' && bridge.returnClass
-            && bridge.returnClass !== 'int' && bridge.returnClass !== 'byte'
-            && bridge.returnClass !== 'short' && bridge.returnClass !== 'char'
-            && bridge.returnClass !== 'long' && bridge.returnClass !== 'float'
-            && bridge.returnClass !== 'double' && bridge.returnClass !== 'boolean') {
+        if (isDegradedObject(hostResult) && typeof hostResult === 'number') {
           if (!jvm._numberForObjLogged) jvm._numberForObjLogged = 0;
           if (jvm._numberForObjLogged < 5) {
             jvm._numberForObjLogged++;
@@ -1432,7 +1473,9 @@ const jvm = {
               vmDiag('NUMBER_FOR_OBJECT', 'kind', String(bridge.kind));
               vmDiag('NUMBER_FOR_OBJECT', 'returnClass', String(bridge.returnClass));
               vmDiag('NUMBER_FOR_OBJECT', 'value', String(hostResult));
-              vmDiag('NUMBER_FOR_OBJECT', 'recovery', 'substituted-null');
+              vmDiag('NUMBER_FOR_OBJECT', 'retries', String(jsoRetries));
+              vmDiag('NUMBER_FOR_OBJECT', 'recovery',
+                  idempotentRead ? 'retries-exhausted-substituted-null' : 'substituted-null');
             } catch (_e) {}
           }
           workingHostResult = null;
