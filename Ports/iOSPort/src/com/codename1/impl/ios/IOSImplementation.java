@@ -818,6 +818,125 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         super.setCurrentForm(f);
         syncMacWindowAppearance(f);
+        syncMacDesktopChrome(f);
+        // Push the form title to the OS window for every desktop mode (unchanged from before); in
+        // "custom" mode the title bar is hidden so this is invisible but harmless.
+        if (isDesktop() && f != null && !(f instanceof Dialog)) {
+            pushMacWindowTitle(f);
+        }
+    }
+
+    @Override
+    public boolean isNativeTitle() {
+        // On Mac Catalyst, only the "native" desktop title-bar mode puts the form title into the OS
+        // window title bar (and hides the CN1 Toolbar). In "custom" mode the visible Toolbar is the
+        // title bar, so the OS title is not used. Opt-in only: defaults to toolbar (unchanged).
+        return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
+    // native call is only made when the mode actually changes.
+    private String lastMacChromeMode;
+
+    /// Applies the desktop title-bar mode to the host macOS window chrome: the {@code custom} mode
+    /// undecorates the window so the CN1 Toolbar becomes the title bar. The {@code native} and
+    /// {@code toolbar} modes leave the window chrome completely untouched, so existing Catalyst apps
+    /// are byte-for-byte unaffected. No-op off the Mac desktop.
+    private void syncMacDesktopChrome(Form f) {
+        if (f == null || !isDesktop()) {
+            return;
+        }
+        String mode = getDesktopTitleBarMode();
+        if (mode.equals(lastMacChromeMode)) {
+            return;
+        }
+        lastMacChromeMode = mode;
+        // Only the "custom" mode touches the native window. Non-custom modes never call into the
+        // native chrome, preserving the exact prior window appearance for existing apps.
+        if ("custom".equals(mode)) {
+            nativeInstance.setMacWindowUndecorated(true);
+        }
+    }
+
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as a
+        // Display property by the generated iOS stub. Default toolbar = unchanged legacy behavior.
+        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        Form f = getCurrentForm();
+        if (f != null && isDesktop() && !(f instanceof Dialog)) {
+            pushMacWindowTitle(f);
+        }
+    }
+
+    private void pushMacWindowTitle(Form f) {
+        String t = f.getTitle();
+        nativeInstance.setWindowTitle(t == null ? "" : t);
+    }
+
+    // Commands currently exposed in the Mac native menu, index-aligned with the labels pushed to
+    // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
+    private static List<com.codename1.ui.Command> macNativeCommands;
+
+    @Override
+    public void setNativeCommands(Vector commands) {
+        if (!isDesktop()) {
+            return;
+        }
+        ArrayList<com.codename1.ui.Command> filtered = new ArrayList<com.codename1.ui.Command>();
+        // Encode one row per command as "<menuHint>\t<label>", rows separated by '\n'. The native
+        // side groups rows into the matching standard macOS menus (App/File/Edit/View/Window/Help)
+        // or a top-level menu named by the hint; an empty hint means the default commands menu.
+        StringBuilder sb = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (!(o instanceof com.codename1.ui.Command)) {
+                    continue;
+                }
+                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                String name = c.getCommandName();
+                if (name == null || name.length() == 0) {
+                    continue;
+                }
+                String hint = c.getDesktopMenu();
+                if (hint == null) {
+                    hint = "";
+                }
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append(hint).append('\t').append(name);
+                filtered.add(c);
+            }
+        }
+        macNativeCommands = filtered;
+        nativeInstance.setNativeMenuCommands(sb.toString());
+    }
+
+    /**
+     * Invoked from the native Mac menu action when the user selects the command at the given
+     * index. Dispatches the corresponding Codename One command on the EDT.
+     */
+    public static void fireMacMenuCommand(final int index) {
+        final List<com.codename1.ui.Command> cmds = macNativeCommands;
+        if (cmds == null || index < 0 || index >= cmds.size()) {
+            return;
+        }
+        final com.codename1.ui.Command c = cmds.get(index);
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                c.actionPerformed(new ActionEvent(c));
+            }
+        });
     }
 
     private Boolean lastMacWindowDark;
@@ -1508,7 +1627,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 InputStream in = getResourceAsStream("/iOSModernTheme.res");
                 if (in != null) {
                     r = Resources.open(in);
-                    UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    injectDesktopThemeConstants(tp);
+                    UIManager.getInstance().setThemeProps(tp);
                     return;
                 }
                 // Modern theme isn't in the jar (e.g. framework build hasn't
@@ -1520,14 +1641,34 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(!nativeInstance.isIOS7()) {
                     tp.put("TitleArea.padding", "0,0,0,0");
                 }
+                injectDesktopThemeConstants(tp);
                 UIManager.getInstance().setThemeProps(tp);
                 return;
             }
             // "legacy" / "iphone" / anything else: pre-flat iPhone theme.
             r = Resources.open("/iPhoneTheme.res");
-            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            injectDesktopThemeConstants(tp);
+            UIManager.getInstance().setThemeProps(tp);
         } catch (IOException ex) {
             ex.printStackTrace();
+        }
+    }
+
+    /**
+     * On Mac Catalyst (isDesktop()) the app should feel like a desktop app: enable the
+     * cross-platform interactive scrollbars and the native window chrome (OS title bar +
+     * native menu bar). These theme constants are injected only on the desktop so iOS
+     * phones/tablets are unaffected. Mirrors JavaSEPort.injectDesktopThemeConstants.
+     */
+    private void injectDesktopThemeConstants(Hashtable tp) {
+        if (tp == null || !isDesktop()) {
+            return;
+        }
+        // Opt-in via the desktop.interactiveScrollbars build hint; default off so existing Catalyst
+        // apps render scrollbars exactly as before.
+        if ("true".equalsIgnoreCase(Display.getInstance().getProperty("desktop.interactiveScrollbars", "false"))) {
+            tp.put("@interactiveScrollBool", "true");
         }
     }
 
@@ -3698,6 +3839,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
+    }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new IOSCameraImpl();
     }
 
     @Override
@@ -10181,6 +10327,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
         return new IOSWebSocketImpl(url);
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        nativeInstance.writeToSocketStream(((Long)socket).longValue(), data, offset, len);
     }
 
     @Override

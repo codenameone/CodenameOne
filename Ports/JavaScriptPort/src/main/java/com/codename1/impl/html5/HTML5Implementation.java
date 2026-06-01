@@ -4943,6 +4943,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public PeerComponent createNativePeer(Object nativeComponent) {
         return new HTML5Peer((HTMLElement)nativeComponent);
     }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new HTML5CameraImpl();
+    }
     
     
     

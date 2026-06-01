@@ -757,6 +757,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final int GAME_KEY_CODE_RIGHT = -94;
     private static String nativeTheme;
     private static Resources nativeThemeRes;
+    // Desktop window-chrome configuration. Defaults preserve the legacy behavior (CN1 Toolbar,
+    // no interactive scrollbars); the generated desktop Stub opts a new app in.
+    private static String desktopTitleBarMode = "toolbar";
+    private static boolean desktopInteractiveScrollbars = false;
+    // Caches the last command-name signature pushed to the native menu bar to avoid rebuilding
+    // (and flickering the macOS screen menu) when an unchanged form is re-shown.
+    private String lastNativeMenuSignature;
+    // Press offset within the title bar at the start of a custom-chrome window drag.
+    private int nativeWindowDragOffsetX;
+    private int nativeWindowDragOffsetY;
+    // Guards the one-time undecoration of the desktop window in the "custom" title-bar mode.
+    private boolean desktopCustomWindowConfigured;
+    // Active edge-resize state for the undecorated "custom"-mode window (driven from the glass pane).
+    private static final int RESIZE_NORTH = 1;
+    private static final int RESIZE_SOUTH = 2;
+    private static final int RESIZE_WEST = 4;
+    private static final int RESIZE_EAST = 8;
+    private int desktopResizeEdges;
+    private java.awt.Rectangle desktopResizeStartBounds;
+    private java.awt.Point desktopResizeStartMouse;
     /**
      * The simulatorNativeTheme value that {@link #loadSkinFile(InputStream, JFrame)}
      * last applied as the native-theme override. Useful for tests that
@@ -1202,6 +1222,309 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
         }
+        if (isDesktopCustomTitleBarMode() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            configureDesktopCustomWindow();
+        } else if (isNativeTitle() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            pushWindowTitle(f);
+        }
+    }
+
+    /// @return true when running on the desktop with the {@code custom} title-bar mode, where the
+    /// CN1 Toolbar acts as the window title bar on an undecorated, edge-resizable window.
+    private boolean isDesktopCustomTitleBarMode() {
+        return isDesktop() && "custom".equals(resolveDesktopTitleBarMode());
+    }
+
+    /// One-time setup for the {@code custom} desktop title-bar mode: strips the OS title bar from the
+    /// app window so the visible CN1 Toolbar becomes the window's title bar. The window stays
+    /// edge-resizable (handled by the glass-pane dispatcher) and is moved by dragging the Toolbar.
+    /// Runs on the AWT event thread; undecoration happens before the window is first shown so there
+    /// is no flON.
+    private void configureDesktopCustomWindow() {
+        if (desktopCustomWindowConfigured) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        desktopCustomWindowConfigured = true;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (frame.isUndecorated()) {
+                    return;
+                }
+                boolean wasVisible = frame.isVisible();
+                frame.dispose();
+                frame.setUndecorated(true);
+                if (wasVisible) {
+                    frame.setVisible(true);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            EventQueue.invokeLater(r);
+        }
+    }
+
+    /// Maps a point (in unscaled glass-pane / content coordinates) to the set of window edges within
+    /// the resize hot-zone, as a bitmask of {@code RESIZE_*}. Returns 0 when the point is in the
+    /// interior. Only meaningful in the {@code custom} desktop title-bar mode.
+    private int desktopResizeEdgesAt(int x, int y, int w, int h) {
+        final int margin = 6;
+        int edges = 0;
+        if (x <= margin) {
+            edges |= RESIZE_WEST;
+        } else if (x >= w - margin) {
+            edges |= RESIZE_EAST;
+        }
+        if (y <= margin) {
+            edges |= RESIZE_NORTH;
+        } else if (y >= h - margin) {
+            edges |= RESIZE_SOUTH;
+        }
+        return edges;
+    }
+
+    /// @return the AWT resize cursor for the given {@code RESIZE_*} edge bitmask, or the default
+    /// cursor when no edge is set.
+    private java.awt.Cursor desktopResizeCursor(int edges) {
+        switch (edges) {
+            case RESIZE_NORTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.N_RESIZE_CURSOR);
+            case RESIZE_SOUTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.S_RESIZE_CURSOR);
+            case RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.W_RESIZE_CURSOR);
+            case RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.E_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NW_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NE_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SW_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SE_RESIZE_CURSOR);
+            default: return java.awt.Cursor.getDefaultCursor();
+        }
+    }
+
+    /// Applies a live edge-resize drag to the undecorated {@code custom}-mode window, using the real
+    /// screen mouse position against the bounds captured when the drag started.
+    private void desktopApplyResize() {
+        final JFrame frame = findTopFrame();
+        if (frame == null || desktopResizeStartBounds == null || desktopResizeStartMouse == null) {
+            return;
+        }
+        java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+        if (pi == null) {
+            return;
+        }
+        java.awt.Point m = pi.getLocation();
+        int dx = m.x - desktopResizeStartMouse.x;
+        int dy = m.y - desktopResizeStartMouse.y;
+        java.awt.Rectangle b = new java.awt.Rectangle(desktopResizeStartBounds);
+        final int minW = 200;
+        final int minH = 120;
+        if ((desktopResizeEdges & RESIZE_EAST) != 0) {
+            b.width = Math.max(minW, desktopResizeStartBounds.width + dx);
+        }
+        if ((desktopResizeEdges & RESIZE_SOUTH) != 0) {
+            b.height = Math.max(minH, desktopResizeStartBounds.height + dy);
+        }
+        if ((desktopResizeEdges & RESIZE_WEST) != 0) {
+            int nw = Math.max(minW, desktopResizeStartBounds.width - dx);
+            b.x = desktopResizeStartBounds.x + (desktopResizeStartBounds.width - nw);
+            b.width = nw;
+        }
+        if ((desktopResizeEdges & RESIZE_NORTH) != 0) {
+            int nh = Math.max(minH, desktopResizeStartBounds.height - dy);
+            b.y = desktopResizeStartBounds.y + (desktopResizeStartBounds.height - nh);
+            b.height = nh;
+        }
+        frame.setBounds(b);
+        frame.validate();
+    }
+
+    @Override
+    public boolean isNativeTitle() {
+        return isDesktop() && "native".equals(resolveDesktopTitleBarMode());
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        Form f = getCurrentForm();
+        if (f != null && isNativeTitle() && !(f instanceof com.codename1.ui.Dialog)) {
+            pushWindowTitle(f);
+        }
+    }
+
+    /// Pushes the form's title to the native OS window title bar on the AWT event thread.
+    private void pushWindowTitle(final Form f) {
+        final JFrame frame = findTopFrame();
+        if (frame == null || f == null) {
+            return;
+        }
+        final String t = f.getTitle() == null ? "" : f.getTitle();
+        if (EventQueue.isDispatchThread()) {
+            frame.setTitle(t);
+        } else {
+            EventQueue.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    frame.setTitle(t);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void setNativeCommands(Vector commands) {
+        if (!isDesktopNativeChromeMode()) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        // snapshot the commands on the CN1 EDT; build Swing on the AWT EDT
+        final java.util.ArrayList<com.codename1.ui.Command> snapshot = new java.util.ArrayList<com.codename1.ui.Command>();
+        final StringBuilder sig = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (o instanceof com.codename1.ui.Command) {
+                    com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                    String name = c.getCommandName();
+                    if (name == null || name.length() == 0) {
+                        // skip icon-only commands (back arrow, hamburger) - nothing to label
+                        continue;
+                    }
+                    snapshot.add(c);
+                    sig.append(name).append('\n');
+                }
+            }
+        }
+        final String signature = sig.toString();
+        if (signature.equals(lastNativeMenuSignature)) {
+            return;
+        }
+        lastNativeMenuSignature = signature;
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                frame.setJMenuBar(buildNativeMenuBar(snapshot));
+                frame.revalidate();
+            }
+        });
+    }
+
+    /// Builds a Swing menu bar from the given Codename One commands, grouping them into top-level
+    /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
+    /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
+    /// Codename One EDT before invoking the command's action.
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands) {
+        JMenuBar bar = new JMenuBar();
+        if (commands.isEmpty()) {
+            return bar;
+        }
+        // preserve first-seen order of the menu groups
+        java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
+        for (int i = 0; i < commands.size(); i++) {
+            final com.codename1.ui.Command cmd = commands.get(i);
+            String group = cmd.getDesktopMenu();
+            if (group == null || group.length() == 0) {
+                group = "Commands";
+            }
+            JMenu menu = menus.get(group);
+            if (menu == null) {
+                menu = new JMenu(group);
+                menus.put(group, menu);
+                bar.add(menu);
+            }
+            JMenuItem item = new JMenuItem(cmd.getCommandName());
+            item.addActionListener(new java.awt.event.ActionListener() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent e) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            cmd.actionPerformed(new com.codename1.ui.events.ActionEvent(cmd));
+                        }
+                    });
+                }
+            });
+            menu.add(item);
+        }
+        return bar;
+    }
+
+    @Override
+    public void minimizeNativeWindow() {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                frame.setExtendedState(JFrame.ICONIFIED);
+            }
+        });
+    }
+
+    @Override
+    public void toggleMaximizeNativeWindow() {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                int s = frame.getExtendedState();
+                if ((s & JFrame.MAXIMIZED_BOTH) != 0) {
+                    frame.setExtendedState(JFrame.NORMAL);
+                } else {
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void closeNativeWindow() {
+        Display.getInstance().exitApplication();
+    }
+
+    @Override
+    public void startNativeWindowDrag(int x, int y) {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        // use the real screen mouse position rather than the CN1 pointer coordinate: the CN1
+        // coordinate is relative to the (about-to-move) content pane, which would feed back
+        java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+        java.awt.Point loc = frame.getLocationOnScreen();
+        if (pi != null) {
+            nativeWindowDragOffsetX = pi.getLocation().x - loc.x;
+            nativeWindowDragOffsetY = pi.getLocation().y - loc.y;
+        }
+    }
+
+    @Override
+    public void dragNativeWindow(final int x, final int y) {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+                if (pi != null) {
+                    java.awt.Point m = pi.getLocation();
+                    frame.setLocation(m.x - nativeWindowDragOffsetX, m.y - nativeWindowDragOffsetY);
+                }
+            }
+        });
     }
 
     public static void setNativeTheme(String resFile) {
@@ -1210,6 +1533,57 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public static void setNativeTheme(Resources resFile) {
         nativeThemeRes = resFile;
+    }
+
+    /// Configures the desktop title-bar mode for the generated desktop app: one of
+    /// {@code "native"} (OS title bar + native menu bar), {@code "custom"} (undecorated
+    /// window with CN1-drawn chrome) or {@code "toolbar"} (legacy CN1 Toolbar). Only takes
+    /// effect when running on the desktop. Typically called from the generated Stub.
+    public static void setDesktopTitleBarMode(String mode) {
+        desktopTitleBarMode = mode;
+    }
+
+    /// @return the configured desktop title-bar mode (defaults to {@code "toolbar"}).
+    public static String getDesktopTitleBarModeSetting() {
+        return desktopTitleBarMode;
+    }
+
+    /// The desktop title-bar mode core consults to decide whether to suppress the CN1 Toolbar.
+    /// Returns the configured mode on the desktop, {@code "toolbar"} otherwise.
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        return resolveDesktopTitleBarMode();
+    }
+
+    /// Enables interactive (grab-able thumb, click-to-page, always-visible) desktop
+    /// scrollbars for the generated desktop app. Only takes effect when running on the
+    /// desktop. Typically called from the generated Stub.
+    public static void setDesktopInteractiveScrollbars(boolean enabled) {
+        desktopInteractiveScrollbars = enabled;
+    }
+
+    /// @return whether interactive desktop scrollbars are enabled.
+    public static boolean isDesktopInteractiveScrollbars() {
+        return desktopInteractiveScrollbars;
+    }
+
+    /// Resolves the effective desktop title-bar mode, honoring the
+    /// {@code codename1.arg.desktop.titleBar} system property fallback.
+    private String resolveDesktopTitleBarMode() {
+        return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+    }
+
+    /// @return true when running on the desktop with a title-bar mode that hides the CN1
+    /// Toolbar in favor of native chrome (native or custom).
+    private boolean isDesktopNativeChromeMode() {
+        if (!isDesktop()) {
+            return false;
+        }
+        String m = resolveDesktopTitleBarMode();
+        return "native".equals(m) || "custom".equals(m);
     }
 
     @Override
@@ -1251,14 +1625,38 @@ public class JavaSEPort extends CodenameOneImplementation {
                     safeAreaPortrait = null;
                     h.remove("@paintsTitleBarBool");
                 }
+                injectDesktopThemeConstants(h);
                 UIManager.getInstance().setThemeProps(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         } else {
             if (nativeThemeRes != null) {
-                UIManager.getInstance().setThemeProps(nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]));
+                Hashtable h = nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]);
+                injectDesktopThemeConstants(h);
+                UIManager.getInstance().setThemeProps(h);
             }
+        }
+    }
+
+    /// Injects the desktop window-chrome and interactive-scrollbar theme constants into the
+    /// native theme, but only when running on the desktop. This is the seam that keeps these
+    /// behaviors "only when isDesktop()": the core framework reads the constants but never sees
+    /// them on mobile because this method is a no-op there. Values come from the static config
+    /// (set by the generated desktop Stub) with a {@code codename1.arg.desktop.*} system-property
+    /// fallback so build hints work too.
+    private void injectDesktopThemeConstants(Hashtable h) {
+        if (h == null || !isDesktop()) {
+            return;
+        }
+        String mode = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        if (mode != null && mode.length() > 0) {
+            h.put("@desktopTitleBarMode", mode);
+        }
+        boolean interactive = desktopInteractiveScrollbars
+                || "true".equalsIgnoreCase(System.getProperty("codename1.arg.desktop.interactiveScrollbars", "false"));
+        if (interactive) {
+            h.put("@interactiveScrollBool", "true");
         }
     }
 
@@ -7058,7 +7456,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
             }
         }
-        if (findTopFrame() != null && retinaScale > 1.0) {
+        if (findTopFrame() != null && (retinaScale > 1.0 || isDesktopCustomTitleBarMode())) {
+            // a glass pane is required on retina (coordinate scaling) and in the desktop "custom"
+            // title-bar mode (the glass-pane dispatcher implements undecorated-window edge resize)
             findTopFrame().setGlassPane(new CN1GlassPane());
             findTopFrame().getGlassPane().setVisible(true);
         }
@@ -13227,6 +13627,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkCameraUsageDescription();
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new JavaSECameraImpl();
+    }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -14834,9 +15239,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void writeToStream(byte[] param) {
+            writeToStream(param, 0, param.length);
+        }
+
+        public void writeToStream(byte[] param, int offset, int len) {
             try {
                 OutputStream os = getOutput();
-                os.write(param);
+                os.write(param, offset, len);
                 os.flush();
             } catch(IOException err) {
                 socketInstance = null;	// no longer connected
@@ -14988,6 +15397,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
         return new JavaSEWebSocketImpl(url);
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        ((SocketImpl)socket).writeToStream(data, offset, len);
     }
 
     /**
@@ -16347,10 +16761,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseMoved(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
         public void mouseDragged(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
@@ -16367,12 +16787,62 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mousePressed(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             isPress = true;
             redispatchMouseEvent(e);
             isPress = false;
         }
 
+        /// In the {@code custom} desktop title-bar mode the window is undecorated, so the glass pane
+        /// implements edge-resize: while the pointer is in an edge hot-zone (or a resize drag is in
+        /// progress) the event drives the window resize instead of being redispatched to the CN1
+        /// canvas. Returns true when the event was consumed for resizing. No-op in every other mode.
+        private boolean handleDesktopEdgeResize(MouseEvent e) {
+            if (!isDesktopCustomTitleBarMode()) {
+                return false;
+            }
+            java.awt.Component comp = e.getComponent();
+            int w = comp.getWidth();
+            int h = comp.getHeight();
+            int id = e.getID();
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                if (edges != 0) {
+                    desktopResizeEdges = edges;
+                    JFrame fr = findTopFrame();
+                    if (fr != null) {
+                        desktopResizeStartBounds = fr.getBounds();
+                    }
+                    java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+                    desktopResizeStartMouse = pi != null ? pi.getLocation() : null;
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_DRAGGED) {
+                if (desktopResizeEdges != 0) {
+                    desktopApplyResize();
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_MOVED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                comp.setCursor(desktopResizeCursor(edges));
+                return edges != 0;
+            }
+            return false;
+        }
+
         public void mouseReleased(MouseEvent e) {
+            if (desktopResizeEdges != 0) {
+                desktopResizeEdges = 0;
+                desktopResizeStartBounds = null;
+                desktopResizeStartMouse = null;
+                return;
+            }
             redispatchMouseEvent(e);
         }
 

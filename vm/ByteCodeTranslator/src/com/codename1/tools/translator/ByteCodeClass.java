@@ -185,10 +185,6 @@ public class ByteCodeClass {
         fields.add(m);
     }
     
-    public String generateCSharpCode() {
-        return "";
-    }
-
     public String generateJavascriptCode(List<ByteCodeClass> allClasses) {
         return JavascriptMethodGenerator.generateClassJavascript(this, allClasses);
     }

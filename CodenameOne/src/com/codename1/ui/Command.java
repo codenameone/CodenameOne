@@ -385,6 +385,59 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
+    /// Client property key carrying the desktop native-menu placement hint for this command.
+    /// When a desktop app bridges its commands to the native menu bar (title-bar mode
+    /// {@code native}/{@code custom}), the value selects which menu the command appears under.
+    /// Recognized values (case-insensitive): `#DESKTOP_MENU_APP`, `#DESKTOP_MENU_ABOUT`,
+    /// `#DESKTOP_MENU_PREFERENCES`, `#DESKTOP_MENU_QUIT`, `#DESKTOP_MENU_FILE`,
+    /// `#DESKTOP_MENU_EDIT`, `#DESKTOP_MENU_VIEW`, `#DESKTOP_MENU_WINDOW`, `#DESKTOP_MENU_HELP`.
+    /// Any other value becomes a top-level menu with that literal title. Commands without the
+    /// hint are grouped under a default application-commands menu.
+    public static final String DESKTOP_MENU = "DesktopMenu";
+
+    /// Standard desktop menu placement: the application menu (macOS app menu / a leading menu).
+    public static final String DESKTOP_MENU_APP = "App";
+    /// Standard desktop menu placement: an "About" item, conventionally in the application menu.
+    public static final String DESKTOP_MENU_ABOUT = "About";
+    /// Standard desktop menu placement: a "Preferences"/"Settings" item in the application menu.
+    public static final String DESKTOP_MENU_PREFERENCES = "Preferences";
+    /// Standard desktop menu placement: a "Quit"/"Exit" item in the application menu.
+    public static final String DESKTOP_MENU_QUIT = "Quit";
+    /// Standard desktop menu placement: the File menu.
+    public static final String DESKTOP_MENU_FILE = "File";
+    /// Standard desktop menu placement: the Edit menu.
+    public static final String DESKTOP_MENU_EDIT = "Edit";
+    /// Standard desktop menu placement: the View menu.
+    public static final String DESKTOP_MENU_VIEW = "View";
+    /// Standard desktop menu placement: the Window menu.
+    public static final String DESKTOP_MENU_WINDOW = "Window";
+    /// Standard desktop menu placement: the Help menu.
+    public static final String DESKTOP_MENU_HELP = "Help";
+
+    /// Sets the desktop native-menu placement hint for this command. See `#DESKTOP_MENU`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: one of the {@code DESKTOP_MENU_*} constants or a custom top-level menu title
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopMenu(String menu) {
+        putClientProperty(DESKTOP_MENU, menu);
+        return this;
+    }
+
+    /// Returns the desktop native-menu placement hint, or null when unset. See `#DESKTOP_MENU`.
+    ///
+    /// #### Returns
+    ///
+    /// the placement hint or null
+    public String getDesktopMenu() {
+        Object o = getClientProperty(DESKTOP_MENU);
+        return o == null ? null : o.toString();
+    }
+
     /// #### Returns
     ///
     /// the materialIcon

@@ -842,6 +842,40 @@ public class Form extends Container {
         return titleArea;
     }
 
+    /// Returns the configured desktop title-bar mode ({@code native}, {@code custom} or
+    /// {@code toolbar}). Sourced from the implementation (desktop ports report the real mode;
+    /// everything else returns {@code toolbar}).
+    String getDesktopTitleBarMode() {
+        return Display.impl.getDesktopTitleBarMode();
+    }
+
+    /// Indicates that this form runs on the desktop in a title-bar mode that bridges the Toolbar's
+    /// commands to a native menu bar ({@code native} or {@code custom}). Inert (false) on mobile
+    /// because {@link Display#isDesktop()} is false and the theme constant is absent.
+    boolean isDesktopNativeChrome() {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        String m = getDesktopTitleBarMode();
+        return "native".equals(m) || "custom".equals(m);
+    }
+
+    /// Indicates the {@code native} desktop title-bar mode, where the CN1 Toolbar is hidden entirely:
+    /// the form title goes into the real OS window title bar and the commands are bridged to a native
+    /// menu bar. Inert (false) on mobile.
+    boolean isDesktopHideToolbar() {
+        return Display.getInstance().isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    /// Indicates the {@code custom} desktop title-bar mode, where the CN1 Toolbar stays visible and
+    /// acts as the window's title bar: the OS window is undecorated (no native title area), the
+    /// Toolbar is the drag handle that moves the window, the window is resized by dragging its edges,
+    /// and the commands appear both in the native menu bar and in the Toolbar's side menu. Inert
+    /// (false) on mobile.
+    boolean isDesktopToolbarTitle() {
+        return Display.getInstance().isDesktop() && "custom".equals(getDesktopTitleBarMode());
+    }
+
     @Override
     public UIManager getUIManager() {
         if (uiManager != null) {
@@ -1978,6 +2012,11 @@ public class Form extends Container {
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
+            // in desktop "native" mode the toolbar is hidden; push the title to the OS window title
+            // bar instead. In "custom" mode the (visible) toolbar shows the title itself.
+            if (isDesktopHideToolbar() && Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
+                Display.getInstance().refreshNativeTitle();
+            }
             return;
         }
 
@@ -2622,6 +2661,9 @@ public class Form extends Container {
         dragged = null;
         if (Display.getInstance().isNativeCommands()) {
             Display.impl.setNativeCommands(menuBar.getCommands());
+        } else if (isDesktopNativeChrome() && toolbar != null) {
+            // bridge the (hidden) toolbar's commands to the native desktop menu bar
+            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
         }
         if (getParent() != null) {
             Form f = getParent().getComponentForm();

@@ -4356,6 +4356,57 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
+    /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
+    /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}
+    /// by default; desktop ports override this when running on the desktop. This is the
+    /// authoritative source consulted by `Form.isDesktopNativeChrome()` - more robust than a theme
+    /// constant, which not all ports propagate identically.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop title-bar mode, never null
+    public String getDesktopTitleBarMode() {
+        return "toolbar";
+    }
+
+    /// Minimizes the native desktop window when the application draws its own (custom mode)
+    /// window chrome on an undecorated window. No-op on platforms without a native window.
+    public void minimizeNativeWindow() {
+    }
+
+    /// Toggles the maximized state of the native desktop window when the application draws
+    /// its own (custom mode) window chrome. No-op on platforms without a native window.
+    public void toggleMaximizeNativeWindow() {
+    }
+
+    /// Closes the native desktop window when the application draws its own (custom mode)
+    /// window chrome. No-op on platforms without a native window.
+    public void closeNativeWindow() {
+    }
+
+    /// Begins dragging the native desktop window (custom mode title bar). The arguments are
+    /// absolute pointer coordinates at the start of the drag. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void startNativeWindowDrag(int x, int y) {
+    }
+
+    /// Continues dragging the native desktop window (custom mode title bar). The arguments
+    /// are the current absolute pointer coordinates. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void dragNativeWindow(int x, int y) {
+    }
+
     /// Exits the application...
     public void exitApplication() {
     }
@@ -6769,6 +6820,15 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `response`: callback for the resulting image
     public void capturePhoto(ActionListener response) {
+    }
+
+    /// Factory for the low-level `com.codename1.camera.Camera` API. Each call
+    /// returns a fresh per-session backend, or `null` on platforms that do not
+    /// implement the new API. Subclasses override to wire in their port.
+    ///
+    /// @hidden
+    public CameraImpl createCameraImpl() {
+        return null;
     }
 
     /// Captures a screenshot of the screen.
@@ -9293,6 +9353,30 @@ public abstract class CodenameOneImplementation {
     /// @throws RuntimeException if the port does not support WebSocket.
     public WebSocketImpl createWebSocketImpl(String url) {
         throw new RuntimeException("WebSocket not supported on this platform");
+    }
+
+    /// Write a range of the given byte array to the socket. The default implementation
+    /// copies the requested range into a fresh array and delegates to
+    /// {@link #writeToSocketStream(Object, byte[])}; platform ports that can write a
+    /// sub-range natively should override this to avoid the intermediate allocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// - `data`: the buffer containing the data to write
+    ///
+    /// - `offset`: the offset within the buffer at which to start writing
+    ///
+    /// - `len`: the number of bytes to write
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        if (offset == 0 && len == data.length) {
+            writeToSocketStream(socket, data);
+            return;
+        }
+        byte[] arr = new byte[len];
+        System.arraycopy(data, offset, arr, 0, len);
+        writeToSocketStream(socket, arr);
     }
 
     private void mkdirs(FileSystemStorage fs, String path) {

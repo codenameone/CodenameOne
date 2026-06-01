@@ -201,6 +201,30 @@ class MacNativeBuilder {
         } else if (allowJit) {
             sb.append("    <key>com.apple.security.cs.allow-jit</key>\n    <true/>\n");
         }
+        // Sandboxed Mac apps that touch the camera or microphone need
+        // explicit device entitlements; without them the OS refuses to
+        // open the AVCaptureSession even when the Info.plist usage
+        // descriptions are present. We piggyback on the iOS plist hints
+        // already populated by AiDependencyTable -- when the build
+        // pipeline detected com.codename1.camera.* (or any other API
+        // that triggers NSCameraUsageDescription / NSMicrophoneUsageDescription)
+        // we mirror that into the Mac entitlements. Developers may
+        // opt out via macNative.entitlements.device.camera=false /
+        // macNative.entitlements.device.microphone=false.
+        if (sandbox) {
+            boolean needsCamera = request.getArg("ios.NSCameraUsageDescription", null) != null;
+            boolean cameraOptIn = parseEntitlementBool(request,
+                    "macNative.entitlements.device.camera", needsCamera);
+            if (cameraOptIn) {
+                sb.append("    <key>com.apple.security.device.camera</key>\n    <true/>\n");
+            }
+            boolean needsMic = request.getArg("ios.NSMicrophoneUsageDescription", null) != null;
+            boolean micOptIn = parseEntitlementBool(request,
+                    "macNative.entitlements.device.microphone", needsMic);
+            if (micOptIn) {
+                sb.append("    <key>com.apple.security.device.microphone</key>\n    <true/>\n");
+            }
+        }
         if (extra != null && extra.trim().length() > 0) {
             sb.append(extra);
             if (!extra.endsWith("\n")) {

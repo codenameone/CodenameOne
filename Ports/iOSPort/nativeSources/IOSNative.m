@@ -1608,6 +1608,38 @@ void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_T
 #endif
 }
 
+// Mac Catalyst: set the host window title bar text. On a Catalyst app the UIWindowScene.title
+// maps to the AppKit window title, so updating it here updates the visible title bar. No-op on
+// iOS phones/tablets (guarded by TARGET_OS_MACCATALYST and only ever called when isDesktop()).
+// Mac Catalyst native window-chrome bridge. The window-title and menu work (including re-applying
+// on scene activation) lives in CodenameOne_GLAppDelegate.m so the UIMenuBuilder override sits on a
+// UIResponder in the chain; these natives just forward to it.
+#if TARGET_OS_MACCATALYST
+extern void CN1SetMacWindowTitle(NSString* title);
+extern void CN1SetMacMenuLabels(NSArray* labels);
+extern void CN1SetMacWindowUndecorated(BOOL undecorated);
+#endif
+void com_codename1_impl_ios_IOSNative_setWindowTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
+#if TARGET_OS_MACCATALYST
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    CN1SetMacWindowTitle(t == nil ? @"" : t);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT namesNewlineJoined) {
+#if TARGET_OS_MACCATALYST
+    NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG namesNewlineJoined);
+    NSArray* labels = (joined == nil || joined.length == 0) ? @[] : [joined componentsSeparatedByString:@"\n"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1SetMacMenuLabels(labels);
+    });
+#endif
+}
+void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
+#if TARGET_OS_MACCATALYST
+    CN1SetMacWindowUndecorated(undecorated ? YES : NO);
+#endif
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);
@@ -8007,6 +8039,14 @@ NSData* arrayToData(JAVA_OBJECT arr) {
     return d;
 }
 
+NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
+    if (arr == JAVA_NULL) return nil;
+    JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
+    char* data = (char*)byteArray->data;
+    NSData* d = [NSData dataWithBytes:(data + offset * byteArray->primitiveSize) length:len * byteArray->primitiveSize];
+    return d;
+}
+
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length] / sizeof(JAVA_ARRAY_BYTE), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
@@ -8076,6 +8116,14 @@ NSData* arrayToData(JAVA_OBJECT arr) {
     org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
     void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+    return d;
+}
+
+NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
+    if (arr == JAVA_NULL) return nil;
+    org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
+    char* data = (char*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    NSData* d = [NSData dataWithBytes:(data + offset) length:len];
     return d;
 }
 
@@ -9193,6 +9241,13 @@ void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY(CN1
     POOL_BEGIN();
     SocketImpl* impl = (BRIDGE_CAST SocketImpl*)((void *)socket);
     [impl writeToStream:arrayToData(data)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG socket, JAVA_OBJECT data, JAVA_INT offset, JAVA_INT len) {
+    POOL_BEGIN();
+    SocketImpl* impl = (BRIDGE_CAST SocketImpl*)((void *)socket);
+    [impl writeToStream:arrayToDataRange(data, offset, len)];
     POOL_END();
 }
 

@@ -156,6 +156,31 @@ public final class AiDependencyTable {
                 .iosFrameworks("Accelerate")
                 .description("On-device Whisper transcription (libwhisper.a ships with the cn1lib)"));
 
+        // Low-level cross-platform camera API: live preview + frame
+        // stream + photo + video. iOS uses AVFoundation (framework
+        // only, no pod); Android uses CameraX (androidx.camera) which
+        // is added as Gradle deps below. Just referencing classes in
+        // com.codename1.camera causes the build to inject the right
+        // permissions and plist strings; developers may still override
+        // the plist text via the ios.NSCameraUsageDescription build
+        // hint.
+        e.add(new Entry("com/codename1/camera/")
+                .iosFrameworks("AVFoundation", "CoreMedia", "CoreVideo")
+                .iosPlist("NSCameraUsageDescription",
+                         "Used to capture photos and video.")
+                .iosPlist("NSMicrophoneUsageDescription",
+                         "Used to capture audio for video recording.")
+                .androidPermissions("android.permission.CAMERA",
+                                    "android.permission.RECORD_AUDIO")
+                .androidFeatures("android.hardware.camera",
+                                 "android.hardware.camera.autofocus")
+                .androidGradle("androidx.camera:camera-core:1.3.4")
+                .androidGradle("androidx.camera:camera-camera2:1.3.4")
+                .androidGradle("androidx.camera:camera-lifecycle:1.3.4")
+                .androidGradle("androidx.camera:camera-view:1.3.4")
+                .androidGradle("androidx.camera:camera-video:1.3.4")
+                .description("Cross-platform camera (preview + frames + photo + video)"));
+
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so
         // the cloud build server can abort early with a helpful
