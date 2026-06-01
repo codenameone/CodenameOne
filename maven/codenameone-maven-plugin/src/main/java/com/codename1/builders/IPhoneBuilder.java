@@ -2125,6 +2125,15 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
 
+                // BackgroundTasks.framework (BGTaskScheduler / BGProcessingTaskRequest,
+                // iOS 13+) is referenced unconditionally by the IOSNative background
+                // processing bridge, so it must always be linked.
+                if (addLibs == null) {
+                    addLibs = "BackgroundTasks.framework";
+                } else if (!addLibs.toLowerCase().contains("backgroundtasks")) {
+                    addLibs += ";BackgroundTasks.framework";
+                }
+
                 if (request.getArg("ios.useJavascriptCore", "false").equalsIgnoreCase("true")) {
                     replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_JAVASCRIPTCORE", "#define CN1_USE_JAVASCRIPTCORE");
                     if (addLibs == null) {
