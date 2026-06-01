@@ -71,22 +71,27 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // ToolbarTheme_dark.png showed "TabsTheme / light"). iOS /
     // Android / JavaSE keep their wider 30s cap because they don't
     // share the JS port's canvas-hang failure mode.
-    private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
+    // HTML5 caps trimmed once the canvas-accumulation leak was fixed: a test's
+    // screenshot is now captured ~2-3s in (registerReadyCallback's HTML5 settle
+    // + host-side wait_for_ui_settle), and the remaining wait is purely for a
+    // done() that some tests never call. The timeout only bounds that idle
+    // tail, so 7s leaves comfortable headroom over the real capture time while
+    // reclaiming the bulk of the per-test idle wait. DualAppearance runs two
+    // phases serially so it gets a wider 18s HTML5 cap. Native ports keep 30s.
+    private static final int TEST_TIMEOUT_MS_HTML5 = 7000;
+    private static final int TEST_TIMEOUT_MS_HTML5_DUAL = 18000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
     private static int testTimeoutMs(BaseTest testClass) {
-        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
-        // phases serially, each paying registerReadyCallback's 1500ms + settle
-        // + capture). Other tests stay at the tighter HTML5 default so a hung
-        // test doesn't eat the suite-level budget.
-        if ("HTML5".equals(Display.getInstance().getPlatformName())
-                && testClass instanceof DualAppearanceBaseTest) {
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
             return TEST_TIMEOUT_MS_NATIVE;
         }
-        return "HTML5".equals(Display.getInstance().getPlatformName())
-                ? TEST_TIMEOUT_MS_HTML5
-                : TEST_TIMEOUT_MS_NATIVE;
+        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
+        // phases serially, each paying the settle + capture).
+        return (testClass instanceof DualAppearanceBaseTest)
+                ? TEST_TIMEOUT_MS_HTML5_DUAL
+                : TEST_TIMEOUT_MS_HTML5;
     }
 
     // Calling Display.getInstance() at static-init time was tripping the iOS

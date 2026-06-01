@@ -41,8 +41,15 @@ public abstract class BaseTest extends AbstractTest {
     }
 
     protected void registerReadyCallback(Form parent, Runnable run) {
-        // Android misses some images when the time is lower
-        UITimer.timer(1500, false, parent, run);
+        // Android misses some images when the time is lower. The JavaScript
+        // port doesn't need the long fixed settle: its host-side capture path
+        // (__cn1_wait_for_ui_settle__) already blocks until the canvas is
+        // paint-stable before grabbing pixels, so a shorter head-start just
+        // starts the animation poll sooner without changing the captured
+        // frame. Trimming it on HTML5 alone shaves ~0.8s off every one of the
+        // ~120 tests (~1.5 min of the suite) without touching the native ports.
+        int settleMs = "HTML5".equals(Display.getInstance().getPlatformName()) ? 700 : 1500;
+        UITimer.timer(settleMs, false, parent, run);
     }
 
     /// After the initial 1500ms settle, poll the form's AnimationManager until
