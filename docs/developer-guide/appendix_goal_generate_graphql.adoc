@@ -73,7 +73,7 @@ files (only missing files are written).
 
 ==== Generation modes
 
-Unlike OpenAPI paths or gRPC service methods, a GraphQL schema does not
+Unlike OpenAPI paths or gRPC service methods, a GraphQL schema doesn't
 enumerate the operations a client wants -- the client chooses which
 fields to select.  The goal therefore supports two modes:
 
@@ -85,8 +85,8 @@ nested generated types).  Referenced fragment definitions are inlined
 into the request document automatically.
 * **Schema-only quick-start mode**: omit `cn1.graphql.operations`.  For
 each field of the root `Query` / `Mutation` / `Subscription` type the
-generator emits one method whose selection set is auto-expanded to
-`cn1.graphql.maxDepth` levels, stopping at recursive types.  This is a
+generator emits one method whose selection set is automatically expanded
+to `cn1.graphql.maxDepth` levels, stopping at recursive types.  This is a
 convenience for getting started; it may over- or under-fetch, so prefer
 operations mode for production code.
 
