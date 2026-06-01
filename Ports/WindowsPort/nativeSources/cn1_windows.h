@@ -127,6 +127,7 @@ typedef struct CN1Font {
     int style;
     float ascent;                    /* cached metrics in DIPs               */
     float height;
+    wchar_t* family;                 /* owned UTF-16 copy of the family name  */
 } CN1Font;
 
 typedef struct CN1Image {

@@ -335,6 +335,30 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return WindowsNative.fontHeight(peer(nativeFont == null ? defaultFont : nativeFont));
     }
 
+    @Override
+    public boolean isTrueTypeSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        long font = WindowsNative.loadTrueTypeFont(fontName, fileName);
+        if (font == 0) {
+            return null;
+        }
+        return Long.valueOf(font);
+    }
+
+    @Override
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        return Long.valueOf(WindowsNative.deriveTrueTypeFont(peer(font), size, weight));
+    }
+
     /* -------------------------------------------------------------- images */
 
     @Override

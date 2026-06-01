@@ -66,6 +66,36 @@ void cn1WindowsLog(const char* message) {
     fflush(stderr);
 }
 
+/* Last-resort crash logger: prints the exception code + faulting address (and a
+ * few raw return addresses) so a silent native crash leaves a breadcrumb. */
+static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
+    char buf[256];
+    sprintf(buf, "UNHANDLED EXCEPTION code=0x%08lX addr=%p base=%p",
+            (unsigned long) info->ExceptionRecord->ExceptionCode,
+            (void*) info->ExceptionRecord->ExceptionAddress,
+            (void*) GetModuleHandleW(NULL));
+    cn1WindowsLog(buf);
+#ifdef _M_ARM64
+    /* On ARM64 the crash context's Lr is the faulting function's caller return
+     * address; walk the x29 frame-pointer chain for the frames above it. */
+    CONTEXT* ctx = info->ContextRecord;
+    sprintf(buf, "  pc=%p lr=%p fp=%p", (void*) ctx->Pc, (void*) ctx->Lr, (void*) ctx->Fp);
+    cn1WindowsLog(buf);
+    DWORD64 fp = ctx->Fp;
+    for (int i = 0; i < 24 && fp != 0; i++) {
+        DWORD64 ret = ((DWORD64*) fp)[1];
+        DWORD64 next = ((DWORD64*) fp)[0];
+        sprintf(buf, "  fpframe[%d]=%p", i, (void*) ret);
+        cn1WindowsLog(buf);
+        if (next <= fp) {
+            break;
+        }
+        fp = next;
+    }
+#endif
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 /* ----------------------------------------------------------- string helper */
 
 WCHAR* cn1WinJavaStringToWide(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, UINT32* outLen) {
@@ -228,6 +258,8 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    cn1WindowsLog("initDisplay: enter");
+    SetUnhandledExceptionFilter(cn1WinUnhandled);
     InitializeCriticalSection(&cn1Win.eventLock);
     cn1Win.eventSignal = CreateEventW(NULL, FALSE, FALSE, NULL);
     cn1Win.eventHead = 0;
@@ -243,7 +275,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     /* Direct2D factory + HWND render target sized to the client area. */
     /* In C++ the COM REFIID/REFCLSID parameters are references, so the GUID is
      * passed by value (no &). */
-    D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, IID_ID2D1Factory, NULL,
+    // Multi-threaded: the window is created/pumped on the app's main thread but
+    // the render target is drawn from the Codename One EDT, so D2D must guard
+    // its own resources across threads.
+    D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, IID_ID2D1Factory, NULL,
             (void**) &cn1Win.d2dFactory);
 
     RECT rc;
@@ -268,6 +303,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
         cn1WindowsLog("initDisplay: failed to create HWND render target");
         return;
     }
+    cn1WindowsLog("initDisplay: render target created");
     cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
 
     /* WIC factory for the image layer. The DirectWrite factory is created lazily
@@ -277,6 +313,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
 
     ShowWindow(cn1Win.hwnd, SW_SHOW);
     UpdateWindow(cn1Win.hwnd);
+    cn1WindowsLog("initDisplay: window shown");
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENAME_ONE_THREAD_STATE) {
@@ -302,17 +339,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_flushGraphics___long_int_int_
     }
 }
 
-static void cn1WinPump(void) {
-    MSG msg;
-    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-}
-
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
-    cn1WinPump();
+    /* The message loop runs on the main thread (runMessageLoop); the EDT only
+     * dequeues here -- it must not PeekMessage on its own (empty) queue. */
     CN1Event ev;
     if (!cn1WinPollEvent(&ev)) {
         return JAVA_FALSE;
@@ -328,10 +358,24 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_waitForEvent___long(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
-    /* Block until input arrives or the timeout elapses, then pump so the next
-     * pollEvent sees any freshly translated messages. */
-    MsgWaitForMultipleObjectsEx(0, NULL, (DWORD) __cn1Arg1, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
-    cn1WinPump();
+    /* EDT idle: block until the window proc (on the main thread) signals that an
+     * event was queued, or the timeout elapses. */
+    if (cn1Win.eventSignal != NULL) {
+        WaitForSingleObject(cn1Win.eventSignal, (DWORD) __cn1Arg1);
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_runMessageLoop__(CODENAME_ONE_THREAD_STATE) {
+    /* Runs on the app's main thread (the window's owner) after Display.init.
+     * Pumps Win32 messages so the window is responsive; the window proc enqueues
+     * input that the EDT drains via pollEvent. Returns when the window closes. */
+    cn1WindowsLog("runMessageLoop: enter");
+    MSG msg;
+    while (GetMessageW(&msg, NULL, 0, 0) > 0) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+    cn1WindowsLog("runMessageLoop: exit");
 }
 
 } /* extern "C" */

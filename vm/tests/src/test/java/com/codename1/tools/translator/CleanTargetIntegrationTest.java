@@ -379,6 +379,128 @@ class CleanTargetIntegrationTest {
         assertTrue(bg > 0xf0f0f0, "expected white background, was " + Integer.toHexString(bg));
     }
 
+    /**
+     * Builds a real Codename One Form app through the native Windows path:
+     * compiles a minimal app (Display.init + a Form) against the full
+     * codename1-core, translates app + core + WindowsPort + JavaAPI +
+     * nativeSources with the "windows" app type, and links the executable with
+     * clang-cl. This proves the builder pipeline on an actual Display/Form app
+     * (not just the bridge). Windows-only; core/port classes are read from the
+     * reactor's target/classes (reachable in the build VM via the shared repo).
+     */
+    @org.junit.jupiter.api.Test
+    void buildsFullFormAppNative() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Native Windows Form-app build is Windows-only");
+        Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
+        Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
+                "codenameone-core must be built (maven/core/target/classes)");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/windows/WindowsImplementation.class")),
+                "WindowsPort must be built (maven/windows/target/classes)");
+
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("winform-sources");
+        Path classesDir = Files.createTempDirectory("winform-classes");
+        Path javaApiDir = Files.createTempDirectory("winform-japi");
+        Files.write(sourceDir.resolve("WinFormApp.java"), winFormAppSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        // The app is compiled against the full core (CN1 API) + the JDK (java.*).
+        List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
+                "-source", config.targetVersion, "-target", config.targetVersion,
+                "-classpath", coreClasses + java.io.File.pathSeparator + portClasses,
+                "-d", classesDir.toString(), sourceDir.resolve("WinFormApp.java").toString()));
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, appCompile),
+                "WinFormApp should compile against core + port:\n" + CompilerHelper.getLastErrorLog());
+
+        // Stage the native layer into a folder the translator copies into srcRoot.
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        Path nativeStage = Files.createTempDirectory("winform-native");
+        try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    Files.copy(p, nativeStage.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        Path outputDir = Files.createTempDirectory("winform-out");
+        // Source roots: app classes, full core, WindowsPort classes, JavaAPI, native sources.
+        String sources = classesDir + ";" + coreClasses + ";" + portClasses + ";" + javaApiDir + ";" + nativeStage;
+        // Bind the abstract platform impl to WindowsImplementation (its @Concrete
+        // is baked to the iOS impl, which we don't translate here).
+        String prevConcrete = System.getProperty("cn1.concreteImplementation");
+        System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
+        try {
+            runTranslatorMultiSource(sources, outputDir, "WinFormApp", "windows");
+        } finally {
+            if (prevConcrete == null) {
+                System.clearProperty("cn1.concreteImplementation");
+            } else {
+                System.setProperty("cn1.concreteImplementation", prevConcrete);
+            }
+        }
+
+        Path cmakeRoot = outputDir.resolve("dist");
+        assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
+        Path buildDir = cmakeRoot.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
+                // RelWithDebInfo so clang-cl emits a .pdb; a crash address is
+                // symbolized via (addr - module base) with llvm-symbolizer.
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
+                "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
+        runCommand(configure, cmakeRoot);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        Path exe = buildDir.resolve(CompilerHelper.executableName("WinFormApp"));
+        assertTrue(Files.exists(exe), "native Form-app executable should be produced: " + exe);
+        // Copy to a stable location so the app can be launched and tried.
+        Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
+        Files.createDirectories(dest);
+        Path destExe = dest.resolve(CompilerHelper.executableName("WinFormApp"));
+        Files.copy(exe, destExe, StandardCopyOption.REPLACE_EXISTING);
+        Path pdb = buildDir.resolve("WinFormApp.pdb");
+        if (Files.exists(pdb)) {
+            Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
+    }
+
+    static String winFormAppSource() {
+        return "import com.codename1.ui.Display;\n" +
+                "import com.codename1.ui.Form;\n" +
+                "import com.codename1.ui.Label;\n" +
+                "public class WinFormApp {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        Display.init(null);\n" +
+                "        Display.getInstance().callSerially(new Runnable() {\n" +
+                "            public void run() {\n" +
+                "                Form f = new Form(\"CN1 Native\");\n" +
+                "                f.add(new Label(\"Hello from the native Windows port!\"));\n" +
+                "                f.show();\n" +
+                "            }\n" +
+                "        });\n" +
+                // Display.init started the EDT (which renders); the main thread now
+                // owns the Win32 message loop so the window is responsive.
+                "        com.codename1.impl.windows.WindowsNative.runMessageLoop();\n" +
+                "    }\n" +
+                "}\n";
+    }
+
+    /** runTranslator variant taking a pre-joined ';'-separated source-root list. */
+    static void runTranslatorMultiSource(String sources, Path outputDir, String appName, String appType) throws Exception {
+        runTranslatorImpl(sources, outputDir, appName, appType);
+    }
+
     static String winGfxTestSource() {
         return "import com.codename1.impl.windows.WindowsNative;\n" +
                 "public class WinGfxTest {\n" +
@@ -403,6 +525,10 @@ class CleanTargetIntegrationTest {
     }
 
     static void runTranslator(Path classesDir, Path outputDir, String appName, String appType) throws Exception {
+        runTranslatorImpl(classesDir.toString(), outputDir, appName, appType);
+    }
+
+    static void runTranslatorImpl(String sources, Path outputDir, String appName, String appType) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
         URL[] systemUrls;
@@ -433,7 +559,7 @@ class CleanTargetIntegrationTest {
             Method main = translatorClass.getMethod("main", String[].class);
             String[] args = new String[]{
                     "clean",
-                    classesDir.toString(),
+                    sources,
                     outputDir.toString(),
                     appName,
                     "com.example.hello",

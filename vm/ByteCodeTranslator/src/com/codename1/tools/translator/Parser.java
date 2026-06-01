@@ -926,7 +926,24 @@ public class Parser extends ClassVisitor {
                 @Override
                 public void visit(String name, Object value) {
                     if ("name".equals(name) && value instanceof String) {
-                        cls.setConcreteClass(((String)value).replace('.', '/'));
+                        String concrete = (String) value;
+                        // @Concrete hints in core are baked to the iOS port (the
+                        // only prior ParparVM target). A non-iOS native build sets
+                        // cn1.concreteImplementation: the abstract platform impl is
+                        // bound to that concrete class (e.g. WindowsImplementation),
+                        // while other iOS specializations (e.g. IOSSimd) are dropped
+                        // so the usable base class is translated instead of pulling
+                        // in the absent iOS port.
+                        String override = System.getProperty("cn1.concreteImplementation");
+                        if (override != null && override.length() > 0
+                                && concrete.startsWith("com.codename1.impl.ios.")) {
+                            if (concrete.endsWith("IOSImplementation")) {
+                                cls.setConcreteClass(override.replace('.', '/'));
+                            }
+                            // else: leave concreteClass unset; use the base class.
+                        } else {
+                            cls.setConcreteClass(concrete.replace('.', '/'));
+                        }
                     }
                     super.visit(name, value);
                 }

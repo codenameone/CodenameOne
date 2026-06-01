@@ -68,6 +68,14 @@ public final class WindowsNative {
     public static native void waitForEvent(long timeoutMillis);
 
     /**
+     * Runs the Win32 message loop on the calling thread until the window closes.
+     * Must be called on the thread that created the window (the app's main
+     * thread, after Display.init); the EDT renders concurrently and the window
+     * proc feeds input into the queue that {@link #pollEvent(int[])} drains.
+     */
+    public static native void runMessageLoop();
+
+    /**
      * Creates an offscreen (WIC-backed) Direct2D graphics target of the given
      * size. Used for headless rendering and the screenshot tests; draws go
      * through the same graphics bridge as the on-screen target.
@@ -138,6 +146,17 @@ public final class WindowsNative {
     public static native int charsWidth(long font, char[] chars, int offset, int length);
 
     public static native int fontHeight(long font);
+
+    /**
+     * Resolves a TrueType/native font name to a DirectWrite family and returns a
+     * font peer. {@code native:} scheme names map to the platform UI family;
+     * other names are treated as literal families. {@code fileName} is the CN1
+     * fallback path, unused on Windows. 0 means failure.
+     */
+    public static native long loadTrueTypeFont(String fontName, String fileName);
+
+    /** Derives a new font peer at the given pixel size and CN1 style/weight bits. */
+    public static native long deriveTrueTypeFont(long font, float size, int weight);
 
     /* ---------------------------------------------------------- images */
 

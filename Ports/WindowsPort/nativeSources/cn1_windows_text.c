@@ -36,6 +36,7 @@
 #include "cn1_windows_dwrite.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* CN1 Font constants (com.codename1.ui.Font). */
 #define CN1_FACE_MONOSPACE 32
@@ -44,6 +45,37 @@
 #define CN1_SIZE_MEDIUM    0
 #define CN1_SIZE_SMALL     8
 #define CN1_SIZE_LARGE     16
+
+/* Owned UTF-16 duplicate; avoids depending on the _wcsdup CRT name. */
+static wchar_t* cn1WinWideDup(const wchar_t* src) {
+    if (src == NULL) {
+        return NULL;
+    }
+    size_t bytes = (wcslen(src) + 1) * sizeof(wchar_t);
+    wchar_t* copy = (wchar_t*) malloc(bytes);
+    if (copy != NULL) {
+        memcpy(copy, src, bytes);
+    }
+    return copy;
+}
+
+/* Builds a CN1Font for an explicit family / pixel size / style. */
+static CN1Font* cn1WinMakeFont(const wchar_t* family, float px, int face, int style) {
+    int bold = (style & CN1_STYLE_BOLD) != 0;
+    int italic = (style & CN1_STYLE_ITALIC) != 0;
+    CN1Font* font = (CN1Font*) malloc(sizeof(CN1Font));
+    if (font == NULL) {
+        return NULL;
+    }
+    font->format = cn1dwCreateFormat(family, px, bold, italic);
+    font->size = px;
+    font->face = face;
+    font->style = style;
+    font->height = cn1dwFontHeight(font->format);
+    font->ascent = cn1dwFontAscent(font->format);
+    font->family = cn1WinWideDup(family);
+    return font;
+}
 
 CN1Font* cn1WinCreateFont(int face, int style, int size) {
     float dpi = cn1Win.dpiScale > 0.0f ? cn1Win.dpiScale : 1.0f;
@@ -62,20 +94,7 @@ CN1Font* cn1WinCreateFont(int face, int style, int size) {
     px *= dpi;
 
     const wchar_t* family = (face == CN1_FACE_MONOSPACE) ? L"Consolas" : L"Segoe UI";
-    int bold = (style & CN1_STYLE_BOLD) != 0;
-    int italic = (style & CN1_STYLE_ITALIC) != 0;
-
-    CN1Font* font = (CN1Font*) malloc(sizeof(CN1Font));
-    if (font == NULL) {
-        return NULL;
-    }
-    font->format = cn1dwCreateFormat(family, px, bold, italic);
-    font->size = px;
-    font->face = face;
-    font->style = style;
-    font->height = cn1dwFontHeight(font->format);
-    font->ascent = cn1dwFontAscent(font->format);
-    return font;
+    return cn1WinMakeFont(family, px, face, style);
 }
 
 static CN1Font* cn1WinDefaultFont(void) {
@@ -153,6 +172,48 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawString___long_java_lang_S
     cn1dwDrawText(g->target, font ? font->format : NULL, cn1WinBrush(g), w, (int) len,
             (float) __cn1Arg3, (float) __cn1Arg4);
     free(w);
+}
+
+/*
+ * loadTrueTypeFont maps a Codename One font name to a DirectWrite family. The
+ * "native:" scheme names (native:MainLight, native:ItalicBold, ...) resolve to
+ * the platform UI family (Segoe UI) with weight/slant taken from the suffix;
+ * any other name is treated as a literal family. The fileName argument is the
+ * CN1 fallback path and is unused on Windows where families resolve by name.
+ */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_String_java_lang_String_R_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    WCHAR* name = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, NULL);
+    const wchar_t* family = L"Segoe UI";
+    int style = 0;
+    if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
+        const wchar_t* suffix = name + 7;
+        if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
+            style |= CN1_STYLE_BOLD;
+        }
+        if (wcsstr(suffix, L"Italic") != NULL) {
+            style |= CN1_STYLE_ITALIC;
+        }
+    } else if (name != NULL && name[0] != L'\0') {
+        family = name;
+    }
+    float dpi = cn1Win.dpiScale > 0.0f ? cn1Win.dpiScale : 1.0f;
+    CN1Font* font = cn1WinMakeFont(family, 15.0f * dpi, 0, style);
+    free(name);
+    return (JAVA_LONG) (intptr_t) font;
+}
+
+/*
+ * deriveTrueTypeFont produces a new peer at the requested pixel size and weight,
+ * reusing the base font's family. weight carries the CN1 STYLE_* bits.
+ */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_deriveTrueTypeFont___long_float_int_R_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_FLOAT __cn1Arg2, JAVA_INT __cn1Arg3) {
+    CN1Font* base = (CN1Font*) (intptr_t) __cn1Arg1;
+    const wchar_t* family = (base != NULL && base->family != NULL) ? base->family : L"Segoe UI";
+    float px = __cn1Arg2 > 0.0f ? __cn1Arg2 : 15.0f;
+    CN1Font* font = cn1WinMakeFont(family, px, 0, __cn1Arg3);
+    return (JAVA_LONG) (intptr_t) font;
 }
 
 #endif /* _WIN32 */

@@ -204,6 +204,9 @@ public class WindowsNativeBuilder extends Executor {
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
         parparCmd.add("-Xmx768m");
+        // Bind the abstract CodenameOneImplementation to the Windows concrete
+        // impl (its @Concrete annotation otherwise names the iOS impl).
+        parparCmd.add("-Dcn1.concreteImplementation=com.codename1.impl.windows.WindowsImplementation");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         parparCmd.add("windows");

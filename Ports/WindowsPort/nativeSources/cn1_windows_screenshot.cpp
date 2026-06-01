@@ -40,7 +40,7 @@ extern "C" {
 
 static ID2D1Factory* cn1ShotD2DFactory(void) {
     if (cn1Win.d2dFactory == NULL) {
-        D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, IID_ID2D1Factory, NULL,
+        D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, IID_ID2D1Factory, NULL,
                 (void**) &cn1Win.d2dFactory);
     }
     return cn1Win.d2dFactory;
