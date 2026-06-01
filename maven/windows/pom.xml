@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!--
+    Artifacts:
+
+    1. codenameone-windows-8.0-SNAPSHOT.jar
+        The src directory compiled (the Win32 platform implementation). No native
+        compilation happens here; the C in nativeSources is compiled by ParparVM's
+        "windows" clean-target build (clang-cl) on Windows.
+    2. codenameone-windows-8.0-SNAPSHOT-bundle.jar
+        Zip with WindowsPort.jar and nativewindows.jar in the root, mirroring the
+        iOS port bundle. Consumed by the build pipeline to supply the port classes
+        and the native sources to the translator.
+    -->
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-windows</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Codename One Windows Port</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>6</maven.compiler.source>
+        <maven.compiler.target>6</maven.compiler.target>
+        <src.dir>../../Ports/WindowsPort/src</src.dir>
+        <codename1.nativewindows.dir>../../Ports/WindowsPort/nativeSources</codename1.nativewindows.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${src.dir}</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>${src.dir}</directory>
+                <excludes><exclude>**/*.java</exclude></excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/codenameone/windowsport-bundle"/>
+                                <zip destfile="${project.build.directory}/codenameone/windowsport-bundle/nativewindows.jar">
+                                    <fileset dir="${codename1.nativewindows.dir}"/>
+                                </zip>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar" tofile="${project.build.directory}/codenameone/windowsport-bundle/WindowsPort.jar" overwrite="true"/>
+                                <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
+                                    <fileset dir="${project.build.directory}/codenameone/windowsport-bundle"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-artifacts</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-bundle.jar</file>
+                                    <type>jar</type>
+                                    <classifier>bundle</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
