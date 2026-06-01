@@ -3,12 +3,12 @@
 Codename One exposes a cross-platform API for rich local notifications, runtime
 notification permission, notification channels, constraint-aware background work,
 foreground services, deferrable background processing, receiving content shared from
-other apps, and push topic subscriptions. Each capability degrades gracefully on
-platforms that cannot support it -- calls become documented no-ops rather than errors --
-and the JavaSE simulator implements them so you can exercise the flows without a device.
+other apps, and push topic subscriptions. Each capability degrades on platforms that
+can't support it -- calls become documented no-ops rather than errors -- and the JavaSE
+simulator implements them so you can exercise the flows without a device.
 
-Because these features lean heavily on platform-specific behavior, every section below
-lists the support per platform. In the matrices: *Yes* = fully supported, *Partial* =
+Because these features build on platform-specific behavior, every section below lists
+the support per platform. In the matrices: *Yes* = fully supported, *Partial* =
 supported with documented limitations, *No-op* = the call is accepted but does nothing,
 *Sim* = exercised in the simulator.
 
@@ -36,23 +36,23 @@ Display.getInstance().requestNotificationPermission(req, result -> {
 
 `NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
 enum (`NOT_DETERMINED`, `DENIED`, `AUTHORIZED`, `PROVISIONAL`, `EPHEMERAL`). The values
-are ordered from least to most permissive, and `isGranted()` is simply "more permissive
-than `DENIED`". The callback is delivered on the EDT.
+are ordered from least to most permissive, so `isGranted()` is "more permissive than
+`DENIED`." The callback is delivered on the EDT.
 
 [options="header"]
 |===
 | Request option | iOS | Android | Simulator
-| alert / sound / badge | Yes | Implied by POST_NOTIFICATIONS | Auto-granted
-| provisional | Yes (iOS 12+) | No-op | Auto-granted
-| timeSensitive | Yes (iOS 15+, needs entitlement) | No-op | Auto-granted
-| critical | Yes (needs Apple entitlement) | No-op | Auto-granted
-| carPlay / announcement | Yes | No-op | Auto-granted
+| alert / sound / badge | Yes | Implied by POST_NOTIFICATIONS | Granted
+| provisional | Yes (iOS 12+) | No-op | Granted
+| timeSensitive | Yes (iOS 15+, needs entitlement) | No-op | Granted
+| critical | Yes (needs Apple entitlement) | No-op | Granted
+| carPlay / announcement | Yes | No-op | Granted
 |===
 
 The `timeSensitive` and `critical` options require an Apple capability on the App ID.
 Enable injection of the matching entitlement with the `ios.timeSensitiveNotifications=true`
-and `ios.criticalAlerts=true` build hints (they are opt-in because an entitlement the
-provisioning profile does not carry breaks code signing).
+and `ios.criticalAlerts=true` build hints (they're opt-in because an entitlement the
+provisioning profile doesn't carry breaks code signing).
 
 === Local notifications
 
@@ -95,10 +95,10 @@ runs, so push and local notification actions are handled identically.
 | custom view | Notification content extension | RemoteViews | Sim (render)
 |===
 
-==== Resource names: sound, image and action icons
+==== Resource names for sound, image and action icons
 
 These string parameters are platform *resource names*, not numeric ids (Codename One has
-no `R.drawable` constants). They are resolved at runtime per platform:
+no `R.drawable` constants). They're resolved at runtime per platform:
 
 [options="header"]
 |===
@@ -109,12 +109,12 @@ no `R.drawable` constants). They are resolved at runtime per platform:
 |===
 
 The file extension is optional for the action icon and is ignored. iOS notification
-action buttons do not render icons, so the icon value is ignored there.
+action buttons don't render icons, so the icon value is ignored there.
 
 === Notification channels (Android O+)
 
-Channels let the user control importance, sound, vibration, lights, lockscreen
-visibility and badging for a group of notifications. Build and register one at startup,
+Channels let the user control importance, sound, vibration, lights, lock screen
+visibility and badge display for a group of notifications. Build and register one at startup,
 then reference it from a notification with `setChannelId(...)`:
 
 [source,java]
@@ -135,7 +135,7 @@ channel id you assign is still carried so the notification behaves consistently.
 === Constraint-aware background work
 
 `BackgroundWork` schedules deferrable work that the OS runs when its constraints are met.
-Implement `BackgroundWorker` in a class with a public no-argument constructor (it is
+Implement `BackgroundWorker` in a class with a public no-argument constructor (it's
 reconstructed after a cold launch -- pass state through the input data, not fields):
 
 [source,java]
@@ -216,7 +216,7 @@ public class MyApp extends Lifecycle {
 |===
 
 On Android, declare the accepted MIME types with the `android.shareFilter` build hint
-(comma separated, e.g. `text/plain,image/*`); the build registers the share-receiver
+(comma separated, for example `text/plain,image/*`); the build registers the share-receiver
 activity. On iOS this reuses the share-extension authoring pipeline; set the
 `ios.shareAppGroup` build hint to the App Group the extension writes to. File and image
 items are copied into Codename One `FileSystemStorage` so your code is platform neutral.
