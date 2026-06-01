@@ -9338,6 +9338,30 @@ public abstract class CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
     }
 
+    /// Write a range of the given byte array to the socket. The default implementation
+    /// copies the requested range into a fresh array and delegates to
+    /// {@link #writeToSocketStream(Object, byte[])}; platform ports that can write a
+    /// sub-range natively should override this to avoid the intermediate allocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// - `data`: the buffer containing the data to write
+    ///
+    /// - `offset`: the offset within the buffer at which to start writing
+    ///
+    /// - `len`: the number of bytes to write
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        if (offset == 0 && len == data.length) {
+            writeToSocketStream(socket, data);
+            return;
+        }
+        byte[] arr = new byte[len];
+        System.arraycopy(data, offset, arr, 0, len);
+        writeToSocketStream(socket, arr);
+    }
+
     private void mkdirs(FileSystemStorage fs, String path) {
         int lastPos = path.lastIndexOf('/');
         if (lastPos >= 0) {

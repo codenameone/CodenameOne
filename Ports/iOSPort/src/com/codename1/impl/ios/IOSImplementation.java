@@ -10320,6 +10320,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        nativeInstance.writeToSocketStream(((Long)socket).longValue(), data, offset, len);
+    }
+
+    @Override
     public void splitString(String source, char separator, ArrayList<String> out) {
         nativeInstance.splitString(source, separator, out);
     }

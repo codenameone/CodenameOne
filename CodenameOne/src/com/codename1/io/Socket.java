@@ -411,29 +411,38 @@ public final class Socket {
             }
         }
 
+        // Routes all the write overloads through a single guarded path. The native
+        // socket handle can be torn down (e.g. the connection dropped) while a writer
+        // thread is still pushing data; before this guard that surfaced as an opaque
+        // NullPointerException deep in the platform implementation rather than an
+        // IOException the caller can handle. See issue #5139.
+        private void writeImpl(byte[] b, int off, int len) throws IOException {
+            if (impl == null) {
+                throw new IOException("Socket is not connected");
+            }
+            Util.getImplementation().writeToSocketStream(impl, b, off, len);
+            handleSocketError();
+        }
+
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
-            if (off == 0 && len == b.length) {
-                Util.getImplementation().writeToSocketStream(impl, b);
-                handleSocketError();
-                return;
+            if (b == null) {
+                throw new NullPointerException();
             }
-            byte[] arr = new byte[len];
-            System.arraycopy(b, off, arr, 0, len);
-            Util.getImplementation().writeToSocketStream(impl, arr);
-            handleSocketError();
+            if (off < 0 || len < 0 || off > b.length - len) {
+                throw new IndexOutOfBoundsException();
+            }
+            writeImpl(b, off, len);
         }
 
         @Override
         public void write(byte[] b) throws IOException {
-            Util.getImplementation().writeToSocketStream(impl, b);
-            handleSocketError();
+            writeImpl(b, 0, b.length);
         }
 
         @Override
         public void write(int b) throws IOException {
-            Util.getImplementation().writeToSocketStream(impl, new byte[]{(byte) b});
-            handleSocketError();
+            writeImpl(new byte[]{(byte) b}, 0, 1);
         }
 
         // PMD thinks we need to override finalize. Ugh.
