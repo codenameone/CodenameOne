@@ -279,6 +279,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
                 logThrowable("EDT", (Throwable)e.getSource());
             });
+            // Pre-warm the modern theme .res here, at suite start, before any
+            // test has run and before canvas accumulation builds up. The 14
+            // DualAppearanceBaseTest subclasses all read this same resource;
+            // doing it once up front means none of them performs the risky
+            // late-suite asset read that intermittently hard-stalled the JS
+            // port worker at the first theme test (ButtonTheme, ~index 85).
+            try {
+                DualAppearanceBaseTest.prewarmModernTheme();
+            } catch (Throwable t) {
+                log("CN1SS:WARN:modern theme prewarm failed " + t);
+            }
         });
         runNextTest(0);
     }
