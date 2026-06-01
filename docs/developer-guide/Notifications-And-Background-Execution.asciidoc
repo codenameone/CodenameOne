@@ -1,0 +1,244 @@
+== Notifications and Background Execution
+
+Codename One exposes a cross-platform API for rich local notifications, runtime
+notification permission, notification channels, constraint-aware background work,
+foreground services, deferrable background processing, receiving content shared from
+other apps, and push topic subscriptions. Each capability degrades gracefully on
+platforms that cannot support it -- calls become documented no-ops rather than errors --
+and the JavaSE simulator implements them so you can exercise the flows without a device.
+
+Because these features lean heavily on platform-specific behavior, every section below
+lists the support per platform. In the matrices: *Yes* = fully supported, *Partial* =
+supported with documented limitations, *No-op* = the call is accepted but does nothing,
+*Sim* = exercised in the simulator.
+
+=== Notification permission
+
+On iOS, and on Android 13+ (`POST_NOTIFICATIONS`), an app must obtain permission before
+its notifications are shown. Request it through `Display`:
+
+[source,java]
+----
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult.AuthorizationLevel;
+
+NotificationPermissionRequest req = new NotificationPermissionRequest()
+        .provisional(true)      // iOS: deliver quietly without an explicit prompt
+        .timeSensitive(true);   // iOS: allow the time-sensitive interruption level
+
+Display.getInstance().requestNotificationPermission(req, result -> {
+    if (result.isGranted()) {
+        // schedule notifications
+    }
+    AuthorizationLevel level = result.getAuthorizationLevel();
+});
+----
+
+`NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
+enum (`NOT_DETERMINED`, `DENIED`, `AUTHORIZED`, `PROVISIONAL`, `EPHEMERAL`). The values
+are ordered from least to most permissive, and `isGranted()` is simply "more permissive
+than `DENIED`". The callback is delivered on the EDT.
+
+[options="header"]
+|===
+| Request option | iOS | Android | Simulator
+| alert / sound / badge | Yes | Implied by POST_NOTIFICATIONS | Auto-granted
+| provisional | Yes (iOS 12+) | No-op | Auto-granted
+| timeSensitive | Yes (iOS 15+, needs entitlement) | No-op | Auto-granted
+| critical | Yes (needs Apple entitlement) | No-op | Auto-granted
+| carPlay / announcement | Yes | No-op | Auto-granted
+|===
+
+The `timeSensitive` and `critical` options require an Apple capability on the App ID.
+Enable injection of the matching entitlement with the `ios.timeSensitiveNotifications=true`
+and `ios.criticalAlerts=true` build hints (they are opt-in because an entitlement the
+provisioning profile does not carry breaks code signing).
+
+=== Local notifications
+
+`LocalNotification` is scheduled through `Display.scheduleLocalNotification(...)` as
+before; the bean has been extended with fluent, backward-compatible setters:
+
+[source,java]
+----
+LocalNotification n = new LocalNotification()
+        .setChannelId("messages")                 // Android channel (see below)
+        .setGroup("chat-42")                       // bundle related notifications
+        .setProgress(100, 40)                      // determinate progress bar (Android)
+        .setTimeSensitive(true);                   // break through Focus / elevated importance
+n.setId("msg-42");
+n.setAlertTitle("New message");
+n.setAlertBody("Tap to reply");
+n.addAction("open", "Open");
+n.addInputAction("reply", "Reply", "Type a message", "Send");  // inline quick reply
+Display.getInstance().scheduleLocalNotification(n, System.currentTimeMillis() + 1000,
+        LocalNotification.REPEAT_NONE);
+----
+
+When the user taps an action, the selected action id (and any quick-reply text) are
+delivered through `com.codename1.push.PushContent` -- `getActionId()`, `getActionTitle()`
+and `getTextResponse()` -- before your `LocalNotificationCallback.localNotificationReceived(id)`
+runs, so push and local notification actions are handled identically.
+
+[options="header"]
+|===
+| Capability | iOS | Android | Simulator
+| title / body / badge / sound | Yes | Yes | Sim (panel)
+| image attachment | Yes (UNNotificationAttachment) | Yes (BigPicture) | Sim (thumbnail)
+| action buttons | Yes (UNNotificationAction) | Yes | Sim (buttons)
+| quick-reply input action | Yes (UNTextInputNotificationAction) | Yes (RemoteInput) | Sim (text field)
+| grouping | Yes (thread identifier) | Yes (group + summary) | Partial
+| progress (ongoing) | No-op | Yes | Sim (progress bar)
+| full-screen intent | No-op | Yes (needs permission, see hints) | No-op
+| time-sensitive | Yes (iOS 15+) | Approximated (category + priority) | Sim
+| messaging / conversation style | Partial | Yes (MessagingStyle) | Sim
+| custom view | Notification content extension | RemoteViews | Sim (render)
+|===
+
+==== Resource names: sound, image and action icons
+
+These string parameters are platform *resource names*, not numeric ids (Codename One has
+no `R.drawable` constants). They are resolved at runtime per platform:
+
+[options="header"]
+|===
+| Parameter | What to provide | Android resolution | iOS resolution
+| `alertSound` / channel sound | a file whose name starts with `notification_sound`, bundled in the app | `res/raw/<name>` via `android.resource://` URI | `UNNotificationSound` from the app bundle
+| `alertImage` | image path placed in the app root | loaded from `assets/` | `UNNotificationAttachment` from the bundle
+| `Action` icon | a drawable name bundled in `native/android` | `getResources().getIdentifier(name, "drawable", pkg)` | not displayed
+|===
+
+The file extension is optional for the action icon and is ignored. iOS notification
+action buttons do not render icons, so the icon value is ignored there.
+
+=== Notification channels (Android O+)
+
+Channels let the user control importance, sound, vibration, lights, lockscreen
+visibility and badging for a group of notifications. Build and register one at startup,
+then reference it from a notification with `setChannelId(...)`:
+
+[source,java]
+----
+new NotificationChannelBuilder("messages", "Messages")
+        .description("Incoming chat messages")
+        .importance(NotificationChannelBuilder.IMPORTANCE_HIGH)
+        .sound("/notification_sound_ping.mp3")
+        .enableVibration(true)
+        .lightColor(0xff0000)
+        .register();
+----
+
+Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
+simulator stores the channel so its name can be shown in the notification panel); the
+channel id you assign is still carried so the notification behaves consistently.
+
+=== Constraint-aware background work
+
+`BackgroundWork` schedules deferrable work that the OS runs when its constraints are met.
+Implement `BackgroundWorker` in a class with a public no-argument constructor (it is
+reconstructed after a cold launch -- pass state through the input data, not fields):
+
+[source,java]
+----
+WorkRequest req = WorkRequest.builder("sync", SyncWorker.class)
+        .setRequiresNetwork(true)
+        .setRequiresCharging(true)
+        .setPeriodic(6 * 60 * 60 * 1000L)
+        .putInputData("account", "primary")
+        .build();
+BackgroundWork.schedule(req);
+----
+
+[options="header"]
+|===
+| | iOS | Android | Simulator
+| backend | BGTaskScheduler (iOS 13+) | JobScheduler | Timer
+| requiresNetwork / unmetered | Yes | Yes | Toggle in Simulate menu
+| requiresCharging | Yes (requiresExternalPower) | Yes | Toggle
+| requiresIdle / batteryNotLow | No-op | Yes | Toggle
+| periodic | Approximated (resubmit) | Yes (>= 15 min) | Yes
+|===
+
+`BackgroundTask.scheduleProcessing(id, earliestBeginDate, requiresNetwork, requiresPower,
+runnable)` is a one-shot variant for occasional maintenance work. On iOS the identifiers
+must be declared via the `ios.backgroundProcessingIds` build hint (comma separated,
+default `<packageName>.processing`); the build also adds the `processing` UIBackgroundMode
+and links `BackgroundTasks.framework` automatically.
+
+=== Foreground service (Android)
+
+`ForegroundService` runs a long task while a persistent notification is shown:
+
+[source,java]
+----
+ForegroundService svc = ForegroundService.start("downloads", "Downloading", "Please wait",
+        null, service -> {
+            for (int i = 0; i <= 100; i++) {
+                service.updateNotification("Downloading", i + "%");
+                // ... do a chunk of work ...
+            }
+        });
+// auto-stops when the task returns, or call svc.stop()
+----
+
+[options="header"]
+|===
+| | Android | iOS | Simulator
+| persistent-notification service | Yes | No (best-effort background window + notification) | Sim (status indicator)
+|===
+
+When the app references `ForegroundService` the build registers the service and injects
+`FOREGROUND_SERVICE` plus the per-type `FOREGROUND_SERVICE_<TYPE>` permission (Android 14).
+Override the type with the `android.foregroundServiceType` build hint (default `dataSync`).
+
+=== Receiving shared content
+
+Override `onReceivedSharedContent(SharedContent)` on your `Lifecycle` subclass to receive
+text, URLs, files or images shared into your app from other apps:
+
+[source,java]
+----
+public class MyApp extends Lifecycle {
+    public void onReceivedSharedContent(SharedContent content) {
+        for (SharedContent.Item item : content.getItems()) {
+            if (item.getType() == SharedContent.TYPE_IMAGE) {
+                importImage(item.getFilePath()); // a FileSystemStorage path
+            }
+        }
+    }
+}
+----
+
+[options="header"]
+|===
+| | Android | iOS | Simulator
+| receive shared content | Yes (SEND / SEND_MULTIPLE) | Yes (share extension + App Group) | Sim ("Send shared content")
+|===
+
+On Android, declare the accepted MIME types with the `android.shareFilter` build hint
+(comma separated, e.g. `text/plain,image/*`); the build registers the share-receiver
+activity. On iOS this reuses the share-extension authoring pipeline; set the
+`ios.shareAppGroup` build hint to the App Group the extension writes to. File and image
+items are copied into Codename One `FileSystemStorage` so your code is platform neutral.
+
+=== Push topics
+
+`Push.subscribeToTopic("news")` / `unsubscribeFromTopic("news")` subscribe the device to a
+fan-out topic.
+
+[options="header"]
+|===
+| | Android | iOS
+| topic subscribe / unsubscribe | Yes (Firebase Cloud Messaging) | No-op (raw APNs has no topics; fan out server-side)
+|===
+
+Server-side topic delivery is handled by the Codename One push server.
+
+=== Simulator
+
+The JavaSE simulator implements all of the above so you can develop without a device. Use
+the *Simulate -> Notifications and Background* menu to toggle the background constraints
+(network / charging / idle / battery), run scheduled work immediately, inspect registered
+channels, and inject shared content. Posted notifications appear in a panel at the top
+right; tapping an action (or submitting a quick-reply) routes back through your callback
+exactly as on device.
