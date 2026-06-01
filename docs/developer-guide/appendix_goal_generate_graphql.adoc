@@ -81,7 +81,7 @@ fields to select.  The goal therefore supports two modes:
 For each named `query` / `mutation` / `subscription` the generator emits
 one interface method plus a precise `@Mapped` response-type tree that
 mirrors exactly that operation's selection set (nested selections become
-nested generated types).  Referenced fragment definitions are inlined
+nested generated types).  Referenced fragment definitions are merged
 into the request document automatically.
 * **Schema-only quick-start mode**: omit `cn1.graphql.operations`.  For
 each field of the root `Query` / `Mutation` / `Subscription` type the
@@ -209,7 +209,7 @@ fields, input fields, and method variables); unknown enum names decode
 to `null` rather than throwing.
 * Input object types map to generated `@Mapped` classes; variables of
 scalar, enum, input-object, and list types are supported.
-* Named and inline fragments are resolved against the schema and inlined
+* Named and inline fragments are resolved against the schema and merged
 into the generated response types and the request document.
 * Built-in scalars (`Int`, `Float`, `Boolean`, `String`, `ID`) map to
 their boxed Java types.  Custom scalars fall back to `String`.
