@@ -380,9 +380,7 @@
   // display canvas is held by a long-lived Java field so its wrapper never
   // dies, but guard it anyway.
   function isProtectedHostRef(value) {
-    if (value == null) {
-      return false;
-    }
+    // Callers (releaseHostRefs) already screen out null before reaching here.
     if (value === global || value === global.window) {
       return true;
     }
