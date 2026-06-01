@@ -85,18 +85,17 @@ class CleanTargetIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        runCommand(Arrays.asList(
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
-        Path executable = buildDir.resolve("HelloCleanApp");
+        Path executable = buildDir.resolve(CompilerHelper.executableName("HelloCleanApp"));
         String output = runCommand(Arrays.asList(executable.toString()), buildDir);
 
         assertTrue(output.contains("Hello, Clean Target!"),
@@ -165,9 +164,14 @@ class CleanTargetIntegrationTest {
 
     static void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        // The math functions live in libc/libm on POSIX, but are part of the CRT
+        // under MSVC, where there is no separate libm to link against.
+        String linkLine = CompilerHelper.isWindows()
+                ? ""
+                : "\ntarget_link_libraries(${PROJECT_NAME} m)";
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})" + linkLine
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }

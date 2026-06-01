@@ -916,7 +916,8 @@ class BytecodeInstructionIntegrationTest {
         compileDummyMainClass(sourceDir, "com.example", "MyAppDefault", config);
 
         String[] args = new String[] {
-                "csharp",
+                // Unrecognized output type routes to the plain copy-through default handler
+                "unknown",
                 sourceDir.toAbsolutePath().toString(),
                 outputDir.toAbsolutePath().toString(),
                 "MyAppDefault", "com.example", "My App", "1.0", "ios", "none"

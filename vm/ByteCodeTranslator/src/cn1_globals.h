@@ -6,7 +6,11 @@
 #include <string.h>
 #include <limits.h>
 #include "cn1_class_method_index.h"
+#ifdef _WIN32
+#include "cn1_win_compat.h"
+#else
 #include <pthread.h>
+#endif
 #include <setjmp.h>
 #include <math.h>
 #include <stdatomic.h>
