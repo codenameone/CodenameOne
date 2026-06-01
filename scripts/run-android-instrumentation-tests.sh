@@ -242,6 +242,10 @@ fi
 # base64 decode entirely.
 cn1ss_stop_ws_server
 declare -a COMPARE_ENTRIES=()
+# Declared here (not only inside the legacy branch below) so the post-report
+# guards that reference them still work on the WS path, which skips that branch.
+declare -a FAILED_TESTS=()
+declare -a TEST_NAMES=()
 WS_DELIVERED=0
 if [ -d "${WS_RAW_DIR:-}" ]; then
   for ws_png in "$WS_RAW_DIR"/*.png; do
