@@ -68,8 +68,8 @@ cd "$REPO_ROOT"
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
-  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
+  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
   exit 3
 fi
 cn1ss_log() { ri_log "$1"; }
@@ -808,110 +808,15 @@ if [ "$WS_DELIVERED" -gt 0 ]; then
   ri_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (legacy decode skipped)"
 fi
 
-# Legacy syslog/base64 decode -- only when the WebSocket transport delivered
-# nothing. Kept as a Phase 1 fallback; removed once WS is confirmed on every
-# pipeline.
+# WebSocket is the only transport now. If it delivered nothing the on-device
+# suite either never ran or produced no screenshots -- fail loudly; there is
+# no syslog/base64/file fallback any more.
 if [ "$WS_DELIVERED" -eq 0 ]; then
-
-declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
-
-LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
-ri_log "Chunk counts -> simulator log: ${LOG_CHUNKS}"
-
-if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
-  ri_log "---- CN1SS lines (if any) ----"
-  (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
+  ri_log "STAGE:MARKERS_NOT_FOUND -> no screenshots delivered over WebSocket"
+  ri_log "---- CN1SS lines from log ----"
+  (grep "CN1SS:" "$TEST_LOG" 2>/dev/null || true) | sed 's/^/[CN1SS] /'
   exit 12
 fi
-
-TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
-declare -a TEST_NAMES=()
-if [ -n "$TEST_NAMES_RAW" ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAMES+=("$name")
-  done <<< "$TEST_NAMES_RAW"
-else
-  TEST_NAMES+=("default")
-fi
-ri_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
-
-PAIR_SEP=$'\037'
-declare -a TEST_OUTPUT_ENTRIES=()
-
-ensure_dir "$SCREENSHOT_PREVIEW_DIR"
-
-for test in "${TEST_NAMES[@]}"; do
-  dest="$SCREENSHOT_TMP_DIR/${test}.png"
-  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
-    TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-    ri_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
-    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
-      ri_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-    else
-      rm -f "$preview_dest" 2>/dev/null || true
-    fi
-  else
-    ri_log "Primary decode failed for '$test'; trying fallback log"
-    if [ -s "$FALLBACK_LOG" ] && source_label="$(cn1ss_decode_test_png "$test" "$dest" "SIMLOG:$FALLBACK_LOG")"; then
-      # Without these two lines, tests that needed the fallback log were
-      # decoded but not added to TEST_OUTPUT_ENTRIES, so the comparator
-      # silently skipped them -- iOS Metal compared 84 screenshots vs the
-      # 89 it had streams for, with 5 large transition tests
-      # (SlideHorizontal*, SlideVertical, SlideFadeTitle, CoverHorizontal)
-      # missing from the report because their ~288-chunk streams hit
-      # logcat-style line drops in device-runner.log but survived in the
-      # syslog fallback.
-      TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-      preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-      if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "SIMLOG:$FALLBACK_LOG")"; then
-        ri_log "Decoded preview for '$test' from fallback (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-      else
-        rm -f "$preview_dest" 2>/dev/null || true
-      fi
-      ri_log "Decoded screenshot for '$test' from fallback (size: $(cn1ss_file_size "$dest") bytes)"
-    else
-      ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
-      RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-      {
-        for entry in "${CN1SS_SOURCES[@]}" "SIMLOG:$FALLBACK_LOG"; do
-          path="${entry#*:}"
-          [ -s "$path" ] || continue
-          count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-          if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
-        done
-      } > "$RAW_B64_OUT" 2>/dev/null || true
-      if [ -s "$RAW_B64_OUT" ]; then
-        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-        ri_log "Partial base64 saved at: $RAW_B64_OUT"
-      fi
-      exit 12
-    fi
-  fi
-done
-
-lookup_test_output() {
-  local key="$1" entry prefix
-  for entry in "${TEST_OUTPUT_ENTRIES[@]}"; do
-    prefix="${entry%%$PAIR_SEP*}"
-    if [ "$prefix" = "$key" ]; then
-      echo "${entry#*$PAIR_SEP}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-COMPARE_ENTRIES=()
-for test in "${TEST_NAMES[@]}"; do
-  if dest="$(lookup_test_output "$test")"; then
-    [ -n "$dest" ] || continue
-    COMPARE_ENTRIES+=("${test}=${dest}")
-  fi
-done
-fi  # end: legacy syslog/base64 decode (WS transport delivered nothing)
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"

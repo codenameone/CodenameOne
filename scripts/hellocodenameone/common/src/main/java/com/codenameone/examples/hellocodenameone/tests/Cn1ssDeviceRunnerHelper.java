@@ -1,63 +1,36 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
-import com.codename1.io.Util;
 import com.codename1.io.WebSocket;
 import com.codename1.io.WebSocketState;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
-import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-/// Device-side helper that ships screenshots to the host. Three transports,
-/// tried in priority order:
-///
-///   1. WebSocket (`cn1ss.websocket.url` set) -- ACK-paced, no os_log /
-///      logcat involvement. Works on every port that supports WebSocket
-///      (iOS device, iOS simulator, Android, JavaSE, JS, Mac native).
-///   2. CN1SS:FILE filesystem hand-off (Mac native: `isDesktop() &&
-///      !isSimulator()`) -- writes PNG/JPEG to FileSystemStorage and emits
-///      a path marker the runner reads directly. Sidesteps os_log's
-///      900-byte rate limiter on Mac Catalyst.
-///   3. CN1SS:CHUNK base64-over-stdout -- universal fallback. Slow on
-///      Android (the 50ms/500-byte logcat throttle is here).
-///
-/// Once every runner script launches Cn1ssScreenshotServer and injects
-/// `cn1ss.websocket.url`, paths (2) and (3) are dead code and can go.
+/// Device-side helper that ships screenshots to the host over a single
+/// transport: a WebSocket to the host-side Cn1ssScreenshotServer. The device
+/// connects to ws://HOST:8765, sends a JSON META text frame followed by the
+/// binary PNG, and the host writes the file and echoes an ACK. Native ports
+/// use the blocking, ACK-paced sink (Cn1ssWebSocketSink.trySend); the JS port
+/// (which can't block the browser event loop) uses the async sink that
+/// advances the sequential suite from the ACK callback. There is no
+/// base64-over-stdout or filesystem fallback -- when the socket is
+/// unavailable the screenshot is simply absent and the host-side
+/// missing-screenshot guard flags it.
 interface Cn1ssDeviceRunnerHelper {
-    int CHUNK_SIZE_ANDROID = 500;
-    int CHUNK_SIZE_DEFAULT = 900;
-    // Throttle introduced in 763bd6676 (#4253). The 20ms value was tuned
-    // against the original ~10-test screenshot suite; with 17 animation grid
-    // tests added each emitting ~150KB PNGs (~400 chunks each), the JDK 21
-    // Android job started flaking with one random "PNG chunk truncated before
-    // CRC" per run on different tests across runs (SlideHorizontalTransitionTest
-    // on one CI run, MultiButtonTheme_dark on the next). Bumping to 30ms gave
-    // logcat extra drain time. With three more screenshot tests added by
-    // the sticky-headers PR (#4829) the JDK 21 entry started flaking again
-    // (one random theme stream truncated per run). Bumping to 50ms; the
-    // Cn1ssDeviceRunner per-test deadline is now 30s on native platforms so
-    // the slower emission still completes inside the budget for a dual
-    // appearance test (~14s for two captures).
-    int DELAY_ANDROID = 50;
-    int MAX_PREVIEW_BYTES = 20 * 1024;
     // Standard, fixed port the host-side Cn1ssScreenshotServer listens on
     // (scripts/lib/cn1ss.sh starts it with --port 8765). The runner does not
     // inject the URL per-run; the device defaults to ws://HOST:8765 below so
     // no platform-specific env/property plumbing is needed. Keep this value in
     // sync with CN1SS_WS_PORT in scripts/lib/cn1ss.sh.
     int CN1SS_WS_DEFAULT_PORT = 8765;
-    String PREVIEW_CHANNEL = "PREVIEW";
-    int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
 
     static void runOnEdtSync(Runnable runnable) {
         Display display = Display.getInstance();
@@ -150,17 +123,13 @@ interface Cn1ssDeviceRunnerHelper {
         });
     }
 
-    /// Encodes the PNG once, logs the size/hash/dupe diagnostics, then routes
-    /// to whichever transport is available. The transport priority is:
-    /// WebSocket (when `cn1ss.websocket.url` is set) -> CN1SS:FILE filesystem
-    /// hand-off (Mac native) -> CN1SS:CHUNK base64-over-stdout (everywhere
-    /// else). Once all runners launch Cn1ssScreenshotServer, paths 2 and 3
-    /// disappear.
-    /// Encodes and transports the screenshot. Returns true when the async
-    /// WebSocket path (JS port) has taken ownership of `onComplete` -- it will
-    /// be invoked from the ACK callback, so the caller must NOT call it. Returns
-    /// false for every synchronous path (native WS, file, base64), where the
-    /// caller advances the suite itself. `onComplete` may be null.
+    /// Encodes the PNG once, logs the size/hash/dupe diagnostics, then sends it
+    /// to the host over the WebSocket sink (the only transport). Returns true
+    /// when the async WebSocket path (JS port) has taken ownership of
+    /// `onComplete` -- it will be invoked from the ACK callback, so the caller
+    /// must NOT call it. Returns false on every synchronous path (native WS, or
+    /// WS unavailable), where the caller advances the suite itself.
+    /// `onComplete` may be null.
     private static boolean emitImageScreenshot(String safeName, Image screenshot, int width, int height,
                                                Runnable onComplete) {
         try {
@@ -186,29 +155,18 @@ interface Cn1ssDeviceRunnerHelper {
             }
 
             if (isHtml5()) {
-                // JS cannot block on a monitor; use the async WS sink, which
-                // advances the suite from the ACK callback via onComplete.
+                // JS cannot block on a monitor; the async WS sink advances the
+                // suite from the ACK callback via onComplete.
                 if (Cn1ssWebSocketSink.trySendAsync(safeName, pngBytes, hash, onComplete)) {
                     return true;
                 }
-                // WS unavailable on JS -- fall through to base64.
-            } else if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
-                // Native blocking WS handled it synchronously; caller completes.
-                return false;
+                println("CN1SS:ERR:test=" + safeName + " message=websocket-unavailable");
+            } else if (!Cn1ssWebSocketSink.trySend(safeName, pngBytes, hash)) {
+                println("CN1SS:ERR:test=" + safeName + " message=websocket-unavailable");
             }
-
-            if (Display.getInstance().isDesktop() && !Display.getInstance().isSimulator()) {
-                emitFileScreenshot(safeName, pngBytes, screenshot, io);
-                return false;
-            }
-
-            emitChannel(pngBytes, safeName, "");
-            byte[] preview = encodePreview(io, screenshot, safeName);
-            if (preview != null && preview.length > 0) {
-                emitChannel(preview, safeName, PREVIEW_CHANNEL);
-            } else {
-                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
-            }
+            // WebSocket is the only transport. When it is unavailable the
+            // screenshot is simply absent and the host-side missing-screenshot
+            // guard flags it -- there is no base64 / file fallback any more.
             return false;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
@@ -218,112 +176,6 @@ interface Cn1ssDeviceRunnerHelper {
         } finally {
             screenshot.dispose();
         }
-    }
-
-    /// Save the PNG (and a JPEG preview) into the app's filesystem and
-    /// announce their paths in the log. The runner copies these files
-    /// directly, sidestepping the CN1SS:CHUNK base64 channel. Used on Mac
-    /// native, where the app process and the test driver share a local
-    /// filesystem and `os_log` rate-limits the chunked output.
-    private static void emitFileScreenshot(String safeName, byte[] pngBytes,
-                                           Image screenshot, ImageIO io) throws IOException {
-        FileSystemStorage fs = FileSystemStorage.getInstance();
-        String dir = fs.getAppHomePath();
-        if (dir == null || dir.length() == 0) {
-            throw new IOException("FileSystemStorage.getAppHomePath() returned empty path");
-        }
-        // CN1's getAppHomePath returns a path with trailing separator on
-        // some platforms and without on others; normalise.
-        if (!dir.endsWith("/")) {
-            dir = dir + "/";
-        }
-        String outDir = dir + "cn1ss-screenshots/";
-        fs.mkdir(outDir);
-        String pngPath = outDir + safeName + ".png";
-        OutputStream pngFile = fs.openOutputStream(pngPath);
-        try {
-            pngFile.write(pngBytes);
-        } finally {
-            pngFile.close();
-        }
-        println("CN1SS:FILE:test=" + safeName + " channel= path=" + pngPath
-                + " bytes=" + pngBytes.length);
-
-        byte[] preview = encodePreview(io, screenshot, safeName);
-        if (preview != null && preview.length > 0) {
-            String previewPath = outDir + safeName + ".jpg";
-            OutputStream previewOut = fs.openOutputStream(previewPath);
-            try {
-                previewOut.write(preview);
-            } finally {
-                previewOut.close();
-            }
-            println("CN1SS:FILE:test=" + safeName + " channel=" + PREVIEW_CHANNEL
-                    + " path=" + previewPath + " bytes=" + preview.length);
-        } else {
-            println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
-        }
-    }
-
-    static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
-        byte[] chosenPreview = null;
-        int chosenQuality = 0;
-        int smallestBytes = Integer.MAX_VALUE;
-        for (int quality : PREVIEW_QUALITIES) {
-            ByteArrayOutputStream previewOut = new ByteArrayOutputStream(Math.max(512, screenshot.getWidth() * screenshot.getHeight() / 4));
-            io.save(screenshot, previewOut, ImageIO.FORMAT_JPEG, quality / 100f);
-            byte[] previewBytes = previewOut.toByteArray();
-            if (previewBytes.length == 0) {
-                continue;
-            }
-            if (previewBytes.length < smallestBytes) {
-                smallestBytes = previewBytes.length;
-                chosenPreview = previewBytes;
-                chosenQuality = quality;
-            }
-            if (previewBytes.length <= MAX_PREVIEW_BYTES) {
-                break;
-            }
-        }
-        if (chosenPreview != null) {
-            println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=" + chosenPreview.length + " preview_quality=" + chosenQuality);
-            if (chosenPreview.length > MAX_PREVIEW_BYTES) {
-                println("CN1SS:WARN:test=" + safeName + " preview_exceeds_limit_bytes=" + chosenPreview.length + " max_preview_bytes=" + MAX_PREVIEW_BYTES);
-            }
-        }
-        return chosenPreview;
-    }
-
-    static void emitChannel(byte[] bytes, String safeName, String channel) {
-        String prefix = channel != null && channel.length() > 0 ? "CN1SS" + channel : "CN1SS";
-        if (bytes == null || bytes.length == 0) {
-            println(prefix + ":END:" + safeName);
-            System.out.flush();
-            return;
-        }
-        String base64 = Base64.encodeNoNewline(bytes);
-        int count = 0;
-
-        boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
-        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
-        int delay = isAndroid ? DELAY_ANDROID : 0;
-
-        for (int pos = 0; pos < base64.length(); pos += chunkSize) {
-            int end = Math.min(pos + chunkSize, base64.length());
-            String chunk = base64.substring(pos, end);
-            println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
-            count++;
-            // Slow down to prevent logcat buffer overflow/truncation
-            if (delay > 0) {
-                Util.sleep(delay);
-            }
-        }
-        println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + base64.length());
-        if (delay > 0) {
-            Util.sleep(50);
-        }
-        println(prefix + ":END:" + safeName);
-        System.out.flush();
     }
 
     static String sanitizeTestName(String testName) {
@@ -352,19 +204,6 @@ interface Cn1ssDeviceRunnerHelper {
         return ch == '_' || ch == '.' || ch == '-';
     }
 
-    static String zeroPad(int value, int width) {
-        String text = Integer.toString(value);
-        if (text.length() >= width) {
-            return text;
-        }
-        StringBuffer builder = new StringBuffer(width);
-        for (int i = text.length(); i < width; i++) {
-            builder.append('0');
-        }
-        builder.append(text);
-        return builder.toString();
-    }
-
     static void println(String line) {
         System.out.println(line);
     }
@@ -385,13 +224,13 @@ interface Cn1ssDeviceRunnerHelper {
                 if (isHtml5()) {
                     // Fire-and-forget on JS (no onComplete: the caller advances
                     // the suite for placeholders).
-                    if (Cn1ssWebSocketSink.trySendAsync(safeName, pngBytes, fnv1a64Hex(pngBytes), null)) {
-                        return;
-                    }
-                } else if (Cn1ssWebSocketSink.trySend(safeName, pngBytes, fnv1a64Hex(pngBytes))) {
-                    return;
+                    Cn1ssWebSocketSink.trySendAsync(safeName, pngBytes, fnv1a64Hex(pngBytes), null);
+                } else {
+                    Cn1ssWebSocketSink.trySend(safeName, pngBytes, fnv1a64Hex(pngBytes));
                 }
-                emitChannel(pngBytes, safeName, "");
+                // WebSocket-only: if the socket is unavailable the placeholder
+                // is dropped along with the real screenshot; no base64 channel.
+                println("CN1SS:END:" + safeName);
             } finally {
                 placeholder.dispose();
             }
@@ -509,8 +348,8 @@ final class Cn1ssHashTracker {
 /// `trySend` returns true if the WS path successfully uploaded the PNG
 /// (or transiently failed after the connection was established), and false
 /// if WS is unavailable (no URL configured, unsupported platform, connect
-/// timed out). When trySend returns false the caller falls back to the
-/// CN1SS:FILE or CN1SS:CHUNK paths.
+/// timed out). WebSocket is the only transport now, so a false return just
+/// means the screenshot is absent and the host-side guard flags it.
 final class Cn1ssWebSocketSink {
     private static final int ACK_TIMEOUT_MS = 10_000;
     private static final int CONNECT_TIMEOUT_MS = 5_000;
@@ -530,15 +369,6 @@ final class Cn1ssWebSocketSink {
     private static final int ASYNC_CONNECTING = 1;
     private static final int ASYNC_OPEN = 2;
     private static final int ASYNC_FAILED = 3;
-    // TEMPORARY: the async WS path is wired and the host server is verified
-    // working (a plain WebSocket client connects, sends, and is ACKed), but on
-    // the JS port the core WebSocket.connect() chain is not yet reaching
-    // HTML5WebSocketImpl.connect() (the open/error/close events never fire), so
-    // the suite would stall per test waiting for the ACK. Until that is fixed,
-    // JS stays on the base64-over-console transport. Flip to true to re-enable
-    // the WebSocket transport on JS once the connect path is resolved; the
-    // native ports already use it (their blocking path, not this async one).
-    private static final boolean JS_ASYNC_WS_ENABLED = false;
     private static int asyncState = ASYNC_IDLE;
     private static WebSocket asyncSocket;
     private static final Map<String, Runnable> asyncPending = new HashMap<String, Runnable>();
@@ -566,11 +396,8 @@ final class Cn1ssWebSocketSink {
     /// Non-blocking send for the JS port. Returns true when the WebSocket path
     /// has taken ownership of completion (it will run onComplete from the ACK
     /// callback, or immediately if the send fails); false when WS is
-    /// unavailable and the caller should fall back to the base64 transport.
+    /// unavailable, in which case the screenshot is simply absent (no fallback).
     static synchronized boolean trySendAsync(String safeName, byte[] pngBytes, String hashHex, Runnable onComplete) {
-        if (!JS_ASYNC_WS_ENABLED) {
-            return false; // JS falls back to base64 until the connect path is fixed
-        }
         if (asyncState == ASYNC_FAILED) {
             return false;
         }

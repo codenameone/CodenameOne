@@ -36,8 +36,8 @@ cd "$REPO_ROOT"
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
-  rj_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
+  rj_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
   exit 3
 fi
 cn1ss_log() { rj_log "$1"; }
@@ -95,96 +95,22 @@ if [ -n "${CN1SS_WS_DIR:-}" ] && [ -d "$CN1SS_WS_DIR" ]; then
 fi
 
 if [ "$WS_DELIVERED" -gt 0 ]; then
-  rj_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (base64 decode skipped)"
+  rj_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s)"
 else
-
-LOG_CHUNKS="$(cn1ss_count_chunks "$LOG_FILE")"
-LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"
-: "${LOG_CHUNKS:=0}"
-rj_log "Chunk counts -> browser log: ${LOG_CHUNKS}"
-
-if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  # Distinguish "suite never ran" from "suite ran but every screenshot test
-  # was force-finalised on JS". When port.js routes every chunk-emitting
-  # test through cn1ssForcedTimeoutTestClasses (e.g. while the JS port's
-  # chunk-truncation issue is still open in a separate PR), the suite
-  # legitimately finishes with zero chunks; treating that as a fatal
-  # MARKERS_NOT_FOUND blocks the whole CI step on what is actually a clean
-  # run. If we can see CN1SS:SUITE:FINISHED in the log the harness ran
-  # end-to-end and we should let downstream report generation proceed (it
-  # will have nothing to compare, which is fine).
+  # WebSocket is the only transport. Zero delivered screenshots means either
+  # the suite finished with nothing to capture (a clean no-screenshot run) or
+  # the harness never ran end-to-end (markers absent). Distinguish the two via
+  # the SUITE:FINISHED marker; there is no base64-over-console decode any more.
   if grep -q "CN1SS:SUITE:FINISHED" "$LOG_FILE"; then
-    rj_log "Browser log has zero CN1SS chunks but reached SUITE:FINISHED; treating as a no-screenshot run"
+    rj_log "No screenshots delivered over WebSocket but reached SUITE:FINISHED; treating as a no-screenshot run"
     cp -f "$LOG_FILE" "$ARTIFACTS_DIR/javascript-device-runner.log" 2>/dev/null || true
     exit 0
   fi
-  rj_log "STAGE:MARKERS_NOT_FOUND -> browser log did not include CN1SS chunks"
+  rj_log "STAGE:MARKERS_NOT_FOUND -> no WebSocket screenshots and no SUITE:FINISHED in browser log"
   rj_log "---- CN1SS lines from log ----"
   (grep "CN1SS:" "$LOG_FILE" || true) | sed 's/^/[CN1SS] /'
   exit 12
 fi
-
-TEST_NAMES_RAW="$(cn1ss_list_tests "$LOG_FILE" 2>/dev/null | awk 'NF' | sort -u || true)"
-declare -a TEST_NAMES=()
-if [ -n "$TEST_NAMES_RAW" ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAMES+=("$name")
-  done <<< "$TEST_NAMES_RAW"
-else
-  TEST_NAMES+=("default")
-fi
-if [ "${#TEST_NAMES[@]}" -gt 1 ]; then
-  FILTERED_TEST_NAMES=()
-  for test in "${TEST_NAMES[@]}"; do
-    if [ "$test" = "default" ]; then
-      continue
-    fi
-    FILTERED_TEST_NAMES+=("$test")
-  done
-  if [ "${#FILTERED_TEST_NAMES[@]}" -gt 0 ]; then
-    TEST_NAMES=("${FILTERED_TEST_NAMES[@]}")
-  fi
-fi
-rj_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
-
-declare -a FAILED_TESTS=()
-declare -a COMPARE_ENTRIES=()
-
-if ! cn1ss_print_log "$LOG_FILE"; then
-  # Keep processing screenshots even when suite logs include CN1SS error markers.
-  # The report/comment output is needed specifically for these failing runs.
-  rj_log "CN1SS log check reported test errors; continuing with screenshot decode/report generation"
-fi
-
-for test in "${TEST_NAMES[@]}"; do
-  dest="$SCREENSHOT_RAW_DIR/${test}.png"
-  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
-    rj_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
-    COMPARE_ENTRIES+=("${test}=${dest}")
-    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
-      rj_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-    else
-      rm -f "$preview_dest" 2>/dev/null || true
-    fi
-  else
-    if { [ "$test" = "default" ] || [ "$test" = "bootstrap_placeholder" ]; } && [ "${#TEST_NAMES[@]}" -gt 1 ]; then
-      rj_log "WARN: Skipping decode failure for synthetic '$test' stream because named test streams were detected"
-      continue
-    fi
-    rj_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
-    FAILED_TESTS+=("$test")
-    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-    if cn1ss_extract_base64 "$LOG_FILE" "$test" > "$RAW_B64_OUT" 2>/dev/null; then
-      if [ -s "$RAW_B64_OUT" ]; then
-        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-        rj_log "Partial base64 saved at: $RAW_B64_OUT"
-      fi
-    fi
-  fi
-done
-fi  # end: base64-over-console decode (WebSocket transport delivered nothing)
 
 decoded_count="${#COMPARE_ENTRIES[@]}"
 meaningful_decoded_count=0
