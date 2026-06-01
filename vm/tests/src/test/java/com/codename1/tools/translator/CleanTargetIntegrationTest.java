@@ -102,7 +102,95 @@ class CleanTargetIntegrationTest {
                 "Compiled program should print hello message, actual output was:\n" + output);
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void generatesRunnableExecutableForWindowsAppType(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("windows-target-sources");
+        Path classesDir = Files.createTempDirectory("windows-target-classes");
+        Path javaApiDir = Files.createTempDirectory("windows-java-api-classes");
+        Path javaFile = sourceDir.resolve("HelloWorld.java");
+        Files.write(javaFile, helloWorldSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
+
+        List<String> compileArgs = new java.util.ArrayList<>();
+
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-source");
+            compileArgs.add(config.targetVersion);
+            compileArgs.add("-target");
+            compileArgs.add(config.targetVersion);
+            compileArgs.add("-classpath");
+            compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-source");
+            compileArgs.add(config.targetVersion);
+            compileArgs.add("-target");
+            compileArgs.add(config.targetVersion);
+            compileArgs.add("-bootclasspath");
+            compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+
+        compileArgs.add("-d");
+        compileArgs.add(classesDir.toString());
+        compileArgs.add(javaFile.toString());
+
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult, "HelloWorld.java should compile with " + config);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        Files.copy(sourceDir.resolve("native_hello.c"), classesDir.resolve("native_hello.c"));
+
+        Path outputDir = Files.createTempDirectory("windows-target-output");
+        // The "windows" app type makes the translator emit add_executable() with the
+        // platform link libraries directly, so unlike the other clean-target tests we
+        // do NOT post-process the CMakeLists with replaceLibraryWithExecutableTarget.
+        runTranslator(classesDir, outputDir, "WinCleanApp", "windows");
+
+        Path distDir = outputDir.resolve("dist");
+        Path cmakeLists = distDir.resolve("CMakeLists.txt");
+        assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
+
+        String cmake = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        assertTrue(cmake.contains("add_executable(${PROJECT_NAME}"),
+                "windows app type should emit an executable target, was:\n" + cmake);
+        assertFalse(cmake.contains("add_library(${PROJECT_NAME}"),
+                "windows app type should not emit a library target, was:\n" + cmake);
+        assertTrue(cmake.contains("d2d1") && cmake.contains("dwrite"),
+                "windows app type should link the Direct2D/DirectWrite stack, was:\n" + cmake);
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
+
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve(CompilerHelper.executableName("WinCleanApp"));
+        String output = runCommand(Arrays.asList(executable.toString()), buildDir);
+
+        assertTrue(output.contains("Hello, Clean Target!"),
+                "Compiled program should print hello message, actual output was:\n" + output);
+    }
+
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
+        runTranslator(classesDir, outputDir, appName, "ios");
+    }
+
+    static void runTranslator(Path classesDir, Path outputDir, String appName, String appType) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
         URL[] systemUrls;
@@ -139,7 +227,7 @@ class CleanTargetIntegrationTest {
                     "com.example.hello",
                     "Hello App",
                     "1.0",
-                    "ios",
+                    appType,
                     "none"
             };
             try {

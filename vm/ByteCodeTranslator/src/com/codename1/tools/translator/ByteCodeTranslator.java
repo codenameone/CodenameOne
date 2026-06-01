@@ -197,7 +197,7 @@ public class ByteCodeTranslator {
                 handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
                 break;
             case OUTPUT_TYPE_CLEAN:
-                handleCleanOutput(b, sources, dest, appName);
+                handleCleanOutput(b, sources, dest, appName, appType);
                 break;
             case OUTPUT_TYPE_JAVASCRIPT:
                 handleJavascriptOutput(b, sources, dest, appName);
@@ -212,7 +212,7 @@ public class ByteCodeTranslator {
         Parser.writeOutput(dest);
     }
 
-    private static void handleCleanOutput(ByteCodeTranslator b, File[] sources, File dest, String appName) throws Exception {
+    private static void handleCleanOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appType) throws Exception {
         File root = new File(dest, "dist");
         root.mkdirs();
         if(verbose) {
@@ -271,7 +271,7 @@ public class ByteCodeTranslator {
             }
         }
 
-        writeCmakeProject(root, srcRoot, appName);
+        writeCmakeProject(root, srcRoot, appName, appType);
     }
 
     private static void handleJavascriptOutput(ByteCodeTranslator b, File[] sources, File dest, String appName) throws Exception {
@@ -568,9 +568,14 @@ public class ByteCodeTranslator {
         replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
     }
 
-    private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
+    private static void writeCmakeProject(File projectRoot, File srcRoot, String appName, String appType) throws IOException {
         File cmakeLists = new File(projectRoot, "CMakeLists.txt");
         String srcRootPath = srcRoot.getAbsolutePath();
+        // The native Windows desktop port links the translated runtime into a
+        // standalone executable (Direct2D/DirectWrite rendering + Win32 windowing
+        // live in the bundled nativeSources). Every other consumer of the clean
+        // target embeds the translated code as a library, which stays the default.
+        boolean executable = "windows".equalsIgnoreCase(appType);
         try (Writer writer = new OutputStreamWriter(Files.newOutputStream(cmakeLists.toPath()), StandardCharsets.UTF_8)) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
             writer.append("project(").append(appName).append(" LANGUAGES C)\n");
@@ -583,8 +588,24 @@ public class ByteCodeTranslator {
             writer.append("include_directories(${CN1_APP_SOURCE_ROOT})\n");
             writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
-            writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
-            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
+            if (executable) {
+                writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
+                // Math lives in the CRT under MSVC (no separate libm to link); every
+                // other platform needs an explicit libm link for the translated
+                // runtime. The Win32 import libs back the Direct2D/DirectWrite
+                // rendering, WIC image decode, WinHTTP networking and the Win32
+                // windowing/input layer the port's nativeSources call into; they are
+                // exercised on the Windows CI legs (windows-latest / windows-11-arm).
+                writer.append("if(WIN32)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp user32 gdi32 ole32)\n");
+                writer.append("else()\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
+                writer.append("endif()\n");
+            } else {
+                writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
+            }
         }
     }
 
