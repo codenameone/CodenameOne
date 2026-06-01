@@ -70,7 +70,10 @@ public class IPhoneBuilder extends Executor {
     private File tmpFile;
     private File icon57;
     private File icon512;
-    private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "12.0";
+    // Bumped from 12.0 → 13.0 to enable NSURLSessionWebSocketTask
+    // (iOS 13+) used by com.codename1.io.WebSocket's iOS implementation.
+    // BuildDaemon's iOS lane needs the same bump.
+    private static final String DEFAULT_MIN_DEPLOYMENT_VERSION = "13.0";
 
     // StringBuilder used for constructing ruby script with xcodeproj
     // which adds localized strings files to the project.

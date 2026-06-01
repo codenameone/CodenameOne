@@ -9338,6 +9338,23 @@ public abstract class CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
     }
 
+    /// Indicates whether the underlying implementation supports the
+    /// [com.codename1.io.WebSocket] API. Ports that do not implement
+    /// WebSocket return false; the public `WebSocket.isSupported()` calls
+    /// through here.
+    public boolean isWebSocketSupported() {
+        return false;
+    }
+
+    /// Create a platform-specific `WebSocketImpl` bound to the given URL.
+    /// The returned impl is not yet connected; the public `WebSocket` facade
+    /// wires its event sink and calls `connect(int)`.
+    ///
+    /// @throws RuntimeException if the port does not support WebSocket.
+    public WebSocketImpl createWebSocketImpl(String url) {
+        throw new RuntimeException("WebSocket not supported on this platform");
+    }
+
     /// Write a range of the given byte array to the socket. The default implementation
     /// copies the requested range into a fresh array and delegates to
     /// {@link #writeToSocketStream(Object, byte[])}; platform ports that can write a

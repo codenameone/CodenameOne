@@ -209,12 +209,23 @@ bia_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
   set -e
   if [ $RC -ne 0 ]; then
     bia_log "Maven iOS build failed (exit=$RC). Log: $MVN_IOS_LOG"
+    # Highlight the lines most likely to name the cause...
     bia_log "Key failure lines:"
-    if command -v rg >/dev/null 2>&1; then
-      rg -n "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_IOS_LOG" | tail -n 200 || true
-    else
-      grep -nE "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_IOS_LOG" | tail -n 200 || true
+    if [ -s "$MVN_IOS_LOG" ]; then
+      grep -nE "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|cannot find symbol|package .* does not exist|Could not resolve|Failure to find|\\[ERROR\\])" "$MVN_IOS_LOG" | tail -n 200 || true
     fi
+    # ...but ALWAYS dump the tail of the full log too. The pattern grep above
+    # silently produced nothing on at least one CI run (a non-[ERROR] failure),
+    # leaving the job with zero diagnostics; an unconditional tail guarantees
+    # the actual Maven output is visible in the job log even when no pattern
+    # matches or the log is short.
+    bia_log "----- last 150 lines of $MVN_IOS_LOG (size: $(wc -c < "$MVN_IOS_LOG" 2>/dev/null || echo 0) bytes) -----"
+    if [ -s "$MVN_IOS_LOG" ]; then
+      tail -n 150 "$MVN_IOS_LOG" | sed 's/^/[cn1-ios-build] /'
+    else
+      bia_log "(Maven log is empty or missing -- the build failed before producing any output)"
+    fi
+    bia_log "----- end of $MVN_IOS_LOG -----"
     exit $RC
   fi
 )

@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssChunkTools.java" ]; then
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
   jd_log "CN1SS helper sources not found at $CN1SS_HELPER_SOURCE_DIR" >&2
   exit 2
 fi
@@ -174,12 +174,25 @@ if __name__ == '__main__':
 PY
 }
 
+# Start the host-side WebSocket screenshot server before launching the
+# simulator. The JavaSE device runner connects to ws://127.0.0.1:8765 (the
+# default in Cn1ssDeviceRunnerHelper) and streams each PNG over it -- the same
+# single transport every other port now uses. There is no base64 fallback.
+WS_RAW_DIR="$ARTIFACTS_DIR/ws"
+mkdir -p "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  jd_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  jd_log "WARN: failed to start WebSocket screenshot server; no screenshots will be captured"
+fi
+
 jd_log "Launching Java SE simulator for device-runner app"
 : >"$LOG_FILE"
 set +e
 run_with_timeout "$SIM_TIMEOUT_SECONDS" "$SIM_KILL_GRACE_SECONDS" "$LOG_FILE" "${JAVA_CMD[@]}"
 rc=$?
 set -e
+cn1ss_stop_ws_server 2>/dev/null || true
 
 if [ $rc -ne 0 ]; then
   jd_log "Simulator exited with status $rc (see log at $LOG_FILE)"
@@ -187,38 +200,19 @@ fi
 
 SIM_EXIT_CODE=$rc
 
-TEST_NAMES_RAW="$(cn1ss_list_tests "$LOG_FILE" 2>/dev/null | awk 'NF' | sort -u || true)"
-declare -a TEST_NAMES=()
-if [ -n "$TEST_NAMES_RAW" ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAMES+=("$name")
-  done <<< "$TEST_NAMES_RAW"
-else
-  TEST_NAMES+=("default")
+# Adopt whatever the WebSocket server wrote: one <test>.png per delivered
+# screenshot in $WS_RAW_DIR. No base64-over-log decode any more.
+ws_count=0
+if [ -d "$WS_RAW_DIR" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    cp -f "$ws_png" "$SCREENSHOT_DIR/${ws_test}.png" 2>/dev/null || continue
+    jd_log "Captured screenshot for '$ws_test' over WebSocket"
+    ws_count=$(( ws_count + 1 ))
+  done
 fi
-
-jd_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
-
-declare -a SOURCES=("LOG:$LOG_FILE")
-
-for test in "${TEST_NAMES[@]}"; do
-  png_dest="$SCREENSHOT_DIR/${test}.png"
-  if cn1ss_decode_test_png "$test" "$png_dest" "${SOURCES[@]}"; then
-    jd_log "Decoded screenshot for '$test' -> $png_dest"
-  else
-    jd_log "No screenshot payload detected for '$test'"
-    rm -f "$png_dest" 2>/dev/null || true
-  fi
-
-  preview_dest="$PREVIEW_DIR/${test}.jpg"
-  if cn1ss_decode_test_preview "$test" "$preview_dest" "${SOURCES[@]}"; then
-    jd_log "Decoded preview for '$test' -> $preview_dest"
-  else
-    rm -f "$preview_dest" 2>/dev/null || true
-  fi
-
-done
+jd_log "WebSocket transport delivered ${ws_count} screenshot(s)"
 
 if [ "$SIM_EXIT_CODE" -eq 124 ]; then
   screenshot_count=$(find "$SCREENSHOT_DIR" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d '[:space:]')

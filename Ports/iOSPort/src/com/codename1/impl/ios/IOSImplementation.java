@@ -10320,6 +10320,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new IOSWebSocketImpl(url);
+    }
+
+    @Override
     public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
         nativeInstance.writeToSocketStream(((Long)socket).longValue(), data, offset, len);
     }
