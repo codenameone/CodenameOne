@@ -25,6 +25,7 @@ package com.codename1.impl.windows;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,10 +49,20 @@ import java.util.Locale;
 public class WindowsImplementation extends CodenameOneImplementation {
     private static WindowsImplementation INSTANCE;
 
+    // Event type codes; must mirror the CN1EventType enum in cn1_windows.h.
+    private static final int EVENT_POINTER_PRESSED = 1;
+    private static final int EVENT_POINTER_RELEASED = 2;
+    private static final int EVENT_POINTER_DRAGGED = 3;
+    private static final int EVENT_KEY_PRESSED = 4;
+    private static final int EVENT_KEY_RELEASED = 5;
+    private static final int EVENT_SIZE_CHANGED = 6;
+    private static final int EVENT_CLOSE = 7;
+
     private long windowGraphicsPeer;
     private Long windowGraphics;
     private Long defaultFont;
     private L10NManager l10n;
+    private final int[] eventScratch = new int[4];
 
     /**
      * Registers the singleton so the Win32 native bootstrap and message loop can
@@ -125,6 +136,52 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         WindowsNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
+    }
+
+    @Override
+    public void edtIdle(boolean enter) {
+        // The EDT owns the Win32 message pump on this port. When it is about to
+        // idle we block briefly for native input, then translate every queued
+        // window/input event into Codename One events (which re-enqueue onto the
+        // EDT). On wake-up we just drain whatever has accumulated.
+        if (enter) {
+            WindowsNative.waitForEvent(50);
+        }
+        drainInput();
+    }
+
+    private void drainInput() {
+        while (WindowsNative.pollEvent(eventScratch)) {
+            int type = eventScratch[0];
+            int x = eventScratch[1];
+            int y = eventScratch[2];
+            int key = eventScratch[3];
+            switch (type) {
+                case EVENT_POINTER_PRESSED:
+                    pointerPressed(x, y);
+                    break;
+                case EVENT_POINTER_RELEASED:
+                    pointerReleased(x, y);
+                    break;
+                case EVENT_POINTER_DRAGGED:
+                    pointerDragged(x, y);
+                    break;
+                case EVENT_KEY_PRESSED:
+                    keyPressed(key);
+                    break;
+                case EVENT_KEY_RELEASED:
+                    keyReleased(key);
+                    break;
+                case EVENT_SIZE_CHANGED:
+                    sizeChanged(x, y);
+                    break;
+                case EVENT_CLOSE:
+                    Display.getInstance().exitApplication();
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     @Override
