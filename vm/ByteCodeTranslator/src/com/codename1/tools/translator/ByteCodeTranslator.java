@@ -598,7 +598,7 @@ public class ByteCodeTranslator {
                 // windowing/input layer the port's nativeSources call into; they are
                 // exercised on the Windows CI legs (windows-latest / windows-11-arm).
                 writer.append("if(WIN32)\n");
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp user32 gdi32 ole32)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp user32 gdi32 ole32 uuid)\n");
                 writer.append("else()\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");
