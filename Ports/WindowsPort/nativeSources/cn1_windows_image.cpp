@@ -47,6 +47,9 @@
 #include <string.h>
 #include <stdio.h>
 
+/* C++ unit (Direct2D is C++-only); keep C linkage for the bridge + helpers. */
+extern "C" {
+
 /* ------------------------------------------------------------ color helpers */
 
 /*
@@ -173,7 +176,7 @@ CN1Image* cn1WinDecodeImage(const BYTE* data, UINT32 len) {
         goto cleanup;
     }
     hr = IWICFormatConverter_Initialize(converter, (IWICBitmapSource*)frame,
-                                        &GUID_WICPixelFormat32bppPBGRA,
+                                        GUID_WICPixelFormat32bppPBGRA,
                                         WICBitmapDitherTypeNone, NULL, 0.0,
                                         WICBitmapPaletteTypeMedianCut);
     if (FAILED(hr)) {
@@ -595,7 +598,7 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
 
     hr = IWICImagingFactory_CreateBitmap(cn1Win.wicFactory, (UINT)img->width,
                                          (UINT)img->height,
-                                         &GUID_WICPixelFormat32bppPBGRA,
+                                         GUID_WICPixelFormat32bppPBGRA,
                                          WICBitmapCacheOnLoad, &wicBitmap);
     if (FAILED(hr)) {
         return NULL;
@@ -729,5 +732,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_getImageGraphics___long_R_lon
     }
     return (JAVA_LONG)(intptr_t)img->mutableGraphics;
 }
+
+} /* extern "C" */
 
 #endif /* _WIN32 */

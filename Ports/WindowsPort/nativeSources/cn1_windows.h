@@ -39,19 +39,37 @@
 #ifdef _WIN32
 
 #define WIN32_LEAN_AND_MEAN
-#define COBJMACROS
+
+/*
+ * Both Direct2D (d2d1.h) and DirectWrite (dwrite.h) ship only a C++ binding, so
+ * the COM rendering translation units of this port (window / graphics / image /
+ * dwrite) are compiled as C++ and use real C++ COM method calls (the
+ * COBJMACROS-style call sites resolve through cn1_windows_comc.h). The remaining
+ * C translation units (text / io / net) never invoke a Direct2D method; they
+ * still include this header, so CINTERFACE is defined for C only, which lets
+ * d2d1.h parse as opaque (incomplete) C structs that are used purely as
+ * pointers. <dwrite.h> is never pulled in here -- fonts are opaque void* and all
+ * DirectWrite work lives in cn1_windows_dwrite.cpp behind a plain-C facade.
+ */
+#ifndef __cplusplus
 #define CINTERFACE
+#endif
 #include <windows.h>
 #include <d2d1.h>
-#include <dwrite.h>
 #include <wincodec.h>
 #include <stdint.h>
 
-#include "cn1_globals.h"
+#ifdef __cplusplus
+/* C++ method-call macros for the COBJMACROS-style call sites. */
+#include "cn1_windows_comc.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* The ParparVM runtime is C; keep its declarations C-linked under C++. */
+#include "cn1_globals.h"
 
 /* ------------------------------------------------------------------ events */
 
@@ -102,7 +120,7 @@ typedef struct CN1Graphics {
 } CN1Graphics;
 
 typedef struct CN1Font {
-    IDWriteTextFormat* format;
+    void* format;                    /* IDWriteTextFormat*, opaque to C       */
     float size;
     int face;
     int style;
@@ -123,8 +141,9 @@ typedef struct CN1Image {
 typedef struct {
     HWND hwnd;
     ID2D1Factory* d2dFactory;
-    IDWriteFactory* dwriteFactory;
     IWICImagingFactory* wicFactory;
+    /* The DirectWrite factory is owned privately by cn1_windows_dwrite.cpp (its
+     * header has no C binding), so it is intentionally not held here. */
     CN1Graphics* windowGraphics;
     CN1Font* defaultFont;
     JAVA_INT width;
@@ -158,9 +177,8 @@ void cn1WinEndFrame(CN1Graphics* g);
 ID2D1SolidColorBrush* cn1WinBrush(CN1Graphics* g);
 D2D1_COLOR_F cn1WinColorF(JAVA_INT rgb, JAVA_INT alpha);
 
-/* text (cn1_windows_text.c) */
+/* text (cn1_windows_text.c) -- DirectWrite work delegated to the C++ layer */
 CN1Font* cn1WinCreateFont(int face, int style, int size);
-float cn1WinMeasureWidth(CN1Font* f, const WCHAR* text, UINT32 len);
 
 /* images (cn1_windows_image.c) */
 CN1Image* cn1WinDecodeImage(const BYTE* data, UINT32 len);

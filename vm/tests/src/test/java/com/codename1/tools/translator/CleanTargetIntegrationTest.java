@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -184,6 +185,111 @@ class CleanTargetIntegrationTest {
 
         assertTrue(output.contains("Hello, Clean Target!"),
                 "Compiled program should print hello message, actual output was:\n" + output);
+    }
+
+    /**
+     * Compiles the WindowsPort native layer (the hand-written Win32 / Direct2D /
+     * DirectWrite / WIC / WinHTTP sources) inside a real translated "windows"
+     * app-type dist, so the runtime headers (cn1_globals.h and the generated
+     * cn1_class_method_index.h) are present. Windows-only: it shells out to
+     * clang-cl, which the CI legs / dev VM put on PATH via the MSVC dev
+     * environment. This is a compile check (clang-cl /c) -- linking the full app
+     * is exercised separately once a CN1 app translation is wired.
+     */
+    @org.junit.jupiter.api.Test
+    void compilesWindowsPortNativeLayer() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "WindowsPort native layer is Windows-only");
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("winnative-sources");
+        Path classesDir = Files.createTempDirectory("winnative-classes");
+        Path javaApiDir = Files.createTempDirectory("winnative-japi");
+        Path javaFile = sourceDir.resolve("HelloWorld.java");
+        Files.write(javaFile, helloWorldSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        List<String> compileArgs = new java.util.ArrayList<>();
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-classpath"); compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-bootclasspath"); compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+        compileArgs.add("-d"); compileArgs.add(classesDir.toString());
+        compileArgs.add(javaFile.toString());
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs), "HelloWorld should compile");
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        Files.copy(sourceDir.resolve("native_hello.c"), classesDir.resolve("native_hello.c"));
+
+        Path outputDir = Files.createTempDirectory("winnative-out");
+        runTranslator(classesDir, outputDir, "WinNativeApp", "windows");
+        Path srcRoot = outputDir.resolve("dist").resolve("WinNativeApp-src");
+        assertTrue(Files.exists(srcRoot.resolve("cn1_globals.h")), "translated runtime header should exist");
+
+        // Drop the WindowsPort native layer into the generated dist and compile
+        // each file against the real runtime headers.
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        String[] files = {
+                "cn1_windows.h", "cn1_windows_comc.h", "cn1_windows_dwrite.h",
+                "cn1_windows_window.cpp", "cn1_windows_graphics.cpp", "cn1_windows_text.c",
+                "cn1_windows_image.cpp", "cn1_windows_io.c", "cn1_windows_net.c",
+                "cn1_windows_dwrite.cpp"
+        };
+        for (String f : files) {
+            Files.copy(nativeDir.resolve(f), srcRoot.resolve(f), StandardCopyOption.REPLACE_EXISTING);
+        }
+        Path objDir = Files.createTempDirectory("winnative-obj");
+        List<String> failures = new java.util.ArrayList<>();
+
+        // Probe: does the ParparVM runtime header compile as C++? Direct2D and
+        // DirectWrite are C++-only, so the COM layer must be C++ and include
+        // cn1_globals.h; this decides whether that is viable.
+        Path probe = srcRoot.resolve("cn1_cpp_probe.cpp");
+        Files.write(probe, ("extern \"C\" {\n#include \"cn1_globals.h\"\n}\nint cn1_cpp_probe_fn(void) { return 0; }\n")
+                .getBytes(StandardCharsets.UTF_8));
+        List<String> probeCmd = Arrays.asList("clang-cl", "/c", "/TP", "/std:c++17", "/W3",
+                "/D_CRT_SECURE_NO_WARNINGS", "/I", srcRoot.toString(), probe.toString(),
+                "/Fo" + objDir.resolve("cn1_cpp_probe.obj"));
+        try {
+            runCommand(probeCmd, srcRoot);
+        } catch (Throwable t) {
+            failures.add("===== cn1_globals.h as C++ =====\n" + t.getMessage());
+        }
+        for (String f : files) {
+            if (!f.endsWith(".c") && !f.endsWith(".cpp")) {
+                continue;
+            }
+            List<String> cmd = new java.util.ArrayList<>(Arrays.asList("clang-cl", "/c", "/W3", "/D_CRT_SECURE_NO_WARNINGS"));
+            if (f.endsWith(".cpp")) {
+                cmd.add("/TP");
+                cmd.add("/std:c++17");
+            } else {
+                cmd.add("/std:c11");
+            }
+            cmd.add("/I");
+            cmd.add(srcRoot.toString());
+            cmd.add(srcRoot.resolve(f).toString());
+            cmd.add("/Fo" + objDir.resolve(f + ".obj"));
+            // Compile every file and collect failures so one run reports them all.
+            try {
+                runCommand(cmd, srcRoot);
+            } catch (Throwable t) {
+                failures.add("===== " + f + " =====\n" + t.getMessage());
+            }
+        }
+        assertTrue(failures.isEmpty(), "WindowsPort native compile failures:\n" + String.join("\n", failures));
     }
 
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {

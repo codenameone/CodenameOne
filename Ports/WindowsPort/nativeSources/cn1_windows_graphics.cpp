@@ -27,6 +27,9 @@
 #include <math.h>
 #include <stdlib.h>
 
+/* C++ unit (Direct2D is C++-only); keep C linkage for the bridge + helpers. */
+extern "C" {
+
 /*
  * cn1_windows_graphics.c -- Direct2D backed implementation of the Codename One
  * Graphics primitives for the native Windows port. Every WindowsNative graphics
@@ -520,5 +523,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawRGB___long_int_1ARRAY_int
     ID2D1Bitmap_Release(bmp);
     free(bgra);
 }
+
+} /* extern "C" */
 
 #endif /* _WIN32 */

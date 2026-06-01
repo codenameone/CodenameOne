@@ -578,10 +578,20 @@ public class ByteCodeTranslator {
         boolean executable = "windows".equalsIgnoreCase(appType);
         try (Writer writer = new OutputStreamWriter(Files.newOutputStream(cmakeLists.toPath()), StandardCharsets.UTF_8)) {
             writer.append("cmake_minimum_required(VERSION 3.10)\n");
-            writer.append("project(").append(appName).append(" LANGUAGES C)\n");
+            // The native Windows port mixes the translated C runtime with a C++
+            // layer for the COM APIs that have no C binding (DirectWrite), so the
+            // Windows executable enables CXX; everyone else stays C-only.
+            if (executable) {
+                writer.append("project(").append(appName).append(" LANGUAGES C CXX)\n");
+            } else {
+                writer.append("project(").append(appName).append(" LANGUAGES C)\n");
+            }
             // C11 for <stdatomic.h> (cn1_globals.h) and _Static_assert (Win32 shim);
             // supported by clang/clang-cl, gcc and Xcode's clang alike.
             writer.append("set(CMAKE_C_STANDARD 11)\n");
+            if (executable) {
+                writer.append("set(CMAKE_CXX_STANDARD 17)\n");
+            }
             writer.append("set(CN1_APP_SOURCE_ROOT \"")
                     .append(escapeCmakePath(srcRootPath))
                     .append("\")\n");
@@ -589,7 +599,9 @@ public class ByteCodeTranslator {
             writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
             if (executable) {
-                writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                // The port's nativeSources contribute the C++ DirectWrite layer.
+                writer.append("file(GLOB TRANSLATOR_CXX_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.cpp\")\n");
+                writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
                 // Math lives in the CRT under MSVC (no separate libm to link); every
                 // other platform needs an explicit libm link for the translated

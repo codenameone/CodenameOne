@@ -41,8 +41,11 @@
 #include "cn1_windows.h"
 #include <windowsx.h>   /* GET_X_LPARAM / GET_Y_LPARAM */
 
-/* The translated Java String -> UTF-8 helper lives in the runtime. */
-extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
+/* This unit is C++ (Direct2D has no C binding), but the ParparVM bridge
+ * functions and the shared helpers must keep C linkage so the translated C
+ * runtime links to them; the whole body is therefore wrapped in extern "C".
+ * stringToUTF8 and the other runtime helpers come from cn1_globals.h. */
+extern "C" {
 
 CN1WindowsContext cn1Win;
 
@@ -187,7 +190,9 @@ int cn1WinCreateWindow(const char* utf8Title, int width, int height) {
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = cn1WinWndProc;
     wc.hInstance = hInstance;
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    /* IDC_ARROW resolves to the ANSI MAKEINTRESOURCE without UNICODE defined;
+     * cast to the wide resource id for LoadCursorW. */
+    wc.hCursor = LoadCursorW(NULL, (LPCWSTR) IDC_ARROW);
     wc.lpszClassName = L"CodenameOneWindow";
     RegisterClassExW(&wc);
 
@@ -235,7 +240,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
 
     /* Direct2D factory + HWND render target sized to the client area. */
-    D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &IID_ID2D1Factory, NULL,
+    /* In C++ the COM REFIID/REFCLSID parameters are references, so the GUID is
+     * passed by value (no &). */
+    D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, IID_ID2D1Factory, NULL,
             (void**) &cn1Win.d2dFactory);
 
     RECT rc;
@@ -262,11 +269,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
     cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
 
-    /* DirectWrite + WIC factories used by the text and image layers. */
-    DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, &IID_IDWriteFactory,
-            (IUnknown**) &cn1Win.dwriteFactory);
-    CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
-            &IID_IWICImagingFactory, (void**) &cn1Win.wicFactory);
+    /* WIC factory for the image layer. The DirectWrite factory is created lazily
+     * inside the C++ text layer (cn1_windows_dwrite.cpp), not here. */
+    CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+            IID_IWICImagingFactory, (void**) &cn1Win.wicFactory);
 
     ShowWindow(cn1Win.hwnd, SW_SHOW);
     UpdateWindow(cn1Win.hwnd);
@@ -326,5 +332,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_waitForEvent___long(
     MsgWaitForMultipleObjectsEx(0, NULL, (DWORD) __cn1Arg1, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
     cn1WinPump();
 }
+
+} /* extern "C" */
 
 #endif /* _WIN32 */
