@@ -1,0 +1,221 @@
+=== Generate GraphQL client (`generate-graphql`)
+
+Generates a typed Codename One GraphQL client from a GraphQL SDL
+schema, optionally driven by a set of operation documents.  Writes one
+`@Mapped` record (Java 17+) or class (Java 8 target) per response shape
+and input type, a Java `enum` per GraphQL `enum`, and one
+`@GraphQLClient`-annotated interface carrying one method per operation.
+The generated files land in `common/src/main/java` so the project owns
+the contract; the matching client implementation and JSON mappers are
+emitted into `common/target/generated-sources` by the build-time
+annotation processors so the project source stays clean.
+
+The mojo is paired with the existing `process-annotations` pipeline:
+the generated `@Mapped` types trigger per-class JSON mapper generation
+and a `cn1app.MapperBootstrap` entry, while `@GraphQLClient` triggers
+per-interface `<Name>Impl` generation chained through
+`com.codename1.io.graphql.GraphQL.execute(...)` (queries and mutations)
+or `com.codename1.io.graphql.GraphQL.subscribe(...)` (subscriptions),
+plus a `cn1app.GraphQLClientBootstrap` that wires everything to the
+`com.codename1.io.graphql.GraphQLClients` registry (same splice pattern
+as `@Mapped` mappers and `@GrpcClient` clients).
+
+==== Usage example
+
+[source, bash]
+----
+mvn -pl common cn1:generate-graphql \
+    -Dcn1.graphql.schema=schema.graphqls \
+    -Dcn1.graphql.operations=operations.graphql \
+    -Dcn1.graphql.basePackage=com.example.starwars
+----
+
+Configuration:
+
+[cols="1,3", options="header"]
+|===
+| Property | Description
+
+| `-Dcn1.graphql.schema=PATH`
+| Local path to the GraphQL SDL schema (`.graphqls` / `.graphql`).
+Required: it supplies the type graph used to resolve field types.
+
+| `-Dcn1.graphql.basePackage=PKG`
+| Java package the generated sources are written under.  Models, enums,
+input types, and the `@GraphQLClient` interface all land directly in
+`<basePackage>`.
+
+| `-Dcn1.graphql.operations=PATH` (optional)
+| Path to a `.graphql` operation-document file, or a directory of them.
+When supplied the generator runs in the precise operations mode (one
+method and one response-type tree per named operation).  When omitted it
+falls back to the schema-only quick-start mode.
+
+| `-Dcn1.graphql.clientName=NAME` (optional)
+| Simple name of the generated `@GraphQLClient` interface.  Defaults to
+`GraphQLApi`.
+
+| `-Dcn1.graphql.endpoint=URL` (optional)
+| Default endpoint URL recorded on the generated annotation.  The
+effective endpoint is always the argument passed to `of(String endpoint)`.
+
+| `-Dcn1.graphql.maxDepth=N` (optional)
+| Maximum selection-set depth used by the schema-only quick-start mode.
+Defaults to `2`.
+
+| `-Dcn1.graphql.outputDirectory=DIR` (optional)
+| Defaults to `${project.basedir}/src/main/java`.
+
+| `-Dcn1.graphql.overwrite=false` (optional)
+| Defaults to `true`.  Set to `false` to preserve user edits to existing
+files (only missing files are written).
+|===
+
+==== Generation modes
+
+Unlike OpenAPI paths or gRPC service methods, a GraphQL schema does not
+enumerate the operations a client wants -- the client chooses which
+fields to select.  The goal therefore supports two modes:
+
+* **Operations mode** (recommended): supply `cn1.graphql.operations`.
+For each named `query` / `mutation` / `subscription` the generator emits
+one interface method plus a precise `@Mapped` response-type tree that
+mirrors exactly that operation's selection set (nested selections become
+nested generated types).  Referenced fragment definitions are inlined
+into the request document automatically.
+* **Schema-only quick-start mode**: omit `cn1.graphql.operations`.  For
+each field of the root `Query` / `Mutation` / `Subscription` type the
+generator emits one method whose selection set is auto-expanded to
+`cn1.graphql.maxDepth` levels, stopping at recursive types.  This is a
+convenience for getting started; it may over- or under-fetch, so prefer
+operations mode for production code.
+
+==== Generated output
+
+For a Star Wars schema and an `operations.graphql` declaring
+`query HeroName`, `mutation AddReview`, and
+`subscription OnReview`, the goal emits under `common/src/main/java`:
+
+[listing]
+----
+com/example/starwars/
+  Episode.java               // GraphQL enum -> Java enum
+  ReviewInput.java           // @Mapped input type
+  HeroNameData.java          // @Mapped query response root
+  HeroNameData_Hero.java     // nested selection type
+  AddReviewData.java         // @Mapped mutation response root
+  OnReviewData.java          // @Mapped subscription response root
+  StarWarsApi.java           // @GraphQLClient interface
+----
+
+GraphQL enums map to a generated Java `enum` in response types, input
+types, and method variables alike -- the JSON mapper binds enums by
+their `name()`.  Built-in scalars map to their boxed Java type
+(`Int` -> `Integer`, `Float` -> `Double`, `Boolean` -> `Boolean`,
+`String` / `ID` -> `String`); custom scalars fall back to `String`.
+
+The `@GraphQLClient` interface looks like:
+
+[source, java]
+----
+@GraphQLClient("https://api.example.com/graphql")
+public interface StarWarsApi {
+
+    @Query("query HeroName($episode: Episode) { hero(episode: $episode) { name } }")
+    void heroName(@Var("episode") Episode episode,
+                  @Header("Authorization") String bearerToken,
+                  OnComplete<GraphQLResponse<HeroNameData>> callback);
+
+    @Mutation("mutation AddReview($ep: Episode!, $review: ReviewInput!) { createReview(episode: $ep, review: $review) { stars } }")
+    void addReview(@Var("ep") Episode ep, @Var("review") ReviewInput review,
+                   @Header("Authorization") String bearerToken,
+                   OnComplete<GraphQLResponse<AddReviewData>> callback);
+
+    @Subscription("subscription OnReview($ep: Episode!) { reviewAdded(episode: $ep) { stars } }")
+    GraphQLSubscription onReview(@Var("ep") Episode ep,
+                                 @Header("Authorization") String bearerToken,
+                                 GraphQLSubscription.Handler<OnReviewData> handler);
+
+    static StarWarsApi of(String endpoint) {
+        return GraphQLClients.create(StarWarsApi.class, endpoint);
+    }
+}
+----
+
+Call sites use the static factory.  Queries and mutations report through
+an `OnComplete<GraphQLResponse<T>>`:
+
+[source, java]
+----
+StarWarsApi api = StarWarsApi.of("https://api.example.com/graphql");
+api.heroName(Episode.JEDI, "Bearer " + token, response -> {
+    if (response.isOk()) {
+        renderHero(response.getData().hero().name());
+    } else {
+        showError(response.getResponseErrorMessage());
+    }
+});
+----
+
+A subscription returns a `GraphQLSubscription` handle whose `cancel()`
+ends the stream:
+
+[source, java]
+----
+GraphQLSubscription sub = api.onReview(Episode.EMPIRE, "Bearer " + token,
+        new GraphQLSubscription.Handler<OnReviewData>() {
+            public void onNext(GraphQLResponse<OnReviewData> r) {
+                addReview(r.getData().reviewAdded().stars());
+            }
+            public void onError(GraphQLResponse<OnReviewData> r) {
+                showError(r.getResponseErrorMessage());
+            }
+            public void onComplete() { }
+        });
+// later:
+sub.cancel();
+----
+
+The `<Name>Impl` class that performs the request lives in
+`target/generated-sources` -- the project source never references it
+directly.  The build server probes the project zip for
+`cn1app.GraphQLClientBootstrap` and splices the registry wiring in,
+mirroring the existing `cn1app.MapperBootstrap` pattern.
+
+==== Wire protocol
+
+Queries and mutations are sent as an HTTP `POST` to the endpoint with a
+JSON body `{"query":...,"operationName":...,"variables":{...}}` and a
+`Content-Type: application/json` header.  The response envelope
+(`{"data":...,"errors":[...]}`) is parsed into a typed
+`GraphQLResponse<T>`; because a GraphQL response can carry both data and
+errors, `GraphQLResponse` exposes `getData()` and `getErrors()`
+independently and `isOk()` reports whether the `errors` array was empty.
+
+Subscriptions run over a WebSocket using the `graphql-transport-ws`
+protocol (offered via the `Sec-WebSocket-Protocol` handshake header):
+the client sends `connection_init`, waits for `connection_ack`, sends a
+`subscribe` message carrying the operation, and maps each `next`
+payload's `data` to `T` before delivering it to the handler.  The
+WebSocket endpoint defaults to the query endpoint with its scheme
+rewritten to `ws` / `wss`; pass a `ws://` / `wss://` URL to `of(...)` to
+override it.  All handler callbacks are dispatched on the EDT.
+
+==== Scope
+
+* Queries, mutations, and subscriptions.
+* GraphQL enums map to generated Java enums in every position (response
+fields, input fields, and method variables); unknown enum names decode
+to `null` rather than throwing.
+* Input object types map to generated `@Mapped` classes; variables of
+scalar, enum, input-object, and list types are supported.
+* Named and inline fragments are resolved against the schema and inlined
+into the generated response types and the request document.
+* Built-in scalars (`Int`, `Float`, `Boolean`, `String`, `ID`) map to
+their boxed Java types.  Custom scalars fall back to `String`.
+* `union` / `interface` selections are emitted with their common fields
+in the quick-start mode; use explicit operation documents with inline
+fragments for full polymorphic typing.
+* Authentication: a bearer token is exposed uniformly as a
+`@Header("Authorization") String bearerToken` parameter on every method,
+mirroring the OpenAPI and gRPC bearer-token slots.
