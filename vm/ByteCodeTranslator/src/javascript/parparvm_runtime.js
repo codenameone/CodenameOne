@@ -1461,6 +1461,19 @@ const jvm = {
             args: transferableArgs
           }]);
         }
+        if (jsoRetries > 0) {
+          // Direct evidence the transient-degradation retry fired (and whether
+          // it recovered the real object). Rate-limited.
+          if (!jvm._jsoRetryLogged) jvm._jsoRetryLogged = 0;
+          if (jvm._jsoRetryLogged < 8) {
+            jvm._jsoRetryLogged++;
+            try {
+              vmDiag('JSO_RETRY', 'member', String(bridge.member));
+              vmDiag('JSO_RETRY', 'retries', String(jsoRetries));
+              vmDiag('JSO_RETRY', 'recovered', isDegradedObject(hostResult) ? 'no' : 'yes');
+            } catch (_e) {}
+          }
+        }
         let workingHostResult = hostResult;
         if (isDegradedObject(hostResult) && typeof hostResult === 'number') {
           if (!jvm._numberForObjLogged) jvm._numberForObjLogged = 0;
