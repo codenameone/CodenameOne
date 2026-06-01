@@ -4,14 +4,28 @@ name: ParparVM Java Tests (Windows)
 # (clang-cl on the MSVC ABI) and runs the translator test suite, including the
 # clean-target integration test that translates Java -> C, compiles it with
 # clang-cl and runs the resulting binary. This proves translated C compiles and
-# executes on Windows via LLVM. The Linux workflow (parparvm-tests.yml) still
-# owns the quality-report publishing and release jars.
+# executes on Windows via LLVM, and -- via the "windows" app-type case -- that
+# the native Windows port's Direct2D/DirectWrite/Win32 link set resolves. The
+# Linux workflow (parparvm-tests.yml) still owns the quality-report publishing
+# and release jars.
+#
+# The build runs on a matrix of both Windows architectures:
+#   * x64   (windows-latest)  -- the reliable gate; Intel/AMD desktops.
+#   * arm64 (windows-11-arm)  -- matches Apple-Silicon dev VMs and Arm desktops.
+#
+# windows-11-arm is a public-preview runner that is free ONLY on public
+# repositories (it fails on private repos), and its image differs from x64 (some
+# tooling / JDK architectures are not published for Windows-on-Arm). The arm64
+# leg is therefore marked experimental (continue-on-error) so it gives signal
+# without blocking merges while the image's toolchain is nailed down; fail-fast
+# is disabled so the x64 leg always runs to completion.
 
 on:
   pull_request:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
+      - 'Ports/WindowsPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -20,22 +34,40 @@ on:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
+      - 'Ports/WindowsPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
 
 jobs:
   vm-tests-windows:
-    runs-on: windows-latest
+    name: clean-target (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x64
+            runner: windows-latest
+            msvc_arch: amd64
+            experimental: false
+          - name: arm64
+            runner: windows-11-arm
+            msvc_arch: arm64
+            experimental: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
       # environment has to be on PATH for the spawned cmake/clang-cl to work.
+      # The arch is matched to the runner so the arm64 leg builds native arm64.
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
 
       - name: Set up Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
@@ -47,23 +79,31 @@ jobs:
           ninja --version
           cmake --version
 
-      # Install JDKs and export their paths (CompilerHelper reads JDK_*_HOME).
+      # Install JDKs and export their paths (CompilerHelper reads JDK_*_HOME and
+      # also auto-discovers any others). Temurin does not publish Windows/aarch64
+      # builds for JDK 8/11, so those legs are x64-only; 17/21/25 run on both
+      # architectures, which still exercises every JavaAPI bytecode level the
+      # clean target supports.
       - name: Set up JDK 8
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
       - name: Save JDK 8 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       - name: Set up JDK 11
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
       - name: Save JDK 11 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_11_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
@@ -94,19 +134,29 @@ jobs:
         shell: pwsh
         run: echo "JDK_25_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
-      # Restore JDK 8 as the active runner JDK (cache is on the first JDK 8 above)
-      - name: Restore JDK 8
+      # Restore the active runner JDK that drives Maven: JDK 8 on x64 (matching
+      # the cache above), and JDK 17 on arm64 where 8 is unavailable.
+      - name: Restore JDK 8 (x64)
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
+      - name: Restore JDK 17 (arm64)
+        if: ${{ matrix.name == 'arm64' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       # Only the native-compilation tests are run here: this runner exists to
       # prove the translated C compiles with clang-cl (LLVM) and executes on
       # Windows, which is exactly what CleanTargetIntegrationTest does (translate
-      # Java -> C -> cmake/clang-cl build -> run the binary). The rest of the vm
-      # suite is platform-agnostic Java already covered by parparvm-tests.yml on
-      # Linux, and the JavaScript integration tests additionally require Node.
+      # Java -> C -> cmake/clang-cl build -> run the binary), including the
+      # "windows" app-type case that links the Direct2D/DirectWrite/Win32 stack.
+      # The rest of the vm suite is platform-agnostic Java already covered by
+      # parparvm-tests.yml on Linux, and the JavaScript integration tests
+      # additionally require Node.
       - name: Run ParparVM clean-target build on Windows (clang-cl)
         working-directory: vm
         shell: pwsh
