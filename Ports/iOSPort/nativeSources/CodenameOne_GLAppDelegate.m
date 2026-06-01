@@ -788,6 +788,43 @@ extern void repaintUI();
 static NSArray<NSString *> *cn1MacMenuLabels = nil;
 static NSString *cn1MacPendingTitle = nil;
 static BOOL cn1MacObserverRegistered = NO;
+static BOOL cn1MacUndecorated = NO;
+static BOOL cn1MacUndecoratedSet = NO;
+
+// Applies the "custom" desktop title-bar mode to the host NSWindow: hide the AppKit title bar so the
+// CN1 Toolbar (drawn at the top of the content) becomes the window's title bar, while keeping the
+// window resizable and draggable. Passing the un-decorated flag back to NO restores a titled window.
+// All AppKit access goes through the Obj-C runtime so the Catalyst build needs no AppKit link.
+static void cn1ApplyMacWindowChrome(void) API_AVAILABLE(ios(13.0)) {
+    if (!cn1MacUndecoratedSet) { return; }
+    // NSWindowStyleMaskFullSizeContentView == 1 << 15; NSWindowTitleHidden == 1, NSWindowTitleVisible == 0.
+    const NSUInteger CN1_FULL_SIZE_CONTENT = (1UL << 15);
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { continue; }
+            if ([nsWindow respondsToSelector:@selector(styleMask)] && [nsWindow respondsToSelector:@selector(setStyleMask:)]) {
+                NSUInteger mask = ((NSUInteger (*)(id, SEL))objc_msgSend)(nsWindow, @selector(styleMask));
+                if (cn1MacUndecorated) { mask |= CN1_FULL_SIZE_CONTENT; } else { mask &= ~CN1_FULL_SIZE_CONTENT; }
+                ((void (*)(id, SEL, NSUInteger))objc_msgSend)(nsWindow, @selector(setStyleMask:), mask);
+            }
+            if ([nsWindow respondsToSelector:@selector(setTitlebarAppearsTransparent:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setTitlebarAppearsTransparent:), cn1MacUndecorated ? YES : NO);
+            }
+            if ([nsWindow respondsToSelector:@selector(setTitleVisibility:)]) {
+                ((void (*)(id, SEL, NSInteger))objc_msgSend)(nsWindow, @selector(setTitleVisibility:), cn1MacUndecorated ? (NSInteger)1 : (NSInteger)0);
+            }
+            if ([nsWindow respondsToSelector:@selector(setMovableByWindowBackground:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setMovableByWindowBackground:), cn1MacUndecorated ? YES : NO);
+            }
+        }
+    }
+}
 
 static void cn1ApplyMacWindowTitle(void) API_AVAILABLE(ios(13.0)) {
     if (cn1MacPendingTitle == nil) { return; }
@@ -817,6 +854,7 @@ static void cn1RegisterMacObserver(void) API_AVAILABLE(ios(13.0)) {
                                                        queue:[NSOperationQueue mainQueue]
                                                   usingBlock:^(NSNotification *note) {
         cn1ApplyMacWindowTitle();
+        cn1ApplyMacWindowChrome();
         [[UIMenuSystem mainSystem] setNeedsRebuild];
     }];
 }
@@ -826,6 +864,15 @@ void CN1SetMacWindowTitle(NSString *title) {
         cn1MacPendingTitle = [title copy];
         cn1RegisterMacObserver();
         dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowTitle(); });
+    }
+}
+
+void CN1SetMacWindowUndecorated(BOOL undecorated) {
+    if (@available(iOS 13.0, *)) {
+        cn1MacUndecorated = undecorated;
+        cn1MacUndecoratedSet = YES;
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowChrome(); });
     }
 }
 

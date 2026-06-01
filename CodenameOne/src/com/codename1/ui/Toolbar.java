@@ -2580,6 +2580,55 @@ public class Toolbar extends Container {
         }
     }
 
+    /// Wires the visible Toolbar to act as the draggable title bar of an undecorated desktop window
+    /// (the {@code custom} desktop title-bar mode). The listener is registered at the form level (so
+    /// it fires reliably for every pointer drag) and starts a window move only when the press falls
+    /// within the Toolbar's painted band. Inert on mobile (never invoked there).
+    private void installToolbarWindowDrag(Form parent) {
+        if (parent == null) {
+            return;
+        }
+        ToolbarWindowDrag drag = new ToolbarWindowDrag(this);
+        parent.addPointerPressedListener(drag);
+        parent.addPointerDraggedListener(drag);
+        parent.addPointerReleasedListener(drag);
+    }
+
+    /// @return true when the given form-relative Y coordinate falls within this Toolbar's painted
+    /// band. Used in the desktop {@code custom} mode to start a window drag only from the title bar.
+    boolean isWithinTitleBarBand(int y) {
+        int top = getAbsoluteY();
+        return y >= top && y <= top + getHeight();
+    }
+
+    /// Drives undecorated-window dragging from the Toolbar title region in the desktop {@code custom}
+    /// title-bar mode. A single named (static) class that handles press / drag / release.
+    private static final class ToolbarWindowDrag implements ActionListener {
+        private final Toolbar toolbar;
+        private boolean dragging;
+
+        ToolbarWindowDrag(Toolbar toolbar) {
+            this.toolbar = toolbar;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            ActionEvent.Type t = evt.getEventType();
+            if (t == ActionEvent.Type.PointerPressed) {
+                dragging = toolbar.isWithinTitleBarBand(evt.getY());
+                if (dragging) {
+                    Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
+                }
+            } else if (t == ActionEvent.Type.PointerDrag) {
+                if (dragging) {
+                    Display.impl.dragNativeWindow(evt.getX(), evt.getY());
+                }
+            } else {
+                dragging = false;
+            }
+        }
+    }
+
     /// Returns the associated SideMenuBar object of this Toolbar.
     ///
     /// #### Returns
@@ -3115,16 +3164,12 @@ public class Toolbar extends Container {
                 parent.removeComponentFromForm(ta);
             }
             super.initMenuBar(parent);
-            if (parent.isDesktopNativeChrome()) {
-                // desktop native/custom chrome: keep the Toolbar object (so the command API and
-                // command harvesting work) but never attach it to the form, so no title strip is
-                // painted. The title goes to the OS window and commands go to the native menu bar.
+            if (parent.isDesktopHideToolbar()) {
+                // desktop "native" mode: keep the Toolbar object (so the command API and command
+                // harvesting work) but never attach it to the form, so no title strip is painted.
+                // The title goes to the OS window and commands go to the native menu bar.
                 initialized = true;
                 setTitle(parent.getTitle());
-                if ("custom".equals(parent.getDesktopTitleBarMode())) {
-                    // custom mode draws its own CN1 title bar with caption buttons + drag region
-                    parent.installCustomWindowChrome();
-                }
                 parent.revalidate();
                 initTitleBarStatus();
                 return;
@@ -3142,6 +3187,11 @@ public class Toolbar extends Container {
 
             initialized = true;
             setTitle(parent.getTitle());
+            if (parent.isDesktopToolbarTitle()) {
+                // desktop "custom" mode: the visible Toolbar IS the window title bar - dragging it
+                // moves the (undecorated) window. Commands also bridge to the native menu bar.
+                installToolbarWindowDrag(parent);
+            }
             parent.revalidate();
             initTitleBarStatus();
             Display.getInstance().callSerially(new Runnable() {

@@ -818,6 +818,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         super.setCurrentForm(f);
         syncMacWindowAppearance(f);
+        syncMacDesktopChrome(f);
+        // Push the form title to the OS window for every desktop mode (unchanged from before); in
+        // "custom" mode the title bar is hidden so this is invisible but harmless.
         if (isDesktop() && f != null && !(f instanceof Dialog)) {
             pushMacWindowTitle(f);
         }
@@ -825,10 +828,34 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isNativeTitle() {
-        // On Mac Catalyst, when the app opts into desktop native chrome, the form title belongs in
-        // the native window title bar and the CN1 Toolbar is suppressed. Opt-in only: defaults to
-        // the legacy toolbar so existing Catalyst apps are unaffected.
-        return isDesktop() && !"toolbar".equals(getDesktopTitleBarMode());
+        // On Mac Catalyst, only the "native" desktop title-bar mode puts the form title into the OS
+        // window title bar (and hides the CN1 Toolbar). In "custom" mode the visible Toolbar is the
+        // title bar, so the OS title is not used. Opt-in only: defaults to toolbar (unchanged).
+        return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
+    // native call is only made when the mode actually changes.
+    private String lastMacChromeMode;
+
+    /// Applies the desktop title-bar mode to the host macOS window chrome: the {@code custom} mode
+    /// undecorates the window so the CN1 Toolbar becomes the title bar. The {@code native} and
+    /// {@code toolbar} modes leave the window chrome completely untouched, so existing Catalyst apps
+    /// are byte-for-byte unaffected. No-op off the Mac desktop.
+    private void syncMacDesktopChrome(Form f) {
+        if (f == null || !isDesktop()) {
+            return;
+        }
+        String mode = getDesktopTitleBarMode();
+        if (mode.equals(lastMacChromeMode)) {
+            return;
+        }
+        lastMacChromeMode = mode;
+        // Only the "custom" mode touches the native window. Non-custom modes never call into the
+        // native chrome, preserving the exact prior window appearance for existing apps.
+        if ("custom".equals(mode)) {
+            nativeInstance.setMacWindowUndecorated(true);
+        }
     }
 
     @Override

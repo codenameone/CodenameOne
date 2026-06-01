@@ -767,6 +767,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     // Press offset within the title bar at the start of a custom-chrome window drag.
     private int nativeWindowDragOffsetX;
     private int nativeWindowDragOffsetY;
+    // Guards the one-time undecoration of the desktop window in the "custom" title-bar mode.
+    private boolean desktopCustomWindowConfigured;
+    // Active edge-resize state for the undecorated "custom"-mode window (driven from the glass pane).
+    private static final int RESIZE_NORTH = 1;
+    private static final int RESIZE_SOUTH = 2;
+    private static final int RESIZE_WEST = 4;
+    private static final int RESIZE_EAST = 8;
+    private int desktopResizeEdges;
+    private java.awt.Rectangle desktopResizeStartBounds;
+    private java.awt.Point desktopResizeStartMouse;
     /**
      * The simulatorNativeTheme value that {@link #loadSkinFile(InputStream, JFrame)}
      * last applied as the native-theme override. Useful for tests that
@@ -1212,9 +1222,124 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
         }
-        if (isDesktopNativeChromeMode() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+        if (isDesktopCustomTitleBarMode() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            configureDesktopCustomWindow();
+        } else if (isNativeTitle() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
             pushWindowTitle(f);
         }
+    }
+
+    /// @return true when running on the desktop with the {@code custom} title-bar mode, where the
+    /// CN1 Toolbar acts as the window title bar on an undecorated, edge-resizable window.
+    private boolean isDesktopCustomTitleBarMode() {
+        return isDesktop() && "custom".equals(resolveDesktopTitleBarMode());
+    }
+
+    /// One-time setup for the {@code custom} desktop title-bar mode: strips the OS title bar from the
+    /// app window so the visible CN1 Toolbar becomes the window's title bar. The window stays
+    /// edge-resizable (handled by the glass-pane dispatcher) and is moved by dragging the Toolbar.
+    /// Runs on the AWT event thread; undecoration happens before the window is first shown so there
+    /// is no flON.
+    private void configureDesktopCustomWindow() {
+        if (desktopCustomWindowConfigured) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        desktopCustomWindowConfigured = true;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (frame.isUndecorated()) {
+                    return;
+                }
+                boolean wasVisible = frame.isVisible();
+                frame.dispose();
+                frame.setUndecorated(true);
+                if (wasVisible) {
+                    frame.setVisible(true);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            EventQueue.invokeLater(r);
+        }
+    }
+
+    /// Maps a point (in unscaled glass-pane / content coordinates) to the set of window edges within
+    /// the resize hot-zone, as a bitmask of {@code RESIZE_*}. Returns 0 when the point is in the
+    /// interior. Only meaningful in the {@code custom} desktop title-bar mode.
+    private int desktopResizeEdgesAt(int x, int y, int w, int h) {
+        final int margin = 6;
+        int edges = 0;
+        if (x <= margin) {
+            edges |= RESIZE_WEST;
+        } else if (x >= w - margin) {
+            edges |= RESIZE_EAST;
+        }
+        if (y <= margin) {
+            edges |= RESIZE_NORTH;
+        } else if (y >= h - margin) {
+            edges |= RESIZE_SOUTH;
+        }
+        return edges;
+    }
+
+    /// @return the AWT resize cursor for the given {@code RESIZE_*} edge bitmask, or the default
+    /// cursor when no edge is set.
+    private java.awt.Cursor desktopResizeCursor(int edges) {
+        switch (edges) {
+            case RESIZE_NORTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.N_RESIZE_CURSOR);
+            case RESIZE_SOUTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.S_RESIZE_CURSOR);
+            case RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.W_RESIZE_CURSOR);
+            case RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.E_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NW_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NE_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SW_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SE_RESIZE_CURSOR);
+            default: return java.awt.Cursor.getDefaultCursor();
+        }
+    }
+
+    /// Applies a live edge-resize drag to the undecorated {@code custom}-mode window, using the real
+    /// screen mouse position against the bounds captured when the drag started.
+    private void desktopApplyResize() {
+        final JFrame frame = findTopFrame();
+        if (frame == null || desktopResizeStartBounds == null || desktopResizeStartMouse == null) {
+            return;
+        }
+        java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+        if (pi == null) {
+            return;
+        }
+        java.awt.Point m = pi.getLocation();
+        int dx = m.x - desktopResizeStartMouse.x;
+        int dy = m.y - desktopResizeStartMouse.y;
+        java.awt.Rectangle b = new java.awt.Rectangle(desktopResizeStartBounds);
+        final int minW = 200;
+        final int minH = 120;
+        if ((desktopResizeEdges & RESIZE_EAST) != 0) {
+            b.width = Math.max(minW, desktopResizeStartBounds.width + dx);
+        }
+        if ((desktopResizeEdges & RESIZE_SOUTH) != 0) {
+            b.height = Math.max(minH, desktopResizeStartBounds.height + dy);
+        }
+        if ((desktopResizeEdges & RESIZE_WEST) != 0) {
+            int nw = Math.max(minW, desktopResizeStartBounds.width - dx);
+            b.x = desktopResizeStartBounds.x + (desktopResizeStartBounds.width - nw);
+            b.width = nw;
+        }
+        if ((desktopResizeEdges & RESIZE_NORTH) != 0) {
+            int nh = Math.max(minH, desktopResizeStartBounds.height - dy);
+            b.y = desktopResizeStartBounds.y + (desktopResizeStartBounds.height - nh);
+            b.height = nh;
+        }
+        frame.setBounds(b);
+        frame.validate();
     }
 
     @Override
@@ -7331,7 +7456,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
             }
         }
-        if (findTopFrame() != null && retinaScale > 1.0) {
+        if (findTopFrame() != null && (retinaScale > 1.0 || isDesktopCustomTitleBarMode())) {
+            // a glass pane is required on retina (coordinate scaling) and in the desktop "custom"
+            // title-bar mode (the glass-pane dispatcher implements undecorated-window edge resize)
             findTopFrame().setGlassPane(new CN1GlassPane());
             findTopFrame().getGlassPane().setVisible(true);
         }
@@ -16615,10 +16742,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseMoved(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
         public void mouseDragged(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
@@ -16635,12 +16768,62 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mousePressed(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             isPress = true;
             redispatchMouseEvent(e);
             isPress = false;
         }
 
+        /// In the {@code custom} desktop title-bar mode the window is undecorated, so the glass pane
+        /// implements edge-resize: while the pointer is in an edge hot-zone (or a resize drag is in
+        /// progress) the event drives the window resize instead of being redispatched to the CN1
+        /// canvas. Returns true when the event was consumed for resizing. No-op in every other mode.
+        private boolean handleDesktopEdgeResize(MouseEvent e) {
+            if (!isDesktopCustomTitleBarMode()) {
+                return false;
+            }
+            java.awt.Component comp = e.getComponent();
+            int w = comp.getWidth();
+            int h = comp.getHeight();
+            int id = e.getID();
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                if (edges != 0) {
+                    desktopResizeEdges = edges;
+                    JFrame fr = findTopFrame();
+                    if (fr != null) {
+                        desktopResizeStartBounds = fr.getBounds();
+                    }
+                    java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+                    desktopResizeStartMouse = pi != null ? pi.getLocation() : null;
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_DRAGGED) {
+                if (desktopResizeEdges != 0) {
+                    desktopApplyResize();
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_MOVED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                comp.setCursor(desktopResizeCursor(edges));
+                return edges != 0;
+            }
+            return false;
+        }
+
         public void mouseReleased(MouseEvent e) {
+            if (desktopResizeEdges != 0) {
+                desktopResizeEdges = 0;
+                desktopResizeStartBounds = null;
+                desktopResizeStartMouse = null;
+                return;
+            }
             redispatchMouseEvent(e);
         }
 

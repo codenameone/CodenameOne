@@ -4357,11 +4357,11 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
-    /// bar + native menu bar), {@code "custom"} (undecorated window with CN1-drawn chrome) or
-    /// {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"} by default; desktop
-    /// ports override this when running on the desktop. This is the authoritative source consulted
-    /// by `Form.isDesktopNativeChrome()` - more robust than a theme constant, which not all ports
-    /// propagate identically.
+    /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
+    /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}
+    /// by default; desktop ports override this when running on the desktop. This is the
+    /// authoritative source consulted by `Form.isDesktopNativeChrome()` - more robust than a theme
+    /// constant, which not all ports propagate identically.
     ///
     /// #### Returns
     ///
