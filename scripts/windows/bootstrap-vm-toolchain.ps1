@@ -43,12 +43,18 @@ if (-not (Test-Path "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\
     choco install visualstudio2022buildtools -y --no-progress
 }
 
-# --- Install the real C++ components by driving vs_installer.exe directly --
-# This is the reliable path: --wait blocks until the components are actually
-# downloaded and installed; exit 0/3010/1641 all mean success (3010/1641 = a
-# reboot is advisable but the bits are in place).
-$vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+# --- Install the real C++ components by driving the VS bootstrapper --------
+# The bootstrapper (vs_BuildTools.exe) supports --wait, which blocks until the
+# components are actually downloaded and installed, and modifies the existing
+# instance via --installPath. (vs_installer.exe does NOT accept --wait and
+# returns 87/invalid-parameter; the Chocolatey workload package's --add
+# passthrough silently installs nothing -- hence driving the bootstrapper.)
+# Exit 0/3010/1641 all mean success (3010/1641 = reboot advisable, bits placed).
 $buildToolsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools"
+$bootstrapper = Join-Path $env:TEMP 'vs_BuildTools.exe'
+Write-Host 'Downloading VS Build Tools bootstrapper...'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_BuildTools.exe' -OutFile $bootstrapper
 $components = @(
     'Microsoft.VisualStudio.Workload.VCTools',
     'Microsoft.VisualStudio.Component.VC.Tools.ARM64',
@@ -58,16 +64,16 @@ $components = @(
     'Microsoft.VisualStudio.Component.Windows11SDK.22621',
     'Microsoft.VisualStudio.Component.VC.CMake.Project'
 )
-$addArgs = @()
-foreach ($c in $components) { $addArgs += '--add'; $addArgs += $c }
-$args = @('modify', '--installPath', $buildToolsPath) + $addArgs + @('--quiet', '--wait', '--norestart')
+$installArgs = @('--installPath', $buildToolsPath)
+foreach ($c in $components) { $installArgs += '--add'; $installArgs += $c }
+$installArgs += @('--includeRecommended', '--quiet', '--wait', '--norestart')
 Write-Host 'Installing VC++ components (MSVC ARM64/x64 + clang-cl + Windows SDK + CMake/Ninja)...'
 Write-Host '(this downloads several GB and can take 20-40 min)'
-$p = Start-Process -FilePath $vsInstaller -ArgumentList $args -Wait -PassThru
+$p = Start-Process -FilePath $bootstrapper -ArgumentList $installArgs -Wait -PassThru
 if ($p.ExitCode -notin 0, 3010, 1641) {
-    throw "vs_installer modify failed with exit code $($p.ExitCode). See %ProgramData%\Microsoft\VisualStudio\Packages\_Instances logs."
+    throw "VS bootstrapper failed with exit code $($p.ExitCode). See %ProgramData%\Microsoft\VisualStudio\Packages\_Instances logs."
 }
-Write-Host "VC++ components installed (vs_installer exit $($p.ExitCode))."
+Write-Host "VC++ components installed (bootstrapper exit $($p.ExitCode))."
 
 # --- Stand-alone CMake / Ninja / Maven / JDK 17 ---------------------------
 Write-Host 'Installing CMake, Ninja, Maven, Temurin JDK 17...'
