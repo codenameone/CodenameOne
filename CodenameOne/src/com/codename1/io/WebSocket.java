@@ -220,6 +220,29 @@ public final class WebSocket {
         return this;
     }
 
+    /// Offer one or more subprotocols (RFC 6455 `Sec-WebSocket-Protocol`),
+    /// in preference order, to negotiate during the handshake. Must be
+    /// called before [connect]. After the connection opens,
+    /// [getSelectedSubprotocol] returns the one the server chose (or null).
+    /// Returns `this` for chaining.
+    ///
+    /// ```
+    /// WebSocket.build("wss://api.example.com/graphql")
+    ///     .subprotocols("graphql-transport-ws")
+    ///     .onConnect(w -> Log.p("using " + w.getSelectedSubprotocol()))
+    ///     .connect();
+    /// ```
+    public WebSocket subprotocols(String... protocols) {
+        impl.setRequestedSubprotocols(protocols);
+        return this;
+    }
+
+    /// The subprotocol the server selected during the handshake, or null
+    /// when none was negotiated. Valid once the [ConnectHandler] has fired.
+    public String getSelectedSubprotocol() {
+        return impl.getSelectedSubprotocol();
+    }
+
     /// Start the handshake using the platform default connect timeout.
     /// Returns `this` for chaining; success is signalled asynchronously
     /// via the registered [ConnectHandler].

@@ -9261,10 +9261,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang
     return (JAVA_LONG)impl;
 }
 
-void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs) {
+void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs, JAVA_OBJECT subprotocolsCsv) {
     POOL_BEGIN();
     CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
-    [impl connectWithTimeoutMs:timeoutMs];
+    NSString* csv = subprotocolsCsv == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG subprotocolsCsv);
+    NSArray* protocols = (csv != nil && [csv length] > 0)
+        ? [csv componentsSeparatedByString:@","] : nil;
+    [impl connectWithTimeoutMs:timeoutMs protocols:protocols];
     POOL_END();
 }
 

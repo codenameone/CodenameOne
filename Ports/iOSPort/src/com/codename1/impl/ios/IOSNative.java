@@ -613,7 +613,7 @@ public final class IOSNative {
     public native void writeToSocketStream(long socket, byte[] data, int offset, int len);
 
     public native long createWebSocketNative(int connectionId, String url);
-    public native void connectWebSocketNative(long handle, int connectTimeoutMs);
+    public native void connectWebSocketNative(long handle, int connectTimeoutMs, String subprotocolsCsv);
     public native void closeWebSocketNative(long handle);
     public native void sendWebSocketTextNative(long handle, String text);
     public native void sendWebSocketBinaryNative(long handle, byte[] data);
