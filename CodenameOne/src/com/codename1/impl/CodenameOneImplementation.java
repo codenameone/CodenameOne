@@ -10205,7 +10205,7 @@ public abstract class CodenameOneImplementation {
     /// platform has no permission model and immediately reports the permission as granted.
     public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
         if (callback != null) {
-            callback.notificationPermissionResult(new NotificationPermissionResult(true, NotificationPermissionResult.AUTH_AUTHORIZED));
+            callback.notificationPermissionResult(new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED));
         }
     }
 

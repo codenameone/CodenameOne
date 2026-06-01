@@ -644,13 +644,19 @@ public class LocalNotification {
 
         /// Creates an action with an icon.
         ///
+        /// The icon is a platform resource NAME, not a numeric id (Codename One has no
+        /// numeric resource ids). On Android it is the name of a drawable bundled in the
+        /// `native/android` folder (the build copies it into `res/drawable`), resolved at
+        /// runtime by name; the file extension is optional and ignored. iOS notification
+        /// action buttons do not display icons, so the value is ignored there.
+        ///
         /// #### Parameters
         ///
         /// - `id`: the action id reported back when the user taps the action
         ///
         /// - `title`: the button label
         ///
-        /// - `icon`: an icon name for the action (not supported on all platforms)
+        /// - `icon`: the drawable resource name for the action (Android only)
         public Action(String id, String title, String icon) {
             this.id = id;
             this.title = title;
@@ -675,11 +681,12 @@ public class LocalNotification {
             return title;
         }
 
-        /// Returns the icon name.
+        /// Returns the drawable resource name used for the action icon on Android, or null.
+        /// See `Action#Action(String, String, String)` for how it is resolved.
         ///
         /// #### Returns
         ///
-        /// the icon, or null
+        /// the drawable resource name, or null
         public String getIcon() {
             return icon;
         }

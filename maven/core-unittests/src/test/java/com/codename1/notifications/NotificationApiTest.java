@@ -32,18 +32,23 @@ class NotificationApiTest {
     @Test
     void permissionResultGrantedSemantics() {
         NotificationPermissionResult authorized =
-                new NotificationPermissionResult(true, NotificationPermissionResult.AUTH_AUTHORIZED);
+                new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED);
         assertTrue(authorized.isGranted());
         assertFalse(authorized.isProvisional());
 
         NotificationPermissionResult provisional =
-                new NotificationPermissionResult(true, NotificationPermissionResult.AUTH_PROVISIONAL);
+                new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.PROVISIONAL);
         assertTrue(provisional.isProvisional());
+        assertTrue(provisional.isGranted());
 
         NotificationPermissionResult denied =
-                new NotificationPermissionResult(false, NotificationPermissionResult.AUTH_DENIED);
+                new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.DENIED);
         assertFalse(denied.isGranted());
-        assertEquals(NotificationPermissionResult.AUTH_DENIED, denied.getAuthorizationLevel());
+        assertEquals(NotificationPermissionResult.AuthorizationLevel.DENIED, denied.getAuthorizationLevel());
+
+        NotificationPermissionResult notDetermined =
+                new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.NOT_DETERMINED);
+        assertFalse(notDetermined.isGranted());
     }
 
     @Test

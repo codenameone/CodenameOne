@@ -1975,6 +1975,21 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Time-sensitive / critical notification entitlements. These require a
+            // matching capability to be enabled on the Apple App ID, so auto-injecting them
+            // from mere notification usage would break code signing for apps that have not
+            // provisioned the capability. They are therefore opt-in via build hints:
+            //   ios.timeSensitiveNotifications=true -> com.apple.developer.usernotifications.time-sensitive
+            //   ios.criticalAlerts=true             -> com.apple.developer.usernotifications.critical-alerts
+            if ("true".equals(request.getArg("ios.timeSensitiveNotifications", "false"))
+                    && request.getArg("ios.entitlements.com.apple.developer.usernotifications.time-sensitive", null) == null) {
+                request.putArgument("ios.entitlements.com.apple.developer.usernotifications.time-sensitive", "true");
+            }
+            if ("true".equals(request.getArg("ios.criticalAlerts", "false"))
+                    && request.getArg("ios.entitlements.com.apple.developer.usernotifications.critical-alerts", null) == null) {
+                request.putArgument("ios.entitlements.com.apple.developer.usernotifications.critical-alerts", "true");
+            }
+
             // Deeper-network connectivity (WiFi info / NEHotspotConfiguration
             // / Bonjour). Each block is gated on a scanner flag so apps that
             // never touch the API see no entitlement or plist changes -- this

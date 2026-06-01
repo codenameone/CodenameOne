@@ -189,11 +189,20 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
                 actionIntent.setData(android.net.Uri.parse("http://codenameone.com/a?LocalNotificationID="
                         + android.net.Uri.encode(localNotif.getId()) + "&action=" + android.net.Uri.encode(a.getId())));
                 PendingIntent actionPending = AndroidImplementation.createMutablePendingIntent(context, requestCode++, actionIntent);
-                int iconId;
-                try {
-                    iconId = Integer.parseInt(a.getIcon());
-                } catch (Exception ex) {
-                    iconId = 0;
+                // The action icon is a drawable resource NAME (Codename One has no R.drawable
+                // int constants). Resolve it by name against the generated res/drawable; an
+                // unknown / null name yields 0 (no icon), which the action button tolerates.
+                int iconId = 0;
+                String iconName = a.getIcon();
+                if (iconName != null && iconName.length() > 0) {
+                    if (iconName.startsWith("/")) {
+                        iconName = iconName.substring(1);
+                    }
+                    int dot = iconName.lastIndexOf('.');
+                    if (dot > 0) {
+                        iconName = iconName.substring(0, dot);
+                    }
+                    iconId = ctx.getResources().getIdentifier(iconName, "drawable", ctx.getApplicationInfo().packageName);
                 }
                 try {
                     if (NotificationCompatWrapper.ActionWrapper.BuilderWrapper.isSupported()) {

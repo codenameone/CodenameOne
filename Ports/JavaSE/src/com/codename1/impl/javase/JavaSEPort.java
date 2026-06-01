@@ -1107,7 +1107,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                callback.notificationPermissionResult(new NotificationPermissionResult(true, NotificationPermissionResult.AUTH_AUTHORIZED));
+                callback.notificationPermissionResult(new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED));
             }
         });
     }

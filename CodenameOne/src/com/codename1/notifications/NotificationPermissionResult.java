@@ -23,12 +23,12 @@
 package com.codename1.notifications;
 
 /// The result of a notification permission request delivered to a
-/// `NotificationPermissionCallback`. It exposes whether the user granted permission
-/// and the granular authorization level that was returned by the platform.
+/// `NotificationPermissionCallback`. It exposes the granular authorization level the
+/// platform returned.
 ///
-/// The authorization levels mirror the iOS `UNAuthorizationStatus` values. On platforms
-/// that only have a binary granted/denied model (such as Android) the level will be
-/// either `#AUTH_AUTHORIZED` or `#AUTH_DENIED`.
+/// The levels mirror the iOS `UNAuthorizationStatus` values. On platforms with only a
+/// binary granted/denied model (such as Android) the level is either `AuthorizationLevel#AUTHORIZED`
+/// or `AuthorizationLevel#DENIED`.
 ///
 /// #### See also
 ///
@@ -37,52 +37,54 @@ package com.codename1.notifications;
 /// - NotificationPermissionRequest
 public class NotificationPermissionResult {
 
-    /// The user has not yet made a choice regarding notification permission.
-    public static final int AUTH_NOT_DETERMINED = 0;
+    /// The granular authorization level returned by the platform. The constants are
+    /// ordered from least to most permissive, so any level after `#DENIED` means
+    /// notifications are permitted.
+    public enum AuthorizationLevel {
+        /// The user has not yet made a choice regarding notification permission.
+        NOT_DETERMINED,
 
-    /// The user explicitly denied notification permission.
-    public static final int AUTH_DENIED = 1;
+        /// The user explicitly denied notification permission.
+        DENIED,
 
-    /// The user granted full notification permission.
-    public static final int AUTH_AUTHORIZED = 2;
+        /// The user granted full notification permission.
+        AUTHORIZED,
 
-    /// Notifications were authorized provisionally (delivered quietly without an
-    /// explicit prompt). Applies to iOS provisional authorization.
-    public static final int AUTH_PROVISIONAL = 3;
+        /// Notifications were authorized provisionally (delivered quietly without an
+        /// explicit prompt). Applies to iOS provisional authorization.
+        PROVISIONAL,
 
-    /// Notifications were authorized for a limited amount of time (App Clip style).
-    public static final int AUTH_EPHEMERAL = 4;
+        /// Notifications were authorized for a limited amount of time (App Clip style).
+        EPHEMERAL
+    }
 
-    private final boolean granted;
-    private final int authorizationLevel;
+    private final AuthorizationLevel authorizationLevel;
 
     /// Creates a new result.
     ///
     /// #### Parameters
     ///
-    /// - `granted`: true if notifications are allowed (full or provisional)
-    ///
-    /// - `authorizationLevel`: one of the `AUTH_` constants
-    public NotificationPermissionResult(boolean granted, int authorizationLevel) {
-        this.granted = granted;
+    /// - `authorizationLevel`: the granular authorization level
+    public NotificationPermissionResult(AuthorizationLevel authorizationLevel) {
         this.authorizationLevel = authorizationLevel;
     }
 
-    /// Returns true if notifications are permitted, including provisional authorization.
+    /// Returns true if notifications are permitted. This is true for any level more
+    /// permissive than `AuthorizationLevel#DENIED` (authorized, provisional or ephemeral).
     ///
     /// #### Returns
     ///
     /// true if notifications can be posted
     public boolean isGranted() {
-        return granted;
+        return authorizationLevel.compareTo(AuthorizationLevel.DENIED) > 0;
     }
 
-    /// Returns the granular authorization level, one of the `AUTH_` constants.
+    /// Returns the granular authorization level.
     ///
     /// #### Returns
     ///
     /// the authorization level
-    public int getAuthorizationLevel() {
+    public AuthorizationLevel getAuthorizationLevel() {
         return authorizationLevel;
     }
 
@@ -90,8 +92,8 @@ public class NotificationPermissionResult {
     ///
     /// #### Returns
     ///
-    /// true if the authorization level is `#AUTH_PROVISIONAL`
+    /// true if the authorization level is `AuthorizationLevel#PROVISIONAL`
     public boolean isProvisional() {
-        return authorizationLevel == AUTH_PROVISIONAL;
+        return authorizationLevel == AuthorizationLevel.PROVISIONAL;
     }
 }

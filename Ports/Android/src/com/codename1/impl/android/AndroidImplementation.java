@@ -11452,8 +11452,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                callback.notificationPermissionResult(new NotificationPermissionResult(granted,
-                        granted ? NotificationPermissionResult.AUTH_AUTHORIZED : NotificationPermissionResult.AUTH_DENIED));
+                callback.notificationPermissionResult(new NotificationPermissionResult(granted
+                        ? NotificationPermissionResult.AuthorizationLevel.AUTHORIZED
+                        : NotificationPermissionResult.AuthorizationLevel.DENIED));
             }
         });
     }

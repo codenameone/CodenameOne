@@ -10403,14 +10403,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.requestNotificationPermission(request == null ? 7 : request.toAuthorizationOptionsMask());
     }
 
-    /// Invoked from native once the authorization request resolves.
+    /// Invoked from native once the authorization request resolves. authLevel is the
+    /// ordinal of NotificationPermissionResult.AuthorizationLevel as produced by the
+    /// native UNAuthorizationStatus mapping (granted is derived from the level).
     public static void notificationPermissionResult(final boolean granted, final int authLevel) {
         final NotificationPermissionCallback cb = pendingNotificationPermissionCallback;
         pendingNotificationPermissionCallback = null;
         if (cb != null) {
+            final NotificationPermissionResult.AuthorizationLevel[] levels =
+                    NotificationPermissionResult.AuthorizationLevel.values();
+            final NotificationPermissionResult.AuthorizationLevel level =
+                    (authLevel >= 0 && authLevel < levels.length)
+                            ? levels[authLevel]
+                            : NotificationPermissionResult.AuthorizationLevel.NOT_DETERMINED;
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    cb.notificationPermissionResult(new NotificationPermissionResult(granted, authLevel));
+                    cb.notificationPermissionResult(new NotificationPermissionResult(level));
                 }
             });
         }

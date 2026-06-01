@@ -2517,6 +2517,25 @@ public class AndroidGradleBuilder extends Executor {
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
         }
 
+        // When the Codename One ForegroundService helper is used, Android 14 (API 34)
+        // additionally requires the per-type FOREGROUND_SERVICE_<TYPE> permission matching
+        // the service's foregroundServiceType (default dataSync). Inject it automatically;
+        // it is not a restricted permission.
+        if (usesForegroundService) {
+            String fgType = request.getArg("android.foregroundServiceType", "dataSync");
+            String fgPerm = "android.permission.FOREGROUND_SERVICE_" + fgType.toUpperCase();
+            permissions += permissionAdd(request, "\"" + fgPerm + "\"",
+                    "    <uses-permission android:name=\"" + fgPerm + "\" />\n");
+        }
+
+        // USE_FULL_SCREEN_INTENT (required on Android 14+ for LocalNotification.setFullScreenIntent)
+        // is a restricted permission Google only allows for calling/alarm apps, so it is
+        // opt-in via the android.fullScreenIntent build hint rather than auto-injected.
+        if ("true".equals(request.getArg("android.fullScreenIntent", "false"))) {
+            permissions += permissionAdd(request, "\"android.permission.USE_FULL_SCREEN_INTENT\"",
+                    "    <uses-permission android:name=\"android.permission.USE_FULL_SCREEN_INTENT\" />\n");
+        }
+
         if (postNotificationsPermission) {
             permissions += permissionAdd(request, "\"android.permission.POST_NOTIFICATIONS\"",
                     "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n");
