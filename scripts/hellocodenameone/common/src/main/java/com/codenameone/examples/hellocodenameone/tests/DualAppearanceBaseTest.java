@@ -285,72 +285,6 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         done();
     }
 
-    // The modern theme .res is identical across all 14 DualAppearanceBaseTest
-    // subclasses, but each previously re-opened and re-parsed it through the
-    // port's asset-read bridge. On the JS port that read goes through
-    // getBundledAssetAsDataURL, and deep in the suite (~test 85, ButtonTheme is
-    // the first theme test there) the worker<->host bridge can hand back a
-    // degraded stream that wedges Resources.open in a synchronous parse loop --
-    // the whole suite then hard-stalls (no yield, the per-test watchdog can't
-    // fire). Caching the parsed theme means the .res is read exactly once, and
-    // prewarmModernTheme() does that read at suite start where there is no
-    // accumulation pressure, so no theme test ever performs the risky
-    // late-suite read.
-    private static final java.util.Map<String, java.util.Hashtable> MODERN_THEME_CACHE =
-            new java.util.HashMap<String, java.util.Hashtable>();
-
-    /// Read + parse the platform's modern theme .res once, early in the suite,
-    /// and cache it. Call before the first test runs so the cached copy is
-    /// populated under no canvas-accumulation pressure. No-op off the modern
-    /// theme platforms.
-    static void prewarmModernTheme() {
-        String resourceName = pickModernThemeResource();
-        if (resourceName != null) {
-            loadModernThemeCached(resourceName);
-        }
-    }
-
-    /// Returns the parsed theme map for resourceName, loading + caching it on
-    /// first use. Emits step-level diagnostics so a hung run pinpoints which
-    /// stage (open / parse / getTheme / apply) stalled.
-    private static java.util.Hashtable loadModernThemeCached(String resourceName) {
-        java.util.Hashtable cached = MODERN_THEME_CACHE.get(resourceName);
-        if (cached != null) {
-            return cached;
-        }
-        logDiag("CN1SS:DIAG:DualAppearance themeOpen:begin resource=" + resourceName);
-        // Try the CN1 resource path first (Display.getResourceAsStream goes
-        // through each port's impl), then fall back to Class.getResourceAsStream
-        // for platforms where the .res sits on the Java classpath (JavaSE / JS).
-        InputStream in = Display.getInstance().getResourceAsStream(DualAppearanceBaseTest.class, resourceName);
-        if (in == null) {
-            in = DualAppearanceBaseTest.class.getResourceAsStream(resourceName);
-        }
-        if (in == null) {
-            logDiag("CN1SS:WARN:DualAppearance modern theme resource missing: " + resourceName);
-            return null;
-        }
-        try {
-            logDiag("CN1SS:DIAG:DualAppearance themeOpen:resolved resource=" + resourceName);
-            Resources r = Resources.open(in);
-            logDiag("CN1SS:DIAG:DualAppearance themeParse:done resource=" + resourceName);
-            String[] names = r.getThemeResourceNames();
-            if (names == null || names.length == 0) {
-                logDiag("CN1SS:ERR:DualAppearance modern theme has no themes resource=" + resourceName);
-                return null;
-            }
-            java.util.Hashtable theme = r.getTheme(names[0]);
-            logDiag("CN1SS:DIAG:DualAppearance themeGet:done resource=" + resourceName + " themeName=" + names[0]);
-            MODERN_THEME_CACHE.put(resourceName, theme);
-            return theme;
-        } catch (IOException ex) {
-            logDiag("CN1SS:ERR:DualAppearance modern theme load failed: " + ex + " resource=" + resourceName);
-            return null;
-        } finally {
-            Util.cleanup(in);
-        }
-    }
-
     private void installModernThemeIfRequested() {
         if (!useModernTheme()) {
             return;
@@ -361,13 +295,42 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     + Display.getInstance().getPlatformName());
             return;
         }
-        java.util.Hashtable theme = loadModernThemeCached(resourceName);
-        if (theme == null) {
+        // Try the CN1 resource path first (Display.getResourceAsStream goes
+        // through each port's impl - Android via getAssets(), iOS via
+        // nativeInstance.getResourceSize/NSFileInputStream), then fall back
+        // to Class.getResourceAsStream for platforms where the .res sits on
+        // the Java classpath (JavaSE / JavaScript).
+        InputStream in = openModernResource(resourceName);
+        if (in == null) {
+            logDiag("CN1SS:WARN:DualAppearance modern theme resource missing: " + resourceName
+                    + " test=" + baseName() + " platform=" + Display.getInstance().getPlatformName());
             return;
         }
-        UIManager.getInstance().setThemeProps(theme);
-        logDiag("CN1SS:INFO:DualAppearance installed modern theme " + resourceName
-                + " test=" + baseName());
+        try {
+            Resources r = Resources.open(in);
+            String[] names = r.getThemeResourceNames();
+            if (names == null || names.length == 0) {
+                logDiag("CN1SS:ERR:DualAppearance modern theme has no themes resource=" + resourceName
+                        + " test=" + baseName());
+                return;
+            }
+            UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+            logDiag("CN1SS:INFO:DualAppearance installed modern theme " + resourceName
+                    + " themeName=" + names[0] + " test=" + baseName());
+        } catch (IOException ex) {
+            logDiag("CN1SS:ERR:DualAppearance modern theme load failed: " + ex
+                    + " resource=" + resourceName + " test=" + baseName());
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    private InputStream openModernResource(String resourceName) {
+        InputStream in = Display.getInstance().getResourceAsStream(getClass(), resourceName);
+        if (in != null) {
+            return in;
+        }
+        return DualAppearanceBaseTest.class.getResourceAsStream(resourceName);
     }
 
     // Route diagnostic messages through com.codename1.io.Log as well as
@@ -379,7 +342,7 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         Log.p(message);
     }
 
-    private static String pickModernThemeResource() {
+    private String pickModernThemeResource() {
         String platform = Display.getInstance().getPlatformName();
         if ("ios".equals(platform)) {
             return "/iOSModernTheme.res";
