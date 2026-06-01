@@ -79,7 +79,7 @@ class SimulatorNotifications {
         });
     }
 
-    private static void buildAndShow(JavaSEPort port, final LocalNotification notif) {
+    private static void buildAndShow(final JavaSEPort port, final LocalNotification notif) {
         dismissInternal(notif.getId());
 
         final JWindow w = new JWindow();

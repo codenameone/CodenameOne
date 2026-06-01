@@ -10139,19 +10139,29 @@ public abstract class CodenameOneImplementation {
     /// extend Lifecycle; non-Lifecycle apps cannot override it and are skipped. The
     /// dispatch is performed on the EDT.
     public void fireSharedContentReceived(final SharedContent content) {
-        final Object app = currentApplicationInstance;
+        Object app = currentApplicationInstance;
         if (content == null || !(app instanceof com.codename1.system.Lifecycle)) {
             return;
         }
-        Runnable r = new Runnable() {
-            public void run() {
-                ((com.codename1.system.Lifecycle) app).onReceivedSharedContent(content);
-            }
-        };
+        Runnable r = new SharedContentDispatch((com.codename1.system.Lifecycle) app, content);
         if (Display.getInstance().isEdt()) {
             r.run();
         } else {
             Display.getInstance().callSerially(r);
+        }
+    }
+
+    private static final class SharedContentDispatch implements Runnable {
+        private final com.codename1.system.Lifecycle lifecycle;
+        private final SharedContent content;
+
+        SharedContentDispatch(com.codename1.system.Lifecycle lifecycle, SharedContent content) {
+            this.lifecycle = lifecycle;
+            this.content = content;
+        }
+
+        public void run() {
+            lifecycle.onReceivedSharedContent(content);
         }
     }
 
@@ -10175,15 +10185,25 @@ public abstract class CodenameOneImplementation {
 
     /// Starts a foreground service. The default implementation runs the task on a thread
     /// without a system notification and returns null.
-    public Object startForegroundService(String channelId, String title, String body, String iconName, final ForegroundService.Task task, final ForegroundService handle) {
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
         if (task != null) {
-            new Thread(new Runnable() {
-                public void run() {
-                    task.run(handle);
-                }
-            }).start();
+            new Thread(new ForegroundServiceRunner(task, handle)).start();
         }
         return null;
+    }
+
+    private static final class ForegroundServiceRunner implements Runnable {
+        private final ForegroundService.Task task;
+        private final ForegroundService handle;
+
+        ForegroundServiceRunner(ForegroundService.Task task, ForegroundService handle) {
+            this.task = task;
+            this.handle = handle;
+        }
+
+        public void run() {
+            task.run(handle);
+        }
     }
 
     /// Updates the notification of a running foreground service. No-op by default.
