@@ -180,6 +180,27 @@ cn1ss_stop_ws_server() {
     cn1ss_log "Cn1ssScreenshotServer (pid $CN1SS_WS_PID) stopped"
     unset CN1SS_WS_PID CN1SS_WS_PORT
   fi
+  # Persist the server log so the WebSocket transport is debuggable from CI
+  # artifacts. The server prints one CN1SS:INFO:test=... line per delivered
+  # screenshot plus any "binary frame without META" / hash_mismatch warnings;
+  # without this the only copy lived in a mktemp file that never reached the
+  # uploaded artifacts (the WS pipeline was effectively a black box on
+  # failure). Also surface a one-line summary + tail in the job log directly.
+  if [ -n "${CN1SS_WS_LOG:-}" ] && [ -s "${CN1SS_WS_LOG:-}" ]; then
+    local delivered dropped
+    delivered="$(grep -c "^CN1SS:INFO:test=" "$CN1SS_WS_LOG" 2>/dev/null || echo 0)"
+    dropped="$(grep -c "binary frame without META" "$CN1SS_WS_LOG" 2>/dev/null || echo 0)"
+    cn1ss_log "WebSocket server summary: ${delivered} screenshot(s) written, ${dropped} unpaired binary frame(s) dropped"
+    if [ -n "${ARTIFACTS_DIR:-}" ]; then
+      mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+      cp -f "$CN1SS_WS_LOG" "$ARTIFACTS_DIR/cn1ss-ws-server.log" 2>/dev/null \
+        && cn1ss_log "WebSocket server log saved to $ARTIFACTS_DIR/cn1ss-ws-server.log"
+    fi
+    cn1ss_log "----- last 40 lines of Cn1ssScreenshotServer log -----"
+    tail -n 40 "$CN1SS_WS_LOG" 2>/dev/null | sed 's/^/[cn1ss-ws-server] /'
+    cn1ss_log "----- end of Cn1ssScreenshotServer log -----"
+  fi
+  unset CN1SS_WS_LOG
 }
 
 cn1ss_file_size() {
