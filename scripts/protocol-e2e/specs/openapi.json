@@ -1,0 +1,37 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Protocol E2E Greeting API", "version": "1.0.0" },
+  "paths": {
+    "/api/greeting": {
+      "get": {
+        "tags": ["Greeting"],
+        "operationId": "greeting",
+        "parameters": [
+          { "name": "name", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A greeting",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Greeting" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Greeting": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "message": { "type": "string" },
+          "transport": { "type": "string" }
+        }
+      }
+    }
+  }
+}

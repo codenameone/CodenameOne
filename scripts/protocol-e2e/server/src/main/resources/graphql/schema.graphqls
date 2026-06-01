@@ -1,0 +1,23 @@
+type Query {
+    hero(name: String): Hero
+}
+
+type Mutation {
+    addReview(episode: Episode!, stars: Int!): Review
+}
+
+type Hero {
+    name: String!
+    greeting: String!
+}
+
+type Review {
+    stars: Int!
+    commentary: String
+}
+
+enum Episode {
+    NEWHOPE
+    EMPIRE
+    JEDI
+}

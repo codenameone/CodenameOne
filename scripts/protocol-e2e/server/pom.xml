@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Spring Boot test server for the multi-protocol end-to-end test. Exposes
+        the SAME logical "greeting" service over three transports so the
+        Codename One generated clients (@RestClient / @GraphQLClient /
+        @GrpcClient) can each be exercised against a real server:
+
+          - REST   : GET  /api/greeting?name=...        -> JSON (OpenAPI/Swagger)
+          - GraphQL: POST /graphql                      -> {data,errors} envelope
+          - gRPC   : POST /grpc/e2e.Greeter/SayHello    -> gRPC-Web binary framing
+
+        The gRPC-Web endpoint is implemented directly (the CN1 client speaks
+        application/grpc-web+proto), so no Envoy/proxy sidecar is required.
+    -->
+    <groupId>com.codename1.e2e</groupId>
+    <artifactId>protocol-e2e-server</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.10</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.release>17</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>protocol-e2e-server</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

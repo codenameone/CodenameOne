@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package e2e;
+
+// Contract for the gRPC-Web transport. The Codename One client classes under
+// client/common/src/main/java/com/codename1/e2e/grpc mirror what
+// `cn1:generate-grpc -Dcn1.grpc.proto=greeter.proto
+// -Dcn1.grpc.basePackage=com.codename1.e2e.grpc` produces from this file.
+message HelloRequest {
+    string name = 1;
+}
+
+message HelloReply {
+    string message = 1;
+}
+
+service Greeter {
+    rpc SayHello (HelloRequest) returns (HelloReply);
+}

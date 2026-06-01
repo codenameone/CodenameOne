@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codename1.e2e</groupId>
+        <artifactId>protocol-e2e-client</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <groupId>com.codename1.e2e</groupId>
+    <artifactId>protocol-e2e-client-common</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <!-- Installs the Codename One support libraries into ~/.codenameone if missing. -->
+        <profile>
+            <id>install-codenameone</id>
+            <activation><file><missing>${user.home}/.codenameone/guibuilder.jar</missing></file></activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>validate</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target name="install-cn1">
+                                        <mkdir dir="${user.home}/.codenameone"/>
+                                        <mkdir dir="${project.build.directory}/codenameone/tmpProject"/>
+                                        <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
+                                             dest="${user.home}/UpdateCodenameOne.jar"
+                                             skipexisting="true"
+                                             ignoreerrors="false"/>
+                                        <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
+                                            <arg value="${project.build.directory}/codenameone/tmpProject"/>
+                                            <arg value="force"/>
+                                        </java>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals><goal>read-project-properties</goal></goals>
+                        <configuration>
+                            <files>
+                                <file>${basedir}/codenameone_settings.properties</file>
+                            </files>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>cn1-process-classes</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>bytecode-compliance</goal>
+                            <goal>css</goal>
+                            <goal>process-annotations</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>attach-test-artifact</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>attach-test-artifact</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
