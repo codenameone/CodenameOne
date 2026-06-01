@@ -107,12 +107,17 @@ jobs:
         shell: pwsh
         run: echo "JDK_11_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
+      # Temurin publishes Windows/aarch64 only from JDK 21, so on arm64 the only
+      # JDK set up is 21; x64 covers 8/11/17/21/25. The translator test harness
+      # adapts to whatever JDKs are present.
       - name: Set up JDK 17
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
       - name: Save JDK 17 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
@@ -126,28 +131,30 @@ jobs:
         run: echo "JDK_21_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       - name: Set up JDK 25
+        if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '25'
       - name: Save JDK 25 Path
+        if: ${{ matrix.name == 'x64' }}
         shell: pwsh
         run: echo "JDK_25_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       # Restore the active runner JDK that drives Maven: JDK 8 on x64 (matching
-      # the cache above), and JDK 17 on arm64 where 8 is unavailable.
+      # the cache above), and JDK 21 on arm64 where 8/11/17 are unavailable.
       - name: Restore JDK 8 (x64)
         if: ${{ matrix.name == 'x64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
-      - name: Restore JDK 17 (arm64)
+      - name: Restore JDK 21 (arm64)
         if: ${{ matrix.name == 'arm64' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       # Only the native-compilation tests are run here: this runner exists to
       # prove the translated C compiles with clang-cl (LLVM) and executes on

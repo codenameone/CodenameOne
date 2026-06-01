@@ -339,8 +339,15 @@ public class WindowsNativeBuilder extends Executor {
         try {
             java.util.zip.ZipEntry entry;
             byte[] buf = new byte[8192];
+            String destCanon = destDir.getCanonicalPath() + File.separator;
             while ((entry = zis.getNextEntry()) != null) {
                 File out = new File(destDir, entry.getName());
+                // Guard against Zip Slip: reject entries that escape destDir via
+                // '..' or absolute paths.
+                if (!out.getCanonicalPath().startsWith(destCanon)) {
+                    throw new BuildException("Refusing to extract entry outside the target directory (zip slip): "
+                            + entry.getName());
+                }
                 if (entry.isDirectory()) {
                     out.mkdirs();
                     continue;
