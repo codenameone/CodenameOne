@@ -63,6 +63,7 @@ void cn1WindowsLog(const char* message) {
     OutputDebugStringA("\n");
     fputs(message, stderr);
     fputc('\n', stderr);
+    fflush(stderr);
 }
 
 /* ----------------------------------------------------------- string helper */

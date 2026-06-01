@@ -67,6 +67,16 @@ public final class WindowsNative {
     /** Blocks up to {@code timeoutMillis} until an input event is available. */
     public static native void waitForEvent(long timeoutMillis);
 
+    /**
+     * Creates an offscreen (WIC-backed) Direct2D graphics target of the given
+     * size. Used for headless rendering and the screenshot tests; draws go
+     * through the same graphics bridge as the on-screen target.
+     */
+    public static native long createOffscreenGraphics(int width, int height);
+
+    /** Encodes the offscreen target behind {@code graphics} to a PNG file. */
+    public static native boolean saveGraphicsToPng(long graphics, String path);
+
     /* ----------------------------------------------------- graphics state */
 
     public static native int getColor(long graphics);

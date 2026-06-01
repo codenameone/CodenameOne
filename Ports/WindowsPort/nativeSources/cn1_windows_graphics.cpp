@@ -84,6 +84,7 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
     g->clipIsRect = JAVA_TRUE;
     g->font = cn1Win.defaultFont;
     g->inFrame = JAVA_FALSE;
+    g->wicBitmap = NULL;
     return g;
 }
 

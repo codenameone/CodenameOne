@@ -117,6 +117,7 @@ typedef struct CN1Graphics {
     JAVA_BOOLEAN clipIsRect;
     struct CN1Font* font;            /* current font, not owned              */
     JAVA_BOOLEAN inFrame;            /* between BeginDraw / EndDraw           */
+    void* wicBitmap;                 /* IWICBitmap* for offscreen targets, else NULL */
 } CN1Graphics;
 
 typedef struct CN1Font {

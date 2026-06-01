@@ -40,6 +40,8 @@
 
 #include "cn1_windows_dwrite.h"
 
+extern "C" void cn1WindowsLog(const char* message);
+
 /* One shared DirectWrite factory for the process. */
 static IDWriteFactory* g_dwrite = nullptr;
 
@@ -65,6 +67,7 @@ extern "C" void* cn1dwCreateFormat(const wchar_t* family, float sizePx, int bold
     HRESULT hr = f->CreateTextFormat(family ? family : L"Segoe UI", nullptr, weight, style,
             DWRITE_FONT_STRETCH_NORMAL, sizePx, L"", &fmt);
     if (FAILED(hr)) {
+        cn1WindowsLog("cn1dwCreateFormat: CreateTextFormat failed");
         return nullptr;
     }
     return fmt;

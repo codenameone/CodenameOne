@@ -245,7 +245,7 @@ class CleanTargetIntegrationTest {
                 "cn1_windows.h", "cn1_windows_comc.h", "cn1_windows_dwrite.h",
                 "cn1_windows_window.cpp", "cn1_windows_graphics.cpp", "cn1_windows_text.c",
                 "cn1_windows_image.cpp", "cn1_windows_io.c", "cn1_windows_net.c",
-                "cn1_windows_dwrite.cpp"
+                "cn1_windows_dwrite.cpp", "cn1_windows_screenshot.cpp"
         };
         for (String f : files) {
             Files.copy(nativeDir.resolve(f), srcRoot.resolve(f), StandardCopyOption.REPLACE_EXISTING);
@@ -290,6 +290,112 @@ class CleanTargetIntegrationTest {
             }
         }
         assertTrue(failures.isEmpty(), "WindowsPort native compile failures:\n" + String.join("\n", failures));
+    }
+
+    /**
+     * End-to-end "builder + screenshot" test: compiles a tiny app that drives the
+     * WindowsNative bridge, translates it with the "windows" app type together
+     * with the WindowsPort native layer, links the executable with clang-cl, runs
+     * it headless to render an offscreen Direct2D frame, and verifies the encoded
+     * PNG (file present + expected pixels). Windows-only; needs clang-cl / cmake /
+     * ninja on PATH via the MSVC dev environment.
+     */
+    @org.junit.jupiter.api.Test
+    void rendersOffscreenToPngWithDirect2D() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Windows port rendering is Windows-only");
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("winrender-sources");
+        Path classesDir = Files.createTempDirectory("winrender-classes");
+        Path javaApiDir = Files.createTempDirectory("winrender-japi");
+        Files.write(sourceDir.resolve("WinGfxTest.java"), winGfxTestSource().getBytes(StandardCharsets.UTF_8));
+        Path windowsNativeSrc = Paths.get("..", "..", "Ports", "WindowsPort", "src",
+                "com", "codename1", "impl", "windows", "WindowsNative.java").normalize().toAbsolutePath();
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        List<String> compileArgs = new java.util.ArrayList<>();
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-classpath"); compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+            compileArgs.add("-bootclasspath"); compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+        compileArgs.add("-d"); compileArgs.add(classesDir.toString());
+        compileArgs.add(sourceDir.resolve("WinGfxTest.java").toString());
+        compileArgs.add(windowsNativeSrc.toString());
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs), "WinGfxTest + WindowsNative should compile");
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        // Bring the native layer into the translation unit so the clean target
+        // globs and links it.
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    Files.copy(p, classesDir.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        Path outputDir = Files.createTempDirectory("winrender-out");
+        runTranslator(classesDir, outputDir, "WinGfxTest", "windows");
+        Path distDir = outputDir.resolve("dist");
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
+                "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
+        runCommand(configure, distDir);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path exe = buildDir.resolve(CompilerHelper.executableName("WinGfxTest"));
+        // The app writes cn1_render.png into its working directory.
+        String out = runCommand(Arrays.asList(exe.toString()), buildDir);
+        Path png = buildDir.resolve("cn1_render.png");
+        assertTrue(out.contains("RENDER_OK"), "render app should report success, output:\n" + out);
+        assertTrue(Files.exists(png), "a PNG frame should be written");
+
+        java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(png.toFile());
+        assertNotNull(img, "PNG should decode");
+        assertEquals(400, img.getWidth());
+        assertEquals(300, img.getHeight());
+        int red = img.getRGB(120, 90) & 0xffffff;   // inside the filled red rect
+        int bg = img.getRGB(5, 5) & 0xffffff;        // white background
+        assertTrue(((red >> 16) & 0xff) > 180 && (red & 0xff) < 80,
+                "expected a red pixel inside the rect, was " + Integer.toHexString(red));
+        assertTrue(bg > 0xf0f0f0, "expected white background, was " + Integer.toHexString(bg));
+    }
+
+    static String winGfxTestSource() {
+        return "import com.codename1.impl.windows.WindowsNative;\n" +
+                "public class WinGfxTest {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        long g = WindowsNative.createOffscreenGraphics(400, 300);\n" +
+                "        WindowsNative.setColor(g, 0xffffff);\n" +
+                "        WindowsNative.fillRect(g, 0, 0, 400, 300);\n" +
+                "        WindowsNative.setColor(g, 0xff0000);\n" +
+                "        WindowsNative.fillRect(g, 50, 50, 200, 100);\n" +
+                "        WindowsNative.setColor(g, 0x000000);\n" +
+                "        WindowsNative.drawString(g, \"Hello Direct2D\", 60, 60);\n" +
+                // The clean target's String[] args marshalling is unrelated to the
+                // port (and currently faulty), so write a fixed file in the cwd.
+                "        boolean ok = WindowsNative.saveGraphicsToPng(g, \"cn1_render.png\");\n" +
+                "        System.out.println(ok ? \"RENDER_OK\" : \"RENDER_FAIL\");\n" +
+                "    }\n" +
+                "}\n";
     }
 
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
