@@ -29,6 +29,7 @@ import android.os.Bundle;
 import com.codename1.share.SharedContent;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -102,6 +103,8 @@ public class CodenameOneShareReceiverActivity extends Activity {
     }
 
     private boolean addStream(SharedContent.Builder b, Uri uri, String type) {
+        InputStream in = null;
+        OutputStream os = null;
         try {
             String mime = type;
             if (mime == null) {
@@ -109,23 +112,23 @@ public class CodenameOneShareReceiverActivity extends Activity {
             }
             String name = queryDisplayName(uri);
             File dir = new File(getFilesDir(), "shared");
-            dir.mkdirs();
+            if (!dir.exists() && !dir.mkdirs()) {
+                com.codename1.io.Log.p("Failed to create shared content directory " + dir.getAbsolutePath());
+                return false;
+            }
             File out = new File(dir, name);
-            InputStream in = getContentResolver().openInputStream(uri);
+            in = getContentResolver().openInputStream(uri);
             if (in == null) {
                 return false;
             }
-            OutputStream os = new FileOutputStream(out);
+            os = new FileOutputStream(out);
             byte[] buf = new byte[8192];
             int r;
-            try {
-                while ((r = in.read(buf)) > 0) {
-                    os.write(buf, 0, r);
-                }
-            } finally {
-                in.close();
-                os.close();
+            while ((r = in.read(buf)) > 0) {
+                os.write(buf, 0, r);
             }
+            os.close();
+            os = null;
             String path = "file://" + out.getAbsolutePath();
             if (mime != null && mime.startsWith("image/")) {
                 b.addImage(mime, path, name);
@@ -136,6 +139,19 @@ public class CodenameOneShareReceiverActivity extends Activity {
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
             return false;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignore) {
+                }
+            }
+            if (os != null) {
+                try {
+                    os.close();
+                } catch (IOException ignore) {
+                }
+            }
         }
     }
 
