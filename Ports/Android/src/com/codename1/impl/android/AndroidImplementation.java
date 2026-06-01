@@ -10580,9 +10580,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void writeToStream(byte[] param) {
+            writeToStream(param, 0, param.length);
+        }
+
+        public void writeToStream(byte[] param, int offset, int len) {
             try {
                 OutputStream os = getOutput();
-                os.write(param);
+                os.write(param, offset, len);
                 os.flush();
             } catch(IOException err) {
                 errorMessage = err.toString();
@@ -10727,6 +10731,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
         ((SocketImpl)socket).writeToStream(data);
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        ((SocketImpl)socket).writeToStream(data, offset, len);
     }
 
     //Begin new Graphics Work

@@ -610,6 +610,7 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+    public native void writeToSocketStream(long socket, byte[] data, int offset, int len);
 
     
     // Paths
