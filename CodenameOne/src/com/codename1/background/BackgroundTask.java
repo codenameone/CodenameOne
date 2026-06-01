@@ -39,7 +39,7 @@ import java.util.Date;
 /// #### See also
 ///
 /// - BackgroundWork
-public class BackgroundTask {
+public final class BackgroundTask {
 
     private BackgroundTask() {
     }

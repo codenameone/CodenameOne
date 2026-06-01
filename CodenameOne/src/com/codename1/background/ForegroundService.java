@@ -40,7 +40,7 @@ import com.codename1.ui.Display;
 ///     });
 /// // the service auto-stops when the task returns, or call svc.stop() early
 /// ```
-public class ForegroundService {
+public final class ForegroundService {
 
     /// The long running task executed by a foreground service.
     public interface Task {

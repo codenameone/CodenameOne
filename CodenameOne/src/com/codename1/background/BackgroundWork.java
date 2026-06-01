@@ -33,7 +33,7 @@ import com.codename1.ui.Display;
 /// - WorkRequest
 ///
 /// - BackgroundWorker
-public class BackgroundWork {
+public final class BackgroundWork {
 
     private BackgroundWork() {
     }

@@ -10160,6 +10160,7 @@ public abstract class CodenameOneImplementation {
             this.content = content;
         }
 
+        @Override
         public void run() {
             lifecycle.onReceivedSharedContent(content);
         }
@@ -10201,6 +10202,7 @@ public abstract class CodenameOneImplementation {
             this.handle = handle;
         }
 
+        @Override
         public void run() {
             task.run(handle);
         }
