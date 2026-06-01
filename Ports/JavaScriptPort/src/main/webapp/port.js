@@ -3315,7 +3315,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // half of CI runs sits at SheetScreenshotTest for the remainder of
   // the budget. Park here for deterministic completion.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe"
+  "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe",
+  // graphicsTransform3dCanvasHang: the 3D perspective / camera transform
+  // tests render into a surface the worker-side screenshot path can't
+  // resolve (SCREENSHOT_START reports canvasCandidates=0), so the suite
+  // re-dispatches the same index indefinitely and never reaches the
+  // per-test deadline. The 2D transform tests (rotation / translation /
+  // affine) are unaffected. Mirrored in Cn1ssDeviceRunner's Java skip list.
+  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformPerspective": "graphicsTransform3dCanvasHang",
+  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "graphicsTransform3dCanvasHang"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3367,7 +3375,11 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
   //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
   "CssGradientsScreenshotTest": "canvasContextWipe",
-  "SheetScreenshotTest": "canvasContextWipe"
+  "SheetScreenshotTest": "canvasContextWipe",
+  // graphicsTransform3dCanvasHang -- see matching fully-qualified entries
+  // in cn1ssForcedTimeoutTestClasses above.
+  "TransformPerspective": "graphicsTransform3dCanvasHang",
+  "TransformCamera": "graphicsTransform3dCanvasHang"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
@@ -4291,46 +4303,147 @@ function resolveBaseTestFromRunnable(runnable) {
   return null;
 }
 
+// --- cn1ss WebSocket transport -------------------------------------------
+// The JS port runs in a Web Worker, which has no DOM but does have WebSocket.
+// Every screenshot funnels through emitCn1ssChunks(); rather than chunk the
+// PNG as base64 over the console (rate-limited, log-scraped on the host), we
+// ship it straight to Cn1ssScreenshotServer over a browser WebSocket -- the
+// same single pipeline the native ports use via the core WebSocket. The
+// browser handles RFC6455 framing, so we just send a META text frame followed
+// by the binary PNG, matching what the server parses. The server replies with
+// an ACK text frame; we track it only for an optional drain. The hash is
+// omitted from META (the server still computes it for dedup); only png_bytes
+// is advertised so a truncated transfer is caught as length_mismatch.
+const cn1ssWs = {
+  socket: null,
+  status: "idle", // idle | connecting | open | failed
+  queue: [],      // {test, bytes} buffered while the socket is still connecting
+  pending: 0      // sent-but-unacked frames, for an optional flush at suite end
+};
+
+function cn1ssWsHost() {
+  try {
+    if (global.location && global.location.hostname) {
+      return global.location.hostname;
+    }
+  } catch (e) { /* worker without location */ }
+  return "127.0.0.1";
+}
+
+function cn1ssWsConnect() {
+  if (cn1ssWs.status === "open" || cn1ssWs.status === "connecting") {
+    return;
+  }
+  if (typeof global.WebSocket === "undefined") {
+    cn1ssWs.status = "failed";
+    return;
+  }
+  cn1ssWs.status = "connecting";
+  const url = "ws://" + cn1ssWsHost() + ":8765";
+  let sock;
+  try {
+    sock = new global.WebSocket(url);
+  } catch (e) {
+    cn1ssWs.status = "failed";
+    emitDiagLine("CN1SS:WSJS:connectError=" + String(e && e.message ? e.message : e));
+    return;
+  }
+  sock.binaryType = "arraybuffer";
+  cn1ssWs.socket = sock;
+  sock.onopen = function () {
+    cn1ssWs.status = "open";
+    const q = cn1ssWs.queue;
+    cn1ssWs.queue = [];
+    for (let i = 0; i < q.length; i++) {
+      cn1ssWsSendNow(q[i].test, q[i].bytes);
+    }
+  };
+  sock.onmessage = function (ev) {
+    const d = (ev && typeof ev.data === "string") ? ev.data : "";
+    if (d.indexOf("ACK ") === 0 && cn1ssWs.pending > 0) {
+      cn1ssWs.pending--;
+    }
+  };
+  sock.onerror = function () { /* failures surface via onclose -> status=failed */ };
+  sock.onclose = function () {
+    if (cn1ssWs.status !== "open") {
+      cn1ssWs.status = "failed";
+    }
+  };
+}
+
+function cn1ssBase64ToBytes(base64) {
+  const bin = global.atob ? global.atob(base64) : "";
+  const len = bin.length;
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    out[i] = bin.charCodeAt(i) & 0xff;
+  }
+  return out;
+}
+
+function cn1ssWsSendNow(test, bytes) {
+  const sock = cn1ssWs.socket;
+  if (!sock || cn1ssWs.status !== "open") {
+    return false;
+  }
+  try {
+    // META is a JSON object (Cn1ssScreenshotServer.parseMeta expects JSON,
+    // matching the native ports' Cn1ssWebSocketSink). The hash is omitted --
+    // the server computes its own for dedup and only flags a mismatch when an
+    // expected hash is supplied; png_bytes lets it catch a truncated transfer.
+    const metaStr = 'META {"test":"' + test + '","png_bytes":' + bytes.length + '}';
+    sock.send(metaStr);
+    sock.send(bytes.buffer);
+    cn1ssWs.pending++;
+    return true;
+  } catch (e) {
+    emitDiagLine("CN1SS:WSJS:sendError=" + String(e && e.message ? e.message : e));
+    return false;
+  }
+}
+
+// Hands a primary-channel screenshot to the WebSocket transport. Returns true
+// when the bytes were sent or buffered for send; false when WS is unavailable
+// (caller then relies on the transitional base64 fallback).
+function cn1ssWsSend(base64, test) {
+  if (cn1ssWs.status === "failed") {
+    return false;
+  }
+  if (cn1ssWs.status === "idle") {
+    cn1ssWsConnect();
+  }
+  if (cn1ssWs.status === "failed") {
+    return false;
+  }
+  let bytes;
+  try {
+    bytes = cn1ssBase64ToBytes(base64);
+  } catch (e) {
+    emitDiagLine("CN1SS:WSJS:decodeError=" + String(e && e.message ? e.message : e));
+    return false;
+  }
+  if (cn1ssWs.status === "open") {
+    return cn1ssWsSendNow(test, bytes);
+  }
+  cn1ssWs.queue.push({ test: test, bytes: bytes });
+  return true;
+}
+
+// Single screenshot transport for the JS port: ship the captured PNG to the
+// host-side Cn1ssScreenshotServer over the worker WebSocket. The function is
+// still named emitCn1ssChunks (and still takes a base64 PNG) because the DOM /
+// host-canvas capture paths -- emitCurrentFormScreenshotDom, emitChannelFastJs
+// -- feed it a base64 data-URL payload; we decode and send it as one binary
+// frame rather than chunking it over the console. Only the primary channel is
+// shipped; the PREVIEW channel (host-side PR-comment thumbnails) is no longer
+// produced on-device. There is no base64-over-console fallback any more.
 function emitCn1ssChunks(base64, testName, channelName) {
   const channel = channelName ? String(channelName).toUpperCase() : "";
-  const prefix = "CN1SS" + channel;
-  const test = normalizeCn1ssTestName(testName);
-  const streamKey = channel + "|" + test;
-  // The chunk index must be the byte offset within the emitted base64
-  // stream, not a sequential counter. Cn1ssChunkTools (and the iOS / Android
-  // / JavaSE Cn1ssDeviceRunnerHelper.emitChannel emitters) read the index
-  // back as an offset to verify the reassembled stream covers
-  // [0, total_b64_len) with no gaps or overlaps. The previous sequential
-  // counter made every JS chunk look like it overlapped its predecessor by
-  // chunkSize - 1 bytes at offset 1, so the consumer rejected every JS
-  // screenshot as "incomplete chunk stream" and the JS pipeline silently
-  // dropped every chart / graphics test. cn1ssChunkIndexByStream still
-  // tracks the running byte offset so callers that emit a single test in
-  // multiple emitCn1ssChunks(...) bursts produce a contiguous stream.
-  const startOffset = cn1ssChunkIndexByStream[streamKey] || 0;
-  const chunkSize = 8000;
-  for (let offset = 0; offset < base64.length; offset += chunkSize) {
-    const payload = base64.substring(offset, offset + chunkSize);
-    const index = String(startOffset + offset).padStart(6, "0");
-    emitDiagLine(prefix + ":" + test + ":" + index + ":" + payload);
+  if (channel) {
+    return;
   }
-  cn1ssChunkIndexByStream[streamKey] = startOffset + base64.length;
-  if (base64.length === 0) {
-    const index = String(startOffset).padStart(6, "0");
-    emitDiagLine(prefix + ":" + test + ":" + index + ":");
-  }
-  // Emit the Java-side end-of-channel summary so Cn1ssChunkTools'
-  // readTotalBase64Length() can verify the reassembled length matches what
-  // the emitter advertised. Without this the integrity check is best-effort
-  // (we still detect gaps/overlaps via the offset walk) but a stream that
-  // truncates after its last chunk would only be caught by the PNG trailer
-  // check downstream, which is platform-specific.
-  emitDiagLine("CN1SS:INFO:test=" + test
-    + " chunks=" + Math.max(1, Math.ceil(base64.length / chunkSize))
-    + " total_b64_len=" + base64.length);
-  // Emit END marker matching the Java emitChannel convention so the
-  // downstream cn1ss_list_tests / cn1ss_decode helpers can detect the stream.
-  emitDiagLine(prefix + ":END:" + test);
+  cn1ssWsSend(base64, normalizeCn1ssTestName(testName));
 }
 
 const cn1ssEmitCurrentFormScreenshotMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunnerHelper_emitCurrentFormScreenshot_java_lang_String_java_lang_Runnable";

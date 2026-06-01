@@ -8039,6 +8039,14 @@ NSData* arrayToData(JAVA_OBJECT arr) {
     return d;
 }
 
+NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
+    if (arr == JAVA_NULL) return nil;
+    JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
+    char* data = (char*)byteArray->data;
+    NSData* d = [NSData dataWithBytes:(data + offset * byteArray->primitiveSize) length:len * byteArray->primitiveSize];
+    return d;
+}
+
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length] / sizeof(JAVA_ARRAY_BYTE), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
@@ -8108,6 +8116,14 @@ NSData* arrayToData(JAVA_OBJECT arr) {
     org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
     void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
+    return d;
+}
+
+NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
+    if (arr == JAVA_NULL) return nil;
+    org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
+    char* data = (char*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    NSData* d = [NSData dataWithBytes:(data + offset) length:len];
     return d;
 }
 
@@ -9225,6 +9241,58 @@ void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY(CN1
     POOL_BEGIN();
     SocketImpl* impl = (BRIDGE_CAST SocketImpl*)((void *)socket);
     [impl writeToStream:arrayToData(data)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_writeToSocketStream___long_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG socket, JAVA_OBJECT data, JAVA_INT offset, JAVA_INT len) {
+    POOL_BEGIN();
+    SocketImpl* impl = (BRIDGE_CAST SocketImpl*)((void *)socket);
+    [impl writeToStream:arrayToDataRange(data, offset, len)];
+    POOL_END();
+}
+
+#import "WebSocketImpl.h"
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = [[CN1WebSocketImpl alloc] initWithId:connectionId
+                                                              url:toNSString(CN1_THREAD_STATE_PASS_ARG url)];
+    POOL_END();
+    return (JAVA_LONG)impl;
+}
+
+void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl connectWithTimeoutMs:timeoutMs];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_closeWebSocketNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl closeConnection];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_sendWebSocketTextNative___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_OBJECT text) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl sendText:toNSString(CN1_THREAD_STATE_PASS_ARG text)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_sendWebSocketBinaryNative___long_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_OBJECT data) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl sendBinary:arrayToData(data)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_releaseWebSocketNative___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle) {
+    POOL_BEGIN();
+    CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
+    [impl release];
     POOL_END();
 }
 
@@ -12624,4 +12692,8 @@ JAVA_INT com_codename1_impl_ios_IOSNative_verify___int_byte_1ARRAY_byte_1ARRAY_b
 
 JAVA_INT com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT bits, JAVA_OBJECT outPub, JAVA_OBJECT outPriv, JAVA_OBJECT lengths) {
     return com_codename1_impl_ios_IOSNative_generateRsaKeyPair___int_byte_1ARRAY_byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_PASS_ARG instanceObject, bits, outPub, outPriv, lengths);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT connectionId, JAVA_OBJECT url) {
+    return com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, connectionId, url);
 }

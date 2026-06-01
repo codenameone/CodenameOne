@@ -601,7 +601,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port, int connectTimeout);    
+    public native long connectSocket(String host, int port, int connectTimeout);
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
@@ -610,6 +610,14 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+    public native void writeToSocketStream(long socket, byte[] data, int offset, int len);
+
+    public native long createWebSocketNative(int connectionId, String url);
+    public native void connectWebSocketNative(long handle, int connectTimeoutMs);
+    public native void closeWebSocketNative(long handle);
+    public native void sendWebSocketTextNative(long handle, String text);
+    public native void sendWebSocketBinaryNative(long handle, byte[] data);
+    public native void releaseWebSocketNative(long handle);
 
     
     // Paths
