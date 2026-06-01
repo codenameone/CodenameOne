@@ -291,6 +291,35 @@ MainTitle { cn1-derive: Title; }
 BackCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 
+/* ---- Desktop chrome (macOS conventions) ----
+   Only used when the desktop port enables interactiveScrollBool /
+   desktop window chrome; inert on real iOS devices. The horizontal
+   padding of DesktopScroll defines the scrollbar gutter width
+   (LookAndFeel.getVerticalScrollWidth sums its horizontal margin +
+   padding), giving a thin macOS-style overlay scrollbar. */
+DesktopScroll {
+    background-color: transparent;
+    padding: 0 1mm 0 1mm;
+    margin: 0;
+}
+DesktopScrollThumb {
+    background-color: rgba(0,0,0,0.35);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScroll {
+    background-color: transparent;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb {
+    background-color: rgba(0,0,0,0.35);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
    hugging the bottom edge, with individual tabs rendered as
    transparent hits inside it. cn1-pill-border draws a true pill;
@@ -563,6 +592,13 @@ PopupContent {
     MainTitle { color: #ffffff; background-color: #000000; }
     BackCommand { color: var(--accent-color-dark, #0a84ff); }
     TitleCommand { color: var(--accent-color-dark, #0a84ff); }
+
+    /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
+       re-declared so the round primitive carries into dark mode. */
+    DesktopScroll { background-color: transparent; }
+    DesktopScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScroll { background-color: transparent; }
+    DesktopHorizontalScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: #1c1c1e; }

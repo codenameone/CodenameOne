@@ -352,6 +352,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return shiftKeyDown;
     }
 
+    @Override
+    public boolean isWebSocketSupported() {
+        return isBrowserWebSocketAvailable();
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new HTML5WebSocketImpl(url);
+    }
+
+    @com.codename1.html5.js.JSBody(params = {}, script = "return typeof WebSocket !== 'undefined';")
+    private static native boolean isBrowserWebSocketAvailable();
+
     MouseEvent lastMouseEvent;
     
     @Override

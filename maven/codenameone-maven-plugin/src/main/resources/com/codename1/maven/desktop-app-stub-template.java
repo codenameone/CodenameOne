@@ -51,6 +51,9 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
     private static final boolean APP_ADAPT_TO_RETINA = __APP_ADAPT_TO_RETINA__;
     private static final boolean APP_RESIZEABLE = __APP_RESIZEABLE__;
     private static final boolean APP_FULLSCREEN = __APP_FULLSCREEN__;
+    // Desktop integration: title bar mode ("native"/"custom"/"toolbar") + interactive scrollbars.
+    private static final String APP_DESKTOP_TITLEBAR = "__APP_DESKTOP_TITLEBAR__";
+    private static final boolean APP_DESKTOP_INTERACTIVE_SCROLLBARS = __APP_DESKTOP_INTERACTIVE_SCROLLBARS__;
     public static final String BUILD_KEY = "";
     public static final String PACKAGE_NAME = "";
     public static final String BUILT_BY_USER = "";
@@ -79,6 +82,10 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
         JavaSEPort.setShowEDTViolationStacks(false);
         JavaSEPort.setShowEDTWarnings(false);
         JavaSEPort.setFullScreen(APP_FULLSCREEN);
+
+        // Desktop integration (only effective when running on the desktop).
+        JavaSEPort.setDesktopTitleBarMode(APP_DESKTOP_TITLEBAR);
+        JavaSEPort.setDesktopInteractiveScrollbars(APP_DESKTOP_INTERACTIVE_SCROLLBARS);
 
         if(fontFaces != null) {
             JavaSEPort.setFontFaces(fontFaces[0], fontFaces[1], fontFaces[2]);
@@ -122,6 +129,10 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
         } else {
             frm.setLocationByPlatform(true);
             frm.setResizable(APP_RESIZEABLE);
+            // custom desktop chrome draws its own title bar on an undecorated window
+            if ("custom".equals(APP_DESKTOP_TITLEBAR)) {
+                frm.setUndecorated(true);
+            }
             int w = APP_WIDTH;
             int h = APP_HEIGHT;
 

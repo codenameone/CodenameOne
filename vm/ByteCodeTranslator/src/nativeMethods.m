@@ -40,9 +40,13 @@
 #import <Foundation/Foundation.h>
 #endif
 
+#ifdef _WIN32
+#include "cn1_win_compat.h"
+#else
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
+#endif
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
 #if defined(__APPLE__) && defined(__OBJC__)

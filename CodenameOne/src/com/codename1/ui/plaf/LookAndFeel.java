@@ -102,6 +102,11 @@ public abstract class LookAndFeel {
     private boolean scrollVisible;
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
+    /// Indicates that scrollbars should behave as interactive desktop scrollbars:
+    /// an always-visible track with a thumb that can be grabbed and dragged and a
+    /// track that pages on click. Enabled via the {@code interactiveScrollBool} theme
+    /// constant which the desktop port injects only when running on the desktop.
+    private boolean interactiveScroll;
     private int fadeScrollBarSpeed = 5;
     private int fadeScrollEdgeLength = 15;
     private Image fadeScrollTop;
@@ -525,7 +530,9 @@ public abstract class LookAndFeel {
         int alpha = scrollStyle.getBgTransparency() & 0xff;
         int thumbAlpha = scrollThumbStyle.getBgTransparency() & 0xff;
         int originalAlpha = g.getAlpha();
-        if (fadeScrollBar) {
+        // interactive desktop scrollbars are always visible, never faded
+        boolean fade = fadeScrollBar && !interactiveScroll;
+        if (fade) {
             if (scrollStyle.getBgTransparency() != 0) {
                 scrollStyle.setBgTransparency(c.getScrollOpacity(), true);
             }
@@ -585,10 +592,25 @@ public abstract class LookAndFeel {
         g.setClip(cx, cy, cw, ch);
         scrollThumb.paintComponent(g);
         g.setClip(cx, cy, cw, ch);
-        if (fadeScrollBar) {
+        if (fade) {
             scrollStyle.setBgTransparency(alpha, true);
             scrollThumbStyle.setBgTransparency(thumbAlpha, true);
             g.setAlpha(originalAlpha);
+        }
+        if (interactiveScroll) {
+            // record the painted geometry (component-local) so pointer code can hit-test
+            // the thumb and track for grab/drag and click-to-page behavior
+            if (isVertical) {
+                c.setVerticalScrollBounds(scrollThumb.getX() - c.getX(), scrollThumb.getY() - c.getY(),
+                        scrollThumb.getWidth(), scrollThumb.getHeight(),
+                        scroll.getX() - c.getX(), scroll.getY() - c.getY(),
+                        scroll.getWidth(), scroll.getHeight());
+            } else {
+                c.setHorizontalScrollBounds(scrollThumb.getX() - c.getX(), scrollThumb.getY() - c.getY(),
+                        scrollThumb.getWidth(), scrollThumb.getHeight(),
+                        scroll.getX() - c.getX(), scroll.getY() - c.getY(),
+                        scroll.getWidth(), scroll.getHeight());
+            }
         }
     }
 
@@ -961,13 +983,22 @@ public abstract class LookAndFeel {
 
     private void initScroll() {
         verticalScroll = new Label();
-        verticalScroll.setUIID("Scroll");
         horizontalScroll = new Label();
-        horizontalScroll.setUIID("HorizontalScroll");
         verticalScrollThumb = new Label();
-        verticalScrollThumb.setUIID("ScrollThumb");
         horizontalScrollThumb = new Label();
-        horizontalScrollThumb.setUIID("HorizontalScrollThumb");
+        if (interactiveScroll) {
+            // desktop scrollbars use dedicated UIIDs so the mobile Scroll/ScrollThumb styling is
+            // never affected and platform conventions can be themed separately
+            verticalScroll.setUIID("DesktopScroll");
+            horizontalScroll.setUIID("DesktopHorizontalScroll");
+            verticalScrollThumb.setUIID("DesktopScrollThumb");
+            horizontalScrollThumb.setUIID("DesktopHorizontalScrollThumb");
+        } else {
+            verticalScroll.setUIID("Scroll");
+            horizontalScroll.setUIID("HorizontalScroll");
+            verticalScrollThumb.setUIID("ScrollThumb");
+            horizontalScrollThumb.setUIID("HorizontalScrollThumb");
+        }
     }
 
     /// This method is a callback to the LookAndFeel when a theme is being
@@ -981,6 +1012,8 @@ public abstract class LookAndFeel {
         fadeScrollBottom = null;
         fadeScrollRight = null;
         fadeScrollLeft = null;
+        // must be resolved before initScroll() so the correct scroll UIIDs are applied
+        interactiveScroll = manager.isThemeConstant("interactiveScrollBool", false);
         initScroll();
         if (menuRenderer != null) {
             if (menuRenderer instanceof Component) {
@@ -1512,6 +1545,17 @@ public abstract class LookAndFeel {
     /// scrollVisible
     public boolean isScrollVisible() {
         return scrollVisible;
+    }
+
+    /// Indicates whether scrollbars behave as interactive desktop scrollbars (grab-able
+    /// thumb, click-to-page track, always visible). Controlled by the
+    /// {@code interactiveScrollBool} theme constant.
+    ///
+    /// #### Returns
+    ///
+    /// true if interactive desktop scrollbars are enabled
+    public boolean isInteractiveScroll() {
+        return interactiveScroll;
     }
 
     /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme

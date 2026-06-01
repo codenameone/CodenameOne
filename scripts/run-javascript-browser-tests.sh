@@ -41,7 +41,18 @@ URL_FILE="$WORK_DIR/url.txt"
 LOG_FILE="$WORK_DIR/browser.log"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts/javascript-browser-tests}"
 
+# cn1ss WebSocket screenshot server. The browser app runs on this host, so it
+# defaults to ws://127.0.0.1:8765; the server (started below, once the harness
+# URL is ready) writes each received screenshot as <test>.png into $CN1SS_WS_DIR
+# and run-javascript-screenshot-tests.sh consumes them. Sourced here so
+# cleanup() can stop the server on any exit path.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cn1ss.sh"
+cn1ss_log() { rjb_log "$1"; }
+CN1SS_WS_DIR="$WORK_DIR/ws"
+
 cleanup() {
+  cn1ss_stop_ws_server 2>/dev/null || true
   if [ -n "${SERVER_PID:-}" ]; then
     kill "$SERVER_PID" >/dev/null 2>&1 || true
     wait "$SERVER_PID" 2>/dev/null || true
@@ -191,6 +202,26 @@ if [ "${CN1_JS_ENABLE_EVENT_FORWARDING:-0}" != "1" ]; then
 fi
 rjb_log "Browser harness serving $URL"
 
+# Start the WebSocket screenshot server before launching the browser so the
+# app can connect on startup. Best-effort: if Java or compilation is
+# unavailable the app falls back to the base64-over-console transport.
+WS_JAVA_BIN=""
+if [ -n "${JAVA17_HOME:-}" ] && [ -x "${JAVA17_HOME}/bin/java" ]; then
+  WS_JAVA_BIN="${JAVA17_HOME}/bin/java"
+elif [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+  WS_JAVA_BIN="${JAVA_HOME}/bin/java"
+elif command -v java >/dev/null 2>&1; then
+  WS_JAVA_BIN="$(command -v java)"
+fi
+if [ -n "$WS_JAVA_BIN" ] \
+    && cn1ss_setup "$WS_JAVA_BIN" "$SCRIPT_DIR/common/java" \
+    && cn1ss_start_ws_server "$CN1SS_WS_DIR"; then
+  export CN1SS_WS_DIR
+  rjb_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$CN1SS_WS_DIR)"
+else
+  rjb_log "WebSocket screenshot server not started; relying on base64-over-console fallback"
+fi
+
 if [ -n "${BROWSER_CMD:-}" ]; then
   URL="$URL" LOG_FILE="$LOG_FILE" sh -c "$BROWSER_CMD" \
     >"$ARTIFACTS_DIR/browser-launch.log" 2>&1 &
@@ -229,6 +260,9 @@ while true; do
 done
 
 wait "$BROWSER_PID" 2>/dev/null || true
+# Stop the WS server so all received PNGs are flushed before the comparison
+# step reads $CN1SS_WS_DIR.
+cn1ss_stop_ws_server
 cp -f "$LOG_FILE" "$ARTIFACTS_DIR/browser.log" 2>/dev/null || true
 write_top_blocker "$ARTIFACTS_DIR/browser.log"
 rjb_log "Top blocker: $(cat "$ARTIFACTS_DIR/top-blocker.txt" 2>/dev/null || echo 'TOP_BLOCKER=unavailable|none|none')"

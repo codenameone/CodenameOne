@@ -117,6 +117,83 @@ function emitVmMessage(message) {
   }
   global.postMessage(safeMessage);
 }
+// --- Host-ref lifecycle (worker side) --------------------------------------
+// browser_bridge.js retains every host object (canvas / image / DOM node) the
+// worker references in a strong ``hostRefById`` map that never evicts. The
+// per-test off-screen screenshot / mutable-image canvases (~4 MB backing store
+// each) piled up for the life of the page, so by ~test 66 the main thread was
+// thrashing: canvas.toBlob stalled, the worker<->host bridge began returning
+// degenerate receivers ("Missing JS member ...", chartDocumentStaleness) and
+// the suite wedged. We close the leak by telling the host to drop a host ref
+// once the LAST worker-side wrapper for it has been garbage-collected.
+// ``jsObjectWrappers`` is a WeakMap, so a wrapper becomes collectable when its
+// owning Java object dies; a FinalizationRegistry then fires and we post a
+// batched ``releaseHostRef``.
+//
+// The GC signal is the crucial property: a canvas that is still REUSED (a
+// cached theme image, a pooled scratch buffer) keeps a live Java reference, so
+// its wrapper is never collected and it is never released -- only genuinely
+// dead canvases are reclaimed. (Time-idle reclamation, by contrast, cannot
+// tell "done" from "idle but reused" and corrupts the bridge.)
+//
+// Multiple wrappers can transiently exist for one host id (the host keeps a
+// stable id per object via its own WeakMap, but each postMessage receipt
+// deserialises a fresh proxy -> fresh wrapper). We refcount per id and only
+// release when the count reaches zero, so a still-live wrapper can never have
+// its ref pulled out from under it. The host side additionally releases ONLY
+// canvases, so a non-canvas ref whose raw ``__jsValue`` marker outlived its
+// wrapper (some @JSBody natives stash the unwrapped marker) is never dropped.
+const hostRefWorkerCount = typeof Object.create === "function" ? Object.create(null) : {};
+let pendingHostRefReleases = [];
+let hostRefReleaseFlushScheduled = false;
+function flushHostRefReleases() {
+  hostRefReleaseFlushScheduled = false;
+  if (!pendingHostRefReleases.length) {
+    return;
+  }
+  const ids = pendingHostRefReleases;
+  pendingHostRefReleases = [];
+  emitVmMessage({ type: "releaseHostRef", ids: ids });
+}
+function scheduleHostRefReleaseFlush() {
+  if (hostRefReleaseFlushScheduled) {
+    return;
+  }
+  hostRefReleaseFlushScheduled = true;
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(flushHostRefReleases);
+  } else if (typeof setTimeout === "function") {
+    setTimeout(flushHostRefReleases, 0);
+  } else {
+    flushHostRefReleases();
+  }
+}
+const hostRefFinalizer = (typeof FinalizationRegistry === "function")
+  ? new FinalizationRegistry(function(hostId) {
+      const count = hostRefWorkerCount[hostId];
+      if (count == null) {
+        return;
+      }
+      if (count <= 1) {
+        delete hostRefWorkerCount[hostId];
+        pendingHostRefReleases.push(hostId);
+        scheduleHostRefReleaseFlush();
+      } else {
+        hostRefWorkerCount[hostId] = count - 1;
+      }
+    })
+  : null;
+function trackHostRefWrapper(wrapper, value) {
+  if (!hostRefFinalizer || value == null) {
+    return;
+  }
+  const hostId = value.__cn1HostRef;
+  if (hostId == null || hostId === 0) {
+    return;
+  }
+  hostRefWorkerCount[hostId] = (hostRefWorkerCount[hostId] || 0) + 1;
+  hostRefFinalizer.register(wrapper, hostId);
+}
 // An entry in ``cls.methods`` may be either a function (the common
 // case) or a STRING naming another translated function. Inherited
 // method aliases emit the latter form — the alias ``$childId`` points
@@ -1921,6 +1998,11 @@ const jvm = {
     if (jsObjectWrappers) {
       jsObjectWrappers.set(value, wrapper);
     }
+    // Track this wrapper so the host can release the underlying host ref once
+    // every worker-side wrapper for it has been GC'd (see the host-ref
+    // lifecycle block near emitVmMessage). Only host-backed values (carrying
+    // ``__cn1HostRef``) are tracked; pure worker objects never leak.
+    trackHostRefWrapper(wrapper, value);
     this.enhanceJsWrapper(wrapper, resolvedClass);
     if (expectedClass && expectedClass !== resolvedClass) {
       this.enhanceJsWrapper(wrapper, expectedClass);

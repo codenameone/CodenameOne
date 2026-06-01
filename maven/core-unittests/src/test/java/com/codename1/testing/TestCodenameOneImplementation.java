@@ -153,6 +153,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int stopRemoteControlInvocations;
     private boolean mutableImagesFast = true;
     private boolean nativeTitle;
+    private boolean desktop;
+    private String desktopTitleBarMode = "toolbar";
+    private java.util.Vector lastNativeCommands;
     private int softkeyCount = 2;
     private boolean thirdSoftButton = false;
     private boolean nativeFontSchemeSupported = true;
@@ -533,6 +536,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setNativeTitle(boolean nativeTitle) {
         this.nativeTitle = nativeTitle;
+    }
+
+    @Override
+    public boolean isDesktop() {
+        return desktop;
+    }
+
+    public void setDesktop(boolean desktop) {
+        this.desktop = desktop;
+    }
+
+    @Override
+    public String getDesktopTitleBarMode() {
+        return desktopTitleBarMode;
+    }
+
+    public void setDesktopTitleBarMode(String mode) {
+        this.desktopTitleBarMode = mode;
+    }
+
+    @Override
+    public void setNativeCommands(java.util.Vector commands) {
+        this.lastNativeCommands = commands;
+    }
+
+    /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
+    public java.util.Vector getLastNativeCommands() {
+        return lastNativeCommands;
     }
 
     @Override
@@ -1010,6 +1041,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        desktop = false;
+        nativeTitle = false;
+        desktopTitleBarMode = "toolbar";
+        lastNativeCommands = null;
         clearFileSystem();
         clearSockets();
         clearConnections();

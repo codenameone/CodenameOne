@@ -152,10 +152,24 @@ public final class IOSNative {
     native boolean isIOS7();
     native boolean isRunningOnMac();
 
+    // Mac native (Catalyst): set the host window title bar text from the current form title.
+    native void setWindowTitle(String title);
+
+    // Mac native (Catalyst): replace the application menu's CN1 command items. namesNewlineJoined
+    // holds the visible command labels separated by '\n'; selecting item i calls back into
+    // IOSImplementation.fireMacMenuCommand(i).
+    native void setNativeMenuCommands(String namesNewlineJoined);
+
     // Mac native: propagate the current form's brightness to the host
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
     // CN1) matches the app's dark/light theme. A no-op on iOS/iPadOS.
     native void setMacWindowDarkAppearance(boolean dark);
+
+    // Mac native (Catalyst): undecorate the host window for the "custom" desktop title-bar mode -
+    // hide the AppKit title bar (transparent + hidden title + full-size content view) so the CN1
+    // Toolbar acts as the window title bar, and make the window movable by its background so the
+    // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
+    native void setMacWindowUndecorated(boolean undecorated);
     
     native void setImageName(long nativeImage, String name);
     
@@ -587,7 +601,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port, int connectTimeout);    
+    public native long connectSocket(String host, int port, int connectTimeout);
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
@@ -596,6 +610,14 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+    public native void writeToSocketStream(long socket, byte[] data, int offset, int len);
+
+    public native long createWebSocketNative(int connectionId, String url);
+    public native void connectWebSocketNative(long handle, int connectTimeoutMs);
+    public native void closeWebSocketNative(long handle);
+    public native void sendWebSocketTextNative(long handle, String text);
+    public native void sendWebSocketBinaryNative(long handle, byte[] data);
+    public native void releaseWebSocketNative(long handle);
 
     
     // Paths

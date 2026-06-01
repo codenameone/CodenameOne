@@ -622,7 +622,7 @@ public class Parser extends ClassVisitor {
             // methods the conservative graph considered "used" because
             // some OTHER class with the same name+desc was invoked; it
             // never resurrects methods the earlier pass removed. Gated
-            // on OUTPUT_TYPE_JAVASCRIPT because iOS / C# runtimes rely on
+            // on OUTPUT_TYPE_JAVASCRIPT because the iOS runtime relies on
             // different dispatch mechanics and may break under stricter
             // reachability.
             if (BytecodeMethod.optimizerOn
@@ -863,10 +863,7 @@ public class Parser extends ClassVisitor {
         if (outMain instanceof ConcatenatingFileOutputStream) {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
         }
-        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
-            outMain.write(cls.generateCSharpCode().getBytes(StandardCharsets.UTF_8));
-            outMain.close();
-        } else if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+        if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
             outMain.write(cls.generateJavascriptCode(classes).getBytes(StandardCharsets.UTF_8));
             outMain.close();
         } else {

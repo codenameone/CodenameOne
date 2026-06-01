@@ -130,7 +130,8 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         project.addCompileSourceRoot(generatedRoot.getAbsolutePath());
     }
 
-    private String applyTemplate(String template, String packageName, String mainName) {
+    // package-private for unit testing the build-hint -> generated-stub substitution
+    String applyTemplate(String template, String packageName, String mainName) {
         // Default APP_TITLE to displayName; fall back to mainName so we never inject an empty literal.
         String displayName = properties.getProperty("codename1.displayName", mainName);
         String appTitle = arg("desktop.title", displayName);
@@ -141,6 +142,8 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         String resizable = arg("desktop.resizable", "true");
         String fullscreen = arg("desktop.fullscreen", "false");
         String adaptToRetina = arg("desktop.adaptToRetina", "true");
+        String titleBar = arg("desktop.titleBar", "native");
+        String interactiveScrollbars = arg("desktop.interactiveScrollbars", "true");
 
         String result = template;
         result = result.replace("__PACKAGE__", packageName);
@@ -152,7 +155,20 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
         result = result.replace("__APP_RESIZEABLE__", sanitizeBoolean(resizable, true));
         result = result.replace("__APP_FULLSCREEN__", sanitizeBoolean(fullscreen, false));
         result = result.replace("__APP_ADAPT_TO_RETINA__", sanitizeBoolean(adaptToRetina, true));
+        result = result.replace("__APP_DESKTOP_TITLEBAR__", sanitizeTitleBarMode(titleBar));
+        result = result.replace("__APP_DESKTOP_INTERACTIVE_SCROLLBARS__", sanitizeBoolean(interactiveScrollbars, true));
         return result;
+    }
+
+    private String sanitizeTitleBarMode(String value) {
+        if (value != null) {
+            String trimmed = value.trim().toLowerCase();
+            if ("native".equals(trimmed) || "custom".equals(trimmed) || "toolbar".equals(trimmed)) {
+                return trimmed;
+            }
+        }
+        getLog().warn("Invalid desktop.titleBar build hint: '" + value + "'. Using 'native'.");
+        return "native";
     }
 
     private String arg(String name, String defaultValue) {

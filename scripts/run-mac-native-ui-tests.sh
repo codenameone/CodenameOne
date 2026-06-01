@@ -68,8 +68,8 @@ CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
-  rm_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
+  rm_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
   exit 3
 fi
 cn1ss_log() { rm_log "$1"; }
@@ -150,6 +150,21 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
+
+# Start the host-side WebSocket screenshot server on the fixed standard port.
+# The Mac Catalyst app runs on this host, so the device-runner defaults to
+# ws://127.0.0.1:8765 with no per-launch URL injection (see
+# Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT). Screenshots the app sends
+# land directly in $WS_RAW_DIR; if the WS transport delivers nothing (server
+# failed to start, app could not connect) the legacy file/chunk decode below
+# is used instead, so this is purely additive.
+WS_RAW_DIR="$SCREENSHOT_TMP_DIR/ws"
+mkdir -p "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  rm_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  rm_log "WebSocket screenshot server did not start; relying on file/chunk fallback"
+fi
 
 # Patch CN1SS_* placeholders in the shared scheme (the iOS pipeline does
 # this too -- the placeholders come from create-shared-scheme.py). Mac
@@ -394,177 +409,36 @@ fi
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=0
 
-# Aggregate CN1SS sources in priority order: stdout (richest -- chunked
-# PNGs are emitted there) first, then the unified-log streams.
-# With `open --stdout PATH` the launched Catalyst binary writes printf
-# / fprintf / System.out output (ParparVM routes Java stdout through
-# stdout fd 1) into TEST_LOG. That's a file write, not os_log, so it
-# never loses chunks under load. log stream / log show stay as
-# belt-and-suspenders in case ParparVM ever switches to NSLog-only
-# routing on a future SDK.
-declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG" "SIMLOG:$FALLBACK_LOG" "SIMLOG:$LATE_FALLBACK_LOG")
+# The app has exited; stop the WebSocket server and adopt whatever it
+# received. The server wrote one <test>.png per delivered screenshot into
+# $WS_RAW_DIR. When WS delivered at least one image we use that set directly
+# and skip the legacy file/chunk decode entirely.
+cn1ss_stop_ws_server
+declare -a COMPARE_ENTRIES=()
+WS_DELIVERED=0
+if [ -d "${WS_RAW_DIR:-}" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_TMP_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  rm_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (legacy file/chunk decode skipped)"
+fi
 
-# Find the source with the most chunks for diagnostic logging.
-LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
-FALLBACK_CHUNKS="$(cn1ss_count_chunks "$FALLBACK_LOG")"; FALLBACK_CHUNKS="${FALLBACK_CHUNKS//[^0-9]/}"; : "${FALLBACK_CHUNKS:=0}"
-LATE_CHUNKS="$(cn1ss_count_chunks "$LATE_FALLBACK_LOG")"; LATE_CHUNKS="${LATE_CHUNKS//[^0-9]/}"; : "${LATE_CHUNKS:=0}"
-rm_log "Chunk counts -> stdout: ${LOG_CHUNKS}, log-stream: ${FALLBACK_CHUNKS}, log-show: ${LATE_CHUNKS}"
-
-# Count CN1SS:FILE: announcements -- Mac native uses the file fast path
-# and emits no CN1SS:CHUNK lines on success, so the chunk-zero guard
-# below mustn't fire if files exist on disk.
-FILE_HITS=0
-for src in "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG"; do
-  [ -s "$src" ] || continue
-  c=$( { grep -c "CN1SS:FILE:" "$src" 2>/dev/null || true; } | head -n 1)
-  c="${c//[^0-9]/}"
-  : "${c:=0}"
-  FILE_HITS=$(( FILE_HITS + c ))
-done
-rm_log "CN1SS:FILE: lines captured: ${FILE_HITS}"
-
-if [ "${LOG_CHUNKS:-0}" = "0" ] && [ "${FALLBACK_CHUNKS:-0}" = "0" ] && [ "${LATE_CHUNKS:-0}" = "0" ] && [ "${FILE_HITS}" -eq 0 ]; then
-  rm_log "STAGE:MARKERS_NOT_FOUND -> no CN1SS chunks captured (and no CN1SS:FILE entries)"
-  rm_log "---- last 50 lines of stdout log ----"
-  tail -n 50 "$TEST_LOG" 2>/dev/null | sed 's/^/[STDOUT] /' || true
-  rm_log "---- last 50 lines of unified log fallback ----"
-  tail -n 50 "$FALLBACK_LOG" 2>/dev/null | sed 's/^/[OSLOG] /' || true
+# WebSocket is the only transport now. If it delivered nothing the on-device
+# suite either never ran or produced no screenshots -- fail loudly; there is
+# no syslog/base64/file fallback any more.
+if [ "$WS_DELIVERED" -eq 0 ]; then
+  rm_log "STAGE:MARKERS_NOT_FOUND -> no screenshots delivered over WebSocket"
+  rm_log "---- CN1SS lines from log ----"
+  (grep "CN1SS:" "$TEST_LOG" 2>/dev/null || true) | sed 's/^/[CN1SS] /'
   exit 12
 fi
-
-# Pick whichever source has chunks for the test enumeration. The decoder
-# iterates over all sources for each test, so this is just to seed
-# TEST_NAMES. TEST_LOG (open --stdout) is the primary capture; the
-# unified log only catches lines if `open --stdout` ever fails to fd 1.
-PRIMARY_LOG="$TEST_LOG"
-if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  if [ "${FALLBACK_CHUNKS:-0}" != "0" ]; then PRIMARY_LOG="$FALLBACK_LOG"; else PRIMARY_LOG="$LATE_FALLBACK_LOG"; fi
-fi
-
-# On Mac native the helper writes PNGs/JPEGs straight to the app's
-# FileSystemStorage and emits CN1SS:FILE: lines pointing at the absolute
-# paths. The base64 chunk channel is unused on Mac (os_log rate-limits
-# 900-byte CN1SS:CHUNK lines under load); reading the files directly is
-# both faster and immune to log-line drops. Use a flat file index instead
-# of an associative array because macOS bash 3.2 doesn't support `declare -A`.
-CN1SS_FILE_INDEX="$SCREENSHOT_TMP_DIR/cn1ss-file-index.tsv"
-: > "$CN1SS_FILE_INDEX"
-for src in "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG"; do
-  [ -s "$src" ] || continue
-  { grep "CN1SS:FILE:" "$src" 2>/dev/null || true; } | \
-    sed -nE 's|.*CN1SS:FILE:test=([^ ]+) channel=([^ ]*) path=([^ ]+).*|\1	\2	\3|p' \
-    >> "$CN1SS_FILE_INDEX" || true
-done
-# Strip the file:// scheme that FileSystemStorage prepends on iOS/Mac.
-# BSD sed (macOS) doesn't grok `\b`, so anchor the substitution on the
-# tab-delimited column instead. The 3rd column starts after the second
-# tab; replace a leading 'file://' there.
-sed -i.bak -E 's@([^	]+	[^	]*	)file://@\1@' "$CN1SS_FILE_INDEX" 2>/dev/null || true
-rm -f "${CN1SS_FILE_INDEX}.bak" 2>/dev/null || true
-FILE_PNG_COUNT=$( { awk -F'\t' '$2==""' "$CN1SS_FILE_INDEX" 2>/dev/null || true; } | wc -l | tr -d ' ')
-FILE_JPG_COUNT=$( { awk -F'\t' '$2=="PREVIEW"' "$CN1SS_FILE_INDEX" 2>/dev/null || true; } | wc -l | tr -d ' ')
-rm_log "CN1SS:FILE: entries found -> png=${FILE_PNG_COUNT} preview=${FILE_JPG_COUNT}"
-
-# Look up a test's PNG / preview path from the flat index.
-cn1ss_file_path_for() {
-  # $1=testName, $2=channel ("" for png, "PREVIEW" for jpeg)
-  awk -F'\t' -v t="$1" -v c="$2" '$1==t && $2==c {print $3; exit}' "$CN1SS_FILE_INDEX" 2>/dev/null
-}
-
-declare -a TEST_NAMES=()
-if [ "${FILE_PNG_COUNT:-0}" -gt 0 ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAMES+=("$name")
-  done < <(awk -F'\t' '$2==""' "$CN1SS_FILE_INDEX" 2>/dev/null | awk -F'\t' '{print $1}' | sort -u)
-else
-  TEST_NAMES_RAW="$(cn1ss_list_tests "$PRIMARY_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
-  if [ -n "$TEST_NAMES_RAW" ]; then
-    while IFS= read -r name; do
-      [ -n "$name" ] || continue
-      TEST_NAMES+=("$name")
-    done <<< "$TEST_NAMES_RAW"
-  else
-    TEST_NAMES+=("default")
-  fi
-fi
-rm_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
-
-PAIR_SEP=$'\037'
-declare -a TEST_OUTPUT_ENTRIES=()
-
-ensure_dir "$SCREENSHOT_PREVIEW_DIR"
-
-for test in "${TEST_NAMES[@]}"; do
-  dest="$SCREENSHOT_TMP_DIR/${test}.png"
-  preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-
-  # Fast path: copy from the file the app dropped onto the local
-  # filesystem (Mac native) -- no base64 decode, no chunk reassembly.
-  file_png="$(cn1ss_file_path_for "$test" "")"
-  if [ -n "$file_png" ] && [ -s "$file_png" ]; then
-    if cp -f "$file_png" "$dest"; then
-      TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-      rm_log "Copied screenshot for '$test' (file=$file_png, size: $(cn1ss_file_size "$dest") bytes)"
-      file_jpg="$(cn1ss_file_path_for "$test" "PREVIEW")"
-      if [ -n "$file_jpg" ] && [ -s "$file_jpg" ]; then
-        cp -f "$file_jpg" "$preview_dest" 2>/dev/null || true
-        rm_log "Copied preview for '$test' (file=$file_jpg, size: $(cn1ss_file_size "$preview_dest") bytes)"
-      else
-        rm -f "$preview_dest" 2>/dev/null || true
-      fi
-      continue
-    fi
-  fi
-
-  # Fallback: classic CN1SS:CHUNK base64 decode (iOS path, kept here so
-  # the Mac script keeps working if the file-based emit is ever disabled).
-  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
-    TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-    rm_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
-    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
-      rm_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-    else
-      rm -f "$preview_dest" 2>/dev/null || true
-    fi
-  else
-    rm_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
-    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-    {
-      for entry in "${CN1SS_SOURCES[@]}"; do
-        path="${entry#*:}"
-        [ -s "$path" ] || continue
-        count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
-      done
-    } > "$RAW_B64_OUT" 2>/dev/null || true
-    if [ -s "$RAW_B64_OUT" ]; then
-      head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-      rm_log "Partial base64 saved at: $RAW_B64_OUT"
-    fi
-    exit 12
-  fi
-done
-
-lookup_test_output() {
-  local key="$1" entry prefix
-  for entry in "${TEST_OUTPUT_ENTRIES[@]}"; do
-    prefix="${entry%%$PAIR_SEP*}"
-    if [ "$prefix" = "$key" ]; then
-      echo "${entry#*$PAIR_SEP}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-COMPARE_ENTRIES=()
-for test in "${TEST_NAMES[@]}"; do
-  if dest="$(lookup_test_output "$test")"; then
-    [ -n "$dest" ] || continue
-    COMPARE_ENTRIES+=("${test}=${dest}")
-  fi
-done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"

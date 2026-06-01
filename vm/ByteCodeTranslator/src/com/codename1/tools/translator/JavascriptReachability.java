@@ -46,8 +46,8 @@ import org.objectweb.asm.Opcodes;
  * a supertype are re-resolved against it. {@code invokestatic /
  * invokespecial} are handled precisely against the declared owner.
  *
- * We leave the conservative culler alone for iOS / C# — their
- * runtimes rely on different dispatch mechanics and changing their
+ * We leave the conservative culler alone for iOS — its runtime
+ * relies on different dispatch mechanics and changing its
  * reachability could break end-user apps. JS is opt-in via the output
  * type check in {@link Parser#compile(File)}.
  *

@@ -36,7 +36,14 @@
 
 @class CodenameOne_GLViewController;
 
+// On Mac Catalyst the app delegate must be a UIResponder so UIKit invokes
+// -buildMenuWithBuilder: on it for the native menu bar. On iOS keep it as NSObject
+// (the historical superclass) so phone/tablet behavior and rendering are unchanged.
+#if TARGET_OS_MACCATALYST
+@interface CodenameOne_GLAppDelegate : UIResponder <UIApplicationDelegate
+#else
 @interface CodenameOne_GLAppDelegate : NSObject <UIApplicationDelegate
+#endif
 #ifdef CN1_INCLUDE_NOTIFICATIONS
 ,UNUserNotificationCenterDelegate
 #endif

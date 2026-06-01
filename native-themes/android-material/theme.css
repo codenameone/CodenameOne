@@ -333,6 +333,34 @@ MainTitle { cn1-derive: Title; }
 BackCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 
+/* ---- Desktop chrome (Material Design conventions) ----
+   Used when the desktop port enables interactiveScrollBool / desktop
+   window chrome; inert on real Android devices. Material desktop
+   scrollbars are slightly wider and flatter than macOS overlay bars;
+   the DesktopScroll horizontal padding sets the gutter width. */
+DesktopScroll {
+    background-color: #e7e0ec;
+    padding: 0 1.2mm 0 1.2mm;
+    margin: 0;
+}
+DesktopScrollThumb {
+    background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScroll {
+    background-color: #e7e0ec;
+    padding: 1.2mm 0 1.2mm 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb {
+    background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+
 /* Material 3 top tabs: flat surface with selected tab underlined by
    color rather than a pill fill. No border-radius here -
    combining it with a visible border would drop into the 9-piece
@@ -543,6 +571,13 @@ PopupContent {
     MainTitle { color: #e6e0e9; background-color: #141218; }
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
+
+    /* Desktop scrollbar (Material) dark overrides. cn1-background-type is
+       re-declared so the round primitive carries into dark mode. */
+    DesktopScroll { background-color: #2b2930; }
+    DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScroll { background-color: #2b2930; }
+    DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }
