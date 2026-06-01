@@ -23,17 +23,15 @@
 package com.codename1.impl.windows;
 
 /**
- * Java side of the Win32 native bridge for the Windows port. Each {@code native}
- * method here is implemented in C in the port's {@code nativeSources} (Win32,
- * Direct2D/DirectWrite, WIC, WinHTTP) and is translated and linked by ParparVM's
- * "windows" clean-target build. The method names map to ParparVM C symbols, so
- * the corresponding C function for {@code nativeLog(String)} is
- * {@code com_codename1_impl_windows_WindowsNative_nativeLog___java_lang_String}.
+ * Java side of the Win32 native bridge for the Windows port. Every {@code
+ * native} method here has a matching ParparVM-mangled C function in the port's
+ * {@code nativeSources} (Win32, Direct2D/DirectWrite, WIC, WinHTTP), translated
+ * and linked by ParparVM's "windows" clean-target build. All methods are static
+ * so the C signature is simply {@code (CODENAME_ONE_THREAD_STATE, args...)} with
+ * no implicit {@code this}.
  *
- * <p>This skeleton declares only the lifecycle hooks the bootstrap needs; the
- * rendering, input and platform-service hooks are added in their respective
- * phases. The bodies live in the native layer, so this class only carries
- * signatures (it is never instantiated).</p>
+ * <p>Peers (render targets, fonts, images, files, connections) are opaque
+ * native pointers passed across as {@code long}; 0 means none/failure.</p>
  *
  * @author Codename One
  */
@@ -41,18 +39,181 @@ public final class WindowsNative {
     private WindowsNative() {
     }
 
-    /**
-     * Writes a line to the native debug log (stderr / OutputDebugString). Used
-     * by the bootstrap before the UI is up.
-     *
-     * @param message the text to log
-     */
+    /* ---------------------------------------------------------- lifecycle */
+
+    /** Writes a line to the native debug log (OutputDebugString + stderr). */
     public static native void nativeLog(String message);
 
+    /** Creates the main window plus the Direct2D/DirectWrite/WIC factories. */
+    public static native void initDisplay(String title, int width, int height);
+
+    public static native int getDisplayWidth();
+
+    public static native int getDisplayHeight();
+
+    /** The window's graphics peer (a Direct2D render target wrapper). */
+    public static native long getWindowGraphics();
+
+    /** Presents the given dirty rectangle of the window's back buffer. */
+    public static native void flushGraphics(long graphics, int x, int y, int width, int height);
+
     /**
-     * Pumps pending Win32 messages once, dispatching window/input events into
-     * the Codename One event queue. The native message loop calls back into the
-     * EDT through {@link WindowsImplementation#getInstance()}.
+     * Drains one queued input event into {@code out} ([type, x, y, keyCode]);
+     * returns true if an event was dequeued. See the {@code CN1_EVENT_*}
+     * constants in cn1_windows.h for the type codes.
      */
-    public static native void pumpMessages();
+    public static native boolean pollEvent(int[] out);
+
+    /** Blocks up to {@code timeoutMillis} until an input event is available. */
+    public static native void waitForEvent(long timeoutMillis);
+
+    /* ----------------------------------------------------- graphics state */
+
+    public static native int getColor(long graphics);
+
+    public static native void setColor(long graphics, int rgb);
+
+    public static native void setAlpha(long graphics, int alpha);
+
+    public static native int getAlpha(long graphics);
+
+    public static native void setNativeFont(long graphics, long font);
+
+    public static native int getClipX(long graphics);
+
+    public static native int getClipY(long graphics);
+
+    public static native int getClipWidth(long graphics);
+
+    public static native int getClipHeight(long graphics);
+
+    public static native void setClip(long graphics, int x, int y, int width, int height);
+
+    public static native void clipRect(long graphics, int x, int y, int width, int height);
+
+    /* ---------------------------------------------------------- drawing */
+
+    public static native void drawLine(long graphics, int x1, int y1, int x2, int y2);
+
+    public static native void fillRect(long graphics, int x, int y, int width, int height);
+
+    public static native void drawRect(long graphics, int x, int y, int width, int height);
+
+    public static native void drawRoundRect(long graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
+
+    public static native void fillRoundRect(long graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
+
+    public static native void fillArc(long graphics, int x, int y, int width, int height, int startAngle, int arcAngle);
+
+    public static native void drawArc(long graphics, int x, int y, int width, int height, int startAngle, int arcAngle);
+
+    public static native void drawString(long graphics, String str, int x, int y);
+
+    public static native void drawImage(long graphics, long image, int x, int y);
+
+    public static native void drawImageScaled(long graphics, long image, int x, int y, int width, int height);
+
+    public static native void drawRGB(long graphics, int[] rgbData, int offset, int x, int y, int width, int height, boolean processAlpha);
+
+    /* ----------------------------------------------------------- fonts */
+
+    public static native long createFont(int face, int style, int size);
+
+    public static native long getDefaultFont();
+
+    public static native int stringWidth(long font, String str);
+
+    public static native int charWidth(long font, char c);
+
+    public static native int charsWidth(long font, char[] chars, int offset, int length);
+
+    public static native int fontHeight(long font);
+
+    /* ---------------------------------------------------------- images */
+
+    public static native long createImageFromARGB(int[] argb, int width, int height);
+
+    public static native long createImageFromFile(String path);
+
+    public static native long createImageFromBytes(byte[] data, int offset, int length);
+
+    public static native long createMutableImage(int width, int height, int fillColor);
+
+    public static native int imageWidth(long image);
+
+    public static native int imageHeight(long image);
+
+    public static native long scaleImage(long image, int width, int height);
+
+    public static native void imageGetRGB(long image, int[] arr, int offset, int x, int y, int width, int height);
+
+    public static native long getImageGraphics(long image);
+
+    /* ------------------------------------------------------- filesystem */
+
+    public static native long fileOpenRead(String path);
+
+    public static native long fileOpenWrite(String path, boolean append);
+
+    public static native int fileRead(long handle, byte[] buffer, int offset, int length);
+
+    public static native int fileWrite(long handle, byte[] buffer, int offset, int length);
+
+    public static native void fileClose(long handle);
+
+    public static native boolean fileExists(String path);
+
+    public static native boolean fileIsDirectory(String path);
+
+    public static native long fileLength(String path);
+
+    public static native void fileDelete(String path);
+
+    public static native void fileMkdir(String path);
+
+    public static native void fileRename(String path, String newName);
+
+    public static native String[] fileList(String dir);
+
+    public static native String storageDir();
+
+    public static native String[] fileRoots();
+
+    public static native long fileRootSize(String root);
+
+    public static native long fileRootFree(String root);
+
+    public static native boolean fileIsHidden(String path);
+
+    public static native void fileSetHidden(String path, boolean hidden);
+
+    /* --------------------------------------------------------- network */
+
+    public static native long httpOpen(String url, boolean read, boolean write);
+
+    public static native void httpSetMethod(long connection, boolean post);
+
+    public static native void httpSetHeader(long connection, String key, String value);
+
+    public static native int httpResponseCode(long connection);
+
+    public static native String httpResponseMessage(long connection);
+
+    public static native int httpContentLength(long connection);
+
+    public static native String httpHeaderField(long connection, String name);
+
+    public static native String[] httpHeaderFieldNames(long connection);
+
+    public static native int httpReadBody(long connection, byte[] buffer, int offset, int length);
+
+    public static native int httpWriteBody(long connection, byte[] buffer, int offset, int length);
+
+    public static native void httpClose(long connection);
+
+    /* ------------------------------------------------------- clipboard */
+
+    public static native void clipboardSetText(String text);
+
+    public static native String clipboardGetText();
 }

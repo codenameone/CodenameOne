@@ -25,27 +25,33 @@ package com.codename1.impl.windows;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 /**
  * Native Windows (Win32, desktop / tablet) implementation of the Codename One
- * platform layer. The runtime is produced by ParparVM's "clean" C target and
- * linked into a standalone executable; the Direct2D/DirectWrite rendering and
- * Win32 windowing/input live in the bundled nativeSources and are reached
- * through the {@link WindowsNative} peer.
+ * platform layer. The runtime is produced by ParparVM's "windows" clean-target
+ * build and linked into a standalone executable; graphics go through Direct2D,
+ * text through DirectWrite, image decode through WIC and networking through
+ * WinHTTP, all reached via the {@link WindowsNative} bridge.
  *
- * <p>This is the scaffolding skeleton: every platform hook is present so the
- * port compiles against the core, and each is filled in across the windowing,
- * graphics, input and platform-service phases. Unimplemented hooks throw
- * {@link UnsupportedOperationException} rather than silently returning a wrong
- * value.</p>
+ * <p>Peers (graphics targets, fonts, images) are opaque native {@code long}
+ * pointers boxed as {@link Long}. A handful of hooks that need richer desktop
+ * UX (native text editing / IME, native peer components) are intentionally
+ * minimal in this first cut and grow in later phases.</p>
  *
  * @author Codename One
  */
 public class WindowsImplementation extends CodenameOneImplementation {
     private static WindowsImplementation INSTANCE;
+
+    private long windowGraphicsPeer;
+    private Long windowGraphics;
+    private Long defaultFont;
+    private L10NManager l10n;
 
     /**
      * Registers the singleton so the Win32 native bootstrap and message loop can
@@ -63,424 +69,510 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return INSTANCE;
     }
 
+    /* -------------------------------------------------------------- helpers */
+
+    private static long peer(Object o) {
+        return o == null ? 0L : ((Long) o).longValue();
+    }
+
+    private String storagePath(String name) {
+        return WindowsNative.storageDir() + getFileSystemSeparator() + name;
+    }
+
+    private static String stripFileUrl(String path) {
+        if (path.startsWith("file://")) {
+            return path.substring("file://".length());
+        }
+        return path;
+    }
+
+    private static byte[] readFully(InputStream i) throws IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int read = i.read(buffer);
+        while (read > 0) {
+            bo.write(buffer, 0, read);
+            read = i.read(buffer);
+        }
+        return bo.toByteArray();
+    }
+
+    /* ----------------------------------------------------------- lifecycle */
+
     @Override
     public void init(Object m) {
-        throw new UnsupportedOperationException("WindowsImplementation.init is not implemented yet");
+        WindowsNative.initDisplay("Codename One", 800, 600);
+        windowGraphicsPeer = WindowsNative.getWindowGraphics();
+        windowGraphics = Long.valueOf(windowGraphicsPeer);
+        defaultFont = Long.valueOf(WindowsNative.getDefaultFont());
     }
 
     @Override
     public int getDisplayWidth() {
-        throw new UnsupportedOperationException("WindowsImplementation.getDisplayWidth is not implemented yet");
+        return WindowsNative.getDisplayWidth();
     }
 
     @Override
     public int getDisplayHeight() {
-        throw new UnsupportedOperationException("WindowsImplementation.getDisplayHeight is not implemented yet");
-    }
-
-    @Override
-    public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        throw new UnsupportedOperationException("WindowsImplementation.editString is not implemented yet");
-    }
-
-    @Override
-    public void flushGraphics(int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.flushGraphics is not implemented yet");
+        return WindowsNative.getDisplayHeight();
     }
 
     @Override
     public void flushGraphics() {
-        throw new UnsupportedOperationException("WindowsImplementation.flushGraphics is not implemented yet");
+        WindowsNative.flushGraphics(windowGraphicsPeer, 0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
     @Override
-    public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.getRGB is not implemented yet");
-    }
-
-    @Override
-    public Object createImage(int[] rgb, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.createImage is not implemented yet");
-    }
-
-    @Override
-    public Object createImage(String path) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.createImage is not implemented yet");
-    }
-
-    @Override
-    public Object createImage(InputStream i) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.createImage is not implemented yet");
-    }
-
-    @Override
-    public Object createMutableImage(int width, int height, int fillColor) {
-        throw new UnsupportedOperationException("WindowsImplementation.createMutableImage is not implemented yet");
-    }
-
-    @Override
-    public Object createImage(byte[] bytes, int offset, int len) {
-        throw new UnsupportedOperationException("WindowsImplementation.createImage is not implemented yet");
-    }
-
-    @Override
-    public int getImageWidth(Object i) {
-        throw new UnsupportedOperationException("WindowsImplementation.getImageWidth is not implemented yet");
-    }
-
-    @Override
-    public int getImageHeight(Object i) {
-        throw new UnsupportedOperationException("WindowsImplementation.getImageHeight is not implemented yet");
-    }
-
-    @Override
-    public Object scale(Object nativeImage, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.scale is not implemented yet");
-    }
-
-    @Override
-    public int getSoftkeyCount() {
-        throw new UnsupportedOperationException("WindowsImplementation.getSoftkeyCount is not implemented yet");
-    }
-
-    @Override
-    public int[] getSoftkeyCode(int index) {
-        throw new UnsupportedOperationException("WindowsImplementation.getSoftkeyCode is not implemented yet");
-    }
-
-    @Override
-    public int getClearKeyCode() {
-        throw new UnsupportedOperationException("WindowsImplementation.getClearKeyCode is not implemented yet");
-    }
-
-    @Override
-    public int getBackspaceKeyCode() {
-        throw new UnsupportedOperationException("WindowsImplementation.getBackspaceKeyCode is not implemented yet");
-    }
-
-    @Override
-    public int getBackKeyCode() {
-        throw new UnsupportedOperationException("WindowsImplementation.getBackKeyCode is not implemented yet");
-    }
-
-    @Override
-    public int getGameAction(int keyCode) {
-        throw new UnsupportedOperationException("WindowsImplementation.getGameAction is not implemented yet");
-    }
-
-    @Override
-    public int getKeyCode(int gameAction) {
-        throw new UnsupportedOperationException("WindowsImplementation.getKeyCode is not implemented yet");
-    }
-
-    @Override
-    public boolean isTouchDevice() {
-        throw new UnsupportedOperationException("WindowsImplementation.isTouchDevice is not implemented yet");
-    }
-
-    @Override
-    public int getColor(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getColor is not implemented yet");
-    }
-
-    @Override
-    public void setColor(Object graphics, int rgb) {
-        throw new UnsupportedOperationException("WindowsImplementation.setColor is not implemented yet");
-    }
-
-    @Override
-    public void setAlpha(Object graphics, int alpha) {
-        throw new UnsupportedOperationException("WindowsImplementation.setAlpha is not implemented yet");
-    }
-
-    @Override
-    public int getAlpha(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getAlpha is not implemented yet");
-    }
-
-    @Override
-    public void setNativeFont(Object graphics, Object font) {
-        throw new UnsupportedOperationException("WindowsImplementation.setNativeFont is not implemented yet");
-    }
-
-    @Override
-    public int getClipX(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getClipX is not implemented yet");
-    }
-
-    @Override
-    public int getClipY(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getClipY is not implemented yet");
-    }
-
-    @Override
-    public int getClipWidth(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getClipWidth is not implemented yet");
-    }
-
-    @Override
-    public int getClipHeight(Object graphics) {
-        throw new UnsupportedOperationException("WindowsImplementation.getClipHeight is not implemented yet");
-    }
-
-    @Override
-    public void setClip(Object graphics, int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.setClip is not implemented yet");
-    }
-
-    @Override
-    public void clipRect(Object graphics, int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.clipRect is not implemented yet");
-    }
-
-    @Override
-    public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawLine is not implemented yet");
-    }
-
-    @Override
-    public void fillRect(Object graphics, int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.fillRect is not implemented yet");
-    }
-
-    @Override
-    public void drawRect(Object graphics, int x, int y, int width, int height) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawRect is not implemented yet");
-    }
-
-    @Override
-    public void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawRoundRect is not implemented yet");
-    }
-
-    @Override
-    public void fillRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        throw new UnsupportedOperationException("WindowsImplementation.fillRoundRect is not implemented yet");
-    }
-
-    @Override
-    public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        throw new UnsupportedOperationException("WindowsImplementation.fillArc is not implemented yet");
-    }
-
-    @Override
-    public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawArc is not implemented yet");
-    }
-
-    @Override
-    public void drawString(Object graphics, String str, int x, int y) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawString is not implemented yet");
-    }
-
-    @Override
-    public void drawImage(Object graphics, Object img, int x, int y) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawImage is not implemented yet");
-    }
-
-    @Override
-    public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
-        throw new UnsupportedOperationException("WindowsImplementation.drawRGB is not implemented yet");
+    public void flushGraphics(int x, int y, int width, int height) {
+        WindowsNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
     @Override
     public Object getNativeGraphics() {
-        throw new UnsupportedOperationException("WindowsImplementation.getNativeGraphics is not implemented yet");
+        return windowGraphics;
     }
 
     @Override
     public Object getNativeGraphics(Object image) {
-        throw new UnsupportedOperationException("WindowsImplementation.getNativeGraphics is not implemented yet");
+        return Long.valueOf(WindowsNative.getImageGraphics(peer(image)));
+    }
+
+    /* ------------------------------------------------------- graphics state */
+
+    @Override
+    public int getColor(Object graphics) {
+        return WindowsNative.getColor(peer(graphics));
     }
 
     @Override
-    public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        throw new UnsupportedOperationException("WindowsImplementation.charsWidth is not implemented yet");
+    public void setColor(Object graphics, int rgb) {
+        WindowsNative.setColor(peer(graphics), rgb);
     }
 
     @Override
-    public int stringWidth(Object nativeFont, String str) {
-        throw new UnsupportedOperationException("WindowsImplementation.stringWidth is not implemented yet");
+    public void setAlpha(Object graphics, int alpha) {
+        WindowsNative.setAlpha(peer(graphics), alpha);
     }
 
     @Override
-    public int charWidth(Object nativeFont, char ch) {
-        throw new UnsupportedOperationException("WindowsImplementation.charWidth is not implemented yet");
+    public int getAlpha(Object graphics) {
+        return WindowsNative.getAlpha(peer(graphics));
     }
 
     @Override
-    public int getHeight(Object nativeFont) {
-        throw new UnsupportedOperationException("WindowsImplementation.getHeight is not implemented yet");
+    public void setNativeFont(Object graphics, Object font) {
+        WindowsNative.setNativeFont(peer(graphics), peer(font));
+    }
+
+    @Override
+    public int getClipX(Object graphics) {
+        return WindowsNative.getClipX(peer(graphics));
+    }
+
+    @Override
+    public int getClipY(Object graphics) {
+        return WindowsNative.getClipY(peer(graphics));
+    }
+
+    @Override
+    public int getClipWidth(Object graphics) {
+        return WindowsNative.getClipWidth(peer(graphics));
+    }
+
+    @Override
+    public int getClipHeight(Object graphics) {
+        return WindowsNative.getClipHeight(peer(graphics));
+    }
+
+    @Override
+    public void setClip(Object graphics, int x, int y, int width, int height) {
+        WindowsNative.setClip(peer(graphics), x, y, width, height);
+    }
+
+    @Override
+    public void clipRect(Object graphics, int x, int y, int width, int height) {
+        WindowsNative.clipRect(peer(graphics), x, y, width, height);
+    }
+
+    /* ------------------------------------------------------------- drawing */
+
+    @Override
+    public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
+        WindowsNative.drawLine(peer(graphics), x1, y1, x2, y2);
+    }
+
+    @Override
+    public void fillRect(Object graphics, int x, int y, int width, int height) {
+        WindowsNative.fillRect(peer(graphics), x, y, width, height);
+    }
+
+    @Override
+    public void drawRect(Object graphics, int x, int y, int width, int height) {
+        WindowsNative.drawRect(peer(graphics), x, y, width, height);
+    }
+
+    @Override
+    public void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        WindowsNative.drawRoundRect(peer(graphics), x, y, width, height, arcWidth, arcHeight);
+    }
+
+    @Override
+    public void fillRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        WindowsNative.fillRoundRect(peer(graphics), x, y, width, height, arcWidth, arcHeight);
+    }
+
+    @Override
+    public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        WindowsNative.fillArc(peer(graphics), x, y, width, height, startAngle, arcAngle);
+    }
+
+    @Override
+    public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        WindowsNative.drawArc(peer(graphics), x, y, width, height, startAngle, arcAngle);
+    }
+
+    @Override
+    public void drawString(Object graphics, String str, int x, int y) {
+        WindowsNative.drawString(peer(graphics), str, x, y);
+    }
+
+    @Override
+    public void drawImage(Object graphics, Object img, int x, int y) {
+        WindowsNative.drawImage(peer(graphics), peer(img), x, y);
+    }
+
+    @Override
+    public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
+        WindowsNative.drawRGB(peer(graphics), rgbData, offset, x, y, w, h, processAlpha);
+    }
+
+    /* -------------------------------------------------------------- fonts */
+
+    @Override
+    public Object createFont(int face, int style, int size) {
+        return Long.valueOf(WindowsNative.createFont(face, style, size));
     }
 
     @Override
     public Object getDefaultFont() {
-        throw new UnsupportedOperationException("WindowsImplementation.getDefaultFont is not implemented yet");
+        return defaultFont;
     }
 
     @Override
-    public Object createFont(int face, int style, int size) {
-        throw new UnsupportedOperationException("WindowsImplementation.createFont is not implemented yet");
+    public int stringWidth(Object nativeFont, String str) {
+        return WindowsNative.stringWidth(peer(nativeFont == null ? defaultFont : nativeFont), str);
     }
+
+    @Override
+    public int charWidth(Object nativeFont, char ch) {
+        return WindowsNative.charWidth(peer(nativeFont == null ? defaultFont : nativeFont), ch);
+    }
+
+    @Override
+    public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
+        return WindowsNative.charsWidth(peer(nativeFont == null ? defaultFont : nativeFont), ch, offset, length);
+    }
+
+    @Override
+    public int getHeight(Object nativeFont) {
+        return WindowsNative.fontHeight(peer(nativeFont == null ? defaultFont : nativeFont));
+    }
+
+    /* -------------------------------------------------------------- images */
+
+    @Override
+    public Object createImage(int[] rgb, int width, int height) {
+        return Long.valueOf(WindowsNative.createImageFromARGB(rgb, width, height));
+    }
+
+    @Override
+    public Object createImage(String path) throws IOException {
+        return Long.valueOf(WindowsNative.createImageFromFile(stripFileUrl(path)));
+    }
+
+    @Override
+    public Object createImage(InputStream i) throws IOException {
+        byte[] data = readFully(i);
+        return Long.valueOf(WindowsNative.createImageFromBytes(data, 0, data.length));
+    }
+
+    @Override
+    public Object createImage(byte[] bytes, int offset, int len) {
+        return Long.valueOf(WindowsNative.createImageFromBytes(bytes, offset, len));
+    }
+
+    @Override
+    public Object createMutableImage(int width, int height, int fillColor) {
+        return Long.valueOf(WindowsNative.createMutableImage(width, height, fillColor));
+    }
+
+    @Override
+    public int getImageWidth(Object i) {
+        return WindowsNative.imageWidth(peer(i));
+    }
+
+    @Override
+    public int getImageHeight(Object i) {
+        return WindowsNative.imageHeight(peer(i));
+    }
+
+    @Override
+    public Object scale(Object nativeImage, int width, int height) {
+        return Long.valueOf(WindowsNative.scaleImage(peer(nativeImage), width, height));
+    }
+
+    @Override
+    public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
+        WindowsNative.imageGetRGB(peer(nativeImage), arr, offset, x, y, width, height);
+    }
+
+    /* ---------------------------------------------------------- input keys */
+
+    @Override
+    public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        // Native text editing / IME is a later-phase enhancement; the lightweight
+        // editing path remains usable in the meantime.
+        WindowsNative.nativeLog("WindowsImplementation.editString: native editing not wired yet");
+    }
+
+    @Override
+    public boolean isTouchDevice() {
+        return false;
+    }
+
+    @Override
+    public int getSoftkeyCount() {
+        return 0;
+    }
+
+    @Override
+    public int[] getSoftkeyCode(int index) {
+        return null;
+    }
+
+    @Override
+    public int getClearKeyCode() {
+        return -1;
+    }
+
+    @Override
+    public int getBackspaceKeyCode() {
+        return 8;
+    }
+
+    @Override
+    public int getBackKeyCode() {
+        return -1;
+    }
+
+    @Override
+    public int getGameAction(int keyCode) {
+        return 0;
+    }
+
+    @Override
+    public int getKeyCode(int gameAction) {
+        return 0;
+    }
+
+    /* ------------------------------------------------------------ network */
 
     @Override
     public Object connect(String url, boolean read, boolean write) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.connect is not implemented yet");
+        long c = WindowsNative.httpOpen(url, read, write);
+        if (c == 0) {
+            throw new IOException("Unable to open connection to " + url);
+        }
+        return new WindowsHttpConnection(c);
     }
 
     @Override
     public void setHeader(Object connection, String key, String val) {
-        throw new UnsupportedOperationException("WindowsImplementation.setHeader is not implemented yet");
-    }
-
-    @Override
-    public int getContentLength(Object connection) {
-        throw new UnsupportedOperationException("WindowsImplementation.getContentLength is not implemented yet");
-    }
-
-    @Override
-    public OutputStream openOutputStream(Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.openOutputStream is not implemented yet");
-    }
-
-    @Override
-    public OutputStream openOutputStream(Object connection, int offset) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.openOutputStream is not implemented yet");
-    }
-
-    @Override
-    public InputStream openInputStream(Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.openInputStream is not implemented yet");
+        WindowsNative.httpSetHeader(((WindowsHttpConnection) connection).peer, key, val);
     }
 
     @Override
     public void setPostRequest(Object connection, boolean p) {
-        throw new UnsupportedOperationException("WindowsImplementation.setPostRequest is not implemented yet");
+        WindowsNative.httpSetMethod(((WindowsHttpConnection) connection).peer, p);
+    }
+
+    @Override
+    public int getContentLength(Object connection) {
+        return WindowsNative.httpContentLength(((WindowsHttpConnection) connection).peer);
+    }
+
+    @Override
+    public OutputStream openOutputStream(Object connection) throws IOException {
+        if (connection instanceof String) {
+            long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), false);
+            return new WindowsOutputStream(h, false);
+        }
+        return new WindowsOutputStream(((WindowsHttpConnection) connection).peer, true);
+    }
+
+    @Override
+    public OutputStream openOutputStream(Object connection, int offset) throws IOException {
+        // offset-based writing maps to opening the file for append/seek; the
+        // first cut appends, which covers the common resume-write case.
+        long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), true);
+        return new WindowsOutputStream(h, false);
+    }
+
+    @Override
+    public InputStream openInputStream(Object connection) throws IOException {
+        if (connection instanceof String) {
+            long h = WindowsNative.fileOpenRead(stripFileUrl((String) connection));
+            return new WindowsInputStream(h, false);
+        }
+        return new WindowsInputStream(((WindowsHttpConnection) connection).peer, true);
     }
 
     @Override
     public int getResponseCode(Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.getResponseCode is not implemented yet");
+        return WindowsNative.httpResponseCode(((WindowsHttpConnection) connection).peer);
     }
 
     @Override
     public String getResponseMessage(Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.getResponseMessage is not implemented yet");
+        return WindowsNative.httpResponseMessage(((WindowsHttpConnection) connection).peer);
     }
 
     @Override
     public String getHeaderField(String name, Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.getHeaderField is not implemented yet");
+        return WindowsNative.httpHeaderField(((WindowsHttpConnection) connection).peer, name);
     }
 
     @Override
     public String[] getHeaderFieldNames(Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.getHeaderFieldNames is not implemented yet");
+        return WindowsNative.httpHeaderFieldNames(((WindowsHttpConnection) connection).peer);
     }
 
     @Override
     public String[] getHeaderFields(String name, Object connection) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.getHeaderFields is not implemented yet");
+        String value = WindowsNative.httpHeaderField(((WindowsHttpConnection) connection).peer, name);
+        if (value == null) {
+            return null;
+        }
+        return new String[] { value };
     }
 
     @Override
+    public void cleanup(Object o) {
+        if (o instanceof WindowsHttpConnection) {
+            WindowsNative.httpClose(((WindowsHttpConnection) o).peer);
+            return;
+        }
+        super.cleanup(o);
+    }
+
+    /* ------------------------------------------------------- storage/files */
+
+    @Override
     public void deleteStorageFile(String name) {
-        throw new UnsupportedOperationException("WindowsImplementation.deleteStorageFile is not implemented yet");
+        WindowsNative.fileDelete(storagePath(name));
     }
 
     @Override
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.createStorageOutputStream is not implemented yet");
+        long h = WindowsNative.fileOpenWrite(storagePath(name), false);
+        return new WindowsOutputStream(h, false);
     }
 
     @Override
     public InputStream createStorageInputStream(String name) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.createStorageInputStream is not implemented yet");
+        long h = WindowsNative.fileOpenRead(storagePath(name));
+        return new WindowsInputStream(h, false);
     }
 
     @Override
     public boolean storageFileExists(String name) {
-        throw new UnsupportedOperationException("WindowsImplementation.storageFileExists is not implemented yet");
+        return WindowsNative.fileExists(storagePath(name));
     }
 
     @Override
     public String[] listStorageEntries() {
-        throw new UnsupportedOperationException("WindowsImplementation.listStorageEntries is not implemented yet");
+        return WindowsNative.fileList(WindowsNative.storageDir());
     }
 
     @Override
     public String[] listFilesystemRoots() {
-        throw new UnsupportedOperationException("WindowsImplementation.listFilesystemRoots is not implemented yet");
+        return WindowsNative.fileRoots();
     }
 
     @Override
     public String[] listFiles(String directory) throws IOException {
-        throw new UnsupportedOperationException("WindowsImplementation.listFiles is not implemented yet");
+        return WindowsNative.fileList(stripFileUrl(directory));
     }
 
     @Override
     public long getRootSizeBytes(String root) {
-        throw new UnsupportedOperationException("WindowsImplementation.getRootSizeBytes is not implemented yet");
+        return WindowsNative.fileRootSize(root);
     }
 
     @Override
     public long getRootAvailableSpace(String root) {
-        throw new UnsupportedOperationException("WindowsImplementation.getRootAvailableSpace is not implemented yet");
+        return WindowsNative.fileRootFree(root);
     }
 
     @Override
     public void mkdir(String directory) {
-        throw new UnsupportedOperationException("WindowsImplementation.mkdir is not implemented yet");
+        WindowsNative.fileMkdir(stripFileUrl(directory));
     }
 
     @Override
     public void deleteFile(String file) {
-        throw new UnsupportedOperationException("WindowsImplementation.deleteFile is not implemented yet");
+        WindowsNative.fileDelete(stripFileUrl(file));
     }
 
     @Override
     public boolean isHidden(String file) {
-        throw new UnsupportedOperationException("WindowsImplementation.isHidden is not implemented yet");
+        return WindowsNative.fileIsHidden(stripFileUrl(file));
     }
 
     @Override
     public void setHidden(String file, boolean h) {
-        throw new UnsupportedOperationException("WindowsImplementation.setHidden is not implemented yet");
+        WindowsNative.fileSetHidden(stripFileUrl(file), h);
     }
 
     @Override
     public long getFileLength(String file) {
-        throw new UnsupportedOperationException("WindowsImplementation.getFileLength is not implemented yet");
+        return WindowsNative.fileLength(stripFileUrl(file));
     }
 
     @Override
     public boolean isDirectory(String file) {
-        throw new UnsupportedOperationException("WindowsImplementation.isDirectory is not implemented yet");
+        return WindowsNative.fileIsDirectory(stripFileUrl(file));
     }
 
     @Override
     public boolean exists(String file) {
-        throw new UnsupportedOperationException("WindowsImplementation.exists is not implemented yet");
+        return WindowsNative.fileExists(stripFileUrl(file));
     }
 
     @Override
     public void rename(String file, String newName) {
-        throw new UnsupportedOperationException("WindowsImplementation.rename is not implemented yet");
+        WindowsNative.fileRename(stripFileUrl(file), newName);
     }
 
     @Override
     public char getFileSystemSeparator() {
-        throw new UnsupportedOperationException("WindowsImplementation.getFileSystemSeparator is not implemented yet");
+        return '\\';
     }
+
+    /* ------------------------------------------------------------ platform */
 
     @Override
     public String getPlatformName() {
-        throw new UnsupportedOperationException("WindowsImplementation.getPlatformName is not implemented yet");
+        return "win";
     }
 
     @Override
     public L10NManager getLocalizationManager() {
-        throw new UnsupportedOperationException("WindowsImplementation.getLocalizationManager is not implemented yet");
+        if (l10n == null) {
+            Locale l = Locale.getDefault();
+            l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+            };
+        }
+        return l10n;
     }
-
 }
