@@ -69,18 +69,16 @@ jobs:
       CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
-      # The JS port's worker-side screenshot capture is non-deterministically
-      # flaky: under canvas-accumulation pressure later in the run a test's
-      # capture can stall and the suite re-dispatches that index, dropping a
-      # variable tail of trailing screenshots (the skip-list comments in
-      # Cn1ssDeviceRunner / port.js document this "halts on half of CI runs"
-      # behaviour). Unlike the native ports -- which run over the same
-      # WebSocket transport and stay strict (CN1SS_ALLOWED_MISSING=0, or 2 on
-      # iOS) -- the JS job tolerates a flaky tail so a single hung capture
-      # doesn't red the suite. A gross regression (more than this many tests
-      # missing) still fails; a full stall times out and is re-run. Tighten
-      # this once the capture-staleness root cause is fixed.
-      CN1SS_ALLOWED_MISSING: "20"
+      # Strict, matching the native ports. The "variable tail of dropped
+      # screenshots" that previously forced a tolerance of 20 was the
+      # canvas-accumulation root cause: browser_bridge.js retained every host
+      # canvas forever, so by ~test 66 the main thread thrashed, capture
+      # stalled and the suite re-dispatched. That leak is fixed (dead canvas
+      # host-refs are now released on the worker GC signal), so the suite
+      # delivers every screenshot deterministically -- a missing capture is a
+      # real regression again. Keep at 0 like Android/JavaSE (iOS uses 2 for
+      # OrientationLock + MutableImageReadback, which don't apply here).
+      CN1SS_ALLOWED_MISSING: "0"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
     steps:
       - uses: actions/checkout@v4
