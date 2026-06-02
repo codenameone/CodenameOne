@@ -15708,7 +15708,41 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
     }
-    
+
+    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGLSurface> glSurfaces =
+            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGLSurface>();
+
+    @Override
+    public boolean isOpenGLSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.ui.PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
+        JavaSEGLSurface surface = new JavaSEGLSurface(view);
+        com.codename1.ui.PeerComponent peer = createNativePeer(surface);
+        if (peer != null) {
+            glSurfaces.put(peer, surface);
+        }
+        return peer;
+    }
+
+    @Override
+    public void glSetContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
+        JavaSEGLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.setContinuous(continuous);
+        }
+    }
+
+    @Override
+    public void glRequestRender(com.codename1.ui.PeerComponent peer) {
+        JavaSEGLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.requestRender();
+        }
+    }
+
     public Image gaussianBlurImage(Image image, float radius) {
         GaussianFilter gf = new GaussianFilter(radius);
         Image bim = Image.createImage(image.getWidth(), image.getHeight());

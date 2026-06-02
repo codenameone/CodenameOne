@@ -49,7 +49,17 @@ public final class VertexBuffer {
         this.vertexCount = vertexCount;
         this.floatCount = vertexCount * format.getFloatsPerVertex();
         int allocSize = floatCount < 16 ? 16 : floatCount;
-        this.data = CN.getSimd().allocFloat(allocSize);
+        this.data = allocAligned(allocSize);
+    }
+
+    private static float[] allocAligned(int size) {
+        try {
+            return CN.getSimd().allocFloat(size);
+        } catch (Throwable t) {
+            // The platform may not be initialized yet (for example a buffer
+            // created before Display starts); fall back to a plain array.
+            return new float[size];
+        }
     }
 
     /// Returns the vertex layout of this buffer.

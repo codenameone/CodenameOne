@@ -123,6 +123,21 @@ public final class Camera {
         return this;
     }
 
+    /// Returns the eye (camera) world space x coordinate.
+    public float getEyeX() {
+        return eyeX;
+    }
+
+    /// Returns the eye (camera) world space y coordinate.
+    public float getEyeY() {
+        return eyeY;
+    }
+
+    /// Returns the eye (camera) world space z coordinate.
+    public float getEyeZ() {
+        return eyeZ;
+    }
+
     /// Returns the 16 element column-major view matrix.
     public float[] getViewMatrix() {
         recompute();
