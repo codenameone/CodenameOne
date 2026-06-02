@@ -531,6 +531,168 @@ class CleanTargetIntegrationTest {
         return exe;
     }
 
+    /** Minimal extraction of a jar's class tree into a directory (a translator source root). */
+    static void extractJar(Path jar, Path dest) throws Exception {
+        try (java.util.zip.ZipInputStream zin = new java.util.zip.ZipInputStream(Files.newInputStream(jar))) {
+            java.util.zip.ZipEntry e;
+            while ((e = zin.getNextEntry()) != null) {
+                if (e.isDirectory()) { continue; }
+                String name = e.getName();
+                if (!name.endsWith(".class")) { continue; }
+                Path out = dest.resolve(name);
+                Files.createDirectories(out.getParent());
+                Files.copy(zin, out, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
+    /** Launcher main that drives the hellocodenameone Cn1ssDeviceRunner screenshot suite on the Windows port. */
+    static String winHelloLauncherSource() {
+        return "import com.codename1.ui.Display;\n" +
+                "import com.codename1.testing.TestReporting;\n" +
+                "import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner;\n" +
+                "import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;\n" +
+                "public class WinHelloMain {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        Display.init(null);\n" +
+                "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
+                // runSuite blocks polling each test; it must run off the EDT (it
+                // navigates forms via callSerially). The main thread owns the Win32
+                // pump (runMainEventLoop) so the EDT is woken to lay out + paint +
+                // emit each screenshot over the cn1ss WebSocket.
+                "        new Thread(new Runnable() {\n" +
+                "            public void run() { new Cn1ssDeviceRunner().runSuite(); }\n" +
+                "        }, \"CN1SS-Runner\").start();\n" +
+                "        com.codename1.impl.windows.WindowsImplementation.runMainEventLoop();\n" +
+                "    }\n" +
+                "}\n";
+    }
+
+    /**
+     * Builds the real hellocodenameone screenshot suite as a native Windows exe:
+     * stages hellocodenameone-common (the Kotlin/Java app + all *ScreenshotTest
+     * classes) + the Kotlin stdlib + core + the Windows port + JavaAPI, compiles a
+     * launcher that runs Cn1ssDeviceRunner, translates it with the "windows" app
+     * type and clang-cl-builds it. Returns the exe.
+     */
+    static Path buildHelloCodenameOneExe() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Native Windows build is Windows-only");
+        Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
+        Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
+        Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
+                .normalize().toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
+                "codenameone-core must be built (maven/core/target/classes)");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/windows/WindowsImplementation.class")),
+                "WindowsPort must be built (maven/windows/target/classes)");
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                Files.exists(commonClasses.resolve("com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")),
+                "hellocodenameone-common must be built (scripts/hellocodenameone/common/target/classes)");
+
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        // Stage the Kotlin stdlib (the app is Kotlin) into a translator source root.
+        Path kotlinDir = Files.createTempDirectory("winhello-kotlin");
+        Path m2 = Paths.get(System.getProperty("user.home"), ".m2", "repository", "org", "jetbrains", "kotlin");
+        for (String[] ga : new String[][] {
+                { "kotlin-stdlib", "1.6.0" }, { "kotlin-stdlib-jdk7", "1.6.0" }, { "kotlin-stdlib-jdk8", "1.6.0" },
+                { "kotlin-stdlib-common", "1.6.0" }, { "kotlin-annotations-jvm", "1.6.0" } }) {
+            Path jar = m2.resolve(ga[0]).resolve(ga[1]).resolve(ga[0] + "-" + ga[1] + ".jar");
+            if (Files.exists(jar)) {
+                extractJar(jar, kotlinDir);
+            }
+        }
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("winhello-sources");
+        Path classesDir = Files.createTempDirectory("winhello-classes");
+        Path javaApiDir = Files.createTempDirectory("winhello-japi");
+        Files.write(sourceDir.resolve("WinHelloMain.java"), winHelloLauncherSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        String cp = coreClasses + java.io.File.pathSeparator + portClasses
+                + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir;
+        List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
+                "-source", config.targetVersion, "-target", config.targetVersion,
+                "-classpath", cp, "-d", classesDir.toString(),
+                sourceDir.resolve("WinHelloMain.java").toString()));
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, appCompile),
+                "WinHelloMain should compile:\n" + CompilerHelper.getLastErrorLog());
+
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        Path nativeStage = Files.createTempDirectory("winhello-native");
+        try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    Files.copy(p, nativeStage.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        Path outputDir = Files.createTempDirectory("winhello-out");
+        String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
+                + portClasses + ";" + javaApiDir + ";" + nativeStage;
+        String prevConcrete = System.getProperty("cn1.concreteImplementation");
+        System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
+        try {
+            runTranslatorMultiSource(sources, outputDir, "WinHelloMain", "windows");
+        } finally {
+            if (prevConcrete == null) {
+                System.clearProperty("cn1.concreteImplementation");
+            } else {
+                System.setProperty("cn1.concreteImplementation", prevConcrete);
+            }
+        }
+
+        Path cmakeRoot = outputDir.resolve("dist");
+        assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
+        Path buildDir = cmakeRoot.resolve("build");
+        Files.createDirectories(buildDir);
+        runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-G", "Ninja",
+                "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), cmakeRoot);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+        Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
+        assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
+        Path theme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
+        if (Files.exists(theme)) {
+            Files.copy(theme, exe.resolveSibling("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        return exe;
+    }
+
+    /**
+     * Builds the real hellocodenameone screenshot suite through the native Windows
+     * port (translate + clang-cl link). This first milestone proves the full app +
+     * Kotlin stdlib + reachable component graph translates and LINKS (every native
+     * method it reaches has a C implementation); running the suite + capturing the
+     * ~122 screenshots is a separate step once it links.
+     */
+    @org.junit.jupiter.api.Test
+    void buildsHelloCodenameOneNative() throws Exception {
+        Path exe = buildHelloCodenameOneExe();
+        System.out.println("CN1_HELLO_EXE=" + exe.toAbsolutePath());
+        java.nio.file.Path dest = Paths.get(System.getProperty("user.home"), "cn1-hello");
+        Files.createDirectories(dest);
+        try {
+            Path d = dest.resolve("WinHelloMain.exe");
+            Files.copy(exe, d, StandardCopyOption.REPLACE_EXISTING);
+            Path themeSrc = exe.resolveSibling("windowsNativeTheme.res");
+            if (Files.exists(themeSrc)) {
+                Files.copy(themeSrc, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+            }
+            System.out.println("CN1_HELLO_EXE_COPY=" + d.toAbsolutePath());
+        } catch (IOException copyBlocked) {
+            System.out.println("CN1_HELLO_EXE_COPY_SKIPPED=" + copyBlocked.getMessage());
+        }
+    }
+
     static String winFormAppSource() {
         // A small but realistic multi-screen Codename One app: a Toolbar-based
         // scrollable Contacts list (MultiButton rows) that navigates to a detail

@@ -73,9 +73,15 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_socketConnect___java_lang_Str
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    if (getaddrinfo(host, portStr, &hints, &result) != 0) {
-        cn1WindowsLog("socketConnect: getaddrinfo failed");
-        return 0;
+    {
+        int gai;
+        CN1_YIELD_THREAD;
+        gai = getaddrinfo(host, portStr, &hints, &result);
+        CN1_RESUME_THREAD;
+        if (gai != 0) {
+            cn1WindowsLog("socketConnect: getaddrinfo failed");
+            return 0;
+        }
     }
 
     for (ai = result; ai != NULL; ai = ai->ai_next) {
@@ -95,7 +101,15 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_socketConnect___java_lang_Str
             FD_SET(sock, &writable);
             tv.tv_sec = __cn1Arg3 / 1000;
             tv.tv_usec = (__cn1Arg3 % 1000) * 1000;
-            if (select(0, NULL, &writable, NULL, &tv) == 1) {
+            /* select() blocks up to the connect timeout; yield the thread state
+             * so a concurrent GC stop-the-world is not held up waiting for this
+             * (lightweight) connect thread -- otherwise the whole VM can stall,
+             * and the connect never completes within the suite. */
+            int sel;
+            CN1_YIELD_THREAD;
+            sel = select(0, NULL, &writable, NULL, &tv);
+            CN1_RESUME_THREAD;
+            if (sel == 1) {
                 u_long blocking = 0;
                 ioctlsocket(sock, FIONBIO, &blocking);
                 break;
