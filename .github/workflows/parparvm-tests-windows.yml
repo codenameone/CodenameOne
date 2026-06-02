@@ -185,9 +185,10 @@ jobs:
   # with the "windows" app type, links it with clang-cl, and runs it in headless
   # mode -- the app paints into an offscreen Direct2D/WIC bitmap (no window) and
   # writes a PNG. The PNG is uploaded as an artifact; the companion comment job
-  # posts it to the PR. x64 only (the reliable leg); PR events only (the comment
-  # job needs PR context). This is a separate job from the clean-target gate so
-  # a rendering hiccup never blocks merges.
+  # posts it to the PR. This x64 leg also publishes the compiled core + port
+  # bytecode for the native arm64 leg (windows-port-screenshot-arm64). PR events
+  # only (the comment job needs PR context). Separate from the clean-target gate
+  # so a rendering hiccup never blocks merges.
   windows-port-screenshot:
     name: screenshot-capture (x64)
     if: github.event_name == 'pull_request'
@@ -226,6 +227,22 @@ jobs:
         # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
         run: mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
+      # Publish the compiled (architecture-independent) core + port bytecode right
+      # after building it, so the native arm64 screenshot leg can translate +
+      # clang-cl-build an arm64 exe without rebuilding core -- codename1-core needs
+      # JDK 8 (source/target 1.5), which Temurin does not publish for Windows/
+      # aarch64. Uploaded before the capture step so an x64 capture flake does not
+      # block the arm64 leg.
+      - name: Upload compiled core + port classes
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-classes
+          path: |
+            maven/core/target/classes
+            maven/windows/target/classes
+          if-no-files-found: error
+          retention-days: 1
+
       # Build the ParparVM JavaAPI, then run the websocket capture test: it
       # translates app + core + port + nativeSources, links with clang-cl, starts
       # a Cn1ssScreenshotServer and runs the exe, which renders the Form offscreen
@@ -242,21 +259,92 @@ jobs:
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesFormScreenshotOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
 
-      - name: Upload screenshot artifact
+      - name: Upload screenshot artifact (x64)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-port-screenshot-raw
+          name: windows-port-screenshot-raw-x64
           path: artifacts/windows-port/raw
           if-no-files-found: warn
           retention-days: 14
 
-  # Posts the captured PNG as a PR comment using the shared CN1SS machinery.
+  # Native arm64 leg of the screenshot capture: reuses the core + port bytecode
+  # compiled by the x64 job (architecture-independent), then translates +
+  # clang-cl-builds a native arm64 exe on the windows-11-arm runner and captures
+  # the same Contacts UI over the cn1ss WebSocket. Experimental (continue-on-error)
+  # like the arm64 clean-target leg, so an arm64-runner hiccup never blocks the PR.
+  windows-port-screenshot-arm64:
+    name: screenshot-capture (arm64)
+    needs: windows-port-screenshot
+    if: github.event_name == 'pull_request'
+    runs-on: windows-11-arm
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Set up Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
+      # translator harness and builds the JavaAPI. Core + port come pre-compiled.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Restore compiled core + port classes
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-classes
+          path: maven
+
+      # Fail loudly if the artifact did not land where the test reads it
+      # (maven/core/target/classes, maven/windows/target/classes) -- otherwise the
+      # capture test would silently skip (assumeTrue) and post no arm64 image.
+      - name: Verify restored classes
+        shell: pwsh
+        run: |
+          $core = "maven/core/target/classes/com/codename1/ui/Form.class"
+          $port = "maven/windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class"
+          if (!(Test-Path $core)) { Write-Error "core classes missing after download: $core"; exit 1 }
+          if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
+          Write-Host "Restored core + Windows port classes OK"
+
+      - name: Build JavaAPI + capture screenshot over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesFormScreenshotOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact (arm64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Posts the captured PNG(s) as a PR comment using the shared CN1SS machinery.
   # Runs on Linux -- where that posting path is exercised by the other ports --
-  # so the Windows job only has to produce and upload the image.
+  # so the Windows jobs only have to produce and upload the images. Depends on
+  # both arch legs; the arm64 leg is continue-on-error so a missing arm64 image
+  # never blocks the comment (the x64 image is always posted).
   windows-port-screenshot-comment:
     name: screenshot-comment
-    needs: windows-port-screenshot
+    needs: [windows-port-screenshot, windows-port-screenshot-arm64]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -276,11 +364,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Download screenshot artifact
+      # Download both arch legs into separate dirs; the arm64 artifact may be
+      # absent if that experimental leg failed -- the comment still posts x64.
+      - name: Download x64 screenshot artifact
         uses: actions/download-artifact@v4
         with:
-          name: windows-port-screenshot-raw
-          path: artifacts/windows-port/raw
+          name: windows-port-screenshot-raw-x64
+          path: artifacts/windows-port/raw-x64
+
+      - name: Download arm64 screenshot artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw-arm64
 
       - name: Post screenshot to PR
         shell: bash
@@ -288,22 +385,27 @@ jobs:
           CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_COMMENT -->'
           CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port]'
           CN1SS_PREVIEW_SUBDIR: 'windows-native'
-          CN1SS_SUCCESS_MESSAGE: 'Native Windows port UI, rendered offscreen with Direct2D/DirectWrite.'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port UI, rendered offscreen with Direct2D/DirectWrite (x64 + arm64).'
         run: |
           set -e
           ART="artifacts/windows-port"
-          shot="$ART/raw/cn1-windows-native.png"
-          if [ ! -f "$shot" ]; then
-            echo "No screenshot was produced; skipping PR comment."
+          x64shot="$ART/raw-x64/cn1-windows-native.png"
+          arm64shot="$ART/raw-arm64/cn1-windows-native.png"
+          entries=()
+          [ -f "$x64shot" ] && entries+=("windows-native-x64=$x64shot")
+          [ -f "$arm64shot" ] && entries+=("windows-native-arm64=$arm64shot")
+          if [ ${#entries[@]} -eq 0 ]; then
+            echo "No screenshot was produced on either architecture; skipping PR comment."
             exit 0
           fi
+          echo "Posting ${#entries[@]} screenshot(s): ${entries[*]}"
           mkdir -p "$ART/previews"
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
-          # No reference set yet: ProcessScreenshots marks the image "new" and
+          # No reference set yet: ProcessScreenshots marks each image "new" and
           # posts it without a baseline comparison (no failure on mismatch).
           cn1ss_process_and_report \
             "Native Windows port" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$ART/no-reference" "$ART/previews" "$ART" \
-            "windows-native=$shot"
+            "${entries[@]}"
