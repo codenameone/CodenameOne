@@ -30,7 +30,7 @@ This tip is for those of you who are building your own cn1libs. When I’m devel
 
 This can create a lot of manual steps each time you make changes to your cn1lib and want to test them out. You need to build the library project, then copy the cn1lib from the library’s dist directory, into the application project’s lib directory. Then you need to select "Refresh Cn1libs" from the Codename One menu in the IDE.
 
-As far as I’m concerned, anything more than a single button press is too much for being able to test my changes. Luckily its really easy to eliminate the extra steps by adding a small snippet into your library project’s `build.xml` file.
+As far as I’m concerned, anything more than a single button press is too much for being able to test my changes. Luckily it’s really easy to eliminate the extra steps by adding a small snippet into your library project’s `build.xml` file.
 
 At the end of the "jar" target, add the following:
     

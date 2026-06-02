@@ -85,11 +85,11 @@ As we always do with a release we’d like to shine a spotlight on the things 3.
 
   * Improved default themes & material design – this is an area we need to spend more time on. We are attacking it one component at a time but that is often challenging. We can use your help in filing issues and pull requests to improve the situation. If you see something that doesn’t look good or doesn’t look native [go to the issue tracker & create a new issue](http://github.com/codenameone/CodenameOne/issues/new) in it include a screenshot of how it looks now and a screenshot of how it should look. This helps us focus on the things that are important to our users. Even if we know about the problem an issue helps us focus!
 
-  * Theme & Localization – The new GUI builder is starting to take shape and it’s time to turn our attention to the other rolls that the old designer tool handles. We already made some improvements to styling but we can go further.
+  * Theme & Localization – The new GUI builder is starting to take shape and it’s time to turn our attention to the other roles that the old designer tool handles. We already made some improvements to styling but we can go further.
 
 ### Onwards to 3.8
 
-We completed almost everything we wanted to do for 3.7, to be fair that’s not to hard as we delayed the release due to the bootcamp and that gave us extra time.
+We completed almost everything we wanted to do for 3.7, to be fair that’s not too hard as we delayed the release due to the bootcamp and that gave us extra time.
 
 The next version will be out in mid November which already feels damn close by now so I’m not sure which ones of the lowlights above we’ll be able to address by then but those are our biggest priorities not necessarily in that order.
 

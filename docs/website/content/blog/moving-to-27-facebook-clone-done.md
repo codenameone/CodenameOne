@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/moving-to-27-facebook-clone-done/android_studio.jpg)
 
-This is important: We’ll update the build tools & build target to API level 27 with next weeks update (June 8th). We HIGHLY recommend you check your app before we flip the switch!  
+This is important: We’ll update the build tools & build target to API level 27 with next week's update (June 8th). We HIGHLY recommend you check your app before we flip the switch!  
 I also just uploaded the final lesson in the Facebook Clone App which is now fully live in the [online course](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java).
 
 I’ve discussed the [build target 27 migration before](/blog/android-build-target-27-migration.html). We wanted to do it in May but the work on the Facebook clone pushed that back so it will have to wait. You can test this right now by setting the build hints:
@@ -30,7 +30,7 @@ I was racing against the clock to get the Facebook clone out of the door and mad
 
 I’ll try to write an article similar to the one [I wrote about Uber](https://medium.com/@Codename_One/what-ive-learned-from-cloning-the-uber-app-b0a7c743c1c1) detailing some of my experiences here.
 
-I mentioned before when we launched the Uber app that the price of the course will go up by 100USD to $599 once the Facebook clone is up. Since it was late we’ll postpone this price change to June 12th so if you still didn’t signup for the course nows a good time.  
+I mentioned before when we launched the Uber app that the price of the course will go up by 100USD to $599 once the Facebook clone is up. Since it was late we’ll postpone this price change to June 12th so if you still didn’t signup for the course now's a good time.  
 We’ll raise the price further in the future as we add things to the courses but probably not by the same amount.
 
 I’ll send out a couple of reminders for this by email during the week.

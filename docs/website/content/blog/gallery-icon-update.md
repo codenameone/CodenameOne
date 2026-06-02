@@ -32,7 +32,7 @@ due to an invalid binary. Missing the Icon.png file…
 Our iOS project build is pretty complex e.g.  
 [it takes screenshots](http://www.codenameone.com/blog/the-7-screenshots-of-ios)  
 and it also handles things like icon resizing. The latter is much simpler, we generate the roughly 10 icon  
-sizes the Apple needs for the various iOS devices from the one icon you supply (seriously they expect 10 icons…). 
+sizes that Apple needs for the various iOS devices from the one icon you supply (seriously they expect 10 icons…). 
 
 We store these icons in the bundle and in this case the developer also stored an icon.png file in the root triggering  
 a collision. Naturally our build process needs to be smarter and catch onto those things but I would recommend  

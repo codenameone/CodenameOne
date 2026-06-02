@@ -33,7 +33,7 @@ In other news you might recall in a recent blog post I mentioned
 [  
 we added isDragRegion  
 ](http://www.codenameone.com/3/post/2014/02/wheel-drag.html)  
-, well its now deprecated in favor of a more ambitious getDragRegionStatus which can return multiple constants to help us fine tune the drag behavior to all the various edge cases and make the UI feel more responsive.  
+, well it's now deprecated in favor of a more ambitious getDragRegionStatus which can return multiple constants to help us fine tune the drag behavior to all the various edge cases and make the UI feel more responsive.  
   
   
   
@@ -45,7 +45,7 @@ Up until now desktop applications in Codename One shared the same .cn1 storage a
   
   
   
-The Google Play ads were causing some issues in Gingerbread devices where clicks would have no effect, unfortunately we aren’t clear on why exactly this happens but its related to obfuscation probably removing some compatibility code needed by Google. The only workaround we found for this to work on older devices is to disable obfuscation on Android by using the build argument: `android.enableProguard=false`  
+The Google Play ads were causing some issues in Gingerbread devices where clicks would have no effect, unfortunately we aren’t clear on why exactly this happens but it's related to obfuscation probably removing some compatibility code needed by Google. The only workaround we found for this to work on older devices is to disable obfuscation on Android by using the build argument: `android.enableProguard=false`  
   
   
   

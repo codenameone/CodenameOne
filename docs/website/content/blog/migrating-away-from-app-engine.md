@@ -14,9 +14,9 @@ author: Shai Almog
 Google has just announced that it is deprecating cloud storage and effectively a major part of App Engine that  
 we are relying on. To make matters worse the window of time to its removal is quite short so we don’t have enough  
 time to rewrite and adapt all the various API’s and tools that rely on this API.  
-We have already started the process of migrating off App Engine completely both due to rising costs and Googles  
+We have already started the process of migrating off App Engine completely both due to rising costs and Google's  
 horrible service/support. This will also allow us to finally support many long standing user requests such as more powerful  
-push API’s etc. since we will no longer be held back by App Engines limitations. 
+push API’s etc. since we will no longer be held back by App Engine's limitations. 
 
 In fact our choice to leave App Engine completely was sealed last month as our App Engine expenses skyrocketed…  
 The App Engine console simply stated a cryptic "datastore reads" number that was very high/expensive. We normally cache  

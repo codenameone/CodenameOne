@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/java-8-switch-new-preferences-demo-structure/java-8-lambada.png)
 
-With the 3.4 release we discussed the process of modernizing the demos and also mention that we would  
+With the 3.4 release we discussed the process of modernizing the demos and also mentioned that we would  
 continue the trend of building Codename One on top of itself. We now have a rough outline of what we are  
 going to do possibly starting with the next plugin update.
 
@@ -20,7 +20,7 @@ going to do possibly starting with the next plugin update.
 New builds will use Java 8 by default for all projects. In the past we needed you to define the build hint  
 `java.version=8` and if you left it out we defaulted to `java.version=5`.
 
-With the this will now be the exact opposite where the default will assume Java 8 unless you are using  
+This will now be the exact opposite where the default will assume Java 8 unless you are using  
 versioned builds.
 
 This is a part of a wider switch that we will carry into the IDE plugin and into the Codename One libraries.  

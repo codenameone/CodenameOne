@@ -28,8 +28,8 @@ I felt the need to write this opening paragraph due to a highly visible source c
 company. We have no intentions, plans, thoughts or wavers in that direction. Furthermore, we consider  
 contributions to be the least important benefits of Open Source Software. 
 
-Codename One is "more" open source than most projects, e.g. OpenJDK is OSS but its pretty hard to change  
-code within it. Its even hard to contribute these changes!  
+Codename One is "more" open source than most projects, e.g. OpenJDK is OSS but it's pretty hard to change  
+code within it. It's even hard to contribute these changes!  
 You can use/change most of our code using a trivial process. You don’t need a complex compiler toolchain  
 for changing or debugging Codename One. Most importantly: 99% of the code is in Java so you should feel  
 right at home! 
@@ -37,7 +37,7 @@ right at home!
 #### Using The Source
 
 We already have an old tutorial called "[use the source](/blog/use-the-source.html)"  
-but its pretty old by now. It still points at the old SVN and didn’t really go into details, so re-doing that and reminding  
+but it's pretty old by now. It still points at the old SVN and didn’t really go into details, so re-doing that and reminding  
 you that this can be done seems in order.  
 When you debug your app with our source code you can place breakpoints deep within Codename One and  
 gain unique insight. E.g. a `Form` flickers in your application just place a breakpoint in  

@@ -283,7 +283,7 @@ In the above snippet, the first instruction is `aload_0` (which adds `this` to t
 __ |  You don’t need to understand what all of these instructions do. You just need to look for instructions that may be problematic.   
 ---|---  
   
-The only instruction that I **think** might be problematic is "invokedynamic". All other instructions should work find in Codename One. (I don’t know for a fact that invokedynmic won’t work – I just suspect it might not work on some platforms).
+The only instruction that I **think** might be problematic is "invokedynamic". All other instructions should work fine in Codename One. (I don’t know for a fact that invokedynamic won’t work – I just suspect it might not work on some platforms).
 
 **Summary of Byte-code Assessment**
 
@@ -363,7 +363,7 @@ At this point we already have a manual process for incorporating files built wit
 
   5. Use your library from the Codename One project.
 
-When I first developed Mirah support I just automated this process using an [ANT script](https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml). I also automatically generated some bootstrap code so that I could develop the whole app in Mirah and I woudn’t have to write any Java. However, I soon found that this level of integration has limitations.
+When I first developed Mirah support I just automated this process using an [ANT script](https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml). I also automatically generated some bootstrap code so that I could develop the whole app in Mirah and I wouldn’t have to write any Java. However, I soon found that this level of integration has limitations.
 
 For example, with this approach alone, I couldn’t have two-way dependencies between Java source and Mirah source. Yes, my Mirah code could use Java libraries (and it did depend on `CodenameOne.jar`), and my Java code could use my Mirah code. However, my Mirah **source** code could not depend on the Java **source** code in my project. This has to do with the order in which code is compiled. It’s a bit of a chicken and egg issue. If we are building a project that has Java source code and Mirah source code, we are using two different compilers: mirahc to compile the Mirah files, and javac to compile the Java files. If we are starting from a clean build, and we run mirahc first, then the .java files haven’t yet been compiled to .class files – and thus mirahc can’t **reference** them – and any mirah code that depends on those uncompiled Java classes will fail. If we compile the .java files first, then we have the opposite problem.
 

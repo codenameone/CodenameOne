@@ -27,7 +27,7 @@ The problem is that both of these issues are notoriously hard to catch on the si
 
 To ease the process of detecting these violations we added a flag to the simulator allowing you to receive information about such cases. When using light debugging you will see printouts to the console when accessing the EDT from a separate thread or taking too long to perform the task on the EDT. When setting it to full you will also see the stack trace where the violation was detected.
 
-These tools aren’t perfect and they sometimes printout warnings that are unwarranted while entirely missing a real violation. However they can be a valuable tool in improving your application’s portability and responsiveness on multiple devices when used consciously. 
+These tools aren’t perfect and they sometimes print out warnings that are unwarranted while entirely missing a real violation. However they can be a valuable tool in improving your application’s portability and responsiveness on multiple devices when used consciously. 
 
 * * *
 

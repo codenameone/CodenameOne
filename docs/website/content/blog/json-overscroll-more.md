@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-Its been pretty busy around here the last couple of weeks. However, we still introduced a couple of new API’s and abilities besides the many bug fixes that constantly go in.  
+It's been pretty busy around here the last couple of weeks. However, we still introduced a couple of new API’s and abilities besides the many bug fixes that constantly go in.  
   
   
 We deprecated JSONParser.parse(Reader) in favor of Map<String, Object> parseJSON(Reader i). This is effectively the exact same class with one minor difference, it returns HashMaps/ArrayLists rather than Hashtables/Vectors to represent the hierarchy.  
@@ -67,7 +67,7 @@ componentName to be red? Just use:
 `map.put("componentName_uiid", "red");` 
 
   
-This will apply the uiid "red" to the component which you can then style in the them. Notice that once you start doing this you need to define this entry for all entries e.g.:  
+This will apply the uiid "red" to the component which you can then style in the theme. Notice that once you start doing this you need to define this entry for all entries e.g.:  
   
   
 `map.put("componentName_uiid", "blue");`  

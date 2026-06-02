@@ -31,7 +31,7 @@ The simulator would help you a little bit by placing a translucent red highlight
 
 Figure 2. After choosing "Inspect Component", the "Components" panel auto-expands and selects the corresponding node, and the "Component details" panel is populated with the selected component details.
 
-You’ll notice also, that the "Component Details" will automatically populate with the details of your selected component. Most for the fields in the component details form are read only, but the **UIID** field can be edited, allowing you to experiment with different styles for your elements directly in the simulator.
+You’ll notice also, that the "Component Details" will automatically populate with the details of your selected component. Most of the fields in the component details form are read only, but the **UIID** field can be edited, allowing you to experiment with different styles for your elements directly in the simulator.
 
 ### Disabling the Context Menu
 

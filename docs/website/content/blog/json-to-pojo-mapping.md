@@ -27,7 +27,7 @@ While the
 [  
 webservice wizard  
 ](/how-do-i---access-remote-webservices-perform-operations-on-the-server.html)  
-in Codename One is pretty useful for many things it still requires a proxy and Servlet container which might not be the right choice for everyone. Steve Hannah, created a pretty cool set of tools to map POJO’s (plain old Java objects) to JSON structures by using compile time object mapping. This eliminates the costs/issues of reflection while still delivering a programming experience that is on par with the one we get from Java SE webservice mappings. 
+in Codename One is pretty useful for many things it still requires a proxy and Servlet container which might not be the right choice for everyone. Steve Hannah created a pretty cool set of tools to map POJO’s (plain old Java objects) to JSON structures by using compile time object mapping. This eliminates the costs/issues of reflection while still delivering a programming experience that is on par with the one we get from Java SE webservice mappings. 
 
 Steve wrote a  
 [  

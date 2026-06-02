@@ -15,14 +15,14 @@ Facebook recently announced the closing of parse.com which is disappointing but 
 knows a project from a large tech company can just shutdown in a blink of an eye leaving millions of users/developers  
 in limbo. In that sense one of the questions that gets under my skin is what happens if Codename One calls it  
 quits…  
-You’d be better off than anyone who used parse and its far less likely to happen. Codename One is "what we do"  
+You’d be better off than anyone who used parse and it’s far less likely to happen. Codename One is "what we do"  
 and have been doing for the past 4 years. More importantly, unlike Parse you could just use the open source project  
 and your users wouldn’t be the wiser. Since Parse is a service that needs to connect to a hosted server everyone  
-who used parse (myself included) need to develop a rather complex strategy of moving their hosted data (which is  
-live) while moving their users some of which might still have the old version that use parse on their devices… 
+who used parse (myself included) needs to develop a rather complex strategy of moving their hosted data (which is  
+live) while moving their users some of which might still have the old version that uses parse on their devices… 
 
 When you are looking at PaaS services you need to always evaluate the case of the PaaS closing down (this  
-is true for IaaS as well but to a lesser degree), in that sense Parse is quite problematic since its effectively  
+is true for IaaS as well but to a lesser degree), in that sense Parse is quite problematic since it’s effectively  
 exposed to user installs. Codename One is far safer since the built app doesn’t really need Codename One anymore… 
 
 As I mentioned above before taking a long detour, I have a personal app that relies on Parse so I will need to port  

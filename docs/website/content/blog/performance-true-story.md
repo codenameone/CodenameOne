@@ -118,7 +118,7 @@ __ |  Due to technical constraints we can’t use a lambda in this specific case
   
 ### Final Word
 
-Performance is a chase that never ends. Its non-trivial and always changes on device/between devices.
+Performance is a chase that never ends. It's non-trivial and always changes on device/between devices.
 
 The nice thing about cross platform tools is that once you optimize something on Android this often maps back to iOS etc. giving you a nice cross platform boost.
 

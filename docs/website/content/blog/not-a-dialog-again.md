@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-When we introduced the idea of the EDT from Swing (and pretty much any modern UI toolkit) into what eventually became Codename One, one of the chief benefits was modal dialogs. Its the ability to block the executing thread in order to ask the user a question, that’s a very powerful tool for a developer. As a result of that we defined modal dialogs the way Swing/AWT defined them: stopping the execution of the code. 
+When we introduced the idea of the EDT from Swing (and pretty much any modern UI toolkit) into what eventually became Codename One, one of the chief benefits was modal dialogs. It's the ability to block the executing thread in order to ask the user a question, that’s a very powerful tool for a developer. As a result of that we defined modal dialogs the way Swing/AWT defined them: stopping the execution of the code. 
 
 However, there is another definition… Dialogs that block the rest of the UI…  
   
@@ -32,9 +32,9 @@ In that regard all dialogs in Codename One are modal; they block the parent form
 
 Well, now it is. We just added InteractionDialog to Codename One which tries to be very similar to Dialog in terms of API but unlike dialog it never blocks anything. Not the calling thread or the UI.  
   
-Its really just a container that is positioned within the layered pane. Notice that because of that design you can have only one such dialog at the moment and if you add something else to the layered pane you might run into trouble.
+It's really just a container that is positioned within the layered pane. Notice that because of that design you can have only one such dialog at the moment and if you add something else to the layered pane you might run into trouble.
 
-Using the interaction dialog is be pretty trivial and very similar to dialog:  
+Using the interaction dialog is pretty trivial and very similar to dialog:  
   
 ```java
 final InteractionDialog dlg = new InteractionDialog("Hello");

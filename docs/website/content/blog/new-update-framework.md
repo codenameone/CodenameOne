@@ -34,7 +34,7 @@ You can also use the usual method of Codename One Settings → Basic → Update 
 
 ### How does it Work?
 
-You can see the full code [here](https://github.com/codenameone/UpdateCodenameOne) the gist of it is very simple. We create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
+You can see the full code [here](https://github.com/codenameone/UpdateCodenameOne) the gist of it is very simple. We create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the user's home directory).
 
 An update happens by running this tool with a path to a Codename One project e.g.:
     
@@ -63,7 +63,7 @@ Notice that no download happened since the files were up to date. You can also f
     
     java -jar ~/.codenameone/UpdateCodenameOne.jar path_to_my_codenameone_project
 
-The way this works under the hood is thought a `Versions.properties` within your directory that lists the versions of local files. That way we know what should be updated.
+The way this works under the hood is through a `Versions.properties` within your directory that lists the versions of local files. That way we know what should be updated.
 
 __ |  Exclude `Versions.properties` from Git   
 ---|---  

@@ -41,7 +41,7 @@ In reviewing the SDKs, I’m looking to answer two questions:
 
 ## Step 2: Designing the Codename One Public API
 
-When designing the Codename One API, I often begin by looking at the [Javadocs](http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html) for the native Android SDK. If the class hierarchy doesn’t look too elaborate, I may decide model my Codename One public API fairly closely on the Android API. On the other hand, if I only need a small part of the SDK’s functionality, I may choose to create my abstractions around just the functionality that I need.
+When designing the Codename One API, I often begin by looking at the [Javadocs](http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html) for the native Android SDK. If the class hierarchy doesn’t look too elaborate, I may decide to model my Codename One public API fairly closely on the Android API. On the other hand, if I only need a small part of the SDK’s functionality, I may choose to create my abstractions around just the functionality that I need.
 
 In the case of the FreshDesk SDK, it looks like most of the functionality is handled by one central class `Mobihelp`, with a few other POJO classes for passing data to and from the service. This is a good candidate for a comprehensive Codename One API.
 
@@ -102,7 +102,7 @@ Although our public API isn’t constrained by the same rules as our Native Inte
     
     public static final void showSolutions (Context activityContext, ArrayList<String> tags)
 
-We’ve already decided to just omit the `Context` parameter in our API, so that’s a non-issue. But what about the `ArrayList<String>` tags parameter? Passing this to our public API is no problem, but when we implement the public API, how will we pass this `ArrayList` to our native interface, since native interfaces don’t allow us to arrays of strings as parameters?
+We’ve already decided to just omit the `Context` parameter in our API, so that’s a non-issue. But what about the `ArrayList<String>` tags parameter? Passing this to our public API is no problem, but when we implement the public API, how will we pass this `ArrayList` to our native interface, since native interfaces don’t allow us to pass arrays of strings as parameters?
 
 I generally use one of three strategies in such cases:
 
@@ -189,7 +189,7 @@ For the second issue, we’ll create a static method that can take the token gen
 
 Most Native SDKs include some sort of initialization method where you pass your developer and application credentials to the API. When I filled in FreshDesk’s web-based form to create a new application, it generated an application ID, an app "secret", and a "domain". The SDK requires me to pass all three of these values to its `init()` method via the `MobihelpConfig` class.
 
-Note, however, that FreshDesk (and most other service provides that have native SDKs) requires me to create different Apps for each platform. This means that my App ID and App secret will be different on iOS than they will be on Android.
+Note, however, that FreshDesk (and most other service providers that have native SDKs) requires me to create different Apps for each platform. This means that my App ID and App secret will be different on iOS than they will be on Android.
 
 Therefore our public API needs to enable us to provide multiple credentials in the same app, and our API needs to know to use the correct credentials depending on the device that the app is running on.
 
@@ -473,7 +473,7 @@ The final native interface is nearly identical to our public API, except in case
         public void	showSupport();
     }
 
-Notice also, that the native interface includes a set of methods with names prefixed with `config__`. This is just a naming conventions I used to identify methods that map to the `MobihelpConfig` class. I could have used a separate native interface for these, but decided to keep all the native stuff in one class for simplicity and maintainability.
+Notice also, that the native interface includes a set of methods with names prefixed with `config__`. This is just a naming convention I used to identify methods that map to the `MobihelpConfig` class. I could have used a separate native interface for these, but decided to keep all the native stuff in one class for simplicity and maintainability.
 
 ### Connecting the Public API to the Native Interface
 
@@ -532,7 +532,7 @@ For most of the methods in the `Mobihelp` class, we can see that the public API 
 
 For some other methods, the public API needs to break apart the parameters into a form that the native interface can accept. E.g. the `init()` method, shown above, takes a `MobihelpConfig` object as a parameter, but it passed the properties of the `config` object individually into the native interface.
 
-Another example, is the `showSupport(ArrayList<String> tags)` method. The corresponding native interface method that is wraps is `showSupport(String tags, String separator)` – i.e it needs to merge all tags into a single delimited string, and pass then to the native interface along with the delimiter used. The implementation is:
+Another example, is the `showSupport(ArrayList<String> tags)` method. The corresponding native interface method that it wraps is `showSupport(String tags, String separator)` – i.e it needs to merge all tags into a single delimited string, and pass them to the native interface along with the delimiter used. The implementation is:
     
     
         public final static void showSupport(ArrayList<String> tags) {

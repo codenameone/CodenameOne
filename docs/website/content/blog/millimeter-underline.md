@@ -25,7 +25,7 @@ Both of these are no longer an issue or a priority so in the upcoming update I a
 
 Notice that we already had a `createLineBorder(int thickness, int color)` method which worked with pixels. The floating point version of the method works with millimeters. For consistency I made the new underline border mode work in the same way and so the `int` version of the method works with pixels and the `float` version of the method works with millimeters.
 
-Also notice the versions of the methods that don’t take a color as an argument use the styles foreground color for the painting.
+Also notice the versions of the methods that don’t take a color as an argument use the style’s foreground color for the painting.
 
 The upcoming version of the Codename One designer will now include the additional `underline` option in the combo box of borders and a new millimeter checkbox next to the thickness entry in the first tab.
 

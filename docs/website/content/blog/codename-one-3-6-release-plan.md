@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-6-release-plan/codenameone-3-6.jpg)
 
-We will release Codename One 3.6 on the 16th of January, this means we will enter code freeze on the 9th during which only critical bugs will be fixed with peer review. Since Codename One is a SaaS product release cycles aren’t as crucial for most of us but they provide a framework both for versioned builds and for us to focus on the more mundane aspects of product maintenence.
+We will release Codename One 3.6 on the 16th of January, this means we will enter code freeze on the 9th during which only critical bugs will be fixed with peer review. Since Codename One is a SaaS product release cycles aren’t as crucial for most of us but they provide a framework both for versioned builds and for us to focus on the more mundane aspects of product maintenance.
 
 With 3.6 we are fine tuning the 4 releases per year approach we took in the past to a more convenient 3 – release per year cycle. This will allow us to deliver more refined releases while still **delivering them** which is harder to do without a fixed roadmap.
 

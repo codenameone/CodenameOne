@@ -26,7 +26,7 @@ We tried to migrate all the blog posts from the old blog, this worked with parti
   * Dates/times on some of the older posts are incorrect
   * Hierarchy got broken
   * Emails are missing so you won’t get notified on responses to old comments.
-  * Some comments were "just lost" – its hard to know which ones though…
+  * Some comments were "just lost" – it's hard to know which ones though…
 
 However, the vast majority of the information (close to 1k comments) was preserved and provides a lot of important information  
 about our older blog posts. We migrated all the older posts but some formatting might be broken, we couldn’t go over all of them  

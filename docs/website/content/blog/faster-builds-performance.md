@@ -20,10 +20,10 @@ author: Shai Almog
   
   
 
-Despite quite a few regressions with the new VM we were finally able to make some major improvements to its performance and bring it on-par with native. Its still not as fast as it could be but coupled with the far improved GC and far superior synchronization its probably a better choice in terms of performance than the old VM. We are still heavily improving it to make it even better.  
+Despite quite a few regressions with the new VM we were finally able to make some major improvements to its performance and bring it on-par with native. It's still not as fast as it could be but coupled with the far improved GC and far superior synchronization it's probably a better choice in terms of performance than the old VM. We are still heavily improving it to make it even better.  
   
   
-On that note, one of the major goals of this VM was in reducing build times. This took a turn to the worse this week with builds in excess of 16 minutes which effectively ground our servers to a halt. Turns out that the LLVM compiler used by Apple is pretty fast for most state of the art C/Objective-C but is downright awful for a simple #define statement. We used a lot of macros to simplify some of the generated code, but apparently the compiler chocked on them so badly it just took up all the CPU.  
+On that note, one of the major goals of this VM was in reducing build times. This took a turn to the worse this week with builds in excess of 16 minutes which effectively ground our servers to a halt. Turns out that the LLVM compiler used by Apple is pretty fast for most state of the art C/Objective-C but is downright awful for a simple #define statement. We used a lot of macros to simplify some of the generated code, but apparently the compiler choked on them so badly it just took up all the CPU.  
   
   
   

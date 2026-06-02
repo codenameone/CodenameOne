@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/github-migration-completed/github-logo.jpg)
 
-Its been a long weekend, but now that its finally over the long and tedious migration to github is almost completely  
+It's been a long weekend, but now that it's finally over the long and tedious migration to github is almost completely  
 behind us.  
 Make sure to update your URLs to the new repository at  
 <https://github.com/codenameone/CodenameOne/>.  
@@ -41,7 +41,7 @@ properly. I’m not sure if this is OK with the github guidelines if not we will
 ### The Migration
 
 The migration was remarkably painful, the manual issue export code from Google didn’t work on Mac OS and there  
-were no public workaround. Its a Python script that assumes the users are familiar with python environments  
+was no public workaround. It's a Python script that assumes the users are familiar with python environments  
 in a typical Google hackish sort of way. Eventually I just purchased a droplet instance from Digital Ocean and  
 performed the migration in the cloud, this has the benefit of using a very fast networking pipeline which made a  
 lot of the work way faster even though I was working on a remote shared instance. It also made the python code  

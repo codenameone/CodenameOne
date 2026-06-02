@@ -27,7 +27,7 @@ When the user presses the "Play" button, then the media will start playing becau
 
 The "media ready" popup dialog shouldn’t present a major problem for your app’s user experience. However, if you’re playing several audio clips, one after another, it could become annoying for the user to have to keep pressing "Play" for each clip. Luckily, the browser will "remember" if the user has authorized audio playback on a particular media element, so if you play your cards right, you may only need to prompt the user to play the first sound clip, and the subsequent ones will just be allowed by the browser. In the Javascript port, each `Media` object is mapped to its own `HTMLMediaElement` (an `<audio>` or `<video>` DOM element). It uses a pool of media elements to try and reuse the underlying media elements if it can. A `Media` object’s underlying element is only returned to the pool when its `cleanup()` method is called. If you’re playing a series of audio clips in a row, you should make sure to call the `cleanup()` method on each sound clip, before the next one plays, to avoid being forced by the browser to display "Media Ready/Play" dialog.
 
-For example, suppose you’re need to play a series of sound clips, one after another. You might do something like:
+For example, suppose you need to play a series of sound clips, one after another. You might do something like:
     
     
     Media media;
@@ -46,7 +46,7 @@ For example, suppose you’re need to play a series of sound clips, one after an
     
     play(0);
 
-In this example, I’m using a single property, `media`, which we will reuse for each sound clip, and I have a list of URLs for sound clips I want to play sequentially. The `play(index)` method plays the clip at the specified index – but first, it cleans up the previous sound clip. This is extra important in the Javascript port since this will return the sound clip’s `<audio>` element to the pool, so that it (and it’s granted permissions) can be reused for the next sound clip.
+In this example, I’m using a single property, `media`, which we will reuse for each sound clip, and I have a list of URLs for sound clips I want to play sequentially. The `play(index)` method plays the clip at the specified index – but first, it cleans up the previous sound clip. This is extra important in the Javascript port since this will return the sound clip’s `<audio>` element to the pool, so that it (and its granted permissions) can be reused for the next sound clip.
 
 We use the completion handler in `createMedia()` to be notified when the sound clip has finished playing, at which point it calls `play(index+1)` – i.e. it plays the next clip. Notice that I place the `play()` call inside `callSerially()` so that it is deferred to the next dispatch. This may not be strictly necessary, but it avoids any problems that might occur trying to call `cleanup()` from inside the media’s completed callback.
 

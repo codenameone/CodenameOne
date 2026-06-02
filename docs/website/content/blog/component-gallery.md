@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/component-gallery/component-gallery.png)
 
 As you know we’ve been working a lot on the docs both the developer guide and the JavaDoc’s, we nearly doubled  
-the amount pages in the developer guide and we did it without "cheating" (e.g. cramming more stuff, increasing font size).  
+the amount of pages in the developer guide and we did it without "cheating" (e.g. cramming more stuff, increasing font size).  
 You can see all that work in the [developer guide](https://www.codenameone.com/manual/) section but what I want  
 to discuss today is the new [Component Gallery](/javadoc/com/codename1/ui/package-summary/)  
 & [Layout Gallery](/javadoc/com/codename1/ui/layouts/package-summary/).
@@ -26,7 +26,7 @@ When writing this sample code we tried to reflect back on a lot of the requests 
 such as dynamically downloading images to lists, `ImageViewer` etc. are all covered. Carousel UI with the `Tabs`  
 component and even trivial things such as making a `Button` look like a link.
 
-This take a lot of effort to do so please provide us as much feedback as you can on the process, e.g. on my last  
+This takes a lot of effort to do so please provide us as much feedback as you can on the process, e.g. on my last  
 post a developer asked a question related to `Table`. The answer to that question is now (thanks to him) in the docs.
 ---
 

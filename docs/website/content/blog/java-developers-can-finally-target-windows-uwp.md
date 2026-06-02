@@ -34,7 +34,7 @@ The whole source of this port as well as our changes to iKVM are available in [o
 ### What does this Mean?
 
 As of May Windows 10 is installed on 300 million PC’s and devices making it a significant platform and appstore.  
-Microsoft has traditionally been quite strong in the enterprise and the ability to sell into that market thru it’s  
+Microsoft has traditionally been quite strong in the enterprise and the ability to sell into that market thru its  
 appstore (with the success of the Surface tablet line) is valuable.
 
 Microsoft has standardized on the Universal Windows Platform which effectively "reinvents" Windows as  

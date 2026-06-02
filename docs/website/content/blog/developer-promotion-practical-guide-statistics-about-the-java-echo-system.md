@@ -46,7 +46,7 @@ Java Code Geeks
 [  
 Java Code Geeks  
 ](http://javacodegeeks.com/)  
-as a partner – we needed a partner who is focused on Java (check), who has a big enough audience (check), whose audience isn’t already familiar with our product (check). This is probably the most important step, most of our contestant came from Java Code Geeks and as you can see from the chart to the right. Most of the people who entered our contest didn’t know about Codename One in advance and were happy to find out about us.
+as a partner – we needed a partner who is focused on Java (check), who has a big enough audience (check), whose audience isn’t already familiar with our product (check). This is probably the most important step, most of our contestants came from Java Code Geeks and as you can see from the chart to the right. Most of the people who entered our contest didn’t know about Codename One in advance and were happy to find out about us.
 
 3\. We created incentives to social share – most of the people who would read  
 [  
@@ -93,7 +93,7 @@ We asked developers which operating system they were using and were pretty shock
   
   
 
-The IDE of choice brought a pretty predictable result although much closer than we would have thought as the number of answers grew the distance between the IDE’s grew as well with NetBeans surpassing IDEA and Eclipse growing in strength. However, the race between the IDE’s is still very real and despite Eclipse lead its position seems very assailable in the market. Our decision to support all 3 IDE’s seems like an excellent decision in this light.  
+The IDE of choice brought a pretty predictable result although much closer than we would have thought as the number of answers grew the distance between the IDE’s grew as well with NetBeans surpassing IDEA and Eclipse growing in strength. However, the race between the IDE’s is still very real and despite Eclipse's lead its position seems very assailable in the market. Our decision to support all 3 IDE’s seems like an excellent decision in this light.  
 
 * * *
 

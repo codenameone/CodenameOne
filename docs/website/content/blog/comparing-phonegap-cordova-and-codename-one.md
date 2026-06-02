@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/comparing-phonegap-cordova-and-codename-one/compare-to-cordova.jpg)
 
 Last time around we compared [Codename One to Xamarin](/blog/comparing-xamarin-and-codename-one.html) and this  
-time around I’d like to compare [Codename One](/) to what is probably the market leader: PhoneGap/Cordova. If Xamain  
+time around I’d like to compare [Codename One](/) to what is probably the market leader: PhoneGap/Cordova. If Xamarin  
 is big then Cordova is huge, it is so prevalent that it is often the default assumption when people mention cross  
 platform today.
 
@@ -162,7 +162,7 @@ count…​
 
 With so many variations how can we properly compare the two frameworks?
 
-There are several things we can gleam from property cross by reviewing all of the above:
+There are several things we can glean from property cross by reviewing all of the above:
 
   * Codename One has 2 file types that aren’t configuration or build scripts: res file (resources) & Java files.  
 PhoneGap solutions use JavaScript, HTML & CSS.

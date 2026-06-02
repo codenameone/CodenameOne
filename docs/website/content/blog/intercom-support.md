@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/intercom-support/new-features-2.jpg)
 
-We use [intercom.io](http://intercom.io) for our website support system you can see it as the chat button on the bottom right of the page. The true value of this tool is in it’s ability to deliver a unified interface everywhere, normally this stretches into native mobile apps as well. As a result we decided to port the native intercom device API to Codename One so it will be easy to deploy everywhere.
+We use [intercom.io](http://intercom.io) for our website support system you can see it as the chat button on the bottom right of the page. The true value of this tool is in its ability to deliver a unified interface everywhere, normally this stretches into native mobile apps as well. As a result we decided to port the native intercom device API to Codename One so it will be easy to deploy everywhere.
 
 We added a new [cn1lib for intercom](https://github.com/codenameone/IntercomSupport/), it works on Android/iOS and will allow you to communicate with users of your app thru the app and web. It also allows for more advanced event based automation which is really useful when building a user funnel.
 

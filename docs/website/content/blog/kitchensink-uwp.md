@@ -22,7 +22,7 @@ The demo on UWP is still broken in some fundamental ways e.g. shape graphics req
 not ready. Quite a few other things should be implemented but it should still install & run. You can install this  
 demo on a Windows 10 device or desktop from [here](https://www.microsoft.com/en-us/store/p/codename-one-kitchen-sink/9nblggh528c7).
 
-We made a lot of fixed for the UWP port over the past few days so if you were having issues they might have been  
+We made a lot of fixes for the UWP port over the past few days so if you were having issues they might have been  
 resolved by now. There are still some pieces of functionality missing which we hope to get to during the 3.6  
 line but realistically a production release of UWP that is "feature complete" might wait to 3.7.
 
@@ -34,7 +34,7 @@ fixes, since that platform is evolving faster we might need to update it further
 ### Commenting the Demo
 
 Bryan [posted a comment](http://www.codenameone.com/blog/different-icons.html#comment-2898582862) on  
-a previous post & I think this bares repeating in a post:
+a previous post & I think this bears repeating in a post:
 
 > Re Kitchen Sink – I’ve been looking at the source to see how some of the stuff in the demo is done, and it would  
 >  be really good if there were more comments or description in the code (or accompanying the demo) so  

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/pixel-perfect-on-top-menu/pixel-perfect.jpg)
 
-I already have half a post on text components but I’ve put that on hold for now as I’ve been working on the [on-top side menu](/blog/sidemenu-on-top.html) to supersede the existing side menu bar implementation. I’ve made some fixes for it over the week, I wanted to make it the default for Codename One apps but it still isn’t "perfect". We will make it the default within the next couple of weeks so please test it after this weeks update and let us know ASAP if you spot any issues!
+I already have half a post on text components but I’ve put that on hold for now as I’ve been working on the [on-top side menu](/blog/sidemenu-on-top.html) to supersede the existing side menu bar implementation. I’ve made some fixes for it over the week, I wanted to make it the default for Codename One apps but it still isn’t "perfect". We will make it the default within the next couple of weeks so please test it after this week's update and let us know ASAP if you spot any issues!
 
 After the latest round of work the side menu now resides on top of the entire form and not just over the content pane. I was able to address some issues in the form layer implementation and it should work properly now. I also fixed some pretty hairy issues with events and even a rather insane issue with `invokeAndBlock`.
 

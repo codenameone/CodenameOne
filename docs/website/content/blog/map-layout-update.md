@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/map-layout-update/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
-__ |  The information in this blog post is slighly out of date. Check out the [newer blog post](/blog/map-component-positioning-revisited.html) that covers positioning components on the map.   
+__ |  The information in this blog post is slightly out of date. Check out the [newer blog post](/blog/map-component-positioning-revisited.html) that covers positioning components on the map.   
 ---|---  
   
 A while back I [introduced a MapLayout class](/blog/tip-map-layout-manager.html) as a tip and discussed the usage of this class. Since that introduction we ran into some scale issues as the layout misbehaved when a lot of elements were added to it. The crux of the issue is in the native map API which runs on the OS native thread and the Codename One API which needs immediate responses for layout.

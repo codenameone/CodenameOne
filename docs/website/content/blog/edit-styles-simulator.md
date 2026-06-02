@@ -28,7 +28,7 @@ __ |  This changes the `.res` file so if you have it open in a designer you migh
   
 ### How does it Work?
 
-A while back Chen wanted to add the ability to edit a style into the new GUI builder so he created a [command line argument to the designer](/blog/using-designer-command-line-options.html). He did that after I wrote that article so it isn’t documented there but you can effectively open the style editor for of the designer using something like:
+A while back Chen wanted to add the ability to edit a style into the new GUI builder so he created a [command line argument to the designer](/blog/using-designer-command-line-options.html). He did that after I wrote that article so it isn’t documented there but you can effectively open the style editor of the designer using something like:
     
     
     java -jar ~/.codenameone/designer_1.jar -style path-to-res-file.res UIID NameOfTheme

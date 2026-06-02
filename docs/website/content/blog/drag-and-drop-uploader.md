@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/drag-and-drop-uploader/generic-java-1.jpg)
 
-One of our enterprise customers needed help with file upload from the desktop. E.g. in his Codename One app running in the browser or desktop he wanted the ability to drag a file. Somewhat like we can drag a file into gmails compose window.
+One of our enterprise customers needed help with file upload from the desktop. E.g. in his Codename One app running in the browser or desktop he wanted the ability to drag a file. Somewhat like we can drag a file into gmail's compose window.
 
 This doesn’t make sense within Codename One as something like that doesn’t exist on mobile devices or even tablets. Creating a [cn1lib that implements this functionality](https://github.com/shannah/cn1-native-data-transfer) does make sense, so [Steve did just that](https://github.com/shannah/cn1-native-data-transfer).
 

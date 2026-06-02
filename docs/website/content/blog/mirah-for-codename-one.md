@@ -24,7 +24,7 @@ Steve Hannah of new iOS pipeline fame (as well as a ton of open source Codename 
 [  
 see here  
 ](https://github.com/shannah)  
-), has just announced one of his more ambitious undertaking:  
+), has just announced one of his more ambitious undertakings:  
 [  
 Mirah support for Codename One  
 ](http://sjhannah.com/blog/?p=331)  
@@ -32,7 +32,7 @@ Mirah support for Codename One
 [  
 Mirah  
 ](http://www.mirah.org/)  
-is effectively Ruby without the performance penalty of an overly dynamic language, its compiled to bytecode and can thus be compiled with the Codename One build servers.  
+is effectively Ruby without the performance penalty of an overly dynamic language, it's compiled to bytecode and can thus be compiled with the Codename One build servers.  
   
   
 If you are a fan of Ruby you now have an easy option of writing mobile applications for all devices without going into Java and without paying a performance penalty!  

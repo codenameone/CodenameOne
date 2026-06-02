@@ -21,7 +21,7 @@ and not the one in the Run arguments. This means that developers who refactored 
 this failing in the simulator before sending the build and would realize they did something wrong.
 
 We will also fail if `start()` or one of the other methods in the main class declares a `throws` clause. This happens  
-a lot of times because new developers use IDE auto-correct suggestions and add a such a clause automatically.  
+a lot of times because new developers use IDE auto-correct suggestions and add such a clause automatically.  
 Hopefully existing/working applications won’t be impacted by this…​
 
 ### Faster Margin/Padding

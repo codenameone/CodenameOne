@@ -27,7 +27,7 @@ and more dominant than development (e.g. Oracle vs. Sun).
 You can’t satisfy all the users with any pricing model, even if your pricing is competitive/cheaper people will always  
 have issues. But unfortunately a company can’t start tailoring every possible package to every possible use case.  
 If you like a product and want the company to have a sustainable business model, you should root for it to go  
-into the subscription model, its not greed: its sustainability.  
+into the subscription model, it's not greed: it's sustainability.  
 Historically software companies would take lines of credit from banks/venture so they could develop the software  
 and would then include the cost of the credit into the final shrink wrap cost. With SaaS the need for credit/funding  
 is far smaller and companies can scale with demand more easily. This eventually rolls down to the users in more  

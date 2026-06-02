@@ -73,7 +73,7 @@ However, if issues are reported we will probably revert back to the old servers.
 ### Complete Switch
 
 Assuming the trial teaches us about some issues we might do another trial but our final switch target date is  
-July 3rd. Assuming things mostly work our correctly we aim to bring down some of our build server capacity for  
+July 3rd. Assuming things mostly work out correctly we aim to bring down some of our build server capacity for  
 OS upgrade in preparation of the full switch.
 
 This will mark the full switch to the new version of xcode.

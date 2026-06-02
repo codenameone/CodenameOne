@@ -15,7 +15,7 @@ author: Shai Almog
 
 The UWP (Universal Windows Platform) port is finally stable enough to get an  
 [app into the Microsoft store](https://www.microsoft.com/en-us/store/p/codename-one-solitaire/9nblggh51z60).  
-Steve published out Solitaire demo into the Microsoft appstore and it passed thru the whole process. You  
+Steve published our Solitaire demo into the Microsoft appstore and it passed thru the whole process. You  
 can download it, install it on your device and try it.
 
 We’ll try to setup a company account to publish the kitchen sink as well moving forward.
@@ -24,7 +24,7 @@ This is a huge step for the UWP port showing its maturity and readiness for prim
 
 ### Future of Windows Phone Port
 
-We weren’t bullish on the continued maintenence of the Windows Phone port but with recent events e.g. MS discontinuing  
+We weren’t bullish on the continued maintenance of the Windows Phone port but with recent events e.g. MS discontinuing  
 Skype on Windows Phone it is pretty clear the platform is dead. Had the port been mature this wouldn’t have been a  
 problem, but the Windows Phone port has huge glaring problems…​
 

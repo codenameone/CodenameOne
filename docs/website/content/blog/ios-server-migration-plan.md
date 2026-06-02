@@ -13,7 +13,7 @@ author: Shai Almog
 
 We were stuck on an "old" version of xcode in the build servers. This hasn’t been a big deal for most features  
 but in some cases we are running into issues e.g. in using the full capabilities of the new iPad or 3d touch. The reason  
-for this is Apples backwards compatibility policy.
+for this is Apple's backwards compatibility policy.
 
 Apple allows you to run an older version of xcode, but the newer versions of xcode always require the latest  
 version of Mac OS X. The problem here is that the latest version of Mac OS X doesn’t support older versions  
@@ -92,9 +92,9 @@ When we look into more esoteric devices like the Apple Watch or TV things become
 obviously become worse as a result.
 
 This is the problem bitcode aims to solve. Since Apple already uses LLVM which has an intermediate representation  
-after compilation they might as well use that instead of the native OS executables. This would allow Apples servers  
+after compilation they might as well use that instead of the native OS executables. This would allow Apple's servers  
 to natively compile the app to any future processor platform without you changing your code…​ Effectively this is  
-very much like a form of bytecode for Apples benefit.
+very much like a form of bytecode for Apple's benefit.
 
 Bitcode is required for Apple Watch apps and might become required for all apps in the future so it’s a good idea  
 to leave it on.

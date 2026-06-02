@@ -30,7 +30,7 @@ The web interface for linode doesn’t seem as polished as the one on digital oc
 Our biggest expense is still App Engine, we planned to dump it as soon as we can but it’s hard to remove it from our infrastructure as it is embedded so deep. The story above pretty much proves to me the value of IaaS over  
 PaaS when building major apps, it allowed us to cut expenses with almost no effort!
 
-I used to be a big PaaS fan as I can see the value of binding an entire infrastructure seamlessly but with the trouble with had with App Engine over the years I’m now convinced that I was wrong.
+I used to be a big PaaS fan as I can see the value of binding an entire infrastructure seamlessly but with the trouble we had with App Engine over the years I’m now convinced that I was wrong.
 
 ### Future Plans
 

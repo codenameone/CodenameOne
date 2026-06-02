@@ -15,7 +15,7 @@ We recently added Windows Phone support to Codename One, this allows you to buil
 
 MS has a sort of beta distribution option which might alleviate the problem but we didn’t get a chance to try it out.
 
-Sending a build for Windows Phone is similar to sending it to any other platform, with the latest distribution just right click and send a build for Windows Phone, its just that simple.  
+Sending a build for Windows Phone is similar to sending it to any other platform, with the latest distribution just right click and send a build for Windows Phone, it's just that simple.  
   
 Unlike most other platforms MS didn’t burden us with the silly need to sign the distribution (they can sign it themselves when we upload to the store, makes MUCH more sense!).
 

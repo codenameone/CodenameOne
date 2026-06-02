@@ -47,7 +47,7 @@ And change it to
 
 If your app is an old GUI Builder app, then it might be `new StateMachine("/theme")` instead.
 
-![Change the theme reference in you app main class](/blog/migrating-legacy-applications-to-css/image9.png)
+![Change the theme reference in your app main class](/blog/migrating-legacy-applications-to-css/image9.png)
 
 Save
 
@@ -78,7 +78,7 @@ You should see the CSS take effect. In my example, my label is now green.
 
 ### What did all this do?
 
-This tells the app to load your theme_legacy.res file instead of theme.res. Because of the "OverlayThemes" constant in your theme_legacy.res, Your app will automatically load the theme.res file’s styles over top of your legacy theme. The theme.res file will then be generated from your css/theme.css file, and kept in sync.
+This tells the app to load your theme_legacy.res file instead of theme.res. Because of the "OverlayThemes" constant in your theme_legacy.res, your app will automatically load the theme.res file’s styles over top of your legacy theme. The theme.res file will then be generated from your css/theme.css file, and kept in sync.
 ---
 
 ## Archived Comments

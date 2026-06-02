@@ -20,7 +20,7 @@ the side menu UI is perfect, but the folding aspect of it isn’t as great. We h
 it open all the time.  
 Unfortunately, the side menu implementation wasn’t very suited for such usage. With the `Toolbar` this became  
 much easier to implement in a generic way. Right now we hardcoded the side menu to the left, fixing it to work  
-for all sides would requite some effort. But its still pretty neat, just do something like this in your `init(Object)`  
+for all sides would require some effort. But it’s still pretty neat, just do something like this in your `init(Object)`  
 method and your code will implicitly adapt to tablets/desktops if you used the `Toolbar` API. 
     
     
@@ -31,7 +31,7 @@ method and your code will implicitly adapt to tablets/desktops if you used the `
 
 #### All Styles
 
-We recommend using the designer and UIID’s for styles but sometimes its just inconvenient or wrong. That’s why  
+We recommend using the designer and UIID’s for styles but sometimes it’s just inconvenient or wrong. That’s why  
 we allow things such as: 
     
     
@@ -119,7 +119,7 @@ I have the last part of the chat app tutorial practically ready. It was delayed 
 come out and then got delayed because of some bugs related to specific usage of the certificate wizard.  
 I’ll try to get this out next week or the week after that time permitting. 
 
-I’ve been working on some apps recently, most specifically I was building an app in my free time for my spouses  
+I’ve been working on some apps recently, most specifically I was building an app in my free time for my spouse’s  
 [Yoga Studio](http://www.ashtangayoga.co.il) and I’ve been playing with the excellent  
 [Parse cn1lib](https://github.com/sidiabale/parse4cn1) from Chidiebere Okwudire.  
 I was pleasantly surprised by how mature and solid it felt!  

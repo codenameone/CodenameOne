@@ -58,7 +58,7 @@ You can then just add an instance of each Test class to your TestRunnerComponent
         runner.showForm();
     }
 
-When you run the app, it will display a form with single button "Run Tests".
+When you run the app, it will display a form with a single button "Run Tests".
 
 ![](/blog/new-testrunner-component/new-testrunner-component-1-1.png)
 

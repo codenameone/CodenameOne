@@ -30,13 +30,13 @@ rather than build them into Codename One itself, the reasoning is two fold:
 
 2\. Since Maps are VERY complex we wanted to give developers the ability to customize the native code easily.
 
-Going forward we might introduce more and more extensions as cn1libs rather than as builtin functionality. There is one drawback we didn’t predict though, Googles Map API for iOS is 50mb in size which makes sending the builds pretty slow. This is solveable by changing the compression option in the project properties to compress the jar, it is still pretty large though.
+Going forward we might introduce more and more extensions as cn1libs rather than as builtin functionality. There is one drawback we didn’t predict though, Google's Map API for iOS is 50mb in size which makes sending the builds pretty slow. This is solveable by changing the compression option in the project properties to compress the jar, it is still pretty large though.
 
 To browse/checkout the code/demo-test for maps just go to the project page  
 [  
 here  
 ](https://github.com/codenameone/codenameone-google-maps)  
-. For simplicities sake you can just  
+. For simplicity's sake you can just  
 [  
 download the binary here  
 ](https://github.com/codenameone/codenameone-google-maps/raw/master/GoogleMaps.cn1lib)  
@@ -84,7 +84,7 @@ iOS
 
 Now that all of that is done you should be able to create a Map, add markers and paths:  
 
-At the time of this writing there are still issues with Maps some of which are pretty hard to resolve. Currently when poping a dialog over the Map it turns white on Android and we aren’t really sure why. There are some artifacts on iOS as well but those might not be fixable.  
+At the time of this writing there are still issues with Maps some of which are pretty hard to resolve. Currently when popping a dialog over the Map it turns white on Android and we aren’t really sure why. There are some artifacts on iOS as well but those might not be fixable.  
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 ---

@@ -42,7 +42,7 @@ Guaranteed!
 
 That means at least 24 additional modules beyond what we have on launch.
 
-Once every 3 months (once a quarter) we’ll build a complete application as a module. Based on the current vote results it seems that the first app will be an Uber clone. In the module I’ll implement the app and teach you how to build such an app. This means we’ll implement 8 additional apps in total over the next two years (in additional to the 2 already in the course) and I’ll teach you how to build each one of those apps.
+Once every 3 months (once a quarter) we’ll build a complete application as a module. Based on the current vote results it seems that the first app will be an Uber clone. In the module I’ll implement the app and teach you how to build such an app. This means we’ll implement 8 additional apps in total over the next two years (in addition to the 2 already in the course) and I’ll teach you how to build each one of those apps.
 
 I think this update commitment is crucial to keep the material fresh and up to date.
 
@@ -83,7 +83,7 @@ Yes. This is material that’s built specifically for these courses. Some of the
 
 ### Is there any time commitment like we had in the bootcamp?
 
-No. This is a standard course and you can take it at your leasure. Access to the course isn’t time limited.  
+No. This is a standard course and you can take it at your leisure. Access to the course isn’t time limited.  
 Teachable (who we use for our new course materials) used the term perpetual which I personally find "problematic" as I’m pretty sure access will not survive the Sun going supernova.
 
 Having said that, we plan to keep the course online as long as possible and ideally as long as it’s useful. We also guarantee new materials will be added to the courses over the next 2 years at least!

@@ -29,7 +29,7 @@ We can move it from one place to another but still interact with the underlying 
 
 It’s implemented as a `Container` placed into the layered pane of the current `Form` so the `Form` around it is "real". Because the `Form` is "live", layout works better. The removal of modality makes some edge cases related to editing slightly better. There are still some inherent problems with `Dialog` positioning and rotation though. It also allows you to click outside of the `Dialog` while input is ongoing which might be a desirable/undesirable effect for your use case.
 
-Overall I try to use dialogs only for very simple cases and avoid input in any `Dialog` when possible. If I use input I never use more than one field (e.g. no-username and password fields) so I won’t need to scroll. These things work badly for native UIs as well e.g. with the virtual keyboard obscuring the submit button etc. Since those behaviors are very hard to get right for all resolution/virtual keyboard scenarios.
+Overall I try to use dialogs only for very simple cases and avoid input in any `Dialog` when possible. If I use input I never use more than one field (e.g. username and password fields) so I won’t need to scroll. These things work badly for native UIs as well e.g. with the virtual keyboard obscuring the submit button etc. Since those behaviors are very hard to get right for all resolution/virtual keyboard scenarios.
 
 ---
 
