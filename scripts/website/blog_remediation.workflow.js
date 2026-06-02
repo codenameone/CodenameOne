@@ -22,8 +22,12 @@ HARD GUARDRAILS — violating any of these is a failure:
 - Fix ONLY unambiguous errors: clear typos (e.g. "apprently" -> "apparently"),
   doubled words ("the the" -> "the"), and clear grammar ("can sends" ->
   "can send", "This weeks update" -> "This week's update", "Steves" -> "Steve's").
+- The blog is AMERICAN English. Correct British spellings to American
+  (behaviour -> behavior, colour -> color, rasterisation -> rasterization,
+  centring -> centering, organise -> organize, artefact -> artifact). EXCEPTION:
+  if the post's front-matter "author:" is "Steve Hannah", his posts may use
+  British/Canadian spelling intentionally — SKIP British spellings in those.
 - DO NOT change, and SKIP, the following (they are NOT errors):
-  * British spellings (behaviour, colour, rasterisation, artefacts, …).
   * Proper names and handles, even if lowercased or unusual (leave them exactly).
   * Product/library names even if lowercased (braintree, sendgrid, builtin) —
     SKIP unless it is unmistakably a typo of a common word.
@@ -81,7 +85,7 @@ const results = await pipeline(
   (post) => agent(
     `You are correcting genuine prose errors in the AUTHOR's own writing of a Codename One blog post.\n\n` +
     `File: ${post.path}\n\n` +
-    `A linter flagged these candidate findings (many are false positives — names, British spellings, intentional style):\n` +
+    `A linter flagged these candidate findings (many are false positives — names, intentional style):\n` +
     JSON.stringify(post.findings, null, 1) + `\n\n` +
     `Read the file, then use the Edit tool to apply ONLY the high-confidence corrections.\n` +
     `The findings list above is a STARTING POINT, not exhaustive and full of false positives. ` +
@@ -105,7 +109,7 @@ const results = await pipeline(
     `Run: git diff -- ${post.path}   to see exactly what changed.\n\n` +
     `The fixer reported these edits:\n${JSON.stringify(fix?.edits ?? [], null, 1)}\n\n` +
     `Confirm ALL of the following, and set safe=false if ANY fails:\n` +
-    `- Every change fixes a genuine, unambiguous error (not a name, British spelling, product-name casing, "thru", or typography nit).\n` +
+    `- Every change fixes a genuine, unambiguous error (not a name, product-name casing, "thru", or typography nit). British->American spelling fixes ARE valid for this American-English blog, EXCEPT in posts authored by "Steve Hannah" (his British spellings must be left intact).\n` +
     `- Meaning and the author's voice are exactly preserved.\n` +
     `- Only intended changes are present (no stray edits).\n` +
     `- The YAML front matter, code, shortcodes, links, and any archived-comments/discussion section are untouched.\n` +

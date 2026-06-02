@@ -22,23 +22,12 @@ Blogger
 [Gg]iscus
 TestFlight
 
-# British English spellings — the blog is written in British English; flagging
-# these as "spelling mistakes" and "correcting" them would Americanize the
-# author's voice. Matched whole against the flagged word.
-[A-Za-z]+is(?:e|es|ed|ing|ation|able|ations)
-[A-Za-z]+isations?
-behaviours?
-colours?
-favou?rs?
-flavours?
-honours?
-neighbours?
-centr(?:e|es|ing|ed)
-metres?
-litres?
-artefacts?
-foldables?
-rasteris(?:e|ed|es|ing|ation)
+# NOTE: the blog is written in AMERICAN English (Shai Almog's posts and the
+# other contributors). Do NOT add British spellings here — LanguageTool runs as
+# en-US, so it SHOULD flag "behaviour"/"colour"/"rasterisation"/"centring"/etc.
+# as misspellings to be Americanized. (Steve Hannah's ~88 posts may use British
+# spellings; those existing posts are grandfathered by the net-new gate, so they
+# are not flagged unless edited.)
 
 # run_languagetool replaces inline code spans with the placeholder "X"; a
 # pluralized inline code span (`Foo`s) becomes "Xs". Accept the placeholder.
@@ -59,3 +48,4 @@ linejoin
 bbox
 wordmark
 googlemaps
+foldables?
