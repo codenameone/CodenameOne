@@ -73,10 +73,10 @@ Instead of stepping over you can just add multiple snapshots or even inject logs
 My immediate thought was "won’t this be expensive?".
   
   
-It isn’t. If we have a very complex/expensive expressions that prints too much per second or uses problematic (e.g. recursive) logic, Lightrun is smart enough to limit itself so the expression won’t take too much CPU. It protects you from shooting yourself in the foot…
+It isn’t. If we have a very complex/expensive expression that prints too much per second or uses problematic (e.g. recursive) logic, Lightrun is smart enough to limit itself so the expression won’t take too much CPU. It protects you from shooting yourself in the foot…
   
   
-As a result of that there’s no noticeable performance overhead and you can work without worrying. But I digress, lets go back to the push server example above.
+As a result of that there’s no noticeable performance overhead and you can work without worrying. But I digress, let’s go back to the push server example above.
 
 ## Unexpected Bug
 
@@ -147,7 +147,7 @@ The agent is typically installed on your server and not on your local machine. S
 
 The next step is to SSH to the machine and run the script. It creates an "agent" directory which we’ll use when binding the agent.
 
-The gist of this is that we need to add the `-agentpath` argument to the JVM. That’s very simple if your deployment has a "java" command invocation at some point but if your running as a service or within a container that might not be so simple.
+The gist of this is that we need to add the `-agentpath` argument to the JVM. That’s very simple if your deployment has a "java" command invocation at some point but if you’re running as a service or within a container that might not be so simple.
 
 Once you do that the "Next" option will be enabled and you would be able to use Lightrun.
 

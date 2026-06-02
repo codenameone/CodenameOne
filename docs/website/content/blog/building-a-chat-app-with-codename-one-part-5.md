@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/building-a-chat-app-with-codename-one-part-5/chat-app-tutorial-chat-form-5.png)
 
-The chat UI is what we’ve been working at and in todays post we are going to build exactly that!
+The chat UI is what we’ve been working at and in today’s post we are going to build exactly that!
 
 Even better…​ We’ll integrate with Pubnub to make the app almost fully functional as a rudimentary chat app, which  
 is pretty spectacular. In this section we’ll cover UI, storage (externalization), Pubnub & its JSON API…​ We’ll  
@@ -47,7 +47,7 @@ color to white `ffffff`:
 
 ![BubbleMe UIID step 1](/blog/building-a-chat-app-with-codename-one-part-5/chat-app-tutorial-chat-form-1.png)
 
-Then we need to set the padding for the speech bubble to the text won’t be on top of the speech arrow or the border  
+Then we need to set the padding for the speech bubble so the text won’t be on top of the speech arrow or the border  
 itself. We set the padding in millimeters to keep the design portable and set 3mm on the left side to leave room  
 for the arrow:
 

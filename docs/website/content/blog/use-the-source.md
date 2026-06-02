@@ -30,13 +30,13 @@ minor correction to the build process about the `build.xml` issue in the Codenam
   
   
   
-To me the biggest advantage in Codename One over pretty much any other mobile solution is that its realistically open source. Realistically means that even an average developer can dig into 90% of the Codename One source code, change it and contribute to it! 
+To me the biggest advantage in Codename One over pretty much any other mobile solution is that it's realistically open source. Realistically means that even an average developer can dig into 90% of the Codename One source code, change it and contribute to it! 
 
   
-However, sadly most developers don’t even try and most of those who do focus only on the aspect of building for devices rather than the advantage of much easier debugging. By incorporating the Codename One sources you can instantly see the effect of changes we made in SVN without waiting for a plugin update. You can, debug into Codename One code which can help you pinpoint issues in your own code and also in resolving issues in ours!  
+However, sadly most developers don’t even try and most of those who do focus only on the aspect of building for devices rather than the advantage of much easier debugging. By incorporating the Codename One sources you can instantly see the effect of changes we made in SVN without waiting for a plugin update. You can debug into Codename One code which can help you pinpoint issues in your own code and also in resolving issues in ours!  
 
   
-Its REALLY easy too!  
+It's REALLY easy too!  
 
   
 Start by  
@@ -59,9 +59,7 @@ Now that you have the sources open the CodenameOne project that is in the root a
 that these projects might be marked in red and you will probably need to right click on them and select Resolve Reference Problems. You will probably need to fix the JDK settings, and the libraries to point at the correct local paths.  
   
   
-Once you do that you can build bot  
-  
-h projects without a problem. Notice that you will probably get a minor compilation error due to a `build.xml` line in the Codename One project, don’t fret. Just edit that line and comment it out.  
+Once you do that you can build both projects without a problem. Notice that you will probably get a minor compilation error due to a `build.xml` line in the Codename One project, don’t fret. Just edit that line and comment it out.  
 
 * * *
 

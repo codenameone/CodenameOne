@@ -23,9 +23,9 @@ The reason for that is `callSerially()`. When we have code that invokes `callSer
             at com.codename1.ui.RunnableWrapper.run(RunnableWrapper.java:120)
             at com.codename1.impl.CodenameOneThread.run(CodenameOneThread.java:176)
 
-For most cases you can just fix line 400 of `MyClass` so it won’t throw an exception but you might be hiding a worse bug. Lets say that line fails because it expects a specific condition to exist in the app and that condition isn’t met. A good example for this would be logged in users. Lets say your app expects the user to be logged in before `myMethod` is invoked but for some reason he isn’t.
+For most cases you can just fix line 400 of `MyClass` so it won’t throw an exception but you might be hiding a worse bug. Let’s say that line fails because it expects a specific condition to exist in the app and that condition isn’t met. A good example for this would be logged in users. Let’s say your app expects the user to be logged in before `myMethod` is invoked but for some reason he isn’t.
 
-That means the real bug occurred elsewhere probably in the area of code where `callSerially() → myClass.myMethod(;` was called. Lets say you looked over the entire body of code and you have suspects but can’t tell which part is at fault. Narrowing this down would help…​
+That means the real bug occurred elsewhere probably in the area of code where `callSerially() → myClass.myMethod(;` was called. Let’s say you looked over the entire body of code and you have suspects but can’t tell which part is at fault. Narrowing this down would help…​
 
 That’s where `Display.setEnableAsyncStackTraces()` comes in. When set to true it creates a "fake" exception for every `callSerially` if there’s a "real" exception thrown within the `callSerially` it uses this "fake" one as the cause. That means you will be able to see the cause for a specific bug when this is enabled.
 

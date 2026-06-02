@@ -25,7 +25,7 @@ Support for JAR files in Codename One has been a source of confusion despite
 [  
 my previous post on the matter  
 ](http://www.codenameone.com/3/post/2013/02/new-preliminary-library-support.html)  
-so its probably a good idea to revisit this subject again and clarify all the details. 
+so it’s probably a good idea to revisit this subject again and clarify all the details. 
 
   
 The first source of confusion is changing the classpath. You should  
@@ -52,13 +52,13 @@ CN1Lib’s
   
   
   
-Lets start with modularity since its simpler and you can pretty much read  
+Let’s start with modularity since it’s simpler and you can pretty much read  
 [  
 my previous post on the matter  
 ](http://www.codenameone.com/3/post/2013/02/new-preliminary-library-support.html)  
 which covers it pretty accurately.  
   
-You can create a cn1lib in NetBeans although its really just a simple ant project with some special targets and a simple ant task for stubbing. In it you can write all your source code (including native code and libs as described below), when you build the file you will get a cn1lib file that you can place in your projects lib directory.  
+You can create a cn1lib in NetBeans although it’s really just a simple ant project with some special targets and a simple ant task for stubbing. In it you can write all your source code (including native code and libs as described below), when you build the file you will get a cn1lib file that you can place in your projects lib directory.  
 
   
 After a right click and refresh project libs completion will be available for you and you will be able to work as if the code was a part of your project.  

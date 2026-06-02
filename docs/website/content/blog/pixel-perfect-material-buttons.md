@@ -73,7 +73,7 @@ So both iOS and Android use a "flat" button by default and we should align based
 
 ### Action Items
 
-The theme for Android and iOS is current implemented within the resource files here: <https://github.com/codenameone/CodenameOne/tree/master/Themes>
+The theme for Android and iOS is currently implemented within the resource files here: <https://github.com/codenameone/CodenameOne/tree/master/Themes>
 
 Android uses the holo theme whereas iOS uses the iOS 7 theme. We need to update these files with improved fonts and new designs. This might be a problem for developers who relied on the older theme behavior but these changes should be done to keep the platform moving forward.
 

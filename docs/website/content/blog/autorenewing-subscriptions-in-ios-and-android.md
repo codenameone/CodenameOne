@@ -16,7 +16,7 @@ __ |  This is the third post in a three-part series on In-App purchase. Please c
   
 Auto-renewable subscriptions provide, arguably, an easier path to recurring revenue than non-renewable subscriptions because all of the subscription stuff is handled by the app store. You defer almost entirely to the app store (iTunes for iOS, and Play for Android) for billing and management.
 
-If there is a down-side, it would be that you are also subject to the rules of each app store – and they take their cut of the revenue. On iOS, you keep 70% of the revenue for the first year of a subscription. This increases to 85% after the first year. Google also let’s you keep 70% of the revenue on subscriptions. I read a number of news articles from June 2016, stating that they [planned to increase this to 85%](http://www.androidauthority.com/devs-to-keep-85-percent-of-subscription-payments-697528/) to match Apple but I haven’t been able to find any corroborating information on the Play site itself, so at the time of writing, it appears that they are still on the 70/30 split model.
+If there is a down-side, it would be that you are also subject to the rules of each app store – and they take their cut of the revenue. On iOS, you keep 70% of the revenue for the first year of a subscription. This increases to 85% after the first year. Google also lets you keep 70% of the revenue on subscriptions. I read a number of news articles from June 2016, stating that they [planned to increase this to 85%](http://www.androidauthority.com/devs-to-keep-85-percent-of-subscription-payments-697528/) to match Apple but I haven’t been able to find any corroborating information on the Play site itself, so at the time of writing, it appears that they are still on the 70/30 split model.
 
   1. For more information about Apple’s auto-renewable subscription features and rules see [this document](https://developer.apple.com/app-store/subscriptions/).
 
@@ -30,7 +30,7 @@ I recommend [this blog post](https://marco.org/2013/12/02/auto-renewable-subscri
 
 ## Learning By Example
 
-The remainder of this post describes the general workflow of subscription management on the server. It also demonstrates how use Apple’s and Google’s web services to validate receipts and stay informed of important events (such as when users cancel or renew their subscriptions).
+The remainder of this post describes the general workflow of subscription management on the server. It also demonstrates how to use Apple’s and Google’s web services to validate receipts and stay informed of important events (such as when users cancel or renew their subscriptions).
 
 ## Building the IAP Demo Project
 
@@ -126,7 +126,7 @@ Upon completion, the app will submit the purchase to your server, and if all wen
 __ |  This project is set up to use an expedited expiry date schedule for purchases from the simulator. 1 month = 5 minutes. 3 months = 15 minutes. This helps for testing. That is why your expiry date may be different than expected.   
 ---|---  
   
-Just to verify that the receipt was inserted correctly, you should check the contents of your "RECEIPTS" table in your database. In Netbeans, I can do this easily from the "Services" pane. Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select "View Data". This will open a data table similar the the following:
+Just to verify that the receipt was inserted correctly, you should check the contents of your "RECEIPTS" table in your database. In Netbeans, I can do this easily from the "Services" pane. Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select "View Data". This will open a data table similar to the following:
 
 ![Receipts table after insertion](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-view-table-data.png)
 
@@ -573,7 +573,7 @@ __ |  The following steps assume that you have already created your app in Googl
   
 Steps:
 
-  1. Open the [Google API Developer Console](https://console.developers.google.com/apis), and select your App from the the menu.
+  1. Open the [Google API Developer Console](https://console.developers.google.com/apis), and select your App from the menu.
 
   2. Click on the "Library" menu item in the left menu, and then click the "Google Play Developer API" link.
 

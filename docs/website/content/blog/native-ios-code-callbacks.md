@@ -52,7 +52,7 @@ com_mycompany_NativeCallback_callback___int(intValue);
   
 com_mycompany_NativeCallback_callback___int(CN1_THREAD_GET_STATE_PASS_ARG intValue);
 
-Notice that there is no comma between the CN1_THREAD_GET_STATE_PASS_ARG and the value! This is important since under XMLVM CN1_THREAD_GET_STATE_PASS_ARG is defined as nothing, yet under the new VM it will include the necessary comma. Its not an ideal solution but it solves the portability issue as we slowly migrate to the new VM.
+Notice that there is no comma between the CN1_THREAD_GET_STATE_PASS_ARG and the value! This is important since under XMLVM CN1_THREAD_GET_STATE_PASS_ARG is defined as nothing, yet under the new VM it will include the necessary comma. It's not an ideal solution but it solves the portability issue as we slowly migrate to the new VM.
 
 Many of you have been passing string values to the Java side, or really NSString* which is iOS equivalent. So assuming a method like this: `public static void callback(String arg)`
 

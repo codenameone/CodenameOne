@@ -33,7 +33,7 @@ One key goal for this iteration of the designer was to make it more accessible t
 
 Indeed absolute positioning in a mobile application is not practical. Our solution is "relative" positioning. We have beefed up the layered layout manager to support insets and inter-component references, and we have added the ability to manipulate the layout using familiar drag-and-drop GUI designer controls.
 
-For example, if you drag a button down to the bottom corner of the form, the designer doesn’t save the absolute X,Y coordinate for the button. If saves the insets (distance) from that bottom corner. That way, at runtime, the button will always be rendered appropriately in the bottom corner no matter what the device dimensions are.
+For example, if you drag a button down to the bottom corner of the form, the designer doesn’t save the absolute X,Y coordinate for the button. It saves the insets (distance) from that bottom corner. That way, at runtime, the button will always be rendered appropriately in the bottom corner no matter what the device dimensions are.
 
 Going a step further, if you then drag a text field just to the left of the button, the designer will record the text field’s insets relative to the button so that it will lay out properly still even as the device is resized.
 
@@ -193,7 +193,7 @@ Let’s take a closer look at the inset control (the inset controls are the blac
 
 Each control has three sections:
 
-  1. **The inset value drop-down menu**. This shows the current value of the inset (e.g. 0mm, 25%, auto, etc…​). If you click on this, it will open a menu that will allow you to change the units. If the inset is currently in millimetres, it will have options for pixels, and percent. If the inset is in percent, it will have options for pixels and millimetres. Etc.. It also includes a text field to enter a an inset value explicitly.
+  1. **The inset value drop-down menu**. This shows the current value of the inset (e.g. 0mm, 25%, auto, etc…​). If you click on this, it will open a menu that will allow you to change the units. If the inset is currently in millimetres, it will have options for pixels, and percent. If the inset is in percent, it will have options for pixels and millimetres. Etc.. It also includes a text field to enter an inset value explicitly.
 
 ![Inset drop-down menu](/blog/gui-builder-improvements-3-7/guibuilder-2-insets-dropdown-menu.png)
 
@@ -245,7 +245,7 @@ Drag the button (that was previously on the form) over that container, and you s
 
 ![Dropping container on child container with box layout y](/blog/gui-builder-improvements-3-7/guibuilder-2-subcontainer-add-child.png)
 
-You can drop the button directly there. You can As you drag more components into the sub-container, you’ll see them automatically laid out vertically.
+You can drop the button directly there. As you drag more components into the sub-container, you’ll see them automatically laid out vertically.
 
 ![Box Layout Y dropping 2nd child](/blog/gui-builder-improvements-3-7/guibuilder-2-subcontainer-add-child-2.png)
 

@@ -27,7 +27,7 @@ This means we need a new API that will encapsulate the text component and the la
 
 ### TextComponent & TextModeLayout
 
-Let’s start with the end of last weeks post:
+Let’s start with the end of last week’s post:
 
 ![Final result](/blog/pixel-perfect-text-input-part-2/pixel-perfect-text-field-android-codenameone-font.png)
 
@@ -156,7 +156,7 @@ The underlying system is the `errorMessage` method which you can chain like the 
 
 ### InputComponent & PickerComponent
 
-To keep things simple I focused on the the `TextComponent` but after the initial commit we decided to move to a more flexible system where other component types could be laid out in a similar way to maintain consistency with Android/iOS.
+To keep things simple I focused on the `TextComponent` but after the initial commit we decided to move to a more flexible system where other component types could be laid out in a similar way to maintain consistency with Android/iOS.
 
 To keep the code common and generic we use the `InputComponent` abstract base class and derive the other classes from that. `PickerComponent` is currently the only other option. We considered options such as `CheckBox` or `OnOffSwitch` but both are problematic in some ways so we’d like to give them a bit more thought.
 

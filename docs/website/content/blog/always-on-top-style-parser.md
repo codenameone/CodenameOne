@@ -29,7 +29,7 @@ You can use this from code and might find some pretty cool hacks for it but this
 
 Figure 1. Style customization from within the GUI builder
 
-This is a new feature so some things might now work for the 3.7.3 release. Please let us know in the [issue tracker](http://github.com/codenameone/CodenameOne/issues/)
+This is a new feature so some things might not work for the 3.7.3 release. Please let us know in the [issue tracker](http://github.com/codenameone/CodenameOne/issues/)
 
 __ |  In the current version there is a bug that might require you to close and reopen the UI for the styling to work   
 ---|---  

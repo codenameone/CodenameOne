@@ -31,7 +31,7 @@ Updated:
 **  
 Originally this article referred to a system based on Display.setProperty for distinguishing consumable types. This turned out to be an issue in beta testing and was replaced with either a naming convention or build argument. 
 
-Google announced a couple of weeks ago that Android’s In App Purchase 2.x API will be retired soon and all code should be migrated to version 3.0 of the API. Unfortunately version 3.0 is a big departure from version 2.0 which we currently support and its difficult for us to support both so unlike the normal case where we try to maintain compatibility with build arguments we will make a clean break to 3.0.
+Google announced a couple of weeks ago that Android’s In App Purchase 2.x API will be retired soon and all code should be migrated to version 3.0 of the API. Unfortunately version 3.0 is a big departure from version 2.0 which we currently support and it's difficult for us to support both so unlike the normal case where we try to maintain compatibility with build arguments we will make a clean break to 3.0.
 
 Important: if you have a project that relies on in-app-purchase and you are about to make a release we will flip the switch in one week from now! This means that you will have to migrate version 3.0 if you build a version next week, so if you have a release pending you might want to get it out ASAP.
 

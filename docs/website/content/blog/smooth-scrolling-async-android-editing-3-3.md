@@ -34,7 +34,7 @@ smoothness on newer Android devices is spectacular. Unfortunately, we haven’t 
 scrolling behavior was something we designed at Sun based on guesses of how the iPhone scrolling acts. These  
 guesses weren’t as good as some of the newer attempts in this field. 
 
-We are attacking this in several ways. Steve wrote a completely new scrollng motion model that feels more native  
+We are attacking this in several ways. Steve wrote a completely new scrolling motion model that feels more native  
 and is based on some studies of these algorithms done over the past 8 years. It feels much better than the previous  
 friction motion and is currently on by default for all new builds and the new version of the simulator. If you  
 still want the old version to work you can still access that using the theme constant `ScrollMotion=Friction`. 
@@ -49,7 +49,7 @@ We’re still working on a major refactoring here and two of the victims are `De
 Both of these classes had larger roles to play in LWUIT but as we moved to Codename One and matured the  
 theme system they became mostly redundant. Unfortunately, they contain a lot of functionality some of which  
 we intend to keep.   
-We decided to to deprecate both of these classes to get started in this long term migration. However, some  
+We decided to deprecate both of these classes to get started in this long term migration. However, some  
 complex functionality such as deriving and overriding these classes will no longer work in upcoming builds! 
 
 The reason for this is simple, we are moving a lot of the paint work into the core OS porting layer which will allow us  

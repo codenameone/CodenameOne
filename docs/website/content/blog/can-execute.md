@@ -37,7 +37,7 @@ canOpenURL followed by openURL assuming the can message returned true. However, 
   
   
   
-2\. Boolean.FALSE – the URL can be executed.  
+2\. Boolean.FALSE – the URL cannot be executed.  
   
   
 3\. null – we have no idea whether this will work on this platform.  

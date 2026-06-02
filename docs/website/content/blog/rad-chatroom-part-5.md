@@ -17,7 +17,7 @@ This is part 5 of the RAD Chatroom tutorial. You can find part 1 [here](/blog/ra
 
 Most messaging applications include the ability to add photos to messages. Let’s add this feature to our chat app now.
 
-First we’ll define a new action called "capturePhoto", and add to the the `TEXT_ACTIONS` category of our view node.
+First we’ll define a new action called "capturePhoto", and add to the `TEXT_ACTIONS` category of our view node.
     
     
     public static final ActionNode capturePhoto = action(
@@ -37,7 +37,7 @@ First we’ll define a new action called "capturePhoto", and add to the the `TEX
 __**1** | Added capturePhoto action to the TEXT_ACTIONS category so that it will appear as a button beside the text field.  
 ---|---  
   
-And we’ll also add a handler for this action, which will capture a photo, and emed the photo in a message that we will add to the chat room’s view model.
+And we’ll also add a handler for this action, which will capture a photo, and embed the photo in a message that we will add to the chat room’s view model.
     
     
     addActionListener(capturePhoto, evt->{
@@ -84,7 +84,7 @@ Now, let’s fire the chat up again and take it for a test drive.
 
 Figure 1. The capturePhoto action is rendered as a button beside the input text field
 
-You should now be able to click on the "capture photo" button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the devices camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
+You should now be able to click on the "capture photo" button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the device's camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
 
 ![Photo appears in chat after capture](/blog/rad-chatroom-part-5/rad-chat-room-24.png)
 
@@ -92,7 +92,7 @@ Figure 2. Photo appears in chat after capture
 
 ### Linking to a Back-end Chat Server
 
-In this tutorial we created a mock chat application in order to demostrate the ChatRoomView, which is a user interface component. It did not include any integration with a server so it doesn’t allow you to actually chat with other people. Linking to a server is not difficult, and the MVC architecture of this example should make it very clear how the integration should occur. I’ll leave this integration as an exercise for the reader. As a starting point, I recommend checking out the [cn1-websockets](https://github.com/shannah/cn1-websockets) library, and its chat demo.
+In this tutorial we created a mock chat application in order to demonstrate the ChatRoomView, which is a user interface component. It did not include any integration with a server so it doesn’t allow you to actually chat with other people. Linking to a server is not difficult, and the MVC architecture of this example should make it very clear how the integration should occur. I’ll leave this integration as an exercise for the reader. As a starting point, I recommend checking out the [cn1-websockets](https://github.com/shannah/cn1-websockets) library, and its chat demo.
 ---
 
 ## Archived Comments

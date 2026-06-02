@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-customize-tabs-behavior/tip.jpg)
 
-The `Tabs` component isn’t our first attempt at the the multi-tab UI and as such we made a lot of changes to the logic to facilitate a level of flexibility that can answer most use cases e.g. Tabs that can be closed with an X on the top right section or span multiple rows.
+The `Tabs` component isn’t our first attempt at the multi-tab UI and as such we made a lot of changes to the logic to facilitate a level of flexibility that can answer most use cases e.g. Tabs that can be closed with an X on the top right section or span multiple rows.
 
 Most developers are oblivious to this capability which is a shame, it is indeed a bit obscure. The code below demonstrates multi-line tabs:
     

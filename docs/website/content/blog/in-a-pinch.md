@@ -55,13 +55,11 @@ Image Locking
   
   
   
-Once of the big performance improvements we got in swiping was through image locking, unfortunately this is so unclear in our current docs that when Nokia forked LWUIT they actually removed the usage of EncodedImage instead of fixing a minor locking bug.  
+One of the big performance improvements we got in swiping was through image locking, unfortunately this is so unclear in our current docs that when Nokia forked LWUIT they actually removed the usage of EncodedImage instead of fixing a minor locking bug.  
   
   
   
-To understand locking we first need to understand EncodedImage. EncodedImage stores the data of the image in RAM (png or JPEG data) which is normally pretty small, unlike the full decoded image which can take up to width X height X 4. When a user tries to draw an encoded image we check a WeakReference cache and if the image is cached then we show it otherwise w  
-  
-e load the image, cache it then draw.
+To understand locking we first need to understand EncodedImage. EncodedImage stores the data of the image in RAM (png or JPEG data) which is normally pretty small, unlike the full decoded image which can take up to width X height X 4. When a user tries to draw an encoded image we check a WeakReference cache and if the image is cached then we show it otherwise we load the image, cache it then draw.
 
   
 Naturally loading the image is more expensive so we want the images that are showing to stay in cache (otherwise GC will thrash a lot).  

@@ -54,7 +54,7 @@ You can download his source code
 here  
 ](https://code.google.com/p/dropbox-codenameone-sdk/)  
   
-its a Codename One Library project so you just compile it in NetBeans then add it to the lib directory of either Eclipse or NetBeans. Then right click the project  
+it's a Codename One Library project so you just compile it in NetBeans then add it to the lib directory of either Eclipse or NetBeans. Then right click the project  
   
 and press refresh libs and it should "just work".  
   

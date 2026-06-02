@@ -28,7 +28,7 @@ There are generally 4 classifications for products:
 
   2. **Consumable Product** – This is a product that the user can purchase multiple times. E.g. You might have a product for "10 Credits" that allow the user to buy things in a game.
 
-  3. **Non-Renewable Subscription** – A subscription that is purchased once, and will not be "auto-renewed" by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all of the user’s devices. This means that non-renewable subscriptions require that you have a server server to keep track of the subscriptions.
+  3. **Non-Renewable Subscription** – A subscription that is purchased once, and will not be "auto-renewed" by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all of the user’s devices. This means that non-renewable subscriptions require that you have a server to keep track of the subscriptions.
 
   4. **Renewable Subscriptions** – A subscription that is completely managed by the app store. The user will be automatically billed when the subscription period ends, and the subscription will be renewed.
 

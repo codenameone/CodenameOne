@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/bottom-align/new-features-2.jpg)
 
-Box layout Y is one of the most used layouts in Codename One. It’s a wonderful, easy to use layout that makes vertical scrollable layout trivial. I love its simplicity, but sometimes that simplicity goes too far. A good example of that is the a common layout where we have a button at the bottom of the screen.
+Box layout Y is one of the most used layouts in Codename One. It’s a wonderful, easy to use layout that makes vertical scrollable layout trivial. I love its simplicity, but sometimes that simplicity goes too far. A good example of that is the common layout where we have a button at the bottom of the screen.
 
 Historically we solved this by nesting box into a border layout:
     
@@ -56,7 +56,7 @@ Figure 3. After adding a lot of elements it looks like this
 
 Now this might be what you want. The add button is always clearly visible and easily accessible. However, in some cases this doesn’t work.
 
-Lets say you want this exact behavior like we see in the first two images. But once we reach the edge of the form you want the button to act as if this was a regular box layout. Effectively the button would either align to the bottom of the form or the edge of the layout.
+Let's say you want this exact behavior like we see in the first two images. But once we reach the edge of the form you want the button to act as if this was a regular box layout. Effectively the button would either align to the bottom of the form or the edge of the layout.
 
 To accomplish this we are adding a new `yLast` mode in the `BoxLayout` which can be created using `BoxLayout.yLast()` or `new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST)`. E.g the code below will produce the exact same result for the first two images:
     

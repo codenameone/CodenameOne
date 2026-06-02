@@ -128,7 +128,7 @@ This will install the command at `./node_modules/.bin/cn1`
 
 ### Screencast
 
-I’ve create a short screencast demonstrating the use of the `cn1 git-clone` command.
+I’ve created a short screencast demonstrating the use of the `cn1 git-clone` command.
 ---
 
 ## Archived Comments

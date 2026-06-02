@@ -23,7 +23,7 @@ which proposes tutorials for the French-speaking community.
 
 * * *
 
-While investigating the possibilities within Codename One, I made a discovery that I would like to share with you via this short article. But first lets discuss SalesForce, it is a CRM platform. Which has an advantage of an open Web Service API enabling it for use with Codename One. 
+While investigating the possibilities within Codename One, I made a discovery that I would like to share with you via this short article. But first let's discuss SalesForce, it is a CRM platform. Which has an advantage of an open Web Service API enabling it for use with Codename One. 
 
 **  
 This is an ideal combination that provides simple and effective customer management on all mobile devices.  
@@ -38,7 +38,7 @@ This is an ideal combination that provides simple and effective customer managem
 ![Picture](/blog/combining-salesforce-and-codename-one/combining-salesforce-and-codename-one-1.jpg)  
 ](http://www.salesforce.com/)
 
-SalesForce is a CRM (Customer Relationship Management) platform that is fully hosted in the cloud, as indicated by it’s logo. SalesForce (SFDC) is a leader in sales management tools, it provides a complete and evolutionary system. Many tools are available and configurable in a simple and efficient way to manage all the essential information about the sales activity. In addition, the platform is fully integrated with communication tools, social networking and instant messaging. 
+SalesForce is a CRM (Customer Relationship Management) platform that is fully hosted in the cloud, as indicated by its logo. SalesForce (SFDC) is a leader in sales management tools, it provides a complete and evolutionary system. Many tools are available and configurable in a simple and efficient way to manage all the essential information about the sales activity. In addition, the platform is fully integrated with communication tools, social networking and instant messaging. 
 
 * * *
 
@@ -46,7 +46,7 @@ SalesForce is a CRM (Customer Relationship Management) platform that is fully ho
 ![Picture](/blog/combining-salesforce-and-codename-one/combining-salesforce-and-codename-one-2.png)  
 ](/img/blog/old_posts/combining-salesforce-and-codename-one-large-4.png)
 
-Once You connect the SalesForce interface, you can easily add standard data: Users, Accounts, Products, Contacts, etc. Everything is added via forms based interface, If you wish, you can also add new fields to the Available Objects or create new ones from scratch. 
+Once you connect the SalesForce interface, you can easily add standard data: Users, Accounts, Products, Contacts, etc. Everything is added via forms based interface, If you wish, you can also add new fields to the Available Objects or create new ones from scratch. 
 
 SalesForce can therefore easily form a set of custom data hosted in the Cloud. More importantly for mobile development, the SFDC platform offers several communication API’s allowing third party applications access to its data (SOAP, Bulk or REST). 
 

@@ -12,12 +12,12 @@ author: Shai Almog
 ![Header Image](/blog/alphabet-scroll/alphabet-scroll.png)
 
 We got a lot of requests from developers over the years to do an iOS style alphabet side scroll. Some developers  
-implements such scrolling but no one made it generic or contributed it back. So a recent stack overflow question  
+implemented such scrolling but no one made it generic or contributed it back. So a recent stack overflow question  
 got me thinking about how easy it would be to actually implement something like that and I decided to try…​
 
 I ended up building this in 10 minutes and the concept is remarkably simple. I have two containers, one contains  
 the list of the people and the other one contains the letters used for these people. Notice that I chose to only use  
-letters that used in the names, I could have just hardcoded the English alphabet but chose to avoid that as this  
+letters that are used in the names, I could have just hardcoded the English alphabet but chose to avoid that as this  
 would break for internationalization and include letters that might not be common in such cases such as ‘Z’.
 
 Thanks to the usage of layered layout the containers just appear on top of one another, notice that in the sample  

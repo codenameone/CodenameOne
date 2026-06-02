@@ -265,7 +265,7 @@ A few smaller fixes in this update are worth mentioning too:
 
 ## Closing Thoughts
 
-Thanks to those who took the time to annotate the issues that they found important in the issue tracker. Despite adding new RFEs this week were still able to reduce the issue count to 499, which is fantastic. 
+Thanks to those who took the time to annotate the issues that they found important in the issue tracker. Despite adding new RFEs this week we were still able to reduce the issue count to 499, which is fantastic. 
 
 If you submitted an issue in the past, please go to the [issue tracker](https://github.com/codenameone/CodenameOne/issues) and filter based on your account. Make sure that all your issues are still applicable. Close what's irrelevant and comment on what isn't. We're doing that work ourselves, and it's a slow-tedious task.
 

@@ -48,7 +48,7 @@ We’ll install both into our database with the following commands.
     $ mysql -u root -p < sakila-schema.sql
     $ mysql -u root -p < sakila-data.sql
 
-Once these have executed, you should be able to log into mysql and see see the tables listed:
+Once these have executed, you should be able to log into mysql and see the tables listed:
     
     
     $mysql -u root -p
@@ -145,7 +145,7 @@ Next it will ask us which tables to include in the main menu. This is only used 
     ? List the tables that should be included in the main menu in the form: table1=L
     abel1,table2=Label2, etc... customer=Customers
 
-Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow to decide exactly who can access what. This generator will setup the the default table-based authentication and add a "users" table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
+Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow you to decide exactly who can access what. This generator will setup the default table-based authentication and add a "users" table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
 
   1. ADMIN
 
@@ -185,7 +185,7 @@ At this point it will create the "sakila" directory and set up some of the scaff
     Copying .htaccess file
     Copying .htaccess file to templates_c
 
-Now it will ask us about modifications that need to be made to the databse.
+Now it will ask us about modifications that need to be made to the database.
     
     
     ? Create the database sakila now? No

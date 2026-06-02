@@ -44,7 +44,7 @@ installing the android build of the app, should be an easy task, right?
   
   
   
-Wrong again. Spent a couple of hours understanding the process of converting the .apk to a .bar file and then the signing process. Finally I, got a valid .bar file and installing it wasn’t hard. The app was finally running in the emulator and I got a tingling happy feeling all over.  
+Wrong again. Spent a couple of hours understanding the process of converting the .apk to a .bar file and then the signing process. Finally I got a valid .bar file and installing it wasn’t hard. The app was finally running in the emulator and I got a tingling happy feeling all over.  
   
   
   
@@ -68,7 +68,7 @@ Some more googling and I came to the conclusion that the only way to debug this 
 
   
   
-Well a few days past and I got myself a limited edition z10 device (thanks to  
+Well a few days passed and I got myself a limited edition z10 device (thanks to  
 [  
 Shai Ifrach  
 ](https://twitter.com/future_soft/)  

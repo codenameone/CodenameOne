@@ -192,7 +192,7 @@ Matthew
 ](https://twitter.com/matthewmccull)  
 ‘s GIT on NetBeans Hands On Lab. I am not a fan of Hand On Labs and rarely take them (I never liked sitting in classrooms), I went simply because I was so impressed by Matthew following his JavaZone talk and wanted to see more. Matthew is indeed as great a teacher as he is a speaker, he was very interactive and I feel I understand GIT better now. If you happen to see his name at a conference you are attending I highly recommend you check it out, I think its always a good policy to just go to sessions with good speakers. Even if the subject isn’t interesting to you right now you can learn so much.   
   
-In the past we had a lot of issues with GIT especially for Chen who is using Windows where the GIT GUI support isn’t as good as the SVN integration. I’m assuming some of this got fixed and it also seems we used GIT somewhat like Teamware (the gradfather of GIT) which I always loved and Chen really hates with a vengeance. Maybe its time to switch back to github, I love their UI and a lot of the things about it. I wonder how easy it would be to migrate a Google code project (probably should have asked Matthew).
+In the past we had a lot of issues with GIT especially for Chen who is using Windows where the GIT GUI support isn’t as good as the SVN integration. I’m assuming some of this got fixed and it also seems we used GIT somewhat like Teamware (the grandfather of GIT) which I always loved and Chen really hates with a vengeance. Maybe its time to switch back to github, I love their UI and a lot of the things about it. I wonder how easy it would be to migrate a Google code project (probably should have asked Matthew).
 
   
   

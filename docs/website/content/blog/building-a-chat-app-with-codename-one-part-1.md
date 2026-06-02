@@ -35,7 +35,7 @@ Next you will need to save [this image](/files/social-chat-tutorial-image.jpg) t
 
 ## Login UI
 
-Now that we have all the rest in order its time to launch the designer by double clicking the theme file. In the designer  
+Now that we have all the rest in order it's time to launch the designer by double clicking the theme file. In the designer  
 we need to click the `Images→Quick Add Multi Images` option, then select the [image you downloaded to the disk](/files/social-chat-tutorial-image.jpg).
 
 When prompted leave the default of `Very High`, this will effectively create a multi image which stores the image  
@@ -60,7 +60,7 @@ Add another UIID called Padding so we can space the buttons away from the sides/
   * In the color tab uncheck the `Derive Transparency` and set the value to 0. This will make the container invisible.
 
   * In the padding section uncheck `derive` and enter 2 millimeters for all entries except for the bottom where we need 8 millimeters for extra spacing.  
-This will space out the various pieces, its important to use millimeters otherwise the result will be too different on various devices based  
+This will space out the various pieces, it's important to use millimeters otherwise the result will be too different on various devices based  
 on their density.
 
 ![MainForm UIID Styling](/blog/building-a-chat-app-with-codename-one-part-1/chat-app-tutorial-part5.png)

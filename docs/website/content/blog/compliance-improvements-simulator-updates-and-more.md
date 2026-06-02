@@ -64,7 +64,7 @@ This is a small change, but it improves the out-of-the-box experience in a very 
 
 ### Multiline `TextArea` Supports Vertical Centering
 
-Vertical alignment wasn't for multiline rendering in `TextArea` wasn't supported for a long time. We now support centering both horizontally and vertically of multiline texts.
+Vertical alignment for multiline rendering in `TextArea` wasn't supported for a long time. We now support centering both horizontally and vertically of multiline texts.
 
 ### Android Video Thumbnail Workaround
 

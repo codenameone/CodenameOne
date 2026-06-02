@@ -14,7 +14,7 @@ author: Shai Almog
 I’ve been following the news breaking since yesterday as  
 [a hacker news post](https://news.ycombinator.com/item?id=10803775)  
 highlighted that an Android commit included OpenJDK files. This is amazing news and a huge step forward  
-for Java, its still unclear if this is just another move or the inkling of a settlement between Google and  
+for Java, it's still unclear if this is just another move or the inkling of a settlement between Google and  
 Oracle but I’m very hopeful that this is indeed a settlement. So far Google wouldn’t comment on the  
 court case and [  
 whether it was settled since its still ongoing.](http://venturebeat.com/2015/12/29/google-confirms-next-android-version-wont-use-oracles-proprietary-java-apis/)  
@@ -54,7 +54,7 @@ The claim is about copyrighting the API, that’s a problematic claim since Goog
 of the public API’s. The supreme court effectively said that clean room implementations of public API’s are  
 illegal! 
 
-That’s a pretty bad thing since copyright is implicit. Its owned even if the person publishing the material doesn’t  
+That’s a pretty bad thing since copyright is implicit. It's owned even if the person publishing the material doesn’t  
 explicitly write that little (c) you see next to various types of work. So if you ever implemented an API you are  
 now effectively using copyrighted code! 
 
@@ -84,7 +84,7 @@ While Java compatibility is important and Google did do some damage there (not a
 still), this wasn’t the reason for the case.  
 The lawsuit originally mentioned a 6bn USD figure for compensation and Google was willing to pay 100M USD  
 to settle… This was like most lawsuits are about money.  
-Its not necessarily bad to sue about money but this clearly cost more than it should have for both sides as  
+It's not necessarily bad to sue about money but this clearly cost more than it should have for both sides as  
 it hurt Java in the market and that hurt two of its biggest users (Oracle & Google). Sun used to make  
 a per device license fee for every J2ME phone sold, that was a huge bucket of money. I think Sun lost  
 that revenue stream because it just neglected to update J2ME for more than a decade and when it finally did it  
@@ -125,7 +125,7 @@ For those we will be able to use something like retrolambda like we do in Codena
 Right now we tried to avoid OpenJDK code as much as possible with the same basic thought pattern Google  
 took of using a clean room implementation to protect ourselves from future IP claims.  
 We are following this closely, if this happens we’ll align ourselves to be compliant with CLDC 8 which is  
-a valid Java 8 subset. This shouldn’t require much works as we are already 50% there and  
+a valid Java 8 subset. This shouldn’t require much work as we are already 50% there and  
 [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm)  
 etc. should be trivial to move to that level of compliance. 
 

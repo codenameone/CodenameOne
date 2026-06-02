@@ -35,12 +35,12 @@ Preferred size is just one of the values the layout managers take into account w
   
   
   
-Normally, we would do this by finding the largest preferred size in the group then invoke setPreferredSize on all the various components. This is hugely problematic since its both a hassle and changes to the theme, text etc. of a component in the group wouldn’t be reflected. Now we have a solution: Component.setSameWidth(Component… c); & setSameHeight(Component… c)  
+Normally, we would do this by finding the largest preferred size in the group then invoke setPreferredSize on all the various components. This is hugely problematic since it's both a hassle and changes to the theme, text etc. of a component in the group wouldn’t be reflected. Now we have a solution: Component.setSameWidth(Component… c); & setSameHeight(Component… c)  
   
   
   
   
-So we can effectively do something like Component.setSameWidth(cmp1, cmp2, cmp3, cmp4); and they would all have the same preferred width that will be maintained even if we change the text of one of the components. Since that is the biggest use case for setPreferredSize()/W()/H() we are effectively deprecating these methods. Its generally bad practice to use them and would restrict the portability of your code so we highly recommend you use an alternative means for sizing components.  
+So we can effectively do something like Component.setSameWidth(cmp1, cmp2, cmp3, cmp4); and they would all have the same preferred width that will be maintained even if we change the text of one of the components. Since that is the biggest use case for setPreferredSize()/W()/H() we are effectively deprecating these methods. It's generally bad practice to use them and would restrict the portability of your code so we highly recommend you use an alternative means for sizing components.  
   
   
   
@@ -50,7 +50,7 @@ One of our enterprise developers pointed out functionality in iOS7 that allows s
   
   
   
-That one command will enable swiping back from currentForm. LazyValue is a new interface that we will probably use quite often moving forward, its defined as:  
+That one command will enable swiping back from currentForm. LazyValue is a new interface that we will probably use quite often moving forward, it's defined as:  
   
 ```java
 public interface LazyValue<T> {

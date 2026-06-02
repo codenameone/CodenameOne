@@ -11,12 +11,12 @@ author: Shai Almog
 
 ![Header Image](/blog/pressed-selected-icon-font-utf-8/unselected-pressed-disabled-buttons.png)
 
-One of our support emails drew my attention to a glaring ommission in our icon font support…​  
+One of our support emails drew my attention to a glaring omission in our icon font support…​  
 When we create an icon for a `Button` it’s color matches the unselected color of the button which might not  
-look as attractive when the `Buton` is selected or pressed!
+look as attractive when the `Button` is selected or pressed!
 
 The thing is that with an icon font this is trivial to accomplish and requires literally no code changes. So starting with  
-the the next update calling  
+the next update calling  
 [FontImage.setMaterialIcon(Label l, char icon)](/javadoc/com/codename1/ui/FontImage/#setMaterialIcon-com.codename1.ui.Label-char-)  
 or  
 [FontImage.setMaterialIcon(Label l, char icon, float size)](/javadoc/com/codename1/ui/FontImage/#setMaterialIcon-com.codename1.ui.Label-char-float-)  
@@ -48,7 +48,7 @@ E.g.:
 ### PSA – Always Use UTF-8
 
 Everyone has their "pet peeve" about Java and mine is the encoding support. In a typical Sun way the Java API  
-chose the wrong defaults aligning itself with the system instead of aligning itself with whats right.
+chose the wrong defaults aligning itself with the system instead of aligning itself with what's right.
 
 UTF-8 works for pretty much everyone and using it universally would solve many of the problems we see frequently.  
 However, Java defaults to platform native encoding and so minor mistakes like calling the `String.getBytes()` method  

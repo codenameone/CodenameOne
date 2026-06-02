@@ -52,7 +52,7 @@ This is a bit challenging but possible
 
 ### File chooser dialog
 
-We just posted about this in [yesterdays blog post](/blog/native-file-open-dialogs.html)
+We just posted about this in [yesterday's blog post](/blog/native-file-open-dialogs.html)
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40611518/codename-one-file-chooser-dialog)
 
@@ -107,7 +107,7 @@ You need to define the iOS location string so positioning will work correctly
 
 ### Downloading a pdf file of larger size(like 30Mb) fails
 
-Thre is probably a redirect involved here…​
+There is probably a redirect involved here…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40570745/downloading-a-pdf-file-of-larger-sizelike-30mb-fails)
 
@@ -125,7 +125,7 @@ This seems to be a regression with the API level 23 migration
 
 ### send multiple binary files to server
 
-This is strait forward
+This is straight forward
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40562569/send-multiple-binary-files-to-server-codename-one)
 
@@ -174,7 +174,7 @@ This is something we need to address…​
 
 ### Implementing a fixed size virtual UI card
 
-We have such a UI in serveral demos most notably the kitchen sink
+We have such a UI in several demos most notably the kitchen sink
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40540513/implementing-a-fixed-size-virtual-ui-card)
 

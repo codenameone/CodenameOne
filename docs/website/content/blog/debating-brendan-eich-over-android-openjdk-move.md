@@ -140,7 +140,7 @@ peace process and more collaboration to benefit everyone.
 
 I think this sums up a lot of the claims. Yes this will take Google some effort. Yes a few apps might be  
 affected, I’d wager this would be far less than those affected by the Marshmallow changes and Google  
-has the tools to alleviate a lot of that problems (sdk version hints).  
+has the tools to alleviate a lot of those problems (sdk version hints).  
 Would Google have done it without the lawsuit?  
 Maybe… If there was no lawsuit and Java 8 was out, maybe Google would have adopted OpenJDK or maybe  
 they would have dedicated the engineering effort to add this support into Android’s Harmony. Either way  

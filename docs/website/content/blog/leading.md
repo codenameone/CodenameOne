@@ -32,7 +32,7 @@ Codename One has two basic ways to create new components:
 
 As Codename One matures we find ourselves doing less of option 1 and a lot more of option 2. You can look at components like Tabs which make a lot of sense as a Container since they contain other components. However, components like MultiButton, SpanButton & SpanLabel don’t necessarily seem like the right candidate for that but they are…
 
-Using a Container allows us a lot of flexibility in terms of layout & functionality for a specific component. MultiButton is a great example of that. Its internally a Container that contains 5 labels and a Button (that might be replaced with a check box or radio button). 
+Using a Container allows us a lot of flexibility in terms of layout & functionality for a specific component. MultiButton is a great example of that. It's internally a Container that contains 5 labels and a Button (that might be replaced with a check box or radio button). 
 
 So how do we make the MultiButton "feel" like a single button?
 
@@ -40,7 +40,7 @@ Simple, we use setLeadComponent() which turns the button (or radio/checkbox) int
 
 When a Container hierarchy is placed under a leader all events within the hierarchy are sent to the leader, so if a label within the lead component receives a pointer pressed event this event will really be sent to the leader. E.g. in the case of the multi button the button will receive that event and send the action performed event, change the state etc.
 
-The leader also determines the style state, so all the elements being lead are in the same state. E.g. if the the button is pressed all elements will display their pressed states, notice that they will do so with their own styles but they will each pick the pressed version of that style so a Label UIID within a lead component in the pressed state would return the Pressed state for a Label not for the Button.
+The leader also determines the style state, so all the elements being lead are in the same state. E.g. if the button is pressed all elements will display their pressed states, notice that they will do so with their own styles but they will each pick the pressed version of that style so a Label UIID within a lead component in the pressed state would return the Pressed state for a Label not for the Button.
 
 This is very convenient when you need to construct more elaborate UI’s and the cool thing about it is that you can do this entirely in the designer which allows assembling containers and defining the lead component inside the hierarchy.  
 

@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-One of the annoying tasks when programming native Android applications is tuning all the required permissions to match your codes requirements, when we started Codename One we aimed to simplify this. Our build server automatically introspects the classes you sent as part of the build and injects the right set of permissions required by your app. 
+One of the annoying tasks when programming native Android applications is tuning all the required permissions to match your code's requirements, when we started Codename One we aimed to simplify this. Our build server automatically introspects the classes you sent as part of the build and injects the right set of permissions required by your app. 
 
 However, sometimes you might find the permissions that come up a bit confusing and might not understand why a specific permission came up. This maps Android permissions to the methods/classes in Codename One that would trigger them:
 
@@ -38,7 +38,7 @@ However, sometimes you might find the permissions that come up a bit confusing a
 
 package.permission.C2D_MESSAGE, `com.google.android.c2dm.permission.RECEIVE`, `android.permission.RECEIVE_BOOT_COMPLETED` – are requested by the `com.codename1.push` package
 
-`android.permission.READ_CONTACTS` – triggers by the package `com.codename1.contacts` & `Display.getAllContacts()`.
+`android.permission.READ_CONTACTS` – is triggered by the package `com.codename1.contacts` & `Display.getAllContacts()`.
 
 `android.permission.VIBRATE` – is triggered by `Display.vibrate()` and `Display.notifyStatusBar()`
 

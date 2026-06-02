@@ -135,7 +135,7 @@ a new contact object.
 
 ### Getting The Contacts From Facebook
 
-Facebook is pretty similiar, we need to query the Graph API for the users and iterate them. The current code only  
+Facebook is pretty similar, we need to query the Graph API for the users and iterate them. The current code only  
 gets the first page of users hence its a bit flawed but it should be easily adaptable for paging thru the full result list.  
 Notice that Facebook will only return the users that signed in to the app so while the result might list your hundreds of  
 friends you might still get a blank list if none of them signed into the app.
@@ -300,7 +300,7 @@ Notice that if the image is already an encoded image this method does nothing…
 
 We need an encoded image since later in the code we will use `URLImage` which expects `EncodedImage`, the  
 `EncodedImage` is generally a more efficient way of storing images in terms of RAM and it allows us to get the image  
-data more effectively. It means the image PNG/JPEG data is still available…​ All standard/multi images returned form the resource  
+data more effectively. It means the image PNG/JPEG data is still available…​ All standard/multi images returned from the resource  
 file are `EncodedImage’s which helps with memory utilization.
 
 Now that everything is in place we can start with the main method that shows the UI:
@@ -640,7 +640,7 @@ efficient.
   * We then return to the EDT using `callSerially` to add the components to the UI where we create an entry for  
 every component and revalidate to layout the UI
 
-  * There is some code here for a "recent" entry which should priorities the contacts I’ve contacted recently, its  
+  * There is some code here for a "recent" entry which should prioritize the contacts I’ve contacted recently, its  
 functionality that’s added in the local code base but isn’t fully implemented.
 
 Next time we’ll discuss the chat UI.

@@ -34,7 +34,7 @@ Well, if J2ME is dead what about Feature Phones? Should we care about them?
   
 The answer is: Yes! very much so!
 
-Features Phones are still selling in millions and still beats Android sales in the developing world.Recently Nokia shipped the Asha series devices which are quite powerful and capable pieces of hardware, they are very impressive. Nokia’s revenue is driven mainly by the Feature Phone market.  
+Features Phones are still selling in millions and still beat Android sales in the developing world. Recently Nokia shipped the Asha series devices which are quite powerful and capable pieces of hardware, they are very impressive. Nokia’s revenue is driven mainly by the Feature Phone market.  
   
 There is a real battle in the developing countries between Feature Phones and Android devices, Feature Phones are still cheaper and more efficient where Android has more/better content (apps & games).
 
@@ -55,11 +55,11 @@ To win over the competition or at least to maintain its dominate player position
   
 So how should you write your apps for the cool new Nokia Feature Phone if J2ME is dead? Luckily there is an option Codename One ;-).  
   
-In Codename One You have 1 Java API which is the same for J2ME, Android, iOS, Blackberry and Win8.  
+In Codename One you have 1 Java API which is the same for J2ME, Android, iOS, Blackberry and Win8.  
   
 Below are some of the J2ME highlights: 
 
-  1. Facebook Connect – did you noticed there aren’t many social apps on OVI?  
+  1. Facebook Connect – did you notice there aren’t many social apps on OVI?  
   
 There is a reason Facebook uses oauth2 which is a huge pain without a browser API, this is solved and working in Codename One. 
   2. Java 5 features – You can use generics and other Java 5 features in your app and it will work on your J2ME/Blackberry devices. You don’t have to limit yourself to CLDC. 

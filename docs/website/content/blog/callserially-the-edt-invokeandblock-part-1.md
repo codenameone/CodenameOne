@@ -23,7 +23,7 @@ author: Shai Almog
   
   
   
-We last explained some of the concepts behind the EDT in 2008 so its high time we wrote about it again, there is a section about it in the developer guide as well as in the courses on Udemy but since this is the most important thing to understand in Codename One it bares repeating. 
+We last explained some of the concepts behind the EDT in 2008 so it's high time we wrote about it again, there is a section about it in the developer guide as well as in the courses on Udemy but since this is the most important thing to understand in Codename One it bears repeating. 
 
 One of the nice things about the EDT is that many of the concepts within it are similar to the concepts in pretty much every other GUI environment (Swing/FX, Android, iOS etc.). So if you can understand this explanation this might help you when working in other platforms too.
 
@@ -43,7 +43,7 @@ sleepUntilNextEDTCycle();
   
 }
 
-The general rule of the thumb in Codename One is: Every time Codename One invokes a method its probably on the EDT (unless explicitly stated otherwise), every time you invoke something in Codename One it should be on the EDT (unless explicitly stated otherwise).
+The general rule of the thumb in Codename One is: Every time Codename One invokes a method it's probably on the EDT (unless explicitly stated otherwise), every time you invoke something in Codename One it should be on the EDT (unless explicitly stated otherwise).
 
 There are a few notable special cases:  
   
@@ -65,7 +65,7 @@ You can violate the EDT in two major ways:
   
 2\. Do a CPU intensive task (such as reading a large file) on the EDT – this will effectively block all event processing, painting etc. making the application feel slow.
 
-Luckily we have a tool in the simulator: the EDT violation detection tool. This effectively prints a stack trace to suspect violations of the EDT. Its not fool proof and might land your with false positives but it should help you with some of these issues which are hard to detect.
+Luckily we have a tool in the simulator: the EDT violation detection tool. This effectively prints a stack trace to suspect violations of the EDT. It's not fool proof and might land you with false positives but it should help you with some of these issues which are hard to detect.
 
 So how do you prevent an EDT violation?  
   

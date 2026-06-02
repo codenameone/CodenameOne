@@ -82,7 +82,7 @@ This is the kind of maintenance task that we often postpone because it's annoyin
 
 That work is tied to the [long-standing request to keep Material icons current](https://github.com/codenameone/CodenameOne/issues/3152).  
 
-There is two catches, though.
+There are two catches, though.
 
 Google occasionally removes icons from the font. When that happens, we now follow suit and remove the associated constant. That is the only sane thing to do if we want the API surface to track the upstream icon set honestly.
 

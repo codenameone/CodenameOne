@@ -80,7 +80,7 @@ section on layout managers in the developer guide or check out the
 #### Fragments
 
 Fragments essentially solve an issue with Android which mixed `Activity` and `View` in a hierarchy creating a  
-somewhat complex scenario to for dynamic architectures.
+somewhat complex scenario for dynamic architectures.
 
 The concept is powerful, yet it isn’t portable, convenient or robust. Fragments become unnecessary because  
 of the much simpler Codename One hierarchy. Since Codename One doesn’t have a real equivalent of  
@@ -930,7 +930,7 @@ it would have taken longer to a person who isn’t as familiar with Codename One
 wouldn’t need to write an article about it either…​
 
 Looking over the Android code and the corresponding Codename One code the differences are staggering.  
-I’m (obviously) biased but the amount of code and it’s complexity is significantly lower in Codename One.
+I’m (obviously) biased but the amount of code and its complexity is significantly lower in Codename One.
 
 The porting from Android isn’t a trivial task as it does require you to know Codename One. The process has a  
 lot of kinks some of which just aren’t fixable since we don’t want Codename One to venture into the complexity  

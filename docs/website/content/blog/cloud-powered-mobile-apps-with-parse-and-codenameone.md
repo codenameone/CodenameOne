@@ -160,12 +160,12 @@ Once your app has been created you need to create your data model. In Parse.com 
     }
     ?>
 
-For the Parse data model, my first instinct was to just create a class for each table. However, I discovered that that a one-to-one mapping was not ideal. This is due, in part, to the fact that Parse already provides some of the functionality out of the box, and also that Parse’s database is not relational as MySQL is.
+For the Parse data model, my first instinct was to just create a class for each table. However, I discovered that a one-to-one mapping was not ideal. This is due, in part, to the fact that Parse already provides some of the functionality out of the box, and also that Parse’s database is not relational as MySQL is.
 
 __ |  Parse supports relations but they work a little bit different than they do in a relational database like MySQL. We’ll explore the differences in more detail later.   
 ---|---  
   
-In the end, I settled on the following classes for my the app:
+In the end, I settled on the following classes for my app:
 
   1. `User` – For user accounts. I folded the `profile` table data into this single class as well to simplify the model.
 
@@ -247,7 +247,7 @@ In our data model, we needed to track two relationships between user records:
 
   2. Whether there is a pending friend request from one to the other.
 
-So I added a columns named "friends" and "pendingFriendRequests" to the "User" class, both with type "Relation".
+So I added columns named "friends" and "pendingFriendRequests" to the "User" class, both with type "Relation".
 
 __ |  Relationships are one-way only. E.g. If you add "Steve" to the friends relation of "Doug", then that does not automatically add "Doug" to "Steve"‘s friends relation. For the "pendingFriendRequests" relationship this is what we want anyways, but for the "friends" relationship we wanted it to be two-way, so we need to add Steve to Doug and Doug to Steve when making them friends.   
 ---|---  
@@ -672,11 +672,11 @@ Some queries, especially queries involving complex relations like the one in `ge
 
 ## Build the App Yourself
 
-The full project, both the [Codename One client project](https://github.com/shannah/cn1-social-network-parse) and the [parse cloud code](https://github.com/shannah/cn1-social-network-parse/tree/master/social_demo_parse_com) are posted on Github to you can download and build the project yourself.
+The full project, both the [Codename One client project](https://github.com/shannah/cn1-social-network-parse) and the [parse cloud code](https://github.com/shannah/cn1-social-network-parse/tree/master/social_demo_parse_com) are posted on Github so you can download and build the project yourself.
 
 ## Install the App on Android
 
-I have posted an Android build of this app so you can install it directly on your phone is you wish:
+I have posted an Android build of this app so you can install it directly on your phone if you wish:
 
   1. [Download APK](https://github.com/shannah/cn1-social-network-parse/releases)
 ---

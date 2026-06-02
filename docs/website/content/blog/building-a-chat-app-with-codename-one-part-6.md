@@ -142,7 +142,7 @@ and passwords. This should be pretty seamless.
 ### Other Code Changes
 
 When you push to a device you need to have the device key which is a unique identifier of the device to which you  
-want to send a push. Unfortunately since we don’t have a server in place we need somehow pass this key from the  
+want to send a push. Unfortunately since we don’t have a server in place we need to somehow pass this key from the  
 person we are chatting with. The trick is to embed this key into the Message object and thus update it when we receive  
 a message, this means that we can only send a push message to a person who wrote to us in the past. Not a bad  
 feature all and all but still a limitation…​
@@ -192,7 +192,7 @@ To do that we need to do these two simple changes to the `Message` class:
         return obj;
     }
 
-This effectively adds a push ID to every message we send if its available and updates a contacts push ID for usage  
+This effectively adds a push ID to every message we send if its available and updates a contact’s push ID for usage  
 later.
 
 Now we need to register for push, in the end of the `start()` method in `SocialChat.java` we add:
@@ -318,7 +318,7 @@ it with Parse would have made this a much better app.
 
 Login via Google/Facebook etc. was probably the most painful part of the app and I’m including push notification  
 within the set of pains. While it is much simpler than it used to be and is simpler than the native/web versions I  
-think the main problem is in the networks opacity and desire to keep the developers close. The pain is less on  
+think the main problem is in the networks’ opacity and desire to keep the developers close. The pain is less on  
 our side and more on the tedium of creating apps and passing values to Facebook/Google. The APK hash key  
 is just painful, there were things such as "invite a friend" which I just avoided because of the tedium.
 

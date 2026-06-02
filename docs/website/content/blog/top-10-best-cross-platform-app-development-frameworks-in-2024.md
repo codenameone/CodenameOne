@@ -178,7 +178,7 @@ The [Stack Overflow Developer Survey Results 2019](https://insights.stackoverflo
 
 Xamarin offers great compile-time checking which allows developers to experience fewer run-time errors. Xamarin also makes it easy to design a native-like app with its native friendly interface and controls assisting.
 
-Xamarin integrates with Visual Studio which is a Microsoft’s IDE for the .NET Framework, allowing Visual Studio to be used for creating applications for Android, iOS and Windows.
+Xamarin integrates with Visual Studio which is Microsoft’s IDE for the .NET Framework, allowing Visual Studio to be used for creating applications for Android, iOS and Windows.
 
 > ****Programming Language:**** C#
 >
@@ -237,7 +237,7 @@ Its core appeal is its unrestricted access to the native platform allowing devel
 
 > Developed and released by Google in 2017, Flutter is a popular open source and free cross-platform framework. It uses Dart language to develop apps for Android, iOS, Mac, Windows, Linux and the Web from a single codebase.
 
-> Flutter has a strong following in the cross-platform community as its a versatile SDK for mobile app development. The [Stack Overflow developer survey 2020](https://insights.stackoverflow.com/survey/2020#technology-most-loved-dreaded-and-wanted-other-frameworks-libraries-and-tools) results suggests that Flutter is the third-most loved framework.
+> Flutter has a strong following in the cross-platform community as it’s a versatile SDK for mobile app development. The [Stack Overflow developer survey 2020](https://insights.stackoverflow.com/survey/2020#technology-most-loved-dreaded-and-wanted-other-frameworks-libraries-and-tools) results suggests that Flutter is the third-most loved framework.
 >
 > Flutter framework, as well as Dart language, hasn’t been around for long, which is why it’s still not entirely stable and mature.
 
@@ -385,7 +385,7 @@ Axway announced 'End-of-Support' for Titanium effective March 1, 2022.
 | --- | --- |
 | JavaScript compiles to native code with no hybrid compromises. | Limited code reusability (60-90%) across platforms. |
 | Direct access to native APIs using Hyperloop. | The development complexities and costs rise as app complexity increases. |
-| Access to native UI across platforms with Alloy. | Appcelertor Titanium often requires that you rewrite your UI (roughly 50% of the code) for every platform. |
+| Access to native UI across platforms with Alloy. | Appcelerator Titanium often requires that you rewrite your UI (roughly 50% of the code) for every platform. |
 | Schema-less ArrowDB with no setup efforts. | Titanium apps are often slower and laggy with animations and responsiveness. |
 | Growing community of developers. | Errors are usually not detected until runtime. |
 
@@ -447,7 +447,7 @@ Apps written in RubyMotion call into the native platform APIs and function in th
 | --- | --- |
 | Ruby as a language for mobile development environment. | RubyMotion is not open-source. It's a commercial partially open-source product. |
 | RubyMotion apps are statically compiled and call into the native platform APIs. | RubyMotion requires separate GUI code for Android and iOS. |
-| RubyMotion apps can be extended with Gems (reusable components). | It's hard debug with RubyMotion. |
+| RubyMotion apps can be extended with Gems (reusable components). | It's hard to debug with RubyMotion. |
 | CocoaPods and Gradle are supported natively. | RubyMotion's free version is limited. |
 | Terminal + Editor of choice workflow. | RubyMotion needs better documentation for beginners. |
 

@@ -21,12 +21,12 @@ to the release.
 
 The pieces of Codename One that are frozen are effectively the entire github repository with the exception  
 of the Codename One designer and JavaDoc comments. That means that we will avoid any non-critical  
-commits to that change anything other than the designer or docs until next Tuesday.
+commits that change anything other than the designer or docs until next Tuesday.
 
 Notice that plugins etc. move at their own pace and are a separate entity from the release cycle.
 
 We introduce a 3.4 branch into the git repository so you can reference the 3.4 version in the future. For critical  
-issues that must be introduced to the 3.4 release we review each commits and merge it into the 3.4 branch.  
+issues that must be introduced to the 3.4 release we review each commit and merge it into the 3.4 branch.  
 Commits will not go directly into the 3.4 branch and will instead go into the trunk where they will be cherry picked  
 into the branch.
 

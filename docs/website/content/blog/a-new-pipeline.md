@@ -27,7 +27,7 @@ One of our enterprise developers started complaining about the performance of ou
   
   
   
-This took a lot of effort to adapt and the effort is still ongoing but we wrote a brand new rendering layer for Android, at the moment you would need to switch it on explicitly and it will only work for Android 3.x or newer. When we will feel that its stable we will flip the default switch and make this the default for all future Android builds.  
+This took a lot of effort to adapt and the effort is still ongoing but we wrote a brand new rendering layer for Android, at the moment you would need to switch it on explicitly and it will only work for Android 3.x or newer. When we will feel that it's stable we will flip the default switch and make this the default for all future Android builds.  
   
   
   
@@ -59,7 +59,7 @@ devices (very common on Android) and when we use this approach such devices prod
   
   
   
-Another unexpected bonus we got as a result of this change was that Android related GPU debugging tools started working for Codename One applications. Unfortunately, they indicated extreme overdraw issues for some cases. Overdraw indicates that we paint the same pixel multiple times to draw a single form which means the UI will effectively be slower. Androids tools are really good at pointing out a problem but they are awful at pointing us to the location of the problem. So we had to extend our performance monitor tool and add a special mode to it that shows the exact graphics operations performed by every component painting itself. This can be illuminating when trying to see why a specific UI is so slow, it also provides stack traces for every graphics operation.  
+Another unexpected bonus we got as a result of this change was that Android related GPU debugging tools started working for Codename One applications. Unfortunately, they indicated extreme overdraw issues for some cases. Overdraw indicates that we paint the same pixel multiple times to draw a single form which means the UI will effectively be slower. Android's tools are really good at pointing out a problem but they are awful at pointing us to the location of the problem. So we had to extend our performance monitor tool and add a special mode to it that shows the exact graphics operations performed by every component painting itself. This can be illuminating when trying to see why a specific UI is so slow, it also provides stack traces for every graphics operation.  
   
   
   

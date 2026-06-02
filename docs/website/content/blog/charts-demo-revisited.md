@@ -22,7 +22,7 @@ very valuable demo…​
 
 We’d love to modernize it more but time constraints make this impractical, for now we did the following:
 
-  * Added a new tablet mode which makes the demo look completely different on the tablet using it’s screen dimensions  
+  * Added a new tablet mode which makes the demo look completely different on the tablet using its screen dimensions  
 properly
 
   * Streamlined the colors/fonts – a lot of the charts were inconsistent and had really tiny/unreadable fonts

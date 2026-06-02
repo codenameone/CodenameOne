@@ -21,7 +21,7 @@ That usage was awkward, we had to define a special font for the tab area and use
 what would actually appear on the screen. It worked because we only used an icon without text, had we tried to use  
 both it wouldn’t have worked…  
 So we now have support for icon fonts via the new `FontImage` class. This class encapsulates a character  
-or string from the icon font and presents it as an image. You can even scale and rotate such as image and you can convert  
+or string from the icon font and presents it as an image. You can even scale and rotate such an image and you can convert  
 it to an `EncodedImage` or regular `Image` if necessary. 
 
 This allows very smooth graphics that adapt based on the platform e.g. here we use the fontello font to show a rotating  
@@ -43,7 +43,7 @@ include integration with the designer tools etc.
 
 #### Retiring The Old VM
 
-Apple is pretty quick with with moving forward, they pushed everyone to 64 bit very fast and it seems they are  
+Apple is pretty quick with moving forward, they pushed everyone to 64 bit very fast and it seems they are  
 poised to do the same with some new iOS 9 changes. This usually takes the form of requiring an xcode upgrade  
 which is pretty easy for us to do since we just need to login to all the servers and update xcode on those machines. 
 

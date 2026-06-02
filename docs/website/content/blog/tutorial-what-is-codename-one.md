@@ -113,7 +113,7 @@ The Codename One lightweight API is VERY performant. E.g in iOS it is implemente
 
 The lightweight API is VERY customizable, you can literally override the paint behavior of every component or place a drawing region and just draw on top of everything…
 
-Thanks for baring with me. I hope this was helpful and informative.
+Thanks for bearing with me. I hope this was helpful and informative.
 ---
 
 ## Archived Comments

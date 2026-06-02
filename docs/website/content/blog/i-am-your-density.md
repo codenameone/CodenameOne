@@ -37,7 +37,7 @@ After loading the app onto my phone, I can finally see the message: "Chicago Cub
 
 Hmm. Good thing I didn’t bet on the Blue Jays, as I had planned to do. On the bright side, my app works. It displays the image in the correct size on all devices. I finally invent something that works! Perhaps I should submit this to the iTunes store and Google Play.
 
-But what if I send in the app in and they don’t like it? What if they say I’m no good? What if they say, "Get out of here kid. You’ve got no future"? I mean, I just don’t think I can take that kind of rejection.
+But what if I send in the app and they don’t like it? What if they say I’m no good? What if they say, "Get out of here kid. You’ve got no future"? I mean, I just don’t think I can take that kind of rejection.
 
 ## Behind the Scenes: The Making of this Post
 

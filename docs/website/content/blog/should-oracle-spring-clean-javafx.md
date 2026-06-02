@@ -73,7 +73,7 @@ While all of the above are totally fine, you can’t grow a community based on t
 new things, the students will graduate to do something else and the hardcore fans…  
 They might be left with nothing as the platform declines. 
 
-I’ll cover the "why should we care" down this post but first lest talk about the proof for the hardcore fans. 
+I’ll cover the "why should we care" down this post but first let's talk about the proof for the hardcore fans. 
 
 ### Proof JavaFX Doesn’t Have Traction
 
@@ -187,7 +187,7 @@ and well understood.
 with the JDK anything needs to go into the JVM and thru Oracle.
   * QT – I used to really like QT back in my C++ days. It since added some things but ever since the Nokia  
 purchase it was mostly stuck in place. Adding to that the fact that most of the code base is in C++ makes  
-this a non-started for most Java developers.
+this a non-starter for most Java developers.
   * Native – this is actually something we are considering for Codename Ones desktop port. Just calling  
 the OS native API’s directly using a native to Java mapping API. For Codename One this is pretty simple since  
 we can use Open GL and very few peers but I don’t think this will be useful for Java developers as a whole.
@@ -206,7 +206,7 @@ much mapped to mobile.
 ### How did we get here?
 
 This section is probably redundant for most readers but after writing everything above it occurred to me that  
-a fresh Java developer reading my huge rant will have very little historical context. Luckily I can tell recite  
+a fresh Java developer reading my huge rant will have very little historical context. Luckily I can recite  
 the history rather easily as I had a front row seat working at Sun Microsystem during the peek of Java FX  
 and at Oracle as it failed to materialize. 
 
@@ -243,7 +243,7 @@ a lot of things (e.g. accessability) and so a huge amount of code needed to be w
 
 So the team created a well designed API but there was no decent migration path to Swing developers  
 and to some degree the path from Swing problematic to this day (despite many improvements). The API is  
-huge but still incomplete at some parts because the required breadth for such an API. In the meantime Swing  
+huge but still incomplete at some parts because of the required breadth for such an API. In the meantime Swing  
 developers who got no real updates for years mostly evaporated to other platforms and now we have Swing  
 and FX one of which is outdated and the other brand spanking new but has no real traction. 
 
@@ -262,7 +262,7 @@ Both companies stayed the course and invested in the product/partnerships while 
 This took money, time and commitment which is pretty hard to do. 
 
 Unfortunately, looking at the current state of JavaFX and Oracles backing of it. Its pretty obvious that it was  
-already moved to maintenence mode and won’t get the resource commitment it needs to grow. I think we  
+already moved to maintenance mode and won’t get the resource commitment it needs to grow. I think we  
 might be better off moving it aside and allowing other technologies to rise to prominence. Even if you disagree  
 with that opinion I hope we can all agree that there is a serious problem here. To me the problem is mostly  
 with students picking up JavaFX either thru universities or online courses. We might as well teach them  

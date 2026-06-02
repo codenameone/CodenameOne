@@ -81,7 +81,7 @@ Both Java and Swift are quite different in terms of methods, syntax, code usabil
 
 Swift is obviously a preferred choice to develop apps specifically for the Apple ecosystem while Java is a preferred choice for Android development or cross-platform reusability.
 
-> The opportunity cost involved in learning Swift outweighs the benefits since its a platform dependant language.
+> The opportunity cost involved in learning Swift outweighs the benefits since it's a platform dependant language.
 
 ## Java on Apple Hardware
 
@@ -91,7 +91,7 @@ By now you might be thinking ‘if Java code can run on any platform, why can’
 
 Java can run on any platform that has a compatible Java Virtual Machine (JVM). Since Apple doesn’t support JVM for iOS, Java can’t run on iPhones and iPads.
 
-Apple makes sure that only Swift and Objective-C has 100% vendor support on iOS by forbidding alternative runtimes from being deployed on it.
+Apple makes sure that only Swift and Objective-C have 100% vendor support on iOS by forbidding alternative runtimes from being deployed on it.
 
 > Java developers have long been out in the cold with Apple when it comes to porting their apps on Apple devices.
 
@@ -105,7 +105,7 @@ The only way to develop iOS apps in Java is to have a compiler that will compile
 
 With ****Codename One****, Java developers can build apps that run on iOS devices such as the iPhone and iPad. Not only that, your app will work beyond iOS devices i.e Android, Windows and JavaScript.
 
-> Want to utilize your existing Java/Kotlin skills to develops iOS apps? You can do that with Codename One!
+> Want to utilize your existing Java/Kotlin skills to develop iOS apps? You can do that with Codename One!
 
 If you’re not using Codename One yet, then sign up now:
 

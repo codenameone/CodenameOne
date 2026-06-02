@@ -98,7 +98,7 @@ H
 ow do you deal with events on a button click within a list renderer?  
   
   
-So assuming I have a list renderer that has a button named X on the the side, dealing with this differs between a GUI builder app and a handcoded app.  
+So assuming I have a list renderer that has a button named X on the side, dealing with this differs between a GUI builder app and a handcoded app.  
   
   
   
@@ -121,7 +121,7 @@ If you are building a handcoded renderer this is a bit harder:
   
 There are a few other features in the generic list cell renderer that aren’t well documented:  
 
-  * The UIID of the renderer is based on the UIID of the renderer component we also add a focus component to the list whose UIID is based on: `selected.getUIID()` + "Focus". So if your selected renderer container has the UIID MyRenderer, then you focus component will have the UIID MyRendererFocus.  
+  * The UIID of the renderer is based on the UIID of the renderer component we also add a focus component to the list whose UIID is based on: `selected.getUIID()` + "Focus". So if your selected renderer container has the UIID MyRenderer, then your focus component will have the UIID MyRendererFocus.  
   
   
 
