@@ -395,19 +395,15 @@
     return false;
   }
 
-  // Drop host refs the worker reported as dead -- every worker-side wrapper for
-  // them was garbage-collected, so they are unreachable from the worker and
-  // safe to evict, letting the browser reclaim the element AND its multi-MB
-  // backing store. This is the host half of the host-ref leak fix (see
-  // parparvm_runtime.js); without it ``hostRefById`` grew unbounded and the
-  // late-suite canvas-accumulation thrash starved the worker<->host bridge.
-  //
-  // We release CANVASES ONLY. The GC signal already guarantees a reused canvas
-  // (still referenced by a live Java image) is never reported dead. Non-canvas
-  // refs (DOM nodes, events, the WebSocket) are left intact because some
-  // @JSBody natives stash a raw ``__jsValue`` host-ref marker that can outlive
-  // its wrapper -- dropping those produced "Missing host receiver for JSO
-  // bridge" errors and stalled the screenshot WebSocket send.
+  // Drop the host refs the worker's Java-side finalizer reported dead. Each id
+  // belongs to a front-end resource (an image's backing canvas / HTMLImageElement)
+  // whose owning Java image has been GC'd -- the owner was the sole holder of
+  // the id (see parparvm_runtime.js registerNativeResource), so the resource is
+  // genuinely unreachable and safe to evict, freeing the element and its
+  // multi-MB backing store. We release whatever id the owner owned (canvas or
+  // image); the only guard is the never-release singleton allowlist
+  // (window/document/body/the display canvas), which a real image owner can
+  // never legitimately report.
   function releaseHostRefs(ids) {
     if (!ids || !ids.length || !hostRefById) {
       return;
@@ -415,7 +411,7 @@
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i];
       var value = hostRefById[id];
-      if (value == null || isProtectedHostRef(value) || !isCanvasLike(value)) {
+      if (value == null || isProtectedHostRef(value)) {
         continue;
       }
       delete hostRefById[id];

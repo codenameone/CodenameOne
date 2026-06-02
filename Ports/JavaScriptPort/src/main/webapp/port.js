@@ -1599,6 +1599,21 @@ bindNative([
   return null;
 });
 
+// Java-side finalizer hook: arm release of an image's front-end resource
+// (backing canvas / HTMLImageElement). ``resource`` is the stable worker
+// wrapper owned by the Java image; when it (and thus the image) is GC'd, the
+// host drops the resource's id. Keeps the JS host a dumb hard-reference table
+// whose cleanup is driven entirely by Java GC -- mirroring the C/iOS backend.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource___com_codename1_html5_js_JSObject"
+], function*(resource) {
+  if (resource != null && jvm && typeof jvm.registerNativeResource === "function") {
+    jvm.registerNativeResource(resource, resource);
+  }
+  return null;
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
