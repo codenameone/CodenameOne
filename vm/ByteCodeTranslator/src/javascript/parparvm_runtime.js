@@ -190,6 +190,103 @@ function registerNativeResource(owner, hostResource) {
   }
   nativeResourceFinalizer.register(owner, hostId);
 }
+// Object-returning JSO methods that are SAFE to re-issue when their result
+// comes back degraded (see invokeJsoBridge). All are side-effect-free reads or
+// create a fresh detached/standalone object (no DOM mutation, no state change),
+// so repeating one on the rare crossed-response path can't corrupt anything.
+const JSO_RETRYABLE_READ_METHODS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getElementById: true,
+  querySelector: true, getBoundingClientRect: true, getComputedStyle: true,
+  createPattern: true, createLinearGradient: true, createRadialGradient: true,
+  // canvas -> PNG/data-URL encode used by the screenshot emit path. A cross on
+  // the canvas receiver throws "Missing JS member toDataURL" / returns a
+  // degraded value; encoding is a pure read (no canvas mutation) so re-issuing
+  // is safe. Not covering it let an emit-time cross escape and deadlock the EDT.
+  toDataURL: true, toBlob: true
+};
+// Max re-issues for a degraded idempotent read before giving up. A response
+// CROSS comes in BURSTS (a cluster of concurrent numeric getters whose replies
+// cross object reads); 4 was too few to outlast a sustained burst (createElement
+// observed exhausting all 4 in CI). With a backoff sleep between tries -- which
+// lets the in-flight numeric getters finish so they can't re-cross -- a dozen
+// tries clears realistic bursts while staying bounded (only on the degraded
+// path, ~0.5s worst case).
+const JSO_MAX_RETRY = 12;
+// Lost-response watchdog timeouts, keyed by host-call symbol (see the watchdog
+// armed in dispatchYield). Only BOUNDED host natives are listed: a fast
+// JSO-bridge DOM/canvas read (resolves in <100ms), the screenshot UI-settle
+// wait (a bounded rAF loop, ~maxFrames), and the canvas->PNG capture (rAF +
+// encode, sub-second). If the host channel drops their response the worker
+// would otherwise park forever; on expiry we resume the thread with a transient
+// error so the caller recovers (JSO reads re-issue via the retry; capture/
+// settle callers catch and emit a placeholder / advance). UNBOUNDED natives
+// (image load over the network, fetch, the screenshot WebSocket) are
+// deliberately ABSENT -- they legitimately run as long as the app/network
+// needs and must never be aborted by a timer.
+const HOST_CALL_WATCHDOG_MS = {
+  "__cn1_jso_bridge__": 2000,
+  "__cn1_dom_window_current__": 5000,
+  "__cn1_create_custom_event__": 5000,
+  "__cn1_hide_splash__": 5000,
+  "__cn1_load_truetype_font__": 15000,
+  "__cn1_wait_for_ui_settle__": 8000,
+  "__cn1_capture_canvas_png__": 10000
+};
+// Retryable reads that can NEVER legitimately return null/undefined: for these
+// a null result is itself a degraded read (a lost/crossed response delivered
+// null instead of the element/context) and must be re-issued. createElement on
+// a real document always returns an element; getContext('2d') always returns a
+// context; createPattern/createLinearGradient/createRadialGradient always
+// return an object; getImageData/measureText/getBoundingClientRect always
+// return their result object. getElementById/querySelector are deliberately
+// EXCLUDED -- null is their legitimate "not found" answer.
+const JSO_NEVER_NULL_READS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getBoundingClientRect: true,
+  getComputedStyle: true,
+  createLinearGradient: true, createRadialGradient: true,
+  toDataURL: true
+};
+// A degraded object read: a NUMBER where an object was expected (a crossed
+// numeric getter response), a truthy empty {} that lost its host-ref marker on
+// the round-trip, OR null/undefined from a method that can never legitimately
+// return null (see JSO_NEVER_NULL_READS -- this is the transport-cross case
+// where createElement resumed with another call's null/void response). A plain
+// null from a nullable read (getElementById, a getter) is NOT degraded and
+// passes through untouched.
+function isDegradedObjectResult(r, bridge) {
+  if (typeof r === "number") {
+    return true;
+  }
+  if (r && typeof r === "object" && !Array.isArray(r)
+      && r.__cn1HostRef == null
+      && Object.getOwnPropertyNames(r).length === 0) {
+    return true;
+  }
+  if (r == null && bridge && bridge.kind === "method"
+      && JSO_NEVER_NULL_READS[bridge.member] === true) {
+    return true;
+  }
+  return false;
+}
+// A transient host-bridge error worth re-issuing an idempotent read for: the
+// host momentarily failed to resolve the receiver (its host-ref crossed with a
+// concurrent call and pointed at a degraded value), so a member lookup / method
+// call threw rather than running. The same read usually succeeds once the
+// crossed response drains. Matches the exact throw strings the host bridge
+// emits (browser_bridge.js: "Missing JS member ...", "Missing host receiver
+// ...") plus the generic "is not a function" a degraded receiver produces.
+function isTransientHostBridgeError(e) {
+  const m = e == null ? "" : (e.message != null ? String(e.message) : String(e));
+  if (!m) {
+    return false;
+  }
+  return m.indexOf("Missing JS member") >= 0
+      || m.indexOf("Missing host receiver") >= 0
+      || m.indexOf("is not a function") >= 0
+      || m.indexOf("host call timed out") >= 0;
+}
 // An entry in ``cls.methods`` may be either a function (the common
 // case) or a STRING naming another translated function. Inherited
 // method aliases emit the latter form — the alias ``$childId`` points
@@ -1394,14 +1491,81 @@ const jvm = {
         // A round-trip is about to fire; the host must see all
         // previously-queued fire-and-forget ops first to keep
         // canvas state consistent.
-        self.flushPendingFireAndForget();
-        const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+        const jsoRequest = {
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
           kind: bridge.kind,
           member: bridge.member,
           args: transferableArgs
-        }]);
+        };
+        const __retRC = bridge.returnClass;
+        const __expectsObject = __retRC != null && __retRC !== "int" && __retRC !== "byte"
+            && __retRC !== "short" && __retRC !== "char" && __retRC !== "long"
+            && __retRC !== "float" && __retRC !== "double" && __retRC !== "boolean"
+            && __retRC !== "void" && __retRC !== "v";
+        const __retryableRead = bridge.kind === "getter"
+            || (bridge.kind === "method" && JSO_RETRYABLE_READ_METHODS[bridge.member] === true);
+        // DEGRADED-READ RECOVERY (the getDocument-null / canvasContextWipe /
+        // "Missing JS member getContext" family). A round-trip object read for
+        // an IDEMPOTENT member can come back corrupted four ways when its
+        // response crosses with a concurrent host call in a dense paint burst:
+        // (a) a NUMBER where an object was expected, (b) an empty {} that lost
+        // its host-ref marker, (c) null/undefined from a never-null method
+        // (createElement/getContext), or (d) a THROWN "Missing JS member" /
+        // "Missing host receiver" because the receiver momentarily resolved to
+        // a degraded value on the host. All four are transient -- RE-ISSUE the
+        // identical read; the re-issue is another suspend/resume so the crossed
+        // response drains first. Idempotent reads have no observable side
+        // effect (createElement just makes a throwaway detached node) so
+        // repeating is safe. Bounded: a genuinely persistent failure falls
+        // through to substitute-null below or re-throws, and never loops.
+        let hostResult;
+        let __attempt = 0;
+        for (;;) {
+          if (__attempt > 0) {
+            // Backoff before re-issuing: yield long enough for the concurrent
+            // numeric getters whose responses crossed into this read to finish,
+            // so the re-issue isn't immediately re-crossed by the same in-flight
+            // burst. Grows with the attempt (capped) so a sustained storm gets
+            // progressively more room to drain.
+            yield { op: "sleep", millis: Math.min(8 * __attempt, 64) };
+          }
+          let __threw = null;
+          try {
+            // The host must see all previously-queued fire-and-forget ops
+            // first to keep canvas state consistent before this round-trip.
+            self.flushPendingFireAndForget();
+            hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [jsoRequest]);
+          } catch (__hostErr) {
+            __threw = __hostErr;
+          }
+          if (__threw != null) {
+            // A transient throw ("Missing JS member"/"Missing host receiver"/
+            // timeout) means the host call NEVER EXECUTED -- the receiver
+            // momentarily resolved to a degraded value -- so re-issuing is safe
+            // for ANY round-trip method (not just the idempotent-read allowlist;
+            // nothing ran, so there's no side effect to repeat). This is what
+            // catches an emit-time canvas.toDataURL() cross that would otherwise
+            // escape and deadlock the EDT.
+            if (__attempt < JSO_MAX_RETRY && isTransientHostBridgeError(__threw)) {
+              __attempt++;
+              if (VM_DIAG_ENABLED) {
+                try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":throw:attempt=" + __attempt); } catch (_e) {}
+              }
+              continue;
+            }
+            throw __threw;
+          }
+          if (__expectsObject && __retryableRead && __attempt < JSO_MAX_RETRY
+              && isDegradedObjectResult(hostResult, bridge)) {
+            __attempt++;
+            if (VM_DIAG_ENABLED) {
+              try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":attempt=" + __attempt); } catch (_e) {}
+            }
+            continue;
+          }
+          break;
+        }
         // canvasContextWipe RECOVERY: when hostResult is a NUMBER but
         // the expected return class is an object type, substitute null.
         // The downstream code would otherwise treat the number as a
@@ -2106,6 +2270,12 @@ const jvm = {
     if (!pending) {
       return false;
     }
+    // Disarm the lost-response watchdog (if this was a JSO-bridge round-trip) --
+    // the response arrived, so the timeout must not later fire a false abort.
+    if (pending.timeoutEntry) {
+      this._removeTimedWakeup(pending.timeoutEntry);
+      pending.timeoutEntry = null;
+    }
     // Main-thread host callbacks fire on every async bridge call (image
     // load, fetch, BrowserComponent, etc.). The :ok branch is gated
     // behind ``?parparDiag=1`` because in steady-state apps it floods
@@ -2417,6 +2587,16 @@ const jvm = {
           continue;
         }
         this.currentThread = thread;
+        // Worker-liveness probe feeding the heartbeat timer below: a frozen
+        // resume count with a live heartbeat means parked/starved, a stopped
+        // heartbeat means a synchronous infinite loop in this step. The resume
+        // counter is a trivial increment; the (string-building) label is only
+        // recorded under diag so production pays nothing.
+        this.__cn1ResumeCount = (this.__cn1ResumeCount | 0) + 1;
+        if (VM_DIAG_ENABLED) {
+          this.__cn1LastResumeLabel = thread.id + ":" + threadDebugLabel(thread.object);
+          this.__cn1LastResumeTs = this.schedulerNow();
+        }
         if (!thread.__cn1LoggedFirstStep && shouldTraceThread(thread)) {
           thread.__cn1LoggedFirstStep = true;
           vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
@@ -2536,6 +2716,18 @@ const jvm = {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
         this.resumeWaiter(w.waiter);
+      } else if (w.kind === "hostcall") {
+        // A JSO-bridge round-trip whose host response never arrived (see the
+        // watchdog armed in dispatchYield). If it is still pending, fail it
+        // with a transient error so the parked thread resumes and the
+        // invokeJsoBridge retry re-issues the read. If it already resolved,
+        // resolveHostCall cancelled this entry, so this is a no-op.
+        if (this.pendingHostCalls[w.id]) {
+          if (VM_DIAG_ENABLED) {
+            try { vmDiag("HOSTCALL_TIMEOUT", "id", String(w.id)); } catch (_e) {}
+          }
+          this.resolveHostCall(w.id, false, null, "host call timed out (jso bridge)");
+        }
       }
     }
     this._refreshTimedWakeupTimer();
@@ -2587,6 +2779,27 @@ const jvm = {
       // op against an out-of-date canvas state.
       this.flushPendingFireAndForget();
       emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
+      // LOST-RESPONSE WATCHDOG. The host is a thin, dumb pixel sink (mirroring
+      // the C/iOS native backend) and the worker<->host postMessage channel can
+      // drop or never deliver a callback under load -- when it does, this green
+      // thread parks on pendingHostCalls[id] forever and the whole suite wedges
+      // with no error (the lightweight-popup / DualAppearance capture hangs).
+      // For BOUNDED host natives only (see HOST_CALL_WATCHDOG_MS), arm a timeout
+      // matched to that op's worst-case latency: on expiry resume the thread
+      // with a transient error so the caller recovers (JSO reads re-issue via
+      // invokeJsoBridge's retry; capture/settle callers catch and advance).
+      // Unbounded natives (image load, fetch, the screenshot WebSocket) are not
+      // in the map, so they are never aborted. On a healthy channel the call
+      // resolves well within the timeout and this never fires.
+      const __watchdogMs = HOST_CALL_WATCHDOG_MS[yielded.symbol];
+      if (__watchdogMs != null) {
+        const pendingEntry = this.pendingHostCalls[yielded.id];
+        if (pendingEntry) {
+          const timeoutEntry = { kind: "hostcall", id: yielded.id, wakeAt: this.schedulerNow() + __watchdogMs, cancelled: false };
+          pendingEntry.timeoutEntry = timeoutEntry;
+          this._scheduleTimedWakeup(timeoutEntry);
+        }
+      }
       return;
     }
     if (yielded.op === "monitor_enter") {
@@ -4539,4 +4752,30 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
   const event = jvm.eventQueue.shift();
   return event && event.code != null ? (event.code | 0) : -1;
 });
+
+// Worker liveness heartbeat (diag-only). If the worker wedges in a synchronous
+// green-thread step this timer CANNOT fire (single-threaded) and the heartbeat
+// STOPS; if the worker is merely parked/starved (idle, a host callback not
+// delivered) the heartbeat keeps firing with runnable==0 and a frozen resume
+// count. The timer is created ONLY under diag so production has no perpetual
+// wakeup.
+if (VM_DIAG_ENABLED && typeof setInterval === "function") {
+  let __cn1HbLastResumes = -1;
+  setInterval(function() {
+    try {
+      const rc = jvm.__cn1ResumeCount | 0;
+      const frozen = rc === __cn1HbLastResumes;
+      __cn1HbLastResumes = rc;
+      vmTrace("DIAG:WORKER_HB:resumes=" + rc
+        + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
+        + ":draining=" + (jvm.draining ? 1 : 0)
+        + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0)
+        + ":frozen=" + (frozen ? 1 : 0)
+        + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
+        + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+    } catch (e) {
+      void e;
+    }
+  }, 1500);
+}
 })(self);

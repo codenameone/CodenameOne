@@ -58,6 +58,10 @@ public class HTML5Graphics {
     private final JavaScriptRenderState<NativeFont> renderState = new JavaScriptRenderState<NativeFont>();
     private Runnable mutationListener;
     private HTMLCanvasElement canvas;
+    // Backing-canvas dimensions, known Java-side at construction. Kept so paint
+    // ops never read canvas.getWidth()/getHeight() back across the barrier.
+    private int canvasWidth;
+    private int canvasHeight;
     private CanvasRenderingContext2D context;
     //private Paint paint;
     HTML5Implementation impl;
@@ -103,16 +107,26 @@ public class HTML5Graphics {
     //private final Path tmppath = new Path();
     //private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
     
-    HTML5Graphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
+    // ``width``/``height`` are the dimensions the backing canvas was created
+    // with (known Java-side). Use them to seed the clip bounds rather than
+    // reading canvas.getWidth()/getHeight() back across the worker<->host
+    // barrier: those numeric round-trips, fired right after the getContext()
+    // object read on every mutable-image graphics, can have their responses
+    // cross into a concurrent object read (getDocument/getContext resuming with
+    // a width/height number) and wedge the suite. The Java side already knows
+    // the size, so the host stays a dumb pixel sink.
+    HTML5Graphics(HTML5Implementation impl, HTMLCanvasElement canvas, int width, int height) {
         this.canvas = canvas;
         this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
-        
+
         this.impl = impl;
-        this.clipRect.setWidth(canvas.getWidth());
-        this.clipRect.setHeight(canvas.getHeight());
+        this.canvasWidth = width;
+        this.canvasHeight = height;
+        this.clipRect.setWidth(width);
+        this.clipRect.setHeight(height);
         //transform = JSAffineTransform.Factory.getTranslateInstance(0, 0);
         //paint.setAntiAlias(true);
-        
+
         if(context != null) {
             context.save();
         }
@@ -732,7 +746,7 @@ public class HTML5Graphics {
 //    }
     
     void clear(){
-        context.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        context.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {

@@ -19,7 +19,7 @@ public interface JavaScriptRenderingBackend {
     HTMLImageElement createImageElement();
     HTMLImageElement createCrossOriginImageElement(String sourceUrl);
     HTMLImageElement createBlobImageElement(Blob blob);
-    HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas);
+    HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas, int width, int height);
     CanvasRenderingContext2D getContext(HTMLCanvasElement canvas);
     void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height);
     void drawMutableSurface(CanvasRenderingContext2D context, HTMLCanvasElement canvas, int x, int y, int width, int height);

@@ -82,8 +82,8 @@ public class BufferedGraphics extends HTML5Graphics {
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
-    public BufferedGraphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
-        super(impl, canvas);
+    public BufferedGraphics(HTML5Implementation impl, HTMLCanvasElement canvas, int width, int height) {
+        super(impl, canvas, width, height);
     }
 
     @Override

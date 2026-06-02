@@ -167,6 +167,9 @@
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  // Count of host refs the owning-object finalizer has released (see
+  // releaseHostRefs); retained as a lightweight liveness counter.
+  var __cn1HostRefReleased = 0;
   var canvasMetaNextId = 1;
   var canvasMetaByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
   var canvasMetaById = {};
@@ -415,6 +418,7 @@
         continue;
       }
       delete hostRefById[id];
+      __cn1HostRefReleased++;
       if (hostRefByObject && typeof hostRefByObject.delete === 'function') {
         try {
           hostRefByObject.delete(value);
