@@ -92,6 +92,11 @@ void cn1WinBeginFrame(CN1Graphics* g) {
     if (g == NULL || g->target == NULL) {
         return;
     }
+    /* The window target owns any pending resize; apply it here, on the EDT,
+     * before opening a frame (see cn1WinApplyPendingResize). */
+    if (g == cn1Win.windowGraphics) {
+        cn1WinApplyPendingResize();
+    }
     if (!g->inFrame) {
         ID2D1RenderTarget_BeginDraw(g->target);
         g->inFrame = JAVA_TRUE;

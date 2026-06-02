@@ -168,6 +168,14 @@ typedef struct {
     WCHAR* shotPath;
     JAVA_INT shotW;
     JAVA_INT shotH;
+
+    /* Pending window resize. WM_SIZE (main thread) records the new size here and
+     * the EDT applies the Direct2D Resize between its own frames -- resizing the
+     * HWND render target from another thread while the EDT is mid-BeginDraw is
+     * invalid and presents black, so all render-target ops stay on the EDT. */
+    volatile LONG pendingResize;
+    volatile LONG pendingW;
+    volatile LONG pendingH;
 } CN1WindowsContext;
 
 extern CN1WindowsContext cn1Win;
@@ -176,6 +184,7 @@ extern CN1WindowsContext cn1Win;
 
 /* windowing (cn1_windows_window.c) */
 void cn1WindowsLog(const char* message);
+void cn1WinApplyPendingResize(void);
 int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 int  cn1WinPollEvent(CN1Event* out);

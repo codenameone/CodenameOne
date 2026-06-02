@@ -40,6 +40,8 @@
 
 #include "cn1_windows.h"
 #include <windowsx.h>   /* GET_X_LPARAM / GET_Y_LPARAM */
+#include <stdio.h>
+#include <string.h>
 
 /* This unit is C++ (Direct2D has no C binding), but the ParparVM bridge
  * functions and the shared helpers must keep C linkage so the translated C
@@ -64,6 +66,22 @@ void cn1WindowsLog(const char* message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     fflush(stderr);
+    /* Also append to %TEMP%\cn1windows.log so logs survive when the console is
+     * hidden on an interactive launch (see initDisplay). */
+    {
+        char path[MAX_PATH];
+        DWORD n = GetTempPathA(MAX_PATH, path);
+        if (n > 0 && n < MAX_PATH - 16) {
+            FILE* f;
+            strcpy(path + n, "cn1windows.log");
+            f = fopen(path, "a");
+            if (f != NULL) {
+                fputs(message, f);
+                fputc('\n', f);
+                fclose(f);
+            }
+        }
+    }
 }
 
 /* Last-resort crash logger: prints the exception code + faulting address (and a
@@ -182,12 +200,12 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         case WM_SIZE:
             cn1Win.width = LOWORD(lParam);
             cn1Win.height = HIWORD(lParam);
-            if (g_hwndTarget != NULL) {
-                D2D1_SIZE_U size;
-                size.width = (UINT32) cn1Win.width;
-                size.height = (UINT32) cn1Win.height;
-                ID2D1HwndRenderTarget_Resize(g_hwndTarget, &size);
-            }
+            /* Defer the Direct2D Resize to the EDT (cn1WinApplyPendingResize):
+             * resizing the target from this (window) thread while the EDT is
+             * mid-frame corrupts the present and leaves the new area black. */
+            cn1Win.pendingW = cn1Win.width;
+            cn1Win.pendingH = cn1Win.height;
+            cn1Win.pendingResize = 1;
             cn1WinPushEvent(CN1_EVENT_SIZE_CHANGED, cn1Win.width, cn1Win.height, 0);
             return 0;
         case WM_PAINT: {
@@ -251,6 +269,21 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_nativeLog___java_lang_String(
     cn1WindowsLog(stringToUTF8(threadStateData, __cn1Arg1));
 }
 
+/*
+ * Applies a pending window resize to the HWND render target. Called on the EDT
+ * (from cn1WinBeginFrame) so the Resize happens between frames on the same
+ * thread that draws -- never while a frame is open on another thread.
+ */
+void cn1WinApplyPendingResize(void) {
+    if (cn1Win.pendingResize && g_hwndTarget != NULL) {
+        D2D1_SIZE_U size;
+        size.width = (UINT32) cn1Win.pendingW;
+        size.height = (UINT32) cn1Win.pendingH;
+        ID2D1HwndRenderTarget_Resize(g_hwndTarget, &size);
+        cn1Win.pendingResize = 0;
+    }
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3) {
     if (InterlockedCompareExchange(&cn1Win.initialized, 1, 0) != 0) {
@@ -260,6 +293,21 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     cn1WindowsLog("initDisplay: enter");
     SetUnhandledExceptionFilter(cn1WinUnhandled);
+
+    /* The clean target links as a console subsystem app (the translator keeps
+     * stdout for the headless/test apps). For an interactive launch that pops a
+     * stray console window in front of the UI, so hide it -- but only when this
+     * process owns the console alone. When launched from a shell/Maven (the
+     * tests), the console is shared (process count > 1) and left intact so stdout
+     * still reaches the parent. */
+    {
+        DWORD consoleProcs[4];
+        DWORD consoleCount = GetConsoleProcessList(consoleProcs, 4);
+        HWND consoleWnd = GetConsoleWindow();
+        if (consoleCount == 1 && consoleWnd != NULL) {
+            ShowWindow(consoleWnd, SW_HIDE);
+        }
+    }
     InitializeCriticalSection(&cn1Win.eventLock);
     cn1Win.eventSignal = CreateEventW(NULL, FALSE, FALSE, NULL);
     cn1Win.eventHead = 0;
