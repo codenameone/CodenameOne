@@ -38,6 +38,9 @@ LT_STYLISTIC_DENY = {
     "THERE_IS_A_LOT_OF", "A_LOT_OF_NN", "STATE_OF_THE_ART", "SIGN_UP_HYPHEN",
     "WORD_ESSAY_HYPHEN", "ON_OFF_SCREEN_HYPHEN", "OVER_COMPOUNDS", "TO_DO_HYPHEN",
     "PICK_UP_COMPOUND", "DAY_TO_DAY_HYPHEN", "WHETHER", "FOCUS_IN",
+    # Pure comma/clause suggestions ("consider adding a comma") — advisory, not
+    # defects; they must not gate a PR.
+    "PRP_COMMA", "MISSING_COMMA_AFTER_INTRODUCTORY_PHRASE",
 }
 LT_STYLISTIC_DENY_PREFIXES = ("EN_COMPOUNDS_",)
 

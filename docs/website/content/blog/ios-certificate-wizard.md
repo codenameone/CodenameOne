@@ -51,7 +51,7 @@ After you click "Next" on the device form, the wizard checks to see if you alrea
 
 ![Prompt to overwrite other certificate](/blog/ios-certificate-wizard/ios-cert-wizard-4.2-overwrite-cert.png)
 
-The same "decisions" need to be made twice: Once for the development certificate, and once for the Appstore certificate.
+The same "decisions" need to be made twice: Once for the development certificate, and once for the App Store certificate.
 
 ### App IDs and Provisioning Profiles
 
@@ -71,13 +71,13 @@ Once the wizard is finished generating your provisioning profiles, you should cl
 
 ### Building Your App
 
-After selecting your local install location, and closing the wizard, you should see the fields of the "iOS Signing" properties panel filled in correctly. You should now be able to send iOS debug or Appstore builds without the usual hassles.
+After selecting your local install location, and closing the wizard, you should see the fields of the "iOS Signing" properties panel filled in correctly. You should now be able to send iOS debug or App Store builds without the usual hassles.
 
 ![Filled in signing panel after wizard complete](/blog/ios-certificate-wizard/ios-cert-wizard-9-signing-panel.png)
 
 ## Future Improvements
 
-This wizard is just the next step in our mission to simplify the app-development process. In the next while we’ll be rolling out more features like this. Some planned features include push certificate generation and Appstore uploads. If there are particular aspects of the app development and deployment process that you still find cumbersome, make sure to let us know so we can work on finding solutions.
+This wizard is just the next step in our mission to simplify the app-development process. In the next while we’ll be rolling out more features like this. Some planned features include push certificate generation and App Store uploads. If there are particular aspects of the app development and deployment process that you still find cumbersome, make sure to let us know so we can work on finding solutions.
 
 ## Screencast
 

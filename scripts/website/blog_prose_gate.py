@@ -35,6 +35,7 @@ sys.path.insert(0, HERE)
 
 import blog_text  # noqa: E402
 import check_paragraph_capitalization as capcheck  # noqa: E402
+import collect_blog_findings as cbf  # noqa: E402 — share the stylistic deny-list
 
 REPO_ROOT_DEFAULT = os.path.dirname(os.path.dirname(HERE))
 VALE_CONFIG = "docs/website/.vale.ini"
@@ -209,7 +210,13 @@ def lt_findings(text, rel, lt_ctx):
             continue
         for m in matches:
             rid = mod._attr(m, "rule_id", "ruleId", default="")
-            if rid in disabled:
+            # Skip rules disabled in run_languagetool AND the blog stylistic
+            # deny-list, so the gate agrees with the findings collector the sweep
+            # used (otherwise a grammar fix like "all of" -> "all of the" trips
+            # ALL_OF_THE and the gate fails on the sweep's own improvements).
+            if rid in disabled or rid in cbf.LT_STYLISTIC_DENY or any(
+                rid.startswith(p) for p in cbf.LT_STYLISTIC_DENY_PREFIXES
+            ):
                 continue
             flagged = mod._flagged_text(m)
             loff = mod._attr(m, "offset", default=0)

@@ -44,7 +44,7 @@ __ |  If you have an image use it, just make sure to highlight the element withi
   
 ### Explain what you Tried
 
-Stackoverflow highlights this requirement and for good reason. It’s not just there to show that you did some work  
+Stack Overflow highlights this requirement and for good reason. It’s not just there to show that you did some work  
 before popping the question…​
 
 This provides us insight into what doesn’t work so we don’t give an answer you already tried. It also provides insight  
