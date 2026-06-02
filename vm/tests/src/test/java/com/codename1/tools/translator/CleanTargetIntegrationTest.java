@@ -893,6 +893,121 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    /**
+     * Full native-Windows screenshot suite over the cn1ss WebSocket: builds the
+     * hellocodenameone exe (the same one scripts/windows/run-hello.bat runs),
+     * starts a Cn1ssScreenshotServer on 8765 (the port the device runner defaults
+     * to), launches the exe, and waits for the CN1SS:SUITE:FINISHED marker on its
+     * stdout before tearing the process down. Asserts the suite finished and that
+     * a healthy number of PNGs landed. This is the CI counterpart of run-hello.bat.
+     *
+     * Skipped (assumeTrue) unless hellocodenameone-common is built; the CI job
+     * builds it before invoking this test.
+     */
+    @org.junit.jupiter.api.Test
+    void capturesHelloSuiteOverWebSocket() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Native Windows websocket capture is Windows-only");
+        Path exe = buildHelloCodenameOneExe();
+
+        // Compile the shared cn1ss screenshot server with an available JDK.
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        CompilerHelper.CompilerConfig jdk = configs.get(0);
+        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
+                .normalize().toAbsolutePath();
+        Path serverClasses = Files.createTempDirectory("cn1ss-server");
+        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
+                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
+                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
+
+        // The device runner defaults to ws://127.0.0.1:8765 (Cn1ssDeviceRunnerHelper).
+        int port = 8765;
+        Path outDir = Files.createTempDirectory("cn1ss-hello-out");
+        String javaBin = jdk.jdkHome.resolve("bin").resolve(CompilerHelper.executableName("java")).toString();
+        ProcessBuilder serverPb = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
+                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString());
+        serverPb.redirectErrorStream(true);
+        Process server = serverPb.start();
+        Process app = null;
+        try {
+            final java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
+            final StringBuilder serverLog = new StringBuilder();
+            Thread sreader = new Thread(new Runnable() {
+                public void run() {
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                            server.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = r.readLine()) != null) {
+                            synchronized (serverLog) { serverLog.append(line).append('\n'); }
+                            if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                        }
+                    } catch (IOException ignore) {
+                    }
+                }
+            });
+            sreader.setDaemon(true);
+            sreader.start();
+            assertTrue(ready.await(30, java.util.concurrent.TimeUnit.SECONDS),
+                    "cn1ss server should start listening");
+
+            // Launch the suite exe and watch its stdout for the end marker. The
+            // exe never self-exits (it owns the Win32 message pump), so we kill it
+            // once the suite reports done or the deadline passes.
+            ProcessBuilder appPb = new ProcessBuilder(exe.toAbsolutePath().toString());
+            appPb.directory(exe.getParent().toFile());
+            appPb.redirectErrorStream(true);
+            app = appPb.start();
+            final java.util.concurrent.CountDownLatch finished = new java.util.concurrent.CountDownLatch(1);
+            final Process appF = app;
+            Thread areader = new Thread(new Runnable() {
+                public void run() {
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                            appF.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = r.readLine()) != null) {
+                            if (line.contains("CN1SS:SUITE:FINISHED")) { finished.countDown(); }
+                        }
+                    } catch (IOException ignore) {
+                    }
+                }
+            });
+            areader.setDaemon(true);
+            areader.start();
+
+            boolean done = finished.await(20, java.util.concurrent.TimeUnit.MINUTES);
+            assertTrue(done, "hello suite should reach CN1SS:SUITE:FINISHED:\n" + serverLog);
+
+            // Count the PNGs the server received.
+            int pngs = 0;
+            try (java.util.stream.Stream<Path> s = Files.list(outDir)) {
+                for (Path p : (Iterable<Path>) s::iterator) {
+                    if (p.getFileName().toString().endsWith(".png")) { pngs++; }
+                }
+            }
+            assertTrue(pngs >= 100, "expected >=100 screenshots, got " + pngs + ":\n" + serverLog);
+
+            String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
+            if (outEnv != null) {
+                Path dest = Paths.get(outEnv);
+                Files.createDirectories(dest);
+                try (java.util.stream.Stream<Path> s = Files.list(outDir)) {
+                    for (Path p : (Iterable<Path>) s::iterator) {
+                        if (p.getFileName().toString().endsWith(".png")) {
+                            Files.copy(p, dest.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                }
+            }
+            System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);
+        } finally {
+            if (app != null) { app.destroyForcibly(); }
+            server.destroy();
+        }
+    }
+
     /** App that streams a Form screenshot to a cn1ss WebSocket server. */
     static String winWsShotAppSource(String url) {
         return "import com.codename1.ui.Display;\n" +
