@@ -107,6 +107,7 @@ import java.util.Date;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
@@ -4942,6 +4943,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public PeerComponent createNativePeer(Object nativeComponent) {
         return new HTML5Peer((HTMLElement)nativeComponent);
+    }
+
+    private final java.util.Map<PeerComponent, HTML5GLSurface> glSurfaces =
+            new IdentityHashMap<PeerComponent, HTML5GLSurface>();
+
+    @Override
+    public boolean isOpenGLSupported() {
+        return true;
+    }
+
+    @Override
+    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
+        HTML5GLSurface surface = HTML5GLSurface.create(view);
+        if (surface == null) {
+            return null;
+        }
+        glSurfaces.put(surface, surface);
+        return surface;
+    }
+
+    @Override
+    public void glSetContinuous(PeerComponent peer, boolean continuous) {
+        HTML5GLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.setContinuous(continuous);
+        }
+    }
+
+    @Override
+    public void glRequestRender(PeerComponent peer) {
+        HTML5GLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.requestRender();
+        }
     }
 
     @Override

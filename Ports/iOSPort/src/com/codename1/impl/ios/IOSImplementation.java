@@ -7968,6 +7968,55 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new NativeIPhoneView(nativeComponent);
     }
 
+    // Live Metal 3D surfaces keyed by their hosting peer, mirroring the
+    // IdentityHashMap pattern the JavaSE port uses for its GL surfaces.
+    private final java.util.Map<PeerComponent, IOSGLSurface> glSurfaces =
+            new java.util.IdentityHashMap<PeerComponent, IOSGLSurface>();
+
+    @Override
+    public boolean isOpenGLSupported() {
+        // The portable 3D API is implemented on the Metal pipeline only.
+        return metalRendering;
+    }
+
+    @Override
+    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
+        if (!metalRendering) {
+            return null;
+        }
+        long contextPeer = nativeInstance.gl3dCreateContext();
+        if (contextPeer == 0) {
+            return null;
+        }
+        long viewPeer = nativeInstance.gl3dGetViewPeer(contextPeer);
+        if (viewPeer == 0) {
+            nativeInstance.gl3dDestroyContext(contextPeer);
+            return null;
+        }
+        IOSGLSurface surface = new IOSGLSurface(view, contextPeer);
+        PeerComponent peer = createNativePeer(new long[] { viewPeer });
+        if (peer != null) {
+            glSurfaces.put(peer, surface);
+        }
+        return peer;
+    }
+
+    @Override
+    public void glSetContinuous(PeerComponent peer, boolean continuous) {
+        IOSGLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.setContinuous(continuous);
+        }
+    }
+
+    @Override
+    public void glRequestRender(PeerComponent peer) {
+        IOSGLSurface surface = glSurfaces.get(peer);
+        if (surface != null) {
+            surface.requestRender();
+        }
+    }
+
     class NativeIPhoneView extends PeerComponent {
 
         private long nativePeer;
