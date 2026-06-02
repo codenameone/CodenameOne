@@ -61,7 +61,7 @@ If the lib directory within the git project has any cn1lib files copy them into 
 
 ### Run
 
-You can now run a project from GIT regardless of the IDE you are using, notice that if your plugin is old you might need one additional step. Right click the project and select Codename One → Codname One Settings.
+You can now run a project from GIT regardless of the IDE you are using, notice that if your plugin is old you might need one additional step. Right click the project and select Codename One → Codename One Settings.
 
 Under the Basics menu click the Update Project Libs button (bottom left). This will update the jars to the latest allowing the project to run.
 ---

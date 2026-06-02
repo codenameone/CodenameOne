@@ -37,7 +37,7 @@ If there are features or capabilities missing from the current web UI please let
 Some cn1libs are pretty simple to install, just place them under the lib directory and refresh. However, many of the more  
 elaborate cn1libs need some pretty complex configurations. This is the case when native code is involved where  
 we need to add permissions or plist entries for the various native platforms to get everything to work. This makes  
-the cn1lib’s helpful but less than seamless which is where we want to go. 
+the cn1libs helpful but less than seamless which is where we want to go. 
 
 If you don’t intend to write a cn1lib you can skip to the next section, for you this post just means that future cn1lib  
 install instructions would no longer include build hints… However, if you are writing cn1libs then this is a pretty big  
@@ -47,7 +47,7 @@ We now support two new files that can be placed into the cn1lib root and exist w
 the new project wizard: `codenameone_library_required.properties` & `codenameone_library_appended.properties`. 
 
 In these files you can just write a build hint as `codename1.arg.ios.plistInject=...` for the various  
-hints. The obvious question is why do we need to files? 
+hints. The obvious question is why do we need two files? 
 
 There are two types of build hints: required and appended. Required build hints can be something like `ios.objC=true`  
 which we want to always work. E.g. if a cn1lib defines `ios.objC=true` and another cn1lib defines  

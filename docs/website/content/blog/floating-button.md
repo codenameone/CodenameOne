@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/floating-button/floating-action.png)
 
 The material design floating action button is a powerful tool for promoting an action within your application. Quite  
-a few Codename One developers implemented with own interpretation of this UI element and with the coming update  
+a few Codename One developers implemented with their own interpretation of this UI element and with the coming update  
 we will have an official implementation.
 
 The `FloatingActionButton` is a round button that resides on top of the UI typically in the bottom right hand side.  

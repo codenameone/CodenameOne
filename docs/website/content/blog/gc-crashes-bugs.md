@@ -33,7 +33,7 @@ However, this created a rather tricky situation… If a user creates a new array
     objectsInListThatArentYetMarked = null;
     
 
-In this case objectsInListThatArentYetMarked will get wiped by the GC since its no longer necessary and won’t  
+In this case objectsInListThatArentYetMarked will get wiped by the GC since it’s no longer necessary and won’t  
 be marked. Since the array is newly created it will be marked, so when our mark algorithm reaches it then it will  
 see a marked object and won’t traverse further (otherwise we will get into infinite recursions and performance penalties).  
 The solution is actually quite simple, we give newly created objects a special case -1 value and so they will  
@@ -52,7 +52,7 @@ For those of you who haven’t followed this, the JavaScript VM port essentially
 port where our build servers translate the java bytecode into JavaScript with the right porting layer.  
 Unlike GWT this port works with threading code, unlike other solutions (such as echo2) this is a purely client  
 side implementation. This would not have been possible just a couple of years ago but since JavaScript  
-VM’s have come such a long way its actually proving to be a pretty interesting port.
+VM’s have come such a long way it’s actually proving to be a pretty interesting port.
 ---
 
 ## Archived Comments

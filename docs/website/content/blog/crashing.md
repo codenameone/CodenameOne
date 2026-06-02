@@ -34,7 +34,7 @@ In an ideal world your app would work perfectly on the device just as it does on
 
 iOS allows you to extract crash logs from the device using itunes or xcode, this allows your beta testers to send you a log that allows you to gleam some information related to the cause of the crash. If you use `Log.p()` all your entries will appear in the device log (System.out will not appear). The log will also contain stacks indicating the thread stacks including the reason for the crash, this isn’t always helpful but sometimes can provide important clues as to what went wrong. Unfortunately for performance reasons XCode strips out the compiled binary and the stacks just contain memory addresses that provide very little indication applicable to your app.
 
-We now have a feature for pro users allowing them to build an unstripped binary, we are limiting it to pro users since the size of the binary is double and the so is the time it takes to produce such a binary (its a server hog). This can be achieved using the ios.no_strip=true build argument which should allow logs to include symbol information in them by default.  
+We now have a feature for pro users allowing them to build an unstripped binary, we are limiting it to pro users since the size of the binary is double and so is the time it takes to produce such a binary (its a server hog). This can be achieved using the ios.no_strip=true build argument which should allow logs to include symbol information in them by default.  
 
 * * *
 

@@ -18,7 +18,7 @@ If you didn’t sign up yet this is your chance.
 
 [ramsestom](https://github.com/ramsestom) contributed a [pull request](https://github.com/codenameone/CodenameOne/pull/2417) which filled in a gap in the properties API: `SetProperty`. I don’t use `Set` very often as `List` is typically more convenient so it’s something that I just didn’t notice.
 
-You can now declare `SetProperty` as you would a declare a `ListProperty` e.g.:
+You can now declare `SetProperty` as you would declare a `ListProperty` e.g.:
     
     
     public final SetProperty<User, User> peopleYouMayKnow =

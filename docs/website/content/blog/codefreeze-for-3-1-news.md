@@ -18,7 +18,7 @@ After the release of 3.1 we will start aiming for 3.2 currently scheduled for th
 release cycle. 
 
 Our current stated plan for releases includes 3.1 for the 27th of July, 3.2 for the 27th of October and 3.3 for the 27th of January.  
-Assuming this keeps working out nicely we will probably keep the 3 month release cycle going for the forseeable future. There is  
+Assuming this keeps working out nicely we will probably keep the 3 month release cycle going for the foreseeable future. There is  
 one major feature we wanted to release in 3.1 but couldn’t get out the door in time. On the other hand the certificate  
 wizard came in early and surprised us. This shows us that we can still deliver a substantive release within a 3 month cycle  
 without compromising. 

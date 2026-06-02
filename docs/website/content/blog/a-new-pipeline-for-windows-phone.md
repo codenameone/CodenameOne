@@ -46,7 +46,7 @@ Please try this new port and let us know both here and in the discussion forum h
   
   
   
-This was quite a bit of work that took a lot of effort we have a pretty large pipeline of tasks ahead of us both in terms of bug fixes and pending features, so if a particular issue you filed wasn’t addressed please bare with us as we work thru the backlog. Its OK to remind us occasionally since things sometimes do fall thru the cracks.  
+This was quite a bit of work that took a lot of effort we have a pretty large pipeline of tasks ahead of us both in terms of bug fixes and pending features, so if a particular issue you filed wasn’t addressed please bear with us as we work thru the backlog. Its OK to remind us occasionally since things sometimes do fall thru the cracks.  
   
   
 

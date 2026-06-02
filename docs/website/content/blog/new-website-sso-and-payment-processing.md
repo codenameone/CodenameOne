@@ -11,11 +11,11 @@ author: Shai Almog
 
 ![Codename One - New Website, SSO and new Payment Processing](https://beta.codenameone.com/wp-content/uploads/2020/11/Single-Sign-On.jpg)
 
-Welcome to our new website. There are a lot of things that are still being worked on so please bare with us and let us know ASAP when something is broken. Comments are still disabled in the current site but we’ll import them and turn them on in the next few weeks.
+Welcome to our new website. There are a lot of things that are still being worked on so please bear with us and let us know ASAP when something is broken. Comments are still disabled in the current site but we’ll import them and turn them on in the next few weeks.
 
-With the new website we’re migrating to a **Single Sign-On solution** based on**Keycloak**. This means login for this website will go through that system. Right now it’s disconnected from our existing Codename One Build login but we intend to unify everything under Keycloak and your account would merge seamlessly (assuming you used the same email address). 
+With the new website we’re migrating to a **Single Sign-On solution** based on **Keycloak**. This means login for this website will go through that system. Right now it’s disconnected from our existing Codename One Build login but we intend to unify everything under Keycloak and your account would merge seamlessly (assuming you used the same email address). 
 
-### Goodby Paypal. Hello Paddle!
+### Goodbye Paypal. Hello Paddle!
 
 One of the biggest complaints people have about signing up for Codename One’s paid subscription is our use of Paypal. To be fair, Paypal is pretty amazing. They have unparalleled global service and are pretty easy to integrate/work with. 
 

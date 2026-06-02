@@ -19,7 +19,7 @@ One of the features we added as an "afterthought" is probably the most important
 
 When you search for something e.g. <https://www.codenameone.com/search?q=floating+action+button>
 
-You are offered to try the search on Google, [StackOveflow (Codename One tag)](http://stackoverflow.com/tags/codenameone) or [our Google Group (Discussion Forum)](/discussion-forum.html). This might sound mundane because you can just go to each of those resources and search but it’s crucial as many developers miss those resources…​
+You are offered to try the search on Google, [StackOverflow (Codename One tag)](http://stackoverflow.com/tags/codenameone) or [our Google Group (Discussion Forum)](/discussion-forum.html). This might sound mundane because you can just go to each of those resources and search but it’s crucial as many developers miss those resources…​
 
 We considered adding github resources as well such as searching the sources or the issues but that might have created such an overwhelming amount of options that developers won’t check the other options.
 

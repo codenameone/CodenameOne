@@ -37,8 +37,8 @@ Creating more interesting sample data for the ChatRoom’s view model. We add me
         String georgeThumb = "https://weblite.ca/cn1tests/radchat/george.jpg";
         String kramerThumb = "https://weblite.ca/cn1tests/radchat/kramer.jpg";
     
-        room.addMessages(createDemoMessage("Why couldn't you have made me an architect? You know I always wanted to pretend that I was an architect. "
-                + "Well I'm supposed to see her tomorrow, I'm gonna tell her what's goin on. Maybe she likes me for me.",
+        room.addMessages(createDemoMessage("Why couldn’t you have made me an architect? You know I always wanted to pretend that I was an architect. "
+                + "Well I’m supposed to see her tomorrow, I’m gonna tell her what’s goin on. Maybe she likes me for me.",
                 new Date(t), "George", georgeThumb));
         t += HOUR;
         room.addMessages(createDemoMessage("Hey", new Date(t), "Kramer", kramerThumb));
@@ -86,7 +86,7 @@ Recall the screenshot of the finished app, in which the form title included a li
 
 Figure 3. Participants title component with avatars
 
-Let’s add this now by adding some participants to the view model. The ChatRoomView.ViewModel includes methods to directly add participants to the model via addParticpant(Entity…​ participants). Each participant entity should implement the Thing.name or Thing.thumbnailUrl tags, or both. If Only Thing.name is provided, then it will generate an avatar with the first letter of their name. If Thing.thumbnailUrl is provided, then it will use the image at this url as the avatar.
+Let’s add this now by adding some participants to the view model. The ChatRoomView.ViewModel includes methods to directly add participants to the model via addParticpant(Entity…​ participants). Each participant entity should implement the Thing.name or Thing.thumbnailUrl tags, or both. If only Thing.name is provided, then it will generate an avatar with the first letter of their name. If Thing.thumbnailUrl is provided, then it will use the image at this url as the avatar.
 
 Let’s begin by creating a custom entity/view model named "ChatAccount" which will be used as participants in the chat. Create a new Java class named "ChatAccount" with the following contents:
 
@@ -146,7 +146,7 @@ The `Entity` class, together with `EntityType` provide lots of useful features s
 
 Getting and Setting Properties on Entities
 
-Before proceeding, its worth discussing the basics of how to use entities. The Entity class allows us to get and set properties without needing to define getter and setter methods. It also includes a rich set of convenience methods for handling data-conversion. Finally, one of the most powerful features of entities is its loose coupling. It is possible to get and set property values without any knowledge of which properties exist in the entity, via tags.
+Before proceeding, it’s worth discussing the basics of how to use entities. The Entity class allows us to get and set properties without needing to define getter and setter methods. It also includes a rich set of convenience methods for handling data-conversion. Finally, one of the most powerful features of entities is its loose coupling. It is possible to get and set property values without any knowledge of which properties exist in the entity, via tags.
 
 First things first: Getting and setting property values.
 

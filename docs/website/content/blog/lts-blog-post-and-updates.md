@@ -34,7 +34,7 @@ Speaking of promoting other people I hope you filled the
 [  
 developer economics survey  
 ](http://www.visionmobile.com/DE1Q14CodenameOne)  
-, its really helpful for us and time is running out (they are closing the survey soon). They added additional language options which you can use that might make the process faster.  
+, it’s really helpful for us and time is running out (they are closing the survey soon). They added additional language options which you can use that might make the process faster.  
   
   
   
@@ -48,14 +48,14 @@ Back to our regular scheduled programming
   
 We have a few bits of news that might interest you. We just changed the filesystem behavior in the simulator  
   
-to be more consistent with what you would see on the device. This might break some behaviors you might ave come to rely on but that is a good thing since its REALLY problematic to rely on filesystem layout. This started out as fixing  
+to be more consistent with what you would see on the device. This might break some behaviors you might have come to rely on but that is a good thing since it’s REALLY problematic to rely on filesystem layout. This started out as fixing  
 [  
 issue 948  
 ](http://code.google.com/p/codenameone/issues/detail?id=948)  
-but the fix is pretty complex since the right thing to do is to normallize files for the simulator. 
+but the fix is pretty complex since the right thing to do is to normalize files for the simulator. 
 
   
-There are a lot of new features coming up next week but further down the road we just started work on an InteliJ IDEA plugin  
+There are a lot of new features coming up next week but further down the road we just started work on an IntelliJ IDEA plugin  
   
 . If you are a developer who prefers working with IDEA we hope to release a new plugin within the next couple of months!  
 

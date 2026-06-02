@@ -13,7 +13,7 @@ author: Shai Almog
 
 The `Tabs` class is pretty powerful and flexible as I [mentioned before](/blog/tip-customize-tabs-behavior/). One thing it doesn’t support is drag and drop to re-order the tabs. Here the flexibility of Codename One takes over and allows us to accomplish it.
 
-We can use the builtin drag and drop support for components within the tabs container. This is exactly how the code below works. In the drop listener we block the the default processing of drop behavior so we can move the tab manually to the new location:
+We can use the builtin drag and drop support for components within the tabs container. This is exactly how the code below works. In the drop listener we block the default processing of drop behavior so we can move the tab manually to the new location:
     
     
     Form hi = new Form("Tabs", new BorderLayout());

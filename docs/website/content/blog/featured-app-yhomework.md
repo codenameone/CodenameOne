@@ -30,7 +30,7 @@ the answer in the book differ from my result?
 
 [yHomework](http://www.yhomework.com/) was one of the first major Codename One apps ever written, some of  
 our features were explicitly built to help this app. Originally the author wrote an entire implementation in JavaScript  
-and scrapped the whole thing our of concern for IP issues & a personal preference for Java.
+and scrapped the whole thing out of concern for IP issues & a personal preference for Java.
 
 __ |  Despite obfuscation JavaScript apps (e.g. PhoneGap/Cordova) can be unzipped and resold which is a  
 common practice in some markets   
@@ -42,8 +42,8 @@ In fact the app was so successful that it brought down our old push notification
 
 #### Portability
 
-yHomework benefited greatly from it’s portability as a few years ago a competing iOS app went on a media blitz.  
-yHomework saw it’s marketshare rise both on iOS and Android thanks to that competitors campaign. The rise  
+yHomework benefited greatly from its portability as a few years ago a competing iOS app went on a media blitz.  
+yHomework saw its marketshare rise both on iOS and Android thanks to that competitor’s campaign. The rise  
 was especially pronounced on Android (where the competitor wasn’t present) but also carried into iOS thanks  
 to the social sharing effect.
 

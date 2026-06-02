@@ -33,7 +33,7 @@ the original version of this post incorrectly specified the property as AppArgs 
 A common trick in mobile application development, is communication between two unrelated applications. In Android we have intents which are pretty elaborate and can be used via Display.execute, however what if you would like to expose the functionality of your application to a different application running on the device. This would allow that application to launch your application.  
   
   
-This isn’t something we builtin to Codename One, however we did expose enough of the platform capabilities to enable that functionality rather easily on Android.  
+This isn’t something we built in to Codename One, however we did expose enough of the platform capabilities to enable that functionality rather easily on Android.  
   
   
   

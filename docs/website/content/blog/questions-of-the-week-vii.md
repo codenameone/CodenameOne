@@ -35,7 +35,7 @@ it’s pretty darn elegant. It’s great seeing a developer finding out and answ
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37433294/codename-one-get-the-current-visible-image-index-from-a-defaultlistmodel-inclu)
 
-### How to show two or more label at centre of the Container
+### How to show two or more label at center of the Container
 
 This question has quite a few potential correct answers…​.
 

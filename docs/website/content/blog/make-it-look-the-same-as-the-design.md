@@ -29,14 +29,14 @@ I have blogged, in the past, about UI design in Codename One. In [this tutorial]
 
 So, what does "Just like the design" mean? A broad overview is that fonts, colors, padding, margin, and alignment must match the design. In addition, the sections of the UI must be retained correctly. The last part (sections), is most relevant when adapting the UI to different screen sizes. Below, I go into detail on each of these aspects of design.
 
-__ |  I come from the "programming" side of the fence. I don’t have any formal design training, other than having read a few books on the subject, and tips that I have picked in in past projects by **actual** designers.   
+__ |  I come from the "programming" side of the fence. I don’t have any formal design training, other than having read a few books on the subject, and tips that I have picked in past projects by **actual** designers.   
 ---|---  
   
 ## Fonts
 
 **Fonts** should match as much as possible. Try to use the exact same font. If that isn’t possible, then at least find a similar font.
 
-[This website](http://www.identifont.com/similar.html) allows you to type in a font name, and it will show you a list of suggestions for similar fonts. At the bare minimum you’ll want to choose a font that is on the same side of the serif/sans-serif divide. One simple test I use to "rule out" a font is to compare the the lower case "a", "g", and "y", as each has two distinct variants. I generally want my "similar" font to at least agree on those three glyphs.
+[This website](http://www.identifont.com/similar.html) allows you to type in a font name, and it will show you a list of suggestions for similar fonts. At the bare minimum you’ll want to choose a font that is on the same side of the serif/sans-serif divide. One simple test I use to "rule out" a font is to compare the lower case "a", "g", and "y", as each has two distinct variants. I generally want my "similar" font to at least agree on those three glyphs.
 
 ## Colors
 

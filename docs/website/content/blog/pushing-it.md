@@ -27,7 +27,7 @@ request from one of our pro-subscribers
 to support push notification on Blackberry devices. Normally we just implement the feature pro-developers ask for. However, in this case we were cautious… Building anything for/on top of a Blackberry device is often an exercise in futility. 
 
   
-The gist of it though is that we were able to get it working despite the huge hassles. The main issue here isn’t the lack of documentation, its the over abundance of irrelevant, conflicting and misleading documents about a multitude of separate features of push related functionality on Blackberry devices.  
+The gist of it though is that we were able to get it working despite the huge hassles. The main issue here isn’t the lack of documentation, it’s the over abundance of irrelevant, conflicting and misleading documents about a multitude of separate features of push related functionality on Blackberry devices.  
   
   
   
@@ -72,7 +72,7 @@ To start using push (on any platform) you will need to implement the PushCallbac
   
   
   
-You will then need to register to receive push notifications (its OK to call register every time the app loads) by invoking this code below (notice that the google project id needs to be passed to registration): 
+You will then need to register to receive push notifications (it’s OK to call register every time the app loads) by invoking this code below (notice that the google project id needs to be passed to registration): 
 
   
   
@@ -121,7 +121,7 @@ rim.pushBpsURL=…
   
 Once you define  
   
-all of these push should work for all platforms.
+all of these, push should work for all platforms.
 
   
 We hope this small guide has made the development of a push enabled application a bit simpler.  

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/using-icon-fonts-such-as-fontello/font-awesome.jpg)
 
-A lot of our focus in the past couple of releases has been around the material design icon fonts, they changed the way we build UIs. We also support arbitrary font icons, this features isn’t limited to material icons [and we blogged about it a while back](/blog/icon-fonts-oldvm-swan-song.html).
+A lot of our focus in the past couple of releases has been around the material design icon fonts, they changed the way we build UIs. We also support arbitrary font icons, this feature isn’t limited to material icons [and we blogged about it a while back](/blog/icon-fonts-oldvm-swan-song.html).
 
 After going back and forth with developers we got the sense that using an icon font such as fontello wasn’t clear. In this short tutorial we’ll try to explain the process and benefits.
 

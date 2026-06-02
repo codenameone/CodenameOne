@@ -30,7 +30,7 @@ Therefore the screen origin is at the top left corner of the screen. Given this 
 
 Where would this rectangle be drawn on the screen?
 
-If you answered something something like "10 pixels from the top, and 10 pixels from the left of the screen", you  
+If you answered something like "10 pixels from the top, and 10 pixels from the left of the screen", you  
 _might_ be right. It depends on whether the graphics has a translation or transform applied to it. If there is  
 currently a translation of `(20,20)` (i.e. 20 pixels to the right, and 20 pixels down), then the rectangle would be rendered at `(30, 30)`. 
 
@@ -77,7 +77,7 @@ The result is as follows:
 
 ![Rectangle](/blog/codename-one-graphics-understanding-coordinates/rectangle_component1.png)
 
-> Note: The `x` and `y` coordinates that are passed to the `drawRect(x,y,w,h)` method are relative to the component’s _parent’s_ origin — **not the component itself .. its parent.** This is why we the _x_ position is `getX()+5` and not just _5_.
+> Note: The `x` and `y` coordinates that are passed to the `drawRect(x,y,w,h)` method are relative to the component’s _parent’s_ origin — **not the component itself .. its parent.** This is why the _x_ position is `getX()+5` and not just _5_.
 
 #### Transforms and Rotations
 
@@ -125,7 +125,7 @@ The result is as follows:
 
 ![Rotation](/blog/codename-one-graphics-understanding-coordinates/rotation1.png)
 
-This may not be an intuitive outcome since we drew 10 rectangle components, be we only see a portion of one rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation. Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In our case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their containing component - so they are being clipped. A more sensible solution for our component would be to place the rotation pivot point somewhere inside the component. That way all of the components would look the same. Some possibilities would be:
+This may not be an intuitive outcome since we drew 10 rectangle components, but we only see a portion of one rectangle. The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation. Components nearer to this pivot point will experience a less dramatic effect than components farther from it. In our case, the rotation has caused all rectangles except the first one to be rotated outside the bounds of their containing component - so they are being clipped. A more sensible solution for our component would be to place the rotation pivot point somewhere inside the component. That way all of the components would look the same. Some possibilities would be:
 
 Top Left Corner:
     

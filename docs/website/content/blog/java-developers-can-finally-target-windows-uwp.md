@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/java-developers-can-finally-target-windows-uwp/universal-windows-apps_thumb.jpg)
 
-> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+> **Historical note:** Codename One’s UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
 
 After many months of work and effort put in by all of us but especially by [Steve Hannah](http://twitter.com/shannah78) and  
 [Fabrício Carvalho Cabeça](https://twitter.com/ravnos_kun) we are finally live with the Windows Universal Platform (AKA UWP)  
@@ -34,7 +34,7 @@ The whole source of this port as well as our changes to iKVM are available in [o
 ### What does this Mean?
 
 As of May Windows 10 is installed on 300 million PC’s and devices making it a significant platform and appstore.  
-Microsoft has traditionally been quite strong in the enterprise and the ability to sell into that market thru it’s  
+Microsoft has traditionally been quite strong in the enterprise and the ability to sell into that market thru its  
 appstore (with the success of the Surface tablet line) is valuable.
 
 Microsoft has standardized on the Universal Windows Platform which effectively "reinvents" Windows as  

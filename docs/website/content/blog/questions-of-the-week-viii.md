@@ -32,8 +32,8 @@ enough…​
 
 ### Why is the JSONParser always returning a double?
 
-One painful ommission from the API subset supported by Codename One is the Number class. We’d really like  
-to fix that ommission soon.
+One painful omission from the API subset supported by Codename One is the Number class. We’d really like  
+to fix that omission soon.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37477926/why-is-the-jsonparser-always-returning-a-double)
 
@@ -47,7 +47,7 @@ but confuses developers still…​
 
 ### Right side menu shadow is flipped
 
-This was a regression we introduced with this weeks release, it should be fixed by the time you read this…​
+This was a regression we introduced with this week’s release, it should be fixed by the time you read this…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37475286/codename-one-right-side-menu-shadow-is-flipped)
 

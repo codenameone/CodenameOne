@@ -55,10 +55,10 @@ jobs:
         -Dcodename1.arg.ios.gplus.clientId=000000000000-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.apps.googleusercontent.com
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache CocoaPods and user gems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gem
@@ -108,7 +108,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
@@ -116,7 +116,7 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -124,7 +124,7 @@ jobs:
             ${{ runner.os }}-m2-
 
       - name: Restore cn1-binaries cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ../cn1-binaries
           key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload packaging artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-packaging
           path: artifacts

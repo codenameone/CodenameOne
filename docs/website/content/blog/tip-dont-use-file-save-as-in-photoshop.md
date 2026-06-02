@@ -18,7 +18,7 @@ I’ve spent the better part of the day tracking this with no result…​
 I’ve worked on extracting UI’s from PSD files for a while now and I was on my way to build a new UI when suddenly  
 I noticed my theme file was **HUGE**. Not just "big", **HUGE**.
 
-Looking at the images I’ve noticed they were ridiculously big so I started doing the typical things (bluring, scaling,  
+Looking at the images I’ve noticed they were ridiculously big so I started doing the typical things (blurring, scaling,  
 reducing quality) all of which didn’t work until I was able to come up with an odd workaround by saving as  
 JPEG2000 and then resaving as a regular file.
 

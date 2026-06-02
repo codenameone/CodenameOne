@@ -48,7 +48,7 @@ which you can achieve without recoding the app 2-4 times…​
 
 ### Rise of Windows 10
 
-Windows Phone is dead but Windows 10 is rising. In fact Microsofts surface is  
+Windows Phone is dead but Windows 10 is rising. In fact Microsoft’s surface is  
 [leading in the detachable keyboard tablet space](http://www.idc.com/getdoc.jsp?containerId=prUS41072516).  
 This specific segment is hugely important in the corporate world where access to legacy Windows software  
 is crucial.
@@ -75,10 +75,10 @@ Both yielded to a common middle ground. Android placed restrictions on backgroun
 battery with project doze. iOS added support for many use cases which are still not as flexible as activities and  
 services but provide almost all of the commonly needed use cases.
 
-Permissions and security also saw a similar convergence where Android shifted it’s over complicated and misunderstood  
+Permissions and security also saw a similar convergence where Android shifted its over complicated and misunderstood  
 permissions system to one that is more similar to the one iOS has.
 
-These convergences make WORA (Write Once Run Anywhere) far easier as they allow developers to run get a similar  
+These convergences make WORA (Write Once Run Anywhere) far easier as they allow developers to get a similar  
 experience (e.g. permission prompts) across various devices.
 
 ### Final Word

@@ -23,7 +23,7 @@ We also added an iPhone 5 simulator skin allowing you to generate iPhone 5 resol
 
 And we finally added a bar code/qr code reader API. However, this wasn’t as easy as one would suspect. The problem is that ZXing our API of choice for the QR code in the demo, doesn’t do barcodes on iOS… So we had to use a different implementation on iOS which might not be as good as ZXing with QR codes. So the old native approach will still work if you want it too, but you don’t have to because we have a much simpler API.
 
-There is allot more coming in the next couple of months… Stay tuned. 
+There is a lot more coming in the next couple of months… Stay tuned. 
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 

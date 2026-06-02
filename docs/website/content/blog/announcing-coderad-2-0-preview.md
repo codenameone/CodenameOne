@@ -108,7 +108,7 @@ You could write the same component as a CodeRAD view using the following:
 The XML view is automatically transformed into a Java class by the CodeRAD annotation processor so that performance is on par with the hand-coded **Java** version.
   
   
-This example demonstrates the primary benefit of using XML as a language for writing view classes: It is **declarative**! The XML representation maps directly to way the view will be presented in the app.
+This example demonstrates the primary benefit of using XML as a language for writing view classes: It is **declarative**! The XML representation maps directly to the way the view will be presented in the app.
   
   
 This example is just the tip of the iceberg, however, as CodeRAD’s XML views also include many other features aimed at making your development experience as smooth as possible. They have built-in support for property binding, for example, making it easy to maintain a clean separation between your **View** and **Controller** logic.

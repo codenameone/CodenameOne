@@ -13,7 +13,7 @@ author: Shai Almog
 
   
 
-Answering common question is what a FAQ is usually for, but usually that’s just not enough. A common presentation tip is: "Show, don’t tell".  
+Answering common questions is what a FAQ is usually for, but usually that’s just not enough. A common presentation tip is: "Show, don’t tell".  
   
 Which is why we launched the  
 [  

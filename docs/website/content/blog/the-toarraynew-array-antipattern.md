@@ -49,7 +49,7 @@ It will produce an array response that is equal to the size of c and is of type 
 
 Java usually takes the approach of "fail fast", which means that if code fails it should do so ASAP and not "try to recover" which might cause bugs to remain hidden. This isn’t such a case.
 
-If the array past to the toArray method is too small, the code has a fallback. The problem is that the fallback is REALLY bad!  
+If the array passed to the toArray method is too small, the code has a fallback. The problem is that the fallback is REALLY bad!  
   
 It uses reflection to detect the array type and allocate a whole new array. This is really slow and that essentially means the original allocated array is just completely redundant garbage. And all this just saves a single boilerplate method call:  
   

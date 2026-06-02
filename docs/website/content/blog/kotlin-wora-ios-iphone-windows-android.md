@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/kotlin-wora-ios-iphone-windows-android/kotlin_800x320.png)
 
-We received some interest related to Kotlin over the past couple of years and this has risen noticeably in the past month or so. Up until now we tried to be very focused on Java which is why we didn’t add support to other JVM languages even though this shouldn’t be too hard. But Kotlins similarity to Java and its special relationship to Android make it an ideal second language for us.
+We received some interest related to Kotlin over the past couple of years and this has risen noticeably in the past month or so. Up until now we tried to be very focused on Java which is why we didn’t add support to other JVM languages even though this shouldn’t be too hard. But Kotlin’s similarity to Java and its special relationship to Android make it an ideal second language for us.
 
 We plan to implement Kotlin support in the "right way" and offer all the Codename One supported platforms as it would just be a Codename One project for our build process. This should work in a similar way to the Android support by allowing you to mix Kotlin sources and Java sources in a single project.
 

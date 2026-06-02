@@ -18,7 +18,7 @@ the January release of 3.6. During December we’ll probably pause blogging betw
 I’ll still be working and at least some of our team will, but we’ll focus on support and features/issues which will  
 give us a lot to write about when we get back.
 
-Todays update doesn’t include anything exceptional just a couple of new features and fixes.
+Today’s update doesn’t include anything exceptional just a couple of new features and fixes.
 
 [Stuart Brand](http://stackoverflow.com/users/5114135/stuart-brand) asks why the  
 [enter key doesn’t show on the text field](http://stackoverflow.com/questions/40977725/codename-one-textfield-on-android-no-enter-key)  
@@ -35,7 +35,7 @@ keys and not virtual keys
 [Mamatha Damuluri](http://stackoverflow.com/users/6924648/mamatha-damuluri) asks  
 [how one would know if an app is minimized.](http://stackoverflow.com/questions/40990021/how-to-know-the-app-is-closed-or-not-when-i-have-minimize-the-app-and-side-swipe)  
 [Tim Weber](http://stackoverflow.com/users/5371574/tim-weber) provided a great answer for that. Lifecycle  
-is one the harder things in mobile development. We tried to simplify it as much as possible but there  
+is one of the harder things in mobile development. We tried to simplify it as much as possible but there  
 are always pitfalls. Check out the first chapter of the developer guide when we cover some of these concepts…​
 
 [tizbn](http://stackoverflow.com/users/854401/tizbn) asked how to  

@@ -18,7 +18,7 @@ that should help you get started with applications that use such login options.
 
 #### Future Of Windows Phone
 
-I’ve been holding back on writing this before we have further information and can properly asses the situation. However… since  
+I’ve been holding back on writing this before we have further information and can properly assess the situation. However… since  
 MS is taking its time we’d rather discuss the future of Windows Phone once rather than all over the different forums/social and support channels.  
 As you know we wrote roughly 3 different Windows Phone ports, the first targeted Windows Phone 7.5 (mango) which  
 relied on functionality introduced in that version and immediately killed in 8.0! 

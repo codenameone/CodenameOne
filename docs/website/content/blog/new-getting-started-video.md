@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/new-getting-started-video/hello-codenameone-revisited.png)
 
 We just published a new introduction to Codename One video, that we hope will set the bar for future videos from  
-us (or at lease set the bar for the more important videos). This initial one is focused on NetBeans but we intend  
+us (or at least set the bar for the more important videos). This initial one is focused on NetBeans but we intend  
 to publish similar videos for IntelliJ/Eclipse shortly. You can check out this video in the [How Do I section](/how-do-i.html)  
 right [here](/how-do-i---create-a-basic-hello-world-application—​send-it-to-my-device-using-netbeans.html).  
 for your convenience we also embedded the video below but the transcript is only within the  

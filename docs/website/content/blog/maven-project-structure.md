@@ -24,10 +24,10 @@ The new project structure is based on the [cn1app-archetype](https://github.com/
 ****1. This is a multi-module project**** with sub modules for each target platform.
   
   
-2. It comes bundled with a ****maven wrapper script****, and utility shell (and bat) scripts to facility command-line usage.
+2. It comes bundled with a ****maven wrapper script****, and utility shell (and bat) scripts to facilitate command-line usage.
   
   
-3. The includes NetBeans and IntelliJ configuration files to provide better integration with those IDEs.
+3. It includes NetBeans and IntelliJ configuration files to provide better integration with those IDEs.
   
   
 ****4. The "common" module contains all of the cross-platform stuff****, and is the most direct successor to the old Ant project structure.
@@ -52,10 +52,10 @@ i. `codenameone_settings.properties` is found in the common module.
   
        vii. Unit tests are in common/src/test/java.
 
-****5. CSS By Detault****. Projects are set to use CSS by default. You can edit the styles in common/src/main/css/theme.css.
+****5. CSS By Default****. Projects are set to use CSS by default. You can edit the styles in common/src/main/css/theme.css.
   
   
-6. You can install cn1lib dependencies either via a Maven <dependency> snippet in your common/pom.xml file, or using **Codename One Settings**. You can Also use the [install-cn1lib goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
+6. You can install cn1lib dependencies either via a Maven <dependency> snippet in your common/pom.xml file, or using **Codename One Settings**. You can also use the [install-cn1lib goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
 
 ## Creating a New Project
 
@@ -91,7 +91,7 @@ Module containing native Windows UWP code for the UWP windows port.
 
 ## cn1libs
 
-Module where legacy cn1libs will be installed the cn1:install-cn1lib goal.
+Module where legacy cn1libs will be installed by the cn1:install-cn1lib goal.
 
 ### Shell Scripts
 

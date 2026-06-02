@@ -51,7 +51,7 @@ jobs:
       CF_PAGES_PRODUCTION_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Hugo
         uses: peaceiris/actions-hugo@v3
@@ -60,7 +60,7 @@ jobs:
           extended: true
 
       - name: Set up Java 8 for Initializr build
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '8'
@@ -71,7 +71,7 @@ jobs:
           ruby-version: '3.3'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -95,7 +95,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Set up Java 17 for Skin Designer screenshots
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -117,7 +117,7 @@ jobs:
         run: ./scripts/skindesigner/screenshots/take-screenshots.sh
 
       - name: Set up Java 25 for website build
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
@@ -240,7 +240,7 @@ jobs:
 
       - name: Upload codenameone link policy report
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: codenameone-link-policy-report
           path: docs/website/reports/disallowed-codenameone-links.txt
@@ -269,7 +269,7 @@ jobs:
           grep -Eq '^/feed\.xml /blog/index\.xml 302$' docs/website/public/_redirects
 
       - name: Upload built site artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-preview
           path: docs/website/public
@@ -323,7 +323,7 @@ jobs:
 
       - name: Comment Cloudflare preview link on PR
         if: ${{ github.event_name == 'pull_request' && steps.cf_preview.outputs.preview_url != '' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- cn1-cloudflare-preview -->';

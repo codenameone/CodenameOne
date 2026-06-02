@@ -22,7 +22,7 @@ In Java return types create a distinct method signature, so even though the lang
         return 1;
     }
 
-This is actually valid in the bytecode level. Furthermore, it’s a used by the JVM to implement Java language features like covariant return types.
+This is actually valid in the bytecode level. Furthermore, it’s used by the JVM to implement Java language features like covariant return types.
 
 So if you used `ToastBar` and compiled against older libraries you might experience issues when building. Make sure to update your client libraries before sending a build by going into Codename One Settings → Basic → Update Client Libs. Then do a clean/build before sending a new build.
 

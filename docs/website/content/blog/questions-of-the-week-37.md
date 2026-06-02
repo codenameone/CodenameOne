@@ -11,10 +11,10 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-37/qanda-friday2.jpg)
 
-We thought about skipping the release today and going strait for a release on the day of the code freeze but this might create a situation where a regression is missed because you didn’t have enough time with the code. This means we might have more than one update until the 16th release of 3.6 so please bare with us.   
+We thought about skipping the release today and going straight for a release on the day of the code freeze but this might create a situation where a regression is missed because you didn’t have enough time with the code. This means we might have more than one update until the 16th release of 3.6 so please bear with us.   
 We will release plugin updates with the code freeze and they should include the release candidate of 3.6 within them.
 
-Due to the holidays stack overflow was relatively calm depite our week long absence…​
+Due to the holidays stack overflow was relatively calm despite our week long absence…​
 
 [Faugan Bidi](http://stackoverflow.com/users/4470854/faugan-bidi) asked how to [add a tree to the overflow menu](http://stackoverflow.com/questions/41460316/add-tree-component-to-overflowmenu). This isn’t really possible because the overflow menu is really a list. However, I did provide another way that is more elegant to achieve what is effectively the same result.
 

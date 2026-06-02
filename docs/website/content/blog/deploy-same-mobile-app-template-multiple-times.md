@@ -41,7 +41,7 @@ which we will ship as `com.evil.apps.supercoolapp`. To do this I need to follow 
 
 #### Step 1: Create the Acme app as usual
 
-This is pretty strait forward and I’m assuming you all know how to do that…​
+This is pretty straightforward and I’m assuming you all know how to do that…​
 
 #### Step 2: Create the Evil Corp Package
 
@@ -49,7 +49,7 @@ We can just create a new package in the IDE named `com.evil.apps.supercoolapp` a
 Ideally it should have the same name as the main class we have in `com.acme.apps.supercoolapp`, I’ll assume they  
 are both named `Main`.
 
-The cool thing as that one main can derive functionality from another e.g.:
+The cool thing is that one main can derive functionality from another e.g.:
     
     
     package com.evil.apps.supercoolapp;

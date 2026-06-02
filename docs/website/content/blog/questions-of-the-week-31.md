@@ -51,7 +51,7 @@ IAP and push both need the main class to implement their respective callback int
 
 ### Hand coded GUI build failed in Codename One
 
-When you create a GUI builder form and decide to stop using the GUI buidler you need to delete the `.gui` file
+When you create a GUI builder form and decide to stop using the GUI builder you need to delete the `.gui` file
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40483635/hand-coded-gui-build-failed-in-codename-one)
 
@@ -75,7 +75,7 @@ cn1lib’s allow some modularity in Codename One but unfortunately Eclipse doesn
 
 ### Performance related issue with network connection
 
-It is crucial to keep an eye on all networking operationson all times
+It is crucial to keep an eye on all networking operations at all times
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40451469/performance-related-issue-with-network-connection)
 

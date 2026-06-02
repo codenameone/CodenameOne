@@ -31,7 +31,7 @@ The new class is trivial and works as a drop-in replacement for `OnOffSwitch`. T
 
 ### InfiniteProgress
 
-Despite its huge legacy there was no need to rewrite `InfiniteProgress` since the class is much simpler. However, since the new material design progress behavior might not be to everyones liking its off by default. We’ll switch this on for Android when we feel it’s stable enough.
+Despite its huge legacy there was no need to rewrite `InfiniteProgress` since the class is much simpler. However, since the new material design progress behavior might not be to everyone’s liking it’s off by default. We’ll switch this on for Android when we feel it’s stable enough.
 
 You can activate the experimental mode either through code using:
     

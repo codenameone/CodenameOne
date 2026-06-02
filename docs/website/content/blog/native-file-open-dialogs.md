@@ -48,7 +48,7 @@ When you open the file chooser it gives you a list of your device’s installed 
 
 ![iOS filechooser](/blog/native-file-open-dialogs/ios-filechooser.png)
 
-In my case I have my iCloud drive (everyone will have this), and Dropbox because I have the Dropbox app installed on my phone. But if you have other apps have DocumentProvider extensions, then those will also be listed.
+In my case I have my iCloud drive (everyone will have this), and Dropbox because I have the Dropbox app installed on my phone. But if you have other apps that have DocumentProvider extensions, then those will also be listed.
 
 It also includes an "Images" option that allows the user to browse their local images if they have included any "image" types in the call to `showOpenDialog()`
 
@@ -69,7 +69,7 @@ On Windows Phone 10, the dialog allows users to browse their OneDrive, or local 
 
 **Desktop**
 
-In the desktop builds, the simulator, javascript (on the desktop), and Windows 10 Desktop, you will just see the name file chooser dialog.
+In the desktop builds, the simulator, javascript (on the desktop), and Windows 10 Desktop, you will just see the native file chooser dialog.
 
 ### More Information
 

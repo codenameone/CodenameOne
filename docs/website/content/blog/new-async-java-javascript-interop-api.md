@@ -66,7 +66,7 @@ __ |  When using the `andWait()` variant, it is **extremely** important that you
   
 ## Multi-use Callbacks
 
-The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the only difference is that the callback will life on after its first use. E.g. Consider the following code:
+The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the only difference is that the callback will live on after its first use. E.g. Consider the following code:
     
     
     bc.execute(
@@ -107,7 +107,7 @@ The gist is that you embed placeholders in the javascript expression that are re
 
 ## Proxy Objects
 
-The new API also includes a [JSProxy](/javadoc/com/codename1/ui/BrowserComponent.JSProxy/) class that encapsulates a Javascript object simplify the getting and setting of properties on Javascript objects – and the calling of their methods. It provides essentially three core methods, along with several variants of each to allow for async or synchronous usages, parameters, and timeouts.
+The new API also includes a [JSProxy](/javadoc/com/codename1/ui/BrowserComponent.JSProxy/) class that encapsulates a Javascript object to simplify the getting and setting of properties on Javascript objects – and the calling of their methods. It provides essentially three core methods, along with several variants of each to allow for async or synchronous usages, parameters, and timeouts.
 
 E.g. We might want to create a proxy for the [window.location](https://developer.mozilla.org/en-US/docs/Web/API/Window/location) object so that we can access its properties more easily from Java.
     

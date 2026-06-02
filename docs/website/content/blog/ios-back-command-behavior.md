@@ -17,7 +17,7 @@ I’ve been working on the new Facebook clone app, I have a lot to say about tha
 
 Figure 1. Back Command iOS/Android & Facebooks native on Android
 
-On Android we use an arrow to indicate back but on iOS we usually show the title of the previous form with a `<` icon to indicate the back action. Up until recently this was represented in the `BackCommand` UIID with a an image aligned to the left of the command. This was hard to style and made very little sense.
+On Android we use an arrow to indicate back but on iOS we usually show the title of the previous form with a `<` icon to indicate the back action. Up until recently this was represented in the `BackCommand` UIID with an image aligned to the left of the command. This was hard to style and made very little sense.
 
 With the next update we’ll use the builtin material icon for this when you set a back command. In this form I used the following code for back:
     

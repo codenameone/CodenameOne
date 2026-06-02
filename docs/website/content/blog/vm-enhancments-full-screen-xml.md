@@ -25,7 +25,7 @@ Another important piece is `java.util.Objects`. Technically we implemented this 
 
 ### XML Properties
 
-We supported JSON in [properties](/blog/properties-are-amazing/) from day one. XML is a bit harded but not by much. We added highly experimental support for XML into properties which can be useful when working with XML data from the server or storage.
+We supported JSON in [properties](/blog/properties-are-amazing/) from day one. XML is a bit harder but not by much. We added highly experimental support for XML into properties which can be useful when working with XML data from the server or storage.
 
 __ |  This feature is experimental and the API might change/break   
 ---|---  

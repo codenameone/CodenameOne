@@ -23,7 +23,7 @@ author: Shai Almog
 **  
 Updated:  
 **  
-We also added the option: ios.mopubTabletId which is required to build tablet compilant apps. It must point to a leaderboard ad unit.  
+We also added the option: ios.mopubTabletId which is required to build tablet compliant apps. It must point to a leaderboard ad unit.  
   
   
   
@@ -39,7 +39,7 @@ MoPub
 ](http://www.mopub.com/)  
 support for Android/iOS only (for true cross platform our Inneractive support is still in place).  
   
-MoPub isn’t an advertizing network, its an ad exchange. So effectively when you place a banner ad via MoPub you can get an ad from AdMob, iAd or any one of a relatively large list of partner networks.
+MoPub isn’t an advertizing network, it’s an ad exchange. So effectively when you place a banner ad via MoPub you can get an ad from AdMob, iAd or any one of a relatively large list of partner networks.
 
   
 The benefit here is in fill rates, you can improve ad fillrates and payments since if network X doesn’t have the right ad network Y could kick into place! You can mix and match many different networks including iAd which works really well on iOS but isn’t available elsewhere.  
@@ -60,7 +60,7 @@ And you will get banners like the one in the picture.
   
 Notice that currently the ads take over the bottom portion of the screen so you might want to add padding or margin there  
   
-. We are thinking whether this should be automated and if so in what way. This is an experimental feature at the moment so some things might change with it as we move along, but we felt that its a rather urgent feature which is why we are releasing it right now. Hopefully you will find it useful.  
+. We are thinking whether this should be automated and if so in what way. This is an experimental feature at the moment so some things might change with it as we move along, but we felt that it’s a rather urgent feature which is why we are releasing it right now. Hopefully you will find it useful.  
 
 * * *
 

@@ -31,7 +31,7 @@ Flamingo works by translating SVG’s to Java source code that you can compile i
 
 The recent changes include both improvement to the translation process and to the Codename One API. Our updated API now supports features such as paint and gradient drawing which is commonly used in SVG. Specifically Steve added a `Paint` interface, with concrete subclass `LinearGradientPaint` that can be used to fill a shape with a gradient via `Graphics.setColor(Paint)` then `Graphics.fillShape(shape)`. There are quite a few other related changes such as `MultipleGradientPaint` and `AffineTransform`…​
 
-With these in place you can convert a lot of typical SVG’s and use them in your app. The big question is whether we’ll integrate this deeper into Codname One by automating this process. Right now we’re not sure about that or how such integration will look. Maybe something similar to the CSS integration.
+With these in place you can convert a lot of typical SVG’s and use them in your app. The big question is whether we’ll integrate this deeper into Codename One by automating this process. Right now we’re not sure about that or how such integration will look. Maybe something similar to the CSS integration.
 ---
 
 ## Archived Comments

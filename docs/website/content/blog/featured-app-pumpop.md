@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/featured-app-pumpop/pumpop-landscape.png)
 
 Pumpop is a social networking app in the spirit of tinder that is available globally and installed on many devices  
-all over the world. One of its major draws is it’s portability which will soon extend to Windows Phone as well.
+all over the world. One of its major draws is its portability which will soon extend to Windows Phone as well.
 
 Pumpop uses social login controls such as native Facebook login as well as email activation.
 
@@ -51,7 +51,7 @@ to [comscore analytics](https://github.com/Pmovil/comScore). But his biggest wor
 [custom Windows Phone/UWP port](https://github.com/Pmovil/CN1WindowsPort) which served as a basis  
 for our newer port!
 
-That is gumption in it’s true hacker sense and truly represents the open source spirit we try to foster within  
+That is gumption in its true hacker sense and truly represents the open source spirit we try to foster within  
 Codename One. If he hadn’t done all of that work we might not have even started with the UWP port effort  
 so if you are looking forward to the new Windows support you have Fabricio and Pmovil to thank for that.
 ---

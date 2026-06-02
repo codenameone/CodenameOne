@@ -1,0 +1,16 @@
+# Vale syncs upstream style packages (Microsoft, proselint, write-good) here via
+# `vale sync`, but the project-specific vocabulary
+# (config/vocabularies/CodenameOne) and our locally authored rule directory
+# (CodenameOneRules) are tracked so CI and local contributors run the same word
+# list and custom checks. This mirrors docs/developer-guide/.gitignore, but the
+# patterns are anchored with a leading "/" because this file lives INSIDE the
+# styles directory (an unanchored "*" would match at every depth and re-ignore
+# the files we want to keep).
+/*
+!/.gitignore
+!/config/
+!/CodenameOneRules/
+/config/*
+!/config/vocabularies/
+/config/vocabularies/*
+!/config/vocabularies/CodenameOne/

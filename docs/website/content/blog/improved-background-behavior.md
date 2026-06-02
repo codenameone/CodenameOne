@@ -15,7 +15,7 @@ A couple of years ago at Google IO one of the prominent speakers turned to the a
 
 As a guy who worked on VM’s and understands some of the nuance I totally get his point. Lifecycle is hard. On Android it seems the developers took a difficult subject and made it even harder. With that in mind our implementation of background behavior on Android was lacking in some regards and Steve did a major overhaul of the implementation. Like all overhauls this could trigger some regressions so please keep your eyes open for such cases.
 
-This change should be seamless and improve the applications robustness if you use background features.
+This change should be seamless and improve the application’s robustness if you use background features.
 
 ### Material Icons Everywhere
 

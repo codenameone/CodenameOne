@@ -20,7 +20,7 @@ questions/issues there but the benefits far outweigh the issues:
 
   * Cleaner – stack overflow is far better structured than the discussion forum. This translates to better  
 search functionality that can make finding answers much easier
-  * Google spring cleaning – Many Google projects moved their support to StackOverflow and with Googles  
+  * Google spring cleaning – Many Google projects moved their support to StackOverflow and with Google’s  
 history of killing projects in use we have some concerns
   * Community Collaboration – one of the big issues with the existing discussion forum is that the community  
 finds it harder to collaborate and incentives for community support aren’t clear. 
@@ -56,7 +56,7 @@ That’s generally a good practice if you can follow that.
 
 We also added to `Form` the methods `setEditOnShow`/`getEditOnShow`  
 which allow you to determine a `TextArea` that will enter editing mode immediately when the form  
-is shown. This is a common and somewhat error prone use case since its pretty tricky to know when a form  
+is shown. This is a common and somewhat error prone use case since it’s pretty tricky to know when a form  
 was actually shown (post transition). 
 
 #### Floating Hint

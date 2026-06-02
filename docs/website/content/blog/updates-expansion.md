@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/updates-expansion/generic-java-2.jpg)
 
-I haven’t blogged in a while. I’ve been busy working with a couple of startups, some enterprise customers and bringing new people on-board. Steve has been great in picking up some of the slack but his plate is too full to blog with the same frequency I had so the blog slowed down a bit during this time. I hope to pick it back up to a weekly post regiment but my schedule is just so tight I barely have time to breath.
+I haven’t blogged in a while. I’ve been busy working with a couple of startups, some enterprise customers and bringing new people on-board. Steve has been great in picking up some of the slack but his plate is too full to blog with the same frequency I had so the blog slowed down a bit during this time. I hope to pick it back up to a weekly post regiment but my schedule is just so tight I barely have time to breathe.
 
 The good news is that we’re expanding a bit and recently hired a much needed graphics designer to overhaul everything around here with a new coat of paint. Steve and I spent a lot of time with him and we’re super excited about this!
 
@@ -19,7 +19,7 @@ We’ve also made some hirings in the development area which I’m pretty bullis
 
 ### Location Regression
 
-Over the weekend we had a hard time with the location API on Android. In fact we had that last weekend too and we eventually reverted last weeks release to the one from the prior week. This week we pushed through and hopefully we resolved the issues. However, if you’re experiencing issues with the location API please let us know ASAP.
+Over the weekend we had a hard time with the location API on Android. In fact we had that last weekend too and we eventually reverted last week’s release to the one from the prior week. This week we pushed through and hopefully we resolved the issues. However, if you’re experiencing issues with the location API please let us know ASAP.
 
 The reason behind this is the usual flurry with Google. They keep changing the behavior of devices with every API update. This is very problematic for applications that rely on background location, as such it forced us to update to play services version `12.0.0` which caused a cascade of issues across the board. Unfortunately this is inevitable as Google requires updates to newer versions for app submissions.
 

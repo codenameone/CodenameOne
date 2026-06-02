@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-iii/qanda-friday.jpg)
 
-We’re releasing new plugins today in for the 3.4 release, if there are major regressions we’ll push out new  
+We’re releasing new plugins today for the 3.4 release, if there are major regressions we’ll push out new  
 versions for the release itself but if they are stable they will be the actual release versions. We had a great  
 week on stackoverflow as well with many excellent questions. As usual this post isn’t exhaustive and doesn’t cover  
 all the questions asked, but it should provide a sense of the top discussions of the week.

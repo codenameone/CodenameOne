@@ -18,10 +18,10 @@ There are generally 4 levels of subscription: Free, Basic, Pro & Enterprise. (no
 
   
   
-The free and the basic subscriptions are basically identical, the only difference is that the basic subscription has the no monthly build quotas. Free and basic subscribers get basic support in our discussion group, which is great for indie developers.
+The free and the basic subscriptions are basically identical, the only difference is that the basic subscription has no monthly build quotas. Free and basic subscribers get basic support in our discussion group, which is great for indie developers.
 
   
-Pro subscribers get a lot more, but find the biggest advantage to be in the support arena. Besides getting priority in response time, pro subscribers often email us their project source code to get help in debugging nasty issues that they run into. The ability to share proprietary sources with us via email is hugely beneficial, for us its really great because we often find issues in the source that weren’t the reason for contacting us. E.g. a pro subscriber had an issue with background images and while dealing with that issue I noticed he set his back button behavior incorrectly. I wouldn’t have seen this without some access to his sources.  
+Pro subscribers get a lot more, but find the biggest advantage to be in the support arena. Besides getting priority in response time, pro subscribers often email us their project source code to get help in debugging nasty issues that they run into. The ability to share proprietary sources with us via email is hugely beneficial, for us it’s really great because we often find issues in the source that weren’t the reason for contacting us. E.g. a pro subscriber had an issue with background images and while dealing with that issue I noticed he set his back button behavior incorrectly. I wouldn’t have seen this without some access to his sources.  
 
   
   

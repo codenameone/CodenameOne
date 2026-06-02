@@ -19,7 +19,7 @@ However, considering that someone might not do that change or might have other b
 
 The server side push API changed a bit (we updated the developer guide to reflect this) as Windows needs additional arguments. Specifically the push servers expect two new arguments: `sid` & `client_secret` both of which you can get from the Windows Store when submitting your app.
 
-This values are also required on the client but the `Push` API was getting a bit big so we ended up rewriting the `Push` API to use a builder pattern. So instead of using a single `Push.sendPush(…​)` static call we use something like this:
+These values are also required on the client but the `Push` API was getting a bit big so we ended up rewriting the `Push` API to use a builder pattern. So instead of using a single `Push.sendPush(…​)` static call we use something like this:
     
     
     new Push(PUSH_TOKEN, "Hello World", deviceKey)

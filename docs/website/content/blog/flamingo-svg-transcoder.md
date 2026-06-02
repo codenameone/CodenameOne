@@ -32,7 +32,7 @@ I converted a standard SVG of duke waving and showed it using this code:
 
 Figure 1. Duke waving image
 
-You will notice that Dukes nose isn’t red, that’s because it’s a radial gradient in the source SVG.
+You will notice that Duke’s nose isn’t red, that’s because it’s a radial gradient in the source SVG.
 
 The generated `Duke_waving` class looks like this:
     
@@ -290,7 +290,7 @@ In terms of performance it’s hard to know how well SVG will perform. If you ha
 
 This depends a lot on demand/pull requests and needs. Supporting gradients will open up a lot of use cases.
 
-It might be interesting to allow manipulation of some SVG object states as well…​ This might be required if we want to support SVG animations which would provide a great deal of benefit e.g. for animations in the style of Androids menu button animating to a back button etc.
+It might be interesting to allow manipulation of some SVG object states as well…​ This might be required if we want to support SVG animations which would provide a great deal of benefit e.g. for animations in the style of Android’s menu button animating to a back button etc.
 ---
 
 ## Archived Comments

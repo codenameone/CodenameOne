@@ -17,7 +17,7 @@ I’m still waiting on my copy mostly to show to French speakers we meet (I have
 pretty sure its a cool book. Chen and I wrote the forward for the book, I trust Eric did a great job in it just like he has done with  
 [Codename One Fr](http://www.codenameonefr.com).  
 You can order the book either directly thru the [publishers site](http://www.d-booker.fr/cn1/214-codename-one.html)  
-(which is apprently the preferred way) or thru [Amazon](http://www.amazon.fr/Codename-One-D%C3%A9velopper-Android-Blackberry/dp/2822703485). 
+(which is apparently the preferred way) or thru [Amazon](http://www.amazon.fr/Codename-One-D%C3%A9velopper-Android-Blackberry/dp/2822703485). 
 
 We hope many of you purchase this book, if there is interest in it then it might prompt further updates and additional publishers. 
 

@@ -27,7 +27,7 @@ JZLib
 project, we ported their work into the project class hierarchy and added a GZConnectionRequest which will automatically unzip an HTTP response if it is indeed gzipped. 
 
   
-By default this class doesn’t request gzipped data but its pretty easy to do so just add the HTTP header  
+By default this class doesn’t request gzipped data but it’s pretty easy to do so just add the HTTP header  
   
 Accept-Encoding: gzip e.g.: `GZConnectionRequest con = new GZConnectionRequest();` then `con.addRequestHeader("Accept-Encoding", "gzip");`
 

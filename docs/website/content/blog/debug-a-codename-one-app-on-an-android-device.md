@@ -52,7 +52,7 @@ __ |  You might need to copy additional gradle file meta-data such as multi-dexi
 ---|---  
   
 You might not need to repeat the whole thing with every build. E.g. it might be practical to only copy the `userSources.jar`  
-from the libs directory to get the latest version of your code.and you can copy the `src/main` directory to get our  
+from the libs directory to get the latest version of your code. And you can copy the `src/main` directory to get our  
 up to date port.
 
 ### Refinement

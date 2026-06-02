@@ -17,7 +17,7 @@ Who would have thought Hungarian folk dance would be so entertaining! Can’t. s
   
   
   
-Its been a busy week mostly spent on updating the build server code so its iOS 7 ready, during that time we also managed to get some other things done… These are some of the highlights: 
+It’s been a busy week mostly spent on updating the build server code so it’s iOS 7 ready, during that time we also managed to get some other things done… These are some of the highlights: 
 
 You may recall the  
 [  
@@ -31,7 +31,7 @@ Where the boolean argument indicates whether the image is opaque (e.g. for the c
 
 Up until recently we always told people to avoid the scaled method as much as possible, the main issue was that an image gets decoded and then is very expensive to hold in RAM. This is not necessarily the case anymore. Now if you invoke the scaled() method on an EncodedImage (assuming you are not on a feature phone) the ImageIO class will be used to re-encode the resulting image and allow you the same benefits as any other encoded image.  
   
-We still don’t recommend scaled since its still less efficient than drawing and not as sharp as multi image. It will now also be slightly slower but it will have a better memory footprint.
+We still don’t recommend scaled since it’s still less efficient than drawing and not as sharp as multi image. It will now also be slightly slower but it will have a better memory footprint.
 
 We also added a feature that allows you to create an encoded image from ARGB data, again using the ImageIO class, this isn’t guaranteed to work (since ImageIO doesn’t necessarily exist in all devices) but when it does it should be more efficient for most use cases. 
 

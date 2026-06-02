@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-stop-editing/tip.jpg)
 
-Device only bugs are the worse. You need to go through a device build and reproduce/rinse/repeat. Thankfully these bugs are rare but sometimes they just hit you smack in the face. One such problem occurred when I was debugging a transition on Android related to a login form. I would move between a Form where I had the keyboard open to one where it was closed. This created a nasty effect where the keyboard folded leaving a black space and the transition played out about that black space.
+Device only bugs are the worst. You need to go through a device build and reproduce/rinse/repeat. Thankfully these bugs are rare but sometimes they just hit you smack in the face. One such problem occurred when I was debugging a transition on Android related to a login form. I would move between a Form where I had the keyboard open to one where it was closed. This created a nasty effect where the keyboard folded leaving a black space and the transition played out about that black space.
 
 On the simulator this won’t happen, we can’t realistically simulate the virtual keyboard.
 
@@ -25,7 +25,7 @@ Initially I thought I can workaround this by invoking:
     textField.stopEditing();
     callSerially(() -> showOtherForm());
 
-But that only helped on some cases, not all. Even the fact that I used `callSerially` didn’t help as this depends on a native event going through.
+But that only helped in some cases, not all. Even the fact that I used `callSerially` didn’t help as this depends on a native event going through.
 
 The solution is to use the new `stopEditing(Runnable)` API. On most OS’s the runnable will be invoked immediately but on Android it will wait for the screen resize before it invokes the code. So this will work as you would expect:
     

@@ -30,7 +30,7 @@ Generally this sort of code should work fine unless something odd happens or a s
 
 ### DNS problems in Codename One
 
-This is quite misleading, it turns out that this is just another case of confusion over Apples strict HTTPS policy
+This is quite misleading, it turns out that this is just another case of confusion over Apple’s strict HTTPS policy
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40387820/dns-problems-in-codename-one)
 
@@ -104,7 +104,7 @@ quite a bit this week…​
 
 ### Speech Recognition simple example on Android in Codename One
 
-Most such issues (this one include) are due to permission problems
+Most such issues (this one included) are due to permission problems
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40290208/speech-recognition-simple-example-on-android-in-codename-one)
 

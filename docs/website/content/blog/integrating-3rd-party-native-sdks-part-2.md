@@ -96,7 +96,7 @@ If we look inside the `project.properties` file (inside the Mobihelp SDK directo
     
     android.library.reference.1=../appcompat_v7
 
-I.e. it is expecting to find the `appcompat_v7` library located in the same parent directory as the Mobihelp SDK project. After a little bit of research (if you’re not yet familiar with the Android AppCompat support library), we find that the `AppCompat_v7` library is part of the Android Support library, which can can installed into your local Android SDK using Android SDK Manager. [Installation processed specified here](https://developer.android.com/tools/support-library/setup.html).
+I.e. it is expecting to find the `appcompat_v7` library located in the same parent directory as the Mobihelp SDK project. After a little bit of research (if you’re not yet familiar with the Android AppCompat support library), we find that the `AppCompat_v7` library is part of the Android Support library, which can be installed into your local Android SDK using Android SDK Manager. [Installation processed specified here](https://developer.android.com/tools/support-library/setup.html).
 
 After installing the support library, you need to retrieve it from your Android SDK. You can find that .aar file inside the `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support/appcompat-v7/19.1.0/` directory (for version 19.1.0). The contents of that directory on my system are:
     

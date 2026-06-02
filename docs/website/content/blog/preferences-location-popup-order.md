@@ -26,7 +26,7 @@ differently for every login.
 
 ### Location Popup
 
-A while back a user contributed a change the triggered the simulator location dialog popup automatically when  
+A while back a user contributed a change that triggered the simulator location dialog popup automatically when  
 working with the location API. This seemed like a good idea at the time but proved to be one of the most  
 annoying features if you have things like background location tracking.
 

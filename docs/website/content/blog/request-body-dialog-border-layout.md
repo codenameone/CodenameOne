@@ -76,11 +76,11 @@ Another common problem we had in the past is this, see if you can spot the error
         }
     }
 
-Those of you who spotted this might think this won’t compile but it will…​ `BorderLayout` expects one of it’s constants  
+Those of you who spotted this might think this won’t compile but it will…​ `BorderLayout` expects one of its constants  
 the string `BorderLayout.CENTER` but in this case we used `Component.CENTER` which is an `int` we  
 derive thru `Form`.
 
-While this is a "mistake" in theory it occurred to me that there is no "real" mistake here. The programmers  
+While this is a "mistake" in theory it occurred to me that there is no "real" mistake here. The programmer’s  
 intention is clear, why force the usage of a specific constant?
 
 So we added code into `BorderLayout` that will detect this case and do what you expect for the other constants  

@@ -34,9 +34,9 @@ LinkedIn article
 ](https://www.linkedin.com/pulse/article/20141013104245-87574-is-a-booth-at-javaone-worth-the-expense)  
 discussing the financials of a JavaOne booth, if you are a startup/vendor looking at conference booths I hope this provides some much needed transparency. I know that when we researched the issue the lack of information was very problematic. 
 
-iOS 8 introduced a few regressions into Codename One which should now be mostly resolved. This is mostly due to Apple discarding support for some features that were previously deprecated but they didn’t offer any alternative for those features which is a bit of a problem. As a result of this the behavior of the picker component is somewhat different on iPhone’s running iOS 8. 
+iOS 8 introduced a few regressions into Codename One which should now be mostly resolved. This is mostly due to Apple discarding support for some features that were previously deprecated but they didn’t offer any alternative for those features which is a bit of a problem. As a result of this the behavior of the picker component is somewhat different on iPhones running iOS 8. 
 
-On an unrelated note we finished a process of migrating our Mac servers to Mavericks which is hugely important since it will allows us to migrate to xcode 6 for the new VM builds.
+On an unrelated note we finished a process of migrating our Mac servers to Mavericks which is hugely important since it will allow us to migrate to xcode 6 for the new VM builds.
 
 We also moved all our AWS hosted servers to  
 [  

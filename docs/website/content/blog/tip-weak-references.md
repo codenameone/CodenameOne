@@ -22,7 +22,7 @@ This can be made clearer by this sample:
         // ... rest of code
     }
 
-Lets imagine that `otherObjectInCache` is an object that’s expensive to load e.g. an image. As long as `MyObject` is in RAM the `otherObjectInCache` won’t be removed from RAM and this might take up a lot of memory that could be used elsewhere…​
+Let’s imagine that `otherObjectInCache` is an object that’s expensive to load e.g. an image. As long as `MyObject` is in RAM the `otherObjectInCache` won’t be removed from RAM and this might take up a lot of memory that could be used elsewhere…​
 
 The thing is we don’t know. We might have a lot of RAM but we might not, this varies based on the device and checking OS memory is problematic in multi-tasking OS’s and GC languages. What we really want is:
 
@@ -47,7 +47,7 @@ A weak reference allows you to keep a reference to an object that can still be r
                  }
             }
     
-            // object was gc'd
+            // object was gc’d
            Object cachedData = loadObject();
     
             // store the object in the weak reference
@@ -75,7 +75,7 @@ This works rather well in Codename One and elsewhere but there is an even better
                  }
             }
     
-            // object was gc'd
+            // object was gc’d
            Object cachedData = loadObject();
     
             // store the object in the weak reference
@@ -84,7 +84,7 @@ This works rather well in Codename One and elsewhere but there is an even better
         // ... rest of code
     }
 
-__ |  This relies on a change to the `CN` class that will be a part of next weeks update, right now you can use the `Display` class which provides this functionality   
+__ |  This relies on a change to the `CN` class that will be a part of next week’s update, right now you can use the `Display` class which provides this functionality   
 ---|---
 ---
 
