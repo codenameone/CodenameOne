@@ -1963,18 +1963,6 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /// Marks the start of a user-overrideable paint scope (e.g. `Component.paint`,
-    /// `Component.paintBackground`, `Painter.paint`, glass pane). Ports may use this
-    /// to snapshot graphics state and validate that the scope leaves it unchanged.
-    /// Default is a no-op so device ports pay zero cost.
-    public void beginPaintScope(Object graphics, Object owner) {
-    }
-
-    /// Marks the end of a paint scope opened by `#beginPaintScope`. Must be paired
-    /// with a `beginPaintScope` call on the same graphics with the same owner.
-    public void endPaintScope(Object graphics, Object owner) {
-    }
-
     /// Draws a line between the 2 X/Y coordinates
     ///
     /// #### Parameters
