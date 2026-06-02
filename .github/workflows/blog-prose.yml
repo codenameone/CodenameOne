@@ -32,6 +32,7 @@ jobs:
   # PR gate — fails only on net-new findings in changed posts.
   # --------------------------------------------------------------------------- #
   gate:
+    name: Blog prose gate
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
