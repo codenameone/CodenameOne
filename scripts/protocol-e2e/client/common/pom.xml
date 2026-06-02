@@ -85,6 +85,40 @@
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
                 <executions>
+                    <!-- Generate the typed clients from the bundled specs at
+                         build time, so a codegen regression breaks this test. -->
+                    <execution>
+                        <id>generate-rest-client</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>generate-openapi</goal></goals>
+                        <configuration>
+                            <spec>${project.basedir}/cn1specs/openapi.json</spec>
+                            <basePackage>com.codename1.e2e.rest</basePackage>
+                            <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-grpc-client</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>generate-grpc</goal></goals>
+                        <configuration>
+                            <proto>${project.basedir}/cn1specs/catalog.proto</proto>
+                            <basePackage>com.codename1.e2e.grpc</basePackage>
+                            <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-graphql-client</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>generate-graphql</goal></goals>
+                        <configuration>
+                            <schema>${project.basedir}/cn1specs/schema.graphqls</schema>
+                            <operations>${project.basedir}/cn1specs/operations.graphql</operations>
+                            <basePackage>com.codename1.e2e.graphql</basePackage>
+                            <clientName>CatalogGraphApi</clientName>
+                            <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
@@ -100,6 +134,23 @@
                         <goals>
                             <goal>attach-test-artifact</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-generated-cn1-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>add-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/cn1</source>
+                            </sources>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

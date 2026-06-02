@@ -95,9 +95,14 @@ class GenerateGraphQLMojoTest {
 
         String api = read(out, "com/example/sw/StarWarsApi.java");
         assertTrue(api.contains("@GraphQLClient(\"https://api/graphql\")"), "client anno; was:\n" + api);
-        assertTrue(api.contains("query HeroName($episode: Episode) { hero(episode: $episode) "
+        // With an operationName present, the document must be a NAMED value
+        // (`value = "..."`); a positional value alongside operationName does
+        // not compile.
+        assertTrue(api.contains("@Query(value = \"query HeroName($episode: Episode) { hero(episode: $episode) "
                         + "{ ...HeroFields friends { name } } }"),
-                "minified operation document embedded; was:\n" + api);
+                "minified operation document embedded as a named value; was:\n" + api);
+        assertTrue(api.contains("operationName = \"HeroName\""),
+                "operationName emitted; was:\n" + api);
         assertTrue(api.contains("fragment HeroFields on Character { name }"),
                 "referenced fragment appended to document; was:\n" + api);
         assertTrue(api.contains("@Var(\"episode\") Episode episode"), "typed enum variable; was:\n" + api);

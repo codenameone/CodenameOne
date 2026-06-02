@@ -624,9 +624,16 @@ public class GenerateGraphQLMojo extends AbstractMojo {
             StringBuilder sb = new StringBuilder(512);
             String anno = subscription ? "Subscription"
                     : (GraphQLOperationModel.OP_MUTATION.equals(kind) ? "Mutation" : "Query");
-            sb.append("    @").append(anno).append("(\"").append(escapeJava(document)).append('"');
-            if (operationName != null && operationName.length() > 0) {
-                sb.append(", operationName = \"").append(escapeJava(operationName)).append('"');
+            // When operationName is also present the document must be named
+            // (`value = "..."`) -- a positional value is only legal when it is
+            // the sole annotation element.
+            boolean hasOpName = operationName != null && operationName.length() > 0;
+            sb.append("    @").append(anno).append('(');
+            if (hasOpName) {
+                sb.append("value = \"").append(escapeJava(document))
+                        .append("\", operationName = \"").append(escapeJava(operationName)).append('"');
+            } else {
+                sb.append('"').append(escapeJava(document)).append('"');
             }
             sb.append(")\n");
             String ret = subscription ? "GraphQLSubscription" : "void";

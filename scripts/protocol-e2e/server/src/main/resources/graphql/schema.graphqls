@@ -1,23 +1,29 @@
+schema {
+    query: Query
+}
+
 type Query {
-    hero(name: String): Hero
+    products: [Product!]!
+    product(id: ID!): Product
+    productsByCategory(category: Category!): [Product!]!
 }
 
-type Mutation {
-    addReview(episode: Episode!, stars: Int!): Review
-}
-
-type Hero {
+type Product {
+    id: ID!
     name: String!
-    greeting: String!
+    category: Category!
+    tags: [String!]!
+    rating: Float!
+    dimensions: Dimensions
 }
 
-type Review {
-    stars: Int!
-    commentary: String
+type Dimensions {
+    width: Float!
+    height: Float!
 }
 
-enum Episode {
-    NEWHOPE
-    EMPIRE
-    JEDI
+enum Category {
+    BOOKS
+    ELECTRONICS
+    TOYS
 }

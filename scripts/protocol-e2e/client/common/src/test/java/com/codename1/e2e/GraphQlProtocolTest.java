@@ -1,58 +1,81 @@
 package com.codename1.e2e;
 
-import com.codename1.e2e.graphql.AddReviewData;
-import com.codename1.e2e.graphql.Episode;
-import com.codename1.e2e.graphql.HeroData;
-import com.codename1.e2e.graphql.StarWarsApi;
+import com.codename1.e2e.graphql.Category;
+import com.codename1.e2e.graphql.CatalogGraphApi;
+import com.codename1.e2e.graphql.ProductData;
+import com.codename1.e2e.graphql.ProductsByCategoryData;
+import com.codename1.e2e.graphql.ProductsData;
+import com.codename1.e2e.graphql.ProductsData_Products;
 import com.codename1.io.graphql.GraphQLResponse;
 import com.codename1.testing.AbstractTest;
 import com.codename1.util.OnComplete;
 
-/** End-to-end GraphQL query + mutation round-trips against the test server. */
+/**
+ * End-to-end GraphQL round-trips against the catalog server: a list query with
+ * a nested object selection + enum + string list, a single-object query, and a
+ * query with an enum-typed variable.
+ */
 public class GraphQlProtocolTest extends AbstractTest {
 
     @Override
     public boolean runTest() throws Exception {
-        StarWarsApi api = StarWarsApi.of(E2eSupport.baseUrl() + "/graphql");
+        CatalogGraphApi api = CatalogGraphApi.of(E2eSupport.baseUrl() + "/graphql");
 
-        // --- query ---
-        final HeroData[] hero = new HeroData[1];
-        final boolean[] heroOk = { false };
-        final boolean[] heroDone = { false };
-        api.hero("Luke", null, new OnComplete<GraphQLResponse<HeroData>>() {
-            public void completed(GraphQLResponse<HeroData> r) {
-                heroOk[0] = r.isOk();
-                hero[0] = r.getData();
-                heroDone[0] = true;
-            }
+        // --- list query: nested object + enum + string list ---
+        final ProductsData[] data = new ProductsData[1];
+        final boolean[] ok1 = { false };
+        final boolean[] d1 = { false };
+        api.products(null, new OnComplete<GraphQLResponse<ProductsData>>() {
+            public void completed(GraphQLResponse<ProductsData> r) { ok1[0] = r.isOk(); data[0] = r.getData(); d1[0] = true; }
         });
-        E2eSupport.await(heroDone);
-        assertTrue(heroDone[0], "GraphQL query timed out");
-        assertTrue(heroOk[0], "GraphQL query reported errors");
-        assertNotNull(hero[0], "GraphQL data null");
-        assertNotNull(hero[0].hero, "GraphQL hero null");
-        assertEqual("Luke", hero[0].hero.name, "GraphQL hero.name");
-        assertEqual("Hello, Luke!", hero[0].hero.greeting, "GraphQL hero.greeting");
+        E2eSupport.await(d1);
+        assertTrue(d1[0], "GraphQL products timed out");
+        assertTrue(ok1[0], "GraphQL products reported errors");
+        assertNotNull(data[0], "GraphQL products data null");
+        assertEqual(4, data[0].products().size(), "GraphQL product count");
+        ProductsData_Products first = byId(data[0], "1");
+        assertNotNull(first, "GraphQL product id=1 missing");
+        assertEqual("The Hobbit", first.name(), "GraphQL name");
+        assertEqual(Category.BOOKS, first.category(), "GraphQL enum field");
+        assertTrue(first.tags().contains("fantasy"), "GraphQL string-list field");
+        assertNotNull(first.dimensions(), "GraphQL nested selection");
+        assertRange(20.0, first.dimensions().height(), 0.001, "GraphQL nested field");
 
-        // --- mutation (enum + int variables) ---
-        final AddReviewData[] review = new AddReviewData[1];
-        final boolean[] reviewOk = { false };
-        final boolean[] reviewDone = { false };
-        api.addReview(Episode.JEDI, 5, null, new OnComplete<GraphQLResponse<AddReviewData>>() {
-            public void completed(GraphQLResponse<AddReviewData> r) {
-                reviewOk[0] = r.isOk();
-                review[0] = r.getData();
-                reviewDone[0] = true;
-            }
+        // --- single object query ---
+        final ProductData[] pd = new ProductData[1];
+        final boolean[] d2 = { false };
+        api.product("3", null, new OnComplete<GraphQLResponse<ProductData>>() {
+            public void completed(GraphQLResponse<ProductData> r) { pd[0] = r.getData(); d2[0] = true; }
         });
-        E2eSupport.await(reviewDone);
-        assertTrue(reviewDone[0], "GraphQL mutation timed out");
-        assertTrue(reviewOk[0], "GraphQL mutation reported errors");
-        assertNotNull(review[0], "GraphQL mutation data null");
-        assertNotNull(review[0].addReview, "GraphQL addReview null");
-        assertEqual(5, review[0].addReview.stars.intValue(), "GraphQL addReview.stars");
-        assertEqual("JEDI rated 5", review[0].addReview.commentary, "GraphQL addReview.commentary");
+        E2eSupport.await(d2);
+        assertTrue(d2[0], "GraphQL product timed out");
+        assertNotNull(pd[0], "GraphQL product null");
+        assertNotNull(pd[0].product(), "GraphQL product.product null");
+        assertEqual(Category.TOYS, pd[0].product().category(), "GraphQL single enum");
+
+        // --- enum-typed variable ---
+        final ProductsByCategoryData[] pc = new ProductsByCategoryData[1];
+        final boolean[] d3 = { false };
+        api.productsByCategory(Category.ELECTRONICS, null,
+                new OnComplete<GraphQLResponse<ProductsByCategoryData>>() {
+            public void completed(GraphQLResponse<ProductsByCategoryData> r) { pc[0] = r.getData(); d3[0] = true; }
+        });
+        E2eSupport.await(d3);
+        assertTrue(d3[0], "GraphQL byCategory timed out");
+        assertNotNull(pc[0], "GraphQL byCategory null");
+        assertEqual(1, pc[0].productsByCategory().size(), "GraphQL byCategory count");
+        assertEqual(Category.ELECTRONICS, pc[0].productsByCategory().get(0).category(),
+                "GraphQL enum-variable filter");
         return true;
+    }
+
+    private static ProductsData_Products byId(ProductsData data, String id) {
+        for (ProductsData_Products p : data.products()) {
+            if (id.equals(p.id())) {
+                return p;
+            }
+        }
+        return null;
     }
 
     @Override

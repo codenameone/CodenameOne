@@ -42,7 +42,7 @@ trap cleanup EXIT
 echo "[protocol-e2e] Waiting for server readiness..."
 ready=0
 for _ in $(seq 1 90); do
-    if curl -fs -o /dev/null "http://localhost:$PORT/api/greeting?name=ping" 2>/dev/null; then
+    if curl -fs -o /dev/null "http://localhost:$PORT/api/products" 2>/dev/null; then
         ready=1
         break
     fi

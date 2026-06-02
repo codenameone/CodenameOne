@@ -1,31 +1,48 @@
 # Multi-protocol end-to-end test (REST / GraphQL / gRPC)
 
-This test exercises the full Codename One generated-client stack for all three
-"spec → typed client" protocols against a single real server.
+This test exercises the full Codename One generated-client stack -- including
+the build-time **code generation** -- for all three "spec to typed client"
+protocols against a single real server, over a non-trivial catalog API
+(enums, nested objects, repeated/list fields, and multiple methods).
 
 ## Layout
 
-- `server/` — a Spring Boot app exposing the same logical "greeting" service
-  three ways:
-  - **REST** (`GET /api/greeting`, `POST /api/echo`) — JSON, described by
-    [`specs/openapi.json`](specs/openapi.json).
-  - **GraphQL** (`POST /graphql`) — Spring for GraphQL, schema
-    [`specs/schema.graphqls`](specs/schema.graphqls).
-  - **gRPC-Web** (`POST /grpc/e2e.Greeter/SayHello`) — the gRPC-Web binary
-    framing the CN1 client speaks (`application/grpc-web+proto`) is implemented
-    directly, so no Envoy/proxy sidecar is needed. Contract:
-    [`specs/greeter.proto`](specs/greeter.proto).
-- `client/` — a Codename One app (`common` + `javase`). Its
-  `@RestClient` / `@GraphQLClient` / `@GrpcClient` sources under
-  `client/common/src/main/java/com/codename1/e2e/` mirror what
-  `cn1:generate-openapi` / `cn1:generate-graphql` / `cn1:generate-grpc` produce
-  from the specs; `cn1:process-annotations` generates the impls and the
-  `cn1app.*Bootstrap` registrars at build time. The `AbstractTest` classes
-  under `client/common/src/test/java/com/codename1/e2e/` perform real
-  round-trips against the running server and are executed on the JavaSE
-  simulator via `cn1:test`.
-- `run-protocol-e2e.sh` — builds and starts the server, then builds and runs
+- `specs/` -- the canonical contracts: [`openapi.json`](specs/openapi.json),
+  [`schema.graphqls`](specs/schema.graphqls) +
+  [`operations.graphql`](specs/operations.graphql), and
+  [`catalog.proto`](specs/catalog.proto).
+- `server/` -- a Spring Boot app exposing the same catalog three ways:
+  - **REST** (`GET /api/products`, `/api/products/{id}`,
+    `/api/products/category/{category}` with an enum path parameter).
+  - **GraphQL** (`POST /graphql`, Spring for GraphQL) -- list/single queries
+    and an enum-typed variable.
+  - **gRPC-Web** (`POST /grpc/e2e.Catalog/{GetProduct,ListProducts}`) -- the
+    gRPC-Web binary framing and protobuf wire format are implemented directly,
+    so no Envoy/proxy sidecar is required.
+- `client/` -- a Codename One app (`common` + `javase`). The `common` module
+  runs `cn1:generate-openapi`, `cn1:generate-grpc`, and `cn1:generate-graphql`
+  at **build time** (from the specs under `client/common/cn1specs/`) into
+  `target/generated-sources/cn1`; `cn1:process-annotations` then generates the
+  client impls and the `cn1app.*Bootstrap` registrars. The `AbstractTest`
+  classes under `client/common/src/test/java/com/codename1/e2e/` perform real
+  round-trips against the running server and run on the JavaSE simulator via
+  `cn1:test`.
+- `run-protocol-e2e.sh` -- builds and starts the server, then builds and runs
   the client tests against it.
+
+## What it covers
+
+| Nuance | REST | GraphQL | gRPC |
+|--------|------|---------|------|
+| Enum field in a response | yes | yes | yes |
+| Enum as a parameter/variable | path param | variable | request field |
+| Nested object | `Dimensions` | nested selection | -- |
+| List / repeated field | `tags` | `tags` | `tags`, `repeated Product` |
+| Multiple methods | 3 | 3 | 2 |
+| Varied scalars | long, double, string | ID, Float, String | int64, double, string |
+
+Because the clients are generated during the build, a regression in
+`cn1:generate-openapi` / `-grpc` / `-graphql` breaks this test.
 
 ## Running locally
 

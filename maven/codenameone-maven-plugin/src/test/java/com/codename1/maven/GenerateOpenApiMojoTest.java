@@ -117,6 +117,51 @@ class GenerateOpenApiMojoTest {
                 "of(...) factory should delegate to RestClients.create");
     }
 
+    private static final String ENUM_SPEC =
+            "{"
+            + "\"openapi\":\"3.0.0\","
+            + "\"info\":{\"title\":\"Enums\",\"version\":\"1.0\"},"
+            + "\"paths\":{},"
+            + "\"components\":{\"schemas\":{"
+            + "  \"Status\":{\"type\":\"string\",\"enum\":[\"available\",\"pending\",\"sold\"]},"
+            + "  \"Shipping\":{\"type\":\"string\",\"enum\":[\"next-day\",\"two-day\"]},"
+            + "  \"Pet\":{\"type\":\"object\",\"properties\":{"
+            + "     \"id\":{\"type\":\"integer\",\"format\":\"int64\"},"
+            + "     \"status\":{\"$ref\":\"#/components/schemas/Status\"},"
+            + "     \"shipping\":{\"$ref\":\"#/components/schemas/Shipping\"}"
+            + "  }}"
+            + "}}}";
+
+    @Test
+    void emitsJavaEnumsForStringEnumSchemas(@TempDir Path tmp) throws Exception {
+        Map<String, Object> doc = parse(ENUM_SPEC);
+        File out = tmp.toFile();
+        new GenerateOpenApiMojo.Generator(
+                doc, "com.example.petstore", out, true, /*emitRecords*/ true,
+                new SystemStreamLog()).run();
+
+        // Generatable enum -> Java enum whose constants equal the wire values.
+        File statusJava = new File(out, "com/example/petstore/model/Status.java");
+        assertTrue(statusJava.exists(), "expected Status.java enum");
+        String statusSrc = readString(statusJava);
+        assertTrue(statusSrc.contains("public enum Status"), "Status should be a Java enum; was:\n" + statusSrc);
+        assertTrue(statusSrc.contains("available") && statusSrc.contains("pending")
+                && statusSrc.contains("sold"), "Status values; was:\n" + statusSrc);
+        assertFalse(statusSrc.contains("@Mapped"), "a plain enum is not @Mapped");
+
+        // The owning model references the enum type for the status property...
+        String petSrc = readString(new File(out, "com/example/petstore/model/Pet.java"));
+        assertTrue(petSrc.contains("com.example.petstore.model.Status status"),
+                "Pet.status should be typed as the generated enum; was:\n" + petSrc);
+
+        // ...but the hyphenated enum can't be a Java constant, so it degrades
+        // to String and no enum file is emitted.
+        assertFalse(new File(out, "com/example/petstore/model/Shipping.java").exists(),
+                "non-identifier enum values should degrade to String (no Shipping.java)");
+        assertTrue(petSrc.contains("String shipping"),
+                "Pet.shipping should degrade to String; was:\n" + petSrc);
+    }
+
     @Test
     void emitsClassesOnJava8Target(@TempDir Path tmp) throws Exception {
         Map<String, Object> doc = parse(SAMPLE_SPEC);

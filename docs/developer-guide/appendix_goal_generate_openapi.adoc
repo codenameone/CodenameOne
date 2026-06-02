@@ -130,6 +130,13 @@ wiring in, mirroring the existing `cn1app.MapperBootstrap` pattern.
 * Response schemas: `$ref` resolution, primitives (`string` /
 `number` / `integer` / `boolean`), arrays, object schemas.
 `oneOf` / `anyOf` / `allOf` collapse to `Object` -- callers cast.
+* String `enum` schemas are emitted as Java enums and bound by the JSON
+mapper through each constant's `name()`, so a model property typed by an
+enum `$ref` gets the generated enum type.  This requires every enum value
+to be a valid (non-reserved) Java identifier; an enum whose values are
+not -- for example `"two-day"` -- degrades to `String` rather than
+generating an enum that could not round-trip.  Integer/number enums keep
+their numeric type.
 * Schema unification: two `components.schemas` entries with identical
 property shapes collapse to a single record/class to avoid an
 explosion of duplicates.
