@@ -241,6 +241,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
+            // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube,
+            // a textured cube, and a behavioral animation-loop test.
+            new Gpu3DCubeScreenshotTest(),
+            new Gpu3DTexturedCubeScreenshotTest(),
+            new Gpu3DAnimationTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open
