@@ -68,6 +68,26 @@ public final class WindowsNative {
     public static native void waitForEvent(long timeoutMillis);
 
     /**
+     * Parks the calling (main) thread to keep the process alive in headless
+     * screenshot mode, where there is no window message loop. The EDT exits the
+     * process via {@link #headlessTick()} once the screenshot has been written.
+     */
+    public static native void runHeadlessLoop();
+
+    /** Terminates the process with the given exit code. */
+    public static native void exitProcess(int code);
+
+    /** Sleeps the calling thread for the given milliseconds (native Sleep). */
+    public static native void sleepMillis(int millis);
+
+    /**
+     * Parks the calling (main) thread for up to {@code timeoutMillis} to keep the
+     * process alive while worker threads run, then force-exits. Callers exit
+     * early via {@link #exitProcess(int)} when their async work completes.
+     */
+    public static native void parkMainThread(int timeoutMillis);
+
+    /**
      * Runs the Win32 message loop on the calling thread until the window closes.
      * Must be called on the thread that created the window (the app's main
      * thread, after Display.init); the EDT renders concurrently and the window
@@ -84,6 +104,28 @@ public final class WindowsNative {
 
     /** Encodes the offscreen target behind {@code graphics} to a PNG file. */
     public static native boolean saveGraphicsToPng(long graphics, String path);
+
+    /**
+     * Enables headless screenshot mode (call before {@code initDisplay}): the
+     * display renders into an offscreen WIC bitmap of the given size and, once
+     * the UI has painted and settled, the bitmap is written to {@code path} and
+     * the process exits. Lets CI capture a deterministic PNG with no window.
+     */
+    public static native void enableHeadlessScreenshot(String path, int width, int height);
+
+    /**
+     * Encodes a {@code width*height} block of straight-alpha ARGB pixels (CN1
+     * getRGB layout) to PNG and returns the bytes. Backs the port's ImageIO.
+     */
+    public static native byte[] encodeArgbToPng(int[] argb, int width, int height);
+
+    /**
+     * Encodes the current window render target to PNG bytes. In headless /
+     * offscreen mode the target is a WIC bitmap the EDT paints into, so this is
+     * a deterministic snapshot of the rendered UI (the proven render path) for
+     * the cn1ss WebSocket sink. 0-length/null on failure.
+     */
+    public static native byte[] captureWindowToPngBytes();
 
     /* ----------------------------------------------------- graphics state */
 
@@ -239,6 +281,32 @@ public final class WindowsNative {
     public static native int httpWriteBody(long connection, byte[] buffer, int offset, int length);
 
     public static native void httpClose(long connection);
+
+    /* ---------------------------------------------------------- sockets */
+
+    /** Connects a TCP socket to host:port (timeoutMillis 0 = blocking). 0 = failure. */
+    public static native long socketConnect(String host, int port, int timeoutMillis);
+
+    /** Blocking read into buffer[offset..offset+length); returns bytes read, -1 on EOF/error. */
+    public static native int socketRead(long socket, byte[] buffer, int offset, int length);
+
+    /** Writes the full range; returns bytes written, -1 on error. */
+    public static native int socketWrite(long socket, byte[] buffer, int offset, int length);
+
+    /** Bytes available for a non-blocking read without blocking. */
+    public static native int socketAvailable(long socket);
+
+    /** Closes and frees the socket peer. */
+    public static native void socketClose(long socket);
+
+    /** Last WinSock error code for the socket, or -1. */
+    public static native int socketErrorCode(long socket);
+
+    /** True while the socket peer is open. */
+    public static native boolean socketConnected(long socket);
+
+    /** The local host name (used by Socket.getHostOrIP). */
+    public static native String getHostOrIP();
 
     /* ------------------------------------------------------- clipboard */
 

@@ -266,6 +266,21 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     cn1Win.eventTail = 0;
     cn1Win.dpiScale = 1.0f;
 
+    /* Headless screenshot mode: no window; render into an offscreen WIC bitmap
+     * that headlessTick later encodes to PNG. The EDT paints through the same
+     * getWindowGraphics + flushGraphics path as on-screen. */
+    if (cn1Win.headless) {
+        cn1Win.width = cn1Win.shotW > 0 ? cn1Win.shotW : 400;
+        cn1Win.height = cn1Win.shotH > 0 ? cn1Win.shotH : 600;
+        cn1Win.windowGraphics = cn1WinCreateOffscreenGraphics(cn1Win.width, cn1Win.height);
+        if (cn1Win.windowGraphics == NULL) {
+            cn1WindowsLog("initDisplay: headless offscreen target failed");
+        } else {
+            cn1WindowsLog("initDisplay: headless offscreen target created");
+        }
+        return;
+    }
+
     const char* utf8Title = __cn1Arg1 != JAVA_NULL ? stringToUTF8(threadStateData, __cn1Arg1) : "Codename One";
     if (!cn1WinCreateWindow(utf8Title, __cn1Arg2, __cn1Arg3)) {
         cn1WindowsLog("initDisplay: failed to create window");
@@ -376,6 +391,49 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_runMessageLoop__(CODENAME_ONE
         DispatchMessageW(&msg);
     }
     cn1WindowsLog("runMessageLoop: exit");
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_runHeadlessLoop__(CODENAME_ONE_THREAD_STATE) {
+    /* Headless capture has no window / message loop. The main thread parks here
+     * to keep the process alive while the EDT (a separate thread) paints into
+     * the offscreen target, then -- after a fixed settle -- encodes the bitmap
+     * to PNG and exits. Driving the capture from here (not the EDT idle hook)
+     * makes it independent of the EDT's scheduling and guarantees termination.
+     * The UI is static, so by the settle the EDT is idle and not mid-paint. */
+    cn1WindowsLog("runHeadlessLoop: enter");
+    int waitedMs = 0;
+    while (waitedMs < 4000) {
+        Sleep(50);
+        waitedMs += 50;
+    }
+    JAVA_BOOLEAN ok = cn1WinEncodeGraphicsToPng(cn1Win.windowGraphics, cn1Win.shotPath);
+    cn1WindowsLog(ok ? "runHeadlessLoop: screenshot saved" : "runHeadlessLoop: screenshot FAILED");
+    ExitProcess(ok ? 0 : 2);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_exitProcess___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    ExitProcess((UINT) __cn1Arg1);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_sleepMillis___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    if (__cn1Arg1 > 0) {
+        Sleep((DWORD) __cn1Arg1);
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    /* Keeps the main thread (and process) alive while worker threads -- the EDT,
+     * the WebSocket reader -- do their work, up to a timeout safety net. Callers
+     * exit early via exitProcess once their async work has completed. */
+    int waitedMs = 0;
+    while (waitedMs < __cn1Arg1) {
+        Sleep(50);
+        waitedMs += 50;
+    }
+    ExitProcess(3);
 }
 
 } /* extern "C" */

@@ -606,11 +606,12 @@ public class ByteCodeTranslator {
                 // Math lives in the CRT under MSVC (no separate libm to link); every
                 // other platform needs an explicit libm link for the translated
                 // runtime. The Win32 import libs back the Direct2D/DirectWrite
-                // rendering, WIC image decode, WinHTTP networking and the Win32
-                // windowing/input layer the port's nativeSources call into; they are
-                // exercised on the Windows CI legs (windows-latest / windows-11-arm).
+                // rendering, WIC image decode, WinHTTP networking, WinSock raw
+                // sockets (ws2_32) and the Win32 windowing/input layer the port's
+                // nativeSources call into; they are exercised on the Windows CI
+                // legs (windows-latest / windows-11-arm).
                 writer.append("if(WIN32)\n");
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp user32 gdi32 ole32 uuid)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 uuid)\n");
                 writer.append("else()\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");

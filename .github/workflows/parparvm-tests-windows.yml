@@ -178,3 +178,130 @@ jobs:
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
           JDK_21_HOME: ${{ env.JDK_21_HOME }}
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
+  # Renders the native Windows port's UI headlessly and captures a PNG. This is
+  # the GUI/screenshot signal for the port (the "softer" signal in the plan): it
+  # builds codename1-core + the Windows port, translates a real Display/Form app
+  # with the "windows" app type, links it with clang-cl, and runs it in headless
+  # mode -- the app paints into an offscreen Direct2D/WIC bitmap (no window) and
+  # writes a PNG. The PNG is uploaded as an artifact; the companion comment job
+  # posts it to the PR. x64 only (the reliable leg); PR events only (the comment
+  # job needs PR context). This is a separate job from the clean-target gate so
+  # a rendering hiccup never blocks merges.
+  windows-port-screenshot:
+    name: screenshot-capture (x64)
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Set up Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      # JDK 8 builds codename1-core (source/target 1.5) and is also the JDK the
+      # translator harness uses (CompilerHelper auto-discovers JDK_8_HOME).
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 path
+        shell: pwsh
+        run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # Build codenameone-core + the Windows port so the translator can read
+      # their compiled classes (maven/core/target/classes, maven/windows/...).
+      - name: Build core + Windows port (JDK 8)
+        working-directory: maven
+        shell: pwsh
+        run: mvn -B -pl windows -am -DskipTests -Dmaven.javadoc.skip=true install
+
+      # Build the ParparVM JavaAPI, then run the websocket capture test: it
+      # translates app + core + port + nativeSources, links with clang-cl, starts
+      # a Cn1ssScreenshotServer and runs the exe, which renders the Form offscreen
+      # and streams the PNG over com.codename1.io WebSocket (the port's WinSock
+      # sockets) to the server -- the same websocket-based cn1ss capture the other
+      # ports use. The received PNG is copied to CN1_SHOT_OUTPUT_DIR.
+      - name: Build JavaAPI + capture screenshot over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesFormScreenshotOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-port-screenshot-raw
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Posts the captured PNG as a PR comment using the shared CN1SS machinery.
+  # Runs on Linux -- where that posting path is exercised by the other ports --
+  # so the Windows job only has to produce and upload the image.
+  windows-port-screenshot-comment:
+    name: screenshot-comment
+    needs: windows-port-screenshot
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-port-screenshot-raw
+          path: artifacts/windows-port/raw
+
+      - name: Post screenshot to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port UI, rendered offscreen with Direct2D/DirectWrite.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          shot="$ART/raw/cn1-windows-native.png"
+          if [ ! -f "$shot" ]; then
+            echo "No screenshot was produced; skipping PR comment."
+            exit 0
+          fi
+          mkdir -p "$ART/previews"
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          # No reference set yet: ProcessScreenshots marks the image "new" and
+          # posts it without a baseline comparison (no failure on mismatch).
+          cn1ss_process_and_report \
+            "Native Windows port" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$ART/no-reference" "$ART/previews" "$ART" \
+            "windows-native=$shot"

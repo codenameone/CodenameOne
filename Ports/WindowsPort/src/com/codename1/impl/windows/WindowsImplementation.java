@@ -23,6 +23,7 @@
 package com.codename1.impl.windows;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.WebSocketImpl;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -62,6 +63,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private Long windowGraphics;
     private Long defaultFont;
     private L10NManager l10n;
+    private com.codename1.ui.util.ImageIO imageIO;
     private final int[] eventScratch = new int[4];
 
     /**
@@ -544,6 +546,107 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return;
         }
         super.cleanup(o);
+    }
+
+    /* ------------------------------------------------------------ sockets */
+
+    @Override
+    public boolean isSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object connectSocket(String host, int port, int connectTimeout) {
+        WindowsSocket socket = new WindowsSocket(host, port, connectTimeout);
+        return socket.isConnected() ? socket : null;
+    }
+
+    @Override
+    public String getHostOrIP() {
+        return WindowsNative.getHostOrIP();
+    }
+
+    @Override
+    public void disconnectSocket(Object socket) {
+        ((WindowsSocket) socket).close();
+    }
+
+    @Override
+    public boolean isSocketConnected(Object socket) {
+        return socket instanceof WindowsSocket && ((WindowsSocket) socket).isConnected();
+    }
+
+    @Override
+    public int getSocketAvailableInput(Object socket) {
+        return ((WindowsSocket) socket).available();
+    }
+
+    @Override
+    public byte[] readFromSocketStream(Object socket) {
+        return ((WindowsSocket) socket).readChunk();
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data) {
+        ((WindowsSocket) socket).write(data, 0, data.length);
+    }
+
+    @Override
+    public String getSocketErrorMessage(Object socket) {
+        return ((WindowsSocket) socket).getErrorMessage();
+    }
+
+    @Override
+    public int getSocketErrorCode(Object socket) {
+        return ((WindowsSocket) socket).getErrorCode();
+    }
+
+    /* ---------------------------------------------------------- websocket */
+
+    @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public WebSocketImpl createWebSocketImpl(String url) {
+        return new WindowsWebSocketImpl(url);
+    }
+
+    /* --------------------------------------------------------- image I/O */
+
+    @Override
+    public com.codename1.ui.util.ImageIO getImageIO() {
+        if (imageIO == null) {
+            imageIO = new com.codename1.ui.util.ImageIO() {
+                @Override
+                public void save(InputStream image, OutputStream response, String format,
+                        int width, int height, float quality) throws IOException {
+                    com.codename1.ui.Image img = com.codename1.ui.Image.createImage(image);
+                    if (width > 0 && height > 0) {
+                        img = img.scaled(width, height);
+                    }
+                    saveImage(img, response, format, quality);
+                }
+
+                @Override
+                protected void saveImage(com.codename1.ui.Image img, OutputStream response,
+                        String format, float quality) throws IOException {
+                    int[] rgb = img.getRGB();
+                    byte[] png = WindowsNative.encodeArgbToPng(rgb, img.getWidth(), img.getHeight());
+                    if (png == null) {
+                        throw new IOException("PNG encoding failed");
+                    }
+                    response.write(png);
+                }
+
+                @Override
+                public boolean isFormatSupported(String format) {
+                    return FORMAT_PNG.equals(format);
+                }
+            };
+        }
+        return imageIO;
     }
 
     /* ------------------------------------------------------- storage/files */

@@ -390,8 +390,55 @@ class CleanTargetIntegrationTest {
      */
     @org.junit.jupiter.api.Test
     void buildsFullFormAppNative() throws Exception {
+        Path exe = buildWindowsNativeExe("WinFormApp", winFormAppSource());
+        // Copy to a stable location so the app can be launched and tried.
+        Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
+        Files.createDirectories(dest);
+        Path destExe = dest.resolve(CompilerHelper.executableName("WinFormApp"));
+        Files.copy(exe, destExe, StandardCopyOption.REPLACE_EXISTING);
+        Path pdb = exe.resolveSibling("WinFormApp.pdb");
+        if (Files.exists(pdb)) {
+            Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
+    }
+
+    /**
+     * Builds the Form app in headless screenshot mode and runs it: the app
+     * renders the UI into an offscreen Direct2D/WIC bitmap (no window) and, once
+     * it has painted, writes a PNG and exits. Asserts a non-trivial PNG is
+     * produced -- the deterministic capture the Windows CI posts to the PR.
+     */
+    @org.junit.jupiter.api.Test
+    void capturesFormScreenshotHeadless() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
-                "Native Windows Form-app build is Windows-only");
+                "Native Windows headless capture is Windows-only");
+        Path shot = Files.createTempDirectory("winshot-out").resolve("cn1-windows-native.png");
+        // Forward slashes: accepted by the Win32 file APIs and safe to embed in
+        // a Java string literal (no backslash escaping).
+        String shotPath = shot.toAbsolutePath().toString().replace('\\', '/');
+        Path exe = buildWindowsNativeExe("WinShotApp", winShotAppSource(shotPath, 420, 640));
+        // The headless app exits itself once the screenshot is written.
+        runCommand(Arrays.asList(exe.toAbsolutePath().toString()), exe.getParent());
+        assertTrue(Files.exists(shot), "headless run should produce a screenshot PNG: " + shot);
+        assertTrue(Files.size(shot) > 1024, "screenshot PNG should be non-trivial, was " + Files.size(shot) + " bytes");
+        // Publish for the CI screenshot-comment step (env override) or default cwd.
+        String outDir = System.getenv("CN1_SHOT_OUTPUT_DIR");
+        Path dest = (outDir != null ? Paths.get(outDir) : Paths.get(System.getProperty("user.home"), "cn1-winform"));
+        Files.createDirectories(dest);
+        Files.copy(shot, dest.resolve("cn1-windows-native.png"), StandardCopyOption.REPLACE_EXISTING);
+        System.out.println("CN1_WINFORM_SHOT=" + dest.resolve("cn1-windows-native.png").toAbsolutePath());
+    }
+
+    /**
+     * Compiles a single-class app against the full codename1-core + WindowsPort,
+     * translates app + core + port + JavaAPI + nativeSources with the "windows"
+     * app type, and links the executable with clang-cl. Returns the built exe.
+     * Skips (assumption) when not on Windows or when core/port are not built.
+     */
+    static Path buildWindowsNativeExe(String appName, String source) throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Native Windows build is Windows-only");
         Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
         Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
@@ -407,23 +454,23 @@ class CleanTargetIntegrationTest {
         CompilerHelper.CompilerConfig config = configs.get(0);
 
         Parser.cleanup();
-        Path sourceDir = Files.createTempDirectory("winform-sources");
-        Path classesDir = Files.createTempDirectory("winform-classes");
-        Path javaApiDir = Files.createTempDirectory("winform-japi");
-        Files.write(sourceDir.resolve("WinFormApp.java"), winFormAppSource().getBytes(StandardCharsets.UTF_8));
+        Path sourceDir = Files.createTempDirectory("winapp-sources");
+        Path classesDir = Files.createTempDirectory("winapp-classes");
+        Path javaApiDir = Files.createTempDirectory("winapp-japi");
+        Files.write(sourceDir.resolve(appName + ".java"), source.getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         // The app is compiled against the full core (CN1 API) + the JDK (java.*).
         List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
                 "-source", config.targetVersion, "-target", config.targetVersion,
                 "-classpath", coreClasses + java.io.File.pathSeparator + portClasses,
-                "-d", classesDir.toString(), sourceDir.resolve("WinFormApp.java").toString()));
+                "-d", classesDir.toString(), sourceDir.resolve(appName + ".java").toString()));
         assertEquals(0, CompilerHelper.compile(config.jdkHome, appCompile),
-                "WinFormApp should compile against core + port:\n" + CompilerHelper.getLastErrorLog());
+                appName + " should compile against core + port:\n" + CompilerHelper.getLastErrorLog());
 
         // Stage the native layer into a folder the translator copies into srcRoot.
         Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
-        Path nativeStage = Files.createTempDirectory("winform-native");
+        Path nativeStage = Files.createTempDirectory("winapp-native");
         try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
             for (Path p : (Iterable<Path>) s::iterator) {
                 if (Files.isRegularFile(p)) {
@@ -432,7 +479,7 @@ class CleanTargetIntegrationTest {
             }
         }
 
-        Path outputDir = Files.createTempDirectory("winform-out");
+        Path outputDir = Files.createTempDirectory("winapp-out");
         // Source roots: app classes, full core, WindowsPort classes, JavaAPI, native sources.
         String sources = classesDir + ";" + coreClasses + ";" + portClasses + ";" + javaApiDir + ";" + nativeStage;
         // Bind the abstract platform impl to WindowsImplementation (its @Concrete
@@ -440,7 +487,7 @@ class CleanTargetIntegrationTest {
         String prevConcrete = System.getProperty("cn1.concreteImplementation");
         System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
         try {
-            runTranslatorMultiSource(sources, outputDir, "WinFormApp", "windows");
+            runTranslatorMultiSource(sources, outputDir, appName, "windows");
         } finally {
             if (prevConcrete == null) {
                 System.clearProperty("cn1.concreteImplementation");
@@ -461,37 +508,229 @@ class CleanTargetIntegrationTest {
                 "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
         runCommand(configure, cmakeRoot);
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
-        Path exe = buildDir.resolve(CompilerHelper.executableName("WinFormApp"));
-        assertTrue(Files.exists(exe), "native Form-app executable should be produced: " + exe);
-        // Copy to a stable location so the app can be launched and tried.
-        Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
-        Files.createDirectories(dest);
-        Path destExe = dest.resolve(CompilerHelper.executableName("WinFormApp"));
-        Files.copy(exe, destExe, StandardCopyOption.REPLACE_EXISTING);
-        Path pdb = buildDir.resolve("WinFormApp.pdb");
-        if (Files.exists(pdb)) {
-            Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
-        }
-        System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
+        Path exe = buildDir.resolve(CompilerHelper.executableName(appName));
+        assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
+        return exe;
     }
 
     static String winFormAppSource() {
         return "import com.codename1.ui.Display;\n" +
                 "import com.codename1.ui.Form;\n" +
                 "import com.codename1.ui.Label;\n" +
+                "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.layouts.BoxLayout;\n" +
                 "public class WinFormApp {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
                 "        Display.getInstance().callSerially(new Runnable() {\n" +
                 "            public void run() {\n" +
-                "                Form f = new Form(\"CN1 Native\");\n" +
-                "                f.add(new Label(\"Hello from the native Windows port!\"));\n" +
+                "                Form f = new Form(\"CN1 Native\", BoxLayout.y());\n" +
+                "                final Label status = new Label(\"Hello from the native Windows port!\");\n" +
+                "                final Button button = new Button(\"Click me\");\n" +
+                "                final int[] count = new int[1];\n" +
+                "                button.addActionListener(new com.codename1.ui.events.ActionListener() {\n" +
+                "                    public void actionPerformed(com.codename1.ui.events.ActionEvent e) {\n" +
+                "                        count[0]++;\n" +
+                "                        status.setText(\"Clicked \" + count[0] + \" time(s)\");\n" +
+                "                        status.getParent().revalidate();\n" +
+                "                    }\n" +
+                "                });\n" +
+                "                f.add(status);\n" +
+                "                f.add(button);\n" +
                 "                f.show();\n" +
                 "            }\n" +
                 "        });\n" +
                 // Display.init started the EDT (which renders); the main thread now
                 // owns the Win32 message loop so the window is responsive.
                 "        com.codename1.impl.windows.WindowsNative.runMessageLoop();\n" +
+                "    }\n" +
+                "}\n";
+    }
+
+    /** Headless variant: enables screenshot capture, then builds the same UI. */
+    static String winShotAppSource(String pngPath, int width, int height) {
+        return "import com.codename1.ui.Display;\n" +
+                "import com.codename1.ui.Form;\n" +
+                "import com.codename1.ui.Label;\n" +
+                "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.layouts.BoxLayout;\n" +
+                "import com.codename1.impl.windows.WindowsNative;\n" +
+                "public class WinShotApp {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        WindowsNative.enableHeadlessScreenshot(\"" + pngPath + "\", " + width + ", " + height + ");\n" +
+                "        Display.init(null);\n" +
+                "        Display.getInstance().callSerially(new Runnable() {\n" +
+                "            public void run() {\n" +
+                "                Form f = new Form(\"CN1 Native\", BoxLayout.y());\n" +
+                "                f.add(new Label(\"Hello from the native Windows port!\"));\n" +
+                "                f.add(new Button(\"Click me\"));\n" +
+                "                f.show();\n" +
+                "            }\n" +
+                "        });\n" +
+                // Park the main thread so the process stays alive; the EDT writes
+                // the PNG and exits the process once the UI has painted.
+                "        WindowsNative.runHeadlessLoop();\n" +
+                "    }\n" +
+                "}\n";
+    }
+
+    /**
+     * Builds the WebSocket screenshot app and copies it to ~/cn1-winform so it
+     * can be launched against a Cn1ssScreenshotServer. The app captures the
+     * current Form via Display.screenshot, PNG-encodes it through the port's
+     * ImageIO, and streams it to ws://127.0.0.1:8765 using com.codename1.io
+     * WebSocket over the port's WinSock sockets -- the websocket-based cn1ss
+     * capture the other ports use.
+     */
+    @org.junit.jupiter.api.Test
+    void buildsWebSocketShotApp() throws Exception {
+        Path exe = buildWindowsNativeExe("WinWsShotApp", winWsShotAppSource("ws://127.0.0.1:8765"));
+        Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
+        Files.createDirectories(dest);
+        Files.copy(exe, dest.resolve(CompilerHelper.executableName("WinWsShotApp")), StandardCopyOption.REPLACE_EXISTING);
+        Path pdb = exe.resolveSibling("WinWsShotApp.pdb");
+        if (Files.exists(pdb)) {
+            Files.copy(pdb, dest.resolve("WinWsShotApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        System.out.println("CN1_WINWS_EXE=" + dest.resolve(CompilerHelper.executableName("WinWsShotApp")).toAbsolutePath());
+    }
+
+    /**
+     * End-to-end websocket-based cn1ss capture: builds the WebSocket screenshot
+     * app, starts a {@code Cn1ssScreenshotServer} on 127.0.0.1:8765, runs the
+     * native exe (which renders the Form offscreen, PNG-encodes it and streams
+     * it over com.codename1.io WebSocket / WinSock to the server), and asserts
+     * the server wrote a non-trivial PNG. This exercises the port's new socket,
+     * WebSocket and image-encode subsystems exactly as the other ports' cn1ss
+     * pipelines do, and produces the PNG the Windows CI posts to the PR.
+     */
+    @org.junit.jupiter.api.Test
+    void capturesFormScreenshotOverWebSocket() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(CompilerHelper.isWindows(),
+                "Native Windows websocket capture is Windows-only");
+        int port = 8765;
+        Path exe = buildWindowsNativeExe("WinWsShotApp", winWsShotAppSource("ws://127.0.0.1:" + port));
+
+        // Compile the shared cn1ss screenshot server with an available JDK.
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        CompilerHelper.CompilerConfig jdk = configs.get(0);
+        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
+                .normalize().toAbsolutePath();
+        Path serverClasses = Files.createTempDirectory("cn1ss-server");
+        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
+                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
+                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
+
+        Path outDir = Files.createTempDirectory("cn1ss-ws-out");
+        String javaBin = jdk.jdkHome.resolve("bin").resolve(CompilerHelper.executableName("java")).toString();
+        ProcessBuilder serverPb = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
+                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString());
+        serverPb.redirectErrorStream(true);
+        Process server = serverPb.start();
+        try {
+            // Wait until the server prints its readiness line before launching.
+            final java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
+            final StringBuilder serverLog = new StringBuilder();
+            Thread reader = new Thread(new Runnable() {
+                public void run() {
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                            server.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = r.readLine()) != null) {
+                            synchronized (serverLog) { serverLog.append(line).append('\n'); }
+                            if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                        }
+                    } catch (IOException ignore) {
+                    }
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+            assertTrue(ready.await(30, java.util.concurrent.TimeUnit.SECONDS),
+                    "cn1ss server should start listening");
+
+            runCommand(Arrays.asList(exe.toAbsolutePath().toString()), exe.getParent());
+
+            // The server writes <test>.png; wait briefly for the file to land.
+            Path shot = outDir.resolve("windows-native.png");
+            for (int i = 0; i < 50 && !Files.exists(shot); i++) {
+                Thread.sleep(100);
+            }
+            assertTrue(Files.exists(shot), "server should have received a screenshot over the WebSocket:\n" + serverLog);
+            assertTrue(Files.size(shot) > 2048, "screenshot PNG should be non-trivial, was " + Files.size(shot));
+
+            String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
+            Path dest = (outEnv != null ? Paths.get(outEnv) : Paths.get(System.getProperty("user.home"), "cn1-winform"));
+            Files.createDirectories(dest);
+            Files.copy(shot, dest.resolve("cn1-windows-native.png"), StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("CN1_WINWS_SHOT=" + dest.resolve("cn1-windows-native.png").toAbsolutePath());
+        } finally {
+            server.destroy();
+        }
+    }
+
+    /** App that streams a Form screenshot to a cn1ss WebSocket server. */
+    static String winWsShotAppSource(String url) {
+        return "import com.codename1.ui.Display;\n" +
+                "import com.codename1.ui.Form;\n" +
+                "import com.codename1.ui.Label;\n" +
+                "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.layouts.BoxLayout;\n" +
+                "import com.codename1.io.WebSocket;\n" +
+                "import com.codename1.impl.windows.WindowsNative;\n" +
+                "public class WinWsShotApp {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        // Offscreen mode: render the UI into a readable WIC target (no window).\n" +
+                "        WindowsNative.enableHeadlessScreenshot(\"unused\", 420, 640);\n" +
+                "        Display.init(null);\n" +
+                "        Display.getInstance().callSerially(new Runnable() {\n" +
+                "            public void run() {\n" +
+                "                Form f = new Form(\"CN1 Native\", BoxLayout.y());\n" +
+                "                f.add(new Label(\"Hello from the native Windows port!\"));\n" +
+                "                f.add(new Button(\"Click me\"));\n" +
+                "                f.show();\n" +
+                "            }\n" +
+                "        });\n" +
+                "        // Settle so layout + the first paint complete, then snapshot the\n" +
+                "        // rendered window target and stream it over the cn1ss WebSocket.\n" +
+                "        new Thread(new Runnable() {\n" +
+                "            public void run() {\n" +
+                "                WindowsNative.sleepMillis(2500);\n" +
+                "                send();\n" +
+                "            }\n" +
+                "        }).start();\n" +
+                "        WindowsNative.parkMainThread(30000);\n" +
+                "    }\n" +
+                "    static void send() {\n" +
+                "        try {\n" +
+                "            final byte[] png = WindowsNative.captureWindowToPngBytes();\n" +
+                "            if (png == null || png.length == 0) { WindowsNative.exitProcess(6); return; }\n" +
+                "            final String meta = \"META {\\\"test\\\":\\\"windows-native\\\",\\\"png_bytes\\\":\" + png.length\n" +
+                "                    + \",\\\"png_fnv1a64\\\":\\\"\" + fnv(png) + \"\\\"}\";\n" +
+                "            WebSocket.build(\"" + url + "\")\n" +
+                "                .onConnect(new WebSocket.ConnectHandler() {\n" +
+                "                    public void onConnect(WebSocket w) { w.send(meta); w.send(png); }\n" +
+                "                })\n" +
+                "                .onTextMessage(new WebSocket.TextHandler() {\n" +
+                "                    public void onText(WebSocket w, String m) { w.close(); WindowsNative.exitProcess(0); }\n" +
+                "                })\n" +
+                "                .onError(new WebSocket.ErrorHandler() {\n" +
+                "                    public void onError(WebSocket w, Exception e) { WindowsNative.exitProcess(4); }\n" +
+                "                })\n" +
+                "                .connect();\n" +
+                "        } catch (Exception e) {\n" +
+                "            WindowsNative.exitProcess(5);\n" +
+                "        }\n" +
+                "    }\n" +
+                "    static String fnv(byte[] b) {\n" +
+                "        long h = 0xcbf29ce484222325L; long p = 0x100000001b3L;\n" +
+                "        for (int i = 0; i < b.length; i++) { h ^= (b[i] & 0xff); h *= p; }\n" +
+                "        StringBuilder s = new StringBuilder();\n" +
+                "        for (int i = 60; i >= 0; i -= 4) { int nib = (int) ((h >>> i) & 0xf); s.append((char) (nib < 10 ? '0' + nib : 'a' + (nib - 10))); }\n" +
+                "        return s.toString();\n" +
                 "    }\n" +
                 "}\n";
     }

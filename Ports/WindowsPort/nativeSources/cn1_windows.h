@@ -159,6 +159,15 @@ typedef struct {
     volatile LONG eventTail;
 
     volatile LONG initialized;
+
+    /* Headless screenshot mode: when enabled, initDisplay renders into an
+     * offscreen WIC bitmap instead of an HWND, and once the form has painted
+     * the bitmap is encoded to shotPath and the process exits. Used by CI to
+     * capture a deterministic PNG of the rendered UI with no display. */
+    volatile LONG headless;
+    WCHAR* shotPath;
+    JAVA_INT shotW;
+    JAVA_INT shotH;
 } CN1WindowsContext;
 
 extern CN1WindowsContext cn1Win;
@@ -181,6 +190,10 @@ D2D1_COLOR_F cn1WinColorF(JAVA_INT rgb, JAVA_INT alpha);
 
 /* text (cn1_windows_text.c) -- DirectWrite work delegated to the C++ layer */
 CN1Font* cn1WinCreateFont(int face, int style, int size);
+
+/* offscreen rendering (cn1_windows_screenshot.cpp) */
+CN1Graphics* cn1WinCreateOffscreenGraphics(int width, int height);
+JAVA_BOOLEAN cn1WinEncodeGraphicsToPng(CN1Graphics* g, const WCHAR* path);
 
 /* images (cn1_windows_image.c) */
 CN1Image* cn1WinDecodeImage(const BYTE* data, UINT32 len);

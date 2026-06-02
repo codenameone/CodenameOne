@@ -591,6 +591,13 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
         return NULL;
     }
 
+    /* Commit any pending draws: the mutable image's compatible render target is
+     * left mid-frame (BeginDraw) after paintComponent -- nothing flushes it the
+     * way flushGraphics flushes the window target -- so its bitmap is only valid
+     * once EndDraw has run. Without this the readback returns the cleared
+     * surface (a blank image), e.g. for Display.screenshot. */
+    cn1WinEndFrame(img->mutableGraphics);
+
     contentBitmap = cn1WinEnsureBitmap(img, img->mutableGraphics->target);
     if (contentBitmap == NULL) {
         return NULL;
