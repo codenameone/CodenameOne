@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/thats-great-looking-app/java-for-mobile-devices1024.jpg)
 
 I talk to a lot of mobile developers or those who are starting out in the field and by far the number one problem is getting a refined sublime app. There are too many difficulties and pitfalls along the way and the end result is often "sub par" in terms of the UI you want to achieve.  
-We too bare responsibility for that. We focus too much on the technology and too little on making "gorgeous" easy. I want you to join me in changing that narrative…​
+We too bear responsibility for that. We focus too much on the technology and too little on making "gorgeous" easy. I want you to join me in changing that narrative…​
 
 The narrative is very common: "you can’t have it all". You will pay for cross platform by sub par UX or UI. You will "write once debug everywhere".
 

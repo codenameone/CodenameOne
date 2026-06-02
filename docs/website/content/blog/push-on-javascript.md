@@ -39,7 +39,7 @@ So currently we use the `setProperty()` method of `Display` to set the sender ID
 __ |  Notice we used `gcm.sender_id` and not `javascript.sender_id` to highlight that this value is common for GCM implementations   
 ---|---  
   
-Safari is problematic as it doesn’t use the same semantics of any other push service. It doesn’t act like iOS or like other browsers. So at this time we don’t plan on supporting Safari as it’s audience is mostly in mobile where we have proper native app support.
+Safari is problematic as it doesn’t use the same semantics of any other push service. It doesn’t act like iOS or like other browsers. So at this time we don’t plan on supporting Safari as its audience is mostly in mobile where we have proper native app support.
 
 ### Availability & More
 

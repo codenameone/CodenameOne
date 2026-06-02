@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-43/qanda-friday2.jpg)
 
-Surprisingly the big VM update we had last week didn’t trigger any major regressions but we did break some versioned build behavior with the [string obfuscation feature](/blog/obfuscated-constants.html). Todays update is far more tame and should mostly include minor bug fixes and not to many new/disruptive features.
+Surprisingly the big VM update we had last week didn’t trigger any major regressions but we did break some versioned build behavior with the [string obfuscation feature](/blog/obfuscated-constants.html). Today's update is far more tame and should mostly include minor bug fixes and not too many new/disruptive features.
 
 There were a lot of questions but most of them weren’t broad enough for this forum, so I’ll discuss only two questions and in both cases I’ll talk less about the question and more about the implications.
 

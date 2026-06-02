@@ -15,7 +15,7 @@ This has been a very busy week, we published new information on the [properties 
 which I’m excited about but I’m not sure if I can drum up your enthusiasm…​  
 Steve made a [big post](/blog/connecting-to-a-mysql-database.html) about mysql support too.
 
-Todays library update includes [new simulator code](/blog/fail-fast-margin-padding-performance.html) that might  
+Today's library update includes [new simulator code](/blog/fail-fast-margin-padding-performance.html) that might  
 break some apps if you’ve refactored stuff around so be vigilant and let us know if something suddenly stops working.
 
 On stack overflow things were as usual:

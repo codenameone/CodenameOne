@@ -71,7 +71,7 @@ When you get that error it means you got an exception that you didn’t catch in
 
 ### Initialising subcomponents of a GUI form
 
-We are in the process of moving to the new GUI builder which is mostly delay due to lack of documentation.  
+We are in the process of moving to the new GUI builder which is mostly delayed due to lack of documentation.  
 We hope to release docs for this in the coming weeks.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37810040/initialising-subcomponents-of-a-gui-form)
@@ -160,14 +160,14 @@ on a specific Form.
 
 ### Is Codenameone geofencing locations limited to 1?
 
-It’s not, but it is sometimes hard to find out exactly how many locations were bounds and what are the platform  
+It’s not, but it is sometimes hard to find out exactly how many locations were bound and what are the platform  
 limits in regards to location binding.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37751930/is-codenameone-geofencing-locations-limited-to-1)
 
 ### How to minimize gap between Tab icon and Tab text in Codename one?
 
-There is a default padding within the `FontImage` class, the padding allows for a more whitespace which is  
+There is a default padding within the `FontImage` class, the padding allows for more whitespace which is  
 often more visually pleasing. However, you can turn that off…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37748218/how-to-minimize-gap-between-tab-icon-and-tab-text-in-codename-one)
@@ -182,7 +182,7 @@ implementing the native code in the native IDE and copying the results back to C
 
 ### CodenameOne APK is not zip aligned
 
-Google broke Android builds again thru some changes to it’s build again, so we had to scramble to find the  
+Google broke Android builds again thru some changes to its build again, so we had to scramble to find the  
 reason. One of the nice things about Codename One is that we have to do the scrambling after Google/Apple’s  
 shenanigans for you…​
 
@@ -198,7 +198,7 @@ GUI builder which will hopefully become our chief tool in the near future.
 ### Why a String drawn on a Graphics object change its position depending on the used skin?
 
 This is a bit of a challenging thread, `drawString` is core to the platform and it’s hard to figure  
-out what is the reason for the inconsistency n this thread.
+out what is the reason for the inconsistency in this thread.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37739521/why-a-string-drawn-on-a-graphics-object-change-its-position-depending-on-the-use)
 

@@ -52,7 +52,7 @@ One of the changes in iOS 7 was the new 3d spinner component (not sure how that 
 When we started working on this we wanted to use the amazing new Android widgets for date/time, but apparently these are specific to the Android calendar and not really available in the OS… So Google itself isn’t using native widgets for their own application and choosing to go with app specific widgets…. lovely.  
   
   
-If you aren’t an Android 4 calendar user check out the screenshot to the left, its a pretty sweet time picker UI that looks better in real life where it animates very nicely.  
+If you aren’t an Android 4 calendar user check out the screenshot to the left, it's a pretty sweet time picker UI that looks better in real life where it animates very nicely.  
   
   
   
@@ -61,7 +61,7 @@ If you aren’t an Android 4 calendar user check out the screenshot to the left,
   
 So we provide two API layers the first is a simple API with a fallback that just allows you to place a time/date widget. If a native picker is available it will be used otherwise our picker is used. This is the  
   
-Picker API and although it looks likes a text field its really just a button that will popup a picker when pressed. Its really simple to use just add it to your UI either via the designer or in code and set/get the date/time. The only potential source of confusion is that time is defined as minutes since midnight and if you invoke setDate() this won’t work.  
+Picker API and although it looks like a text field it's really just a button that will popup a picker when pressed. It's really simple to use just add it to your UI either via the designer or in code and set/get the date/time. The only potential source of confusion is that time is defined as minutes since midnight and if you invoke setDate() this won’t work.  
   
   
 On the other hand if you use the Date And Time spinner then the Date object you use will have the time embedded in it and you should not use the time related functions.  
@@ -87,7 +87,7 @@ So to show a native picker you must first verify that the picker type is support
   
   
   
-The value type depends on the picker type, for date/date and time a `java.util.Date` object is expected. For time and Integer value with minutes since midnight is expected.  
+The value type depends on the picker type, for date/date and time a `java.util.Date` object is expected. For time an Integer value with minutes since midnight is expected.  
 
   
 The API is blocking like typical dialog API’s and will return with the value when finished.  

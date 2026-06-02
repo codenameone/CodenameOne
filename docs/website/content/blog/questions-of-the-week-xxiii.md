@@ -31,7 +31,7 @@ We do need to support a more consistent cross platform database. SQLite is prett
 
 ### How do I access UI components in a .res file with Codename One?
 
-This is so much easier in the new GUI builder, hopefully this weeks update will tip the scales for most developers
+This is so much easier in the new GUI builder, hopefully this week's update will tip the scales for most developers
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39497111/how-do-i-access-ui-components-in-a-res-file-with-codename-one)
 
@@ -56,7 +56,7 @@ good way to reproduce it consistently
 
 ### UWP deployment failed with CodenameOne
 
-We had some UWP deployment issues that should be fixed in todays update
+We had some UWP deployment issues that should be fixed in today's update
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39477840/uwp-deployment-failed-with-codenameone)
 

@@ -57,7 +57,7 @@ We will also introduce an annual basic account as part of these changes.
 • Current recurring subscription renewals will use the existing prices and not the newer prices.
   
   
-• This price change only apply to users signing up to any paid plan after December 31st.
+• This price change only applies to users signing up to any paid plan after December 31st.
   
   
 • If you subscribe to any paid plan before December 31st, you’ll keep the current pricing ****forever**** (as long as you stay subscribed).****

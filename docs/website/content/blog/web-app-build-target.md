@@ -34,11 +34,11 @@ That’s where we can step in… We would like to sponsor Jaroslav in his effort
 
 We will allow you to just right click a project and select "Build a web app". You will get a self contained app that doesn’t need a server side and would be implemented entirely in JavaScript… You would still be able to use threads and most of the standard things Codename One has to offer, some limitations might apply but you should be able to create a completely portable app!  
   
-One of the nice things is that due to the architecture of Codename One we belive it would be faster than typical HTML5 framworks since it won’t be suseptible to the reflow problems that typical HTML5 code is suseptible to.
+One of the nice things is that due to the architecture of Codename One we believe it would be faster than typical HTML5 frameworks since it won’t be susceptible to the reflow problems that typical HTML5 code is susceptible to.
 
 To pay for this work we will make this feature enterprise only and  
 **  
-would only implemement it if we get 2 annual enterprise subscribers!  
+would only implement it if we get 2 annual enterprise subscribers!  
 **
 
 This will effectively pay for most of the initial effort required to build this feature, if you are interested in this feature make sure to  

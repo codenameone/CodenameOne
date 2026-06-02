@@ -127,7 +127,7 @@ When developing native interfaces, the process I usually follow is:
 
 ![Visual studio project sources](/blog/uwp-native-interfaces-mix-c-java/uwp-sources-directory.png)
 
-  7. Open and edit the native implementation (you’ll find it in the appropriate structure inside the "src" directory.
+  7. Open and edit the native implementation (you’ll find it in the appropriate structure inside the "src" directory).
 
 ![Visual studio solutions explorer](/blog/uwp-native-interfaces-mix-c-java/uwp-solution-explorer.png)
 

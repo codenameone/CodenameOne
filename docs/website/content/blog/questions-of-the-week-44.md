@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-44/qanda-friday2.jpg)
 
-This weeks release adds support for JavaScript push but I’d recommend you don’t use it in production yet…​ The main issue is that we **might** change the way JavaScript push keys are generated so it might be better to put this on hold or only experiment with this for now. Regardless it’s a pretty big change to the push server so we have the old version standing by and might revert it if things get hairy.
+This week's release adds support for JavaScript push but I’d recommend you don’t use it in production yet…​ The main issue is that we **might** change the way JavaScript push keys are generated so it might be better to put this on hold or only experiment with this for now. Regardless it’s a pretty big change to the push server so we have the old version standing by and might revert it if things get hairy.
 
 We don’t have huge new features but we did make some big changes, e.g. the [pull request from jaanushansen](https://github.com/codenameone/CodenameOne/pull/2048) is pretty ambitious and might impact Android text editing significantly so keep your eye out on this.
 

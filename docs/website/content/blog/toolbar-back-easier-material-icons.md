@@ -11,16 +11,16 @@ author: Shai Almog
 
 ![Header Image](/blog/toolbar-back-easier-material-icons/back-arrow.png)
 
-When we initially launched Codename One it was pretty hard to imagine todays apps. Menus and back navigation  
+When we initially launched Codename One it was pretty hard to imagine today's apps. Menus and back navigation  
 were miles apart when comparing Android 2.x and iOS 4.x…​ So we created a very elaborate set of abstractions  
 (command behavior) that served as a set of patch framework we could live with for a while.
 
-But like any patch framework this started crumbling under its shear weight and this lead us to the  
+But like any patch framework this started crumbling under its sheer weight and this lead us to the  
 [Toolbar API](/javadoc/com/codename1/ui/Toolbar/). The reason we  
 could do that is that a lot of the platform differences have converged, in 2012 it was blasphemy to have  
 a back button in Android title area and now it’s the official material design guideline.
 
-So while platforms are still different their differences are more refined an less conceptual and that is the perfect  
+So while platforms are still different their differences are more refined and less conceptual and that is the perfect  
 environment for the `Toolbar` API. `Toolbar` solved most of these differences in a very portable and robust way but  
 one thing it didn’t codify was back button behavior, this was mostly due to the many nuances within this functionality  
 and due to our bad experience with abstracting it in the old command behavior framework.

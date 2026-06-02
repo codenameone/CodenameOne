@@ -13,7 +13,7 @@ author: Shai Almog
 
 I recently had to debug some code on Android Studio and was reminded how awful that IDE really is. IntelliJ is a pretty good IDE but Android Studio is remarkably slow even for trivial projects…​ One of the things that make it slow (besides RAM usage) is the approach of downloading everything it needs dynamically.
 
-This might be unnoticeable on Googles fast networks where this probably runs instantly. But on my fast home network this was painfully slow.
+This might be unnoticeable on Google's fast networks where this probably runs instantly. But on my fast home network this was painfully slow.
 
 With mobile apps this problem is often just as bad, we debug on the device in the office where the device is connected to wifi or 4G networks. This might be OK for some cases but it doesn’t represent flaky on-the-road conditions that exist even in the western hemisphere in some regions.
 

@@ -21,7 +21,7 @@ The new video capture constraints API allows you to specify "constraints" when c
 
   4. Video Resolution (i.e. width and height).
 
-Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component’s preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
+Support for these constraints varies by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component’s preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
 
 ### Example 1: Capturing a Low-Quality 5-Second Clip
 
@@ -39,7 +39,7 @@ This constraint can then be passed to `Capture.captureVideo()` to obtain the cap
 
 ### Not all platforms support all constraints
 
-So how do we know if our constraints will be obeyed? If the platform doesn’t support the max length, constraint, we may want to do something different. We can find out if a constraint is supported by simply asking out constraint object.
+So how do we know if our constraints will be obeyed? If the platform doesn’t support the max length, constraint, we may want to do something different. We can find out if a constraint is supported by simply asking our constraint object.
 
 E.g.
     

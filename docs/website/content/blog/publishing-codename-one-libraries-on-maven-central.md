@@ -62,7 +62,7 @@ Notice the `<maven>` tag which contains the XML dependency snippet that can be a
 
   
 
-Currently there are still many libraries that aren’t on Maven central. These libraries can still be used by Maven projects. You are using **Codename One Settings** to install the library, then the process is seamless. If want to install the cn1lib "manually", you can use the [install-cn1lib Maven goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
+Currently there are still many libraries that aren’t on Maven central. These libraries can still be used by Maven projects. If you are using **Codename One Settings** to install the library, then the process is seamless. If you want to install the cn1lib "manually", you can use the [install-cn1lib Maven goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
 
 ### Getting Started
 
@@ -243,11 +243,11 @@ This is a short list of key servers you should send your key to:
 4. 4. <https://pgp.mit.edu/>
 5. 5. <http://keys.gnupg.net/>
 
-## Importnat:
+## Important:
 
 > Remember your GPG Passphrase!
 
-And now that you have GPG installed and set up, you should add section to your `pom.xml` to enable the signing of artifacts.
+And now that you have GPG installed and set up, you should add a section to your `pom.xml` to enable the signing of artifacts.
 
 A snippet from the GoogleMaps lib `pom.xml` file that enables signing artifacts using GPG.
 
@@ -314,7 +314,7 @@ Open your `settings.xml` file (located at **`$HOME/.m2/settings.xml`**). If you 
 
 Make sure your file includes the `<profiles>` snippet shown above. This defines the gpg.passphrase property so that it will be present for your Maven builds.
 
-## Importnat:
+## Important:
 
 > Substitute your passphrase for the YOUR\_PASSPHRASE text.
 
@@ -374,7 +374,7 @@ When you are developing a project, it will usually have a SNAPSHOT version, mean
 
   
 
-Since this is a multi-module Maven project, the version hard-coded into each module, so updating the version by hand is both tedious and error-prone. Luckily Maven can automate this process for us.
+Since this is a multi-module Maven project, the version is hard-coded into each module, so updating the version by hand is both tedious and error-prone. Luckily Maven can automate this process for us.
 
   
 
@@ -491,7 +491,7 @@ If you want other Codename One developers to find your library, I also recommend
 
 ### Summary
 
-This may look like an over complicated process, but most of heavy lifting is a one-time thing – setting up Sonatype access, generating certificates, etc…​ Subsequent releases will become much easier, and, the work will be worth it.
+This may look like an over complicated process, but most of the heavy lifting is a one-time thing – setting up Sonatype access, generating certificates, etc…​ Subsequent releases will become much easier, and, the work will be worth it.
 
 ---
 

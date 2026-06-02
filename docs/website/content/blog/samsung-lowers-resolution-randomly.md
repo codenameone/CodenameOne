@@ -15,7 +15,7 @@ A few weeks ago we got [this question](https://stackoverflow.com/questions/61752
 
 The issue started innocently enough. A device whose native resolution is high was rendering the UI in low resolution. This can happen because of a new DPI setting or configuration in a new SDK.
 
-But the odd thing was this: if the apps package name was changed the resolution went back to normal!
+But the odd thing was this: if the app's package name was changed the resolution went back to normal!
 
 ### It’s Samsung’s Fault
 

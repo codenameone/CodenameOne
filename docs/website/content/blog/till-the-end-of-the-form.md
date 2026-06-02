@@ -23,7 +23,7 @@ author: Shai Almog
 We’ve had pull to refresh for quite some time which is a really nice feature useful for pulling new updates. We also always had infinite lists using a smart list model approach, however up until now we didn’t have a standard implementation of an infinite container with arbitrary components. 
 
   
-In some of the newer web UI’s such as Tumblr and Twitter the data is fetched dynamically when you reach a fixed location in the form, this is a simpler approach than the one demonstrated by the list model but in some regards its more practical. A user can’t just start jumping around and fetching the entire list, this works better with most REST API’s and is pretty powerful on its own.  
+In some of the newer web UI’s such as Tumblr and Twitter the data is fetched dynamically when you reach a fixed location in the form, this is a simpler approach than the one demonstrated by the list model but in some regards it’s more practical. A user can’t just start jumping around and fetching the entire list, this works better with most REST API’s and is pretty powerful on its own.  
 
   
 My initial thought was to create a Container subclass or even add support for this into Container itself, but eventually I came to the conclusion that this is really unnecessary and we can accomplish something like this without modifying the internal code. For this purpose we created the  
@@ -36,7 +36,7 @@ The runnable will be invoked on the EDT so be sure not to block it (unless you u
 addMoreComponents() method. Notice that you shouldn’t just add/remove components on your own since this will mess up the container.
 
   
-Here is a simple example that adds buttons and sleeps to simulated slow network activity:  
+Here is a simple example that adds buttons and sleeps to simulate slow network activity:  
   
   
   

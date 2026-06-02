@@ -15,10 +15,10 @@ June just ended and we are starting the final stretch to get 3.5 ready, there is
 table right now so most of the work in the coming month will probably focus on stabilizing the GUI builder and  
 fixing the remaining issues for 3.5.
 
-One thing we pushed to todays release in the last minute is a new API called: `Toolbar.setCenteredDefault(boolean)`.  
+One thing we pushed to today's release in the last minute is a new API called: `Toolbar.setCenteredDefault(boolean)`.  
 This was triggered in part by a  
 [stackoverflow question](http://stackoverflow.com/questions/38065436/how-can-i-prevent-my-title-text-from-getting-misaligned)  
-below but is a recurring theme. The `Toolbar` used to center it’s title thru the alignment style, which is problematic  
+below but is a recurring theme. The `Toolbar` used to center its title thru the alignment style, which is problematic  
 as it isn’t centered relatively to the commands on the sides. We now center it properly but this might not be what  
 you want so you can disable this functionality by calling `Toolbar.setCenteredDefault(false);`.
 
@@ -52,7 +52,7 @@ them in the same directory hierarchy. You need to use one or the other for a spe
 
 ### GPS fail if not on top
 
-Location in the background is a special case that requires special permissions and a different apparoach to the API…​
+Location in the background is a special case that requires special permissions and a different approach to the API…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38085499/codenameone-gps-fail-is-not-on-top)
 
@@ -91,7 +91,7 @@ of the nice things in SO though is the fact that you can get answers from everyo
 ### Image always missing in the received message while sharing an image
 
 Like many issues this was multi-layered but it seems that there is also an issue with the Codename One share  
-button. The share button handles it’s action performed before it’s listeners had time to react. By enclosing it  
+button. The share button handles its action performed before its listeners had time to react. By enclosing it  
 in a call serially we were able to workaround the bug mentioned here.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38042512/image-always-missing-in-the-received-message-while-sharing-an-image-in-codename)
@@ -99,7 +99,7 @@ in a call serially we were able to workaround the bug mentioned here.
 ### How can I get an Android device current SDK level in a native interface
 
 Native interfaces are harder to debug, we always suggest building a native project and debugging them there  
-otherwise you might be mislead that something isn’t working as expected.
+otherwise you might be misled that something isn’t working as expected.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38035545/how-can-i-get-an-android-device-current-sdk-level-in-a-native-interface)
 

@@ -15,7 +15,7 @@ We’ve had a very challenging week with a lot of backend work for some enterpri
 much done as we do most weeks. I can say that I’ve seen some of the apps in the pipeline and I’m very excited  
 about the things to come…​
 
-Todays update includes many bug fixes on Android, UWP but not much in terms of new features.
+Today's update includes many bug fixes on Android, UWP but not much in terms of new features.
 
 On stack overflow things were pretty standard:
 

@@ -64,7 +64,7 @@ that are crucial:
   * They can have meta-data associated with them
 
 These features are crucial since properties allow us all kinds of magic e.g. hibernate/ORM uses properties to bind  
-Java objects to a database represenation, jaxb does it to parse XML directly into Java objects and GUI builders  
+Java objects to a database representation, jaxb does it to parse XML directly into Java objects and GUI builders  
 use them to let us customize UI’s visually.
 
 POJO’s don’t support most of that so pretty much all Java based tools use a lot of reflection & bytecode manipulation.  
@@ -200,7 +200,7 @@ values from parsed JSON:
     
     meet.getPropertyIndex().populateFromMap(jsonParsedData);
 
-And visa versa:
+And vice versa:
     
     
     String jsonString = meet.toJSON();

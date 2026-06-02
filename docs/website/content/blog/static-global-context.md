@@ -52,7 +52,7 @@ Then write something like:
 
 ### Why do it in Display?
 
-Adding something like this into `Display` doesn’t make sense…​ It would make that class huge and just persist a design mistake from years ago. It’s better to start with a new global context class that will provide us static methods for all the common things we need where it’s common constants or `NetworkManager` methods etc.
+Adding something like this into `Display` doesn’t make sense…​ It would make that class huge and just persist a design mistake from years ago. It’s better to start with a new global context class that will provide us static methods for all the common things we need whether it’s common constants or `NetworkManager` methods etc.
 
 This doesn’t deprecate `Display` (yet), it provides a better approach for doing the things we do today in `Display` with the new `CN` class. It also adds common methods & constants from several other classes so Codename One code will feel more terse e.g. once we do:
     
@@ -85,7 +85,7 @@ Some things were changed so we won’t have too many conflicts e.g. `Log.p` or `
 
 Instead of `Display.getInstance().getCurrent()` we now have `getCurrentForm()` since `getCurrent()` is too generic. But for most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work".
 
-I ported the Kitchen Sink to use this new convention, to see a sample of how this can cut down on code clutter check of this [diff of my commit](https://github.com/codenameone/KitchenSink/commit/6c4ed67579ec8cbbe3a3da67d30224688c9fe602).
+I ported the Kitchen Sink to use this new convention, to see a sample of how this can cut down on code clutter check out this [diff of my commit](https://github.com/codenameone/KitchenSink/commit/6c4ed67579ec8cbbe3a3da67d30224688c9fe602).
 
 The motivation for this change is three fold:
 

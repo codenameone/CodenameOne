@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/whatsapp-clone/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
-I’ve been pretty busy this new year with a lot of unpredictable detours. As such I completely missed the deadline of releasing the whatsapp clone application I promissed for the end of year. I’m now in the process of uploading modules into the [online course](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) for the WhatsApp clone.
+I’ve been pretty busy this new year with a lot of unpredictable detours. As such I completely missed the deadline of releasing the whatsapp clone application I promised for the end of year. I’m now in the process of uploading modules into the [online course](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) for the WhatsApp clone.
 
 Unlike previous clones I plan to make this far simpler as a lot of the work was already covered in the Facebook Clone module. This mostly focuses on features that weren’t covered there and fixes some things e.g. SMS activation is handled in the server side.
 

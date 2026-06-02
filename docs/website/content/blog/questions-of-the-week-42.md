@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-42/qanda-friday2.jpg)
 
-This weeks update will go out a bit late or maybe even tomorrow. The reason for the postponing is the scope of the changes. We’ve made a lot of changes to [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm) and we are very concerned that there will be regressions. So we would like this update to go in later in case we need to revert that work. Steve wrote a detailed post about the changes he made to ParparVM which we will post next week…​
+This week's update will go out a bit late or maybe even tomorrow. The reason for the postponing is the scope of the changes. We’ve made a lot of changes to [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm) and we are very concerned that there will be regressions. So we would like this update to go in later in case we need to revert that work. Steve wrote a detailed post about the changes he made to ParparVM which we will post next week…​
 
 Besides that with the 64bit change to the build I’m sure there will be a lot of feedback on this update during the week. There are quite a few other interesting things in this update including the big change to the way redirects are handled on iOS which might be significant as well.
 

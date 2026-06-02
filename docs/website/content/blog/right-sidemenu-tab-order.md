@@ -49,7 +49,7 @@ Because RTL languages are read from the right side users expect the entire UI to
 
 Up until now we couldn’t do this for the side menu but now that [Francesco Galgani](https://github.com/jsfan3) introduced support for [right side menu in his PR](https://github.com/codenameone/CodenameOne/pull/2437) and [followup PR](https://github.com/codenameone/CodenameOne/pull/2439) this is finally possible!
 
-With next weeks update you could invoke a version of the add to side menu method that lets you add an element to the right side.
+With next week's update you could invoke a version of the add to side menu method that lets you add an element to the right side.
 
 ### Input Cycle
 

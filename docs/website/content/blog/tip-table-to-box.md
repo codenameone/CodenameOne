@@ -94,7 +94,7 @@ Since the elements already have the right position the layout animation will pro
 ### Final Word
 
 What makes an app delightful is the attention to detail, small changes like this make the UX of an app  
-and it’s esthetic far more appealing.
+and its esthetic far more appealing.
 ---
 
 ## Archived Comments

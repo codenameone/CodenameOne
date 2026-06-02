@@ -30,7 +30,7 @@ iOS developers literally run their applications 7 times with blank data to grab 
 
 When we started working on Codename One we understood that this will not be feasible, initially we thought we would show a hardcoded screenshot but that wouldn’t be "right" then we came up with a simple idea. We run the application 7 times in the build server, grab the right sized screenshot in our simulator and then build the app!  
   
-This means the process of the iPhone splash screen is almost seamless to you… But its not completely seamless.
+This means the process of the iPhone splash screen is almost seamless to you… But it's not completely seamless.
 
 Every abstraction leaks and this one has quite a few leaks/pitfalls you should be aware of as a developer. 
 
@@ -56,7 +56,7 @@ Unsupported component
   
 One of the biggest obstacles is with heavyweight components, e.g. if you use a browser or maps on the first screen of the app you will see a partially loaded/distorted MapComponent and the native webkit browser obviously can’t be rendered properly by our servers.
 
-The workaround for such issues is to have a splash screen that doesn’t include any of the above. Its OK to show it for a very brief amount of time since the screenshot process is pretty fast. 
+The workaround for such issues is to have a splash screen that doesn’t include any of the above. It's OK to show it for a very brief amount of time since the screenshot process is pretty fast. 
 
 On the right hand side of this article you can see the upcoming native Google maps implementation running on Android. There are still bugs there but we are getting there…  
 

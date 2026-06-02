@@ -14,7 +14,7 @@ author: Shai Almog
 Just last week I wrote that we are making an effort not to add new features and we got foiled by a couple of new features.  
 The main reason for this is paying customers who need to  
 have a feature **now**. This makes it hard for us to focus completely, but it does keep the lights on  
-here so we can’t really complain.+  
+here so we can’t really complain.  
 To be fair, during this time we were able to almost double the page count of the developer guide from the  
 3.2 era to 584 pages at this moment and we still have a lot of work ahead of us in that department.
 
@@ -33,8 +33,8 @@ is a quick video Steve made showing off the `ToastBar`.
 
 Some effects are very easy to accomplish in Codename One while others not so much. Gaussian blur is  
 one of those none trivial effects that become even harder to achieve when performance is of the essence.  
-Its a really powerful effect that makes the UI standout over the background and should be built in now that  
-its a builtin part of iOS 8+.
+It’s a really powerful effect that makes the UI standout over the background and should be built in now that  
+it’s a builtin part of iOS 8+.
 
 We now have two new API’s in `Display`:  
 [gaussianBlurImage](/javadoc/com/codename1/ui/Display/#gaussianBlurImage-com.codename1.ui.Image-float-) &  

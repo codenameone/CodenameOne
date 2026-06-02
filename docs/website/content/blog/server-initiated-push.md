@@ -13,7 +13,7 @@ author: Shai Almog
 
 Sending a push notification from the simulator or mobile device is pretty trivial when we use the `Push`  
 class. However, sending push messages from the server seems to be a bit more complicated for most developers  
-since its not as well documented. The main point of complexity is that we didn’t provide any samples of server  
+since it’s not as well documented. The main point of complexity is that we didn’t provide any samples of server  
 push code and from the fact that the server expects arguments as POST. 
 
 This code should work for Java desktop and server side to perform a simple push, notice that the complexity is  

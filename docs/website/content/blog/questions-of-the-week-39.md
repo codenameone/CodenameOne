@@ -16,7 +16,7 @@ We had a lot of updates and new features this week but we decided in advance to 
 
 We had a lot of good questions on stackoverflow this week but I don’t think most of them would be interesting to the general blog readership. I thought about covering [Dave’s request in the group](https://groups.google.com/d/msg/codenameone-discussions/7mmJxJgXqng/-Bd0axl5EgAJ) but I don’t have much more to say other than: "we need enterprise customers to keep the lights on, please upgrade".
 
-With that I’ll cut this weeks Q&A short…​
+With that I’ll cut this week’s Q&A short…​
 
 ---
 

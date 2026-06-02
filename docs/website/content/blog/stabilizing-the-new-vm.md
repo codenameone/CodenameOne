@@ -25,7 +25,7 @@ author: Shai Almog
   
   
   
-Its always a challenge to migrate to a new implementation and the new VM is no exception, we ran into several issues and are already hard at work fixing them.  
+It's always a challenge to migrate to a new implementation and the new VM is no exception, we ran into several issues and are already hard at work fixing them.  
   
 Currently resolved are:  
   

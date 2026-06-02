@@ -14,7 +14,7 @@ author: Shai Almog
 
 Tel Aviv, Israel – Mobile development platform Codename One is announcing the release of its 2.0 version on Wednesday, December 25th. In the 7 months since the May release of 1.1 Codename One has reached profitability, quadrupled its paying subscriber base and was downloaded by 500,000 developers. 
 
-Codename One is a one of a kind solution that allows Java developers to build native applications that work on all mobile devices seamlessly. It combines an open source client architecture that integrates seamlessly with all major Java development environments: Eclipse, NetBeans and IntelliJ IDEA. To leverageits one of kind cloud build system. This unique architecture enables Java developers to build iPhone applications without owning a Mac or Windows Phone applications without a Windows 8 machine. 
+Codename One is a one of a kind solution that allows Java developers to build native applications that work on all mobile devices seamlessly. It combines an open source client architecture that integrates seamlessly with all major Java development environments: Eclipse, NetBeans and IntelliJ IDEA. To leverage its one of a kind cloud build system. This unique architecture enables Java developers to build iPhone applications without owning a Mac or Windows Phone applications without a Windows 8 machine. 
 
 Version 2.0 is a major leap forward with containing 300 new features and improvements to the 1.1 version such as: Support for IntelliJ IDEA, Google Play Ads, binary 3rd party libraries and much more.
 

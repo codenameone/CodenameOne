@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-listen-on-all-radios/tip.jpg)
 
-Using toggle buttons in touch interfaces is very intuitive for many use cases. We implement them via `RadioButton` or `CheckBox` to indicate inclusive or exclusive selection. As a result I find myself using `RadioButton` quite a lot and ran into an ommission that frankly should have been there from day 1.
+Using toggle buttons in touch interfaces is very intuitive for many use cases. We implement them via `RadioButton` or `CheckBox` to indicate inclusive or exclusive selection. As a result I find myself using `RadioButton` quite a lot and ran into an omission that frankly should have been there from day 1.
 
 Up until now you couldn’t listen to selection on the `ButtonGroup` only on the `RadioButton` itself which isn’t as convenient since for pretty much every case you had to bind listeners over and over. With the latest version of Codename One you can bind a listener to the button group directly like this:
     

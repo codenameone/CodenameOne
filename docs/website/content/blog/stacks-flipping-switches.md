@@ -30,7 +30,7 @@ We are turning on the new Android/iOS graphics pipelines by default which should
   
   
   
-We are also switching on a virtual keyboard change for iOS which provides a more "native’ feel for the iOS keyboard, it still has some unique edge cases but we feel it provides a better default experience overall. This virtual keyboard mode keeps the keyboard open once you start editing even if you scroll the form, its generally more like the native editing functionality in iOS. You can disable it using ios.keyboardOpen=false.  
+We are also switching on a virtual keyboard change for iOS which provides a more "native" feel for the iOS keyboard, it still has some unique edge cases but we feel it provides a better default experience overall. This virtual keyboard mode keeps the keyboard open once you start editing even if you scroll the form, it’s generally more like the native editing functionality in iOS. You can disable it using ios.keyboardOpen=false.  
   
   
   

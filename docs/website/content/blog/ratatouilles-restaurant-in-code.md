@@ -20,7 +20,7 @@ your browser without compiling anything…
 The demo shows off how attractive a really simple UI can be with the right font face and a few images/transparency  
 effects. This is further emphasized via the nice expansion animation when clicking on an image. We also  
 demonstrate navigation, maps and integration with table ordering systems as part of the demo (haven’t  
-tested the latter since its only supposed to work in the states). You can check out the  
+tested the latter since it’s only supposed to work in the states). You can check out the  
 [full source code of the  
 demo in github](https://github.com/codenameone/RestaurantDemo). 
 

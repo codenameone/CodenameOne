@@ -54,7 +54,7 @@ It also helped our SEO efforts and our general visibility.
   * [Bad design by default](/blog/good-looking-by-default-native-fonts-simulator-detection-more.html) –  
 a default hello world application looked horrible in Codename One. The default  
 fonts were also pretty horrible. Material design and other common paradigms are still not properly addressed  
-out of the box in Codename One. We are working on filling the gap here and cosider these to be important priorities.
+out of the box in Codename One. We are working on filling the gap here and consider these to be important priorities.
   * [Fast release cycle](/blog/smooth-scrolling-async-android-editing-3.3.html) –  
 we procrastinated on releases prior to 2015. This made basic features like versioned  
 build completely useless. Shortening the release cycles made them easier as each release became simpler.
@@ -225,7 +225,7 @@ the most crucial part in any tool.
 
 #### The Plan For 2016
 
-Based on the above and general feedback we get continously from developers we would like to focus on the following  
+Based on the above and general feedback we get continuously from developers we would like to focus on the following  
 thru 2016. The highest priority bits would be: 
 
   1. GUI builder – get it out the door and into the default projects. Hello world app should be a GUI builder app

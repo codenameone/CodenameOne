@@ -27,15 +27,15 @@ a big deal for small projects but it became an issue as Codename One application
 output is compressed, so that server builds would be significantly smaller. This is crucial since it reduces upload  
 time in the client side which is a huge contributor to the total build time. 
 
-Notice that apps created in the past year should have this on by default but its always important to check. 
+Notice that apps created in the past year should have this on by default but it's always important to check. 
 
 #### Inspect the Sent JAR
 
-When optimizing the jar size its often hard to see where to begin. After you send a build if you open your dist folder  
-(or bin folder for Eclipse) you will see what seems to be the jar of your application. However, in this case its the jar  
+When optimizing the jar size it's often hard to see where to begin. After you send a build if you open your dist folder  
+(or bin folder for Eclipse) you will see what seems to be the jar of your application. However, in this case it's the jar  
 that was sent to the server including the native bits that need to be compiled on the server side.  
 You can use a zip utility such as 7-zip to inspect the content of the jar and see what takes up space and how  
-well are files compressed. Its possible that a specific file within the zip isn’t supposed to be there and its possible  
+well are files compressed. It's possible that a specific file within the zip isn’t supposed to be there and it's possible  
 that things can be shrunk further. 
 
 #### Shrinking Resources
@@ -45,11 +45,11 @@ the space and reducing the size. For the former we have `Image->Image Sizes`, in
 tool. It returns the list of images ordered by the space they take up in the resource file, since images can’t be further  
 compressed they are the biggest space hog in the resource file. 
 
-Unless you found a specific image that takes up most of the space its probable that space is taken up by many  
+Unless you found a specific image that takes up most of the space it's probable that space is taken up by many  
 multi-images. Multi-images are essentially a single image in multiple resolutions for different device densities,  
 these images can grow to a very large size as we store a lot of resolutions for every such image. If there are densities  
 you don’t need such as LOW &amp VERY_LOW (both of which don’t exist in smart devices) you can just delete  
-all of these images from existing multi-image’s thru the menu item: `Image->Advanced->Remove DPI`. 
+all of these images from existing multi-images thru the menu item: `Image->Advanced->Remove DPI`. 
 
 `Image->Delete Unused Images` presents you with a dialog containing the images that are unused.  
 It allows you to select the images you wish to delete (all are selected by default). Notice that this method was designed for  
