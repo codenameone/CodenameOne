@@ -151,7 +151,8 @@ def main():
                     "scripts/website/languagetool-accept-blog.txt"):
             p = os.path.join(REPO_ROOT, rel)
             if os.path.exists(p):
-                accept_path_parts.append(open(p, encoding="utf-8").read())
+                with open(p, encoding="utf-8") as fh:
+                    accept_path_parts.append(fh.read())
         import tempfile
         fd, acc = tempfile.mkstemp(suffix=".txt")
         os.write(fd, "\n".join(accept_path_parts).encode())
@@ -172,8 +173,9 @@ def main():
             rel = os.path.relpath(path, REPO_ROOT)
             findings = vale_findings(path) + cap_findings(path, rel)
             if tool is not None:
-                findings += lt_findings_for(open(path, encoding="utf-8").read(),
-                                            lt, tool, accept_re)
+                with open(path, encoding="utf-8") as fh:
+                    post_text = fh.read()
+                findings += lt_findings_for(post_text, lt, tool, accept_re)
             result[rel] = findings
             print(f"{rel}: {len(findings)} finding(s)")
     finally:
