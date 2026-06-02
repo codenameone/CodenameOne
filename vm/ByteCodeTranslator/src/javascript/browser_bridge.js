@@ -104,22 +104,27 @@
     // and explicitly flag when the SAME id is posted more than once (the
     // smoking gun). Rate-limited; gated on the diag toggle so it is silent in
     // production.
-    if (diagEnabled) {
+    if (diagEnabled && id) {
       try {
-        if (!global.__cn1CbSeen) { global.__cn1CbSeen = Object.create(null); global.__cn1CbTraceN = 0; }
+        // Log every NUMERIC postback (id != 0) unbounded -- these are the
+        // width/height-shaped values that cross into getContext/getDocument.
+        // Correlate id with the HOSTREQ:member trace and the worker's
+        // JSO_RETRY:callId to see which read's response the worker received.
+        if (errorMessage == null && typeof value === 'number') {
+          log('DIAG:HOSTCB_NUM:id=' + id + ':num=' + value);
+        }
+        // Flag any id posted more than once with a differing shape (real
+        // round-trip ids only; id 0 is the shared no-response/fire-and-forget
+        // bucket and is expected to repeat).
+        if (!global.__cn1CbSeen) { global.__cn1CbSeen = Object.create(null); }
         var vshape = (errorMessage != null) ? 'err'
           : (typeof value === 'number') ? ('num:' + value)
           : (value && typeof value === 'object' && value.__cn1HostRef != null) ? ('ref:' + value.__cn1HostClass)
           : (typeof value);
-        if (global.__cn1CbSeen[id]) {
+        if (global.__cn1CbSeen[id] != null && global.__cn1CbSeen[id] !== vshape) {
           log('DIAG:HOSTCB_DUP:id=' + id + ':prev=' + global.__cn1CbSeen[id] + ':now=' + vshape);
-        } else {
-          global.__cn1CbSeen[id] = vshape;
         }
-        if (global.__cn1CbTraceN < 200) {
-          global.__cn1CbTraceN++;
-          log('DIAG:HOSTCB:id=' + id + ':' + vshape);
-        }
+        global.__cn1CbSeen[id] = vshape;
       } catch (_e) {}
     }
     var message;
@@ -1990,6 +1995,25 @@
       return;
     }
     if (data.type === 'host-call') {
+      // #5145: trace the request id+member for the reads that degrade, so we
+      // can correlate with the late HOSTCB id+value (which read's response the
+      // worker actually received). Watches getContext/getDocument/getWidth/
+      // getHeight. Flags if the SAME id arrives on two host-call requests.
+      if (diagEnabled && data.symbol === '__cn1_jso_bridge__' && data.args && data.args[0]) {
+        try {
+          var m = data.args[0].member;
+          if (m === 'getContext' || m === 'document' || m === 'width' || m === 'height'
+              || m === 'getBoundingClientRect') {
+            log('DIAG:HOSTREQ:id=' + data.id + ':member=' + m);
+            if (!global.__cn1ReqSeen) { global.__cn1ReqSeen = Object.create(null); }
+            if (global.__cn1ReqSeen[data.id] != null) {
+              log('DIAG:HOSTREQ_DUP:id=' + data.id + ':prev=' + global.__cn1ReqSeen[data.id] + ':now=' + m);
+            } else {
+              global.__cn1ReqSeen[data.id] = m;
+            }
+          }
+        } catch (_e) {}
+      }
       hostBridge.invoke(data.symbol, data.args || [], target || global.__parparWorker, data.id);
       return;
     }
