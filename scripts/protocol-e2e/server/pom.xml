@@ -6,13 +6,13 @@
 
     <!--
         Spring Boot test server for the multi-protocol end-to-end test. Exposes
-        the SAME logical "greeting" service over three transports so the
+        the SAME logical "catalog" service over three transports so the
         Codename One generated clients (@RestClient / @GraphQLClient /
         @GrpcClient) can each be exercised against a real server:
 
-          - REST   : GET  /api/greeting?name=...        -> JSON (OpenAPI/Swagger)
-          - GraphQL: POST /graphql                      -> {data,errors} envelope
-          - gRPC   : POST /grpc/e2e.Greeter/SayHello    -> gRPC-Web binary framing
+          - REST   : GET  /api/products[/{id}|/category/{cat}] -> JSON (OpenAPI)
+          - GraphQL: POST /graphql                             -> {data,errors} envelope
+          - gRPC   : POST /grpc/e2e.Catalog/{GetProduct,ListProducts} -> gRPC-Web framing
 
         The gRPC-Web endpoint is implemented directly (the CN1 client speaks
         application/grpc-web+proto), so no Envoy/proxy sidecar is required.
