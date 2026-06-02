@@ -92,7 +92,7 @@
                         <phase>generate-sources</phase>
                         <goals><goal>generate-openapi</goal></goals>
                         <configuration>
-                            <spec>${project.basedir}/cn1specs/openapi.json</spec>
+                            <spec>${project.basedir}/../../specs/openapi.json</spec>
                             <basePackage>com.codename1.e2e.rest</basePackage>
                             <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>
                         </configuration>
@@ -102,7 +102,7 @@
                         <phase>generate-sources</phase>
                         <goals><goal>generate-grpc</goal></goals>
                         <configuration>
-                            <proto>${project.basedir}/cn1specs/catalog.proto</proto>
+                            <proto>${project.basedir}/../../specs/catalog.proto</proto>
                             <basePackage>com.codename1.e2e.grpc</basePackage>
                             <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>
                         </configuration>
@@ -112,8 +112,8 @@
                         <phase>generate-sources</phase>
                         <goals><goal>generate-graphql</goal></goals>
                         <configuration>
-                            <schema>${project.basedir}/cn1specs/schema.graphqls</schema>
-                            <operations>${project.basedir}/cn1specs/operations.graphql</operations>
+                            <schema>${project.basedir}/../../specs/schema.graphqls</schema>
+                            <operations>${project.basedir}/../../specs/operations.graphql</operations>
                             <basePackage>com.codename1.e2e.graphql</basePackage>
                             <clientName>CatalogGraphApi</clientName>
                             <outputDirectory>${project.build.directory}/generated-sources/cn1</outputDirectory>

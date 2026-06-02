@@ -21,7 +21,7 @@ protocols against a single real server, over a non-trivial catalog API
     so no Envoy/proxy sidecar is required.
 - `client/` -- a Codename One app (`common` + `javase`). The `common` module
   runs `cn1:generate-openapi`, `cn1:generate-grpc`, and `cn1:generate-graphql`
-  at **build time** (from the specs under `client/common/cn1specs/`) into
+  at **build time** (from the shared `specs/` directory) into
   `target/generated-sources/cn1`; `cn1:process-annotations` then generates the
   client impls and the `cn1app.*Bootstrap` registrars. The `AbstractTest`
   classes under `client/common/src/test/java/com/codename1/e2e/` perform real
