@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Full history so the gate can compute the merge-base and read the
           # base version of each changed post.
@@ -64,7 +64,7 @@ jobs:
 
       - name: Set up Python 3
         if: steps.detect.outputs.has_posts == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -88,7 +88,7 @@ jobs:
 
       - name: Set up Java 17 for LanguageTool
         if: steps.detect.outputs.has_posts == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload net-new findings report
         if: ${{ always() && steps.detect.outputs.has_posts == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: blog-prose-net-new
           path: build/blog-prose/net-new.json
@@ -120,7 +120,7 @@ jobs:
 
       - name: Comment net-new findings on PR
         if: ${{ always() && steps.detect.outputs.has_posts == 'true' && !github.event.pull_request.head.repo.fork }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -172,10 +172,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -218,7 +218,7 @@ jobs:
           PY
 
       - name: Upload backlog report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: blog-prose-backlog-report
           path: build/blog-prose/
