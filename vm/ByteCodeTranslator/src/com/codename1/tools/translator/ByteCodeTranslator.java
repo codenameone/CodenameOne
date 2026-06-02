@@ -612,6 +612,11 @@ public class ByteCodeTranslator {
                 // legs (windows-latest / windows-11-arm).
                 writer.append("if(WIN32)\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 uuid)\n");
+                // Emit a PDB (clang-cl /Zi + linker /DEBUG) so native crash
+                // addresses in this dev/test executable symbolize to function
+                // names (llvm-symbolizer). Optimizations stay on.
+                writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
+                writer.append("    target_link_options(${PROJECT_NAME} PRIVATE /DEBUG)\n");
                 writer.append("else()\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");

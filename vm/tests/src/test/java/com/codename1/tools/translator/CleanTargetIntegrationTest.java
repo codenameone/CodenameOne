@@ -683,6 +683,10 @@ class CleanTargetIntegrationTest {
         try {
             Path d = dest.resolve("WinHelloMain.exe");
             Files.copy(exe, d, StandardCopyOption.REPLACE_EXISTING);
+            Path pdb = exe.resolveSibling("WinHelloMain.pdb");
+            if (Files.exists(pdb)) {
+                Files.copy(pdb, dest.resolve("WinHelloMain.pdb"), StandardCopyOption.REPLACE_EXISTING);
+            }
             Path themeSrc = exe.resolveSibling("windowsNativeTheme.res");
             if (Files.exists(themeSrc)) {
                 Files.copy(themeSrc, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);

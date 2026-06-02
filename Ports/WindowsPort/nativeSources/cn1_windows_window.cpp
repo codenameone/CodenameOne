@@ -98,22 +98,49 @@ static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
             (void*) info->ExceptionRecord->ExceptionAddress,
             (void*) GetModuleHandleW(NULL));
     cn1WindowsLog(buf);
+    /* The access type + faulting data address pin down what was dereferenced
+     * (e.g. a corrupt String pointer vs a small null+offset). */
+    if (info->ExceptionRecord->NumberParameters >= 2) {
+        ULONG_PTR acc = info->ExceptionRecord->ExceptionInformation[0];
+        sprintf(buf, "  access=%s dataAddr=%p",
+                acc == 0 ? "read" : (acc == 1 ? "write" : (acc == 8 ? "exec" : "?")),
+                (void*) info->ExceptionRecord->ExceptionInformation[1]);
+        cn1WindowsLog(buf);
+    }
 #ifdef _M_ARM64
     /* On ARM64 the crash context's Lr is the faulting function's caller return
      * address; walk the x29 frame-pointer chain for the frames above it. */
     CONTEXT* ctx = info->ContextRecord;
-    sprintf(buf, "  pc=%p lr=%p fp=%p", (void*) ctx->Pc, (void*) ctx->Lr, (void*) ctx->Fp);
+    sprintf(buf, "  pc=%p lr=%p fp=%p sp=%p", (void*) ctx->Pc, (void*) ctx->Lr, (void*) ctx->Fp, (void*) ctx->Sp);
     cn1WindowsLog(buf);
-    DWORD64 fp = ctx->Fp;
-    for (int i = 0; i < 24 && fp != 0; i++) {
-        DWORD64 ret = ((DWORD64*) fp)[1];
-        DWORD64 next = ((DWORD64*) fp)[0];
-        sprintf(buf, "  fpframe[%d]=%p", i, (void*) ret);
+    for (int r = 0; r <= 8; r++) {
+        sprintf(buf, "  x%d=%p", r, (void*) ctx->X[r]);
         cn1WindowsLog(buf);
-        if (next <= fp) {
-            break;
+    }
+    /* Proper ARM64 unwind via .pdata (RtlVirtualUnwind); works even when the
+     * x29 frame-pointer chain is corrupt (fp=0x14 in the observed crash).
+     * Prints each frame's RVA so it symbolizes against the PDB. */
+    {
+        DWORD64 modBase = (DWORD64) GetModuleHandleW(NULL);
+        CONTEXT uc = *ctx;
+        for (int i = 0; i < 40 && uc.Pc != 0; i++) {
+            sprintf(buf, "  stack[%d]=%p rva=%p", i, (void*) uc.Pc, (void*) (uc.Pc - modBase));
+            cn1WindowsLog(buf);
+            DWORD64 imageBase = 0;
+            PRUNTIME_FUNCTION fe = RtlLookupFunctionEntry(uc.Pc, &imageBase, NULL);
+            if (fe == NULL) {
+                /* leaf function: the return address is in Lr. */
+                if (uc.Lr == 0 || uc.Lr == uc.Pc) {
+                    break;
+                }
+                uc.Pc = uc.Lr;
+                continue;
+            }
+            PVOID handlerData = NULL;
+            DWORD64 establisher = 0;
+            RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, uc.Pc, fe, &uc,
+                             &handlerData, &establisher, NULL);
         }
-        fp = next;
     }
 #endif
     return EXCEPTION_EXECUTE_HANDLER;
