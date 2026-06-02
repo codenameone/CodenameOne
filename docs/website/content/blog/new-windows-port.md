@@ -15,7 +15,7 @@ Our existing Windows Phone port has already gone thru 3 rewrites and a community
 at work on the 4th rewrite (or 5th counting the community port). However, we decided to take a radically different  
 direction with the new port and with backwards compatibility to allow better scale.
 
-So lets start with the "bad news" and follow by an explanation of why and how we plan to do that.
+So let’s start with the "bad news" and follow by an explanation of why and how we plan to do that.
 
 ### Dropping Windows Phone 8 Support
 
@@ -55,7 +55,7 @@ of the overall port by at least 10 man months!
 The work is far from done but we are on a solid path and once we have a stable build server process I think we would  
 be able to move really quickly.
 
-The port itself (which is on top of the VM used) is based on the work that Fabcio did and will remain open source  
+The port itself (which is on top of the VM used) is based on the work that Fabricio did and will remain open source  
 together with the forked changes we needed to get iKVM to work.
 
 #### How Will it Differ From the Existing Port?

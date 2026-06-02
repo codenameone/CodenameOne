@@ -154,6 +154,15 @@ class JavaSEWebSocketImpl extends WebSocketImpl {
         req.append("Connection: Upgrade\r\n");
         req.append("Sec-WebSocket-Key: ").append(key).append("\r\n");
         req.append("Sec-WebSocket-Version: 13\r\n");
+        String[] subs = requestedSubprotocols();
+        if (subs != null && subs.length > 0) {
+            req.append("Sec-WebSocket-Protocol: ");
+            for (int i = 0; i < subs.length; i++) {
+                if (i > 0) req.append(", ");
+                req.append(subs[i]);
+            }
+            req.append("\r\n");
+        }
         req.append("\r\n");
         out.write(req.toString().getBytes(StandardCharsets.ISO_8859_1));
         out.flush();
@@ -195,6 +204,7 @@ class JavaSEWebSocketImpl extends WebSocketImpl {
         if (accept == null || !accept.equals(expected)) {
             throw new IOException("Sec-WebSocket-Accept mismatch");
         }
+        setSelectedSubprotocol(headers.get("sec-websocket-protocol"));
     }
 
     private static String readHeaderLine(InputStream in) throws IOException {

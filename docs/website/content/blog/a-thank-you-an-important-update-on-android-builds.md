@@ -27,14 +27,14 @@ FYI If you cancel the subscription during this time or let it lapse this capabil
 #### Memory Issue on Android Builds
 
 With the switch to gradle in Android builds we experienced memory issues for some cases when building huge  
-apps. For some cases ading `android.gradle=false` to the build hints was enough but for others  
+apps. For some cases adding `android.gradle=false` to the build hints was enough but for others  
 not so much. 
 
 The problem relates to the size of Google Play Services which are an essential part of Android applications but  
 have grown to a size that is pretty big. We need play services for better location tracking, in-app-purchase, push  
 notification, maps etc.  
 In the past we had the build hint `android.includeGPlayServices` which  
-tried to be smart about play services but its a bit too coarse as it only accepts true/false. 
+tried to be smart about play services but it’s a bit too coarse as it only accepts true/false. 
 
 To alleviate this issue we deprecated the `android.includeGPlayServices` and are introducing  
 the new build hints below that will allow you to selectively include a play service. This means that future builds  

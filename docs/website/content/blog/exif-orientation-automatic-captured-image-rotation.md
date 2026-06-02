@@ -45,7 +45,7 @@ Suppose we acquire an image with the following code:
 
 A few remarks:
 
-__**1** | `photoTempPath` is `null` if the user has cancelled the photo capture;  
+__**1** | `photoTempPath` is `null` if the user has canceled the photo capture;  
 ---|---  
 __**2** | in this case, copying the file from the `FileSystemStorage` temporary folder to a "secure" location in `FileSystemStorage` or `Storage` is not strictly necessary, but it is a good habit that in certain circumstances prevents issues;  
 __**3** | it is always preferable to use `EncodedImage` when we want to keep the impact on memory low.  
@@ -107,13 +107,13 @@ A server-side error may also occur, but this cannot be resolved client-side. All
 
 #### The solution
 
-THe new API [Util.downloadUrlSafely](/javadoc/com/codename1/io/Util/#downloadUrlSafely-java.lang.String-java.lang.String-com.codename1.util.OnComplete-com.codename1.util.OnComplete-) safely download the given URL to the `Storage` or to the `FileSystemStorage`.
+The new API [Util.downloadUrlSafely](/javadoc/com/codename1/io/Util/#downloadUrlSafely-java.lang.String-java.lang.String-com.codename1.util.OnComplete-com.codename1.util.OnComplete-) safely downloads the given URL to the `Storage` or to the `FileSystemStorage`.
 
-This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user.
+This method is resistant to network errors and capable of resuming the download as soon as network conditions allow and in a completely transparent way for the user.
 
 #### Server requirements
 
-The server must correctly return the `Content-Length` header and it must supports partial downloads.
+The server must correctly return the `Content-Length` header and it must support partial downloads.
 
 #### Global network error handling requirements
 
@@ -201,7 +201,7 @@ I think the best way to show the use of this API is an actual complete example, 
                     // this is the case of a network error,
                     // like: java.io.IOException: Unreachable
                     Log.p("Error connectiong to: " + err.getConnectionRequest().getUrl(), Log.ERROR);
-                    // maybe there are connectivity issues, let's try again
+                    // maybe there are connectivity issues, let’s try again
                     ToastBar.showInfoMessage("Reconnect...");
                     Timer timer = new Timer();
                     timer.schedule(new TimerTask() {

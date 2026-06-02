@@ -13,7 +13,7 @@ author: Shai Almog
 
 [PropertyCross](https://github.com/codenameone/PropertyCross) is one of our newer demos, due to that there was  
 relatively very little work needed to modernize it and this resulted in a stunning improvement over the existing  
-demo. During that process we also discovered a small regression due to changed in the web service we relied on.
+demo. During that process we also discovered a small regression due to changes in the web service we relied on.
 
 **Check the live version running on the right hand side thanks to the power of the Codename One JavaScript port!**
 
@@ -29,8 +29,8 @@ includes 630 well commented lines of code (including imports and boilerplate) wi
 designs. This makes the Codename One implementation the smallest one we can find in the native tools  
 implementations (in some cases 5x smaller).
 
-In fact Codename Ones implementation is so terse it is smaller than most HTML5 implementations despite  
-JavaScripts famed terseness.
+In fact Codename One’s implementation is so terse it is smaller than most HTML5 implementations despite  
+JavaScript’s famed terseness.
 
 This is despite the fact that Codename One implements some functionality that isn’t specified such as  
 infinite scrolling etc…​

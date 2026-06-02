@@ -21,7 +21,7 @@ author: Shai Almog
   
 
   
-Apple Just announced they will mandate 64 bit for all new submissions starting February 2015, luckily we are very prepared for that and we already support 64 bit builds in our new VM. 
+Apple just announced they will mandate 64 bit for all new submissions starting February 2015, luckily we are very prepared for that and we already support 64 bit builds in our new VM. 
 
 This is a huge triumph for the architecture of our new VM which is very resilient to changes Apple might make in the future thanks to its pure C architecture. Our old XMLVM based approach is limited in that regard since it relies on the Boehm garbage collector which in turn relies on low level assembler and memory layouts heavily. Our new VM is both faster and more portable; now its also open source!  
   

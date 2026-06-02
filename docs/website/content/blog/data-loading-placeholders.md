@@ -25,7 +25,7 @@ In my last post I introduced the new `CN.invokeWithoutBlocking()` method as a me
     f.add(nameLabel);
     f.show();
 
-The concept here is that, the `fetchDataAsync()` method is performing an asynchronous network request in the background but returns an AsyncResource object immediately which will be notified when the response if received. Therefore, the contents of the `ready( data → {…​})` block are executed some time after the form has already been built and shown.
+The concept here is that, the `fetchDataAsync()` method is performing an asynchronous network request in the background but returns an AsyncResource object immediately which will be notified when the response is received. Therefore, the contents of the `ready( data → {…​})` block are executed some time after the form has already been built and shown.
 
 This solved a significant user experience problem, in that the form can be shown to the user immediately without waiting for the network request to complete. However, it introduced a new problem, which is that our `nameLabel` is displaying placeholder text for some period of time before it is replaced with the actual data.
 

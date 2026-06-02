@@ -27,7 +27,7 @@ your questions:
 
 Questions are a form of expressing our lack of knowledge, but when I bring someone else to help with my missing  
 pieces of knowledge that person is ignorant about me and what I’m trying to do. That’s why every question should  
-first start with and explanation of what we are trying to do.
+first start with an explanation of what we are trying to do.
 
 E.g. I can ask a person where is the next pharmacy and he can send me two miles away, but if I ask "where can I buy  
 gum?" he can send me around the block to a convenience store…​
@@ -44,8 +44,8 @@ __ |  If you have an image use it, just make sure to highlight the element withi
   
 ### Explain what you Tried
 
-Stackoveflow highlights this requirement and for good reason. It’s not just there to show that you did some work  
-before poping the question…​
+Stack Overflow highlights this requirement and for good reason. It’s not just there to show that you did some work  
+before popping the question…​
 
 This provides us insight into what doesn’t work so we don’t give an answer you already tried. It also provides insight  
 into the direction you are taking so if some things weren’t clear in your description this should seal the deal.
@@ -59,7 +59,7 @@ __ |  It’s OK to say "I don’t even know where to begin" or "I tried googling
 ### Screenshots, Code Snippets & Error Logs
 
 I can’t stress enough how important a screenshot is for any question, I’d like to recommend [JING](https://www.techsmith.com/jing.html)  
-as it allows us to annotate screeshots very easily with text/arrows/boxes etc.
+as it allows us to annotate screenshots very easily with text/arrows/boxes etc.
 
 This makes a huge difference for visually oriented questions.
 

@@ -32,7 +32,7 @@ This would customize all entry keys to start with `MySettings-` instead of `Sett
 
 ### getAndSet
 
-A part of getting this to work seamlessly is the `getAndSet` API added to the `Preferences` API. This is a bit of a weird API but it’s pretty useful so lets explain it by example.
+A part of getting this to work seamlessly is the `getAndSet` API added to the `Preferences` API. This is a bit of a weird API but it’s pretty useful so let’s explain it by example.
 
 Say we have a user setting for refresh as an integer in minutes:
     
@@ -45,7 +45,7 @@ Normally that isn’t a big deal but if we have one path that invokes `Preferenc
 
 I could use `Preferences.get("refresh", 60);` and if 60 is returned I can invoke `set` to explicitly set the 60 value just to make sure that 60 will be used from now on. But that would mean changing preferences with every invocation even if the data didn’t change.
 
-`getAndSet()` essentially solves that problem. You get the data one and if the default is used that default is then stored into the `Preferences` so you can’t get inconsistent results for a specific entry.
+`getAndSet()` essentially solves that problem. You get the data once and if the default is used that default is then stored into the `Preferences` so you can’t get inconsistent results for a specific entry.
 
 ---
 

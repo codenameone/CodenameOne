@@ -1,0 +1,31 @@
+# Operations the CN1 GraphQL client is generated from (operations mode).
+# Exercises: a list query with nested object selection, a single-object query
+# with an enum field, and an enum-typed variable.
+
+query Products {
+    products {
+        id
+        name
+        category
+        tags
+        rating
+        dimensions { width height }
+    }
+}
+
+query Product($id: ID!) {
+    product(id: $id) {
+        id
+        name
+        category
+        rating
+    }
+}
+
+query ProductsByCategory($category: Category!) {
+    productsByCategory(category: $category) {
+        id
+        name
+        category
+    }
+}

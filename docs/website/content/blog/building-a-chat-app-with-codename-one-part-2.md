@@ -29,17 +29,17 @@ who have the app installed and to accomplish that we will need to "invite" peopl
 Pretty much everything discussed in this blog post is covered [here](http://www.codenameone.com/google-login.html).  
 However, that is a rather general post so in this tutorial I’ll try to be more specific.
 
-Start by going to the the Google developer console: <https://console.developers.google.com/>
+Start by going to the Google developer console: <https://console.developers.google.com/>
 
 Create a new app by pressing the create button:
 
 ![Create New Project](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-1.png)
 
-Just enter the name of the app e.g. for this case its SocialChat and press "Create":
+Just enter the name of the app e.g. for this case it’s SocialChat and press "Create":
 
 ![Create New Project](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-2.png)
 
-Now can select the API’s section where you should see the new project page:
+Now you can select the API’s section where you should see the new project page:
 
 ![New Project Page](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-3.png)
 
@@ -54,7 +54,7 @@ everything other than iOS & Android:
 ![Google+ API Section](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-5.png)
 
 The consent screen is used to prompt users for permissions, you should normally fill it up properly for a "real world" application  
-but in this case we left it mostly empty for simplicities sake:
+but in this case we left it mostly empty for simplicity’s sake:
 
 ![Consent screen](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-6.png)
 
@@ -135,7 +135,7 @@ The code that binds this to the button looks like this:
         doLogin(gc, new GoogleData(), false);
     });
 
-Notice that we hid the client secrete and used the `GoogleData` class which is effectively the implementation of the  
+Notice that we hid the client secret and used the `GoogleData` class which is effectively the implementation of the  
 `UserData` interface. The `GoogleData` class looks like this:
     
     
@@ -196,7 +196,7 @@ that we then parse and set to the right variables.
 
 The `JSONParser` class returns the JSON data as a tree of lists & maps that we can traverse thru to extract the data we need.
 
-One value that might not be clear to the casual observer is the `token`, this is a string that contains a "key" to the users  
+One value that might not be clear to the casual observer is the `token`, this is a string that contains a "key" to the user’s  
 account. Facebook/Google etc. keep the passwords for their users hashed in their database (effectively meaning  
 even they don’t know the passwords), so to prove that we got permission from the user to access their data we  
 get a unique token that looks like a long string of gibberish and we can use that when accessing their respective API’s  

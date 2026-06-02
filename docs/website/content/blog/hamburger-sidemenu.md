@@ -16,7 +16,7 @@ author: Shai Almog
 The title of this post might be a bit misleading… Hamburger?  
   
   
-The Hambuger sidemenu is the menu style popularized by the Facebook app, its called a Hamburger because of the 3 line icon on the top left resembling a hamburger patty between two buns (get it: its a side menu…)!  
+The Hamburger sidemenu is the menu style popularized by the Facebook app, its called a Hamburger because of the 3 line icon on the top left resembling a hamburger patty between two buns (get it: its a side menu…)!  
   
   
   

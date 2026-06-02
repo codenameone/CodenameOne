@@ -32,7 +32,7 @@ alpha, paint (shapes) or a multitude of other capabilities that make gradients i
 ### So Why Fix Gradients?
 
 We’d like to fix gradients completely, currently our graphics capabilities still lag behind those of Java2D/FX. That’s  
-not a horrible place to be in as both of these API’s weren’t designed for todays mobile environments and their  
+not a horrible place to be in as both of these API’s weren’t designed for today’s mobile environments and their  
 oddities.
 
 __ |  This is true for the most part but we do have at least one thing which Java2D doesn’t have: perspective transform   

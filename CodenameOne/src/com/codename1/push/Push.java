@@ -251,6 +251,33 @@ public class Push {
         return null;
     }
 
+    /// Subscribes this device to a push topic. Topics are a fan-out mechanism: a single
+    /// server-side push to a topic is delivered to every device subscribed to it, without
+    /// the server needing to track individual device keys.
+    ///
+    /// On Android this maps to Firebase Cloud Messaging topics. On iOS, where the stock
+    /// push transport is raw APNs which has no native topic concept, this is a no-op and
+    /// topic fan-out must be performed server side; a warning is logged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public static void subscribeToTopic(String topic) {
+        Display.getInstance().subscribeToPushTopic(topic);
+    }
+
+    /// Unsubscribes this device from a previously subscribed push topic.
+    ///
+    /// On Android this maps to Firebase Cloud Messaging topics. On iOS this is a no-op;
+    /// a warning is logged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public static void unsubscribeFromTopic(String topic) {
+        Display.getInstance().unsubscribeFromPushTopic(topic);
+    }
+
     /// Sends a push message and returns true if server delivery succeeded, notice that the
     /// push message isn't guaranteed to reach all devices.
     /// This method uses the new push servers

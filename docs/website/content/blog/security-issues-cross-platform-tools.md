@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/security-issues-cross-platform-tools/security.jpg)
 
-A couple of weeks ago I [answered a question on Quora](https://www.quora.com/Are-there-any-specific-security-issues-when-developing-cross-platform-banking-apps/answer/Shai-Almog?prompt_topic_bio=1) about the security of cross platform tools. I try to rise about my confirmation bias when discussing these things. I won’t discuss Codename One in this context or any other specific tool. Only general ideas.
+A couple of weeks ago I [answered a question on Quora](https://www.quora.com/Are-there-any-specific-security-issues-when-developing-cross-platform-banking-apps/answer/Shai-Almog?prompt_topic_bio=1) about the security of cross platform tools. I try to rise above my confirmation bias when discussing these things. I won’t discuss Codename One in this context or any other specific tool. Only general ideas.
 
 Security depends a lot on the tools involved and their level of support for security features such as certificate pinning, storage/db encryption etc. Some tools also store the code of the app as plain text or obfuscated scripting code which is still fully readable, this can have a serious impact on security.
 
@@ -54,7 +54,7 @@ Things to ask your cross platform tool vendor:
   * Do you use custom socket communication and not the OS level connection (this is important as there might be a low level vulnerability in a custom implementation of SSL)?  
 It’s more secure to use the OS native APIs when doing networking operations
 
-  * I disable copy and paste?
+  * Can I disable copy and paste?
 
   * Can I disable the OS screenshot feature in the task manager (this isn’t possible on all OS’s)?
 

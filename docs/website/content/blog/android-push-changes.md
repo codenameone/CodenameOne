@@ -31,7 +31,7 @@ Our Push API now requires a JSON key instead of the old FCM API key. For example
 
 Currently, the `auth` parameter will be set to an FCM API key, it might look something like `auth=AAAABbbbCccDddEeeeFfffGGggHhhhIiiiJjjjKkkkLlllMmmmNnnnOooPppQqqRrrrSsssTttUuuuVvvvWxxxYyyyZzzz`
 
-You will need to change this parameter to be a URL (reachable by the Codename One push server) to a the JSON key for your service. It will look something like:
+You will need to change this parameter to be a URL (reachable by the Codename One push server) to the JSON key for your service. It will look something like:
     
     
     auth=https%3A%2F%2Fexample.com%2Fsecret%2Fpath%2Fto%2Fservice-account-file.json
@@ -50,7 +50,7 @@ Google deprecated their legacy FCM APIs on June 20, 2023, and will be removing t
 
 The OAuth2 authentication is more complicated than the old API key flow, as it involves multiple pieces of information, including the client ID, client secret, and project ID. To simplify this, Google encapsulates all of these credentials inside a single JSON file which can be used in an opaque manner via its Firebase SDKs.
 
-On our side, we wanted to avoid unnecessary changes to our API to make this transition as seamless as possible for our users, so we haven’t added or removed any parameters from the request. We just changed the `auth` parameter to include the URL to your `service-account-file.json`, instead of an FCM API key. We chose not to include the whole JSON file contents in each request because the JSON file tends to be quite large and presents unnecessary a network overhead. 
+On our side, we wanted to avoid unnecessary changes to our API to make this transition as seamless as possible for our users, so we haven’t added or removed any parameters from the request. We just changed the `auth` parameter to include the URL to your `service-account-file.json`, instead of an FCM API key. We chose not to include the whole JSON file contents in each request because the JSON file tends to be quite large and presents an unnecessary network overhead. 
 
 We may iterate on this approach in a non-breaking way based on user feedback.
 

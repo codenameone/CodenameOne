@@ -118,13 +118,13 @@ I am using TextField and on addDataChangedListener I am trying to add some chara
 
 ### Workaround for applying a mask to an image in Codename One
 
-There are some complex image modes in Codename One but most of them are convertable to standard raster images
+There are some complex image modes in Codename One but most of them are convertible to standard raster images
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40163082/workaround-for-applying-a-mask-to-an-image-in-codename-one)
 
 ### How do I restore a deleted multi-image
 
-We generally recommend keeping the res directory in source control so this dosen’t become an issue
+We generally recommend keeping the res directory in source control so this doesn’t become an issue
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40162111/how-do-i-restore-a-deleted-multi-image)
 

@@ -52,7 +52,7 @@ Ram shipped his app on iOS & Android without a problem but it stagnated for a co
 A highly visible YC funded company entered the field and got a lot of visibility/PR.  
 This sounds like a disaster right?
 
-In Rams case this was a blessing!  
+In Ram’s case this was a blessing!  
 Typically for that time the newcomer was available only in iOS. Ram seized the opportunity & as a result people searching for similar solutions on Android installed his app increasing his install base by leaps and bounds. These users shared the app socially boosting his iOS installs as well.
 
 While the specific app Ram built is unique, the lessons learned are not. Getting into the market fast and supporting secondary markets such as Windows Mobile is often a powerful play for smaller companies. You still need to invest in design, marketing and the general alphabet soup as you don’t want to rely on luck alone.
@@ -83,7 +83,7 @@ So here are some of the things I want to address within the bootcamp:
 
   * Custom components, composite components and lead components
 
-  * Working with GUI builder and it’s underlying XML
+  * Working with GUI builder and its underlying XML
 
   * Localization, Internationalization & RTL/Bidi
 
@@ -109,11 +109,11 @@ I’m also still looking for feedback on that list so if you think something is 
 
 ### Up Next
 
-Later in the week I want to outline the exactly how everything will work out as there is obvious logistic complexity with my time and how we are going to run this bootcamp.
+Later in the week I want to outline exactly how everything will work out as there is obvious logistic complexity with my time and how we are going to run this bootcamp.
 
 I’m thinking about it as a startup experience to go thru together, it’s hard, fast and very effective. The intensity is a core part of a good bootcamp and it applies to everyone who takes part in a bootcamp including me. The trick that always works for me is to dive head first into the challenge.
 
-I got a lot of personal contacts and a some comments asking how they can join. I’m sorry but we just haven’t scheduled everything yet so I don’t know for sure. I’ll try to get the basics up by the end of the week & by early next week I think I’ll have the final details. What I can tell is that we’d like to move fast and open/close signup quickly as the scheduling for this is turning out to be really difficult.
+I got a lot of personal contacts and some comments asking how they can join. I’m sorry but we just haven’t scheduled everything yet so I don’t know for sure. I’ll try to get the basics up by the end of the week & by early next week I think I’ll have the final details. What I can tell is that we’d like to move fast and open/close signup quickly as the scheduling for this is turning out to be really difficult.
 
 P.S. Thanks to all of you who shared my last post within your social circle, I really appreciate that as it brings more people into the discussion and helps us make a better product overall. I would appreciate your taking the time to share this article as well!
 ---

@@ -11,9 +11,9 @@ author: Steve Hannah
 
 ![Header Image](/blog/push-cheatsheet/push-megaphone.png)
 
-Push support is one of the most complicated features to set up, due to all of the red tape you have to cut through on each platform. Each platform has its own series of hurdles you have to jump through. Apple (iOS) requires you to generate push certificates. Google (Android) requries you to set up a project in Firebase console. Microsoft requires you to register your app for the Windows store. And that’s just the beginning.
+Push support is one of the most complicated features to set up, due to all of the red tape you have to cut through on each platform. Each platform has its own series of hurdles you have to jump through. Apple (iOS) requires you to generate push certificates. Google (Android) requires you to set up a project in Firebase console. Microsoft requires you to register your app for the Windows store. And that’s just the beginning.
 
-Our developer’s guide provides detailed instructions on how to perform each of these steps to get up and running, but it is quite verbose. If you’ve already gone through the guide to setup push for your first app, you may not require quite such a detailed guide to help you with your 2nd app. If you’re like me, you just want a birds-eye view of what is required to get push working, and not necessarily a step-by-step tutorial on how to meet those requirements.
+Our developer’s guide provides detailed instructions on how to perform each of these steps to get up and running, but it is quite verbose. If you’ve already gone through the guide to set up push for your first app, you may not require quite such a detailed guide to help you with your 2nd app. If you’re like me, you just want a birds-eye view of what is required to get push working, and not necessarily a step-by-step tutorial on how to meet those requirements.
 
 So…​ I have created a [Push Cheatsheet](files/push-cheatsheet.pdf), to serve as a quick reference for setting up push notifications in your mobile apps.
 

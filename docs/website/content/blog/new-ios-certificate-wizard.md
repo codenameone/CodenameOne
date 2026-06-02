@@ -26,7 +26,7 @@ The key improvements in this new certificate wizard are:
 
 ### Launching The Wizard
 
-The Certicate Wizard can be accessed in the same way as usual. Open Codename One Settings, and select ******Device Settings** > **iOS** > **Certificate Wizard**.****
+The Certificate Wizard can be accessed in the same way as usual. Open Codename One Settings, and select ******Device Settings** > **iOS** > **Certificate Wizard**.****
 
 ![Launching The Wizard](/blog/new-ios-certificate-wizard/cert-wizard-menu.png) 
 

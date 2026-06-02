@@ -34,8 +34,8 @@ Figure 2. The same UI in the new GUI builder
 
 Why two GUI Builders?
 
-The original old GUI builder has it’s roots in our work at Sun Microsystems. We developed it as part of the  
-designer tool and we store it’s data in the resource file. When creating an application for the old GUI  
+The original old GUI builder has its roots in our work at Sun Microsystems. We developed it as part of the  
+designer tool and we store its data in the resource file. When creating an application for the old GUI  
 builder you must define it as a "visual application" which will make it use the old GUI builder.
 
 The roots of this GUI builder are pretty old. When we initially built it we still had to support feature phones with  
@@ -121,7 +121,7 @@ Figure 13. Launch the GUI builder thru the right click menu on the newly created
 
 Notice that the UI of the new GUIBuilder might change in the future but the basic concepts should remain the same.
 
-We control the GUI builder via it’s main toolbar, notice that your changes will apply only when you click  
+We control the GUI builder via its main toolbar, notice that your changes will apply only when you click  
 the Save button on the right:
 
 ![The features of the main toolbar](/blog/using-the-new-gui-builder/gui-builder-main-toolbar.png)
@@ -249,7 +249,7 @@ is created in a matching hierarchy in the project under the res/guibuilder direc
 
 Figure 26. The java and GUI files in the hierarchy
 
-__ |  If you refactor (rename or move) the java file it’s connection with the GUI file will break. You need  
+__ |  If you refactor (rename or move) the java file its connection with the GUI file will break. You need  
 to move/rename both   
 ---|---  
   
@@ -288,7 +288,7 @@ to the new GUI builder possible. This file triggers the following Java source fi
             initGuiBuilderComponents(resourceObjectInstance);
         }
     
-    //-- DON'T EDIT BELOW THIS LINE!!!
+    //-- DON’T EDIT BELOW THIS LINE!!!
         private com.codename1.ui.Label gui_Label_1 = new com.codename1.ui.Label();
         private com.codename1.ui.Button gui_Button_1 = new com.codename1.ui.Button();
     
@@ -335,7 +335,7 @@ to the new GUI builder possible. This file triggers the following Java source fi
             gui_Button_1.setName("Button_1");
         }// </editor-fold>
     
-    //-- DON'T EDIT ABOVE THIS LINE!!!
+    //-- DON’T EDIT ABOVE THIS LINE!!!
         public void onButton_1ActionEvent(com.codename1.ui.events.ActionEvent ev) {
         }
     
@@ -355,7 +355,7 @@ constructors or thru overriding functionality in the base class.
 
 Yes if you want to move forward.
 
-If your app is in maintenence mode then no. We have no plans to remove support for the old GUI builder although  
+If your app is in maintenance mode then no. We have no plans to remove support for the old GUI builder although  
 we will de-emphasize it slowly.
 
 While we still aren’t ready to crown the GUI builder as fully production grade we do think the XML based file format  

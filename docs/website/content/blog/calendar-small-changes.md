@@ -28,7 +28,7 @@ to be used as a
 [  
 cn1lib  
 ](http://codenameone.com/cn1libs.html)  
-(working is a strong word I’ve mostly just bossed them around and didn’t really do much, they did all the work). Its a pretty ambitious project since Calendar API’s are so fragmented and problematic, in fact no cross platform tool I’m familiar with has anything remotely close to a working Calendar API.  
+(working is a strong word I’ve mostly just bossed them around and didn’t really do much, they did all the work). It’s a pretty ambitious project since Calendar API’s are so fragmented and problematic, in fact no cross platform tool I’m familiar with has anything remotely close to a working Calendar API.  
   
   
 If this is something important/dear to your heart feel free to pitch in and try to improve the implementation, file issues etc.  
@@ -38,7 +38,7 @@ If this is something important/dear to your heart feel free to pitch in and try 
   
   
   
-In other news we’ve Improved facebook support on iOS to use the device native login where possible, this was actually implemented incorrectly and was brought to our attention.  
+In other news we’ve improved facebook support on iOS to use the device native login where possible, this was actually implemented incorrectly and was brought to our attention.  
   
   
   

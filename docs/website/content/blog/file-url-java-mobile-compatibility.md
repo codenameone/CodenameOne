@@ -30,7 +30,7 @@ separate from `ConnectionRequest` and will not block the network thread when you
 
 We’d like to start looking at big ticket Java libraries that people use that we can port to Codename One. So we  
 can learn from the process and provide both "best practices" and better support from within.  
-If you have a wishlist of a jars you want to use in Codename One let us know and we’ll add them to the consideration.
+If you have a wishlist of jars you want to use in Codename One let us know and we’ll add them to the consideration.
 
 ---
 

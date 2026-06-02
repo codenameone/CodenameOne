@@ -96,7 +96,7 @@ SHA1 works fine on all devices guaranteed
 
 ### ComboBox in codename one
 
-I don’t like `ComboBox` as it derives from `List` which is problematic and adds problems of it’s own…​
+I don’t like `ComboBox` as it derives from `List` which is problematic and adds problems of its own…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39887406/combobox-in-codename-one)
 

@@ -31,7 +31,7 @@ I tried learning by watching tutorial videos on [Codename One Academy](https://c
 
 In the beginning, I didn’t understand some common terms and jargons and I had to Google my way around in order to get a good grasp of things. At the end of the first week, I was asked to show my progress. 
 
-I barely wrote 100 lines of code (not the best ones). Even worst than that, I felt like I didn’t learn enough in the past week. In the second week, I decided to start from scratch. Now that I knew the basics, things became much easier. 
+I barely wrote 100 lines of code (not the best ones). Even worse than that, I felt like I didn’t learn enough in the past week. In the second week, I decided to start from scratch. Now that I knew the basics, things became much easier. 
 
 ### What Really Helped?
 

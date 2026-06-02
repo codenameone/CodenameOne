@@ -22,7 +22,7 @@ Starting with the latest update we now have a file in the root of Codename One c
     [EDT] 0:0:0,0 - Codename One revisions: 4ee2778c79ad5eaadd2344bc0f215a82483421cb
     1955
 
-The former is a GIT version, this can help you browse the git repository at that specific version by using a UWL like this:
+The former is a GIT version, this can help you browse the git repository at that specific version by using a URL like this:
 
 `[version](https://github.com/codenameone/CodenameOne/tree/)`
 

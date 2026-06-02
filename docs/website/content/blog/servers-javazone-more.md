@@ -43,7 +43,7 @@ We also pushed out an experimental fix for a long standing
 IDEA issue that has been around for a while, if you are one of the developers affected by the issue please let us know if this is still happening and if so please provide a log for this so we can debug it.
 
   
-Chen has made some interesting performance improvements for the graphics pipelines, they are still not up on the build servers but hopefully they will be noticeable. We also added a new API to get all the contacts in one go, this works much faster on Android then extracting the contacts one by one but is still pretty expensive so a thread is still essential. This new API effectively consists of two methods in Display:  
+Chen has made some interesting performance improvements for the graphics pipelines, they are still not up on the build servers but hopefully they will be noticeable. We also added a new API to get all the contacts in one go, this works much faster on Android than extracting the contacts one by one but is still pretty expensive so a thread is still essential. This new API effectively consists of two methods in Display:  
   
   
   

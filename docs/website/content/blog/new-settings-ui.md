@@ -30,13 +30,13 @@ Figure 2. Dark Mode
 
 This is one of the first signs of very big changes we have coming in the next few months. We intend to overhaul a lot of things in the UI, deep functionalities and even in the free/basic tier features.
 
-The design was made by our new in-house designer [Renzo](https://github.com/RenzoEdnaco) whose work you’ve seen for a while now in our new orignal blog post images. He completely redesigned the website a while back but we’re still having issues in getting it all out there…​
+The design was made by our new in-house designer [Renzo](https://github.com/RenzoEdnaco) whose work you’ve seen for a while now in our new original blog post images. He completely redesigned the website a while back but we’re still having issues in getting it all out there…​
 
 He did a lot of great things and I’m confident he’ll help us improve the one part where we sorely lack: good looking by default.
 
 To help him please check out the issues in the issue tracker assigned to him and feel free to provide feedback. Any feedback given during the UI design stage is far more valuable. Later on it’s much harder to revisit/adapt an implementation.
 
-To get started check out and follow these two issues for [GUI Builder Redesign](https://github.com/codenameone/CodenameOne/issues/3172) and [Codenme One Build Redesign](https://github.com/codenameone/CodenameOne/issues/3177). Once the tools incorporate this aesthetic, we’ll bring it to the themes we generate. We plan to overhaul project creation and make it easier to change the pre-existing templates in Codename One in an IDE agnostic way.
+To get started check out and follow these two issues for [GUI Builder Redesign](https://github.com/codenameone/CodenameOne/issues/3172) and [Codename One Build Redesign](https://github.com/codenameone/CodenameOne/issues/3177). Once the tools incorporate this aesthetic, we’ll bring it to the themes we generate. We plan to overhaul project creation and make it easier to change the pre-existing templates in Codename One in an IDE agnostic way.
 
 I’m pretty excited about that…​
 ---

@@ -2059,6 +2059,9 @@ public abstract class Executor {
         if (projectHasBootstrap(sourceZip, "cn1app/GrpcClientBootstrap.class")) {
             sb.append(indent).append("new cn1app.GrpcClientBootstrap();\n");
         }
+        if (projectHasBootstrap(sourceZip, "cn1app/GraphQLClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.GraphQLClientBootstrap();\n");
+        }
         return sb.toString();
     }
 

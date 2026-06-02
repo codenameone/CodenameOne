@@ -29,7 +29,7 @@ and we’d very much appreciate it if you check it out, share it (ideally via th
   
 The ShareButton component in Codename One  
   
-is one the most important pieces in making your app a viral success. In Android it fires the native share intent where you can select to distribute the app’s message via a very wide selection of options. In other platforms you get a pretty narrow, fixed selection of options that is very cross platform since it uses Codename One’s builtin capabilities.
+is one of the most important pieces in making your app a viral success. In Android it fires the native share intent where you can select to distribute the app’s message via a very wide selection of options. In other platforms you get a pretty narrow, fixed selection of options that is very cross platform since it uses Codename One’s builtin capabilities.
 
   
 We added support for native iOS sharing in the latest version, this effectively means that when running on iOS you would get a native share dialog that would integrate with apps installed in the system in a very similar way to the Android intent. We hope this will improve viral distribution in iOS.  

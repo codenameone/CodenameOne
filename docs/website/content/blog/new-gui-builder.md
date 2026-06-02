@@ -12,15 +12,15 @@ author: Shai Almog
 ![Header Image](/blog/new-gui-builder/new-gui-builder-preview.png)
 
 Our GUI builder is the result of many twists and turns in our product line mostly due to corporate bureaucracy  
-hacks and last minute deadlines from our days at Sun. Its also written using Swing which is pretty much a dead  
-end API that isn’t seeing any maintenence and since FX is even worse off there isn’t much hope for the  
+hacks and last minute deadlines from our days at Sun. It’s also written using Swing which is pretty much a dead  
+end API that isn’t seeing any maintenance and since FX is even worse off there isn’t much hope for the  
 tools future.  
 The GUI builder is also one of the most controversial parts of our UI. While it has its strengths and simplicities its  
 UI could do with a facelift and its architecture was designed before tablets existed. It was designed when  
 Apple just barely surpassed Blackberry sales and had just announced the iPhone 4 (first with Retina display). 
 
 With that in mind we decided to rethink the GUI builder from the ground up with a complete from scratch  
-rewrite. This allows us to keep the existing GUI builder for 100% compatibility for the forseeable future  
+rewrite. This allows us to keep the existing GUI builder for 100% compatibility for the foreseeable future  
 and add a decent migration path to developers who want to move to the new approach.  
 We did learn from the bad experience with FX where there is still no decent migration path for Swing apps to  
 this day so we intend to make the long term migration as easy as possible and intend to support the existing  

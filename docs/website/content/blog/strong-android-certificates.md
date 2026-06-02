@@ -15,7 +15,7 @@ When Android launched RSA1024 with SHA1 was considered strong enough for the for
 
 APK’s are signed as part of the build process when we upload an app to the Google Play Store. This process seems redundant as we generate the signature/certificate ourselves (unlike Apple which generates it for us). However, this is a crucial step as it allows the device to verify upgrades and make sure a new update is from the same original author!
 
-This means that if a hacker takes over your account on Google Play, he still won’t be able to ship fake updates to your apps without your certificate. That’s important since if a hacker would have access to your certificate he could create an app update that would just send him all the users private information e.g. if you are a bank this could be a disaster.
+This means that if a hacker takes over your account on Google Play, he still won’t be able to ship fake updates to your apps without your certificate. That’s important since if a hacker would have access to your certificate he could create an app update that would just send him all the users' private information e.g. if you are a bank this could be a disaster.
 
 Android launched with RSA1024/SHA1 as the signing certificates. This was good enough at the time and is still pretty secure. However, these algorithms are slowly eroding and it is conceivable that within the 10-15 year lifetime of an app they might be compromised using powerful hardware. That is why Google introduced support for stronger cryptographic signing into newer versions of Android and you can use that.
 

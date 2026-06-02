@@ -58,7 +58,7 @@ However, the technical aspects are challenging to say the least!
 Codename One’s roots predated Android. We started working on the predecessor of Codename One at Sun in  
 2007\. This was before the iPhone announcement and before the Android announcement.
 
-While todays product looks completely different from its original version a lot of the API design decisions are  
+While today’s product looks completely different from its original version a lot of the API design decisions are  
 different and hard to adapt. Android’s layout system has many parallels to our layout system as both are inspired  
 by previous work in the same field, but Android’s layouts are far more complex with many small nuances.
 

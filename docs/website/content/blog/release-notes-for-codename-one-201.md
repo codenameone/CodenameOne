@@ -109,7 +109,7 @@ Details
 
   * Fix for contact images in J2ME to work correctly  
 
-  * Rewrote event processing to be much faster and reduce GC thrushing  
+  * Rewrote event processing to be much faster and reduce GC thrashing  
 
   * Removed some usage of Hashtable to speed up rendering  
 
@@ -167,7 +167,7 @@ Details
 
   * Fixed issue 939 : Two Memory Leaks in iOS Obj C Code  
 
-  * Fixed the designer to hide properties that are overriden by custom component attributes  
+  * Fixed the designer to hide properties that are overridden by custom component attributes  
 
   * Fix for RFE 936: text shadow bottom right (i.e. drop shadow)  
 
@@ -683,7 +683,7 @@ Details
 
   * Fixed the SideMenuBar to open on menu key and close on back key  
 
-  * Fixed getDatabasePath() to work correctly on all platforms and return the proper path for a databased that wasn’t created  
+  * Fixed getDatabasePath() to work correctly on all platforms and return the proper path for a database that wasn’t created  
 
   * Fixed multipart request which used the wrong content length  
 

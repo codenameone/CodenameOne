@@ -84,7 +84,7 @@ Check out the full code on github here: <https://github.com/codenameone/MapAnima
 
 ### Learn More
 
-It’s small things like that and attention to detail that can transform your app into a loved app. If you See similar effects or don’t fully understand why the code above works just ask in the comments!
+It’s small things like that and attention to detail that can transform your app into a loved app. If you see similar effects or don’t fully understand why the code above works just ask in the comments!
 
 We’re here to help you make great looking apps.
 ---

@@ -25,9 +25,16 @@ Required env vars per platform (script auto-skips a platform when its creds
 are missing, just like the API script):
 
     foojay     : FOOJAY_USER, FOOJAY_PASSWORD
-    hashnode   : HASHNODE_STORAGE_STATE (base64-encoded Playwright
-                 storageState JSON — produce with
-                 ``scripts/website/export_storage_state.py --site hashnode``)
+    hashnode   : a signed-in session, resolved in priority order —
+                   1. HASHNODE_STORAGE_STATE env var (base64 Playwright
+                      storageState; this is how CI would receive it),
+                   2. a persistent file written by
+                      ``scripts/website/export_storage_state.py --site hashnode``
+                      (under ~/.codenameone/syndication/), reused across shells,
+                   3. the live Firefox profile — just stay logged in to
+                      Hashnode in Firefox; nothing to export.
+                 Locally you normally need none of the above beyond being
+                 logged in to Hashnode in Firefox.
 
 DZone and Medium are NOT driven from this Playwright script — both sit
 behind aggressive Cloudflare bot detection that cannot be bypassed
@@ -40,7 +47,11 @@ GraphQL) but Hashnode shut down free public GraphQL access on 2026-05-13
 and moved it behind a paid / allow-listed offering, so we drive its
 web editor here from a signed-in storage state instead. The Hashnode
 adapter is intended to be run locally, not from CI — CI does not hold
-the storage-state secret.
+the storage-state secret, so the adapter skips itself there. Locally,
+the session is resolved automatically (see the per-platform env-var note
+above): being logged in to Hashnode in Firefox is enough, so the
+platform no longer silently drops out when a shell forgets to export a
+secret.
 
 HackerNoon was previously supported here but removed: HackerNoon
 charges business sites for canonical URL support, which makes it
@@ -76,6 +87,7 @@ from syndicate_blog_posts import (  # noqa: E402  (intentional path injection)
     render_syndicated_body,
     select_candidate,
 )
+from export_storage_state import default_storage_path  # noqa: E402  (sibling on sys.path)
 
 
 SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "docs" / "website" / "reports" / "syndication-screenshots"
@@ -85,10 +97,11 @@ SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "docs" / "website" / "rep
 # scripts/website/queue_browser_syndication.py and handled manually from
 # an already-signed-in browser session.
 #
-# Hashnode IS driven from here (HashnodeAdapter below) using a saved
-# storage state — see the module docstring. CI does not hold the
-# HASHNODE_STORAGE_STATE secret so the platform is skipped automatically
-# in cron runs; the maintainer runs the script locally to drive it.
+# Hashnode IS driven from here (HashnodeAdapter below) using a signed-in
+# session resolved at runtime (env var → persistent file → live Firefox
+# profile; see _resolve_hashnode_storage_state). CI holds none of those so
+# the platform is skipped automatically in cron runs; the maintainer runs
+# the script locally, where a logged-in Firefox session is enough.
 DEFAULT_PLATFORMS = "foojay,hashnode"
 
 _UA_STR = (
@@ -145,9 +158,72 @@ def _load_base64_storage_state(env_var: str) -> Path:
     """Decode a base64-encoded storage_state JSON from an env var to a temp file."""
     encoded = os.environ[env_var]
     decoded = base64.b64decode(encoded)
-    path = Path(f"/tmp/{env_var.lower()}.json")
+    path = Path(tempfile.gettempdir()) / f"{env_var.lower()}.json"
     path.write_bytes(decoded)
     return path
+
+
+# Persistent on-disk Hashnode session, written by export_storage_state.py.
+# Shared via that module so the producer and this consumer agree on the path.
+HASHNODE_STORAGE_FILE = default_storage_path("hashnode")
+
+# Cache so the (possibly disk-touching) resolution runs once per process:
+# is_configured() and storage_state_path() are both called per run.
+_HASHNODE_STATE_RESOLVED = False
+_HASHNODE_STATE_PATH: Path | None = None
+
+
+def _hashnode_storage_from_firefox() -> Path | None:
+    """Build a Playwright storage state live from the local Firefox profile's
+    Hashnode cookies. As long as you stay logged in to Hashnode in Firefox,
+    no env var and no manual export are needed. Returns a temp-file path, or
+    None when Firefox/the profile/a valid session is unavailable (e.g. in CI).
+    """
+    try:
+        from export_storage_state import (  # noqa: E402  (sibling module on sys.path)
+            SITE_PROFILES,
+            _firefox_storage_state,
+            _locate_firefox_profile,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    profile = SITE_PROFILES.get("hashnode")
+    if not profile:
+        return None
+    try:
+        cookies_db = _locate_firefox_profile("auto")
+        state = _firefox_storage_state(cookies_db, profile["cookie_host_glob"])
+    except Exception:  # noqa: BLE001 — no profile, locked DB, read error, etc.
+        return None
+    if not profile["is_logged_in"](state.get("cookies", [])):
+        return None
+    path = Path(tempfile.gettempdir()) / "hashnode-storage-state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    return path
+
+
+def _resolve_hashnode_storage_state() -> Path | None:
+    """Resolve a usable Hashnode storage-state file, in priority order:
+
+      1. HASHNODE_STORAGE_STATE env var (base64) — used by CI / explicit override.
+      2. A persistent JSON file at HASHNODE_STORAGE_FILE — captured once by
+         export_storage_state.py and reused across shell sessions.
+      3. The live Firefox profile — just stay logged in to Hashnode in Firefox.
+
+    Returns the path to a storage-state JSON, or None when none is available.
+    The result is memoized for the lifetime of the process.
+    """
+    global _HASHNODE_STATE_RESOLVED, _HASHNODE_STATE_PATH
+    if _HASHNODE_STATE_RESOLVED:
+        return _HASHNODE_STATE_PATH
+    if os.environ.get("HASHNODE_STORAGE_STATE"):
+        _HASHNODE_STATE_PATH = _load_base64_storage_state("HASHNODE_STORAGE_STATE")
+    elif HASHNODE_STORAGE_FILE.is_file():
+        _HASHNODE_STATE_PATH = HASHNODE_STORAGE_FILE
+    else:
+        _HASHNODE_STATE_PATH = _hashnode_storage_from_firefox()
+    _HASHNODE_STATE_RESOLVED = True
+    return _HASHNODE_STATE_PATH
 
 
 def _download_to_temp(url: str) -> Path:
@@ -566,11 +642,18 @@ class HashnodeAdapter:
 
     @staticmethod
     def is_configured() -> bool:
-        return bool(os.environ.get("HASHNODE_STORAGE_STATE"))
+        return _resolve_hashnode_storage_state() is not None
 
     @staticmethod
     def storage_state_path() -> Path:
-        return _load_base64_storage_state("HASHNODE_STORAGE_STATE")
+        path = _resolve_hashnode_storage_state()
+        if path is None:
+            raise AdapterError(
+                "Hashnode storage state unavailable — set HASHNODE_STORAGE_STATE, "
+                f"save a session to {HASHNODE_STORAGE_FILE} via "
+                "export_storage_state.py, or log in to Hashnode in Firefox."
+            )
+        return path
 
     def login(self, page) -> None:
         # No-op: storage state was loaded into the browser context already.
@@ -944,6 +1027,29 @@ ADAPTERS: dict[str, Callable[[], Any]] = {
     "hashnode": HashnodeAdapter,
 }
 
+# How to fix an unconfigured platform, shown in the loud "skipping" banner that
+# fires only outside CI (see main()). In CI these skips are expected and stay
+# quiet; locally they almost always mean a missing/expired session, which is
+# exactly how Hashnode silently fell out of the rotation after #4956.
+SETUP_HINTS: dict[str, str] = {
+    "foojay": "set FOOJAY_USER and FOOJAY_PASSWORD",
+    "hashnode": (
+        "log in to Hashnode in Firefox, or capture a session with "
+        "`python3 scripts/website/export_storage_state.py --site hashnode --from-firefox-profile`"
+    ),
+}
+
+
+def _running_in_ci() -> bool:
+    """True when executing inside GitHub Actions (or another CI runner).
+
+    Browser platforms are intentionally skipped in CI because their session
+    secrets are not exposed there — that skip is expected and stays quiet.
+    A skip during a *local* run, by contrast, almost always means a forgotten
+    or expired session, so we surface it loudly instead.
+    """
+    return bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
+
 
 # --------------------------------------------------------------------------- #
 # Driver                                                                       #
@@ -1033,12 +1139,33 @@ def main(argv: list[str]) -> int:
         return 1
 
     adapters: list[Any] = []
+    skipped: list[str] = []
     for name in requested:
         adapter = ADAPTERS[name]()
         if args.dry_run or args.validate_only or adapter.is_configured():
             adapters.append(adapter)
         else:
-            print(f"[{name}] credentials not configured; skipping platform.")
+            skipped.append(name)
+
+    if skipped:
+        if _running_in_ci():
+            # Expected in CI — session secrets are intentionally not exposed
+            # there. Keep it to a quiet one-liner per platform.
+            for name in skipped:
+                print(f"[{name}] credentials not configured; skipping platform (expected in CI).")
+        else:
+            # Local run: an unconfigured platform almost always means a
+            # forgotten/expired session. Make it impossible to miss so a
+            # platform can't silently drop out of the rotation again.
+            print("!" * 72, file=sys.stderr)
+            print(f"WARNING: skipping {len(skipped)} unconfigured platform(s) on a LOCAL run:",
+                  file=sys.stderr)
+            for name in skipped:
+                hint = SETUP_HINTS.get(name, "set its credentials")
+                print(f"  - {name}: not configured — {hint}", file=sys.stderr)
+            print("These will NOT be syndicated. If that is not intended, configure them and re-run.",
+                  file=sys.stderr)
+            print("!" * 72, file=sys.stderr)
 
     if not adapters:
         print("No browser platforms are configured; nothing to do.")

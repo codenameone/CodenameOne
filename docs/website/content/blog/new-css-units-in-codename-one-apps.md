@@ -128,7 +128,7 @@ myStyle.setMarginRight(10);
 
 ### Overriding the Default Font Size
 
-When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. We have now added theme constants to explicitly set the the default font size in "screen-independent-pixels".
+When trying to make a design look "good" across multiple platforms it can be difficult to deal with the differing default font sizes on different platforms. You may spend hours tweaking your UI to look perfect on iPhone X, only to find out that the fonts are too small when viewed on an android device. We have now added theme constants to explicitly set the default font size in "screen-independent-pixels".
 
 ## Note
 
@@ -151,7 +151,7 @@ If you add the following to your stylesheet, it will set the default font size t
 
 ### Desktop and Tablet Default Font sizes
 
-On the desktop, you may find that **18** is too big. You can additionally define a default font size for for tablet and desktop using `defaultDesktopFontSizeInt` and
+On the desktop, you may find that **18** is too big. You can additionally define a default font size for tablet and desktop using `defaultDesktopFontSizeInt` and
 
 `defaultFontSizeDesktopInt` respectively. I have found that a `defaultDesktopFontSizeInt` gives results that closely match the Mac OS default font size.
 

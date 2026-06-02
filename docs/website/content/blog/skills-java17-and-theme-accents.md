@@ -38,7 +38,7 @@ These three things together are most of why an agent that was previously polite-
 
 ## Native theme accents
 
-[PR #4884](https://github.com/codenameone/CodenameOne/pull/4884) closes the loop on the new iOS Modern and Material 3 native themes [we shipped two weeks ago](/blog/liquid-glass-material-3-modern-native-themes/). The native themes now expose their accent palette as named theme constants, so rebranding your app to your own colours is a five-line CSS change instead of a fork.
+[PR #4884](https://github.com/codenameone/CodenameOne/pull/4884) closes the loop on the new iOS Modern and Material 3 native themes [we shipped two weeks ago](/blog/liquid-glass-material-3-modern-native-themes/). The native themes now expose their accent palette as named theme constants, so rebranding your app to your own colors is a five-line CSS change instead of a fork.
 
 Override the constants inside the `#Constants` block of your own `theme.css`:
 
@@ -54,11 +54,11 @@ Override the constants inside the `#Constants` block of your own `theme.css`:
 }
 ```
 
-That is it. Every accent-bearing UIID picks up the new colour. Light and dark are independent (`--accent-color` vs `--accent-color-dark`), and partial overrides are fine; anything you do not redeclare stays at the framework default. Material 3 has a couple of additional container-tier constants for the elevated-surface tone; iOS ignores those.
+That is it. Every accent-bearing UIID picks up the new color. Light and dark are independent (`--accent-color` vs `--accent-color-dark`), and partial overrides are fine; anything you do not redeclare stays at the framework default. Material 3 has a couple of additional container-tier constants for the elevated-surface tone; iOS ignores those.
 
-There is also a runtime path for dynamic theming (in-app accent toggles, branded flavours, A/B tests). It uses the same constants. The Native Themes chapter of the developer guide covers it in detail, along with the full iOS and Android constant tables and the places where the binding system intentionally does not apply: [Accent palette override](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Native-Themes.asciidoc#accent-palette-override).
+There is also a runtime path for dynamic theming (in-app accent toggles, branded flavors, A/B tests). It uses the same constants. The Native Themes chapter of the developer guide covers it in detail, along with the full iOS and Android constant tables and the places where the binding system intentionally does not apply: [Accent palette override](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Native-Themes.asciidoc#accent-palette-override).
 
-The point worth pulling out: the parts of theming that do not change per app (which UIIDs participate in the accent palette, which states they expose, which dark-mode counterparts they have) live inside the framework and stay there. The parts that do change per app (your colours) live in your project as five constants and nothing else. That is the whole reason this change exists.
+The point worth pulling out: the parts of theming that do not change per app (which UIIDs participate in the accent palette, which states they expose, which dark-mode counterparts they have) live inside the framework and stay there. The parts that do change per app (your colors) live in your project as five constants and nothing else. That is the whole reason this change exists.
 
 ## Metal follow-ups
 
@@ -68,19 +68,19 @@ Last week was about shipping the Metal renderer. This week is the follow-up week
 
 Long-standing issue [#3302](https://github.com/codenameone/CodenameOne/issues/3302) had a clear repro: `g.translate + g.scale(sx, sy) + fillShape` with `sx != sy` produced shapes that visibly drifted off the axis-aligned `drawRect` and `drawLine` calls the framework emitted alongside them. Triangles inscribed in rectangles escaped their bounding rect.
 
-The cause was that the legacy alpha-mask path rasterised the shape at a uniform scale (the diagonal ratio `h2/h1`), then stretched the resulting texture non-uniformly through the GPU matrix to recover the requested aspect. The bbox math is exact in real numbers, but the texture is pixel-rounded at the intermediate uniform scale, so the stretch drifted the rasterised shape off the pixel grid that `drawRect` and `drawLine` were already on.
+The cause was that the legacy alpha-mask path rasterized the shape at a uniform scale (the diagonal ratio `h2/h1`), then stretched the resulting texture non-uniformly through the GPU matrix to recover the requested aspect. The bbox math is exact in real numbers, but the texture is pixel-rounded at the intermediate uniform scale, so the stretch drifted the rasterized shape off the pixel grid that `drawRect` and `drawLine` were already on.
 
-The fix factors the user transform's 2x2 linear part by taking the column norms as `(sx, sy)`, rasterises the path at `S(sx, sy)` so the per-axis stretch happens at rasterisation time against a vector path rather than a pixel grid, and applies only the residual `transform * S(1/sx, 1/sy)` on the GPU. The residual is pure rotation (and shear in the worst case), so no per-axis stretch happens at sample time and the alpha-mask texture lands on the same pixel grid as its `drawRect` siblings.
+The fix factors the user transform's 2x2 linear part by taking the column norms as `(sx, sy)`, rasterizes the path at `S(sx, sy)` so the per-axis stretch happens at rasterization time against a vector path rather than a pixel grid, and applies only the residual `transform * S(1/sx, 1/sy)` on the GPU. The residual is pure rotation (and shear in the worst case), so no per-axis stretch happens at sample time and the alpha-mask texture lands on the same pixel grid as its `drawRect` siblings.
 
 The change is gated to Metal; the GL ES2 path keeps its legacy branch so the existing GL goldens are byte-identical. A new `InscribedTriangleGrid` screenshot test was registered with `Cn1ssDeviceRunner` so the inscribed-triangle property is now visually verifiable in CI.
 
 ### Clip-under-rotation diagnostic (#4924, towards #3921)
 
-[PR #4924](https://github.com/codenameone/CodenameOne/pull/4924) does not fix a bug, it localises one. Issue [#3921](https://github.com/codenameone/CodenameOne/issues/3921) is "clip-under-rotation behaves wrong on some ports", entangled with a `getClip` / `setClip(int[])` round-trip limitation the reporter himself called out as a separate issue. To split the two, we shipped a screenshot test that uses only `pushClip` / `popClip` and `rotateRadians`. The clip becomes non-axis-aligned via `clipRect` inside a 30-degree rotation, which forces the framework through its polygon-clip branch.
+[PR #4924](https://github.com/codenameone/CodenameOne/pull/4924) does not fix a bug, it localizes one. Issue [#3921](https://github.com/codenameone/CodenameOne/issues/3921) is "clip-under-rotation behaves wrong on some ports", entangled with a `getClip` / `setClip(int[])` round-trip limitation the reporter himself called out as a separate issue. To split the two, we shipped a screenshot test that uses only `pushClip` / `popClip` and `rotateRadians`. The clip becomes non-axis-aligned via `clipRect` inside a 30-degree rotation, which forces the framework through its polygon-clip branch.
 
-The expected outcome is a 30-degree-tilted red fill that overlaps the navy outline at two diagonal corners and falls short at the other two. Two distinguishable failure modes are pre-labelled in the PR: the clip widened to its axis-aligned bbox (red exactly matches the navy outline), or the polygon clip dropped entirely (red fills the whole cell). When the iOS Metal cell of this test renders, we know within a glance which of the three behaviours we are looking at. The expected-failure cell is also a hypothesis: `ClipRect.m`'s polygon initialiser stores `x = y = w = h = -1`, and the Metal execute path then calls `CN1MetalSetScissor(0, 0, -2, -2)`, whose `width <= 0 / height <= 0` branch sets the scissor to the full framebuffer instead of the intended polygon. If the screenshot confirms the hypothesis, the fix is a one-line replacement of the polygon-scissor fallback.
+The expected outcome is a 30-degree-tilted red fill that overlaps the navy outline at two diagonal corners and falls short at the other two. Two distinguishable failure modes are pre-labeled in the PR: the clip widened to its axis-aligned bbox (red exactly matches the navy outline), or the polygon clip dropped entirely (red fills the whole cell). When the iOS Metal cell of this test renders, we know within a glance which of the three behaviors we are looking at. The expected-failure cell is also a hypothesis: `ClipRect.m`'s polygon initialiser stores `x = y = w = h = -1`, and the Metal execute path then calls `CN1MetalSetScissor(0, 0, -2, -2)`, whose `width <= 0 / height <= 0` branch sets the scissor to the full framebuffer instead of the intended polygon. If the screenshot confirms the hypothesis, the fix is a one-line replacement of the polygon-scissor fallback.
 
-### iOS Metal colour space hint (#4909, fixes #4908)
+### iOS Metal color space hint (#4909, fixes #4908)
 
 [PR #4909](https://github.com/codenameone/CodenameOne/pull/4909) adds an `ios.metal.colorSpace` build hint. Until this week, the Metal layer's `CAMetalLayer.colorspace` was hard-coded to sRGB. For most apps that is right; sRGB is what your existing assets are authored in. But on iPhone XR and later, Apple's screens are wide-gamut (Display P3), and a marketing-led brand that ships P3 artwork was visibly losing saturation by being routed through the sRGB pipeline.
 
@@ -90,7 +90,7 @@ Accepted values are `sRGB` (default), `displayP3`, `deviceRGB`, `linearSRGB`, `e
 codename1.arg.ios.metal.colorSpace=displayP3
 ```
 
-The hint is dormant when `ios.metal=false`, so existing GL builds are unchanged. Unrecognised values produce a warning log and fall back to sRGB. Documented under [Working-With-iOS.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Working-With-iOS.asciidoc).
+The hint is dormant when `ios.metal=false`, so existing GL builds are unchanged. Unrecognized values produce a warning log and fall back to sRGB. Documented under [Working-With-iOS.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Working-With-iOS.asciidoc).
 
 ### The new `translateMatrix` API
 
@@ -126,13 +126,13 @@ It is a small change in line count. In practice it is a noticeable reduction in 
 
 The fix moves the prompt to the natural points. `Push.register()` triggers the system prompt (this code path already requested permission inside `IOSNative.m`; we just stopped firing it ahead of time). `LocalNotification.schedule()` also triggers it, via a new `requestAuthorizationWithOptions` call in `sendLocalNotification`. Same flow Android has been on for years. The practical consequence is that you can now show your own rationale screen ("we'd like to ping you when your order ships") before the system dialog fires.
 
-If you have an app that needs the legacy launch-time behaviour, a backwards-compatibility build hint restores it:
+If you have an app that needs the legacy launch-time behavior, a backwards-compatibility build hint restores it:
 
 ```
 codename1.arg.ios.notificationPermissionAtLaunch=true
 ```
 
-The default is `false`, so existing apps that did not opt in pick up the new behaviour on next rebuild. Documented in [Push-Notifications.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Push-Notifications.asciidoc). The cloud-side build server change shipped as [BuildDaemon #71](https://github.com/codenameone/BuildDaemon/pull/71), so local and cloud builds match.
+The default is `false`, so existing apps that did not opt in pick up the new behavior on next rebuild. Documented in [Push-Notifications.asciidoc](https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Push-Notifications.asciidoc). The cloud-side build server change shipped as [BuildDaemon #71](https://github.com/codenameone/BuildDaemon/pull/71), so local and cloud builds match.
 
 One thing to flag if you are updating an existing iOS app: if your onboarding flow was relying on the launch-time prompt happening automatically, your prompt now never fires unless `Push.register()` or `LocalNotification.schedule()` is invoked somewhere. That is almost certainly what you want, but check that the call lands.
 

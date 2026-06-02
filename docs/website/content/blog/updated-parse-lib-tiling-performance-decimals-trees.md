@@ -26,7 +26,7 @@ implementation to make it more compliant to the Java SE version of these classes
 
 #### Expanding A Tree
 
-A common request for the tree class is to open it when its already expanded. I recently had to do that myself for  
+A common request for the tree class is to open it when it’s already expanded. I recently had to do that myself for  
 the GUI builder and noticed that one of the pain points is the fact that the `Tree` always animates  
 expansion. So we added a new method that allows path expansion without animation specifically: `expandPath(animated, path)`.  
 This tree class shows itself expanded by default and can be useful for your app: 

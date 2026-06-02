@@ -13,7 +13,7 @@ description: Codename One is migrating to Maven. This will simplify some aspects
 
 Codename One is migrating to Maven. This will simplify some aspects of our build process and update/dependency management.
 
-As the headline states, we’re moving to Maven, and leaving the ant-infested old build system behind. To be honest, I love using Ant. It is quick and dirty, and let’s me assemble ad-hoc build workflows with little effort.
+As the headline states, we’re moving to Maven, and leaving the ant-infested old build system behind. To be honest, I love using Ant. It is quick and dirty, and lets me assemble ad-hoc build workflows with little effort.
 
 Migrating to Maven, at times, felt like strapping on a pair of cement boots. It is much more rigid than Ant, and much more opinionated. It’s the "Maven" way, or you’re in for a world of pain.
 
@@ -55,7 +55,7 @@ This is made possible by improvements to our compile-time compliance check which
 
 ## Publish your Libraries on Maven Central
 
-You can now deploy your Codename One Library projects to Maven central so that others can use them by pasting a dependency snippet into the the `pom.xml` file of their Application projects. Cn1libs listed in Codename One Settings can now include a Maven dependency snippet which will be used when adding the library to a Maven project.
+You can now deploy your Codename One Library projects to Maven central so that others can use them by pasting a dependency snippet into the `pom.xml` file of their Application projects. Cn1libs listed in Codename One Settings can now include a Maven dependency snippet which will be used when adding the library to a Maven project.
 
 ### A Small Change in the Workflow
 

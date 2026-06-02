@@ -46,7 +46,7 @@ Then we need to implement the following methods:
             try {
                 JSONObject obj = new JSONObject(value);
     
-                // this is still early since we probably didn't login yet so add the messages to the list of pending messages
+                // this is still early since we probably didn’t login yet so add the messages to the list of pending messages
                 java.util.List<Message> pendingMessages = (java.util.List<Message>)Storage.getInstance().readObject("pendingMessages");
                 if(pendingMessages == null) {
                     pendingMessages = new ArrayList<>();
@@ -142,7 +142,7 @@ and passwords. This should be pretty seamless.
 ### Other Code Changes
 
 When you push to a device you need to have the device key which is a unique identifier of the device to which you  
-want to send a push. Unfortunately since we don’t have a server in place we need somehow pass this key from the  
+want to send a push. Unfortunately since we don’t have a server in place we need to somehow pass this key from the  
 person we are chatting with. The trick is to embed this key into the Message object and thus update it when we receive  
 a message, this means that we can only send a push message to a person who wrote to us in the past. Not a bad  
 feature all and all but still a limitation…​
@@ -192,13 +192,13 @@ To do that we need to do these two simple changes to the `Message` class:
         return obj;
     }
 
-This effectively adds a push ID to every message we send if its available and updates a contacts push ID for usage  
+This effectively adds a push ID to every message we send if its available and updates a contact’s push ID for usage  
 later.
 
 Now we need to register for push, in the end of the `start()` method in `SocialChat.java` we add:
     
     
-    // let the login form show before we register the push so the permission screen doesn't appear on a white
+    // let the login form show before we register the push so the permission screen doesn’t appear on a white
     // background
     Display.getInstance().callSerially(() -> {
         // registering for push after the UI appears
@@ -257,12 +257,12 @@ the relevant section here:
     
     String pid = Preferences.get("pid-" + tokenPrefix + d.uniqueId, null);
     if(pid != null) {
-        // if we have a push address for the contact we can send them a push if they aren't reachable...
+        // if we have a push address for the contact we can send them a push if they aren’t reachable...
         UITimer timeout = new UITimer(() -> {
             if(pendingAck.contains(tokenPrefix + d.uniqueId)) {
                 pendingAck.remove(tokenPrefix + d.uniqueId);
                 // send two messages, one hidden with the data as JSON for parsing on the client
-                // the other one visible with the text that should appear to the user who isn't running
+                // the other one visible with the text that should appear to the user who isn’t running
                 // the app, this will allow him to launch the app and then receive the hidden message immediately
                 // within the app
                 String cert = ITUNES_DEVELOPMENT_PUSH_CERT;
@@ -279,7 +279,7 @@ the relevant section here:
                 } else {
                     chatArea.removeComponent(t);
                     chatArea.revalidate();
-                    Dialog.show("Error", "We couldn't reach " + d.name + " thru push", "OK", null);
+                    Dialog.show("Error", "We couldn’t reach " + d.name + " thru push", "OK", null);
                 }
             }
         });
@@ -318,7 +318,7 @@ it with Parse would have made this a much better app.
 
 Login via Google/Facebook etc. was probably the most painful part of the app and I’m including push notification  
 within the set of pains. While it is much simpler than it used to be and is simpler than the native/web versions I  
-think the main problem is in the networks opacity and desire to keep the developers close. The pain is less on  
+think the main problem is in the networks’ opacity and desire to keep the developers close. The pain is less on  
 our side and more on the tedium of creating apps and passing values to Facebook/Google. The APK hash key  
 is just painful, there were things such as "invite a friend" which I just avoided because of the tedium.
 

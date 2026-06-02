@@ -31,7 +31,7 @@ Well, it’s actually pretty simple. You can add the build hint:
 
 This would "work" but there is a catch…​
 
-You might need to define the specific version of the Android SDK used and specific version of Google play services version used. Intercom is pretty sensitive about those and demanded that we also add:
+You might need to define the specific version of the Android SDK used and specific version of Google play services used. Intercom is pretty sensitive about those and demanded that we also add:
     
     
     android.playServices=9.8.0

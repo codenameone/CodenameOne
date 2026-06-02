@@ -71,6 +71,8 @@ include::io.asciidoc[]
 
 include::Push-Notifications.asciidoc[]
 
+include::Notifications-And-Background-Execution.asciidoc[]
+
 include::Miscellaneous-Features.asciidoc[]
 
 include::performance.asciidoc[]

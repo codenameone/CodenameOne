@@ -34,7 +34,7 @@ However, this had some downsides specifically:
   
 4\. It uses Harmony for the class libraries which are much larger than what we actually need resulting in slower compilations and larger/slower executables.  
   
-5\. It translates dalvik code to iOS instead of bytecode directly which is slightly unintuitive and potentially suboptimial for some cases.
+5\. It translates dalvik code to iOS instead of bytecode directly which is slightly unintuitive and potentially suboptimal for some cases.
 
 Normally we would have other priorities but Apple has effectively forced our hand to do this when they released xcode 5.1 which broke compatibility with boehm code. Right now this isn’t a problem but Apple might suddenly decide to force all developers to migrate to a new version of xcode (which they did with 5.0) and we don’t want to get caught in such a situation scampering to patch an issue.
 
@@ -42,7 +42,7 @@ We thought long and hard about fixing XMLVM for our needs but eventually came to
 
 We did look extensively at other projects that have sprung up in the past couple of years to address these issues but all seemed to be suffering from the problem of addressing a too large problem space, using harmony (or worse open JDK) and using boehm (which is a fine GC except for the stalls). The exception here is J2ObjC which isn’t really a VM and isn’t intended for this use case at all.
 
-You might be wondering how this will effect you as a Codename One developer.
+You might be wondering how this will affect you as a Codename One developer.
 
 It won’t really, except for the fact that at some point in the future your builds will become faster and perform better. We chose a source architecture that is very similar to XMLVM since we liked the basic concepts of XMLVM and we think its the right direction going forward to be as compatible with Apple’s way of doing things as possible. All the things you rely on including native interfaces etc. should work just the same and the screenshot you see in this post is taken from the kitchen sink running in the new VM!
 

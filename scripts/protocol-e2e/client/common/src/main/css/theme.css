@@ -1,0 +1,7 @@
+/* Minimal theme for the protocol e2e client (UI is incidental; tests do the work). */
+#Constants {
+}
+
+Form {
+    background-color: #ffffff;
+}

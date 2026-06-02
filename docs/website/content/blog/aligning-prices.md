@@ -27,7 +27,7 @@ As part of this move we also analyzed our build server usage and noticed many de
 place a very heavy toll on the build servers with long builds that eventually cost in service degradation to everyone.  
 That is one of the reasons we originally made the iOS build quota so limiting… 
 
-So we are now reducing the credits for iOS builds to 8 credits per build (from 20) but also placing a size quotas on  
+So we are now reducing the credits for iOS builds to 8 credits per build (from 20) but also placing a size quota on  
 builds from free users to reduce both our storage costs and build times (upload/download and server instance costs).  
 We are sure this step will improve performance for everyone involved and help people try Codename One before  
 committing to a paid account.

@@ -45,6 +45,11 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
 import com.codename1.payment.Purchase;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
@@ -5825,6 +5830,206 @@ public final class Display extends CN1Constants {
     /// - com.codename1.notifications.LocalNotification
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
+    }
+
+    /// Requests permission to post notifications using a default request (alert, sound and
+    /// badge). The result is delivered to the callback on the EDT. On platforms without a
+    /// notification permission model the callback reports the permission as granted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the callback to receive the result
+    public void requestNotificationPermission(NotificationPermissionCallback callback) {
+        requestNotificationPermission(new NotificationPermissionRequest(), callback);
+    }
+
+    /// Requests permission to post notifications with the capabilities described by the
+    /// given request. The result is delivered to the callback on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: describes which notification capabilities to request
+    ///
+    /// - `callback`: the callback to receive the result
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        impl.requestNotificationPermission(request, callback);
+    }
+
+    /// Registers a notification channel (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `builder`: the channel definition
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+        impl.registerNotificationChannel(builder);
+    }
+
+    /// Deletes a notification channel (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the channel id to delete
+    public void deleteNotificationChannel(String channelId) {
+        impl.deleteNotificationChannel(channelId);
+    }
+
+    /// Creates a notification channel group (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: the group id
+    ///
+    /// - `groupName`: the user-visible group name
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+        impl.createNotificationChannelGroup(groupId, groupName);
+    }
+
+    /// Schedules constraint-aware background work. Used internally by
+    /// `com.codename1.background.BackgroundWork`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the work request
+    public void scheduleBackgroundWork(WorkRequest request) {
+        impl.scheduleBackgroundWork(request);
+    }
+
+    /// Cancels scheduled background work by id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `workId`: the work id
+    public void cancelBackgroundWork(String workId) {
+        impl.cancelBackgroundWork(workId);
+    }
+
+    /// Returns true if constraint-aware background work is supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isBackgroundWorkSupported() {
+        return impl.isBackgroundWorkSupported();
+    }
+
+    /// Schedules a deferrable background processing task. Used internally by
+    /// `com.codename1.background.BackgroundTask`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the task id
+    ///
+    /// - `earliestBeginEpochMs`: the earliest begin time in milliseconds since the epoch, or 0
+    ///
+    /// - `requiresNetwork`: true if network is required
+    ///
+    /// - `requiresPower`: true if charging is required
+    ///
+    /// - `task`: the work to run
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        impl.scheduleBackgroundProcessing(id, earliestBeginEpochMs, requiresNetwork, requiresPower, task);
+    }
+
+    /// Cancels a scheduled background processing task.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the task id
+    public void cancelBackgroundProcessing(String id) {
+        impl.cancelBackgroundProcessing(id);
+    }
+
+    /// Returns true if deferrable background processing is supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isBackgroundProcessingSupported() {
+        return impl.isBackgroundProcessingSupported();
+    }
+
+    /// Starts a foreground service. Used internally by
+    /// `com.codename1.background.ForegroundService`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the notification channel id
+    ///
+    /// - `title`: the notification title
+    ///
+    /// - `body`: the notification body
+    ///
+    /// - `iconName`: the small icon resource name, or null
+    ///
+    /// - `task`: the task to run
+    ///
+    /// - `handle`: the service handle passed to the task
+    ///
+    /// #### Returns
+    ///
+    /// an opaque native handle
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
+        return impl.startForegroundService(channelId, title, body, iconName, task, handle);
+    }
+
+    /// Updates a foreground service notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeHandle`: the handle returned by `#startForegroundService`
+    ///
+    /// - `title`: the new title
+    ///
+    /// - `body`: the new body
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        impl.updateForegroundServiceNotification(nativeHandle, title, body);
+    }
+
+    /// Stops a foreground service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeHandle`: the handle returned by `#startForegroundService`
+    public void stopForegroundService(Object nativeHandle) {
+        impl.stopForegroundService(nativeHandle);
+    }
+
+    /// Returns true if foreground services are supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isForegroundServiceSupported() {
+        return impl.isForegroundServiceSupported();
+    }
+
+    /// Returns true if the platform can receive shared content from other apps.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isReceiveSharedContentSupported() {
+        return impl.isReceiveSharedContentSupported();
+    }
+
+    /// Subscribes the device to a push topic. Used internally by
+    /// `com.codename1.push.Push`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public void subscribeToPushTopic(String topic) {
+        impl.subscribeToPushTopic(topic);
+    }
+
+    /// Unsubscribes the device from a push topic. Used internally by
+    /// `com.codename1.push.Push`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public void unsubscribeFromPushTopic(String topic) {
+        impl.unsubscribeFromPushTopic(topic);
     }
 
     /// Sets the preferred time interval between background fetches.  This is only a

@@ -60,7 +60,7 @@ The current 2.0 version contains the following demos:
 
 #### Layouts
 
-Shows some of the core layouts in Codename One this is the one demo that bares some semblance to the old kitchen sink demo
+Shows some of the core layouts in Codename One this is the one demo that bears some semblance to the old kitchen sink demo
 
 ![Layouts demo](/blog/kitchensink-ii/kitchensink-ii-layouts.png)
 

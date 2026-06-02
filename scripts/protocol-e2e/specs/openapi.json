@@ -1,0 +1,84 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Protocol E2E Catalog API", "version": "1.0.0" },
+  "paths": {
+    "/api/products": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "description": "All products",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{id}": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "getProduct",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A product",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Product" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/category/{category}": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "getProductsByCategory",
+        "parameters": [
+          { "name": "category", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Category" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products in a category",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Category": {
+        "type": "string",
+        "enum": ["BOOKS", "ELECTRONICS", "TOYS"]
+      },
+      "Dimensions": {
+        "type": "object",
+        "properties": {
+          "width": { "type": "number", "format": "double" },
+          "height": { "type": "number", "format": "double" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "category": { "$ref": "#/components/schemas/Category" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "rating": { "type": "number", "format": "double" },
+          "dimensions": { "$ref": "#/components/schemas/Dimensions" }
+        }
+      }
+    }
+  }
+}

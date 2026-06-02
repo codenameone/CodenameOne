@@ -59,7 +59,7 @@ jobs:
             experimental: true
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
       # environment has to be on PATH for the spawned cmake/clang-cl to work.
@@ -86,7 +86,7 @@ jobs:
       # clean target supports.
       - name: Set up JDK 8
         if: ${{ matrix.name == 'x64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
@@ -98,7 +98,7 @@ jobs:
 
       - name: Set up JDK 11
         if: ${{ matrix.name == 'x64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '11'
@@ -112,7 +112,7 @@ jobs:
       # adapts to whatever JDKs are present.
       - name: Set up JDK 17
         if: ${{ matrix.name == 'x64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -122,7 +122,7 @@ jobs:
         run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -132,7 +132,7 @@ jobs:
 
       - name: Set up JDK 25
         if: ${{ matrix.name == 'x64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
@@ -145,13 +145,13 @@ jobs:
       # the cache above), and JDK 21 on arm64 where 8/11/17 are unavailable.
       - name: Restore JDK 8 (x64)
         if: ${{ matrix.name == 'x64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
       - name: Restore JDK 21 (arm64)
         if: ${{ matrix.name == 'arm64' }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -209,7 +209,7 @@ jobs:
       # JDK 8 builds codename1-core (source/target 1.5) and is also the JDK the
       # translator harness uses (CompilerHelper auto-discovers JDK_8_HOME).
       - name: Set up JDK 8
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
@@ -295,7 +295,7 @@ jobs:
       # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
       # translator harness and builds the JavaAPI. Core + port come pre-compiled.
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -359,7 +359,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'

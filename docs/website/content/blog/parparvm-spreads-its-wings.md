@@ -16,7 +16,7 @@ we always viewed it as a Codename One specific tool. Something that would only b
 source because "that is our way" and didn’t give it much thought after that.  
 It started to dawn on us recently that this tool could be useful for other developers that might take it in a different  
 direction from our original intention. We also came to the conclusion that this might not be a bad idea altogether.  
-So we are are effectively launching the Codename One VM as  
+So we are effectively launching the Codename One VM as  
 [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm)  
 and it includes a lot of interesting benefits. 
 
@@ -52,7 +52,7 @@ It seems like there are a lot of open source iOS Java VM’s in the field but th
 proprietary or rely on a path that is very risky.  
 By translating bytecode to C source code ParparVM is effectively the only VM that we are aware of, that uses  
 a 100% supported by Apple approach for Java compatibility. The closest 2nd place would be J2ObjC from  
-Google but it isn’t intended as a full VM and actually fills a very different roll from ParparVM. 
+Google but it isn’t intended as a full VM and actually fills a very different role from ParparVM. 
 
 XMLVM’s C backend had a similar architecture but the project is no longer actively maintained.  
 All other Java VM’s for iOS that are actively maintained use approaches that Apple doesn’t officially support  

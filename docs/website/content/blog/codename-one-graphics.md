@@ -27,7 +27,7 @@ author: Steve Hannah
   
   
   
-This post we written by  
+This post was written by  
 [  
 Steve Hannah  
 ](http://sjhannah.com/)  
@@ -166,7 +166,7 @@ Component
   
 
   
-Conceptually this is very basic component. We will be overriding the  
+Conceptually this is a very basic component. We will be overriding the  
 [  
 paintBackground()  
 ](/javadoc/com/codename1/ui/Component.html#paintBackground%28com.codename1.ui.Graphics%29)  
@@ -195,7 +195,7 @@ Implementing addPoint()
 The addPoint method is designed to allow us to add points to the drawing. A simple implementation that uses straight lines rather than curves might look like this:  
 
   
-We introduced a couple house-keeping member vars (lastX and lastY) to store the last point that was added so that we know whether this is the first tap or a subsequent tap. The first tap triggers a moveTo() call, whereas subsequent taps trigger lineTo() calls, which draw lines from the last point to the current point.  
+We introduced a couple of house-keeping member vars (lastX and lastY) to store the last point that was added so that we know whether this is the first tap or a subsequent tap. The first tap triggers a moveTo() call, whereas subsequent taps trigger lineTo() calls, which draw lines from the last point to the current point.  
   
   
   

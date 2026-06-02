@@ -22,7 +22,7 @@ that form a larger platform evolution arch.
 ____New GUI Builder (technology preview)
 
 The new GUI builder is a big departure from our existing  
-designer tool. This tool is now in "technology preview" status meaning that its not quite ready for  
+designer tool. This tool is now in "technology preview" status meaning that it’s not quite ready for  
 prime time but we want feedback on its direction and issues.  
 Read more about this work in [this blog post](/blog/new-gui-builder.html). 
 

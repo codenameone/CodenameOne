@@ -27,7 +27,7 @@ The new Codename One CSS library allows you to do just that. The library enables
 
 ## Rounded Corners
 
-The following a CSS definition for a minimal rounded button.
+The following is a CSS definition for a minimal rounded button.
     
     
     Round1 {
@@ -46,7 +46,7 @@ How it works:
 
 At compile-time, the CSS library compiles the CSS file into a codename one resource file. Each element selector (in the example above this is "Round1") is converted into a UIID/Style that can be referenced from your codename one application. If the CSS styles specified can be expressed completely by Codename One style properties (e.g. padding, margin, font, simple borders, etc…​), then the resulting UIID will be more or less a direct conversion of the CSS properties. If, however, the CSS styles mandate a background or border that Codename One cannot express using its regular styles (e.g. rounded corners, shadows, gradients), then an appropriate image border or background will be generated and saved in the resource file as a multi-image.
 
-In the above example, we specify that the "Round1" UIID should include rounded corners with a radius of 20pt. Since Codename One doesn’t support rounded corners natively, the CSS module will (at compile time) generate a an image with the appropriate rounded border and use this in an image border for the "Round1" UIID.
+In the above example, we specify that the "Round1" UIID should include rounded corners with a radius of 20pt. Since Codename One doesn’t support rounded corners natively, the CSS module will (at compile time) generate an image with the appropriate rounded border and use this in an image border for the "Round1" UIID.
 
 ## Inner Shadows
 
@@ -130,7 +130,7 @@ We would change this to
 
 ## Where Do I Put My CSS File?
 
-"This CSS looks really nice, but where to I put it, and how to I set up the CSS module?", you say. I’m glad you asked. The CSS compiler will look for .css files inside your project’s "css" directory (which you’ll need to create). It will compiles these CSS files into corresponding .res files which will be placed into your project’s src directory. You can then load this theme in your app just as you would load any other theme file.
+"This CSS looks really nice, but where do I put it, and how do I set up the CSS module?", you say. I’m glad you asked. The CSS compiler will look for .css files inside your project’s "css" directory (which you’ll need to create). It will compile these CSS files into corresponding .res files which will be placed into your project’s src directory. You can then load this theme in your app just as you would load any other theme file.
 
 ![Codename One CSS flow chart](/blog/rounded-corners-shadows-and-gradients-with-css/bf44abe4-73f7-11e5-8ecb-976478e297da.png)
 

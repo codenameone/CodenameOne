@@ -13,7 +13,7 @@ author: Steve Hannah
 
 On Thursday morning we rolled the cameras for chapter 2 of our exciting new webinar series. This time around there were far fewer (though not zero) technical issues, and we were able to share a productive hour of mobile app development in the company of our fellow coders.
 
-[Last time](/blog/java-mobile-dev-webinar-recap/), we built a [social media app](https://github.com/shannah/social-network) similar to Facebook. It highlighted how you can easily build REST client using Codename One. This time around we changed directions and built a game: **Classic Flickr Concentration**. Basically it is a matching game where you get a set of cards, and you tap them to flip them over. You just need to find the matches. My two-year-old daughter loves this game, by the way.
+[Last time](/blog/java-mobile-dev-webinar-recap/), we built a [social media app](https://github.com/shannah/social-network) similar to Facebook. It highlighted how you can easily build a REST client using Codename One. This time around we changed directions and built a game: **Classic Flickr Concentration**. Basically it is a matching game where you get a set of cards, and you tap them to flip them over. You just need to find the matches. My two-year-old daughter loves this game, by the way.
 
 Here is a 1-minute screen-cast of the game being played side-by-side on both an iPad Air 2, and a Nexus 5:
 
@@ -33,7 +33,7 @@ You can also download the [android apk](https://github.com/shannah/cn1-flickr-co
 
 ### We Want Your Input
 
-Now that we have completed two webinars, we would are working on scheduling content further in advance. We will be holding them every two weeks and we’d like your input.
+Now that we have completed two webinars, we are working on scheduling content further in advance. We will be holding them every two weeks and we’d like your input.
 
   1. What kinds of topics would you like to have covered?
 

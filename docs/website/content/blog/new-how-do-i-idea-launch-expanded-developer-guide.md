@@ -24,7 +24,7 @@ If you haven’t checked the
 [  
 How Do I?  
 ](/how-do-i.html)  
-section recently check it out now. Its completely redone with a filter tool and every video now has the ability to accept comments right below it which you can use to give out tips to other community members about the usage of a specific feature. There is also a  
+section recently check it out now. It’s completely redone with a filter tool and every video now has the ability to accept comments right below it which you can use to give out tips to other community members about the usage of a specific feature. There is also a  
 [  
 new video covering the include sources feature  
 ](/how-do-i---use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc.html)  
@@ -35,7 +35,7 @@ Apparently the old i18n How Do I video
   
 that I recorded ages ago slipped between the cracks and never made it to the how do I page either so  
 [  
-its now there as well  
+it’s now there as well  
 ](/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html)  
 . 
 

@@ -15,7 +15,7 @@ When building an iOS debug version of the app we only build a 32bit version to s
 
 The crux of the issue is [Apple forcing developers to support 64 bit](https://arstechnica.com/apple/2017/01/future-ios-release-will-soon-end-support-for-unmaintained-32-bit-apps/), we already support it and have for years. But now Apple is showing a warning on apps built without 64 bit support even if they are only meant for debug.
 
-Unfortunately, even if this remains only as a warning this doesn’t look good for to developers trying Codename One for the first time and seeing a message that the app might be "slow". So from now on we will build 64 bit versions of the apps by default and if you have an old 32 bit device you would need to explicitly disable that using the build hint:
+Unfortunately, even if this remains only as a warning this doesn’t look good for developers trying Codename One for the first time and seeing a message that the app might be "slow". So from now on we will build 64 bit versions of the apps by default and if you have an old 32 bit device you would need to explicitly disable that using the build hint:
     
     
     ios.debug.archs=armv7

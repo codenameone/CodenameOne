@@ -12,10 +12,10 @@ author: Shai Almog
 ![Header Image](/blog/questions-of-the-week-xiii/qanda-friday.jpg)
 
 This has been a remarkably busy week for us trying to get the final bugs and features ready for the 3.5 code  
-freeze and the work we are doing on peer components etc. All the while the summer vacation is on it’s way  
+freeze and the work we are doing on peer components etc. All the while the summer vacation is on its way  
 and it’s already pretty hard to get any work done.
 
-This weeks release doesn’t contain any major changes, it’s mostly a bug fix release update.
+This week’s release doesn’t contain any major changes, it’s mostly a bug fix release update.
 
 This doesn’t seem to affect stack overflow which had a busy week as usual despite the heat:
 
@@ -133,7 +133,7 @@ these questions pave the way to a smoother overall process…​
 
 ### Getting an OOM when rendering Bitmap for videoPlayer
 
-Peer components are a pain, it’s a good thing we are looking into a [major ovehaul for them](/blog/peering-revisited/)…​
+Peer components are a pain, it’s a good thing we are looking into a [major overhaul for them](/blog/peering-revisited/)…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38135558/getting-an-oom-when-rendering-bitmap-for-videoplayer-in-codename-one-app)
 

@@ -71,7 +71,7 @@ flat design
 [  
 detailing some of the migration efforts  
 ](http://www.appdesignvault.com/ios-7-update/)  
-from a designers perspective.  
+from a designer’s perspective.  
 
   
 You can already update your user interface and theme to be more flat and modern (as well as your icon design etc.).  
@@ -95,7 +95,7 @@ Traction, Testimonials & Trips
   
   
   
-You might have noticed the big counter of installed devices we added to the home page, we are pretty thrilled having crossed the 20M device install base. Now lets work on adding a couple of zeros there…
+You might have noticed the big counter of installed devices we added to the home page, we are pretty thrilled having crossed the 20M device install base. Now let’s work on adding a couple of zeros there…
 
   
 We also added a testimonials popup to the home page (commented out due to an issue in Firefox), if you have a testimonial you would like to contribute to appear on our home page and an impressive public linked in profile we would really appreciate it  

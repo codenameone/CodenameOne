@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/splitpane-cursors-push-registration/new-features-6.jpg)
 
-Until this weeks release push notification was registered using `Display.registerPush(Hashtable, boolean)` the thing is that both of these arguments to that method are no longer used or not the best way to implement registration. So we deprecated that method and introduced a new version of the method `Display.registerPush()`.
+Until this week’s release push notification was registered using `Display.registerPush(Hashtable, boolean)` the thing is that both of these arguments to that method are no longer used or not the best way to implement registration. So we deprecated that method and introduced a new version of the method `Display.registerPush()`.
 
 Since push fallback hasn’t been supported since we migrated to the new API it’s going away isn’t a big deal but up until recently the `Hashtable` argument was used to pass the GCM push ID.
 

@@ -60,7 +60,7 @@ This XML can be transformed into a `Component` using
       .set("submitButton", new Button("Submit"))
       .getView();
 
-While this notation is slightly easier to read than it’s pure-java equivalent, it is still quite lengthy. For a UI like this, I’d like a notation that I can easily stick into a single-line  
+While this notation is slightly easier to read than its pure-java equivalent, it is still quite lengthy. For a UI like this, I’d like a notation that I can easily stick into a single-line  
 string. So let’s take a look at the JSON-ish UI notation.
     
     
@@ -90,7 +90,7 @@ While the total lines of code hasn’t changed, the portion related to construct
 
 ## Syntax
 
-The syntax is built around containers. Rather that have a `container` tag, I opted to use a separate tag for each layout type. This makes the syntax both easier to read and easier to write. Instead of `<container layout="flow">` we simply have `<flow>`.
+The syntax is built around containers. Rather than have a `container` tag, I opted to use a separate tag for each layout type. This makes the syntax both easier to read and easier to write. Instead of `<container layout="flow">` we simply have `<flow>`.
 
 The supported layouts are shown in the following table.
 
@@ -394,7 +394,7 @@ Example using `class` Attribute and ComponentSelector
 
 This example demonstrates the use of the `class` attribute for setting tags that can be used by `ComponentSelector` for selecting nested components in the fragment. We have two nested containers. One in the center with tags "tag1" and "tag2"; and a second component in the south with tag "tag2" only.
 
-We’re able to select on "tag1" to set the background color of the first component to red. Then we selet on "tag2" (which selects both of the components), to set the border of both components to use a line border.
+We’re able to select on "tag1" to set the background color of the first component to red. Then we select on "tag2" (which selects both of the components), to set the border of both components to use a line border.
 
 The result:
 
@@ -402,7 +402,7 @@ The result:
 
 ## Summary
 
-`UIFragment` provides simple way to user interfaces using a declarative syntax. It supports both an XML and a JSON syntax. The JSON notation is almost always more succinct and easier to read than the XML equivalent, and both provide advantages over directly defining the UI in Java code. You can embed placeholders inside your fragment’s JSON/XML and have them replaced by custom components when the fragment is compiled. Additionally, you can access nested components within fragments for further customization by tagging them either with an "id" or a "class" attribute. Finally you can reuse the same fragment to generate entire sets of components by setting placeholders with different values.
+`UIFragment` provides a simple way to create user interfaces using a declarative syntax. It supports both an XML and a JSON syntax. The JSON notation is almost always more succinct and easier to read than the XML equivalent, and both provide advantages over directly defining the UI in Java code. You can embed placeholders inside your fragment’s JSON/XML and have them replaced by custom components when the fragment is compiled. Additionally, you can access nested components within fragments for further customization by tagging them either with an "id" or a "class" attribute. Finally you can reuse the same fragment to generate entire sets of components by setting placeholders with different values.
 
 ---
 

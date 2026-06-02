@@ -51,7 +51,7 @@ The code for `bindCrashProtection` looks like this:
         crashBound = true;
     }
 
-The first interesting thing you will notice above is: `addEdtErrorHandler` which is a listener on the `Display` class. It allows us to to receive an event when the EDT catches an exception. All exceptions on the EDT are caught, we try to recover from them.
+The first interesting thing you will notice above is: `addEdtErrorHandler` which is a listener on the `Display` class. It allows us to receive an event when the EDT catches an exception. All exceptions on the EDT are caught, we try to recover from them.
 
 The default behavior is to show an error dialog but if we consume the event that error dialog won’t show.
 

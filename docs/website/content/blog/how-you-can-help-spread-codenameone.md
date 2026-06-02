@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![](/blog/how-you-can-help-spread-codenameone/guest-post-1.jpg)
 
-I’ve written this in emails before and on quite a few occasions but this bares repeating. Gaining visibility in this industry is tough especially when the industry is driven by the likes of Google, Facebook & Apple.
+I’ve written this in emails before and on quite a few occasions but this bears repeating. Gaining visibility in this industry is tough especially when the industry is driven by the likes of Google, Facebook & Apple.
 
 Despite years of effort, most Java developers or mobile developers haven’t heard about us and it’s still an uphill battle for awareness.
 

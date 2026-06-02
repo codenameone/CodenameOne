@@ -151,7 +151,7 @@ Then changing 30 properties on the model would trigger only a single revalidatio
 
 ### Summary
 
-So summarize the new features discussed in this post:
+To summarize the new features discussed in this post:
 
   1. Revalidation should be done as little as possible for best performance.
   2. Style changes on components trigger revalidations by default.

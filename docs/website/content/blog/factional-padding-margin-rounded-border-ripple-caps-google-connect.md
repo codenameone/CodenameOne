@@ -17,7 +17,7 @@ I wrote about some of these features before in the pixel perfect posts but I glo
 
 ### Google Plus is Dead
 
-Even when we wrote the blog posts detailing google plus login we new the end was near for that social network…​
+Even when we wrote the blog posts detailing google plus login we knew the end was near for that social network…​
 
 Google has pretty much ended support for the old Google+ login API’s and Steve migrated our existing Google+ support to use standard Google account connect. The cool thing is that the integration should now be MUCH easier and can be summed up with:
 
@@ -31,7 +31,7 @@ Google has pretty much ended support for the old Google+ login API’s and Steve
 
   * Download the GoogleService-Info.plist file into your project’s native/ios directory
 
-This is the super short version…​ Steve updated the [developer guide section on Google Cconnect](/manual/misc-features.html) with a longer more detailed explanation of the steps.
+This is the super short version…​ Steve updated the [developer guide section on Google connect](/manual/misc-features.html) with a longer more detailed explanation of the steps.
 
 ### Fractional Padding/Margin
 
@@ -123,7 +123,7 @@ There are several things we learned from doing the `RoundBorder` that we applied
 
   * We use the UIID for the background color that just makes sense. We didn’t do the same for the stroke color/foreground color though. The background should now behave nicely including gradients and images!
 
-  * We use millimeters where it makes sense, so a stroke can be in pixels since a 1 or 2 pixel stoke is something you might need but corner radius is always in millimeters as pixels just don’t fit here
+  * We use millimeters where it makes sense, so a stroke can be in pixels since a 1 or 2 pixel stroke is something you might need but corner radius is always in millimeters as pixels just don’t fit here
 
 This can also be customized via the designer tool which is another reason we had to change the resource file format:
 

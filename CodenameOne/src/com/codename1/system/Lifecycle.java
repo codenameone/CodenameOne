@@ -146,6 +146,19 @@ public class Lifecycle {
     /// Callback when the app is destroyed
     public void destroy() {
     }
+
+    /// Invoked when the app is launched or resumed because the user shared content
+    /// (text, a URL, a file or an image) into it from another application. The default
+    /// implementation does nothing; override it to handle the shared payload.
+    ///
+    /// This is delivered on the EDT. File and image items are exposed as
+    /// `com.codename1.io.FileSystemStorage` paths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the shared content
+    public void onReceivedSharedContent(com.codename1.share.SharedContent content) {
+    }
     
     /// Returns the form currently stored by this `Lifecycle` instance for
     /// application resume handling.

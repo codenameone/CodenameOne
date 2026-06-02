@@ -33,7 +33,7 @@ the menu button icon as such:
     FontImage.setMaterialIcon(menuButton, FontImage.MATERIAL_MENU);
     menuButton.addActionListener(e -> ((SideMenuBar)getToolbar().getMenuBar()).openMenu(null));
 
-Most of that is pretty standard and easy except of the downcast to the `SideMenuBar` class. So we’ve added  
+Most of that is pretty standard and easy except for the downcast to the `SideMenuBar` class. So we’ve added  
 a method to `Toolbar` named `openSideMenu` which would make this far more reasonable:
     
     

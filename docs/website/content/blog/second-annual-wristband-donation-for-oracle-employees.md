@@ -39,7 +39,7 @@ and/or share this via Facebook (publicly) then drop by our booth to log your nam
   
   
   
-We will hold the raffle on Wednesday at 3pm in our booth  
+We will hold the raffle on Wednesday at 3 pm in our booth  
   
   
 be sure to be there in order to claim the wristband or we will have to give it to someone else.  

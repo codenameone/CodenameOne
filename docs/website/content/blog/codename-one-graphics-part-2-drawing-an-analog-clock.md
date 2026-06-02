@@ -191,7 +191,7 @@ The radius of the clock.
   
 
   
-In addition, I am adding the following parameters to to help customize how the clock is rendered:  
+In addition, I am adding the following parameters to help customize how the clock is rendered:  
   
 
   1.   

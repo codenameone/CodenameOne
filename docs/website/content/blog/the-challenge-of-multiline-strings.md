@@ -21,7 +21,7 @@ There are two basic challenges in multiline strings, the first is related to the
 set the X/Y/Size of the components dynamically based on available space. This seems simple enough until we get  
 into the notion of nesting & changes.
 
-E.g. if I have a layout manager on the `Form` it knows that it can has the width/height of the screen to place components  
+E.g. if I have a layout manager on the `Form` it knows that it has the width/height of the screen to place components  
 so it can arrange them based on that constraint. However, when nesting starts things start to get tricky…​
 
 A child container needs its parent to allocate space for it before it knows the amount of available space. But here  
@@ -72,7 +72,7 @@ This isn’t a bad thing as normally we want the text area to take up a decent a
 real amount it needs. So when we construct a text component in Codename One we usually give it the number of  
 columns/rows and these are used to indicate the correct preferred size value that is later used for calculations.
 
-This isn’t what we want for `SpanLabel`. We’d like it to have the actual preferred size based on it’s text.
+This isn’t what we want for `SpanLabel`. We’d like it to have the actual preferred size based on its text.
 
 So the `setActAsLabel` does exactly that, provides the size based on `stringWidth` and it tries to ignore the row/column  
 values when the text just occupies one line.

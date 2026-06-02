@@ -24,7 +24,7 @@ We don’t have a set date to retry the migration but we are currently aiming fo
 The main issue involves the rather elaborate build script we have in place since the days of xcode 4.x. It seems  
 that for some applications or provisioning profiles xcode just crashes…​
 
-The solution is probably to build the application in a rather different way than we current do which might not crash  
+The solution is probably to build the application in a rather different way than we currently do which might not crash  
 xcode but unfortunately this will make this change & migration more complicated than we initially hoped so the  
 sensible solution seems to be to move back to the `iphone_new` mode and make builds go to the old servers  
 while we experiment.

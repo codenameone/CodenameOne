@@ -34,7 +34,7 @@ There is a reason why we shy away from adding too many VM level API’s, it’s 
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37624023/how-to-enhance-a-class-in-codename-one-api)
 
-### Is there a way to save a Graphics object in Codename One without without taking a screenshot?
+### Is there a way to save a Graphics object in Codename One without taking a screenshot?
 
 Graphics doesn’t always map to a surface which is why it doesn’t include capabilities such as `getPixel`.  
 This allows us to use rather elaborate hardware acceleration when running on some platforms and also  

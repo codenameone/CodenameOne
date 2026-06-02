@@ -32,7 +32,7 @@ asynchronously and starting with current builds all replace/layout animations (e
 #### Broken Compatibility
 
 This is important since some compatibility is broken as a result of this change!  
-One of the core problems with the old animation framework was that you can’t have to animations going on  
+One of the core problems with the old animation framework was that you can’t have two animations going on  
 at once e.g. if you did something like this: 
     
     
@@ -76,7 +76,7 @@ This animation is a combination of a new ability to step thru animation stages w
 destination UIID. This specific demo includes this code: 
     
     
-    Form hi = new Form("Shai's Social App", new BoxLayout(BoxLayout.Y_AXIS));
+    Form hi = new Form("Shai’s Social App", new BoxLayout(BoxLayout.Y_AXIS));
     for(int iter = 0 ; iter < 100 ; iter++) {
         hi.add(new Label("Social Data Goes here..."));
     }

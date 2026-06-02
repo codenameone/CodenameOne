@@ -13,7 +13,7 @@ author: Shai Almog
 
 We are on the final stretch of 3.5 getting ready for the codefreeze that will go into effect in the middle of next week. With that in mind we have last minute features we are trying to get out of the door and unfortunately had to skip some big tasks. One of the big problems is the iOS server migration which we couldn’t fit into the schedule. The peer component changes made it to Android but aren’t set as the default, this makes the most sense in the current state. We’ll probably flip the switch to the new peer components after the release.
 
-There are other issues that didn’t make it but we are still rather please with this release and we think it follows  
+There are other issues that didn’t make it but we are still rather pleased with this release and we think it follows  
 the trends we set before of refinement, stability & ease of use. We’ll write more about those as when we make the  
 final announcement.
 
@@ -21,7 +21,7 @@ In other news Stackoverflow introduced a new documentation feature which looks i
 
 We already setup a [Codename One section](http://stackoverflow.com/documentation/codenameone)  
 although it’s hard to tell how this will play with our existing docs. I’ve tried it a bit and I think it still needs  
-a bit of work although I love some of the interface interface elements. If we get community involvement  
+a bit of work although I love some of the interface elements. If we get community involvement  
 there we might migrate our documentation effort.
 
 ### How to make use of keep-alive in ConnectionRequest in Codename One?

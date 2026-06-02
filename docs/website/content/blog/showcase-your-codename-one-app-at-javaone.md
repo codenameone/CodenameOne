@@ -33,7 +33,7 @@ On an unrelated subject we recently added a
 [  
 videos  
 ](/videos.html)  
-section to the website that you might want to checkout, we also added a new  
+section to the website that you might want to check out, we also added a new  
 [  
 Udemy course  
 ](https://www.udemy.com/build-mobile-ios-apps-in-java-using-codename-one/)  

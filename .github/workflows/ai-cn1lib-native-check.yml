@@ -46,7 +46,7 @@ jobs:
           - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
           - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Select Xcode 16 (xcodegen emits Xcode-16-format projects)
         # The default xcode-select on macos-14 is Xcode 15.4; that can't

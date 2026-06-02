@@ -97,6 +97,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
@@ -147,6 +148,13 @@ import com.codename1.media.MediaProxy;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
 import com.codename1.payment.Purchase;
 import com.codename1.push.PushAction;
 import com.codename1.push.PushActionCategory;
@@ -11260,6 +11268,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
+        // carry the configured content intent as a template so the publisher can build
+        // a distinct per-action PendingIntent (with the action id and any remote input)
+        if (!notif.getActions().isEmpty()) {
+            notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_CONTENT_TEMPLATE, contentIntent);
+        }
 
 
         PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
@@ -11308,6 +11321,54 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         b.putString("NOTIF_SOUND", notif.getAlertSound());
         b.putString("NOTIF_IMAGE", notif.getAlertImage());
         b.putInt("NOTIF_NUMBER", notif.getBadgeNumber());
+        b.putString("NOTIF_CHANNEL", notif.getChannelId());
+        b.putString("NOTIF_GROUP", notif.getGroupId());
+        b.putBoolean("NOTIF_GROUP_SUMMARY", notif.isGroupSummary());
+        b.putBoolean("NOTIF_FULLSCREEN", notif.isFullScreenIntent());
+        b.putBoolean("NOTIF_TIME_SENSITIVE", notif.isTimeSensitive());
+        b.putBoolean("NOTIF_ONGOING", notif.isOngoing());
+        b.putInt("NOTIF_PROGRESS_MAX", notif.getProgressMax());
+        b.putInt("NOTIF_PROGRESS", notif.getProgress());
+        b.putBoolean("NOTIF_PROGRESS_INDETERMINATE", notif.isProgressIndeterminate());
+        b.putString("NOTIF_CUSTOM_VIEW", notif.getCustomView());
+        java.util.List<LocalNotification.Action> actions = notif.getActions();
+        if (!actions.isEmpty()) {
+            ArrayList<String> ids = new ArrayList<String>();
+            ArrayList<String> titles = new ArrayList<String>();
+            ArrayList<String> icons = new ArrayList<String>();
+            ArrayList<String> placeholders = new ArrayList<String>();
+            ArrayList<String> buttons = new ArrayList<String>();
+            for (LocalNotification.Action a : actions) {
+                ids.add(a.getId());
+                titles.add(a.getTitle() == null ? "" : a.getTitle());
+                icons.add(a.getIcon() == null ? "" : a.getIcon());
+                placeholders.add(a.getTextInputPlaceholder() == null ? "" : a.getTextInputPlaceholder());
+                buttons.add(a.getTextInputButtonText() == null ? "" : a.getTextInputButtonText());
+            }
+            b.putStringArrayList("NOTIF_ACTION_IDS", ids);
+            b.putStringArrayList("NOTIF_ACTION_TITLES", titles);
+            b.putStringArrayList("NOTIF_ACTION_ICONS", icons);
+            b.putStringArrayList("NOTIF_ACTION_PLACEHOLDERS", placeholders);
+            b.putStringArrayList("NOTIF_ACTION_BUTTONS", buttons);
+        }
+        LocalNotification.MessagingStyle ms = notif.getMessagingStyle();
+        if (ms != null) {
+            b.putString("NOTIF_MSG_SELF", ms.getSelfDisplayName());
+            b.putString("NOTIF_MSG_TITLE", ms.getConversationTitle());
+            b.putBoolean("NOTIF_MSG_GROUP", ms.isGroupConversation());
+            ArrayList<String> texts = new ArrayList<String>();
+            ArrayList<String> senders = new ArrayList<String>();
+            long[] times = new long[ms.getMessages().size()];
+            int i = 0;
+            for (LocalNotification.MessagingStyle.Message m : ms.getMessages()) {
+                texts.add(m.getText() == null ? "" : m.getText());
+                senders.add(m.getSenderName() == null ? "" : m.getSenderName());
+                times[i++] = m.getTimestamp();
+            }
+            b.putStringArrayList("NOTIF_MSG_TEXTS", texts);
+            b.putStringArrayList("NOTIF_MSG_SENDERS", senders);
+            b.putLongArray("NOTIF_MSG_TIMES", times);
+        }
         return b;
     }
 
@@ -11319,7 +11380,405 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         n.setAlertSound(b.getString("NOTIF_SOUND"));
         n.setAlertImage(b.getString("NOTIF_IMAGE"));
         n.setBadgeNumber(b.getInt("NOTIF_NUMBER"));
+        // new fields are guarded so bundles serialized by older builds still parse
+        if (b.containsKey("NOTIF_CHANNEL")) {
+            n.setChannelId(b.getString("NOTIF_CHANNEL"));
+        }
+        if (b.containsKey("NOTIF_GROUP")) {
+            n.setGroup(b.getString("NOTIF_GROUP"));
+        }
+        n.setGroupSummary(b.getBoolean("NOTIF_GROUP_SUMMARY", false));
+        n.setFullScreenIntent(b.getBoolean("NOTIF_FULLSCREEN", false));
+        n.setTimeSensitive(b.getBoolean("NOTIF_TIME_SENSITIVE", false));
+        n.setOngoing(b.getBoolean("NOTIF_ONGOING", false));
+        int progressMax = b.getInt("NOTIF_PROGRESS_MAX", 0);
+        if (progressMax > 0) {
+            n.setProgress(progressMax, b.getInt("NOTIF_PROGRESS", 0));
+        }
+        n.setIndeterminateProgress(b.getBoolean("NOTIF_PROGRESS_INDETERMINATE", false));
+        if (b.containsKey("NOTIF_CUSTOM_VIEW")) {
+            n.setCustomView(b.getString("NOTIF_CUSTOM_VIEW"));
+        }
+        ArrayList<String> ids = b.getStringArrayList("NOTIF_ACTION_IDS");
+        if (ids != null) {
+            ArrayList<String> titles = b.getStringArrayList("NOTIF_ACTION_TITLES");
+            ArrayList<String> icons = b.getStringArrayList("NOTIF_ACTION_ICONS");
+            ArrayList<String> placeholders = b.getStringArrayList("NOTIF_ACTION_PLACEHOLDERS");
+            ArrayList<String> buttons = b.getStringArrayList("NOTIF_ACTION_BUTTONS");
+            for (int i = 0; i < ids.size(); i++) {
+                String placeholder = placeholders != null ? emptyToNull(placeholders.get(i)) : null;
+                String button = buttons != null ? emptyToNull(buttons.get(i)) : null;
+                if (placeholder != null || button != null) {
+                    n.addInputAction(ids.get(i), titles.get(i), placeholder, button);
+                } else {
+                    String icon = icons != null ? emptyToNull(icons.get(i)) : null;
+                    n.addAction(new LocalNotification.Action(ids.get(i), titles.get(i), icon));
+                }
+            }
+        }
+        if (b.containsKey("NOTIF_MSG_SELF")) {
+            LocalNotification.MessagingStyle ms = n.asMessagingStyle(b.getString("NOTIF_MSG_SELF"));
+            ms.conversationTitle(b.getString("NOTIF_MSG_TITLE"));
+            ms.groupConversation(b.getBoolean("NOTIF_MSG_GROUP", false));
+            ArrayList<String> texts = b.getStringArrayList("NOTIF_MSG_TEXTS");
+            ArrayList<String> senders = b.getStringArrayList("NOTIF_MSG_SENDERS");
+            long[] times = b.getLongArray("NOTIF_MSG_TIMES");
+            if (texts != null) {
+                for (int i = 0; i < texts.size(); i++) {
+                    ms.addMessage(texts.get(i),
+                            times != null && i < times.length ? times[i] : 0,
+                            senders != null ? emptyToNull(senders.get(i)) : null);
+                }
+            }
+        }
         return n;
+    }
+
+    private static String emptyToNull(String s) {
+        return s == null || s.length() == 0 ? null : s;
+    }
+
+    @Override
+    public void requestNotificationPermission(final NotificationPermissionRequest request, final NotificationPermissionCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        final boolean granted;
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            granted = checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications", true);
+        } else {
+            // notifications are allowed by default below Android 13
+            granted = true;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                callback.notificationPermissionResult(new NotificationPermissionResult(granted
+                        ? NotificationPermissionResult.AuthorizationLevel.AUTHORIZED
+                        : NotificationPermissionResult.AuthorizationLevel.DENIED));
+            }
+        });
+    }
+
+    @Override
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+        if (builder == null || android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        try {
+            NotificationManager nm = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+            Class<?> clsChannel = Class.forName("android.app.NotificationChannel");
+            Constructor<?> ctor = clsChannel.getConstructor(String.class, CharSequence.class, int.class);
+            // map our 0..5 importance onto the platform IMPORTANCE_* (NONE=0 .. MAX=5)
+            Object channel = ctor.newInstance(builder.getId(), builder.getName(), builder.getImportance());
+            if (builder.getDescription() != null) {
+                clsChannel.getMethod("setDescription", String.class).invoke(channel, builder.getDescription());
+            }
+            clsChannel.getMethod("enableLights", boolean.class).invoke(channel, builder.isLightsEnabled());
+            if (builder.isLightsEnabled()) {
+                clsChannel.getMethod("setLightColor", int.class).invoke(channel, builder.getLightColor());
+            }
+            clsChannel.getMethod("enableVibration", boolean.class).invoke(channel, builder.isVibrationEnabled());
+            if (builder.getVibrationPattern() != null) {
+                clsChannel.getMethod("setVibrationPattern", long[].class).invoke(channel, (Object) builder.getVibrationPattern());
+            }
+            clsChannel.getMethod("setLockscreenVisibility", int.class).invoke(channel, builder.getLockscreenVisibility());
+            clsChannel.getMethod("setShowBadge", boolean.class).invoke(channel, builder.isShowBadge());
+            if (builder.getGroup() != null) {
+                clsChannel.getMethod("setGroup", String.class).invoke(channel, builder.getGroup());
+            }
+            String sound = builder.getSound();
+            if (sound != null && sound.length() > 0) {
+                sound = sound.toLowerCase();
+                Uri uri = Uri.parse("android.resource://" + getContext().getApplicationInfo().packageName + "/raw"
+                        + sound.substring(0, sound.indexOf(".")));
+                android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .build();
+                clsChannel.getMethod("setSound", Uri.class, android.media.AudioAttributes.class).invoke(channel, uri, attrs);
+            }
+            nm.getClass().getMethod("createNotificationChannel", clsChannel).invoke(nm, channel);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void deleteNotificationChannel(String channelId) {
+        if (channelId == null || android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        try {
+            NotificationManager nm = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+            nm.getClass().getMethod("deleteNotificationChannel", String.class).invoke(nm, channelId);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+        if (groupId == null || android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        try {
+            NotificationManager nm = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+            Class<?> clsGroup = Class.forName("android.app.NotificationChannelGroup");
+            Constructor<?> ctor = clsGroup.getConstructor(String.class, CharSequence.class);
+            Object group = ctor.newInstance(groupId, groupName);
+            nm.getClass().getMethod("createNotificationChannelGroup", clsGroup).invoke(nm, group);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void subscribeToPushTopic(final String topic) {
+        invokeFirebaseTopic("subscribeToTopic", topic);
+    }
+
+    @Override
+    public void unsubscribeFromPushTopic(final String topic) {
+        invokeFirebaseTopic("unsubscribeFromTopic", topic);
+    }
+
+    private void invokeFirebaseTopic(String methodName, String topic) {
+        try {
+            Class<?> cls = Class.forName("com.google.firebase.messaging.FirebaseMessaging");
+            Object instance = cls.getMethod("getInstance").invoke(null);
+            cls.getMethod(methodName, String.class).invoke(instance, topic);
+        } catch (ClassNotFoundException notAvailable) {
+            com.codename1.io.Log.p("Firebase Cloud Messaging is not available; topic '" + topic
+                    + "' subscription must be handled server side");
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return true;
+    }
+
+    private static SharedContent pendingSharedContent;
+
+    /// Delivers shared content received from another app. If the CN1 app instance is
+    /// running it is dispatched immediately on the EDT; otherwise it is held until the app
+    /// finishes starting and `#deliverPendingSharedContent()` is invoked.
+    static void deliverSharedContent(SharedContent content) {
+        if (content == null) {
+            return;
+        }
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        if (app != null && Display.isInitialized()) {
+            dispatchSharedContent(app, content);
+        } else {
+            pendingSharedContent = content;
+        }
+    }
+
+    /// Invoked once the app has started to flush any shared content that arrived before the
+    /// app instance existed.
+    public static void deliverPendingSharedContent() {
+        SharedContent c = pendingSharedContent;
+        pendingSharedContent = null;
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        if (c != null && app != null) {
+            dispatchSharedContent(app, c);
+        }
+    }
+
+    private static void dispatchSharedContent(final Object app, final SharedContent content) {
+        if (!(app instanceof com.codename1.system.Lifecycle)) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                ((com.codename1.system.Lifecycle) app).onReceivedSharedContent(content);
+            }
+        });
+    }
+
+    // ---- Constraint-aware background work (JobScheduler) ----
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 21;
+    }
+
+    private static int jobIdFor(String id) {
+        return (id.hashCode() & 0x7fffffff) % 1000000 + 1000;
+    }
+
+    @Override
+    public void scheduleBackgroundWork(WorkRequest request) {
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            android.content.ComponentName component =
+                    new android.content.ComponentName(getContext(), CodenameOneJobService.class);
+            android.app.job.JobInfo.Builder builder =
+                    new android.app.job.JobInfo.Builder(jobIdFor(request.getId()), component);
+
+            if (request.isRequiresUnmeteredNetwork()) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_UNMETERED);
+            } else if (request.isRequiresNetwork()) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_ANY);
+            }
+            builder.setRequiresCharging(request.isRequiresCharging());
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                builder.setRequiresDeviceIdle(request.isRequiresIdle());
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                builder.setRequiresBatteryNotLow(request.isRequiresBatteryNotLow());
+            }
+            if (request.isPeriodic()) {
+                builder.setPeriodic(Math.max(15 * 60 * 1000L, request.getMinIntervalMillis()));
+            } else {
+                if (request.getInitialDelayMillis() > 0) {
+                    builder.setMinimumLatency(request.getInitialDelayMillis());
+                }
+                builder.setOverrideDeadline(Math.max(request.getInitialDelayMillis(), 0) + 60 * 60 * 1000L);
+            }
+
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(CodenameOneJobService.EXTRA_WORKER_CLASS, request.getWorkerClass());
+            extras.putString(CodenameOneJobService.EXTRA_WORK_ID, request.getId());
+            for (java.util.Map.Entry<String, String> e : request.getInputData().entrySet()) {
+                extras.putString(CodenameOneJobService.INPUT_PREFIX + e.getKey(), e.getValue());
+            }
+            builder.setExtras(extras);
+            scheduler.schedule(builder.build());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            scheduler.cancel(jobIdFor(workId));
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 21;
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        if (android.os.Build.VERSION.SDK_INT < 21 || task == null) {
+            return;
+        }
+        try {
+            CodenameOneJobService.registerProcessingRunnable(id, task);
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            android.content.ComponentName component =
+                    new android.content.ComponentName(getContext(), CodenameOneJobService.class);
+            android.app.job.JobInfo.Builder builder =
+                    new android.app.job.JobInfo.Builder(jobIdFor("proc-" + id), component);
+            if (requiresNetwork) {
+                builder.setRequiredNetworkType(android.app.job.JobInfo.NETWORK_TYPE_ANY);
+            }
+            builder.setRequiresCharging(requiresPower);
+            long delay = earliestBeginEpochMs <= 0 ? 0 : Math.max(0, earliestBeginEpochMs - System.currentTimeMillis());
+            if (delay > 0) {
+                builder.setMinimumLatency(delay);
+            }
+            builder.setOverrideDeadline(delay + 60 * 60 * 1000L);
+            PersistableBundle extras = new PersistableBundle();
+            extras.putString(CodenameOneJobService.EXTRA_PROCESSING_ID, id);
+            builder.setExtras(extras);
+            scheduler.schedule(builder.build());
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        CodenameOneJobService.unregisterProcessingRunnable(id);
+        if (android.os.Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        try {
+            android.app.job.JobScheduler scheduler =
+                    (android.app.job.JobScheduler) getContext().getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            scheduler.cancel(jobIdFor("proc-" + id));
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    // ---- Foreground service ----
+
+    @Override
+    public boolean isForegroundServiceSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
+        int token = CodenameOneForegroundService.registerTask(task, handle, channelId, title, body, iconName);
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_START);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, token);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_CHANNEL, channelId);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TITLE, title);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_BODY, body);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_ICON, iconName);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                getContext().startForegroundService(intent);
+            } else {
+                getContext().startService(intent);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return Integer.valueOf(token);
+    }
+
+    @Override
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_UPDATE);
+            if (nativeHandle instanceof Integer) {
+                intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, ((Integer) nativeHandle).intValue());
+            }
+            intent.putExtra(CodenameOneForegroundService.EXTRA_TITLE, title);
+            intent.putExtra(CodenameOneForegroundService.EXTRA_BODY, body);
+            getContext().startService(intent);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void stopForegroundService(Object nativeHandle) {
+        try {
+            Intent intent = new Intent(getContext(), CodenameOneForegroundService.class);
+            intent.setAction(CodenameOneForegroundService.ACTION_STOP);
+            if (nativeHandle instanceof Integer) {
+                intent.putExtra(CodenameOneForegroundService.EXTRA_TOKEN, ((Integer) nativeHandle).intValue());
+            }
+            getContext().startService(intent);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
     }
 
     boolean brokenGaussian;

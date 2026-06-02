@@ -25,7 +25,7 @@ In the latest update to desktop builds we made the mouse wheel scroll the UI whi
   
   
   
-This was a big challenging to implement properly since the mouse doesn’t actually touch a specific component, eventually we decided to just send press/release/drag events in sequence when a mouse wheel is active.  
+This was a big challenge to implement properly since the mouse doesn’t actually touch a specific component, eventually we decided to just send press/release/drag events in sequence when a mouse wheel is active.  
   
   
   
@@ -35,7 +35,7 @@ We also made some improvements to drag behavior. One of the surprisingly difficu
   
   
   
-Its the main reason we should avoid binding logic to the pointer pressed method and instead use the pointer released method (there is another reason but I digress…). The problem is further compounded by the fact that some devices send drag events even when there was no perceivable drag. This makes it even harder to differentiate such a case.  
+It’s the main reason we should avoid binding logic to the pointer pressed method and instead use the pointer released method (there is another reason but I digress…). The problem is further compounded by the fact that some devices send drag events even when there was no perceivable drag. This makes it even harder to differentiate such a case.  
   
   
   

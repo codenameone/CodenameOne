@@ -13,11 +13,11 @@ author: Shai Almog
 
 We covered the [new Accordion component last week](/blog/accordion-component.html) and just started using  
 it in a demo for which it was very suitable. As we were working with it we discovered that it was missing some  
-core methods to remove an `Accordion` entry or change it’s title. But worse, was the fact that a delete button in  
+core methods to remove an `Accordion` entry or change its title. But worse, was the fact that a delete button in  
 the title wouldn’t work!  
 The crux of the issue is in the fact that  
 [lead component](/manual/misc-features/#lead-component-section)  
-doesn’t support excluding a specific component within the hierarchy from it’s behavior so we set about to fix that…​
+doesn’t support excluding a specific component within the hierarchy from its behavior so we set about to fix that…​
 
 We added two new methods to the `Component` class: `setBlockLead(boolean)` & `isBlockLead()`.
 
@@ -26,7 +26,7 @@ rest you can use this method to exclude it from the lead component behavior whil
 
 This should have no effect if the component isn’t a part of a lead component.
 
-Other than that we also added to `Accordion` some methods that allow us to mutate it’s state:  
+Other than that we also added to `Accordion` some methods that allow us to mutate its state:  
 [removeContent](/javadoc/com/codename1/components/Accordion/#removeContent-com.codename1.ui.Component-)  
 & two variations of  
 [setHeader](/javadoc/com/codename1/components/Accordion/#setHeader-com.codename1.ui.Component-com.codename1.ui.Component-).

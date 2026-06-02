@@ -21,7 +21,7 @@ That’s really helpful when you’re tracking an issue that happens on an end u
 
 We’ve had several cases of downtime with the certificate wizard lately and we are going through such a downtime right now. We are working on fixing it and hopefully it will be fixed by the time you read this…​
 
-However, I’d like to explain why these things happen. The certificate wizard connects to Apples undocumented system to support generating certificates/provisioning. It’s a system they have in place for xcode but it’s a bit flaky. We could just use something like webscraping in the worst case scenario but either way every time Apple makes a change we need to adapt.
+However, I’d like to explain why these things happen. The certificate wizard connects to Apple’s undocumented system to support generating certificates/provisioning. It’s a system they have in place for xcode but it’s a bit flaky. We could just use something like webscraping in the worst case scenario but either way every time Apple makes a change we need to adapt.
 
 A while back Apple made a change, we adapted relatively quickly but introduced a few regressions which were really hard to pinpoint as they relate to behaviors such as cookie policies etc. Things that work for our localized test cases sometimes fail as we scale them to the entire community…​
 

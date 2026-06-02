@@ -1,0 +1,51 @@
+# LanguageTool accept-list overlay for the blog.
+#
+# Same format as docs/developer-guide/languagetool-accept.txt: one Python
+# regex per line, matched against the exact text LanguageTool flagged. Blank
+# lines and lines starting with "#" are ignored.
+#
+# The blog CI gate concatenates the developer guide's accept-list with this
+# file, so EVERYTHING accepted for the guide is already accepted here — only
+# add terms that are unique to blog prose (older product/service names,
+# community handles, syndication targets) and not worth adding to the guide.
+#
+# Keep this list short and justified. Most false positives are better handled
+# by the shared developer-guide list (for genuinely cross-cutting terms) or by
+# the CodenameOne Vale vocabulary. This file is seeded minimally; the corpus
+# assessment pass (Phase 3) populates it from real findings.
+
+# Syndication targets and community/blog platform names.
+Foojay
+Hashnode
+DZone
+Blogger
+[Gg]iscus
+TestFlight
+
+# NOTE: the blog is written in AMERICAN English (Shai Almog's posts and the
+# other contributors). Do NOT add British spellings here — LanguageTool runs as
+# en-US, so it SHOULD flag "behaviour"/"colour"/"rasterisation"/"centring"/etc.
+# as misspellings to be Americanized. (Steve Hannah's ~88 posts may use British
+# spellings; those existing posts are grandfathered by the net-new gate, so they
+# are not flagged unless edited.)
+
+# run_languagetool replaces inline code spans with the placeholder "X"; a
+# pluralized inline code span (`Foo`s) becomes "Xs". Accept the placeholder.
+Xs
+
+# Tech / library / product names that appear in blog prose (not as code spans).
+Lightrun
+Bodymovin
+Mockito
+AssertJ
+Moshi
+Zeroconf
+subreddit
+transcoders?
+[Tt]ranscoder
+linecap
+linejoin
+bbox
+wordmark
+googlemaps
+foldables?

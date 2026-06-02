@@ -20,7 +20,7 @@ __ |  As I write this it looks like Camera Kit is moving towards 1.0 but it’s 
   
 We still kept the name for the cn1lib which might breed some confusion so we’re open to suggestions here and might update it in the future.
 
-As part of this overhaul we the library now supports the JavaScript port. It doesn’t support all the features but you should be able to get low level camera access in your web apps as well.
+As part of this overhaul the library now supports the JavaScript port. It doesn’t support all the features but you should be able to get low level camera access in your web apps as well.
 
 The nice thing is that the API is mostly unchanged. It can still be used with roughly the same API as we had before: <https://github.com/codenameone/CameraKitDemo/>
 ---
