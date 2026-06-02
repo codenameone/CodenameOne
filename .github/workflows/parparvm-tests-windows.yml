@@ -222,7 +222,9 @@ jobs:
       - name: Build core + Windows port (JDK 8)
         working-directory: maven
         shell: pwsh
-        run: mvn -B -pl windows -am -DskipTests -Dmaven.javadoc.skip=true install
+        # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
+        # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
+        run: mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       # Build the ParparVM JavaAPI, then run the websocket capture test: it
       # translates app + core + port + nativeSources, links with clang-cl, starts
