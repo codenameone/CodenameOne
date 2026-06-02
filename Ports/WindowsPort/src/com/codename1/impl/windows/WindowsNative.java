@@ -248,6 +248,9 @@ public final class WindowsNative {
 
     public static native String storageDir();
 
+    /** Directory of the running executable; resources are resolved relative to it. */
+    public static native String executableDir();
+
     public static native String[] fileRoots();
 
     public static native long fileRootSize(String root);

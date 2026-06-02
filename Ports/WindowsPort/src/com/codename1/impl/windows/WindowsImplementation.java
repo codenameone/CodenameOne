@@ -112,12 +112,59 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* ----------------------------------------------------------- lifecycle */
 
+    /** The port's bundled native (material) theme, shipped next to the exe. */
+    private static final String NATIVE_THEME_RES = "windowsNativeTheme.res";
+
     @Override
     public void init(Object m) {
         WindowsNative.initDisplay("Codename One", 800, 600);
         windowGraphicsPeer = WindowsNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(WindowsNative.getDefaultFont());
+        installNativeTheme();
+    }
+
+    @Override
+    public boolean hasNativeTheme() {
+        InputStream in = getResourceAsStream(WindowsImplementation.class, "/" + NATIVE_THEME_RES);
+        if (in == null) {
+            return false;
+        }
+        try {
+            in.close();
+        } catch (IOException ignore) {
+        }
+        return true;
+    }
+
+    /**
+     * Applies the port's bundled native theme (a material theme shipped next to
+     * the executable) as the base look, mirroring how the iOS port installs
+     * iOSModernTheme.res. An app that loads its own theme layers over this.
+     * Silently does nothing when the theme resource is absent. This is the
+     * framework hook (UIManager calls it for {@code @includeNativeBool} themes);
+     * init() also calls it so an app with no theme of its own still gets it.
+     */
+    @Override
+    public void installNativeTheme() {
+        InputStream in = getResourceAsStream(WindowsImplementation.class, "/" + NATIVE_THEME_RES);
+        if (in == null) {
+            return;
+        }
+        try {
+            com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(in);
+            String[] names = r.getThemeResourceNames();
+            if (names != null && names.length > 0) {
+                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+            }
+        } catch (Throwable t) {
+            // A bad/absent theme must not stop the app from starting.
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignore) {
+            }
+        }
     }
 
     @Override
@@ -508,6 +555,30 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return new WindowsInputStream(h, false);
         }
         return new WindowsInputStream(((WindowsHttpConnection) connection).peer, true);
+    }
+
+    /**
+     * Resolves a classpath-style resource (e.g. {@code /theme.res}) to a file
+     * shipped next to the executable. The ParparVM clean target has no embedded
+     * classpath resources, so app resources travel alongside the exe. Returns
+     * null when the resource is absent.
+     */
+    @Override
+    public InputStream getResourceAsStream(Class cls, String resource) {
+        if (resource == null) {
+            return null;
+        }
+        String dir = WindowsNative.executableDir();
+        if (dir == null) {
+            return null;
+        }
+        String name = resource.startsWith("/") ? resource.substring(1) : resource;
+        String path = dir + "\\" + name.replace('/', '\\');
+        long h = WindowsNative.fileOpenRead(path);
+        if (h == 0) {
+            return null;
+        }
+        return new WindowsInputStream(h, false);
     }
 
     @Override

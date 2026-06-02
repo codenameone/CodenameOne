@@ -35,6 +35,7 @@
 #include "cn1_windows.h"
 #include <shlobj.h>
 #include <stdio.h>
+#include <wchar.h>
 
 /*
  * The element class for a String[] in generated ParparVM code is
@@ -344,6 +345,23 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_storageDir___R_java_lang_St
     /* ensure the directory exists; ignore "already exists" */
     CreateDirectoryW(dir, NULL);
     return cn1WinWideToJavaString(threadStateData, dir);
+}
+
+/* The directory containing the running executable (no trailing separator).
+ * Resources shipped alongside the exe -- the native theme, app assets -- are
+ * resolved relative to this by getResourceAsStream. */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_executableDir___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    WCHAR path[MAX_PATH];
+    WCHAR* lastSlash;
+    DWORD n = GetModuleFileNameW(NULL, path, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) {
+        return JAVA_NULL;
+    }
+    lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash != NULL) {
+        *lastSlash = L'\0';
+    }
+    return cn1WinWideToJavaString(threadStateData, path);
 }
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileRoots___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {

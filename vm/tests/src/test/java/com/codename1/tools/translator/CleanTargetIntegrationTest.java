@@ -400,6 +400,10 @@ class CleanTargetIntegrationTest {
         if (Files.exists(pdb)) {
             Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
         }
+        Path theme = exe.resolveSibling("windowsNativeTheme.res");
+        if (Files.exists(theme)) {
+            Files.copy(theme, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+        }
         System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
     }
 
@@ -510,6 +514,12 @@ class CleanTargetIntegrationTest {
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path exe = buildDir.resolve(CompilerHelper.executableName(appName));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
+        // Ship the port's native material theme next to the exe so the Windows
+        // impl can load it (the clean target has no embedded classpath resources).
+        Path theme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
+        if (Files.exists(theme)) {
+            Files.copy(theme, exe.resolveSibling("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+        }
         return exe;
     }
 
