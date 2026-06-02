@@ -20,7 +20,7 @@ jobs:
       actions: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Determine changed components
         id: changes
@@ -38,7 +38,7 @@ jobs:
               - '.github/workflows/developer-guide-docs.yml'
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '11'
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload animation screenshot mismatches
         if: steps.compare_animation_screenshots.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-animation-screenshots
           path: build/developer-guide/animation-screenshots
@@ -290,7 +290,7 @@ jobs:
 
       - name: Set up Java 17 for LanguageTool
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -392,7 +392,7 @@ jobs:
 
       - name: Upload HTML artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-html
           path: build/developer-guide/developer-guide-html.zip
@@ -400,7 +400,7 @@ jobs:
 
       - name: Upload PDF artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-pdf
           path: build/developer-guide/pdf/developer-guide.pdf
@@ -408,7 +408,7 @@ jobs:
 
       - name: Upload AsciiDoc linter report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-asciidoc-lint
           path: ${{ env.ASCII_DOC_LINT_REPORT }}
@@ -416,7 +416,7 @@ jobs:
 
       - name: Upload Vale report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-vale-report
           path: |
@@ -426,7 +426,7 @@ jobs:
 
       - name: Upload unused image report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-unused-images
           path: |
@@ -436,7 +436,7 @@ jobs:
 
       - name: Upload paragraph capitalization report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-paragraph-capitalization
           path: ${{ env.PARAGRAPH_CAP_REPORT }}
@@ -444,7 +444,7 @@ jobs:
 
       - name: Upload LanguageTool report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: developer-guide-languagetool
           path: ${{ env.LANGUAGETOOL_REPORT }}
@@ -487,7 +487,7 @@ jobs:
 
       - name: Comment with artifact download links
         if: ${{ always() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ASCII_SUMMARY: ${{ steps.summarize_asciidoc_lint.outputs.summary }}
           VALE_SUMMARY: ${{ steps.summarize_vale.outputs.summary }}

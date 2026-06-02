@@ -29,7 +29,7 @@ jobs:
   check-since-tags:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Full history including all tags so `git tag --list` returns
           # the complete set of released versions.
