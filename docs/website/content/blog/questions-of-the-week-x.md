@@ -69,7 +69,7 @@ When you get that error it means you got an exception that you didn’t catch in
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37814316/app-unfortunately-stopped-form-codenameone-with-paypal-integration)
 
-### Initialising subcomponents of a GUI form
+### Initializing subcomponents of a GUI form
 
 We are in the process of moving to the new GUI builder which is mostly delayed due to lack of documentation.  
 We hope to release docs for this in the coming weeks.

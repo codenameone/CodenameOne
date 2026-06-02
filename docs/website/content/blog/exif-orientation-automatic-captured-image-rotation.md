@@ -45,7 +45,7 @@ Suppose we acquire an image with the following code:
 
 A few remarks:
 
-__**1** | `photoTempPath` is `null` if the user has cancelled the photo capture;  
+__**1** | `photoTempPath` is `null` if the user has canceled the photo capture;  
 ---|---  
 __**2** | in this case, copying the file from the `FileSystemStorage` temporary folder to a "secure" location in `FileSystemStorage` or `Storage` is not strictly necessary, but it is a good habit that in certain circumstances prevents issues;  
 __**3** | it is always preferable to use `EncodedImage` when we want to keep the impact on memory low.  

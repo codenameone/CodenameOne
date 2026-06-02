@@ -26,7 +26,7 @@ Codename One is a small open source company. We are not a 200-engineer platform 
 | Cross-platform build matrix | 24 GitHub workflows build every PR against iOS, Android, JavaSE, and JavaScript. |
 | JDK matrix | JDK 8 build, JDK 11 through 25 runtime. |
 
-That is a meaningful amount of automated coverage and it catches a lot before code ever lands. What it does not catch is brand new behaviour, because there is nothing yet to compare a brand new feature against. The first golden of a new test is also the bug, until somebody actually runs the feature and tells us so.
+That is a meaningful amount of automated coverage and it catches a lot before code ever lands. What it does not catch is brand new behavior, because there is nothing yet to compare a brand new feature against. The first golden of a new test is also the bug, until somebody actually runs the feature and tells us so.
 
 With that in mind, let's talk about the two specific incidents from the past two weeks.
 
@@ -72,7 +72,7 @@ ios.metal=true
 
 Everything else stays the same. The Java surface is unchanged, your existing code keeps working.
 
-**We plan to flip Metal to be the default within two weeks**, assuming no major issues surface. The `ios.metal` hint will stay around (set it to `false` to opt back into GL), but new projects and the build server's default behaviour will move over. If you ship an iOS app, please set the hint *now* and put your real flows through it. We want regressions to surface against your real screens, not the day after the default changes.
+**We plan to flip Metal to be the default within two weeks**, assuming no major issues surface. The `ios.metal` hint will stay around (set it to `false` to opt back into GL), but new projects and the build server's default behavior will move over. If you ship an iOS app, please set the hint *now* and put your real flows through it. We want regressions to surface against your real screens, not the day after the default changes.
 
 The most user-visible improvement from the Metal port is text. Here is the `ShowcaseTheme` capture from the Metal screenshot suite:
 
@@ -94,7 +94,7 @@ The Metal `Dialog` capture is also worth showing because the translucent surface
 
 This is bigger than a website convenience. It is how we get out of the skin business.
 
-For the entire history of Codename One, "no skin for the iPhone 16 Pro Max" or "no skin for the iPad mini 7" has been a recurring complaint, and we have published skins as fast as we could. That model never scaled. Apple ships new device sizes faster than any of us want to maintain a parallel skin catalogue, and Android has effectively infinite device shapes. Today we are deprecating the skin downloader and moving to a generic browser-based authoring tool.
+For the entire history of Codename One, "no skin for the iPhone 16 Pro Max" or "no skin for the iPad mini 7" has been a recurring complaint, and we have published skins as fast as we could. That model never scaled. Apple ships new device sizes faster than any of us want to maintain a parallel skin catalog, and Android has effectively infinite device shapes. Today we are deprecating the skin downloader and moving to a generic browser-based authoring tool.
 
 To be clear about what is changing:
 
@@ -135,7 +135,7 @@ The *Info* tab is mostly read-only and shows what is about to be written into `s
 
 ![Skin Designer stage 3, Info tab](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-3-editor-info.png)
 
-**Stage 4, finish and download.** Clicking *Finish* renders the portrait skin image at the device's actual resolution with rounded corners, transparent screen, opaque cutouts, and a home indicator if enabled. It synthesises the landscape skin by 90-degree rotation, writes the `skin_map.png` overlays that mark the screen rectangle for the simulator's screen-position detection, bundles the appropriate native theme inside the skin zip, and writes `skin.properties` with the platform metadata, safe-area, PPI, and display rect. Clicking *Download skin* hands the file to the browser's download dialog. After the file is on disk, drop it into your simulator's skins folder (or use the *Add* command in the simulator's *Skins* menu) and your new device should appear in the picker.
+**Stage 4, finish and download.** Clicking *Finish* renders the portrait skin image at the device's actual resolution with rounded corners, transparent screen, opaque cutouts, and a home indicator if enabled. It synthesizes the landscape skin by 90-degree rotation, writes the `skin_map.png` overlays that mark the screen rectangle for the simulator's screen-position detection, bundles the appropriate native theme inside the skin zip, and writes `skin.properties` with the platform metadata, safe-area, PPI, and display rect. Clicking *Download skin* hands the file to the browser's download dialog. After the file is on disk, drop it into your simulator's skins folder (or use the *Add* command in the simulator's *Skins* menu) and your new device should appear in the picker.
 
 ![Skin Designer stage 4, finish and download](https://www.codenameone.com/developer-guide/img/skin-designer/skin-designer-stage-4-done.png)
 
@@ -165,7 +165,7 @@ The source for all three lives in the same [CodenameOne](https://github.com/code
 
 ## iOS multi-line TextArea: Return as Done
 
-[PR #4859](https://github.com/codenameone/CodenameOne/pull/4859), driven by issue [#4854](https://github.com/codenameone/CodenameOne/issues/4854), gives multi-line `TextArea` an opt-in flag that makes the iOS keyboard's Return key act as Done. It closes the editor and fires the Done listener instead of inserting a newline. This is the iOS Reminders-app behaviour: a growing, multi-line task-title field where Return finishes the entry.
+[PR #4859](https://github.com/codenameone/CodenameOne/pull/4859), driven by issue [#4854](https://github.com/codenameone/CodenameOne/issues/4854), gives multi-line `TextArea` an opt-in flag that makes the iOS keyboard's Return key act as Done. It closes the editor and fires the Done listener instead of inserting a newline. This is the iOS Reminders-app behavior: a growing, multi-line task-title field where Return finishes the entry.
 
 The reason it has to be a flag is that real iOS does not expose this as a built-in primitive. Reminders implements it on a `UITextView` whose delegate intercepts `\n` in `shouldChangeTextInRange:`. We replicate that exactly, gated behind a client property so existing layouts are untouched:
 
@@ -175,13 +175,13 @@ ta.putClientProperty("iosReturnExitsEditing", Boolean.TRUE);
 ta.setDoneListener(e -> { /* Return / Done was tapped */ });
 ```
 
-While the flag is set, the keyboard's Return key is relabelled to **Done** (`UIReturnKeyDone`). Default behaviour is unchanged: the flag defaults to off, only takes effect on multi-line `TextArea`s, and only intercepts an exact `"\n"` replacement so pasted multi-line text is unaffected.
+While the flag is set, the keyboard's Return key is relabelled to **Done** (`UIReturnKeyDone`). Default behavior is unchanged: the flag defaults to off, only takes effect on multi-line `TextArea`s, and only intercepts an exact `"\n"` replacement so pasted multi-line text is unaffected.
 
 ## Diagnostics for status-bar tap scroll-to-top
 
 [PR #4868](https://github.com/codenameone/CodenameOne/pull/4868), driven by issue [#3589](https://github.com/codenameone/CodenameOne/issues/3589), adds three complementary diagnostics for the iOS status-bar tap path. We shipped a fix earlier ([#4857](https://github.com/codenameone/CodenameOne/pull/4857)) and the reporter still saw no scroll on device. Rather than another sweep in the dark, we built tools to make the path observable.
 
-* **Simulator menu, `Simulate > iOS Status Bar Tap`.** Synthesises the same `(displayWidth/2, 0)` tap that `scrollViewShouldScrollToTop:` dispatches, pops a dialog reporting the responder UIID, the build-hint state, and an OK / PROBLEM verdict, then actually fires `pointerPressed` and `pointerReleased` so any wired-up scroll-to-top is observable.
+* **Simulator menu, `Simulate > iOS Status Bar Tap`.** Synthesizes the same `(displayWidth/2, 0)` tap that `scrollViewShouldScrollToTop:` dispatches, pops a dialog reporting the responder UIID, the build-hint state, and an OK / PROBLEM verdict, then actually fires `pointerPressed` and `pointerReleased` so any wired-up scroll-to-top is observable.
 * **Device-side properties.** `Display.getProperty("cn1.iosStatusBarTap.count")`, `cn1.iosStatusBarTap.lastEpochMillis`, `cn1.iosStatusBarTap.lastX/Y`, and `cn1.iosStatusBarTap.proxyInstalled` let you inspect the path on a real iPhone. Run your app on the device, tap the status bar, and read the property. That distinguishes "iOS never delivered the message" from "iOS delivered it but a CodenameOne component intercepted the tap".
 * **Regression coverage.** `StatusBarTapDiagnosticScreenshotTest` exercises the exact same code path through a 2x3 frame grid, with the visible counter rising and the scroll position alternating, so future regressions surface in CI.
 
@@ -201,7 +201,7 @@ We are doing it because the underlying backend needs to move forward, and the co
 
 ## Warning: Android 16 will effectively disallow locking orientation
 
-Thanks to **Durank** for flagging [#4879](https://github.com/codenameone/CodenameOne/issues/4879). The [Android 16 behavior changes](https://developer.android.com/about/versions/16/behavior-changes-16) include a meaningful change to how Android handles orientation, in short, on large-screen devices the platform will ignore an app's request to lock orientation. If your app calls `Display.lockOrientation(...)` or sets a fixed orientation in the Android manifest, that lock will be honoured on phones but effectively ignored on tablets and foldables once the device targets Android 16.
+Thanks to **Durank** for flagging [#4879](https://github.com/codenameone/CodenameOne/issues/4879). The [Android 16 behavior changes](https://developer.android.com/about/versions/16/behavior-changes-16) include a meaningful change to how Android handles orientation, in short, on large-screen devices the platform will ignore an app's request to lock orientation. If your app calls `Display.lockOrientation(...)` or sets a fixed orientation in the Android manifest, that lock will be honored on phones but effectively ignored on tablets and foldables once the device targets Android 16.
 
 There is not much we can do about this on the framework side. It is a platform-level decision and there is no public opt-out for general apps. The realistic path forward is to design layouts that work in both orientations, and to test your app against both portrait and landscape on a tablet before Android 16 reaches your users. We will keep watching for any opt-in path Google publishes, but for the moment please plan accordingly.
 
@@ -211,11 +211,11 @@ A small note on versioning: the current release is **7.0.242**, not 7.0.238 as y
 
 ## Wrapping up
 
-We closed **24 issues** in the past week, a meaningful share of them direct beneficiaries of the Metal port. Old GL-only rasterisation diffs, font sizing on retina, polygon drawing artefacts, perspective transform issues, things that the Metal pipeline simply renders correctly out of the box. Migrating the rendering layer turned out to be the cleanest way to retire a long tail of small bugs at once. With the new Skin Designer landing in the same week, two long-running structural problems went from "we should fix this someday" to "this is fixed and shipping".
+We closed **24 issues** in the past week, a meaningful share of them direct beneficiaries of the Metal port. Old GL-only rasterization diffs, font sizing on retina, polygon drawing artifacts, perspective transform issues, things that the Metal pipeline simply renders correctly out of the box. Migrating the rendering layer turned out to be the cleanest way to retire a long tail of small bugs at once. With the new Skin Designer landing in the same week, two long-running structural problems went from "we should fix this someday" to "this is fixed and shipping".
 
 If you ship an iOS app, please flip `ios.metal=true` this week and run your real app through it. We want to find any remaining issues now, not the day we flip the default. Issue tracker is [here](https://github.com/codenameone/CodenameOne/issues), the [Playground](/playground) is the easiest place to poke at the new themes, the [Skin Designer](/skindesigner/) is live on the site.
 
-A specific thank-you this week to **Thomas (@ThomasH99)** for the sticky-header transition report and the Picker centring follow-up, **Francesco Galgani (@jsfan3)** for the iOS Reminders-style Return RFE, and the reporter on [#3589](https://github.com/codenameone/CodenameOne/issues/3589) for sticking with us through a multi-PR diagnosis on the status-bar tap. The "tests cannot catch everything" section above is also a "and that is why we need you" section. It works because you keep filing.
+A specific thank-you this week to **Thomas (@ThomasH99)** for the sticky-header transition report and the Picker centering follow-up, **Francesco Galgani (@jsfan3)** for the iOS Reminders-style Return RFE, and the reporter on [#3589](https://github.com/codenameone/CodenameOne/issues/3589) for sticking with us through a multi-PR diagnosis on the status-bar tap. The "tests cannot catch everything" section above is also a "and that is why we need you" section. It works because you keep filing.
 
 ---
 

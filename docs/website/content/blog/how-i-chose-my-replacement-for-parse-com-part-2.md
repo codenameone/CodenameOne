@@ -99,7 +99,7 @@ In this article, I’ve presented three Parse Server solutions, outlining their 
 
 Of course, your app might differ in scope and purpose from the example that I’ve used in this article. Nevertheless, I’m pretty sure that if you follow my line of thought and apply the guidelines I’ve outlined in this series thoughtfully, you’d find a good replacement for your apps as well. I’ve shared the facts as well as my opinions with you; it’s now up to you to double-check and make your own choice; in that sense you have the final word!
 
-If you know of other attractive solutions, have success stories/useful tips to share and/or disagree with my reasoning/opinion, do not hesitate to leave a comment! Should the information in these articles and complementary ones on the Internet not suffice, feel free to get in touch with us at SMash ICT for personalised consultation or contact me personally at chidi [dot] okwudire [at] smash-ict [dot] com. I wish you the very best with choosing your own replacement for Parse.com and would be glad to assist you in any way possible!
+If you know of other attractive solutions, have success stories/useful tips to share and/or disagree with my reasoning/opinion, do not hesitate to leave a comment! Should the information in these articles and complementary ones on the Internet not suffice, feel free to get in touch with us at SMash ICT for personalized consultation or contact me personally at chidi [dot] okwudire [at] smash-ict [dot] com. I wish you the very best with choosing your own replacement for Parse.com and would be glad to assist you in any way possible!
 
 ### References and interesting reads
 

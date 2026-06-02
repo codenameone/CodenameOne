@@ -30,7 +30,7 @@ If you need to opt out for any reason, the hint still works in reverse:
 ios.metal=false
 ```
 
-A few things worth a glance on your first Metal build: gradient fidelity (multi-stop, conic, and repeating gradients now hit the GPU directly through [PR #4957](https://github.com/codenameone/CodenameOne/pull/4957)), the colour space (sRGB by default, flip to `displayP3` via `ios.metal.colorSpace` if your assets are wide gamut), and anything that draws `filter: blur(...)` or `backdrop-filter`. Everything else should look unchanged. That is the point.
+A few things worth a glance on your first Metal build: gradient fidelity (multi-stop, conic, and repeating gradients now hit the GPU directly through [PR #4957](https://github.com/codenameone/CodenameOne/pull/4957)), the color space (sRGB by default, flip to `displayP3` via `ios.metal.colorSpace` if your assets are wide gamut), and anything that draws `filter: blur(...)` or `backdrop-filter`. Everything else should look unchanged. That is the point.
 
 A specific thank you to the community testers who flipped the hint over the past three weeks, took screenshots, and filed issues against real apps. The Metal default landed in materially better shape than it would have without you.
 

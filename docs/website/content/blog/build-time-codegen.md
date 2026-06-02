@@ -69,7 +69,7 @@ candidate.setStatus("available");
 pets.addPet(candidate).onResult((created, err) -> { /* ... */ });
 ```
 
-There is no hand-rolled `ConnectionRequest` setup, no manual JSON parsing, no string-typed request bodies. The generated client takes a typed `Pet`, serialises it with `Mappers.toJson(...)`, fires the right HTTP verb, deserialises the response with `Mappers.fromJson(...)`, and surfaces the result through the framework's `AsyncResource` so your callback fires on the EDT.
+There is no hand-rolled `ConnectionRequest` setup, no manual JSON parsing, no string-typed request bodies. The generated client takes a typed `Pet`, serializes it with `Mappers.toJson(...)`, fires the right HTTP verb, deserializes the response with `Mappers.fromJson(...)`, and surfaces the result through the framework's `AsyncResource` so your callback fires on the EDT.
 
 For teams who already publish an OpenAPI spec as part of their backend (most modern backend frameworks do this automatically; FastAPI, Spring's `springdoc-openapi`, NestJS, ASP.NET Core, Go's `gnostic`), the practical effect is that the mobile client's bindings stay in sync with the backend without anyone hand-writing a single network call. Update the spec, re-run `mvn generate-sources`, and the new and changed endpoints land in your app as typed Java the IDE picks up immediately.
 
@@ -230,11 +230,11 @@ If a project does not use CSS for theming, the two-`float` constructor on the ge
 
 The transcoder is a `maven/svg-transcoder/` module that parses SVG with `javax.xml` StAX. No Batik, no Flamingo, no external dependencies. Coverage targets what real-world icon SVGs use: `rect` (rounded corners included), `circle`, `ellipse`, `line`, `polyline`, `polygon`, the full `path` grammar (`M` / `L` / `H` / `V` / `C` / `S` / `Q` / `T` / `A` / `Z` plus relative-coordinate and smooth-curve reflection), groups with affine transforms (`translate`, `scale`, `rotate`, `skew`, `matrix`), linear gradients via `LinearGradientPaint`, fill, stroke, stroke-width, linecap, linejoin, opacity.
 
-SMIL animations are supported in the same pipeline: `<animate>`, `<animateTransform>` (`translate`, `scale`, `rotate`), and `<set>`. Time values interpolate against wall-clock time on every paint, with `from` / `to` / `values` / `begin` / `dur` / `repeatCount` / `fill="freeze"` honoured.
+SMIL animations are supported in the same pipeline: `<animate>`, `<animateTransform>` (`translate`, `scale`, `rotate`), and `<set>`. Time values interpolate against wall-clock time on every paint, with `from` / `to` / `values` / `begin` / `dur` / `repeatCount` / `fill="freeze"` honored.
 
 Text and clip-path landed in the [follow-up PR for the static SVG fixtures](https://github.com/codenameone/CodenameOne/pull/5056), and both are visible in the screenshot above (the "Codename One / build-time SVG" wordmark in the rounded button, the "PRO" badge text, and the clip-path-shaped rounded-corner badge underneath). `<text>` and `<tspan>` work with single-style fills and transforms; `<clipPath>` referenced via `clip-path="url(#id)"` works against `rect`, `circle`, and `path` clip shapes (nested clip refs are ignored).
 
-What is still not supported: SVG `filter` primitives, `<mask>` (treated as a clip, so alpha masking falls back to opaque), `<radialGradient>` (falls back to the first-stop colour), and CSS-in-SVG (style rules inside the SVG document; the transcoder reads presentation attributes and the inline `style="..."` attribute, but a `<style>` element with selectors is not parsed).
+What is still not supported: SVG `filter` primitives, `<mask>` (treated as a clip, so alpha masking falls back to opaque), `<radialGradient>` (falls back to the first-stop color), and CSS-in-SVG (style rules inside the SVG document; the transcoder reads presentation attributes and the inline `style="..."` attribute, but a `<style>` element with selectors is not parsed).
 
 **If you hit an SVG that does not transcode the way you expect**, please open an issue at [github.com/codenameone/CodenameOne/issues](https://github.com/codenameone/CodenameOne/issues) and **attach the source file**. The fastest way to extend the coverage is for us to run the failing case through the test fixtures and watch the output. Every SVG we ship test goldens for started as somebody else's "this doesn't render right" report.
 

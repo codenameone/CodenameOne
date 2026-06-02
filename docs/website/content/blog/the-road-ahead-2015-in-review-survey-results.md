@@ -163,7 +163,7 @@ support. They also don’t support cn1lib’s which are pretty powerful.
 Having said that, we would still like to add something like "maven central" to Codename One eventually, we’re  
 just unsure whether maven central itself can actually be used for something like this. 
 
-> Codename One is getting better all the time anyway. I realise that reflection is challenging but RoboVM  
+> Codename One is getting better all the time anyway. I realize that reflection is challenging but RoboVM  
 >  manages it. It would make a big difference to simplifying some of the more complex data driven apps that I  
 >  have. Headless JUnit testing for apps, channels for push notifications. Google maps in the simulator. 
 

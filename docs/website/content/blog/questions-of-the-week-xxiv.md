@@ -97,7 +97,7 @@ We rely heavily on the fact that `Container` is transparent and has 0 padding/ma
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39545709/recommended-way-to-change-the-size-of-the-toolbar-in-codename-one)
 
-### Change CodenameOne InfiniteContainer PullToRefresh Behaviour
+### Change CodenameOne InfiniteContainer PullToRefresh Behavior
 
 You can override the refresh method in that class
 
