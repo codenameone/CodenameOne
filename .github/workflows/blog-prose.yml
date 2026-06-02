@@ -1,0 +1,200 @@
+name: Blog Prose Checks
+
+# Diff-scoped, net-new prose gate for the Hugo blog, plus a non-blocking
+# weekly whole-corpus report. This is the blog counterpart of
+# "Build Developer Guide Docs", but unlike the guide it does NOT gate the whole
+# corpus: the blog is 854 mostly-historical posts, so the gate fails only on
+# findings a PR INTRODUCES (scripts/website/blog_prose_gate.py diffs each
+# changed post against its merge-base version). The backlog stays grandfathered;
+# the weekly report job tracks it without blocking anyone.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/website/content/blog/**'
+      - 'docs/website/.vale.ini'
+      - 'docs/website/styles/CodenameOneRules/**'
+      - 'docs/website/styles/config/**'
+      - 'scripts/website/blog_prose_gate.py'
+      - 'scripts/website/blog_text.py'
+      - 'scripts/website/check_paragraph_capitalization.py'
+      - 'scripts/website/render_blog_prose_html.py'
+      - 'scripts/website/languagetool-accept-blog.txt'
+      - 'scripts/developer-guide/run_languagetool.py'
+      - 'scripts/developer-guide/languagetool-accept.txt'
+      - '.github/workflows/blog-prose.yml'
+  schedule:
+    # Weekly whole-corpus backlog report (Mondays 06:00 UTC). Non-blocking.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  VALE_VERSION: '3.13.0'
+
+jobs:
+  # --------------------------------------------------------------------------- #
+  # PR gate — fails only on net-new findings in changed posts.
+  # --------------------------------------------------------------------------- #
+  gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so the gate can compute the merge-base and read the
+          # base version of each changed post.
+          fetch-depth: 0
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install python-markdown
+        run: pip install --user 'markdown==3.7'
+
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          ARCHIVE="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl -fsSL -o "$ARCHIVE" "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/${ARCHIVE}"
+          tar -xzf "$ARCHIVE"
+          sudo mv vale /usr/local/bin/vale
+          rm -f "$ARCHIVE"
+
+      - name: Sync Vale styles
+        run: vale sync --config docs/website/.vale.ini
+
+      - name: Set up Java 17 for LanguageTool
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install language-tool-python
+        run: pip install --user language-tool-python==2.9.4
+
+      - name: Run net-new prose gate
+        id: gate
+        run: |
+          set -euo pipefail
+          mkdir -p build/blog-prose
+          set +e
+          python3 scripts/website/blog_prose_gate.py \
+            --base-ref "origin/${GITHUB_BASE_REF}" \
+            --report build/blog-prose/net-new.json
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Upload net-new findings report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blog-prose-net-new
+          path: build/blog-prose/net-new.json
+          if-no-files-found: warn
+
+      - name: Comment net-new findings on PR
+        if: ${{ always() && !github.event.pull_request.head.repo.fork }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- blog-prose-gate -->';
+            let report = { total: 0, findings: [] };
+            try { report = JSON.parse(fs.readFileSync('build/blog-prose/net-new.json', 'utf8')); } catch (e) {}
+            const lines = [marker, '## Blog prose gate', ''];
+            if (report.total === 0) {
+              lines.push('✅ No net-new prose findings introduced by this PR.');
+            } else {
+              lines.push(`❌ ${report.total} net-new prose finding(s) introduced by this PR. Pre-existing issues in the same posts are ignored.`, '');
+              for (const f of report.findings.slice(0, 50)) {
+                lines.push(`- \`${f.file}:${f.line}\` — ${f.message}`);
+              }
+              if (report.findings.length > 50) lines.push(`- …and ${report.findings.length - 50} more (see the blog-prose-net-new artifact).`);
+              lines.push('', 'Fix the prose, add a term to `scripts/website/languagetool-accept-blog.txt` or the CodenameOne Vale vocab, or add a `<!-- vale-skip: rule: reason -->` comment.');
+            }
+            const body = lines.join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail on net-new findings
+        run: |
+          if [ "${{ steps.gate.outputs.status }}" != "0" ]; then
+            echo "Blog prose gate found net-new findings. See the log and the blog-prose-net-new artifact." >&2
+            exit 1
+          fi
+          echo "Blog prose gate passed."
+
+  # --------------------------------------------------------------------------- #
+  # Weekly / on-demand whole-corpus backlog report. NEVER fails the build.
+  # --------------------------------------------------------------------------- #
+  report:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          ARCHIVE="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl -fsSL -o "$ARCHIVE" "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/${ARCHIVE}"
+          tar -xzf "$ARCHIVE"
+          sudo mv vale /usr/local/bin/vale
+          rm -f "$ARCHIVE"
+
+      - name: Sync Vale styles
+        run: vale sync --config docs/website/.vale.ini
+
+      - name: Whole-corpus Vale + capitalization report
+        run: |
+          set -euo pipefail
+          mkdir -p build/blog-prose
+          vale --config docs/website/.vale.ini --minAlertLevel=suggestion --output=JSON \
+            docs/website/content/blog > build/blog-prose/vale-corpus.json 2>/dev/null || true
+          python3 scripts/website/check_paragraph_capitalization.py \
+            --output build/blog-prose/capitalization-corpus.json \
+            docs/website/content/blog || true
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, collections
+          d = json.load(open('build/blog-prose/vale-corpus.json'))
+          by_rule = collections.Counter()
+          files = set()
+          for f, items in d.items():
+              for it in items:
+                  by_rule[it['Check']] += 1; files.add(f)
+          cap = json.load(open('build/blog-prose/capitalization-corpus.json'))
+          print('## Blog prose backlog report\n')
+          print(f'Vale: **{sum(by_rule.values())}** findings across **{len(files)}** posts.\n')
+          print('| Rule | Count |\n|---|---|')
+          for r, n in by_rule.most_common(25):
+              print(f'| {r} | {n} |')
+          print(f'\nParagraph capitalization: **{cap["total"]}** findings.')
+          PY
+
+      - name: Upload backlog report
+        uses: actions/upload-artifact@v4
+        with:
+          name: blog-prose-backlog-report
+          path: build/blog-prose/
+          if-no-files-found: warn

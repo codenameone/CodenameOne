@@ -1,0 +1,14 @@
+Codename
+CodenameOne
+ParparVM
+RoboVM
+asciidoctor
+asciidoc
+adoc
+Lollipop
+[Ee]xtensible
+oversized
+Java ME
+Java SE
+Java EE
+[Bb]ackend

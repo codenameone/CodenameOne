@@ -1,0 +1,23 @@
+# LanguageTool accept-list overlay for the blog.
+#
+# Same format as docs/developer-guide/languagetool-accept.txt: one Python
+# regex per line, matched against the exact text LanguageTool flagged. Blank
+# lines and lines starting with "#" are ignored.
+#
+# The blog CI gate concatenates the developer guide's accept-list with this
+# file, so EVERYTHING accepted for the guide is already accepted here — only
+# add terms that are unique to blog prose (older product/service names,
+# community handles, syndication targets) and not worth adding to the guide.
+#
+# Keep this list short and justified. Most false positives are better handled
+# by the shared developer-guide list (for genuinely cross-cutting terms) or by
+# the CodenameOne Vale vocabulary. This file is seeded minimally; the corpus
+# assessment pass (Phase 3) populates it from real findings.
+
+# Syndication targets and community/blog platform names.
+Foojay
+Hashnode
+DZone
+Blogger
+giscus
+TestFlight
