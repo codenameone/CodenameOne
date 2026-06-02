@@ -545,6 +545,29 @@ public final class Display extends CN1Constants {
         return simd;
     }
 
+    /// Returns true if the current platform provides a hardware accelerated 3D
+    /// GPU backend for `com.codename1.gpu.RenderView`.
+    public boolean isOpenGLSupported() {
+        return impl.isOpenGLSupported();
+    }
+
+    /// Creates the native GPU peer backing a `RenderView`. Intended for use by
+    /// `RenderView`; returns null on platforms without a 3D backend.
+    public com.codename1.ui.PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
+        return impl.createGLPeer(view);
+    }
+
+    /// Sets whether a GPU peer renders continuously or only on demand. Intended
+    /// for use by `RenderView`.
+    public void glSetContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
+        impl.glSetContinuous(peer, continuous);
+    }
+
+    /// Requests a single frame from a GPU peer. Intended for use by `RenderView`.
+    public void glRequestRender(com.codename1.ui.PeerComponent peer) {
+        impl.glRequestRender(peer);
+    }
+
     /// Indicates the maximum frames the API will try to draw every second
     /// by default this is set to 10. The advantage of limiting
     /// framerate is to allow the CPU to perform other tasks besides drawing.
