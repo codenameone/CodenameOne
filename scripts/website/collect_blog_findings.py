@@ -56,10 +56,22 @@ def _denied(rule):
 
 
 def vale_findings(path):
-    r = subprocess.run(
-        ["vale", "--config", VALE_CONFIG, "--minAlertLevel=suggestion",
-         "--output=JSON", path],
-        cwd=REPO_ROOT, capture_output=True, text=True)
+    # Lint author prose only: write front matter + author body (truncated at the
+    # archived-comments / discussion heading) to a temp .md. The retained prefix
+    # keeps source line numbers intact for everything before the cut.
+    fm, body, _start = blog_text.read_post(path)
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
+                                     encoding="utf-8") as tf:
+        tf.write(fm + blog_text.author_body(body))
+        tmp = tf.name
+    try:
+        r = subprocess.run(
+            ["vale", "--config", VALE_CONFIG, "--minAlertLevel=suggestion",
+             "--output=JSON", tmp],
+            cwd=REPO_ROOT, capture_output=True, text=True)
+    finally:
+        os.unlink(tmp)
     out = r.stdout.strip()
     if not out:
         return []

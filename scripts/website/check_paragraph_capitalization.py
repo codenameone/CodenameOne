@@ -24,7 +24,7 @@ import os
 import re
 import sys
 
-from blog_text import read_post, strip_shortcodes
+from blog_text import author_body, read_post, strip_shortcodes
 
 # First tokens that are legitimately lowercase-led brand/identifier names.
 ALLOWED_FIRST_TOKENS = {
@@ -137,6 +137,7 @@ def first_prose_word(paragraph):
 def find_lowercase_paragraphs(body, body_start_line, rel):
     """Return capitalization findings for a post body (text-level entry point)."""
     findings = []
+    body = author_body(body)  # skip imported comments / discussion footer
     for line_no, paragraph in iter_paragraphs(body, body_start_line):
         word = first_prose_word(paragraph)
         if word is None:

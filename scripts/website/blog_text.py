@@ -31,6 +31,14 @@ _PAIRED_CODE_RE = re.compile(
 # not prose.
 _SHORTCODE_RE = re.compile(r"\{\{[<%].*?[%>]\}\}", re.DOTALL)
 
+# Headings that begin non-author content. Migrated posts append an
+# "## Archived Comments" section (imported third-party comment threads,
+# preserved for historical context — editing them would rewrite other people's
+# words) and every post ends with a "## Discussion" giscus footer. Prose checks
+# must stop at the first of these.
+_NON_AUTHOR_HEADING_RE = re.compile(
+    r"(?m)^#{1,6}\s+(?:Archived Comments|Discussion)\b")
+
 
 def split_front_matter(text):
     """Split a post into (front_matter, body, body_start_line).
@@ -46,6 +54,13 @@ def split_front_matter(text):
     body = text[m.end():]
     body_start_line = front_matter.count("\n") + 1
     return front_matter, body, body_start_line
+
+
+def author_body(body):
+    """Truncate a post body at the first non-author section (archived comments
+    / discussion footer), returning only the author's own prose."""
+    m = _NON_AUTHOR_HEADING_RE.search(body)
+    return body[:m.start()] if m else body
 
 
 def strip_shortcodes(text):
@@ -77,6 +92,6 @@ def body_to_html(body):
 
     _fm, body, _start = split_front_matter(body)
     return markdown.markdown(
-        strip_shortcodes(body),
+        strip_shortcodes(author_body(body)),
         extensions=["fenced_code", "tables"],
     )
