@@ -54,24 +54,82 @@ class LambdaIntegrationTest {
                 "}\n";
     }
 
-    private String nativeReportSource() {
+    private String nativeReportSource(String className) {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
-                "void LambdaApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
+                "void " + className + "_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
                 "    printf(\"RESULT=%d\\n\", value);\n" +
+                "}\n";
+    }
+
+    /**
+     * Method references whose implementation parameter / return types differ
+     * from the functional interface's signature force LambdaMetafactory to
+     * insert box / unbox / widen / cast adaptation. The translator generates
+     * the adapter class itself, so it has to replicate that adaptation -- a
+     * regression here surfaced as iOS Xcode builds failing to compile (a
+     * Double object passed where a primitive double was expected).
+     */
+    private String unboxAppSource() {
+        return "public class UnboxApp {\n" +
+                "    interface DoubleSink { void accept(Double value); }\n" +   // explicit wrapper -> unbox to double
+                "    interface Sink<T> { void accept(T value); }\n" +           // erased Object -> checkcast Double + unbox
+                "    interface DoubleSource { Double get(); }\n" +              // primitive double return -> box to Double
+                "    interface IntToLong { long apply(int x); }\n" +           // widen int argument to long
+                "\n" +
+                "    static double accumulated;\n" +
+                "\n" +
+                "    void addValue(double v) { accumulated += v; }\n" +
+                "    static double produceHalf() { return 0.5; }\n" +
+                "    static long identityLong(long x) { return x; }\n" +
+                "\n" +
+                "    public static void main(String[] args) {\n" +
+                "        UnboxApp app = new UnboxApp();\n" +
+                "\n" +
+                "        // 1. unbox: accept(Double) bound to addValue(double)\n" +
+                "        DoubleSink sink = app::addValue;\n" +
+                "        sink.accept(Double.valueOf(2.5));            // accumulated = 2.5\n" +
+                "\n" +
+                "        // 2. unbox via erased generic SAM: accept(Object) bound to addValue(double)\n" +
+                "        Sink<Double> gsink = app::addValue;\n" +
+                "        gsink.accept(Double.valueOf(4.0));           // accumulated = 6.5\n" +
+                "\n" +
+                "        // 3. box: produceHalf() double return bound to get() Double return\n" +
+                "        DoubleSource src = UnboxApp::produceHalf;\n" +
+                "        Double boxed = src.get();                    // 0.5 boxed\n" +
+                "        app.addValue(boxed.doubleValue());           // accumulated = 7.0\n" +
+                "\n" +
+                "        // 4. widen: apply(int) bound to identityLong(long)\n" +
+                "        IntToLong widener = UnboxApp::identityLong;\n" +
+                "        long w = widener.apply(3);                   // 3\n" +
+                "\n" +
+                "        report((int)(accumulated * 10) + (int) w);   // 70 + 3 = 73\n" +
+                "    }\n" +
+                "\n" +
+                "    private static native void report(int value);\n" +
                 "}\n";
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"1.8"})
     void translatesLambdaBytecodeToLLVMExecutable(String targetVersion) throws Exception {
+        translateBuildAndRun(targetVersion, "LambdaApp", appSource(), "RESULT=145");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.8"})
+    void adaptsBoxingUnboxingInMethodReferences(String targetVersion) throws Exception {
+        translateBuildAndRun(targetVersion, "UnboxApp", unboxAppSource(), "RESULT=73");
+    }
+
+    private void translateBuildAndRun(String targetVersion, String className, String source, String expectedOutput) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("lambda-integration-sources");
         Path classesDir = Files.createTempDirectory("lambda-integration-classes");
         Path javaApiDir = Files.createTempDirectory("java-api-classes");
 
-        Files.write(sourceDir.resolve("LambdaApp.java"), appSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve(className + ".java"), source.getBytes(StandardCharsets.UTF_8));
 
         CompilerHelper.CompilerConfig config = selectCompiler(targetVersion);
         if (config == null) {
@@ -84,7 +142,7 @@ class LambdaIntegrationTest {
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
-        Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(nativeReport, nativeReportSource(className).getBytes(StandardCharsets.UTF_8));
 
         // Compile App using JavaAPI as bootclasspath
         List<String> compileArgs = new ArrayList<>();
@@ -101,23 +159,23 @@ class LambdaIntegrationTest {
         }
         compileArgs.add("-d");
         compileArgs.add(classesDir.toString());
-        compileArgs.add(sourceDir.resolve("LambdaApp.java").toString());
+        compileArgs.add(sourceDir.resolve(className + ".java").toString());
 
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
-        assertEquals(0, compileResult, "LambdaApp should compile");
+        assertEquals(0, compileResult, className + " should compile");
 
         CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
         Path outputDir = Files.createTempDirectory("lambda-integration-output");
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "LambdaApp");
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, className);
 
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 
-        Path srcRoot = distDir.resolve("LambdaApp-src");
+        Path srcRoot = distDir.resolve(className + "-src");
 
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
@@ -134,9 +192,9 @@ class LambdaIntegrationTest {
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
-        Path executable = buildDir.resolve("LambdaApp");
+        Path executable = buildDir.resolve(className);
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
-        assertTrue(output.contains("RESULT=145"), "Compiled program should print the expected result: " + output);
+        assertTrue(output.contains(expectedOutput), "Compiled program should print the expected result: " + output);
     }
 
     private CompilerHelper.CompilerConfig selectCompiler(String targetVersion) {
