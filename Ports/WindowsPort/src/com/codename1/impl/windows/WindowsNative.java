@@ -61,6 +61,13 @@ public final class WindowsNative {
     public static native void flushGraphics(long graphics, int x, int y, int width, int height);
 
     /**
+     * Sets the 2D affine transform on the graphics' Direct2D render target. The
+     * six values are the Codename One affine (m00,m10,m01,m11,m02,m12).
+     */
+    public static native void setTransform(long graphics, float m00, float m10, float m01,
+            float m11, float m02, float m12);
+
+    /**
      * Drains one queued input event into {@code out} ([type, x, y, keyCode]);
      * returns true if an event was dequeued. See the {@code CN1_EVENT_*}
      * constants in cn1_windows.h for the type codes.

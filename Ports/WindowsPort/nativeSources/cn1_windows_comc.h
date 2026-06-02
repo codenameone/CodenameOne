@@ -122,6 +122,9 @@
 #ifndef ID2D1RenderTarget_EndDraw
 #define ID2D1RenderTarget_EndDraw(This, ...) ((This)->EndDraw(__VA_ARGS__))
 #endif
+#ifndef ID2D1RenderTarget_SetTransform
+#define ID2D1RenderTarget_SetTransform(This, ...) ((This)->SetTransform(__VA_ARGS__))
+#endif
 #ifndef ID2D1RenderTarget_FillGeometry
 #define ID2D1RenderTarget_FillGeometry(This, ...) ((This)->FillGeometry(__VA_ARGS__))
 #endif

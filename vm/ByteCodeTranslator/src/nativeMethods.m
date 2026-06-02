@@ -1611,7 +1611,11 @@ void* threadRunner(void *x)
     d->currentThreadObject = t;
     
    // printf("launching thread %d",(int)d->threadId);
-    java_lang_Thread_runImpl___long(d, t, (long)d); // pass the actual structure as threadid
+    // Pass the struct pointer as the thread id. Cast through intptr_t, not long:
+    // on Windows (LLP64) `long` is 32-bit while pointers are 64-bit, so `(long)d`
+    // truncates + sign-extends the pointer, and freeing it later in
+    // releaseThreadNativeResources corrupts memory / crashes.
+    java_lang_Thread_runImpl___long(d, t, (JAVA_LONG)(intptr_t)d); // pass the actual structure as threadid
    // printf("terminate thread %d",(int)d->threadId);
     
     // we remove the thread here since this is the only place we can do this

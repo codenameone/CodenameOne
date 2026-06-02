@@ -99,8 +99,29 @@ void cn1WinBeginFrame(CN1Graphics* g) {
     }
     if (!g->inFrame) {
         ID2D1RenderTarget_BeginDraw(g->target);
+        /* Each frame starts with the identity transform; Codename One sets any
+         * affine via setTransform during the frame and resets to identity when
+         * done. Without this reset a transform left over from the previous frame
+         * would leak into the next one. */
+        D2D1_MATRIX_3X2_F idm = D2D1::Matrix3x2F::Identity();
+        ID2D1RenderTarget_SetTransform(g->target, &idm);
         g->inFrame = JAVA_TRUE;
     }
+}
+
+/* Sets the 2D affine transform on the render target. The six values are the
+ * Codename One affine (m00,m10,m01,m11,m02,m12): x' = m00*x + m01*y + m02,
+ * y' = m10*x + m11*y + m12, mapped to D2D's row-vector 3x2 matrix. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_setTransform___long_float_float_float_float_float_float(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_FLOAT m00, JAVA_FLOAT m10, JAVA_FLOAT m01,
+        JAVA_FLOAT m11, JAVA_FLOAT m02, JAVA_FLOAT m12) {
+    CN1Graphics* g = (CN1Graphics*) (intptr_t) __cn1Arg1;
+    if (g == NULL || g->target == NULL) {
+        return;
+    }
+    /* D2D1::Matrix3x2F(_11,_12,_21,_22,_31,_32) maps directly from the CN1 affine. */
+    D2D1_MATRIX_3X2_F m = D2D1::Matrix3x2F(m00, m10, m01, m11, m02, m12);
+    ID2D1RenderTarget_SetTransform(g->target, &m);
 }
 
 void cn1WinEndFrame(CN1Graphics* g) {

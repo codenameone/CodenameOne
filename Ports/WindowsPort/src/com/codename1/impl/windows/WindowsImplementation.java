@@ -302,6 +302,190 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return Long.valueOf(WindowsNative.getImageGraphics(peer(image)));
     }
 
+    /* ------------------------------------------------------------- transforms
+     * Direct2D supports 2D affine transforms natively, so the port implements
+     * the Transform SPI (charts, rotated/scaled drawing, transition effects rely
+     * on it -- the default impl throws "Transforms not supported"). The native
+     * transform object is a 6-element double affine [m00,m10,m01,m11,m02,m12]:
+     * x' = m00*x + m01*y + m02, y' = m10*x + m11*y + m12. 3D/perspective is not
+     * supported. The current per-graphics transform is tracked here and pushed to
+     * the render target via WindowsNative.setTransform. */
+    private final java.util.HashMap<Long, com.codename1.ui.Transform> graphicsTransforms =
+            new java.util.HashMap<Long, com.codename1.ui.Transform>();
+
+    @Override
+    public boolean isTransformSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isPerspectiveTransformSupported() {
+        return false;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public boolean isPerspectiveTransformSupported(Object graphics) {
+        return false;
+    }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        return new double[] { m00, m10, m01, m11, m02, m12 };
+    }
+
+    @Override
+    public void setTransformAffine(Object nt, double m00, double m10, double m01, double m11, double m02, double m12) {
+        setAff((double[]) nt, m00, m10, m01, m11, m02, m12);
+    }
+
+    @Override
+    public Object makeTransformTranslation(float x, float y, float z) {
+        return new double[] { 1, 0, 0, 1, x, y };
+    }
+
+    @Override
+    public void setTransformTranslation(Object nt, float x, float y, float z) {
+        setAff((double[]) nt, 1, 0, 0, 1, x, y);
+    }
+
+    @Override
+    public Object makeTransformScale(float sx, float sy, float sz) {
+        return new double[] { sx, 0, 0, sy, 0, 0 };
+    }
+
+    @Override
+    public void setTransformScale(Object nt, float sx, float sy, float sz) {
+        setAff((double[]) nt, sx, 0, 0, sy, 0, 0);
+    }
+
+    @Override
+    public Object makeTransformRotation(float angle, float x, float y, float z) {
+        return rot(angle, x, y);
+    }
+
+    @Override
+    public void setTransformRotation(Object nt, float angle, float x, float y, float z) {
+        System.arraycopy(rot(angle, x, y), 0, (double[]) nt, 0, 6);
+    }
+
+    @Override
+    public Object makeTransformIdentity() {
+        return new double[] { 1, 0, 0, 1, 0, 0 };
+    }
+
+    @Override
+    public void setTransformIdentity(Object nt) {
+        setAff((double[]) nt, 1, 0, 0, 1, 0, 0);
+    }
+
+    @Override
+    public Object makeTransformInverse(Object nt) {
+        return invert((double[]) nt);
+    }
+
+    @Override
+    public void setTransformInverse(Object nt) throws com.codename1.ui.Transform.NotInvertibleException {
+        double[] r = invert((double[]) nt);
+        if (r == null) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+        System.arraycopy(r, 0, (double[]) nt, 0, 6);
+    }
+
+    @Override
+    public void copyTransform(Object src, Object dest) {
+        System.arraycopy((double[]) src, 0, (double[]) dest, 0, 6);
+    }
+
+    @Override
+    public void concatenateTransform(Object t1, Object t2) {
+        System.arraycopy(mul((double[]) t1, (double[]) t2), 0, (double[]) t1, 0, 6);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
+        if (t1 == null) {
+            return t2 == null;
+        }
+        if (t2 == null) {
+            return false;
+        }
+        return java.util.Arrays.equals((double[]) t1, (double[]) t2);
+    }
+
+    @Override
+    public void setTransform(Object graphics, com.codename1.ui.Transform transform) {
+        long g = peer(graphics);
+        if (transform == null) {
+            graphicsTransforms.remove(Long.valueOf(g));
+            WindowsNative.setTransform(g, 1, 0, 0, 1, 0, 0);
+            return;
+        }
+        graphicsTransforms.put(Long.valueOf(g), transform.copy());
+        double[] a = (double[]) transform.getNativeTransform();
+        WindowsNative.setTransform(g, (float) a[0], (float) a[1], (float) a[2], (float) a[3], (float) a[4], (float) a[5]);
+    }
+
+    @Override
+    public com.codename1.ui.Transform getTransform(Object graphics) {
+        com.codename1.ui.Transform t = graphicsTransforms.get(Long.valueOf(peer(graphics)));
+        return t == null ? com.codename1.ui.Transform.makeIdentity() : t.copy();
+    }
+
+    @Override
+    public void getTransform(Object graphics, com.codename1.ui.Transform t) {
+        com.codename1.ui.Transform cur = graphicsTransforms.get(Long.valueOf(peer(graphics)));
+        if (cur == null) {
+            t.setIdentity();
+        } else {
+            t.setTransform(cur);
+        }
+    }
+
+    private static void setAff(double[] a, double m00, double m10, double m01, double m11, double m02, double m12) {
+        a[0] = m00; a[1] = m10; a[2] = m01; a[3] = m11; a[4] = m02; a[5] = m12;
+    }
+
+    /** Rotation by {@code angle} radians about pivot (px,py). */
+    private static double[] rot(float angle, float px, float py) {
+        double cos = Math.cos(angle), sin = Math.sin(angle);
+        double[] r = { cos, sin, -sin, cos, 0, 0 };
+        if (px != 0 || py != 0) {
+            return mul(mul(new double[] { 1, 0, 0, 1, px, py }, r), new double[] { 1, 0, 0, 1, -px, -py });
+        }
+        return r;
+    }
+
+    /** Returns A*B (B applied first, then A). */
+    private static double[] mul(double[] a, double[] b) {
+        return new double[] {
+            a[0] * b[0] + a[2] * b[1],
+            a[1] * b[0] + a[3] * b[1],
+            a[0] * b[2] + a[2] * b[3],
+            a[1] * b[2] + a[3] * b[3],
+            a[0] * b[4] + a[2] * b[5] + a[4],
+            a[1] * b[4] + a[3] * b[5] + a[5]
+        };
+    }
+
+    /** Inverse of a 2D affine, or null if singular. */
+    private static double[] invert(double[] m) {
+        double det = m[0] * m[3] - m[1] * m[2];
+        if (Math.abs(det) < 1e-12) {
+            return null;
+        }
+        double id = 1.0 / det;
+        double na = m[3] * id, nb = -m[1] * id, nc = -m[2] * id, nd = m[0] * id;
+        double ne = -(m[4] * na + m[5] * nc);
+        double nf = -(m[4] * nb + m[5] * nd);
+        return new double[] { na, nb, nc, nd, ne, nf };
+    }
+
     /* ------------------------------------------------------- graphics state */
 
     @Override
