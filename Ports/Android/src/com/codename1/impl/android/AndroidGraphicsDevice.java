@@ -178,7 +178,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         VertexFormat fmt = vb.getFormat();
 
         Program program = getProgram(material, fmt);
-        if (program == null || program.handle == 0) {
+        if (program.handle == 0) {
             return;
         }
         GLES20.glUseProgram(program.handle);

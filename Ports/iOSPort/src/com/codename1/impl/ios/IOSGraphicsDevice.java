@@ -45,11 +45,6 @@ class IOSGraphicsDevice extends GraphicsDevice {
     /// long). Zero before the context is created or after disposal.
     private long contextPeer;
 
-    private int vpX;
-    private int vpY;
-    private int vpW;
-    private int vpH;
-
     // Pipeline state objects keyed by a stable string derived from the material
     // shader key, the vertex stride and the render state. Holds the native
     // MTLRenderPipelineState pointers so we generate and compile each variant
@@ -110,10 +105,6 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     public void setViewport(int x, int y, int width, int height) {
-        vpX = x;
-        vpY = y;
-        vpW = width;
-        vpH = height;
         if (contextPeer != 0) {
             IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, x, y, width, height);
         }

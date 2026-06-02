@@ -20,7 +20,7 @@ Instead you describe a https://www.codenameone.com/javadoc/com/codename1/gpu/Mat
 (a lighting model plus color and texture) and the engine generates the matching
 platform shader behind the scenes: GLSL ES on OpenGL ES and WebGL, and Metal
 Shading Language on iOS. This "engine-managed shader" approach is what keeps the
-same application code rendering identically across very different GPUs.
+same application code rendering identically across a range of different GPUs.
 
 The main types are:
 
@@ -38,7 +38,7 @@ The main types are:
  https://www.codenameone.com/javadoc/com/codename1/gpu/Light.html[Light] -
  the high level scene building blocks.
 
-=== A first scene: a spinning cube
+=== A first scene: A spinning cube
 
 The renderer below draws a Phong lit cube. `Primitives.cube` builds the geometry,
 a `Material` describes the surface, and a `Camera` supplies the view. Notice there
@@ -133,7 +133,7 @@ Mesh mesh = new Mesh(vb, ib, PrimitiveType.TRIANGLES);
 
 Vertex buffers are allocated through the platform SIMD allocator, which on iOS
 (ParparVM) places the data at a fixed, aligned native address so it can be handed
-to Metal with no intermediate copy. You do not need to do anything special to get
+to Metal with no intermediate copy. You don't need to do anything special to get
 this; just write into `getData()` and call `setDirty()` when you mutate it.
 
 === Camera and math
@@ -149,7 +149,7 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/Matrix4.html[Matrix4]
 === Platform notes
 
 * *JavaSE simulator* - rendered by a built in software rasterizer. This keeps the
- simulator dependency free and makes 3D screenshots deterministic; it is not meant
+ simulator dependency free and makes 3D screenshots deterministic; it's not meant
  to match device GPU performance.
 * *Android* - OpenGL ES 2 via a `GLSurfaceView` hosted as a native peer.
 * *iOS* - Metal. Shaders are generated as Metal Shading Language and compiled at
@@ -169,5 +169,5 @@ if (CN.isOpenGLSupported()) {
 === Threading
 
 `Renderer` callbacks run on the platform render thread, not the Codename One EDT.
-Do not touch UI components from inside them. To move data the other way (for
+Don't touch UI components from inside them. To move data the other way (for
 example to update a HUD label from a game loop), use `CN.callSerially(...)`.
