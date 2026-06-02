@@ -104,6 +104,16 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.LocalNotificationCallback;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.BackgroundWorker;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
+import com.codename1.push.PushContent;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
@@ -984,7 +994,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Map<String,TimerTask> localNotifications = new HashMap<String,TimerTask>();
     private java.util.Timer localNotificationsTimer;
-    
+    private final Map<String,NotificationChannelBuilder> notificationChannels = new HashMap<String,NotificationChannelBuilder>();
+
     @Override
     public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
         if (isSimulator()) {
@@ -993,34 +1004,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             TimerTask task = new TimerTask() {
                 public void run() {
-                    if (!SystemTray.isSupported()) {
-                        System.out.println("Local notification not supported on this OS!!!");
-                        return;
-                    }
-                    if (isMinimized()) {
-                        SystemTray sysTray = SystemTray.getSystemTray();
-                        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
-                        tray.setImageAutoSize(true);
-                        tray.addActionListener(new ActionListener() {
-                            @Override
-                            public void actionPerformed(ActionEvent e) {
-                                Display.getInstance().callSerially(new Runnable() {
-                                    public void run() {
-                                        Executor.startApp();
-                                        minimized = false;
-                                    }
-                                });
-                                canvas.setEnabled(true);
-                                pause.setText("Pause App");
-                            }
-                        });
-                        try {
-                            sysTray.add(tray);
-                            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                    }
+                    SimulatorNotifications.show(JavaSEPort.this, notif);
                 }
             };
             if (localNotifications.containsKey(notif.getId())) {
@@ -1044,7 +1028,308 @@ public class JavaSEPort extends CodenameOneImplementation {
                 n.cancel();
                 localNotifications.remove(notificationId);
             }
+            SimulatorNotifications.dismiss(notificationId);
         }
+    }
+
+    /// Returns the channel registered for the given id, or null. Used by the simulator
+    /// notification panel and the channel inspector.
+    NotificationChannelBuilder getSimulatorChannel(String id) {
+        return id == null ? null : notificationChannels.get(id);
+    }
+
+    java.util.Collection<NotificationChannelBuilder> getSimulatorChannels() {
+        return notificationChannels.values();
+    }
+
+    /// Falls back to the legacy system tray notification (used when the simulator window
+    /// is minimized and the rich panel cannot be shown over the canvas).
+    void showTrayNotification(final LocalNotification notif) {
+        if (!SystemTray.isSupported()) {
+            System.out.println("Local notification not supported on this OS!!!");
+            return;
+        }
+        SystemTray sysTray = SystemTray.getSystemTray();
+        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
+        tray.setImageAutoSize(true);
+        tray.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Executor.startApp();
+                        minimized = false;
+                    }
+                });
+                canvas.setEnabled(true);
+                if (pause != null) {
+                    pause.setText("Pause App");
+                }
+            }
+        });
+        try {
+            sysTray.add(tray);
+            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    /// Dispatches a local notification (and any selected action / text reply) to the
+    /// running app's LocalNotificationCallback, mirroring the device behavior. Called by
+    /// the simulator notification panel when the user taps the notification or an action.
+    void dispatchLocalNotification(String notificationId, String actionId, String actionTitle, String textResponse) {
+        if (actionId != null) {
+            PushContent.setActionId(actionId);
+        }
+        if (actionTitle != null) {
+            PushContent.setActionTitle(actionTitle);
+        }
+        if (textResponse != null) {
+            PushContent.setTextResponse(textResponse);
+        }
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        final String fid = notificationId;
+        if (app instanceof LocalNotificationCallback) {
+            final LocalNotificationCallback cb = (LocalNotificationCallback) app;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    cb.localNotificationReceived(fid);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void requestNotificationPermission(final NotificationPermissionRequest request, final NotificationPermissionCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                callback.notificationPermissionResult(new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED));
+            }
+        });
+    }
+
+    @Override
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+        if (builder != null) {
+            notificationChannels.put(builder.getId(), builder);
+        }
+    }
+
+    @Override
+    public void deleteNotificationChannel(String channelId) {
+        notificationChannels.remove(channelId);
+    }
+
+    @Override
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+        // channel groups are presentational only in the simulator
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return isSimulator();
+    }
+
+    // ---- Constraint-aware background work (simulator) ----
+
+    boolean simNetworkAvailable = true;
+    boolean simCharging = true;
+    boolean simDeviceIdle = true;
+    boolean simBatteryNotLow = true;
+    private final Map<String,WorkRequest> scheduledWork = new java.util.LinkedHashMap<String,WorkRequest>();
+    private final Map<String,TimerTask> scheduledWorkTasks = new HashMap<String,TimerTask>();
+    private java.util.Timer backgroundWorkTimer;
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return isSimulator();
+    }
+
+    Map<String,WorkRequest> getScheduledWork() {
+        return scheduledWork;
+    }
+
+    boolean constraintsSatisfied(WorkRequest r) {
+        if ((r.isRequiresNetwork() || r.isRequiresUnmeteredNetwork()) && !simNetworkAvailable) {
+            return false;
+        }
+        if (r.isRequiresCharging() && !simCharging) {
+            return false;
+        }
+        if (r.isRequiresIdle() && !simDeviceIdle) {
+            return false;
+        }
+        if (r.isRequiresBatteryNotLow() && !simBatteryNotLow) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void scheduleBackgroundWork(final WorkRequest request) {
+        if (!isSimulator()) {
+            return;
+        }
+        scheduledWork.put(request.getId(), request);
+        if (backgroundWorkTimer == null) {
+            backgroundWorkTimer = new java.util.Timer();
+        }
+        TimerTask existing = scheduledWorkTasks.remove(request.getId());
+        if (existing != null) {
+            existing.cancel();
+        }
+        TimerTask task = new TimerTask() {
+            public void run() {
+                if (constraintsSatisfied(request)) {
+                    runWorkerNow(request);
+                } else {
+                    System.out.println("[BackgroundWork] '" + request.getId() + "' deferred: constraints not satisfied");
+                }
+            }
+        };
+        scheduledWorkTasks.put(request.getId(), task);
+        long delay = Math.max(0, request.getInitialDelayMillis());
+        if (request.isPeriodic()) {
+            backgroundWorkTimer.schedule(task, delay == 0 ? 1000 : delay, Math.max(1000, request.getMinIntervalMillis()));
+        } else {
+            backgroundWorkTimer.schedule(task, delay == 0 ? 500 : delay);
+        }
+    }
+
+    void runWorkerNow(final WorkRequest request) {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Class<?> cls = Class.forName(request.getWorkerClass());
+                    final BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
+                    long deadline = System.currentTimeMillis() + 30000;
+                    worker.performWork(request.getId(), request.getInputData(), deadline, new com.codename1.util.Callback<Boolean>() {
+                        public void onSucess(Boolean value) {
+                            System.out.println("[BackgroundWork] '" + request.getId() + "' completed: success=" + value);
+                        }
+                        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                            com.codename1.io.Log.e(err);
+                        }
+                    });
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        }, "cn1-sim-background-work").start();
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        scheduledWork.remove(workId);
+        TimerTask t = scheduledWorkTasks.remove(workId);
+        if (t != null) {
+            t.cancel();
+        }
+    }
+
+    // ---- Background processing (simulator) ----
+
+    private final Map<String,TimerTask> processingTasks = new HashMap<String,TimerTask>();
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return isSimulator();
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, final Runnable task) {
+        if (!isSimulator() || task == null) {
+            return;
+        }
+        if (backgroundWorkTimer == null) {
+            backgroundWorkTimer = new java.util.Timer();
+        }
+        TimerTask existing = processingTasks.remove(id);
+        if (existing != null) {
+            existing.cancel();
+        }
+        final boolean reqNet = requiresNetwork;
+        final boolean reqPow = requiresPower;
+        final String fid = id;
+        TimerTask t = new TimerTask() {
+            public void run() {
+                if ((reqNet && !simNetworkAvailable) || (reqPow && !simCharging)) {
+                    System.out.println("[BackgroundTask] '" + fid + "' deferred: constraints not satisfied");
+                    return;
+                }
+                new Thread(task, "cn1-sim-background-task").start();
+            }
+        };
+        processingTasks.put(id, t);
+        long delay = earliestBeginEpochMs <= 0 ? 500 : Math.max(0, earliestBeginEpochMs - System.currentTimeMillis());
+        backgroundWorkTimer.schedule(t, delay);
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        TimerTask t = processingTasks.remove(id);
+        if (t != null) {
+            t.cancel();
+        }
+    }
+
+    // ---- Foreground service (simulator) ----
+
+    @Override
+    public boolean isForegroundServiceSupported() {
+        return isSimulator();
+    }
+
+    @Override
+    public Object startForegroundService(String channelId, String title, String body, String iconName, final ForegroundService.Task task, final ForegroundService handle) {
+        final String[] text = new String[]{title, body};
+        System.out.println("[ForegroundService] started: " + title + " - " + body);
+        SimulatorNotifications.setForegroundServiceStatus(title + " - " + body);
+        if (task != null) {
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        task.run(handle);
+                    } catch (Throwable t) {
+                        com.codename1.io.Log.e(t);
+                    } finally {
+                        SimulatorNotifications.setForegroundServiceStatus(null);
+                        System.out.println("[ForegroundService] stopped");
+                    }
+                }
+            }, "cn1-sim-foreground-service").start();
+        }
+        return text;
+    }
+
+    @Override
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        if (nativeHandle instanceof String[]) {
+            ((String[]) nativeHandle)[0] = title;
+            ((String[]) nativeHandle)[1] = body;
+        }
+        System.out.println("[ForegroundService] update: " + title + " - " + body);
+        SimulatorNotifications.setForegroundServiceStatus(title + " - " + body);
+    }
+
+    @Override
+    public void stopForegroundService(Object nativeHandle) {
+        System.out.println("[ForegroundService] stop requested");
+        SimulatorNotifications.setForegroundServiceStatus(null);
+    }
+
+    @Override
+    public void subscribeToPushTopic(String topic) {
+        System.out.println("[Push] subscribeToTopic: " + topic);
+    }
+
+    @Override
+    public void unsubscribeFromPushTopic(String topic) {
+        System.out.println("[Push] unsubscribeFromTopic: " + topic);
     }
     
     
@@ -5591,6 +5876,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         installLargerTextMenu(simulateMenu, pref, frm);
 
+        installNotificationBackgroundSimulationMenu(simulateMenu);
+
         pause = new JMenuItem("Pause App");
         simulateMenu.addSeparator();
         simulateMenu.add(pause);
@@ -6669,6 +6956,139 @@ public class JavaSEPort extends CodenameOneImplementation {
      * Preferences keys all start with "NfcSim." so they survive simulator
      * restarts.
      */
+    private void installNotificationBackgroundSimulationMenu(JMenu simulateMenu) {
+        JMenu menu = new JMenu("Notifications and Background");
+
+        final JCheckBoxMenuItem network = new JCheckBoxMenuItem("Network available", simNetworkAvailable);
+        network.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simNetworkAvailable = network.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem charging = new JCheckBoxMenuItem("Charging", simCharging);
+        charging.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simCharging = charging.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem idle = new JCheckBoxMenuItem("Device idle", simDeviceIdle);
+        idle.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simDeviceIdle = idle.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem battery = new JCheckBoxMenuItem("Battery not low", simBatteryNotLow);
+        battery.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simBatteryNotLow = battery.isSelected();
+            }
+        });
+        JMenu constraints = new JMenu("Background constraints");
+        constraints.add(network);
+        constraints.add(charging);
+        constraints.add(idle);
+        constraints.add(battery);
+        menu.add(constraints);
+
+        JMenuItem runWork = new JMenuItem("Run scheduled background work now");
+        runWork.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                java.util.Collection<WorkRequest> all = new java.util.ArrayList<WorkRequest>(getScheduledWork().values());
+                if (all.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "No background work is currently scheduled.");
+                    return;
+                }
+                for (WorkRequest r : all) {
+                    if (constraintsSatisfied(r)) {
+                        runWorkerNow(r);
+                    } else {
+                        System.out.println("[BackgroundWork] '" + r.getId() + "' not run: constraints not satisfied");
+                    }
+                }
+            }
+        });
+        menu.add(runWork);
+
+        JMenuItem channels = new JMenuItem("Show registered channels...");
+        channels.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                StringBuilder sb = new StringBuilder();
+                for (NotificationChannelBuilder c : getSimulatorChannels()) {
+                    sb.append(c.getName()).append(" (").append(c.getId()).append(") importance=")
+                            .append(c.getImportance());
+                    if (c.getSound() != null) {
+                        sb.append(" sound=").append(c.getSound());
+                    }
+                    sb.append('\n');
+                }
+                JOptionPane.showMessageDialog(null, sb.length() == 0 ? "No channels registered." : sb.toString());
+            }
+        });
+        menu.add(channels);
+
+        menu.addSeparator();
+
+        JMenuItem shareText = new JMenuItem("Send shared text...");
+        shareText.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String text = JOptionPane.showInputDialog(null, "Text to share into the app:", "Shared text", JOptionPane.PLAIN_MESSAGE);
+                if (text != null) {
+                    deliverSharedContent(SharedContent.builder().addText(text).build());
+                }
+            }
+        });
+        menu.add(shareText);
+
+        JMenuItem shareUrl = new JMenuItem("Send shared URL...");
+        shareUrl.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String url = JOptionPane.showInputDialog(null, "URL to share into the app:", "Shared URL", JOptionPane.PLAIN_MESSAGE);
+                if (url != null) {
+                    deliverSharedContent(SharedContent.builder().addUrl(url).build());
+                }
+            }
+        });
+        menu.add(shareUrl);
+
+        JMenuItem shareFile = new JMenuItem("Send shared file...");
+        shareFile.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                JFileChooser fc = new JFileChooser();
+                if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File f = fc.getSelectedFile();
+                    String path = f.getAbsolutePath();
+                    String lower = path.toLowerCase();
+                    boolean image = lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                            || lower.endsWith(".gif") || lower.endsWith(".webp");
+                    SharedContent.Builder b = SharedContent.builder();
+                    if (image) {
+                        b.addImage(null, "file://" + path, f.getName());
+                    } else {
+                        b.addFile(null, "file://" + path, f.getName());
+                    }
+                    deliverSharedContent(b.build());
+                }
+            }
+        });
+        menu.add(shareFile);
+
+        menu.addSeparator();
+        JLabel fgStatus = new JLabel("Foreground service: stopped");
+        fgStatus.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+        SimulatorNotifications.setForegroundServiceLabel(fgStatus);
+        menu.add(fgStatus);
+
+        simulateMenu.add(menu);
+    }
+
+    private void deliverSharedContent(final SharedContent content) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                fireSharedContentReceived(content);
+            }
+        });
+    }
+
     private void installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
         JMenu nfcMenu = new JMenu("NFC");
 

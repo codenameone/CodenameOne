@@ -37,6 +37,7 @@ public final class PushContent {
     private final String category;
     private final String metaData;
     private final String actionId;
+    private final String actionTitle;
     private final String textResponse;
     private int type;
 
@@ -47,6 +48,7 @@ public final class PushContent {
         category = p("category", null);
         metaData = p("metaData", null);
         actionId = p("actionId", null);
+        actionTitle = p("actionTitle", null);
         textResponse = p("textResponse", null);
         String typeVal = p("type", null);
         if (typeVal != null) {
@@ -59,7 +61,7 @@ public final class PushContent {
     }
 
     private static String[] keys() {
-        return new String[]{"title", "body", "imageUrl", "category", "metaData", "actionId", "textResponse"};
+        return new String[]{"title", "body", "imageUrl", "category", "metaData", "actionId", "actionTitle", "textResponse"};
     }
 
     /// Checks if there is pending push content to retrieve.
@@ -295,6 +297,31 @@ public final class PushContent {
     /// - PushAction
     public static void setActionId(String actionId) {
         setProperty("actionId", actionId);
+    }
+
+    /// If the user selected an action on the notification, then the title (button label)
+    /// of the selected action is available here. This applies both to push notification
+    /// actions and to local notification actions. If the user did not tap an action, this
+    /// is null.
+    ///
+    /// #### Returns
+    ///
+    /// The title of the action that was selected by the user, or null.
+    public String getActionTitle() {
+        return actionTitle;
+    }
+
+    /// Sets the action title of the notification content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `actionTitle`: the title of the action that was selected
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal use only.
+    public static void setActionTitle(String actionTitle) {
+        setProperty("actionTitle", actionTitle);
     }
 
     /// If the push notification action included a text field for the user to enter a response, then that response
