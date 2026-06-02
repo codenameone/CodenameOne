@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.codename1.e2e</groupId>
+  <artifactId>protocol-e2e-client</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>protocol-e2e-client</name>
+  <description>Codename One client exercising REST / GraphQL / gRPC against the e2e server</description>
+
+  <modules>
+    <module>common</module>
+  </modules>
+
+  <properties>
+    <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
+    <cn1.version>8.0-SNAPSHOT</cn1.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>17</java.version>
+    <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.testSource>17</maven.compiler.testSource>
+    <maven.compiler.testTarget>17</maven.compiler.testTarget>
+    <cn1app.name>protocol-e2e-client</cn1app.name>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>java-runtime</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-core</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javase</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-maven-plugin</artifactId>
+          <version>${cn1.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.0.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <groupId>org.apache.maven.plugins</groupId>
+          <version>3.1.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-maven-plugin</artifactId>
+        <version>${cn1.plugin.version}</version>
+      </plugin>
+      <plugin>
+        <!-- Codename One uses its own test runner; this dummy provider stops
+             Surefire from trying to run the cn1 tests itself. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M5</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-maven-plugin</artifactId>
+            <version>${cn1.plugin.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>javase</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>javase</value>
+        </property>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <modules>
+        <module>javase</module>
+      </modules>
+    </profile>
+  </profiles>
+</project>

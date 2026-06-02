@@ -122,6 +122,51 @@ class JavaSEWebSocketImplTest {
     }
 
     @Test
+    void negotiatesSubprotocol() throws Exception {
+        final CountDownLatch connected = new CountDownLatch(1);
+        final AtomicReference<Exception> errored = new AtomicReference<Exception>();
+
+        JavaSEWebSocketImpl impl = new JavaSEWebSocketImpl(
+                "ws://127.0.0.1:" + server.port() + "/");
+        impl.setRequestedSubprotocols(new String[] { "graphql-transport-ws", "chat" });
+        impl.setEventSink(new WebSocketEventSink() {
+            @Override
+            public void onConnect() {
+                connected.countDown();
+            }
+
+            @Override
+            public void onTextMessage(String message) {
+            }
+
+            @Override
+            public void onBinaryMessage(byte[] message) {
+            }
+
+            @Override
+            public void onClose(int code, String reason) {
+            }
+
+            @Override
+            public void onError(Exception ex) {
+                errored.set(ex);
+            }
+        });
+        impl.connect(0);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                connected.await(3, TimeUnit.SECONDS), "handshake completes");
+        // The client offered both protocols in the Sec-WebSocket-Protocol header...
+        org.junit.jupiter.api.Assertions.assertEquals("graphql-transport-ws, chat",
+                server.lastRequestedProtocols);
+        // ...and surfaces the server's selection.
+        org.junit.jupiter.api.Assertions.assertEquals("graphql-transport-ws",
+                impl.getSelectedSubprotocol());
+        org.junit.jupiter.api.Assertions.assertNull(errored.get());
+        impl.close();
+    }
+
+    @Test
     void largePayloadSurvivesFragmentation() throws Exception {
         final CountDownLatch connected = new CountDownLatch(1);
         final List<byte[]> received = new CopyOnWriteArrayList<byte[]>();
@@ -175,6 +220,7 @@ class JavaSEWebSocketImplTest {
         private static final String GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         private ServerSocket serverSocket;
         private Thread thread;
+        private volatile String lastRequestedProtocols;
 
         void start() throws IOException {
             serverSocket = new ServerSocket();
@@ -235,13 +281,22 @@ class JavaSEWebSocketImplTest {
                     }
                 }
                 String key = headers.get("sec-websocket-key");
+                String requestedProtocols = headers.get("sec-websocket-protocol");
+                lastRequestedProtocols = requestedProtocols;
                 MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
                 String accept = Base64.getEncoder().encodeToString(
                         sha1.digest((key + GUID).getBytes(ASCII)));
+                String protocolHeader = "";
+                if (requestedProtocols != null && requestedProtocols.length() > 0) {
+                    // Negotiate by selecting the first offered subprotocol.
+                    String selected = requestedProtocols.split(",")[0].trim();
+                    protocolHeader = "Sec-WebSocket-Protocol: " + selected + "\r\n";
+                }
                 String resp = "HTTP/1.1 101 Switching Protocols\r\n"
                         + "Upgrade: websocket\r\n"
                         + "Connection: Upgrade\r\n"
-                        + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n";
+                        + "Sec-WebSocket-Accept: " + accept + "\r\n"
+                        + protocolHeader + "\r\n";
                 out.write(resp.getBytes(ASCII));
                 out.flush();
 

@@ -1,0 +1,63 @@
+name: Protocol E2E (REST / GraphQL / gRPC)
+
+# Stands up a Spring Boot server exposing the same logical service over REST
+# (OpenAPI), GraphQL and gRPC-Web, then builds a Codename One client whose
+# generated-style @RestClient / @GraphQLClient / @GrpcClient code is wired by
+# process-annotations and run on the JavaSE simulator (cn1:test). The client
+# performs real round-trips against all three endpoints and asserts the
+# responses -- an end-to-end check of the full generated-client stack.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/protocol-e2e/**'
+      - 'CodenameOne/src/com/codename1/io/graphql/**'
+      - 'CodenameOne/src/com/codename1/annotations/graphql/**'
+      - 'CodenameOne/src/com/codename1/io/grpc/**'
+      - 'CodenameOne/src/com/codename1/io/rest/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - '.github/workflows/protocol-e2e.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'scripts/protocol-e2e/**'
+      - 'CodenameOne/src/com/codename1/io/graphql/**'
+      - 'CodenameOne/src/com/codename1/annotations/graphql/**'
+      - '.github/workflows/protocol-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  protocol-e2e:
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Codename One artifacts (core / javase / css-compiler / plugin)
+        run: |
+          export JAVA_HOME="${JAVA_HOME_8}"
+          export PATH="${JAVA_HOME_8}/bin:$PATH"
+          cd maven
+          mvn -B -pl core,javase,css-compiler,codenameone-maven-plugin -am install \
+              -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true
+
+      - name: Ensure a virtual display (xvfb) for the simulator
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            (apt-get update && apt-get install -y xvfb) || true
+          fi
+
+      - name: Run REST / GraphQL / gRPC end-to-end
+        run: |
+          export JAVA_HOME="${JAVA_HOME_17}"
+          export PATH="${JAVA_HOME_17}/bin:$PATH"
+          scripts/protocol-e2e/run-protocol-e2e.sh
+
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protocol-e2e-server-log
+          path: /tmp/protocol-e2e-server.log
+          if-no-files-found: ignore

@@ -18,12 +18,15 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -87,6 +90,67 @@ public class MappingAnnotationProcessorTest {
             Object restored = fromMap.invoke(mapper, back);
             assertEquals("Bob", userCls.getField("firstName").get(restored));
             assertEquals(42, userCls.getField("age").getInt(restored));
+        }
+    }
+
+    @Test
+    public void enumFieldsRoundTripThroughJson() throws Exception {
+        File classes = tmp.newFolder("classes");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Color",
+                "package com.example;\n"
+                        + "public enum Color { RED, GREEN, BLUE }\n");
+        sources.put("com.example.Paint",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.Mapped;\n"
+                        + "import java.util.List;\n"
+                        + "@Mapped public class Paint {\n"
+                        + "    public Color primary;\n"
+                        + "    public List<Color> palette;\n"
+                        + "    public Paint() {}\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> colorCls = cl.loadClass("com.example.Color");
+            Class<?> paintCls = cl.loadClass("com.example.Paint");
+            Class<?> mapperCls = cl.loadClass("com.example.PaintCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Method valueOf = colorCls.getMethod("valueOf", String.class);
+            Object red = valueOf.invoke(null, "RED");
+            Object blue = valueOf.invoke(null, "BLUE");
+
+            Object paint = paintCls.newInstance();
+            paintCls.getField("primary").set(paint, red);
+            List<Object> pal = new ArrayList<Object>();
+            pal.add(red);
+            pal.add(blue);
+            paintCls.getField("palette").set(paint, pal);
+
+            // toMap: enum -> name(); List<enum> -> List<String>.
+            Method toMap = mapperCls.getMethod("toMap", paintCls);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> json = (Map<String, Object>) toMap.invoke(mapper, paint);
+            assertEquals("RED", json.get("primary"));
+            assertEquals(Arrays.asList("RED", "BLUE"), json.get("palette"));
+
+            // fromMap: name -> enum constant; list of names -> list of enums.
+            Map<String, Object> in = new LinkedHashMap<String, Object>();
+            in.put("primary", "GREEN");
+            in.put("palette", Arrays.asList("BLUE", "RED"));
+            Method fromMap = mapperCls.getMethod("fromMap", Map.class);
+            Object restored = fromMap.invoke(mapper, in);
+            assertEquals(valueOf.invoke(null, "GREEN"), paintCls.getField("primary").get(restored));
+            List<?> rpal = (List<?>) paintCls.getField("palette").get(restored);
+            assertEquals(blue, rpal.get(0));
+            assertEquals(red, rpal.get(1));
+
+            // Unknown enum names decode to null rather than throwing.
+            Map<String, Object> bad = new LinkedHashMap<String, Object>();
+            bad.put("primary", "MAGENTA");
+            Object r2 = fromMap.invoke(mapper, bad);
+            assertNull(paintCls.getField("primary").get(r2));
         }
     }
 

@@ -97,6 +97,9 @@ public final class AnnotatedClass {
 
     private static final int ACC_RECORD = 0x10000;
 
+    /// `true` when the class file's `ACC_ENUM` flag is set (a Java enum).
+    public boolean isEnum() { return (access & Opcodes.ACC_ENUM) != 0; }
+
     /// Class-level annotations, keyed by JVM descriptor.
     public Map<String, AnnotationValues> getClassAnnotations() { return annotations; }
 
