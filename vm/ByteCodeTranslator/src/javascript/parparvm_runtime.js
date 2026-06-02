@@ -1466,6 +1466,13 @@ const jvm = {
           }
         };
         let attempt = yield* runBridgeOnce();
+        // Capture the FIRST-degraded attempt for clean host correlation: its
+        // call-id is the one that received the crossed response (the retry that
+        // eventually succeeds gets a fresh, clean id, so logging the last
+        // attempt's id was misleading).
+        const firstDegraded = isDegradedObject(attempt.value)
+          ? { callId: attempt.callId, value: attempt.value }
+          : null;
         let jsoRetries = 0;
         let jsoRetryThrew = false;
         while (idempotentRead && jsoRetries < 4
@@ -1492,7 +1499,10 @@ const jvm = {
             jvm._jsoRetryLogged++;
             try {
               vmDiag('JSO_RETRY', 'member', String(bridge.member));
-              vmDiag('JSO_RETRY', 'callId', String(attempt.callId));
+              vmDiag('JSO_RETRY', 'returnClass', String(bridge.returnClass));
+              vmDiag('JSO_RETRY', 'firstCallId', String(firstDegraded ? firstDegraded.callId : 'na'));
+              vmDiag('JSO_RETRY', 'firstValue', String(firstDegraded ? firstDegraded.value : 'na'));
+              vmDiag('JSO_RETRY', 'lastCallId', String(attempt.callId));
               vmDiag('JSO_RETRY', 'retries', String(jsoRetries));
               vmDiag('JSO_RETRY', 'via', jsoRetryThrew ? 'throw' : 'value');
               vmDiag('JSO_RETRY', 'recovered', isDegradedObject(hostResult) ? 'no' : 'yes');
