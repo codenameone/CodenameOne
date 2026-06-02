@@ -65,6 +65,8 @@ include::The-EDT---Event-Dispatch-Thread.asciidoc[]
 
 include::graphics.asciidoc[]
 
+include::3D-Graphics.asciidoc[]
+
 include::Events.asciidoc[]
 
 include::io.asciidoc[]
