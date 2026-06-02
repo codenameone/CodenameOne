@@ -97,6 +97,31 @@
   }
 
   function postHostCallback(target, id, value, errorMessage) {
+    // #5145 host-callback id trace. The worker resumes getContext with 375
+    // (a width), but the host never computes a number for getContext
+    // (NUMBER_LEAK=0) -- so the callback channel is delivering the wrong value
+    // for an id (collision or double-post). Log every post's id + value shape,
+    // and explicitly flag when the SAME id is posted more than once (the
+    // smoking gun). Rate-limited; gated on the diag toggle so it is silent in
+    // production.
+    if (diagEnabled) {
+      try {
+        if (!global.__cn1CbSeen) { global.__cn1CbSeen = Object.create(null); global.__cn1CbTraceN = 0; }
+        var vshape = (errorMessage != null) ? 'err'
+          : (typeof value === 'number') ? ('num:' + value)
+          : (value && typeof value === 'object' && value.__cn1HostRef != null) ? ('ref:' + value.__cn1HostClass)
+          : (typeof value);
+        if (global.__cn1CbSeen[id]) {
+          log('DIAG:HOSTCB_DUP:id=' + id + ':prev=' + global.__cn1CbSeen[id] + ':now=' + vshape);
+        } else {
+          global.__cn1CbSeen[id] = vshape;
+        }
+        if (global.__cn1CbTraceN < 200) {
+          global.__cn1CbTraceN++;
+          log('DIAG:HOSTCB:id=' + id + ':' + vshape);
+        }
+      } catch (_e) {}
+    }
     var message;
     if (errorMessage == null) {
       message = { type: 'host-callback', id: id, value: value };

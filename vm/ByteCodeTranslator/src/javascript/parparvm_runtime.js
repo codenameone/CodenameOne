@@ -1440,36 +1440,61 @@ const jvm = {
               && r.__cn1HostRef == null
               && Object.getOwnPropertyNames(r).length === 0);
         };
-        let hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
-          receiver: receiver,
-          receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
-          kind: bridge.kind,
-          member: bridge.member,
-          args: transferableArgs
-        }]);
-        let jsoRetries = 0;
-        while (isDegradedObject(hostResult) && idempotentRead && jsoRetries < 4) {
-          jsoRetries++;
-          // Re-issue with all queued fire-and-forget ops flushed first so the
-          // host sees consistent state. The yield drains the crossed response.
-          self.flushPendingFireAndForget();
-          hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+        // The same transient degradation surfaces two ways: the host returns a
+        // degraded value (number / empty {}), OR -- when the degraded receiver
+        // doesn't even expose the member -- the host THROWS "Missing JS member"
+        // / "Missing host receiver". Both are recoverable on a re-issue for an
+        // idempotent read. ``runBridgeOnce`` does one round-trip and reports
+        // which (if any) transient condition occurred.
+        const transientErrorRe = /Missing JS member|Missing host receiver|Missing host object/;
+        const runBridgeOnce = function*() {
+          // Capture the host-call id so a degraded result can be correlated
+          // with the host-side HOSTCB trace (#5145 id-collision hunt).
+          const op = self.invokeHostNative("__cn1_jso_bridge__", [{
             receiver: receiver,
             receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
             kind: bridge.kind,
             member: bridge.member,
             args: transferableArgs
           }]);
+          const callId = op && op.id;
+          try {
+            const r = yield op;
+            return { value: r, threw: false, err: null, callId: callId };
+          } catch (e) {
+            return { value: undefined, threw: true, err: e, callId: callId };
+          }
+        };
+        let attempt = yield* runBridgeOnce();
+        let jsoRetries = 0;
+        let jsoRetryThrew = false;
+        while (idempotentRead && jsoRetries < 4
+               && ((attempt.threw && transientErrorRe.test(String(attempt.err && attempt.err.message ? attempt.err.message : attempt.err)))
+                   || isDegradedObject(attempt.value))) {
+          jsoRetries++;
+          if (attempt.threw) { jsoRetryThrew = true; }
+          // Re-issue with all queued fire-and-forget ops flushed first so the
+          // host sees consistent state. The yield drains the crossed response.
+          self.flushPendingFireAndForget();
+          attempt = yield* runBridgeOnce();
         }
+        if (attempt.threw) {
+          // Not transient, or retries exhausted on a thrown error -- propagate
+          // the original error so the caller's normal catch/NPE path runs.
+          throw attempt.err;
+        }
+        let hostResult = attempt.value;
         if (jsoRetries > 0) {
           // Direct evidence the transient-degradation retry fired (and whether
-          // it recovered the real object). Rate-limited.
+          // it recovered). Rate-limited.
           if (!jvm._jsoRetryLogged) jvm._jsoRetryLogged = 0;
           if (jvm._jsoRetryLogged < 8) {
             jvm._jsoRetryLogged++;
             try {
               vmDiag('JSO_RETRY', 'member', String(bridge.member));
+              vmDiag('JSO_RETRY', 'callId', String(attempt.callId));
               vmDiag('JSO_RETRY', 'retries', String(jsoRetries));
+              vmDiag('JSO_RETRY', 'via', jsoRetryThrew ? 'throw' : 'value');
               vmDiag('JSO_RETRY', 'recovered', isDegradedObject(hostResult) ? 'no' : 'yes');
             } catch (_e) {}
           }
