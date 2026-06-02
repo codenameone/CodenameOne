@@ -24,7 +24,7 @@ What the??! He said it was 1 inch squared. How will I ever see what is on this i
 What I needed to do was convert this image to a multi-image so that it would display at the proper size on my device, and all devices. So I imported the image into my Codename One resource file, specifying a source density of "Very Low". Then created a simple app using the Codename One GUI builder, that displays a single label. The source to display the multi-image roughly as follows (Please excuse the crudity of this model. I didn’t have time to build it to scale or paint it):
     
     
-    System.out.println("I'm your density: "+ Display.getInstance().getDeviceDensity());
+    System.out.println("I’m your density: "+ Display.getInstance().getDeviceDensity());
     
     Label image = new Label(theme.getImage("AlmanacClipping.png"));
     theForm.addComponent(image);

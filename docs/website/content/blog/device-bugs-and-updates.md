@@ -24,7 +24,7 @@ We’ve been even more busy than usual with our first
 [  
 corporate deployment  
 ](/corporate-server.html)  
-kicking off, this is currently a pretty rough process that requires a lot of hands on help from us but we hope to make it less painful for our customers. Either way, this being a completely new offering with a great deal of complexity involved it's an uphill effort which is part of why we are experiencing a slowdown in new features.  
+kicking off, this is currently a pretty rough process that requires a lot of hands on help from us but we hope to make it less painful for our customers. Either way, this being a completely new offering with a great deal of complexity involved it’s an uphill effort which is part of why we are experiencing a slowdown in new features.  
   
   
   

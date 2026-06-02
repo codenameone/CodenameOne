@@ -17,7 +17,7 @@ The video of the LTS talk is now live, unfortunately during the talk we had audi
 
   
   
-We are gearing up for some major updates and new features in the coming weeks and are now in the process of narrowing down the requirements for Codename One 2.0 (yes major version number). This will hopefully land before the year's end but as you know these things are pretty hard to tune precisely.  
+We are gearing up for some major updates and new features in the coming weeks and are now in the process of narrowing down the requirements for Codename One 2.0 (yes major version number). This will hopefully land before the year’s end but as you know these things are pretty hard to tune precisely.  
   
   
 

@@ -32,7 +32,7 @@ Codename One has two basic ways to create new components:
 
 As Codename One matures we find ourselves doing less of option 1 and a lot more of option 2. You can look at components like Tabs which make a lot of sense as a Container since they contain other components. However, components like MultiButton, SpanButton & SpanLabel don’t necessarily seem like the right candidate for that but they are…
 
-Using a Container allows us a lot of flexibility in terms of layout & functionality for a specific component. MultiButton is a great example of that. It's internally a Container that contains 5 labels and a Button (that might be replaced with a check box or radio button). 
+Using a Container allows us a lot of flexibility in terms of layout & functionality for a specific component. MultiButton is a great example of that. It’s internally a Container that contains 5 labels and a Button (that might be replaced with a check box or radio button). 
 
 So how do we make the MultiButton "feel" like a single button?
 

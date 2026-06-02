@@ -143,7 +143,7 @@ Figure 4. Error handling when the text is blank
 
 Figure 5. Error handling when there is some input (notice red title label)
 
-![On iOS the situation hasn't changed much yet](/blog/pixel-perfect-text-input-part-2/pixel-perfect-text-field-error-handling-on-ios.png)
+![On iOS the situation hasn’t changed much yet](/blog/pixel-perfect-text-input-part-2/pixel-perfect-text-field-error-handling-on-ios.png)
 
 Figure 6. On iOS the situation hasn’t changed much yet
 

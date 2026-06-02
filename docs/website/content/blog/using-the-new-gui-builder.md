@@ -288,7 +288,7 @@ to the new GUI builder possible. This file triggers the following Java source fi
             initGuiBuilderComponents(resourceObjectInstance);
         }
     
-    //-- DON'T EDIT BELOW THIS LINE!!!
+    //-- DON’T EDIT BELOW THIS LINE!!!
         private com.codename1.ui.Label gui_Label_1 = new com.codename1.ui.Label();
         private com.codename1.ui.Button gui_Button_1 = new com.codename1.ui.Button();
     
@@ -335,7 +335,7 @@ to the new GUI builder possible. This file triggers the following Java source fi
             gui_Button_1.setName("Button_1");
         }// </editor-fold>
     
-    //-- DON'T EDIT ABOVE THIS LINE!!!
+    //-- DON’T EDIT ABOVE THIS LINE!!!
         public void onButton_1ActionEvent(com.codename1.ui.events.ActionEvent ev) {
         }
     

@@ -333,7 +333,7 @@ verbose but relatively simple.
             String text = write.getText();
             final Component t = say(chatArea, text);
     
-            // we make outgoing messages translucent to indicate that they weren't received yet
+            // we make outgoing messages translucent to indicate that they weren’t received yet
             t.getUnselectedStyle().setOpacity(120);
             write.setText("");
     
@@ -352,7 +352,7 @@ verbose but relatively simple.
                 public void errorCallback(String channel, PubnubError error) {
                     chatArea.removeComponent(t);
                     chatArea.revalidate();
-                    Dialog.show("Error", "Connection error message wasn't sent", "OK", null);
+                    Dialog.show("Error", "Connection error message wasn’t sent", "OK", null);
                 }
             });
         });
@@ -445,7 +445,7 @@ But the big difference is that those methods aren’t invoked for incoming chat 
         addMessage(m);
         EncodedImage rounded = getRoundedFriendImage(m.getSenderId(), m.getPicture());
         if(clientId == null || !clientId.equals(m.getSenderId())) {
-            // show toast, we aren't in the chat form...
+            // show toast, we aren’t in the chat form...
             InteractionDialog toast = new InteractionDialog();
             toast.setUIID("Container");
             toast.setLayout(new BorderLayout());

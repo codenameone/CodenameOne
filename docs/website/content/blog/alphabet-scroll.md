@@ -38,7 +38,7 @@ the relevant code below:
         "Jon Snow", "Petyr Baelish", "Jorah Mormont", "Sansa Stark", "Arya Stark", "Theon Greyjoy",
         "Bran Stark", "Sandor Clegane", "Joffrey Baratheon", "Catelyn Stark", "Robb Stark", "Ned Stark",
         "Robert Baratheon", "Viserys Targaryen", "Varys", "Samwell Tarly", "Bronn","Tywin Lannister",
-        "Shae", "Jeor Mormont","Gendry","Tommen Baratheon","Jaqen H'ghar","Khal Drogo","Davos Seaworth",
+        "Shae", "Jeor Mormont","Gendry","Tommen Baratheon","Jaqen H’ghar","Khal Drogo","Davos Seaworth",
         "Melisandre","Margaery Tyrell","Stannis Baratheon","Ygritte","Talisa Stark","Brienne of Tarth","Gilly",
         "Roose Bolton","Tormund Giantsbane","Ramsay Bolton","Daario Naharis","Missandei","Ellaria Sand",
         "The High Sparrow","Grand Maester Pycelle","Loras Tyrell","Hodor","Gregor Clegane","Meryn Trant",

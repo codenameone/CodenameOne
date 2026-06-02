@@ -48,7 +48,7 @@ which you can achieve without recoding the app 2-4 times…​
 
 ### Rise of Windows 10
 
-Windows Phone is dead but Windows 10 is rising. In fact Microsoft's surface is  
+Windows Phone is dead but Windows 10 is rising. In fact Microsoft’s surface is  
 [leading in the detachable keyboard tablet space](http://www.idc.com/getdoc.jsp?containerId=prUS41072516).  
 This specific segment is hugely important in the corporate world where access to legacy Windows software  
 is crucial.

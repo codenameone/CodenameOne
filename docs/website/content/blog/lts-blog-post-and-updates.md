@@ -34,7 +34,7 @@ Speaking of promoting other people I hope you filled the
 [  
 developer economics survey  
 ](http://www.visionmobile.com/DE1Q14CodenameOne)  
-, it's really helpful for us and time is running out (they are closing the survey soon). They added additional language options which you can use that might make the process faster.  
+, it’s really helpful for us and time is running out (they are closing the survey soon). They added additional language options which you can use that might make the process faster.  
   
   
   
@@ -48,7 +48,7 @@ Back to our regular scheduled programming
   
 We have a few bits of news that might interest you. We just changed the filesystem behavior in the simulator  
   
-to be more consistent with what you would see on the device. This might break some behaviors you might have come to rely on but that is a good thing since it's REALLY problematic to rely on filesystem layout. This started out as fixing  
+to be more consistent with what you would see on the device. This might break some behaviors you might have come to rely on but that is a good thing since it’s REALLY problematic to rely on filesystem layout. This started out as fixing  
 [  
 issue 948  
 ](http://code.google.com/p/codenameone/issues/detail?id=948)  

@@ -16,7 +16,7 @@ are remarkably successful and as a result our push servers got bogged down.
   
 To mitigate that and prevent service interruptions we moved all push activity to the new servers, this effectively  
 means that a push operation on the old servers will map to the new servers seamlessly. This also means  
-that we no longer support the null push target even for the old push servers. It's just too expensive to support  
+that we no longer support the null push target even for the old push servers. It’s just too expensive to support  
 on scale of 150M+ devices. 
 
 Unless you use null pushes this should have no effect on your code. It does mean though that we see the new  

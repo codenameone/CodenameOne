@@ -19,7 +19,7 @@ This cn1lib lets you create a simple web server on the device. You can then conn
 
 This sounds insane but it’s a surprisingly common trick used by developers to get around odd device limitations. I first ran into this use case around 2010. Back then a company I was consulting for needed a way to process media files before playback (to apply DRM). This was impossible in Android at the time and it’s still challenging. Their solution was genius and trivial: they implemented a webserver on the device.
 
-This way they could download and decode the file locally, then playback from a local URL on the device itself. The device's media API was oblivious to the fact that DRM was used in playback.
+This way they could download and decode the file locally, then playback from a local URL on the device itself. The device’s media API was oblivious to the fact that DRM was used in playback.
 
 There are quite a few additional cases such as the ability to embed HTML/JS code that needs server interaction in order to work. For most of us this feature is pretty niche but the fact that you can accomplish it with a simple plugin is huge.
 

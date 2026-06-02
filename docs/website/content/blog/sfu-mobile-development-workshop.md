@@ -22,7 +22,7 @@ The workshop followed a strict tutorial format. Once the students were ready, an
 ![SFU Tourguide App Main screen](/blog/sfu-mobile-development-workshop/sfu-workshop-tourguide-app.png)
     
     
-    While the app, in this form, isn't all that useful since the content is hard-coded in Java and not connected to a database, it is a good starting point for developers who want to build this type of app.
+    While the app, in this form, isn’t all that useful since the content is hard-coded in Java and not connected to a database, it is a good starting point for developers who want to build this type of app.
 
 ## What I Learned
 

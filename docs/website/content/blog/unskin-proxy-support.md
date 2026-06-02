@@ -24,7 +24,7 @@ the only one we will ship by default. To fix this just select the More option an
 
 ### Working Behind a Proxy
 
-In this week's library update we released an important feature: Proxy support.
+In this week’s library update we released an important feature: Proxy support.
 
 Previously setting up a proxy required doing this globally in the Java settings which are somewhat hidden. This  
 new UI allows you to determine a custom setting for Codename One and also allows you to pick the system  

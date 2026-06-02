@@ -20,7 +20,7 @@ Everything should "just work". But for some edge cases things might fail or beha
 
 If you run into such a problem first verify it by testing against xcode 10.1 using the build hint: `ios.xcode_version=10.1`.
 
-__ |  We suggest removing this build hint once you're done so you can use the default target recommended by us   
+__ |  We suggest removing this build hint once you’re done so you can use the default target recommended by us   
 ---|---
 
 ---

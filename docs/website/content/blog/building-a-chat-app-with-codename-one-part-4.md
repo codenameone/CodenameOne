@@ -313,7 +313,7 @@ Now that everything is in place we can start with the main method that shows the
         // the toolbar is created into a layer on the content pane. This allows us to render behind it and leave it semi transparent
         Toolbar tb = new Toolbar(true);
     
-        // we want the title area to be transparent so it won't get in the way
+        // we want the title area to be transparent so it won’t get in the way
         contactsForm.getTitleArea().setUIID("Container");
     
         // folds the toolbar automatically as we scroll down, shows it if we scroll back up
@@ -412,7 +412,7 @@ identifier represented by the button. That’s great for decoupling the applicat
             parent.getContentPane().animateUnlayoutAndWait(400, 0);
             parent.getContentPane().removeAll();
     
-            // we can't mutate a form into a component in another form so we need to convert the background to an image and then morph that
+            // we can’t mutate a form into a component in another form so we need to convert the background to an image and then morph that
             // this is especially easy since we already removed all the components
             Label dummy = new Label();
             dummy.setShowEvenIfBlank(true);
@@ -468,7 +468,7 @@ all the standard effects. It also has a cool search feature that we will discuss
         Container titleArea = new Container(new BorderLayout());
     
         // since the Toolbar is now transparent we assign the title area UIID to one of the layers within and the look
-        // is preserved, we make it translucent though so we can see what's underneath
+        // is preserved, we make it translucent though so we can see what’s underneath
         titleArea.setUIID("TitleArea");
         titleArea.getUnselectedStyle().setBgTransparency(128);
     
@@ -525,7 +525,7 @@ All of this functionality is embedded directly into the code that creates the se
         FontImage searchIcon = FontImage.create(" ue806 ", s);
         FontImage cancelIcon = FontImage.create(" ue81e ", s);
     
-        // this is the actual search button, but we don't want it to have a border...
+        // this is the actual search button, but we don’t want it to have a border...
         Button search = new Button(searchIcon);
         search.setUIID("Label");
     

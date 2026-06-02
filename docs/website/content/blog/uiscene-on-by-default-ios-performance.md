@@ -10,11 +10,11 @@ feed_html: '<img src="https://www.codenameone.com/blog/uiscene-on-by-default-ios
 
 ![UIScene on by Default and iOS Performance](/blog/uiscene-on-by-default-ios-performance.jpg)
 
-Last month I [mentioned an option to enable UIScene in Codename One builds](/blog/xcode-26-migration-and-localization-bundles/). We've tested that mode for the past month and with the coming update this Friday we will flip the default mode. This means that builds will implicitly set the build hint `ios.uiscene=true` instead of the current default of `false`. Ideally, this would have no impact on anyone...
+Last month I [mentioned an option to enable UIScene in Codename One builds](/blog/xcode-26-migration-and-localization-bundles/). We’ve tested that mode for the past month and with the coming update this Friday we will flip the default mode. This means that builds will implicitly set the build hint `ios.uiscene=true` instead of the current default of `false`. Ideally, this would have no impact on anyone...
 
-However, if you do run into sudden issues after Friday the 25th of April 2026... It might mean you need to set the build hint to `ios.uiscene=false` and see if it works. If you're experiencing a regression due to this change, then let us know ASAP. 
+However, if you do run into sudden issues after Friday the 25th of April 2026... It might mean you need to set the build hint to `ios.uiscene=false` and see if it works. If you’re experiencing a regression due to this change, then let us know ASAP. 
 
-To be clear: we are not doing this change lightly, this is a requirement from Apple, and we're trying to get ahead of it so your App Store deployments won't be disrupted. 
+To be clear: we are not doing this change lightly, this is a requirement from Apple, and we’re trying to get ahead of it so your App Store deployments won’t be disrupted. 
 
 ## Base64 Performance on iOS
 
@@ -66,19 +66,19 @@ We also added:
 
 - `@Concrete(name="fully.qualified.ConcreteClassName")`
 
-This is a class-level hint for native ParparVM output that lets us tell the translator that a base type always maps to a known concrete implementation at runtime. Most of you will probably never need this annotation since polymorphism by its nature doesn't do that. However, the Codename One API was designed with OOP principles in mind. When we invoke any API we call a generic virtual method in `CodenameOneImplementation` these are usually overridden by the platform native implementation. Since the native implementation in iOS is always `IOSImplementation` we could define that as the concrete implementation of `CodenameOneImplementation`. 
+This is a class-level hint for native ParparVM output that lets us tell the translator that a base type always maps to a known concrete implementation at runtime. Most of you will probably never need this annotation since polymorphism by its nature doesn’t do that. However, the Codename One API was designed with OOP principles in mind. When we invoke any API we call a generic virtual method in `CodenameOneImplementation` these are usually overridden by the platform native implementation. Since the native implementation in iOS is always `IOSImplementation` we could define that as the concrete implementation of `CodenameOneImplementation`. 
 
-When we call a Codename One API in normal Java SE/Android the call would eventually link to the right virtual call since Java is great at dynamic dispatch. But ParparVM didn't know that at compile time, so it couldn't make that assumption. It needs to look up the function pointer for the method at runtime and always do a vtable lookup which is inefficient. 
+When we call a Codename One API in normal Java SE/Android the call would eventually link to the right virtual call since Java is great at dynamic dispatch. But ParparVM didn’t know that at compile time, so it couldn’t make that assumption. It needs to look up the function pointer for the method at runtime and always do a vtable lookup which is inefficient. 
 
 We now invoke `IOSImplementation` directly, and we can do that for all native implementation classes, which reduces a lot of overhead. 
 
-Typically, end user applications don't have polymorphic classes like that. Even when they do have platform-specific polymorphism, the performance impact isn't always worth the cost. So this feature is great, but probably not useful for you other than the performance gains you receive from it.
+Typically, end user applications don’t have polymorphic classes like that. Even when they do have platform-specific polymorphism, the performance impact isn’t always worth the cost. So this feature is great, but probably not useful for you other than the performance gains you receive from it.
 
 ## Material Icons Will Now Update Automatically
 
 Another useful change in this release is that **Material icon and font updates are now automated through CI**.
 
-This is the kind of maintenance task that we often postpone because it's annoying to do by hand. Automating it means icon updates can happen regularly instead of depending on someone remembering to revisit them after a long gap (thank you to those dedicated community members who ask for this!).
+This is the kind of maintenance task that we often postpone because it’s annoying to do by hand. Automating it means icon updates can happen regularly instead of depending on someone remembering to revisit them after a long gap (thank you to those dedicated community members who ask for this!).
 
 That work is tied to the [long-standing request to keep Material icons current](https://github.com/codenameone/CodenameOne/issues/3152).  
 
@@ -90,7 +90,7 @@ The downside is that this can eventually lead to compilation failures in project
 
 That is not ideal, but the alternative is worse: silently pretending an icon still exists when the source font no longer includes it.
 
-The second problem is with newer icons. Google started encoding icons with values that exceed the 16bit char values used in Java. Currently, there's only one such icon, and for now we decided to ignore that glyph.   
+The second problem is with newer icons. Google started encoding icons with values that exceed the 16bit char values used in Java. Currently, there’s only one such icon, and for now we decided to ignore that glyph.   
 
 ## The Picker Gets Quick Action Buttons
 
@@ -135,11 +135,11 @@ This is a small API, but it can make date picking feel much more intentional in 
 
 We also improved `TextArea` so that when `growByContent` changes the row count, the parent revalidates properly [as requested in this issue](https://github.com/codenameone/CodenameOne/issues/2085).
 
-The main complexity here is in efficient UI reflow while typing, without disrupting existing functionality. We tried to be as smart as possible about it, but it's a risky change.
+The main complexity here is in efficient UI reflow while typing, without disrupting existing functionality. We tried to be as smart as possible about it, but it’s a risky change.
 
 ## Closing Thoughts
 
-I closed the last blog post celebrating the reduction of issues below 500... We were down to 495 when I started writing this post, but now we're back up to 500. Mostly due to RFEs that we submitted. Hopefully, we'll still be able to put a dent into that moving forward.
+I closed the last blog post celebrating the reduction of issues below 500... We were down to 495 when I started writing this post, but now we’re back up to 500. Mostly due to RFEs that we submitted. Hopefully, we’ll still be able to put a dent into that moving forward.
 
 When it comes to performance, our long-term goal is no longer to just get close enough to native. The goal is to beat native where it makes sense to do so. In principle, ParparVM should have some structural advantages in places where we can generate very direct code and avoid the sort of overhead native Objective-C or Swift often pays for ARC and dispatch. We are not fully there yet across the board, but the direction is very clear.
 

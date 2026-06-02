@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/big-changes-jcef/generic-java-2.jpg)
 
-Today we released one of the biggest changes to Codename One's simulator in ages. We added the ability to use CEF (Chrome Embedding Framework). This is **currently** off by default but even if you don’t use it you might feel the impact so it’s crucial that you read this post.
+Today we released one of the biggest changes to Codename One’s simulator in ages. We added the ability to use CEF (Chrome Embedding Framework). This is **currently** off by default but even if you don’t use it you might feel the impact so it’s crucial that you read this post.
 
 __ |  Updated July 31st with additional platform instructions below   
 ---|---  

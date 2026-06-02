@@ -93,7 +93,7 @@ We asked developers which operating system they were using and were pretty shock
   
   
 
-The IDE of choice brought a pretty predictable result although much closer than we would have thought as the number of answers grew the distance between the IDE’s grew as well with NetBeans surpassing IDEA and Eclipse growing in strength. However, the race between the IDE’s is still very real and despite Eclipse's lead its position seems very assailable in the market. Our decision to support all 3 IDE’s seems like an excellent decision in this light.  
+The IDE of choice brought a pretty predictable result although much closer than we would have thought as the number of answers grew the distance between the IDE’s grew as well with NetBeans surpassing IDEA and Eclipse growing in strength. However, the race between the IDE’s is still very real and despite Eclipse’s lead its position seems very assailable in the market. Our decision to support all 3 IDE’s seems like an excellent decision in this light.  
 
 * * *
 

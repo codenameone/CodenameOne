@@ -35,7 +35,7 @@ We also made some improvements to drag behavior. One of the surprisingly difficu
   
   
   
-It's the main reason we should avoid binding logic to the pointer pressed method and instead use the pointer released method (there is another reason but I digress…). The problem is further compounded by the fact that some devices send drag events even when there was no perceivable drag. This makes it even harder to differentiate such a case.  
+It’s the main reason we should avoid binding logic to the pointer pressed method and instead use the pointer released method (there is another reason but I digress…). The problem is further compounded by the fact that some devices send drag events even when there was no perceivable drag. This makes it even harder to differentiate such a case.  
   
   
   

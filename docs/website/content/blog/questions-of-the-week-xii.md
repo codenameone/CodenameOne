@@ -15,7 +15,7 @@ June just ended and we are starting the final stretch to get 3.5 ready, there is
 table right now so most of the work in the coming month will probably focus on stabilizing the GUI builder and  
 fixing the remaining issues for 3.5.
 
-One thing we pushed to today's release in the last minute is a new API called: `Toolbar.setCenteredDefault(boolean)`.  
+One thing we pushed to today’s release in the last minute is a new API called: `Toolbar.setCenteredDefault(boolean)`.  
 This was triggered in part by a  
 [stackoverflow question](http://stackoverflow.com/questions/38065436/how-can-i-prevent-my-title-text-from-getting-misaligned)  
 below but is a recurring theme. The `Toolbar` used to center its title thru the alignment style, which is problematic  

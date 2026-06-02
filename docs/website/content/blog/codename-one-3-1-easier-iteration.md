@@ -11,11 +11,11 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-1-easier-iteration/3.1.jpg)
 
-It's been a busy month and getting busier by the moment, we are preparing for App Engine's suspension of  
+It’s been a busy month and getting busier by the moment, we are preparing for App Engine’s suspension of  
 its blobstore service which will be coming around soon. This effectively means older crash report email  
 functionality will be stopped for older apps (just rebuild the app for the emails to work again).   
 We are also getting ready for Codename One 3.1 which we have tentatively scheduled for July 27th. This  
-release will include a week's worth of code freeze and will be  
+release will include a week’s worth of code freeze and will be  
 the first of our new policy for faster release schedules. 
 
 Some features we wanted to make it will have to go in to 3.2 but overall we are pretty thrilled with the shorter  
@@ -41,7 +41,7 @@ which allows this instead:
        // do something with c
     }
 
-Which is obviously easier, it's not necessarily as efficient but it's easier to write. These are the sort of features  
+Which is obviously easier, it’s not necessarily as efficient but it’s easier to write. These are the sort of features  
 we should add into Codename One all over e.g. we just fixed `Element` from the XML parsing  
 code to allow iteration over its children in a similar way.
 

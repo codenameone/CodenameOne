@@ -18,8 +18,8 @@ This is part 2 of the RAD Chatroom tutorial. You can find part 1 [here](/blog/ra
 A "Send" button is a pretty important part of any chat application. We’ll add a send button to our app by defining an action in our controller, and passing it to the ChatRoomView as follows. First we’ll define the action in our ChatFormController class:
     
     
-    // We're going to use a lot of static functions from the UI class for creating
-    // UI elements like actions declaratively, so we'll do a static import here.
+    // We’re going to use a lot of static functions from the UI class for creating
+    // UI elements like actions declaratively, so we’ll do a static import here.
     import static com.codename1.rad.ui.UI.*;
     
     // ...
@@ -54,8 +54,8 @@ If this is the first time you’ve seen a ViewNode definition, this may look a l
     import com.codename1.ui.Form;
     import com.codename1.ui.layouts.BorderLayout;
     
-    // We're going to use a lot of static functions from the UI class for creating
-    // UI elements like actions declaratively, so we'll do a static import here.
+    // We’re going to use a lot of static functions from the UI class for creating
+    // UI elements like actions declaratively, so we’ll do a static import here.
     import static com.codename1.rad.ui.UI.*;
     
     public class ChatFormController extends FormController {

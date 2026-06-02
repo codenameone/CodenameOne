@@ -174,7 +174,7 @@ Up until now the code wasn’t very usable so let’s abstract it a bit. But fir
     import static com.codename1.ui.CN.*;
     
     /**
-     * This is an internal class, it's package protect to hide that
+     * This is an internal class, it’s package protect to hide that
      */
     class SMSCallback {
         static SuccessCallback<String> onSuccess;

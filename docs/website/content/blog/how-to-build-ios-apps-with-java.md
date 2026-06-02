@@ -40,7 +40,7 @@ Some common cross-platform frameworks include Flutter, React Native and Codename
 
 ****Related 📝**** [Top 10 Best Cross-Platform App Development Frameworks in 2023](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/)
 
-> On Android, Java or Kotlin are the native languages whereas Apple's iOS platform relies on Swift and Obj-C as its native languages.
+> On Android, Java or Kotlin are the native languages whereas Apple’s iOS platform relies on Swift and Obj-C as its native languages.
 
 ## iOS App Development
 
@@ -73,7 +73,7 @@ Swift is one of the newer programming languages while Java has been around for y
 | Platform | Java is not platform dependent | Swift is dependent on iOS and MacOS |
 | Syntax | Java is verbose and has complex syntax and code readability | Swift has easy syntax and code readability |
 | Performance | Modern Java is quite fast. A well optimized Java app can be as fast as a native app | Swift is fast as it was built with performance in mind for Apple ecosystem |
-| Security | Java is more secure compared to Swift with its byte-code verifier, JVM and security API's | Swift was designed to be memory safe. Swift can call Objective-C code which makes it prone to overflows |
+| Security | Java is more secure compared to Swift with its byte-code verifier, JVM and security API’s | Swift was designed to be memory safe. Swift can call Objective-C code which makes it prone to overflows |
 | Popularity | Java is a mature and popular programming language. [Tiobe](https://www.tiobe.com/tiobe-index/) and [Redmonk](https://redmonk.com/sogrady/2022/03/28/language-rankings-1-22/) ranks Java at number 3 by popularity | Swift is reasonably popular for mobile development. [Tiobe](https://www.tiobe.com/tiobe-index/) and [Redmonk](https://redmonk.com/sogrady/2022/03/28/language-rankings-1-22/) ranks Swift at number 10 and 11 respectively |
 |
 
@@ -81,11 +81,11 @@ Both Java and Swift are quite different in terms of methods, syntax, code usabil
 
 Swift is obviously a preferred choice to develop apps specifically for the Apple ecosystem while Java is a preferred choice for Android development or cross-platform reusability.
 
-> The opportunity cost involved in learning Swift outweighs the benefits since it's a platform dependant language.
+> The opportunity cost involved in learning Swift outweighs the benefits since it’s a platform dependant language.
 
 ## Java on Apple Hardware
 
-### Why doesn't Apple support Java?
+### Why doesn’t Apple support Java?
 
 By now you might be thinking ‘if Java code can run on any platform, why can’t Java run on iOS?’
 
@@ -109,7 +109,7 @@ With ****Codename One****, Java developers can build apps that run on iOS device
 
 If you’re not using Codename One yet, then sign up now:
 
-[Sign Up - It's Free!](https://cloud.codenameone.com/secure/index.html)
+[Sign Up - It’s Free!](https://cloud.codenameone.com/secure/index.html)
 
 ## How Does It Work?
 
@@ -129,7 +129,7 @@ The process works seamlessly and makes Codename One apps native as they are lite
 
 Java bytecode is dynamically translated to a native iOS Xcode project and seamlessly compiled to a native binary. This binary can be installed on iOS devices or uploaded to App Store.
 
-> • With Codename One, you don't need to have a Mac to develop iOS apps.
+> • With Codename One, you don’t need to have a Mac to develop iOS apps.
 >   
 > • Codename One also provides an option to ****build offline****.
 >   
@@ -292,7 +292,7 @@ To build a native app, Codename One supports a variety of different target platf
   
 ㅤJavaSE
 
-## TLDR (Too Long Didn't Read)
+## TLDR (Too Long Didn’t Read)
 
 ### All of the above is shown in this tutorial by Steve Hannah
 
@@ -346,7 +346,7 @@ Codename One Community:
 
 Can I run Java on iOS?
 
-Java code can't run on iPhone and iPad since there is no Java Virtual Machine (JVM) for iOS. However, Codename One can compile Java code to native iOS binary.
+Java code can’t run on iPhone and iPad since there is no Java Virtual Machine (JVM) for iOS. However, Codename One can compile Java code to native iOS binary.
 
 Can I develop iOS apps without Swift?
 
@@ -382,7 +382,7 @@ Yes, you can build iOS apps on Windows using Codename One without using a Mac, m
 
 Is it legal to develop iOS apps on Windows?
 
-Yes, it's legal to develop iOS apps on non-Apple hardware or software as it does not violate the Apple Developer Agreement.
+Yes, it’s legal to develop iOS apps on non-Apple hardware or software as it does not violate the Apple Developer Agreement.
 
 How to build iOS apps with Java?
 

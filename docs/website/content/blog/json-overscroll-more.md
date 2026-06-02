@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-It's been pretty busy around here the last couple of weeks. However, we still introduced a couple of new API’s and abilities besides the many bug fixes that constantly go in.  
+It’s been pretty busy around here the last couple of weeks. However, we still introduced a couple of new API’s and abilities besides the many bug fixes that constantly go in.  
   
   
 We deprecated JSONParser.parse(Reader) in favor of Map<String, Object> parseJSON(Reader i). This is effectively the exact same class with one minor difference, it returns HashMaps/ArrayLists rather than Hashtables/Vectors to represent the hierarchy.  

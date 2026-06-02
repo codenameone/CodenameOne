@@ -167,10 +167,10 @@ The [Stack Overflow Developer Survey Results 2019](https://insights.stackoverflo
 
 | React Native Pros | React Native Cons |
 | --- | --- |
-| React Native's focus on UI is to a great extent, rendering a highly responsive interface. | React Native is not a truly cross-platform framework. Code is not 100% reusable across platforms, depending on the app’s complexity. |
+| React Native’s focus on UI is to a great extent, rendering a highly responsive interface. | React Native is not a truly cross-platform framework. Code is not 100% reusable across platforms, depending on the app’s complexity. |
 | Rich variety of built-in and community driven components and APIs save development time. | When it comes to releasing of updates, React Native lacks consistency. |
 | Fast Refresh feature enables developers to see changes made in code within seconds. | React Native apps are not efficiently optimized for speed and memory use. |
-| React Native is supported by contributions from developers and companies around the world. It has one of the highest number of contributors for any repository in GitHub. | React Native's dependency on third-party libraries is on the higher side. |
+| React Native is supported by contributions from developers and companies around the world. It has one of the highest number of contributors for any repository in GitHub. | React Native’s dependency on third-party libraries is on the higher side. |
 
 #### 2. Xamarin
 
@@ -228,9 +228,9 @@ Its core appeal is its unrestricted access to the native platform allowing devel
 | Codename One Pros | Codename One Cons |
 | --- | --- |
 | Write Once Run Anywhere (WORA) support with no special hardware requirements and 100% code reuse. | Not suitable for elaborate games such as FPS. The framework and related tools were designed from the start focused around apps. |
-| Codename One has plugins for popular IDEs such as IntelliJ/IDEA, NetBeans and Eclipse. | Codename One's graphic UI does not match the requirements of large projects and its visual themes are not updated. |
+| Codename One has plugins for popular IDEs such as IntelliJ/IDEA, NetBeans and Eclipse. | Codename One’s graphic UI does not match the requirements of large projects and its visual themes are not updated. |
 | Codename One is easy to use with 100% portable Drag & Drop GUI builder. | Due to the storage of all event handlers in a single file, development part is cumbersome. |
-| Codename One can be extended easily using 3rd party libraries (cn1libs) that can include native OS code. | While it's possible to build without the cloud build server, in case if its needed, then there's a monthly quota of builds. |
+| Codename One can be extended easily using 3rd party libraries (cn1libs) that can include native OS code. | While it’s possible to build without the cloud build server, in case if its needed, then there’s a monthly quota of builds. |
 | Codename One’s cloud build allows developers to build native applications using cloud servers. This removes the need to own dedicated hardware. |
 
 #### 4. Flutter
@@ -258,9 +258,9 @@ Its core appeal is its unrestricted access to the native platform allowing devel
 | Flutter Pros | Flutter Cons |
 | --- | --- |
 | Flutter is easy to learn, simple to build and debug with, and is fully compiled. | Dart is a less popular programming language and the Hot Reload feature works only with Dart. |
-| Flutter has a full set of widgets in Google’s Material Design and in Apple’s style with the Cupertino pack. | Flutter doesn't support all the devices. It won't run on your 32-bit laptop seamlessly. |
+| Flutter has a full set of widgets in Google’s Material Design and in Apple’s style with the Cupertino pack. | Flutter doesn’t support all the devices. It won’t run on your 32-bit laptop seamlessly. |
 | Hot Reload feature enables developers to see changes made in code within seconds. | There are fewer third-party packages available to support Flutter apps on multiple platforms. |
-| Flutter's community of developers is active and evolving, proactively helping developers in solving problems related to the platform. | Flutter is suitable for MVP and startups. For large-scale projects, you will have to proceed smartly. |
+| Flutter’s community of developers is active and evolving, proactively helping developers in solving problems related to the platform. | Flutter is suitable for MVP and startups. For large-scale projects, you will have to proceed smartly. |
 |  | Flutter is relatively new and growing. You will find little proven expertise in the market. |
 |  | Flutter apps are relatively bigger in size. |
 
@@ -291,7 +291,7 @@ Ionic has its own IDE known as Ionic Studio. Ionic also offers features such as 
 | Based on well-known technologies i.e. Angular, HTML, CSS and JavaScript. | If one wants to go beyond basic apps, knowledge of AngularJS becomes almost a necessity. |
 | Compatability with React, Angular and Vue frameworks and supports Cordova plugins. | Performance of apps built with Ionic is on a lower side. |
 | Ionic has a wide range of tools, plugins and UI components. | Building in-app navigation is difficult because of its complex UI-router. |
-| Ionic is backed by a vibrant community of developers and sufficient documentation. | High dependency on plugins. Some native plugins aren't stable and can conflict with each other. |
+| Ionic is backed by a vibrant community of developers and sufficient documentation. | High dependency on plugins. Some native plugins aren’t stable and can conflict with each other. |
 
 #### 6. Cordova
 
@@ -416,8 +416,8 @@ Qt tools include the Qt Creator IDE for C++ and Qt Quick which includes a declar
 | Qt is mature and stable. It has been vetted by major companies. | The time to market is long without using Qt Quick Compiler, which is only available with the Commercial license. |
 | It is a well-designed C++ GUI application framework. | Mobile UX is far from being smooth. When using default QT GUI components you do not get an ideal look and feel for iOS and Android. |
 | The code is compiled to native binaries that run at full speed (no need to use a virtual machine) | There is no official Qt support for mainstream Ad Networks (only 3rd party libraries, if available) |
-| Qt's IDE, Qt Creator is very capable and works on all platforms. | QT requires licensing fees for distribution. If you stop paying the monthly licensing fee, you need to stop distributing the apps you’ve already built. |
-| Qt has huge user base and documentation. It's easy to get answers to questions. | The QObject and QWidget are not thread-safe. |
+| Qt’s IDE, Qt Creator is very capable and works on all platforms. | QT requires licensing fees for distribution. If you stop paying the monthly licensing fee, you need to stop distributing the apps you’ve already built. |
+| Qt has huge user base and documentation. It’s easy to get answers to questions. | The QObject and QWidget are not thread-safe. |
 
 #### 10. RubyMotion
 
@@ -445,10 +445,10 @@ Apps written in RubyMotion call into the native platform APIs and function in th
 
 | RubyMotion Pros | RubyMotion Cons |
 | --- | --- |
-| Ruby as a language for mobile development environment. | RubyMotion is not open-source. It's a commercial partially open-source product. |
+| Ruby as a language for mobile development environment. | RubyMotion is not open-source. It’s a commercial partially open-source product. |
 | RubyMotion apps are statically compiled and call into the native platform APIs. | RubyMotion requires separate GUI code for Android and iOS. |
-| RubyMotion apps can be extended with Gems (reusable components). | It's hard to debug with RubyMotion. |
-| CocoaPods and Gradle are supported natively. | RubyMotion's free version is limited. |
+| RubyMotion apps can be extended with Gems (reusable components). | It’s hard to debug with RubyMotion. |
+| CocoaPods and Gradle are supported natively. | RubyMotion’s free version is limited. |
 | Terminal + Editor of choice workflow. | RubyMotion needs better documentation for beginners. |
 
 ### Frequently Asked Questions (FAQs)
@@ -497,7 +497,7 @@ Disadvantages of cross-platform app development includes:
 
 How much does it cost to make a cross-platform app?
 
-Cross-platform app development is less costly as compared to native app development since there's a single codebase, they're quicker to develop and take less QA effort.
+Cross-platform app development is less costly as compared to native app development since there’s a single codebase, they’re quicker to develop and take less QA effort.
 
 Cross-platform apps usually cost $30 to $80+ per hour depending on the requirements and complexity.
 

@@ -23,7 +23,7 @@ which proposes tutorials for the French-speaking community.
 
 * * *
 
-While investigating the possibilities within Codename One, I made a discovery that I would like to share with you via this short article. But first let's discuss SalesForce, it is a CRM platform. Which has an advantage of an open Web Service API enabling it for use with Codename One. 
+While investigating the possibilities within Codename One, I made a discovery that I would like to share with you via this short article. But first let’s discuss SalesForce, it is a CRM platform. Which has an advantage of an open Web Service API enabling it for use with Codename One. 
 
 **  
 This is an ideal combination that provides simple and effective customer management on all mobile devices.  

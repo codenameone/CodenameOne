@@ -183,7 +183,7 @@ Adding a phone number to the George account in the view controller. We leave Kra
 
 Let’s start up the app again. There are a few things to notice here:
 
-  1. If you press on either George or Kramer’s avatar next to one of their chat bubbles, and try to phone them, they’ll both give you the "This user has no phone number" message. That's because the avatar that appears next to the chat bubble is actually the ChatMessage.ViewModel entity, and not our ChatAccount entity. The ChatMessage.ViewModel entity doesn’t include a telephone field. The ChatAccount entities are only used to render the title component of the form.
+  1. If you press on either George or Kramer’s avatar next to one of their chat bubbles, and try to phone them, they’ll both give you the "This user has no phone number" message. That’s because the avatar that appears next to the chat bubble is actually the ChatMessage.ViewModel entity, and not our ChatAccount entity. The ChatMessage.ViewModel entity doesn’t include a telephone field. The ChatAccount entities are only used to render the title component of the form.
 
   2. If you try to phone Kramer via the title component, you’ll get the same "This user has no phone number" message. This is correct, because we didn’t give Kramer a phone number.
 

@@ -56,7 +56,7 @@ Whatsapp and Netflix pretty much tied here but AirBnb shrunk.
 
 Before I go into analysis and comments I’d like to declare the winners!
 
-  1. **Facebook** – The social app which won #2 place in last year's survey will be a Facebook clone
+  1. **Facebook** – The social app which won #2 place in last year’s survey will be a Facebook clone
 
   2. **Whatsapp** – The next app released in the summer should be a whatsapp clone
 

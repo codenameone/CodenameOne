@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/psd-to-app-revisited/psd_to_app_title_image.jpg)
 
 One of our most important posts from 2015 was  
-[Steve's PSD to App: Converting a Beautiful Design into a Native Mobile App](http://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html#comment-2566720750).  
+[Steve’s PSD to App: Converting a Beautiful Design into a Native Mobile App](http://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html#comment-2566720750).  
 This post included a very thorough step by step video guide walking thru the creation of a non-trivial UI design  
 and ended with the introduction of Steve’s CSS plugin for Codename One.
 
@@ -110,7 +110,7 @@ Figure 7. Double clicking the smart object allows us to edit only the form we ne
 
 ##### Removing the Noise
 
-The first thing we need to do is remove from the image all of the things that we don’t really need. The status bar area on the top is redundant as it is a part of the phone's UI. We can select it using the select tool and click the eye icon next to the layer to hide it.
+The first thing we need to do is remove from the image all of the things that we don’t really need. The status bar area on the top is redundant as it is a part of the phone’s UI. We can select it using the select tool and click the eye icon next to the layer to hide it.
 
 Normally we’d want to have the back arrow but thanks to the material design icons that are a part of Codename One we don’t need that icon so we can hide that too.
 

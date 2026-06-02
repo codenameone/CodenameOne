@@ -34,7 +34,7 @@ The problem relates to the size of Google Play Services which are an essential p
 have grown to a size that is pretty big. We need play services for better location tracking, in-app-purchase, push  
 notification, maps etc.  
 In the past we had the build hint `android.includeGPlayServices` which  
-tried to be smart about play services but it's a bit too coarse as it only accepts true/false. 
+tried to be smart about play services but it’s a bit too coarse as it only accepts true/false. 
 
 To alleviate this issue we deprecated the `android.includeGPlayServices` and are introducing  
 the new build hints below that will allow you to selectively include a play service. This means that future builds  

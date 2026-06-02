@@ -17,7 +17,7 @@ Who would have thought Hungarian folk dance would be so entertaining! Can’t. s
   
   
   
-It's been a busy week mostly spent on updating the build server code so it's iOS 7 ready, during that time we also managed to get some other things done… These are some of the highlights: 
+It’s been a busy week mostly spent on updating the build server code so it’s iOS 7 ready, during that time we also managed to get some other things done… These are some of the highlights: 
 
 You may recall the  
 [  

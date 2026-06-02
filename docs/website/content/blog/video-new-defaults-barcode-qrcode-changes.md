@@ -20,7 +20,7 @@ Check out the new video below.
 #### Gradle & Keyboard Default Switch
 
 We just flipped the switch on two major changes in the Android build. All Android builds from now on will  
-default to gradle instead of Ant. This is far superior to Ant builds as it's the way forward for Google and it  
+default to gradle instead of Ant. This is far superior to Ant builds as it’s the way forward for Google and it  
 allows you to [  
 open the resulting project in Android studio](http://stackoverflow.com/questions/34430404/how-to-build-the-native-android-sources-from-codename-ones-build-server).   
 We are flipping this switch to test this functionality before 3.3 rolls out. If this triggers issues for you please  
@@ -36,7 +36,7 @@ You can manually disable this build hint using the `android.keyboardOpen=false` 
 When we originally launched the barcode/qrcode API’s we didn’t yet have cn1libs so we just added this to the  
 API core. Now that cn1libs have been around for ages and also used to implement  
 [another barcode/QR code scanner API](https://github.com/littlemonkeyltd/QRScanner)  
-we think it's time to deprecate the API and move it into a separate cn1lib here:  
+we think it’s time to deprecate the API and move it into a separate cn1lib here:  
 <https://github.com/codenameone/cn1-codescan>. 
 
 After 3.3 we will remove this API for good from the core and you will need to migrate to the cn1lib (which should  

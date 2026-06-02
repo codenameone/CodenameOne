@@ -11,7 +11,7 @@ description: We're adjusting pricing for paid plans for new users signing up aft
   December 31st, 2021. Learn how you can keep the old price.
 ---
 
-We're adjusting pricing for paid plans for new users signing up after December 31st, 2021. Learn how you can keep the old price.
+We’re adjusting pricing for paid plans for new users signing up after December 31st, 2021. Learn how you can keep the old price.
 
 ![Pricing Change - Codename One](/blog/we-are-raising-prices/cn1-new-pricing-1024x536.jpg)
 

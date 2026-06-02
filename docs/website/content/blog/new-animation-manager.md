@@ -76,7 +76,7 @@ This animation is a combination of a new ability to step thru animation stages w
 destination UIID. This specific demo includes this code: 
     
     
-    Form hi = new Form("Shai's Social App", new BoxLayout(BoxLayout.Y_AXIS));
+    Form hi = new Form("Shai’s Social App", new BoxLayout(BoxLayout.Y_AXIS));
     for(int iter = 0 ; iter < 100 ; iter++) {
         hi.add(new Label("Social Data Goes here..."));
     }

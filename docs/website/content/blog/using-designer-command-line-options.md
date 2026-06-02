@@ -31,7 +31,7 @@ commit the XML and free form files into version control and handle conflicts mor
 
 ### The Command Line
 
-The Codename One plugin automatically installs the designer in the user's home directory. You can invoke  
+The Codename One plugin automatically installs the designer in the user’s home directory. You can invoke  
 the designer from the command line on Linux/Unix using:
     
     

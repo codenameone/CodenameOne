@@ -29,7 +29,7 @@ code and performance improvements on devices for that code.
 
 #### JavaDoc Index
 
-A while back I was sitting with a developer who's been programming with Java and Codename One for quite some time,  
+A while back I was sitting with a developer who’s been programming with Java and Codename One for quite some time,  
 yet didn’t find a feature that he was searching for in the [JavaDoc](/javadoc/). This brought to my attention  
 the fact that quite a few people forget about the existence of the [JavaDoc](/javadoc/) index file  
 (just click the index link on the top right). 

@@ -19,9 +19,9 @@ There is some implementation detail related to the library which I think would b
 
 ### Why HTML/JS and Not Native?
 
-When I started the work of porting the library I looked at the Crisp native SDKs for iOS/Android. I even got some code working but as I looked through the actual SDK source code it became apparent that Crisp's native SDKs for iOS and Android don’t leverage native functionality. This is perfectly OK as HTML/JS can deliver a fine experience for this type of app.
+When I started the work of porting the library I looked at the Crisp native SDKs for iOS/Android. I even got some code working but as I looked through the actual SDK source code it became apparent that Crisp’s native SDKs for iOS and Android don’t leverage native functionality. This is perfectly OK as HTML/JS can deliver a fine experience for this type of app.
 
-However, it's silly to wrap the native libraries when I can use HTML directly and get greater portability. As a result of that I threw away the code I wrote for the original integration and used the HTML approach. This highlights the importance of reviewing the implementation before we start implementing a cn1lib.
+However, it’s silly to wrap the native libraries when I can use HTML directly and get greater portability. As a result of that I threw away the code I wrote for the original integration and used the HTML approach. This highlights the importance of reviewing the implementation before we start implementing a cn1lib.
 ---
 
 ## Archived Comments

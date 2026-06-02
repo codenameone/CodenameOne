@@ -52,7 +52,7 @@ This is a bit challenging but possible
 
 ### File chooser dialog
 
-We just posted about this in [yesterday's blog post](/blog/native-file-open-dialogs.html)
+We just posted about this in [yesterday’s blog post](/blog/native-file-open-dialogs.html)
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40611518/codename-one-file-chooser-dialog)
 

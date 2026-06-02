@@ -71,7 +71,7 @@ When you sign up for cloudinary, you’ll receive an API key, and associated cre
           "api_secret", "my_api_secret"));
     
     
-        // Disable private CDN URLs as this doesn't seem to work with free accounts
+        // Disable private CDN URLs as this doesn’t seem to work with free accounts
         cloudinary.config.privateCdn = false;
     
         ...

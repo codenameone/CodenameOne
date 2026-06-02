@@ -35,7 +35,7 @@ which is an HTML subset markup language that allows you to effectively build Cod
   
   
   
-When we were at Sun, our manager Yoav Barel was heavily on our case for building exactly that and we effectively convinced him that it's not feasible to do this since it's too much work. I guess we should have known about Steve back then!  
+When we were at Sun, our manager Yoav Barel was heavily on our case for building exactly that and we effectively convinced him that it’s not feasible to do this since it’s too much work. I guess we should have known about Steve back then!  
   
   
 I think this is a very interesting idea and direction, one of the things I’d really like to see here is proper box model spanning behavior (float etc.) which is very tricky to do in Codename One today. Amazingly this is also very tricky to do natively in iOS/Android so we are all on the same boat…  

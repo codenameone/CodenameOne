@@ -60,7 +60,7 @@ Figure 1. Login screen
 
 Figure 2. Welcome wizard page 1
 
-![I designed another page for the welcome wizard so we'll have 2 pages...](/blog/template-mobile-material-screens-ui-kit/3.png)
+![I designed another page for the welcome wizard so we’ll have 2 pages...](/blog/template-mobile-material-screens-ui-kit/3.png)
 
 Figure 3. I designed another page for the welcome wizard so we’ll have 2 pages…​
 

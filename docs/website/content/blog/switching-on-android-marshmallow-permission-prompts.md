@@ -13,7 +13,7 @@ author: Shai Almog
 
 Up until Marshmallow (version 6) Android used a rather obtuse permission system that very few end users understood.  
 With API level 23 (Marshmallow) Android finally shifted to a structure that makes more sense similarly to iOS.  
-Marshmallow asks a user's permission the first time an API is used e.g. when accessing contacts the user will  
+Marshmallow asks a user’s permission the first time an API is used e.g. when accessing contacts the user will  
 receive a prompt whether to allow contacts access.
 
 __ |  Permission can be denied and a user can later on revoke/grant a permission via external settings UI   

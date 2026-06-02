@@ -354,7 +354,7 @@ On the client side, I’m going to use the [CN1Xataface library](https://github.
             contactsDemo.revalidate();
             finishedLoading = true;
     
-            // XFClient won't load the whole set all at once because that would be a waste of
+            // XFClient won’t load the whole set all at once because that would be a waste of
             // network traffic.  Default batch size is 30.  We use InfiniteScrollAdapter
             // to load more of the result set as the user scrolls down the list.
     
@@ -399,10 +399,10 @@ On the client side, I’m going to use the [CN1Xataface library](https://github.
          * Creates a single row for the contact list that encapsulates the provided
          * contact.
          * @param c The contact to represent with this row.
-         * @param parent The parent container to which the row is to be added.  This method doesn't actually add the
+         * @param parent The parent container to which the row is to be added.  This method doesn’t actually add the
          * row to the parent, but it does need to reference it for some of the listeners that are added to the row.  The caller
          * should add the resulting row to the parent after calling this method.
-         * @return A container encapsulating the row, or null if the contact didn't have a name.
+         * @return A container encapsulating the row, or null if the contact didn’t have a name.
          */
         private Container createContactRow(Contact c, Container parent) {
             // redacted... no Database-specific code here.

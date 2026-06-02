@@ -45,7 +45,7 @@ The top 5 features of this release are covered in this short video, check out fu
 __ |  Currently the iOS version is still in beta due to the tedious appstore approval process   
 ---|---  
   
-  * **xcode 10.1 Migration** — builds on the Codename One cloud implicitly use [xcode 10.1](/blog/xcode-10-1-migration-phase-2/). We migrated from xcode 9.2 to satisfy Apple's requirements, this has been seamless for [the most part](/blog/file-chooser-xcode-10/)
+  * **xcode 10.1 Migration** — builds on the Codename One cloud implicitly use [xcode 10.1](/blog/xcode-10-1-migration-phase-2/). We migrated from xcode 9.2 to satisfy Apple’s requirements, this has been seamless for [the most part](/blog/file-chooser-xcode-10/)
 
   * **VM Changes** — we now support `java.util.Objects` and some additional [methods from Class](/blog/vm-enhancments-full-screen-xml/)
 

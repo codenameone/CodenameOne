@@ -84,7 +84,7 @@ Now, let’s fire the chat up again and take it for a test drive.
 
 Figure 1. The capturePhoto action is rendered as a button beside the input text field
 
-You should now be able to click on the "capture photo" button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the device's camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
+You should now be able to click on the "capture photo" button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the device’s camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
 
 ![Photo appears in chat after capture](/blog/rad-chatroom-part-5/rad-chat-room-24.png)
 

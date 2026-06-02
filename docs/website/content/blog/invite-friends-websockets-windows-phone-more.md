@@ -12,14 +12,14 @@ author: Shai Almog
 ![Header Image](/blog/invite-friends-websockets-windows-phone-more/facebook-invite-friends.jpg)
 
 We’ve released a burst of small new features that piled up during the code freeze and release cycle, we also have a couple of interesting  
-3rd party efforts such as an independent Windows Phone port and websockets implementation. But first let's start with  
-Facebook's "invite friends" feature. Historically with the Facebook API you could just use the Graph API to query  
+3rd party efforts such as an independent Windows Phone port and websockets implementation. But first let’s start with  
+Facebook’s "invite friends" feature. Historically with the Facebook API you could just use the Graph API to query  
 Facebook for the list of friends. This will return an empty list now and will only expose friends who are already using the  
 app. You can use the standard share button or Facebook share both of which are great options to promote your app.  
 However, Facebook also has a special native API allowing the user to invite his friends into the app… 
 
-The `FacebookConnection` class now has support for that feature, it's a non-trivial feature and you will need to activate  
-some options within the Facebook application in order to fully utilize it but it's a pretty powerful feature if you use  
+The `FacebookConnection` class now has support for that feature, it’s a non-trivial feature and you will need to activate  
+some options within the Facebook application in order to fully utilize it but it’s a pretty powerful feature if you use  
 Facebook login and want to promote your app socially. 
 
 #### Windows Phone Port
@@ -27,7 +27,7 @@ Facebook login and want to promote your app socially.
 As you may recall, we are taking a ["wait and see"  
 approach for the future of the Windows Phone port](/blog/login-tutorials-future-of-windows-phone.html) based on MS’s historical flakiness when committing to  
 technologies. However, some developers need to release a version to Windows Phone now and Fabricio who is one such developer  
-took it upon himself to improve the current port with some interesting results. You can check out his company's project  
+took it upon himself to improve the current port with some interesting results. You can check out his company’s project  
 [here](https://github.com/Pmovil/CN1WindowsPort). 
 
 There are several inherent problems that would be harder still to fix, they derive from the C# based port that relies on  
@@ -53,7 +53,7 @@ about websockets, is that you can just program to it using a webserver with URL 
 a lot of the hassle you might have normally with socket programming. 
 
 As part of the release [Steve](http://sjhannah.com/) also added a chat app that  
-communicates between users. It's a really interesting approach and you might find it very useful if you want to  
+communicates between users. It’s a really interesting approach and you might find it very useful if you want to  
 integrate chat functionality in your application. 
 
 #### URLImage.createMaskAdapter
@@ -103,7 +103,7 @@ Up until now handcoded Codename One apps had a pretty standard set of boilerplat
         e.printStackTrace();
     }
 
-It's redundant since it's rarely changed by users and when it is changed it's usually with one purpose (setting  
+It’s redundant since it’s rarely changed by users and when it is changed it’s usually with one purpose (setting  
 a specific theme). So rather than write all that code we now use: 
     
     
@@ -131,7 +131,7 @@ and that’s really useful when we want to do something like:
 
 Which allows us to effectively sort an array or collection based on a string element very easily. However, having this  
 in the `String` class is painful when we have to do it to multiple platforms. Furthermore this approach is  
-inefficient since the object needs to be instantiated even when it's unused so we’d rather not add something like  
+inefficient since the object needs to be instantiated even when it’s unused so we’d rather not add something like  
 that to a mobile device platform where every KB counts.  
 As a result we decided to add the class `CaseInsensitiveOrder` which is effectively almost identical: 
     

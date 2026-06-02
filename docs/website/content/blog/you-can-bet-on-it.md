@@ -22,7 +22,7 @@ mobile gaming article
   
 The game took 270 lines of code (including imports,  
   
-it's a bit larger now since I commented the code quite a bit  
+it’s a bit larger now since I commented the code quite a bit  
   
 ), it took me roughly 2 hours to write that code.  
   

@@ -30,13 +30,13 @@ rather than build them into Codename One itself, the reasoning is two fold:
 
 2\. Since Maps are VERY complex we wanted to give developers the ability to customize the native code easily.
 
-Going forward we might introduce more and more extensions as cn1libs rather than as builtin functionality. There is one drawback we didn’t predict though, Google's Map API for iOS is 50mb in size which makes sending the builds pretty slow. This is solveable by changing the compression option in the project properties to compress the jar, it is still pretty large though.
+Going forward we might introduce more and more extensions as cn1libs rather than as builtin functionality. There is one drawback we didn’t predict though, Google’s Map API for iOS is 50mb in size which makes sending the builds pretty slow. This is solveable by changing the compression option in the project properties to compress the jar, it is still pretty large though.
 
 To browse/checkout the code/demo-test for maps just go to the project page  
 [  
 here  
 ](https://github.com/codenameone/codenameone-google-maps)  
-. For simplicity's sake you can just  
+. For simplicity’s sake you can just  
 [  
 download the binary here  
 ](https://github.com/codenameone/codenameone-google-maps/raw/master/GoogleMaps.cn1lib)  

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/first-uwp-app-and-the-way-forward/solitaire-uwp.jpg)
 
-> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+> **Historical note:** Codename One’s UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
 
 The UWP (Universal Windows Platform) port is finally stable enough to get an  
 [app into the Microsoft store](https://www.microsoft.com/en-us/store/p/codename-one-solitaire/9nblggh51z60).  

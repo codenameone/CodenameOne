@@ -22,7 +22,7 @@ author: Shai Almog
 
 For the uninitiated, ARC is Apple’s term for Automatic Reference Counting. Objective-C uses a reference counting scenario to collect objects which is pretty painful to work with. Personally I preferred C/C++’s manual delete/free to the Objective-C semantics. But a couple of years ago Apple introduced ARC in which the compiler implicitly inserts the retain/release reference counting logic. 
 
-While it's a big improvement it's still a reference counter with many of the implied limitations. It solves 95% of your memory handling logic leaving the hardest 5% for you to deal with manually but it does have one advantage over a GC: determinism. Since memory is deallocated immediately it provides consistent performance with no GC stalls.
+While it’s a big improvement it’s still a reference counter with many of the implied limitations. It solves 95% of your memory handling logic leaving the hardest 5% for you to deal with manually but it does have one advantage over a GC: determinism. Since memory is deallocated immediately it provides consistent performance with no GC stalls.
 
 We briefly covered the garbage collection approach we took with the new iOS VM, however this time we’ll go more in-depth into the implementation details. Our goal with the garbage collection was not to create the fastest GC possible but the one that stalls the least. Up to now pretty much all open source/iOS VM’s used Boehm GC which is a conservative GC designed for C, it is state of the art and pretty cool but stalls.  
   
@@ -44,7 +44,7 @@ Simple, we don’t de-allocate. All objects that our reference counter deems to 
 
 Our GC never actually pauses the world, it uses a simple mark sweep cycle where we iterate the thread stacks and mark all objects in use, we then iterate all the objects in the world and delete the living, unmarked objects. Since deletion of GC’d and reference counted objects is always done in the GC thread this is pretty easy and thread safe on the VM part. The architecture is actually rather simple and conservative.
 
-The benefit of the reference counting approach becomes very clear with the non-pausing GC, since the reference counting system still kicks out objects from RAM the GC serves only for the heavy lifting. So it can be executed less frequently and it's OK for it to miss quite a few objects as the reference counting implementation will pick up the slack.
+The benefit of the reference counting approach becomes very clear with the non-pausing GC, since the reference counting system still kicks out objects from RAM the GC serves only for the heavy lifting. So it can be executed less frequently and it’s OK for it to miss quite a few objects as the reference counting implementation will pick up the slack.
 
 We are still working on getting this into users' hands ideally within the next couple of weeks (albeit in alpha state) and eventually open sourcing all of that code.
 

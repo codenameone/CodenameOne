@@ -15,7 +15,7 @@ author: Shai Almog
   
   
 [  
-![Uh... I'm standing on stage next to James Gosling during rehearsal. Achievement unlocked.](/blog/java-one-detailed-trip-report/java-one-detailed-trip-report-1.png)  
+![Uh... I’m standing on stage next to James Gosling during rehearsal. Achievement unlocked.](/blog/java-one-detailed-trip-report/java-one-detailed-trip-report-1.png)  
 ](https://twitter.com/SeanMiPhillips)  
   
   

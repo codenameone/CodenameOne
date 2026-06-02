@@ -25,7 +25,7 @@ You can check out the press release and full announcement [here](/files/pr/Coden
 ____New iOS VM
 
 When Codename One debuted we used XMLVM as the underlying iOS virtual  
-machine abstraction. XMLVM is an excellent product but it's unmaintained and its goals are too different from the  
+machine abstraction. XMLVM is an excellent product but it’s unmaintained and its goals are too different from the  
 goals of Codename One. The new VM includes some features that would be remarkably hard to achieve with XMLVM  
 such as: proper stack traces, faster builds (2x overall!), smaller code size, concurrent GC, deep OS binding (String – NSString relationship) etc.  
 Read more about this work on [the announcement blog](/blog/new-codename-one-ios-vm-is-now-the-default.html). 
@@ -104,7 +104,7 @@ Read more about this work on [this blog post](/blog/html-hierarchy-release-plan-
 ____New Morph & Flip Transitions
 
 The [morph transition](/blog/mighty-morphing-components.html) was inspired by the Material design UI, converting a component on one form to  
-a component on another form. The [flip transition](/blog/easy-demos-flip-more.html) provides an impressive 3d effect that's trivial to apply  
+a component on another form. The [flip transition](/blog/easy-demos-flip-more.html) provides an impressive 3d effect that’s trivial to apply  
 to any form or transition. 
 
 ____InteractionDialog

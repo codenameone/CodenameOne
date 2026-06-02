@@ -201,7 +201,7 @@ I think the best way to show the use of this API is an actual complete example, 
                     // this is the case of a network error,
                     // like: java.io.IOException: Unreachable
                     Log.p("Error connectiong to: " + err.getConnectionRequest().getUrl(), Log.ERROR);
-                    // maybe there are connectivity issues, let's try again
+                    // maybe there are connectivity issues, let’s try again
                     ToastBar.showInfoMessage("Reconnect...");
                     Timer timer = new Timer();
                     timer.schedule(new TimerTask() {

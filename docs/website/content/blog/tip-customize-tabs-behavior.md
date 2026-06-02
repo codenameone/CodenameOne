@@ -68,7 +68,7 @@ The result looks pretty much like a standard tabs only it allows line breaks and
 
 Figure 1. Portrait mode shows the line break in place
 
-![In landscape we have more space so a line break isn't necessary](/blog/tip-customize-tabs-behavior/multiline-tabs-2.png)
+![In landscape we have more space so a line break isn’t necessary](/blog/tip-customize-tabs-behavior/multiline-tabs-2.png)
 
 Figure 2. In landscape we have more space so a line break isn’t necessary
 ---

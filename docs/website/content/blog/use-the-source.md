@@ -30,13 +30,13 @@ minor correction to the build process about the `build.xml` issue in the Codenam
   
   
   
-To me the biggest advantage in Codename One over pretty much any other mobile solution is that it's realistically open source. Realistically means that even an average developer can dig into 90% of the Codename One source code, change it and contribute to it! 
+To me the biggest advantage in Codename One over pretty much any other mobile solution is that it’s realistically open source. Realistically means that even an average developer can dig into 90% of the Codename One source code, change it and contribute to it! 
 
   
 However, sadly most developers don’t even try and most of those who do focus only on the aspect of building for devices rather than the advantage of much easier debugging. By incorporating the Codename One sources you can instantly see the effect of changes we made in SVN without waiting for a plugin update. You can debug into Codename One code which can help you pinpoint issues in your own code and also in resolving issues in ours!  
 
   
-It's REALLY easy too!  
+It’s REALLY easy too!  
 
   
 Start by  

@@ -13,7 +13,7 @@ author: Shai Almog
 
 Devices have sensors such as accelerometer, GPS and up until now our support for them was relatively basic.  
 Chen recently introduced a [cn1lib](https://github.com/chen-fishbein/sensors-codenameone)  
-that includes support for various types of sensors on the device. It's really simple to use: 
+that includes support for various types of sensors on the device. It’s really simple to use: 
     
     
     SensorsManager sensor = SensorsManager.getSenorsManager(SensorsManager.TYPE_ACCELEROMETER);

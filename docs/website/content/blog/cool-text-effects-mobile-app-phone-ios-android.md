@@ -103,13 +103,13 @@ Since `TTFFonts` are actually rendered in CN1 as shapes, they will be slower tha
         // Stroke with red 1px outline
     
     font = font.deriveStroked(Stroke(1f, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f), null);
-        // Stroked - stroke color determined by graphics context's current color.. e.g. defers to Style's foreground color
+        // Stroked - stroke color determined by graphics context’s current color.. e.g. defers to Style’s foreground color
     
     font = font.deriveStroked(null, 0x0);
         // Not stroked
     
     font = font.deriveFilled(true, null);
-        // Filled - fill color determined by graphics context's current color.. e.g. defers to Style's foreground color
+        // Filled - fill color determined by graphics context’s current color.. e.g. defers to Style’s foreground color
     
     font = font.deriveFilled(true, 0x00ff00);
         // Filled with green

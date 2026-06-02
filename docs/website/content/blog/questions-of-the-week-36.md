@@ -13,7 +13,7 @@ author: Shai Almog
 
 We had to push out an update to the IntelliJ/IDEA plugin to workaround an issue that started happening with their  
 latest IDE update. The 3.5.11 version didn’t change much just fixed those specific issues. Other than that this  
-week's release includes some new In-App-Purchase features (that we will discuss next week) and the new  
+week’s release includes some new In-App-Purchase features (that we will discuss next week) and the new  
 seamless caching API discussed yesterday.
 
 One of the features we didn’t mention this week in the posts is a new ability to set the default size of a floating  

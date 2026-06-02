@@ -73,7 +73,7 @@ While all of the above are totally fine, you can’t grow a community based on t
 new things, the students will graduate to do something else and the hardcore fans…  
 They might be left with nothing as the platform declines. 
 
-I’ll cover the "why should we care" down this post but first let's talk about the proof for the hardcore fans. 
+I’ll cover the "why should we care" down this post but first let’s talk about the proof for the hardcore fans. 
 
 ### Proof JavaFX Doesn’t Have Traction
 

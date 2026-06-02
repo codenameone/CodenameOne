@@ -90,7 +90,7 @@ So let’s find out if this constraint will be obeyed.
        // Yay! This platform supports our constraint, so the captured video will
        // be exactly 320x240.
     } else {
-       // Not supported... let's see if the platform will at least try to accommodate us
+       // Not supported... let’s see if the platform will at least try to accommodate us
        int effectiveWidth = cnst.getWidth();
        int effectiveHeight = cnst.getHeight();
        int quality = cnst.getQuality();
@@ -103,7 +103,7 @@ So let’s find out if this constraint will be obeyed.
               // be set to QUALITY_LOW
            }
        } else {
-           // The platform couldn't capture at 320x240, but it has provided an
+           // The platform couldn’t capture at 320x240, but it has provided an
            // alternate size that is as close to that as possible.
        }
     }

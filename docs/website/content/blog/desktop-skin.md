@@ -25,7 +25,7 @@ Figure 2. The desktop skin running the kitchen sink demo
 
 ### Desktop Features
 
-We’ve been moving slowly to improve Codename One's desktop support. Our own tools are already mostly written using Codename One (GUI builder, Settings).
+We’ve been moving slowly to improve Codename One’s desktop support. Our own tools are already mostly written using Codename One (GUI builder, Settings).
 
 We already feel that using Codename One in a desktop setting can produce a decent result in the right hands and we know a few people do exactly that. However, it’s hard for us to gauge expectations and desires from customers without feedback. When we build our own apps we use a lot of tricks we never bother to publish as our use cases are usually edge cases.
 

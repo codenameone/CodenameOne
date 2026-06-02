@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/uwp-update/uwp-on-codenameone.jpg)
 
-> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+> **Historical note:** Codename One’s UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
 
 We’ve mentioned the progress we made with the Universal Windows Platform support in the past. This support  
 is moving at a very fast pace…​  

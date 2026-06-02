@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/toolbar-back-easier-material-icons/back-arrow.png)
 
-When we initially launched Codename One it was pretty hard to imagine today's apps. Menus and back navigation  
+When we initially launched Codename One it was pretty hard to imagine today’s apps. Menus and back navigation  
 were miles apart when comparing Android 2.x and iOS 4.x…​ So we created a very elaborate set of abstractions  
 (command behavior) that served as a set of patch framework we could live with for a while.
 

@@ -27,7 +27,7 @@ Hamburger Menu
 ) since we initially launched it. We now support a lot of new features seamlessly such as swiping the sidemenu in/out and various other capabilities. The other day we added support for side menus on the right and top as well as multiple buttons on the side menu title bar. 
 
   
-So let's get started with the features, first is one of the newer features up our sleeve, the ability to place a side menu on the right, top or on both sides of the title (as in the facebook app). You can  
+So let’s get started with the features, first is one of the newer features up our sleeve, the ability to place a side menu on the right, top or on both sides of the title (as in the facebook app). You can  
   
 accomplish this by using something like `cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);`
 
@@ -41,7 +41,7 @@ One of the nice things about the side menu bar is that you can add just about an
   
   
 
-This is remarkably useful but it's also somewhat problematic for some developers, the SideMenuBar is pretty complex so if we just set a button to the custom component and invoke showForm() we will not have any transition out of the side menu bar. Thankfully we added several options to solve these issues.  
+This is remarkably useful but it’s also somewhat problematic for some developers, the SideMenuBar is pretty complex so if we just set a button to the custom component and invoke showForm() we will not have any transition out of the side menu bar. Thankfully we added several options to solve these issues.  
   
   
 The first is actionable which you enable by just turning it on as such: cmd  
@@ -51,7 +51,7 @@ The first is actionable which you enable by just turning it on as such: cmd
   
 This effectively means that the custom  
   
-component will look exactly the same, but when it's touched/clicked it will act like any other command on the list. This uses a lead component trick to make the hierarchy (or component) in customCmp act as a single action.
+component will look exactly the same, but when it’s touched/clicked it will act like any other command on the list. This uses a lead component trick to make the hierarchy (or component) in customCmp act as a single action.
 
   
 There are several additional options that allow you to just bind action events and then "manage" the SideMenuBar e.g.:  
@@ -79,7 +79,7 @@ e also have some helpful theme constants within the side menu bar that you might
   
 
   * sideMenuImage – pretty obvious, this is the hamburger image we use to open the menu. 
-  * sideMenuPressImage – this is the pressed version of the image above. It's optional and the sideMenuImage will be used by default. 
+  * sideMenuPressImage – this is the pressed version of the image above. It’s optional and the sideMenuImage will be used by default. 
   * rightSideMenuImage/rightSideMenuPressImage – identical to the sideMenuImage/sideMenuPressImage only specific to the right side navigation.  
 
   * sideMenuFoldedSwipeBool – by default a swipe will open the side menu. You can disable that functionality by setting this theme constant to false. 

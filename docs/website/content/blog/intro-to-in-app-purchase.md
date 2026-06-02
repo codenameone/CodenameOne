@@ -99,7 +99,7 @@ Now in the start method, we’ll add a button that allows the user to buy the wo
             Button buyWorld = new Button("Buy World");
             buyWorld.addActionListener(e->{
                 if (Purchase.getInAppPurchase().wasPurchased(SKU_WORLD)) {
-                    Dialog.show("Can't Buy It", "You already Own It", "OK", null);
+                    Dialog.show("Can’t Buy It", "You already Own It", "OK", null);
                 } else {
                     Purchase.getInAppPurchase().purchase(SKU_WORLD);
                 }

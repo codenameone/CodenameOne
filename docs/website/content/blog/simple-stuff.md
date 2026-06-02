@@ -92,7 +92,7 @@ You should show a progress dialog while it is running since it might take some t
   
   
   
-It's not an ideal way to track location, this is only for relatively simple use cases.  
+It’s not an ideal way to track location, this is only for relatively simple use cases.  
   
   
   
@@ -104,7 +104,7 @@ On a different note I was reviewing code for one of our enterprise customers and
 Back when they launched their new analytics for applications support, they didn’t have a REST API so we had to use the WEB API which sucks!  
 
   
-The customer in question agreed to contribute the code which I assimilated into our Analytics API. It's off by default but if you will invoke AnaliticsService.  
+The customer in question agreed to contribute the code which I assimilated into our Analytics API. It’s off by default but if you will invoke AnaliticsService.  
   
 setAppsMode(true) app tracking should start using the new Google API which might have quite a few advantages for you. We didn’t get a chance to test it much but it should be pretty cool.  
 

@@ -51,9 +51,9 @@ if (Font.isTrueTypeFileSupported()) {
 }
 ```
   
-Notice that in code only pixel sizes are supported so it's up to you to decide how to convert that. You also need to derive the font with the proper size unless you want a 0 sized font which probably isn’t very useful.  
+Notice that in code only pixel sizes are supported so it’s up to you to decide how to convert that. You also need to derive the font with the proper size unless you want a 0 sized font which probably isn’t very useful.  
   
-The font name is the difficult bit, iOS requires the name of the font which doesn’t always correlate to the file name in order to load the font, it's sometimes viewable within a font viewer but isn’t always intuitive so be sure to test that on the device to make sure you got it right. 
+The font name is the difficult bit, iOS requires the name of the font which doesn’t always correlate to the file name in order to load the font, it’s sometimes viewable within a font viewer but isn’t always intuitive so be sure to test that on the device to make sure you got it right. 
 
 * * *
 

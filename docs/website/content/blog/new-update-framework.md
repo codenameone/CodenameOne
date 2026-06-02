@@ -34,7 +34,7 @@ You can also use the usual method of Codename One Settings → Basic → Update 
 
 ### How does it Work?
 
-You can see the full code [here](https://github.com/codenameone/UpdateCodenameOne) the gist of it is very simple. We create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the user's home directory).
+You can see the full code [here](https://github.com/codenameone/UpdateCodenameOne) the gist of it is very simple. We create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the user’s home directory).
 
 An update happens by running this tool with a path to a Codename One project e.g.:
     

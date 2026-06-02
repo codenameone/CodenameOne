@@ -46,7 +46,7 @@ So why add native widgets at all?
   
 We need the native device to do input, html rendering etc. these are just too big and too complex tasks for us to do from scratch.
 
-So what's the problems with native widgets?  
+So what’s the problems with native widgets?  
   
 Codename One does pretty much everything on the EDT (Event Dispatch Thread), this provides a lot of cool features e.g. modal dialogs, invokeAndBlock etc. however native widgets have to be drawn on their own thread… So the process for drawing a native widget has to occur in the native rendering thread. This means that drawing looks something like this:  
   

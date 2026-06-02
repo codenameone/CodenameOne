@@ -45,7 +45,7 @@ Yes. If you ever cancel your account you’d revert to paid mode and still have 
 
 #### How does this Work?
 
-The referral URL sets a cookie in the user's browser that is active for 6 months. If during those 6 months the user signs up he is counted.  
+The referral URL sets a cookie in the user’s browser that is active for 6 months. If during those 6 months the user signs up he is counted.  
 You would need to promote Codename One to your friends/social network to get the additional credits.
 
 #### What if a User Clicks two URL’s?

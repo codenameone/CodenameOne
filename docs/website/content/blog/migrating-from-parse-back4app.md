@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/migrating-from-parse-back4app/parse.com-post-header.jpg)
 
-A couple of years ago I wrote an app for my spouse's yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
+A couple of years ago I wrote an app for my spouse’s yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
 
 As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](/blog/how-i-chose-my-replacement-for-parse-com/) detailing the various [options](/blog/how-i-chose-my-replacement-for-parse-com-part-2/) I thought it might be possible to take the "lazy approach".
 

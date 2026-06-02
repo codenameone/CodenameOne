@@ -15,7 +15,7 @@ Our existing Windows Phone port has already gone thru 3 rewrites and a community
 at work on the 4th rewrite (or 5th counting the community port). However, we decided to take a radically different  
 direction with the new port and with backwards compatibility to allow better scale.
 
-So let's start with the "bad news" and follow by an explanation of why and how we plan to do that.
+So let’s start with the "bad news" and follow by an explanation of why and how we plan to do that.
 
 ### Dropping Windows Phone 8 Support
 

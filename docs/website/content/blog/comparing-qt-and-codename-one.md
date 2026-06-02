@@ -50,7 +50,7 @@ App Distribution |  Only with active subscription |  Perpetual
 
 #### Language
 
-While QT supports QML (an XML flavor) with JavaScript bindings. QT at it’s base is C based. If you need to integrate a native widget like Google's native maps or similar capabilities you need to do this via C.
+While QT supports QML (an XML flavor) with JavaScript bindings. QT at it’s base is C based. If you need to integrate a native widget like Google’s native maps or similar capabilities you need to do this via C.
 
 This might be challenging as most of the integration documentation for various libraries is in Java, Objective-C.  
 Binding an iOS/Android SDK to QT might not be trivial. C++ isn’t garbage collected or "safe" and is a challenging  

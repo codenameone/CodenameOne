@@ -27,7 +27,7 @@ guiding you thru the process of using it
 . 
 
   
-If you didn’t use Codename One LIVE! in the past it's a really cool tool that allows you to instantly preview the design you build within the GUI builder right on the device. This works seamlessly for all devices although for iOS it's difficult to get an app like that thru itunes and it requires a jailbroken device (unlike regular Codename One apps).  
+If you didn’t use Codename One LIVE! in the past it’s a really cool tool that allows you to instantly preview the design you build within the GUI builder right on the device. This works seamlessly for all devices although for iOS it’s difficult to get an app like that thru itunes and it requires a jailbroken device (unlike regular Codename One apps).  
   
   
   

@@ -259,7 +259,7 @@ On the server-side, our REST controller is a standard JAX-RS REST interface. I u
             // Save the receipt first in case something goes wrong in the validation stage
             super.create(entity);
     
-            // Let's validate the receipt
+            // Let’s validate the receipt
             validateAndSaveReceipt(entity);
                 // validates the receipt against appropriate web service
                 // and updates database if expiry date has changed.
@@ -417,8 +417,8 @@ You are now ready to see the full magic of the `validateAndSaveReceipt()` method
                     Receipt[] result = validator.validate(r2);
                     // Depending on the platform, result may contain many receipts or a single receipt
                     // matching our receipt.  In the case of iTunes, none of the receipt transaction IDs
-                    // might match the original receipt's transactionId because the validator
-                    // will set the transaction ID to the *original* receipt's transaction ID.
+                    // might match the original receipt’s transactionId because the validator
+                    // will set the transaction ID to the *original* receipt’s transaction ID.
                     // If none match, then we should remove our receipt, and update each of the returned
                     // receipts in the database.
                      Receipt matchingValidatedReceipt = null;
@@ -430,9 +430,9 @@ You are now ready to see the full magic of the `validateAndSaveReceipt()` method
                     }
     
                     if (matchingValidatedReceipt == null) {
-                        // Since the validator didn't find our receipt,
+                        // Since the validator didn’t find our receipt,
                         // we should remove the receipt.  The equivalent
-                        // is stored under the original receipt's transaction ID
+                        // is stored under the original receipt’s transaction ID
                         if (managedReceipt != null) {
                             em.remove(managedReceipt);
                             managedReceipt = null;
@@ -469,8 +469,8 @@ You are now ready to see the full magic of the `validateAndSaveReceipt()` method
     
                 } catch (Exception ex) {
                     // We should probably store some info about the failure in the
-                    // database to make it easier to find receipts that aren't validating,
-                    // but for now we'll just log it.
+                    // database to make it easier to find receipts that aren’t validating,
+                    // but for now we’ll just log it.
                     Log.p("Failed to validate receipt "+r2);
                     Log.p("Reason: "+ex.getMessage());
                     Log.e(ex);

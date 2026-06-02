@@ -46,7 +46,7 @@ Then we need to implement the following methods:
             try {
                 JSONObject obj = new JSONObject(value);
     
-                // this is still early since we probably didn't login yet so add the messages to the list of pending messages
+                // this is still early since we probably didn’t login yet so add the messages to the list of pending messages
                 java.util.List<Message> pendingMessages = (java.util.List<Message>)Storage.getInstance().readObject("pendingMessages");
                 if(pendingMessages == null) {
                     pendingMessages = new ArrayList<>();
@@ -198,7 +198,7 @@ later.
 Now we need to register for push, in the end of the `start()` method in `SocialChat.java` we add:
     
     
-    // let the login form show before we register the push so the permission screen doesn't appear on a white
+    // let the login form show before we register the push so the permission screen doesn’t appear on a white
     // background
     Display.getInstance().callSerially(() -> {
         // registering for push after the UI appears
@@ -257,12 +257,12 @@ the relevant section here:
     
     String pid = Preferences.get("pid-" + tokenPrefix + d.uniqueId, null);
     if(pid != null) {
-        // if we have a push address for the contact we can send them a push if they aren't reachable...
+        // if we have a push address for the contact we can send them a push if they aren’t reachable...
         UITimer timeout = new UITimer(() -> {
             if(pendingAck.contains(tokenPrefix + d.uniqueId)) {
                 pendingAck.remove(tokenPrefix + d.uniqueId);
                 // send two messages, one hidden with the data as JSON for parsing on the client
-                // the other one visible with the text that should appear to the user who isn't running
+                // the other one visible with the text that should appear to the user who isn’t running
                 // the app, this will allow him to launch the app and then receive the hidden message immediately
                 // within the app
                 String cert = ITUNES_DEVELOPMENT_PUSH_CERT;
@@ -279,7 +279,7 @@ the relevant section here:
                 } else {
                     chatArea.removeComponent(t);
                     chatArea.revalidate();
-                    Dialog.show("Error", "We couldn't reach " + d.name + " thru push", "OK", null);
+                    Dialog.show("Error", "We couldn’t reach " + d.name + " thru push", "OK", null);
                 }
             }
         });

@@ -15,7 +15,7 @@ We just released the first version of the open source
 [CN1Cordova project](https://github.com/codenameone/CN1Cordova) on github. This  
 means you can take a common Cordova/PhoneGap app, import it into NetBeans and  
 build a native app using our cloud build servers without any changes!  
-Before we delve into the exact process of converting an app let's start by reviewing the exact benefits  
+Before we delve into the exact process of converting an app let’s start by reviewing the exact benefits  
 PhoneGap/Cordova developers can gain from Codename One. You can also check out the video tutorial and  
 slides below. 
 
@@ -42,7 +42,7 @@ ____Better Protection Of IP
 Cordova/PhoneGap apps are effectively just a set of HTML/JavaScript & CSS files.  
 Since native packaging is "just a zip file", it triggered a cottage industry of unzipping such applications and reselling them thru  
 other accounts/stores.  
-It's much harder to do this for compiled applications, making the Java code in Codename One more opaque to the  
+It’s much harder to do this for compiled applications, making the Java code in Codename One more opaque to the  
 casual hacker. If your application contains sensitive logic you can code it in Java for extra security. We are also considering  
 a hardened version of the PhoneGap integration that will encrypt the files within making the process even more secure. 
 
@@ -78,7 +78,7 @@ plugin functionality is already supported in the core Codename One Java API, thi
 for most cases. 
 
 Currently the browser component used in Codename One is based on the JavaFX browser component which  
-is pretty awful. It's based on webkit but has many limitations in regard to full HTML5 compliance and doesn’t  
+is pretty awful. It’s based on webkit but has many limitations in regard to full HTML5 compliance and doesn’t  
 correctly specify things such as user-agent. It does work with most JavaScript frameworks correctly though.  
 We have plans to replace that component with a more mature browser component based on chromium  
 if there is enough community interest to justify the effort. 

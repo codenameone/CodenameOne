@@ -15,7 +15,7 @@ It’s been a hectic month getting the academy up and orchestrating the release.
 
 ### Kotlin
 
-As you recall I published a Kotlin survey a while back and we didn’t publish the results. Some of the results were a bit surprising…​ Let's review some of the answers.
+As you recall I published a Kotlin survey a while back and we didn’t publish the results. Some of the results were a bit surprising…​ Let’s review some of the answers.
 
 ![How do you use Kotlin today?](/blog/survey-results-kotlin-updates-news/survey-how-kotlin-today.png)
 

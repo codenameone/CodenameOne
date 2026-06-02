@@ -132,7 +132,7 @@ The mask and image sizes must be identical, we throw this exception to prevent w
 
 ### Component not showing when swipeable container is swiped using code
 
-This is a bit hidden knowledge that's required for working with this
+This is a bit hidden knowledge that’s required for working with this
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39776900/component-not-showing-when-swipeable-container-is-swiped-using-code)
 

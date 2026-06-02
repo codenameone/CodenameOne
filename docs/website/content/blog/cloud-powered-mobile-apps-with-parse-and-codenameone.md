@@ -360,7 +360,7 @@ It allows you to create a local version of the Parse app, in so much as developi
     Type "(n)ew" or "(e)xisting": e
     1:	Social Demo
     Select an App to add to config: 1
-    Awesome! Now it's time to setup some Cloud Code for the app: "Social Demo",
+    Awesome! Now it’s time to setup some Cloud Code for the app: "Social Demo",
     Next we will create a directory to hold your Cloud Code.
     Please enter the name to use for this directory,
     or hit ENTER to use "Social Demo" as the directory name.

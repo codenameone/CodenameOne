@@ -27,7 +27,7 @@ We just added an experimental feature to connection request that allows you to s
 
   * **MANUAL** means that the developer is responsible for the actual caching but the system will not do a request on a resource that’s already "fresh"
 
-  * **OFFLINE** will fetch data from the cache and won't try to go to the server. It will generate a 404 error if data isn’t available
+  * **OFFLINE** will fetch data from the cache and won’t try to go to the server. It will generate a 404 error if data isn’t available
 
 You can toggle these in the specific request by using `setCacheMode(CachingMode)` and set the global  
 default using `setDefaultCacheMode(CachingMode)`.

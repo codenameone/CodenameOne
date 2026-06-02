@@ -134,7 +134,7 @@ For example, suppose I want to place a text field in the center of the form (bot
 
 This would result in:
 
-![Button's left inset linked to text field](/blog/gui-builder-improvements-3-7/guibuilder-2-insets-3.png)
+![Button’s left inset linked to text field](/blog/gui-builder-improvements-3-7/guibuilder-2-insets-3.png)
 
 The two active lines here are the last two:
     

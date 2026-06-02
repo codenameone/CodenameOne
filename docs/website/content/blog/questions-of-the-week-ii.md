@@ -21,7 +21,7 @@ an issue with the web browser component. It turns out that we just fixed that sp
 moving into the final stretch before 3.4.
 
 However, I did mention an interesting project which didn’t get much attention there,  
-[Steve's xml view](https://github.com/shannah/cn1-xmlview). You might want to check that out.
+[Steve’s xml view](https://github.com/shannah/cn1-xmlview). You might want to check that out.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/36708229/codenameone-alternative-to-webbrowsers)
 

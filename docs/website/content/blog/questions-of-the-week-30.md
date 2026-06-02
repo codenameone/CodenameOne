@@ -30,7 +30,7 @@ Generally this sort of code should work fine unless something odd happens or a s
 
 ### DNS problems in Codename One
 
-This is quite misleading, it turns out that this is just another case of confusion over Apple's strict HTTPS policy
+This is quite misleading, it turns out that this is just another case of confusion over Apple’s strict HTTPS policy
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40387820/dns-problems-in-codename-one)
 

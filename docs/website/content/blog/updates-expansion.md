@@ -19,7 +19,7 @@ We’ve also made some hirings in the development area which I’m pretty bullis
 
 ### Location Regression
 
-Over the weekend we had a hard time with the location API on Android. In fact we had that last weekend too and we eventually reverted last week's release to the one from the prior week. This week we pushed through and hopefully we resolved the issues. However, if you’re experiencing issues with the location API please let us know ASAP.
+Over the weekend we had a hard time with the location API on Android. In fact we had that last weekend too and we eventually reverted last week’s release to the one from the prior week. This week we pushed through and hopefully we resolved the issues. However, if you’re experiencing issues with the location API please let us know ASAP.
 
 The reason behind this is the usual flurry with Google. They keep changing the behavior of devices with every API update. This is very problematic for applications that rely on background location, as such it forced us to update to play services version `12.0.0` which caused a cascade of issues across the board. Unfortunately this is inevitable as Google requires updates to newer versions for app submissions.
 

@@ -68,7 +68,7 @@ The use case that we were provided with included hundreds of method invocations 
 
 The resulting C-code for each of these would be over 20 lines of code. It would add the shape and each of the numbers to the stack, then call the function which would unwind the stack.
 
-I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang's "hanging" problem, and improved performance.
+I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang’s "hanging" problem, and improved performance.
 
 ### Let’s do ALL the Optimizations!
 

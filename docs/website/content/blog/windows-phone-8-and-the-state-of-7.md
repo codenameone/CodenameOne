@@ -45,7 +45,7 @@ So Codename One is based on the XAML API.
 Most people would think of XAML as an XML based API, but you can use it from C# and just ignore most of the XML aspects of it which is what we need since our UI is constructed dynamically. However, this is more complicated than it seems.  
 
   
-To understand the complexity you need to understand the idea of a Scene Graph. If you used Codename One you are using a more immediate mode graphics API, where the paint method is invoked and just paints the component whenever it's needed. This is the simplest most portable way of doing graphics and is pretty common, it's used natively by Android, OpenGL, Direct3D etc. and is very familiar to developers.  
+To understand the complexity you need to understand the idea of a Scene Graph. If you used Codename One you are using a more immediate mode graphics API, where the paint method is invoked and just paints the component whenever it’s needed. This is the simplest most portable way of doing graphics and is pretty common, it’s used natively by Android, OpenGL, Direct3D etc. and is very familiar to developers.  
 
   
 In recent years many Scene Graph API’s sprung up, XAML is one of them and so is JavaFX, Flash, SVG and many others. In a Scene Graph world you construct a graphics hierarchy and then let it be rendered, the whole paint() sequence is hidden from the developer. The best way to explain it is that our components in Codename One are really a scene graph, only at a higher abstraction level. Windows/Flash placed the scene graph on the graphics as well, so to draw a rectangle you would just add it to the tree (and remove it when you no longer need it).  
@@ -57,7 +57,7 @@ This is actually pretty powerful, you can do animations just by changing compone
 However, the reality of this is that most developers find these API’s harder to work with (since they need to keep track of a rather complex unintuitive tree), the API’s aren’t portable at all since the hierarchies are so different. Performance is also very hard to tune since so much is hidden by the underlying hidden paint logic.  
 
   
-For Codename One this is a huge problem, we need our API to act as if it's painting in immediate mode while constructing/updating a scene! When we initially built this the performance was indeed as bad as you might imagine. While we are not in the clear yet, the performance is much improved…  
+For Codename One this is a huge problem, we need our API to act as if it’s painting in immediate mode while constructing/updating a scene! When we initially built this the performance was indeed as bad as you might imagine. While we are not in the clear yet, the performance is much improved…  
 
   
 How did we solve this?  
@@ -69,7 +69,7 @@ There are several different issues involved, the first is the number of elements
 When painting a component in Codename One we normally traverse up the component tree and paint the first opaque component forward (known as painters algorithm) however, since the scene already has the parent component painting it again would result in many copies of the image being within the scene graph. E.g. I have a background image on a form, when painting a translucent label I have to paint the background image within a clipping region matching the label…. In the Windows Phone port we have a special hook that just disables this functionality, this hook alone pushed us over the top to reasonable graphics performance!  
 
   
-We are working on getting additional performance oriented features into place and fixing some issues related to this approach, it's not a simple task since the API wasn’t designed with this in mind but it is doable. We would appreciate you taking the time to review the port  
+We are working on getting additional performance oriented features into place and fixing some issues related to this approach, it’s not a simple task since the API wasn’t designed with this in mind but it is doable. We would appreciate you taking the time to review the port  
   
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.

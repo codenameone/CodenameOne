@@ -27,7 +27,7 @@ I hope that this addition to the designer will make the creation of great lookin
 
 ![The round border support in the designers border section](/blog/round-border-in-the-designer/round-border-in-designer.png)
 
-Figure 1. The round border support in the designer's border section
+Figure 1. The round border support in the designer’s border section
 
 ---
 

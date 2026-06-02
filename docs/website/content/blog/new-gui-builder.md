@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/new-gui-builder/new-gui-builder-preview.png)
 
 Our GUI builder is the result of many twists and turns in our product line mostly due to corporate bureaucracy  
-hacks and last minute deadlines from our days at Sun. It's also written using Swing which is pretty much a dead  
+hacks and last minute deadlines from our days at Sun. It’s also written using Swing which is pretty much a dead  
 end API that isn’t seeing any maintenance and since FX is even worse off there isn’t much hope for the  
 tools future.  
 The GUI builder is also one of the most controversial parts of our UI. While it has its strengths and simplicities its  

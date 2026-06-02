@@ -29,8 +29,8 @@ includes 630 well commented lines of code (including imports and boilerplate) wi
 designs. This makes the Codename One implementation the smallest one we can find in the native tools  
 implementations (in some cases 5x smaller).
 
-In fact Codename One's implementation is so terse it is smaller than most HTML5 implementations despite  
-JavaScript's famed terseness.
+In fact Codename One’s implementation is so terse it is smaller than most HTML5 implementations despite  
+JavaScript’s famed terseness.
 
 This is despite the fact that Codename One implements some functionality that isn’t specified such as  
 infinite scrolling etc…​

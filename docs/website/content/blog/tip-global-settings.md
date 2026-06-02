@@ -22,7 +22,7 @@ Figure 1. The global settings toggle button
 
 A good use for this is in the Android settings where you can define one certificate for use with all your apps. For iOS you can define the same certificate for all applications as they don’t change between apps. However, you would need a different provisioning profile so for distribution you will need to re-run the wizard and generate only the provisioning.
 
-There is a trick for iOS where you can create a "generic" provisioning profile to the `*` package/identifier. This can be done via the web UI on Apple's developer site here: <https://developer.apple.com/account/ios/profile/>
+There is a trick for iOS where you can create a "generic" provisioning profile to the `*` package/identifier. This can be done via the web UI on Apple’s developer site here: <https://developer.apple.com/account/ios/profile/>
 
 You can generate an "AllApps" provisioning profile and save it to your disk, then point the debug provisioning to that. Once this is defined, new projects will build on iOS without a single change.
 ---
