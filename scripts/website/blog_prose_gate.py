@@ -133,7 +133,10 @@ def run_capcheck(text, rel):
     out = []
     for f in capcheck.find_lowercase_paragraphs(body, body_start, rel):
         out.append({
-            "signature": ("cap", "ParagraphCapitalization", f["word"] + "|" + f["excerpt"]),
+            # Key on the offending word, NOT the excerpt: editing an unrelated
+            # typo in the same paragraph shifts the excerpt and would otherwise
+            # make a pre-existing lowercase-start look "net-new".
+            "signature": ("cap", "ParagraphCapitalization", f["word"]),
             "file": rel,
             "line": f["line"],
             "message": f"Paragraph starts with lowercase '{f['word']}' — {f['excerpt']}",
@@ -214,12 +217,15 @@ def lt_findings(text, rel, lt_ctx):
             after = chunk[loff + llen:loff + llen + 64]
             if mod.is_accepted(flagged, accept_re, surrounding_after=after):
                 continue
-            ctx = (mod._attr(m, "context", default="") or "").strip()
             out.append({
-                "signature": ("lt", rid, ctx),
+                # Key on the flagged token, NOT the surrounding context snippet:
+                # a nearby edit shifts the snippet and would otherwise make a
+                # pre-existing, deliberately-kept finding (e.g. "thru", a proper
+                # name, a British spelling) look "net-new".
+                "signature": ("lt", rid, flagged),
                 "file": rel,
                 "line": extracted.count("\n", 0, global_offset + m.offset) + 1,
-                "message": f"{rid}: {mod._attr(m, 'message', default='')}",
+                "message": f"{rid}: {mod._attr(m, 'message', default='')} [{flagged}]",
             })
     return out
 
