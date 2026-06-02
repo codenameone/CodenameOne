@@ -9,20 +9,12 @@ name: Blog Prose Checks
 # the weekly report job tracks it without blocking anyone.
 
 on:
+  # Runs on EVERY pull request (no path filter) so the gate can be registered as
+  # a required status check on the base branch without the "required check never
+  # reports" deadlock that path-filtered workflows cause. The job itself detects
+  # whether any blog content changed and fast-skips (passing) when none did, so
+  # non-blog PRs stay cheap.
   pull_request:
-    paths:
-      - 'docs/website/content/blog/**'
-      - 'docs/website/.vale.ini'
-      - 'docs/website/styles/CodenameOneRules/**'
-      - 'docs/website/styles/config/**'
-      - 'scripts/website/blog_prose_gate.py'
-      - 'scripts/website/blog_text.py'
-      - 'scripts/website/check_paragraph_capitalization.py'
-      - 'scripts/website/render_blog_prose_html.py'
-      - 'scripts/website/languagetool-accept-blog.txt'
-      - 'scripts/developer-guide/run_languagetool.py'
-      - 'scripts/developer-guide/languagetool-accept.txt'
-      - '.github/workflows/blog-prose.yml'
   schedule:
     # Weekly whole-corpus backlog report (Mondays 06:00 UTC). Non-blocking.
     - cron: '0 6 * * 1'
@@ -50,15 +42,37 @@ jobs:
           # base version of each changed post.
           fetch-depth: 0
 
+      - name: Detect changed blog posts
+        id: detect
+        run: |
+          set -euo pipefail
+          base="origin/${GITHUB_BASE_REF}"
+          mb="$(git merge-base "$base" HEAD 2>/dev/null || true)"
+          if [ -z "$mb" ]; then
+            count=0
+          else
+            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' | wc -l | tr -d ' ')"
+          fi
+          echo "Changed blog posts: $count"
+          if [ "$count" -gt 0 ]; then
+            echo "has_posts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_posts=false" >> "$GITHUB_OUTPUT"
+            echo "No blog content changed — prose gate skips its heavy steps and passes."
+          fi
+
       - name: Set up Python 3
+        if: steps.detect.outputs.has_posts == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install python-markdown
+        if: steps.detect.outputs.has_posts == 'true'
         run: pip install --user 'markdown==3.7'
 
       - name: Install Vale
+        if: steps.detect.outputs.has_posts == 'true'
         run: |
           set -euo pipefail
           ARCHIVE="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
@@ -68,19 +82,23 @@ jobs:
           rm -f "$ARCHIVE"
 
       - name: Sync Vale styles
+        if: steps.detect.outputs.has_posts == 'true'
         run: vale sync --config docs/website/.vale.ini
 
       - name: Set up Java 17 for LanguageTool
+        if: steps.detect.outputs.has_posts == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Install language-tool-python
+        if: steps.detect.outputs.has_posts == 'true'
         run: pip install --user language-tool-python==2.9.4
 
       - name: Run net-new prose gate
         id: gate
+        if: steps.detect.outputs.has_posts == 'true'
         run: |
           set -euo pipefail
           mkdir -p build/blog-prose
@@ -92,7 +110,7 @@ jobs:
           set -e
 
       - name: Upload net-new findings report
-        if: always()
+        if: ${{ always() && steps.detect.outputs.has_posts == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: blog-prose-net-new
@@ -100,7 +118,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Comment net-new findings on PR
-        if: ${{ always() && !github.event.pull_request.head.repo.fork }}
+        if: ${{ always() && steps.detect.outputs.has_posts == 'true' && !github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -132,8 +150,14 @@ jobs:
             }
 
       - name: Fail on net-new findings
+        if: always()
         run: |
-          if [ "${{ steps.gate.outputs.status }}" != "0" ]; then
+          status="${{ steps.gate.outputs.status }}"
+          if [ "${{ steps.detect.outputs.has_posts }}" != "true" ]; then
+            echo "No blog content changed — prose gate passes."
+            exit 0
+          fi
+          if [ -n "$status" ] && [ "$status" != "0" ]; then
             echo "Blog prose gate found net-new findings. See the log and the blog-prose-net-new artifact." >&2
             exit 1
           fi

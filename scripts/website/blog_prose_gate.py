@@ -156,17 +156,35 @@ def _lt_module():
         return None
 
 
-def run_languagetool(text, rel, repo_root, accept_path):
+def make_lt_context(accept_path):
+    """Build ONE shared LanguageTool server reused across every post.
+
+    Spinning up a server per post (the naive approach) is fine for a typical PR
+    of a few posts but melts down on a large PR — so we start it once here and
+    thread it through. Returns None (LanguageTool skipped) if the module or
+    language_tool_python is unavailable, so the gate degrades to Vale + cap.
+    """
+    mod = _lt_module()
+    if mod is None:
+        return None
+    try:
+        import language_tool_python
+        tool = language_tool_python.LanguageTool("en-US")
+        tool.disabled_rules.update(mod.DISABLED_RULES)
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"LanguageTool unavailable; running Vale + cap only: {exc}\n")
+        return None
+    return {"mod": mod, "tool": tool, "accept_re": mod.load_accept_patterns(accept_path)}
+
+
+def lt_findings(text, rel, lt_ctx):
     if not text.strip():
         return []
-    lt = _lt_module()
-    if lt is None:
-        return None  # signal "skipped" so base/head stay symmetric
+    mod, tool, accept_re = lt_ctx["mod"], lt_ctx["tool"], lt_ctx["accept_re"]
     try:
         html = blog_text.body_to_html(text)
     except ImportError as exc:
-        # python-markdown not installed — degrade gracefully (Vale + cap still
-        # run), exactly as we do when language_tool_python is missing.
+        # python-markdown not installed — degrade gracefully (Vale + cap run).
         sys.stderr.write(f"python-markdown unavailable; skipping LanguageTool: {exc}\n")
         return None
     with tempfile.NamedTemporaryFile(
@@ -175,25 +193,34 @@ def run_languagetool(text, rel, repo_root, accept_path):
         tf.write(html)
         tmp = tf.name
     try:
-        extracted = lt.extract_text(tmp)
-        accept_re = lt.load_accept_patterns(accept_path)
-        matches = lt.run_languagetool(extracted, accept_re=accept_re)
-        if matches is None:
-            return None  # language_tool_python not installed
-        serialized = lt.matches_to_json(matches, extracted)
-    except Exception as exc:  # noqa: BLE001 — advisory check must never crash the gate
-        sys.stderr.write(f"LanguageTool failed on {rel}: {exc}\n")
-        return []
+        extracted = mod.extract_text(tmp)
     finally:
         os.unlink(tmp)
+    disabled = set(mod.DISABLED_RULES)
     out = []
-    for m in serialized:
-        out.append({
-            "signature": ("lt", m.get("rule", ""), (m.get("context", "") or "").strip()),
-            "file": rel,
-            "line": m.get("line", 0),
-            "message": f"{m.get('rule','')}: {m.get('message','')}",
-        })
+    for global_offset, chunk in mod.chunk_text(extracted):
+        try:
+            matches = tool.check(chunk)
+        except Exception as exc:  # noqa: BLE001 — advisory check must never crash the gate
+            sys.stderr.write(f"LanguageTool failed on {rel}: {exc}\n")
+            continue
+        for m in matches:
+            rid = mod._attr(m, "rule_id", "ruleId", default="")
+            if rid in disabled:
+                continue
+            flagged = mod._flagged_text(m)
+            loff = mod._attr(m, "offset", default=0)
+            llen = mod._attr(m, "error_length", "errorLength", default=0)
+            after = chunk[loff + llen:loff + llen + 64]
+            if mod.is_accepted(flagged, accept_re, surrounding_after=after):
+                continue
+            ctx = (mod._attr(m, "context", default="") or "").strip()
+            out.append({
+                "signature": ("lt", rid, ctx),
+                "file": rel,
+                "line": extracted.count("\n", 0, global_offset + m.offset) + 1,
+                "message": f"{rid}: {mod._attr(m, 'message', default='')}",
+            })
     return out
 
 
@@ -227,15 +254,15 @@ def build_accept_file(repo_root):
     return path
 
 
-def gate_file(path, base_sha, repo_root, accept_path, with_lt):
+def gate_file(path, base_sha, repo_root, lt_ctx):
     head = head_content(path, repo_root)
     base = base_content(base_sha, path, repo_root)
     new = []
     new += net_new(run_vale(head, path, repo_root), run_vale(base, path, repo_root))
     new += net_new(run_capcheck(head, path), run_capcheck(base, path))
-    if with_lt:
-        head_lt = run_languagetool(head, path, repo_root, accept_path)
-        base_lt = run_languagetool(base, path, repo_root, accept_path)
+    if lt_ctx:
+        head_lt = lt_findings(head, path, lt_ctx)
+        base_lt = lt_findings(base, path, lt_ctx)
         if head_lt is not None and base_lt is not None:
             new += net_new(head_lt, base_lt)
     return new
@@ -264,14 +291,17 @@ def main():
         return 0
 
     accept_path = build_accept_file(repo_root)
+    lt_ctx = None if args.no_languagetool else make_lt_context(accept_path)
     try:
         all_new = []
         for path in posts:
-            all_new.extend(
-                gate_file(path, base_sha, repo_root, accept_path,
-                          with_lt=not args.no_languagetool)
-            )
+            all_new.extend(gate_file(path, base_sha, repo_root, lt_ctx))
     finally:
+        if lt_ctx:
+            try:
+                lt_ctx["tool"].close()
+            except Exception:  # noqa: BLE001
+                pass
         os.unlink(accept_path)
 
     if args.report:
