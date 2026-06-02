@@ -20,7 +20,7 @@ In [my last post](/blog/intro-to-in-app-purchase/) we looked at one-off in-app p
 
   2. Auto-renewable
 
-Non-renewable subscriptions are really the same as consumable products, except that they are shareable across all of a user’s devices. Auto-renewable subscriptions, on the other hand, will continue as long as the user doesn’t cancel it. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and all management of the subscription is handled by the the app-store itself.
+Non-renewable subscriptions are really the same as consumable products, except that they are shareable across all of a user’s devices. Auto-renewable subscriptions, on the other hand, will continue as long as the user doesn’t cancel it. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and all management of the subscription is handled by the app-store itself.
 
 __ |  The concept of an "Non-renewable" subscription is an invention of the iTunes store. There is no formal equivalent in Google play. In order to create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a regular product in Google play, and a Non-renewable subscription in the iTunes store. We’ll learn more about that in a later post when we go into the specifics of app store setup.   
 ---|---  

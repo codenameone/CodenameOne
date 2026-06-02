@@ -68,7 +68,7 @@ running and an object would need to be allocated.
 
 Notice that you should NOT perform long operations in the background listener callback. IOS wake-up time is  
 limited to approximately 10 seconds and the app could get killed if it exceeds that time slice.  
-Notice that the listener can sends events also when the app is in the foreground, therefore it is recommended  
+Notice that the listener can send events also when the app is in the foreground, therefore it is recommended  
 to check the app state before deciding how to process this event. You can use `Display.isMinimized()`  
 to determine if the app is currently running or in the background. 
 
