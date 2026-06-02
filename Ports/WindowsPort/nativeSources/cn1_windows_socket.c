@@ -135,7 +135,10 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_socketRead___long_byte_1ARRAY_
         return -1;
     }
     data = (JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY) __cn1Arg2).data;
+    /* recv blocks; yield the thread state so the GC is not held up by it. */
+    CN1_YIELD_THREAD;
     n = recv(peer->s, (char*) (data + __cn1Arg3), (int) __cn1Arg4, 0);
+    CN1_RESUME_THREAD;
     if (n == 0) {
         return -1; /* peer closed */
     }

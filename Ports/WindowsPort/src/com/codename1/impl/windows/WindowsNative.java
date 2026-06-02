@@ -51,6 +51,9 @@ public final class WindowsNative {
 
     public static native int getDisplayHeight();
 
+    /** Real horizontal screen DPI (96 == 100% scale). */
+    public static native int screenDpi();
+
     /** The window's graphics peer (a Direct2D render target wrapper). */
     public static native long getWindowGraphics();
 
@@ -63,9 +66,6 @@ public final class WindowsNative {
      * constants in cn1_windows.h for the type codes.
      */
     public static native boolean pollEvent(int[] out);
-
-    /** Blocks up to {@code timeoutMillis} until an input event is available. */
-    public static native void waitForEvent(long timeoutMillis);
 
     /**
      * Parks the calling (main) thread to keep the process alive in headless
@@ -88,12 +88,16 @@ public final class WindowsNative {
     public static native void parkMainThread(int timeoutMillis);
 
     /**
-     * Runs the Win32 message loop on the calling thread until the window closes.
-     * Must be called on the thread that created the window (the app's main
-     * thread, after Display.init); the EDT renders concurrently and the window
-     * proc feeds input into the queue that {@link #pollEvent(int[])} drains.
+     * Pumps one batch of Win32 messages on the calling thread. Blocks for the
+     * next window message, dispatches it (and any already-queued burst), then
+     * returns so the caller can drain the translated input into Codename One on
+     * this thread -- which wakes the EDT. Must be called on the thread that
+     * created the window (the app's main thread, after Display.init). Returns
+     * {@code false} once the window has closed and the loop should stop.
+     *
+     * @see WindowsImplementation#runMainEventLoop()
      */
-    public static native void runMessageLoop();
+    public static native boolean pumpMessages();
 
     /**
      * Creates an offscreen (WIC-backed) Direct2D graphics target of the given

@@ -27,13 +27,16 @@
  * DirectWrite / WIC factories, the cross-file string helper, and the input
  * event ring buffer.
  *
- * Threading model: the Codename One EDT (the translated Java main thread that
- * called init -> initDisplay) creates the window on itself and is the single
- * thread that pumps the Win32 queue (through pollEvent / waitForEvent) and
- * renders. Keeping one thread for both window messages and Direct2D drawing
- * matches Win32's "messages on the creating thread" rule and avoids any
- * cross-thread render-target synchronisation. The window proc only enqueues
- * encoded events; the EDT drains them via pollEvent.
+ * Threading model: the app's main thread calls Display.init (which runs
+ * initDisplay here, creating the window on the main thread) and then owns the
+ * Win32 message pump via pumpMessages. Win32 delivers a window's messages to the
+ * thread that created it, so the pump must live on the main thread. The window
+ * proc only enqueues encoded events into a small ring buffer; the main thread
+ * then drains that ring (WindowsImplementation.drainInput) into Codename One,
+ * which wakes the EDT. The EDT is a separate thread (spawned by Display.init)
+ * that consumes the Codename One event queue, lays out, and renders with
+ * Direct2D. This producer (main) / consumer (EDT) split mirrors how every
+ * desktop Codename One port feeds input from the native UI thread to the EDT.
  */
 
 #ifdef _WIN32
@@ -56,6 +59,7 @@ CN1WindowsContext cn1Win;
 static ID2D1HwndRenderTarget* g_hwndTarget;
 
 /* --------------------------------------------------------------- logging */
+
 
 void cn1WindowsLog(const char* message) {
     if (message == NULL) {
@@ -83,6 +87,7 @@ void cn1WindowsLog(const char* message) {
         }
     }
 }
+
 
 /* Last-resort crash logger: prints the exception code + faulting address (and a
  * few raw return addresses) so a silent native crash leaves a breadcrumb. */
@@ -291,23 +296,20 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     }
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    cn1WindowsLog("initDisplay: enter");
     SetUnhandledExceptionFilter(cn1WinUnhandled);
 
     /* The clean target links as a console subsystem app (the translator keeps
-     * stdout for the headless/test apps). For an interactive launch that pops a
-     * stray console window in front of the UI, so hide it -- but only when this
-     * process owns the console alone. When launched from a shell/Maven (the
-     * tests), the console is shared (process count > 1) and left intact so stdout
-     * still reaches the parent. */
+     * stdout for the headless/test apps). For a GUI app that pops a stray console
+     * window in front of the UI, so hide it. Hiding the window does not close the
+     * stdout handle -- a test that pipes stdout (ProcessBuilder) still receives
+     * it -- so this is safe to do unconditionally when a console window exists. */
     {
-        DWORD consoleProcs[4];
-        DWORD consoleCount = GetConsoleProcessList(consoleProcs, 4);
         HWND consoleWnd = GetConsoleWindow();
-        if (consoleCount == 1 && consoleWnd != NULL) {
+        if (consoleWnd != NULL) {
             ShowWindow(consoleWnd, SW_HIDE);
         }
     }
+
     InitializeCriticalSection(&cn1Win.eventLock);
     cn1Win.eventSignal = CreateEventW(NULL, FALSE, FALSE, NULL);
     cn1Win.eventHead = 0;
@@ -383,6 +385,22 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENA
     return cn1Win.width;
 }
 
+/* Real horizontal screen DPI (96 == 100% scale), so the desktop port sizes
+ * mm-based theme metrics correctly instead of using the mobile density
+ * heuristic, which over-scales everything. */
+JAVA_INT com_codename1_impl_windows_WindowsNative_screenDpi___R_int(CODENAME_ONE_THREAD_STATE) {
+    int dpi = 96;
+    HDC dc = GetDC(cn1Win.hwnd);
+    if (dc != NULL) {
+        int v = GetDeviceCaps(dc, LOGPIXELSX);
+        ReleaseDC(cn1Win.hwnd, dc);
+        if (v > 0) {
+            dpi = v;
+        }
+    }
+    return (JAVA_INT) dpi;
+}
+
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayHeight___R_int(CODENAME_ONE_THREAD_STATE) {
     return cn1Win.height;
 }
@@ -404,8 +422,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_flushGraphics___long_int_int_
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
-    /* The message loop runs on the main thread (runMessageLoop); the EDT only
-     * dequeues here -- it must not PeekMessage on its own (empty) queue. */
+    /* The message loop runs on the main thread (pumpMessages), which also drains
+     * this ring into Codename One. pollEvent must not PeekMessage on its own
+     * (empty) queue. */
     CN1Event ev;
     if (!cn1WinPollEvent(&ev)) {
         return JAVA_FALSE;
@@ -419,26 +438,41 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
     return JAVA_TRUE;
 }
 
-JAVA_VOID com_codename1_impl_windows_WindowsNative_waitForEvent___long(
-        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
-    /* EDT idle: block until the window proc (on the main thread) signals that an
-     * event was queued, or the timeout elapses. */
-    if (cn1Win.eventSignal != NULL) {
-        WaitForSingleObject(cn1Win.eventSignal, (DWORD) __cn1Arg1);
-    }
-}
-
-JAVA_VOID com_codename1_impl_windows_WindowsNative_runMessageLoop__(CODENAME_ONE_THREAD_STATE) {
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pumpMessages___R_boolean(CODENAME_ONE_THREAD_STATE) {
     /* Runs on the app's main thread (the window's owner) after Display.init.
-     * Pumps Win32 messages so the window is responsive; the window proc enqueues
-     * input that the EDT drains via pollEvent. Returns when the window closes. */
-    cn1WindowsLog("runMessageLoop: enter");
+     * Blocks for the next window message, dispatches it plus any already-queued
+     * burst, then returns to Java so the caller can drain the translated input
+     * into Codename One -- which is what wakes the EDT (it sleeps on the Display
+     * lock, not on the native message queue). Returns JAVA_FALSE once the window
+     * has closed (WM_QUIT) so the Java loop terminates.
+     *
+     * Window messages are delivered to the thread that created the window (this
+     * one). The EDT is a different thread, so it can neither see nor pump them --
+     * the producer/consumer split is deliberate and mirrors how every desktop CN1
+     * port feeds input from the native UI thread to the EDT. */
     MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0) > 0) {
+    BOOL got;
+    /* Yield the thread state across the (indefinitely) blocking GetMessage so the
+     * GC never waits on this thread. Resume before dispatching so the window proc
+     * runs with an active thread. */
+    CN1_YIELD_THREAD;
+    got = GetMessageW(&msg, NULL, 0, 0);
+    CN1_RESUME_THREAD;
+    if (got <= 0) {
+        return JAVA_FALSE;
+    }
+    TranslateMessage(&msg);
+    DispatchMessageW(&msg);
+    /* Drain the rest of an input/resize burst without blocking, so the whole
+     * batch is translated before we hand control back to drain it. */
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_QUIT) {
+            return JAVA_FALSE;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-    cn1WindowsLog("runMessageLoop: exit");
+    return JAVA_TRUE;
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_runHeadlessLoop__(CODENAME_ONE_THREAD_STATE) {
@@ -450,10 +484,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_runHeadlessLoop__(CODENAME_ON
      * The UI is static, so by the settle the EDT is idle and not mid-paint. */
     cn1WindowsLog("runHeadlessLoop: enter");
     int waitedMs = 0;
+    CN1_YIELD_THREAD;
     while (waitedMs < 4000) {
         Sleep(50);
         waitedMs += 50;
     }
+    CN1_RESUME_THREAD;
     JAVA_BOOLEAN ok = cn1WinEncodeGraphicsToPng(cn1Win.windowGraphics, cn1Win.shotPath);
     cn1WindowsLog(ok ? "runHeadlessLoop: screenshot saved" : "runHeadlessLoop: screenshot FAILED");
     ExitProcess(ok ? 0 : 2);
@@ -467,7 +503,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_exitProcess___int(
 JAVA_VOID com_codename1_impl_windows_WindowsNative_sleepMillis___int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
     if (__cn1Arg1 > 0) {
+        CN1_YIELD_THREAD;
         Sleep((DWORD) __cn1Arg1);
+        CN1_RESUME_THREAD;
     }
 }
 
@@ -477,10 +515,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_parkMainThread___int(
      * the WebSocket reader -- do their work, up to a timeout safety net. Callers
      * exit early via exitProcess once their async work has completed. */
     int waitedMs = 0;
+    CN1_YIELD_THREAD;
     while (waitedMs < __cn1Arg1) {
         Sleep(50);
         waitedMs += 50;
     }
+    CN1_RESUME_THREAD;
     ExitProcess(3);
 }
 

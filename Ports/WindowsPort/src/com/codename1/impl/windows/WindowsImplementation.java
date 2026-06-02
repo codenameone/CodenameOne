@@ -115,13 +115,75 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /** The port's bundled native (material) theme, shipped next to the exe. */
     private static final String NATIVE_THEME_RES = "windowsNativeTheme.res";
 
+    private int screenDpi = 96;
+
+    /**
+     * The live implementation instance, captured for {@link #runMainEventLoop()}
+     * which is static (called straight from the app's main thread). There is only
+     * ever one display, so a single static handle is sufficient.
+     */
+    private static WindowsImplementation mainLoopInstance;
+
     @Override
     public void init(Object m) {
         WindowsNative.initDisplay("Codename One", 800, 600);
         windowGraphicsPeer = WindowsNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(WindowsNative.getDefaultFont());
+        screenDpi = WindowsNative.screenDpi();
+        if (screenDpi <= 0) {
+            screenDpi = 96;
+        }
+        mainLoopInstance = this;
         installNativeTheme();
+    }
+
+    /**
+     * The app's main thread calls this after {@code Display.init()} to keep the
+     * process alive and own the Win32 message pump. Window messages are delivered
+     * to the thread that created the window (this one), so input must be pumped
+     * and dispatched here -- not on the EDT, which is a separate thread that
+     * sleeps on the Display lock. Each pumped batch is drained into Codename One
+     * via {@link #drainInput()} (pointerPressed/keyPressed/sizeChanged), and those
+     * calls notify the Display lock, waking the EDT to lay out and repaint.
+     *
+     * <p>This mirrors how every desktop Codename One port feeds events from the
+     * native UI thread to the EDT; it returns only when the window closes.</p>
+     */
+    public static void runMainEventLoop() {
+        WindowsImplementation impl = mainLoopInstance;
+        // Flush anything queued while the window was being created (e.g. the
+        // initial WM_SIZE) before we start blocking for new messages.
+        if (impl != null) {
+            impl.drainInput();
+        }
+        while (WindowsNative.pumpMessages()) {
+            if (impl != null) {
+                impl.drainInput();
+            }
+        }
+    }
+
+    /* Desktop pixel conversion uses the real screen DPI rather than the mobile
+     * density buckets, so mm-based theme metrics are sized correctly. dipCount
+     * is in thousandths of a millimetre (see Display.convertToPixels). */
+    @Override
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        return Math.round(dipCount * (screenDpi / 25.4f));
+    }
+
+    @Override
+    public int getDeviceDensity() {
+        if (screenDpi >= 240) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+        if (screenDpi >= 180) {
+            return Display.DENSITY_HIGH;
+        }
+        if (screenDpi >= 120) {
+            return Display.DENSITY_MEDIUM;
+        }
+        return Display.DENSITY_LOW;
     }
 
     @Override
@@ -189,14 +251,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public void edtIdle(boolean enter) {
-        // The EDT owns the Win32 message pump on this port. When it is about to
-        // idle we block briefly for native input, then translate every queued
-        // window/input event into Codename One events (which re-enqueue onto the
-        // EDT). On wake-up we just drain whatever has accumulated.
-        if (enter) {
-            WindowsNative.waitForEvent(50);
-        }
-        drainInput();
+        // Intentionally empty: the Win32 message pump and input dispatch run on the
+        // main thread (see runMainEventLoop), and the EDT is woken by the Display
+        // lock notifications those dispatches trigger. The EDT therefore idles by
+        // sleeping on the lock like every other Codename One platform -- it must
+        // not pump or drain on its own (it is not the window's owning thread).
     }
 
     private void drainInput() {

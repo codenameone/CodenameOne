@@ -391,20 +391,28 @@ class CleanTargetIntegrationTest {
     @org.junit.jupiter.api.Test
     void buildsFullFormAppNative() throws Exception {
         Path exe = buildWindowsNativeExe("WinFormApp", winFormAppSource());
-        // Copy to a stable location so the app can be launched and tried.
-        Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
-        Files.createDirectories(dest);
-        Path destExe = dest.resolve(CompilerHelper.executableName("WinFormApp"));
-        Files.copy(exe, destExe, StandardCopyOption.REPLACE_EXISTING);
-        Path pdb = exe.resolveSibling("WinFormApp.pdb");
-        if (Files.exists(pdb)) {
-            Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
+        // Always surface the freshly-built exe so it can be launched even if the
+        // stable copy below is blocked by a running instance.
+        System.out.println("CN1_WINFORM_TEMP_EXE=" + exe.toAbsolutePath());
+        // Copy to a stable location so the app can be launched and tried; a
+        // running instance locks it, so the copy is best-effort (non-fatal).
+        try {
+            Path dest = Paths.get(System.getProperty("user.home"), "cn1-winform");
+            Files.createDirectories(dest);
+            Path destExe = dest.resolve(CompilerHelper.executableName("WinFormApp"));
+            Files.copy(exe, destExe, StandardCopyOption.REPLACE_EXISTING);
+            Path pdb = exe.resolveSibling("WinFormApp.pdb");
+            if (Files.exists(pdb)) {
+                Files.copy(pdb, dest.resolve("WinFormApp.pdb"), StandardCopyOption.REPLACE_EXISTING);
+            }
+            Path theme = exe.resolveSibling("windowsNativeTheme.res");
+            if (Files.exists(theme)) {
+                Files.copy(theme, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+            }
+            System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
+        } catch (java.io.IOException copyBlocked) {
+            System.out.println("CN1_WINFORM_EXE_COPY_SKIPPED=" + copyBlocked.getMessage());
         }
-        Path theme = exe.resolveSibling("windowsNativeTheme.res");
-        if (Files.exists(theme)) {
-            Files.copy(theme, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
-        }
-        System.out.println("CN1_WINFORM_EXE=" + destExe.toAbsolutePath());
     }
 
     /**
@@ -524,62 +532,71 @@ class CleanTargetIntegrationTest {
     }
 
     static String winFormAppSource() {
+        // A small but realistic multi-screen Codename One app: a Toolbar-based
+        // scrollable Contacts list (MultiButton rows) that navigates to a detail
+        // form (with a toolbar Back command) and pops Dialogs. Exercises the real
+        // CN1 navigation / toolbar / scrolling / modal-dialog paths through the
+        // native Windows port, not just a single static form.
         return "import com.codename1.ui.Display;\n" +
                 "import com.codename1.ui.Form;\n" +
                 "import com.codename1.ui.Label;\n" +
                 "import com.codename1.ui.Button;\n" +
-                "import com.codename1.ui.CheckBox;\n" +
-                "import com.codename1.ui.Container;\n" +
-                "import com.codename1.ui.Slider;\n" +
+                "import com.codename1.ui.Command;\n" +
+                "import com.codename1.ui.Dialog;\n" +
+                "import com.codename1.ui.Toolbar;\n" +
+                "import com.codename1.components.MultiButton;\n" +
                 "import com.codename1.ui.layouts.BoxLayout;\n" +
-                "import com.codename1.ui.layouts.FlowLayout;\n" +
-                "import com.codename1.ui.layouts.BorderLayout;\n" +
-                "import com.codename1.ui.plaf.Style;\n" +
                 "import com.codename1.ui.events.ActionListener;\n" +
                 "import com.codename1.ui.events.ActionEvent;\n" +
                 "public class WinFormApp {\n" +
+                "    static String[] NAMES = {\"Ada Lovelace\",\"Alan Turing\",\"Grace Hopper\",\"Linus Torvalds\",\"Margaret Hamilton\",\"Dennis Ritchie\",\"Barbara Liskov\",\"Ken Thompson\",\"Donald Knuth\",\"Katherine Johnson\",\"Tim Berners-Lee\",\"Radia Perlman\",\"James Gosling\",\"Anita Borg\"};\n" +
+                "    static String[] ROLES = {\"Mathematician, 1843\",\"Computability, 1936\",\"Rear Admiral, COBOL\",\"Linux kernel author\",\"Apollo guidance code\",\"C language, Unix\",\"CLU, data abstraction\",\"Unix co-author\",\"TAOCP and TeX\",\"NASA trajectories\",\"Invented the Web\",\"Spanning tree protocol\",\"Java language\",\"Systers founder\"};\n" +
                 "    public static void main(String[] args) {\n" +
+                "        Toolbar.setGlobalToolbar(true);\n" +
                 "        Display.init(null);\n" +
                 "        Display.getInstance().callSerially(new Runnable() {\n" +
-                "            public void run() { buildForm(); }\n" +
+                "            public void run() { showMain(); }\n" +
                 "        });\n" +
                 // Display.init started the EDT (which renders); the main thread now
-                // owns the Win32 message loop so the window is responsive.
-                "        com.codename1.impl.windows.WindowsNative.runMessageLoop();\n" +
+                // owns the Win32 message loop + input dispatch so the window is
+                // responsive and the EDT (asleep on the Display lock) gets woken.
+                "        com.codename1.impl.windows.WindowsImplementation.runMainEventLoop();\n" +
                 "    }\n" +
-                "    static void buildForm() {\n" +
-                "        Form f = new Form(\"CN1 Native (Windows)\", new BorderLayout());\n" +
-                "        Container body = new Container(BoxLayout.y());\n" +
-                "        body.add(new Label(\"Hello from the native Windows port!\"));\n" +
-                "        body.add(new Label(\"Direct2D / DirectWrite rendering via ParparVM.\"));\n" +
-                "        final Label count = new Label(\"Count: 0\");\n" +
-                "        count.getAllStyles().setFgColor(0x1565c0);\n" +
-                "        final int[] n = new int[1];\n" +
-                "        Button plus = new Button(\"+\");\n" +
-                "        Button minus = new Button(\"-\");\n" +
-                "        plus.addActionListener(new ActionListener() {\n" +
-                "            public void actionPerformed(ActionEvent e) { n[0]++; count.setText(\"Count: \" + n[0]); count.getParent().revalidate(); }\n" +
-                "        });\n" +
-                "        minus.addActionListener(new ActionListener() {\n" +
-                "            public void actionPerformed(ActionEvent e) { n[0]--; count.setText(\"Count: \" + n[0]); count.getParent().revalidate(); }\n" +
-                "        });\n" +
-                "        Container row = new Container(new FlowLayout(com.codename1.ui.Component.CENTER));\n" +
-                "        row.add(minus); row.add(count); row.add(plus);\n" +
-                "        body.add(row);\n" +
-                "        final CheckBox check = new CheckBox(\"Toggle a highlight\");\n" +
-                "        final Label highlight = new Label(\"Highlight is OFF\");\n" +
-                "        check.addActionListener(new ActionListener() {\n" +
+                "    static void showMain() {\n" +
+                "        Form home = new Form(\"Contacts\", BoxLayout.y());\n" +
+                "        home.setScrollableY(true);\n" +
+                "        home.getToolbar().addCommandToRightBar(new Command(\"About\") {\n" +
                 "            public void actionPerformed(ActionEvent e) {\n" +
-                "                highlight.setText(check.isSelected() ? \"Highlight is ON\" : \"Highlight is OFF\");\n" +
-                "                highlight.getAllStyles().setFgColor(check.isSelected() ? 0xd84315 : 0x000000);\n" +
-                "                highlight.getParent().revalidate();\n" +
+                "                Dialog.show(\"About\", \"Codename One running as a real native Windows app -- ParparVM bytecode-to-C with Direct2D / DirectWrite rendering.\", \"Nice\", null);\n" +
                 "            }\n" +
                 "        });\n" +
-                "        body.add(check); body.add(highlight);\n" +
-                "        Slider slider = new Slider();\n" +
-                "        slider.setEditable(true);\n" +
-                "        body.add(new Label(\"Slider:\")); body.add(slider);\n" +
-                "        f.add(BorderLayout.CENTER, body);\n" +
+                "        for (int i = 0; i < NAMES.length; i++) {\n" +
+                "            final int idx = i;\n" +
+                "            MultiButton mb = new MultiButton(NAMES[i]);\n" +
+                "            mb.setTextLine2(ROLES[i]);\n" +
+                "            mb.addActionListener(new ActionListener() {\n" +
+                "                public void actionPerformed(ActionEvent e) { showDetail(idx); }\n" +
+                "            });\n" +
+                "            home.add(mb);\n" +
+                "        }\n" +
+                "        home.show();\n" +
+                "    }\n" +
+                "    static void showDetail(final int idx) {\n" +
+                "        Form f = new Form(NAMES[idx], BoxLayout.y());\n" +
+                "        f.getToolbar().addCommandToLeftBar(new Command(\"Back\") {\n" +
+                "            public void actionPerformed(ActionEvent e) { showMain(); }\n" +
+                "        });\n" +
+                "        Label name = new Label(NAMES[idx]);\n" +
+                "        name.getAllStyles().setFgColor(0x1565c0);\n" +
+                "        f.add(name);\n" +
+                "        f.add(new Label(ROLES[idx]));\n" +
+                "        f.add(new Label(\"Reached by tapping a list row;\"));\n" +
+                "        f.add(new Label(\"native navigation + toolbar back work.\"));\n" +
+                "        Button greet = new Button(\"Say hi\");\n" +
+                "        greet.addActionListener(new ActionListener() {\n" +
+                "            public void actionPerformed(ActionEvent e) { Dialog.show(\"Hi\", \"Hello from \" + NAMES[idx] + \"!\", \"OK\", null); }\n" +
+                "        });\n" +
+                "        f.add(greet);\n" +
                 "        f.show();\n" +
                 "    }\n" +
                 "}\n";
@@ -715,10 +732,13 @@ class CleanTargetIntegrationTest {
         return "import com.codename1.ui.Display;\n" +
                 "import com.codename1.ui.Form;\n" +
                 "import com.codename1.ui.Label;\n" +
-                "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.Command;\n" +
+                "import com.codename1.ui.Toolbar;\n" +
                 "import com.codename1.ui.Image;\n" +
+                "import com.codename1.components.MultiButton;\n" +
                 "import com.codename1.ui.layouts.BoxLayout;\n" +
                 "import com.codename1.ui.util.ImageIO;\n" +
+                "import com.codename1.ui.events.ActionEvent;\n" +
                 "import com.codename1.util.SuccessCallback;\n" +
                 "import com.codename1.io.WebSocket;\n" +
                 "import com.codename1.impl.windows.WindowsNative;\n" +
@@ -726,13 +746,25 @@ class CleanTargetIntegrationTest {
                 "public class WinWsShotApp {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        // Offscreen mode: render the UI into a readable WIC target (no window).\n" +
+                "        // Renders the same Toolbar + Contacts list as the interactive demo so\n" +
+                "        // the posted screenshot validates real multi-component rendering.\n" +
+                "        Toolbar.setGlobalToolbar(true);\n" +
                 "        WindowsNative.enableHeadlessScreenshot(\"unused\", 420, 640);\n" +
                 "        Display.init(null);\n" +
                 "        Display.getInstance().callSerially(new Runnable() {\n" +
                 "            public void run() {\n" +
-                "                Form f = new Form(\"CN1 Native\", BoxLayout.y());\n" +
-                "                f.add(new Label(\"Hello from the native Windows port!\"));\n" +
-                "                f.add(new Button(\"Click me\"));\n" +
+                "                Form f = new Form(\"Contacts\", BoxLayout.y());\n" +
+                "                f.setScrollableY(true);\n" +
+                "                f.getToolbar().addCommandToRightBar(new Command(\"About\") {\n" +
+                "                    public void actionPerformed(ActionEvent e) { }\n" +
+                "                });\n" +
+                "                String[] names = {\"Ada Lovelace\",\"Alan Turing\",\"Grace Hopper\",\"Linus Torvalds\",\"Margaret Hamilton\",\"Dennis Ritchie\",\"Barbara Liskov\",\"Ken Thompson\"};\n" +
+                "                String[] roles = {\"Mathematician, 1843\",\"Computability, 1936\",\"Rear Admiral, COBOL\",\"Linux kernel author\",\"Apollo guidance code\",\"C language, Unix\",\"CLU, data abstraction\",\"Unix co-author\"};\n" +
+                "                for (int i = 0; i < names.length; i++) {\n" +
+                "                    MultiButton mb = new MultiButton(names[i]);\n" +
+                "                    mb.setTextLine2(roles[i]);\n" +
+                "                    f.add(mb);\n" +
+                "                }\n" +
                 "                f.show();\n" +
                 "            }\n" +
                 "        });\n" +
