@@ -518,31 +518,59 @@ class CleanTargetIntegrationTest {
                 "import com.codename1.ui.Form;\n" +
                 "import com.codename1.ui.Label;\n" +
                 "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.CheckBox;\n" +
+                "import com.codename1.ui.Container;\n" +
+                "import com.codename1.ui.Slider;\n" +
                 "import com.codename1.ui.layouts.BoxLayout;\n" +
+                "import com.codename1.ui.layouts.FlowLayout;\n" +
+                "import com.codename1.ui.layouts.BorderLayout;\n" +
+                "import com.codename1.ui.plaf.Style;\n" +
+                "import com.codename1.ui.events.ActionListener;\n" +
+                "import com.codename1.ui.events.ActionEvent;\n" +
                 "public class WinFormApp {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
                 "        Display.getInstance().callSerially(new Runnable() {\n" +
-                "            public void run() {\n" +
-                "                Form f = new Form(\"CN1 Native\", BoxLayout.y());\n" +
-                "                final Label status = new Label(\"Hello from the native Windows port!\");\n" +
-                "                final Button button = new Button(\"Click me\");\n" +
-                "                final int[] count = new int[1];\n" +
-                "                button.addActionListener(new com.codename1.ui.events.ActionListener() {\n" +
-                "                    public void actionPerformed(com.codename1.ui.events.ActionEvent e) {\n" +
-                "                        count[0]++;\n" +
-                "                        status.setText(\"Clicked \" + count[0] + \" time(s)\");\n" +
-                "                        status.getParent().revalidate();\n" +
-                "                    }\n" +
-                "                });\n" +
-                "                f.add(status);\n" +
-                "                f.add(button);\n" +
-                "                f.show();\n" +
-                "            }\n" +
+                "            public void run() { buildForm(); }\n" +
                 "        });\n" +
                 // Display.init started the EDT (which renders); the main thread now
                 // owns the Win32 message loop so the window is responsive.
                 "        com.codename1.impl.windows.WindowsNative.runMessageLoop();\n" +
+                "    }\n" +
+                "    static void buildForm() {\n" +
+                "        Form f = new Form(\"CN1 Native (Windows)\", new BorderLayout());\n" +
+                "        Container body = new Container(BoxLayout.y());\n" +
+                "        body.add(new Label(\"Hello from the native Windows port!\"));\n" +
+                "        body.add(new Label(\"Direct2D / DirectWrite rendering via ParparVM.\"));\n" +
+                "        final Label count = new Label(\"Count: 0\");\n" +
+                "        count.getAllStyles().setFgColor(0x1565c0);\n" +
+                "        final int[] n = new int[1];\n" +
+                "        Button plus = new Button(\"+\");\n" +
+                "        Button minus = new Button(\"-\");\n" +
+                "        plus.addActionListener(new ActionListener() {\n" +
+                "            public void actionPerformed(ActionEvent e) { n[0]++; count.setText(\"Count: \" + n[0]); count.getParent().revalidate(); }\n" +
+                "        });\n" +
+                "        minus.addActionListener(new ActionListener() {\n" +
+                "            public void actionPerformed(ActionEvent e) { n[0]--; count.setText(\"Count: \" + n[0]); count.getParent().revalidate(); }\n" +
+                "        });\n" +
+                "        Container row = new Container(new FlowLayout(com.codename1.ui.Component.CENTER));\n" +
+                "        row.add(minus); row.add(count); row.add(plus);\n" +
+                "        body.add(row);\n" +
+                "        final CheckBox check = new CheckBox(\"Toggle a highlight\");\n" +
+                "        final Label highlight = new Label(\"Highlight is OFF\");\n" +
+                "        check.addActionListener(new ActionListener() {\n" +
+                "            public void actionPerformed(ActionEvent e) {\n" +
+                "                highlight.setText(check.isSelected() ? \"Highlight is ON\" : \"Highlight is OFF\");\n" +
+                "                highlight.getAllStyles().setFgColor(check.isSelected() ? 0xd84315 : 0x000000);\n" +
+                "                highlight.getParent().revalidate();\n" +
+                "            }\n" +
+                "        });\n" +
+                "        body.add(check); body.add(highlight);\n" +
+                "        Slider slider = new Slider();\n" +
+                "        slider.setEditable(true);\n" +
+                "        body.add(new Label(\"Slider:\")); body.add(slider);\n" +
+                "        f.add(BorderLayout.CENTER, body);\n" +
+                "        f.show();\n" +
                 "    }\n" +
                 "}\n";
     }
@@ -678,9 +706,13 @@ class CleanTargetIntegrationTest {
                 "import com.codename1.ui.Form;\n" +
                 "import com.codename1.ui.Label;\n" +
                 "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.Image;\n" +
                 "import com.codename1.ui.layouts.BoxLayout;\n" +
+                "import com.codename1.ui.util.ImageIO;\n" +
+                "import com.codename1.util.SuccessCallback;\n" +
                 "import com.codename1.io.WebSocket;\n" +
                 "import com.codename1.impl.windows.WindowsNative;\n" +
+                "import java.io.ByteArrayOutputStream;\n" +
                 "public class WinWsShotApp {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        // Offscreen mode: render the UI into a readable WIC target (no window).\n" +
@@ -694,19 +726,28 @@ class CleanTargetIntegrationTest {
                 "                f.show();\n" +
                 "            }\n" +
                 "        });\n" +
-                "        // Settle so layout + the first paint complete, then snapshot the\n" +
-                "        // rendered window target and stream it over the cn1ss WebSocket.\n" +
+                "        // Settle so layout + the first paint complete, then capture the\n" +
+                "        // current Form via Display.screenshot (-> port ImageIO/getRGB) and\n" +
+                "        // stream the PNG over the cn1ss WebSocket.\n" +
                 "        new Thread(new Runnable() {\n" +
                 "            public void run() {\n" +
                 "                WindowsNative.sleepMillis(2500);\n" +
-                "                send();\n" +
+                "                Display.getInstance().callSerially(new Runnable() {\n" +
+                "                    public void run() {\n" +
+                "                        Display.getInstance().screenshot(new SuccessCallback<Image>() {\n" +
+                "                            public void onSucess(Image img) { send(img); }\n" +
+                "                        });\n" +
+                "                    }\n" +
+                "                });\n" +
                 "            }\n" +
                 "        }).start();\n" +
                 "        WindowsNative.parkMainThread(30000);\n" +
                 "    }\n" +
-                "    static void send() {\n" +
+                "    static void send(Image img) {\n" +
                 "        try {\n" +
-                "            final byte[] png = WindowsNative.captureWindowToPngBytes();\n" +
+                "            ByteArrayOutputStream bos = new ByteArrayOutputStream();\n" +
+                "            ImageIO.getImageIO().save(img, bos, ImageIO.FORMAT_PNG, 1f);\n" +
+                "            final byte[] png = bos.toByteArray();\n" +
                 "            if (png == null || png.length == 0) { WindowsNative.exitProcess(6); return; }\n" +
                 "            final String meta = \"META {\\\"test\\\":\\\"windows-native\\\",\\\"png_bytes\\\":\" + png.length\n" +
                 "                    + \",\\\"png_fnv1a64\\\":\\\"\" + fnv(png) + \"\\\"}\";\n" +

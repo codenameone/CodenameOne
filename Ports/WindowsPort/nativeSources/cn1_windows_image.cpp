@@ -257,13 +257,21 @@ ID2D1Bitmap* cn1WinEnsureBitmap(CN1Image* img, ID2D1RenderTarget* target) {
     if (img == NULL) {
         return NULL;
     }
-    /* Mutable image: draw from the bitmap render target's content bitmap. */
-    if (img->mutableGraphics != NULL && img->mutableGraphics->target != NULL) {
-        if (img->bitmap == NULL) {
-            ID2D1BitmapRenderTarget_GetBitmap(
-                (ID2D1BitmapRenderTarget*)img->mutableGraphics->target,
-                &img->bitmap);
+    /* Mutable image: it is backed by a WIC bitmap render target, so to draw it
+     * onto another target build a device bitmap from the WIC content. Commit any
+     * pending draws first, and rebuild each time so the blit reflects the latest
+     * content (the WIC bitmap is a CPU snapshot, not a live device view). */
+    if (img->mutableGraphics != NULL && img->mutableGraphics->wicBitmap != NULL) {
+        if (target == NULL) {
+            return img->bitmap;
         }
+        cn1WinEndFrame(img->mutableGraphics);
+        if (img->bitmap != NULL) {
+            ID2D1Bitmap_Release(img->bitmap);
+            img->bitmap = NULL;
+        }
+        ID2D1RenderTarget_CreateBitmapFromWicBitmap(target,
+                (IWICBitmapSource*) img->mutableGraphics->wicBitmap, NULL, &img->bitmap);
         return img->bitmap;
     }
     if (img->bitmap != NULL) {
@@ -414,49 +422,32 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
     JAVA_INT height = __cn1Arg2;
     JAVA_INT fillColor = __cn1Arg3;
     CN1Image* img;
-    ID2D1BitmapRenderTarget* brt = NULL;
-    ID2D1RenderTarget* windowTarget;
-    HRESULT hr;
-    D2D1_SIZE_F desiredSize;
+    ID2D1RenderTarget* target;
     D2D1_COLOR_F clearColor;
     uint32_t a, r, g, b;
 
     if (width <= 0 || height <= 0) {
         return 0;
     }
-    if (cn1Win.windowGraphics == NULL || cn1Win.windowGraphics->target == NULL) {
-        return 0;
-    }
-    windowTarget = cn1Win.windowGraphics->target;
-
-    desiredSize.width = (float)width;
-    desiredSize.height = (float)height;
-    /* A compatible bitmap render target can be both drawn INTO (it is an
-     * ID2D1RenderTarget) and drawn FROM (its content is fetched with
-     * ID2D1BitmapRenderTarget_GetBitmap, done lazily in cn1WinEnsureBitmap). */
-    hr = ID2D1RenderTarget_CreateCompatibleRenderTarget(windowTarget, &desiredSize,
-                                                        NULL, NULL,
-                                                        D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
-                                                        &brt);
-    if (FAILED(hr) || brt == NULL) {
-        return 0;
-    }
 
     img = (CN1Image*)malloc(sizeof(CN1Image));
     if (img == NULL) {
-        ID2D1BitmapRenderTarget_Release(brt);
         return 0;
     }
     img->bitmap = NULL;
     img->width = width;
     img->height = height;
-    img->argb = NULL; /* mutable image lives on the GPU; getRGB reads back */
-    img->mutableGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*)brt);
+    img->argb = NULL; /* content lives in the WIC bitmap; getRGB locks it back */
+    /* A WIC bitmap render target can be drawn INTO (it is an ID2D1RenderTarget)
+     * and read FROM by locking its backing WIC bitmap -- the same path used by
+     * the offscreen capture, so getRGB / screenshots read real content (a GPU
+     * compatible target's GetBitmap is device-bound and cannot be locked). */
+    img->mutableGraphics = cn1WinCreateOffscreenGraphics(width, height);
     if (img->mutableGraphics == NULL) {
-        ID2D1BitmapRenderTarget_Release(brt);
         free(img);
         return 0;
     }
+    target = img->mutableGraphics->target;
 
     /* Clear the new surface to fillColor (0xAARRGGBB straight alpha). Direct2D
      * Clear takes a straight-alpha D2D1_COLOR_F and premultiplies internally. */
@@ -469,9 +460,9 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
     clearColor.b = b / 255.0f;
     clearColor.a = a / 255.0f;
 
-    ID2D1RenderTarget_BeginDraw((ID2D1RenderTarget*)brt);
-    ID2D1RenderTarget_Clear((ID2D1RenderTarget*)brt, &clearColor);
-    ID2D1RenderTarget_EndDraw((ID2D1RenderTarget*)brt, NULL, NULL);
+    ID2D1RenderTarget_BeginDraw(target);
+    ID2D1RenderTarget_Clear(target, &clearColor);
+    ID2D1RenderTarget_EndDraw(target, NULL, NULL);
 
     return (JAVA_LONG)(intptr_t)img;
 }
@@ -560,18 +551,16 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_scaleImage___long_int_int_R_l
 
 /*
  * Read a mutable image's pixels back into a freshly malloc'd straight-alpha
- * 0xAARRGGBB buffer of width*height. We render the bitmap render target's
- * content bitmap into a WIC bitmap via a WIC render target, then CopyPixels.
- * Returns NULL on failure (the caller must free a non-NULL result).
+ * 0xAARRGGBB buffer of width*height. Mutable images are WIC bitmap render
+ * targets (see createMutableImage), so the content is read by locking the
+ * backing WIC bitmap directly -- the same proven path as the offscreen
+ * capture, with no cross-device GetBitmap/DrawBitmap. Returns NULL on failure
+ * (the caller must free a non-NULL result).
  */
 static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
-    IWICBitmap* wicBitmap = NULL;
-    ID2D1RenderTarget* wicRT = NULL;
-    ID2D1Bitmap* contentBitmap = NULL;
+    IWICBitmap* wicBitmap;
     IWICBitmapLock* lock = NULL;
     HRESULT hr;
-    D2D1_RENDER_TARGET_PROPERTIES rtProps;
-    D2D1_RECT_F destRect;
     WICRect lockRect;
     UINT bufSize = 0;
     BYTE* locked = NULL;
@@ -581,66 +570,19 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
     size_t pixels;
     size_t i;
 
-    if (img == NULL || cn1Win.wicFactory == NULL || cn1Win.d2dFactory == NULL) {
-        return NULL;
-    }
-    if (img->mutableGraphics == NULL || img->mutableGraphics->target == NULL) {
+    if (img == NULL || img->mutableGraphics == NULL || img->mutableGraphics->wicBitmap == NULL) {
         return NULL;
     }
     if (img->width <= 0 || img->height <= 0) {
         return NULL;
     }
 
-    /* Commit any pending draws: the mutable image's compatible render target is
-     * left mid-frame (BeginDraw) after paintComponent -- nothing flushes it the
-     * way flushGraphics flushes the window target -- so its bitmap is only valid
-     * once EndDraw has run. Without this the readback returns the cleared
-     * surface (a blank image), e.g. for Display.screenshot. */
+    /* Commit any pending draws before reading: the mutable image's render target
+     * is left mid-frame (BeginDraw) after paintComponent -- nothing flushes it
+     * the way flushGraphics flushes the window target -- so its bitmap reflects
+     * the drawing only once EndDraw has run. */
     cn1WinEndFrame(img->mutableGraphics);
-
-    contentBitmap = cn1WinEnsureBitmap(img, img->mutableGraphics->target);
-    if (contentBitmap == NULL) {
-        return NULL;
-    }
-
-    hr = IWICImagingFactory_CreateBitmap(cn1Win.wicFactory, (UINT)img->width,
-                                         (UINT)img->height,
-                                         GUID_WICPixelFormat32bppPBGRA,
-                                         WICBitmapCacheOnLoad, &wicBitmap);
-    if (FAILED(hr)) {
-        return NULL;
-    }
-
-    rtProps.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
-    rtProps.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    rtProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
-    rtProps.dpiX = 96.0f;
-    rtProps.dpiY = 96.0f;
-    rtProps.usage = D2D1_RENDER_TARGET_USAGE_NONE;
-    rtProps.minLevel = D2D1_FEATURE_LEVEL_DEFAULT;
-
-    hr = ID2D1Factory_CreateWicBitmapRenderTarget(cn1Win.d2dFactory, wicBitmap,
-                                                  &rtProps, &wicRT);
-    if (FAILED(hr) || wicRT == NULL) {
-        IWICBitmap_Release(wicBitmap);
-        return NULL;
-    }
-
-    destRect.left = 0.0f;
-    destRect.top = 0.0f;
-    destRect.right = (float)img->width;
-    destRect.bottom = (float)img->height;
-
-    ID2D1RenderTarget_BeginDraw(wicRT);
-    ID2D1RenderTarget_DrawBitmap(wicRT, contentBitmap, &destRect, 1.0f,
-                                 D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR,
-                                 NULL);
-    hr = ID2D1RenderTarget_EndDraw(wicRT, NULL, NULL);
-    ID2D1RenderTarget_Release(wicRT);
-    if (FAILED(hr)) {
-        IWICBitmap_Release(wicBitmap);
-        return NULL;
-    }
+    wicBitmap = (IWICBitmap*) img->mutableGraphics->wicBitmap;
 
     lockRect.X = 0;
     lockRect.Y = 0;
@@ -648,7 +590,6 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
     lockRect.Height = img->height;
     hr = IWICBitmap_Lock(wicBitmap, &lockRect, WICBitmapLockRead, &lock);
     if (FAILED(hr)) {
-        IWICBitmap_Release(wicBitmap);
         return NULL;
     }
     hr = IWICBitmapLock_GetStride(lock, &stride);
@@ -657,7 +598,6 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
     }
     if (FAILED(hr) || locked == NULL) {
         IWICBitmapLock_Release(lock);
-        IWICBitmap_Release(wicBitmap);
         return NULL;
     }
 
@@ -665,7 +605,6 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
     out = (uint32_t*)malloc(pixels * sizeof(uint32_t));
     if (out == NULL) {
         IWICBitmapLock_Release(lock);
-        IWICBitmap_Release(wicBitmap);
         return NULL;
     }
     /* Locked data is PBGRA with arbitrary stride; copy row by row and
@@ -683,7 +622,6 @@ static uint32_t* cn1WinReadbackMutable(CN1Image* img) {
     }
 
     IWICBitmapLock_Release(lock);
-    IWICBitmap_Release(wicBitmap);
     return out;
 }
 

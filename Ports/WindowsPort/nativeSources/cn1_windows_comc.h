@@ -95,6 +95,9 @@
 #ifndef ID2D1RenderTarget_CreateBitmap
 #define ID2D1RenderTarget_CreateBitmap(This, ...) ((This)->CreateBitmap(__VA_ARGS__))
 #endif
+#ifndef ID2D1RenderTarget_CreateBitmapFromWicBitmap
+#define ID2D1RenderTarget_CreateBitmapFromWicBitmap(This, ...) ((This)->CreateBitmapFromWicBitmap(__VA_ARGS__))
+#endif
 #ifndef ID2D1RenderTarget_CreateCompatibleRenderTarget
 #define ID2D1RenderTarget_CreateCompatibleRenderTarget(This, ...) ((This)->CreateCompatibleRenderTarget(__VA_ARGS__))
 #endif
