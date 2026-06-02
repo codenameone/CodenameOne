@@ -15,8 +15,20 @@ import re
 # Tolerates a UTF-8 BOM. DOTALL so "." spans the metadata block.
 _FRONT_MATTER_RE = re.compile(r"\A﻿?---\n.*?\n---[ \t]*\n", re.DOTALL)
 
-# Hugo shortcodes: {{< ... >}} and {{% ... %}}, including paired open/close
-# forms. These are template directives, not prose.
+# Code-bearing PAIRED shortcodes whose body is a diagram/listing, not prose.
+# The whole block (open tag, body, close tag) is removed so the diagram source
+# (e.g. Mermaid "flowchart LR" with flattened node labels) never reaches the
+# prose checkers. Other paired shortcodes (notice/tip/…) wrap real prose, so
+# only their tags are stripped, by _SHORTCODE_RE below.
+_PAIRED_CODE_RE = re.compile(
+    r"\{\{[<%]\s*(mermaid|highlight|gist|code)\b.*?[%>]\}\}"
+    r".*?"
+    r"\{\{[<%]\s*/\1\s*[%>]\}\}",
+    re.DOTALL,
+)
+
+# Hugo shortcodes: {{< ... >}} and {{% ... %}}. These are template directives,
+# not prose.
 _SHORTCODE_RE = re.compile(r"\{\{[<%].*?[%>]\}\}", re.DOTALL)
 
 
@@ -37,7 +49,12 @@ def split_front_matter(text):
 
 
 def strip_shortcodes(text):
-    """Replace Hugo shortcodes with a space so surrounding prose stays intact."""
+    """Strip Hugo shortcodes so surrounding prose stays intact.
+
+    Code-bearing paired shortcodes (mermaid/highlight/…) are removed body and
+    all; every other shortcode tag is replaced with a space.
+    """
+    text = _PAIRED_CODE_RE.sub("\n\n", text)
     return _SHORTCODE_RE.sub(" ", text)
 
 
@@ -48,14 +65,17 @@ def read_post(path):
 
 
 def body_to_html(body):
-    """Render Markdown body (shortcodes stripped) to HTML for grammar checks.
+    """Render a post's Markdown to HTML for grammar checks.
 
-    Imports python-markdown lazily so the dependency-free paragraph check does
-    not require it. fenced_code/tables produce <pre><code> and <table> markup
-    that run_languagetool.py's extractor already skips.
+    Strips YAML front matter defensively (so callers may pass either the body or
+    the whole file — front matter must never reach the prose checkers) and Hugo
+    shortcodes, then renders. Imports python-markdown lazily so the
+    dependency-free paragraph check does not require it. fenced_code/tables
+    produce <pre><code> and <table> markup that run_languagetool.py skips.
     """
     import markdown  # lazy: only render paths need it
 
+    _fm, body, _start = split_front_matter(body)
     return markdown.markdown(
         strip_shortcodes(body),
         extensions=["fenced_code", "tables"],
