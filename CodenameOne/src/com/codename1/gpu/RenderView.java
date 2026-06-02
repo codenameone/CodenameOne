@@ -131,6 +131,7 @@ public class RenderView extends Container {
         return internal;
     }
 
+    @Override
     protected void initComponent() {
         super.initComponent();
         if (internal == null && Display.getInstance().isOpenGLSupported()) {

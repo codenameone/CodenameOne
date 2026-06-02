@@ -20,10 +20,6 @@ public final class Light {
     private int color = 0xffffffff;
     private int ambientColor = 0xff404040;
 
-    /// Creates a default white directional light coming from the upper front.
-    public Light() {
-    }
-
     /// Sets the world space direction the light travels.
     ///
     /// #### Parameters

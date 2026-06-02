@@ -559,3 +559,7 @@ espeak
 [Pp]rotobuf
 [Vv]arint
 [Ee]nums
+
+# 3D graphics / shader chapter (com.codename1.gpu). "Phong" is the
+# standard name of the Phong/Blinn-Phong lighting model.
+[Pp]hong

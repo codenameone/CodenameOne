@@ -83,9 +83,9 @@ public final class VertexFormat {
     /// Returns the first attribute matching the supplied usage, or null when the
     /// format does not contain it.
     public VertexAttribute findByUsage(VertexAttribute.Usage usage) {
-        for (int i = 0; i < attributes.length; i++) {
-            if (attributes[i].getUsage() == usage) {
-                return attributes[i];
+        for (VertexAttribute a : attributes) {
+            if (a.getUsage() == usage) {
+                return a;
             }
         }
         return null;

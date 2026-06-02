@@ -35,8 +35,11 @@ public class Gpu3DAnimationTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        if (!Display.getInstance().isOpenGLSupported()) {
-            // No 3D backend on this platform; nothing to animate.
+        // Skip on the time-budgeted iOS/HTML5 full-suite jobs (see
+        // Gpu3DCubeScreenshotTest) and where there is no 3D backend.
+        String platform = Display.getInstance().getPlatformName();
+        if ("ios".equals(platform) || "HTML5".equals(platform)
+                || !Display.getInstance().isOpenGLSupported()) {
             done();
             return true;
         }
