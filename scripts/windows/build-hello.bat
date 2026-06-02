@@ -14,6 +14,15 @@ if not exist "Y:\maven\windows\target\classes" mkdir "Y:\maven\windows\target\cl
 dir /s /b "Y:\Ports\WindowsPort\src\*.java" > "%TEMP%\winport-src.txt"
 "%JAVA_HOME%\bin\javac" -nowarn --release 8 -d "Y:\maven\windows\target\classes" -cp "Y:\maven\core\target\classes" @"%TEMP%\winport-src.txt" || exit /b 1
 
+rem Recompile hellocodenameone-common Java against the fresh core. The prebuilt
+rem common/target/classes can be stale vs source (the WebSocket screenshot
+rem transport + newer *ScreenshotTest classes live here, and a full maven rebuild
+rem needs the 8.0-SNAPSHOT plugin). Kotlin is unchanged, so javac against the
+rem fresh core + the existing Kotlin classes is sufficient. Compile to the Kotlin
+rem jvmTarget level (17) so the translator handles the bytecode.
+dir /s /b "Y:\scripts\hellocodenameone\common\src\main\java\*.java" > "%TEMP%\cc-java.txt"
+"%JAVA_HOME%\bin\javac" -nowarn -encoding UTF-8 --release 17 -cp "Y:\maven\core\target\classes;Y:\scripts\hellocodenameone\common\target\classes" -d "Y:\scripts\hellocodenameone\common\target\classes" @"%TEMP%\cc-java.txt" || exit /b 1
+
 cd /d Y:\vm || exit /b 1
 call mvn -B test -pl tests -am "-Dtest=CleanTargetIntegrationTest#buildsHelloCodenameOneNative" "-Dsurefire.failIfNoSpecifiedTests=false"
 exit /b %ERRORLEVEL%
