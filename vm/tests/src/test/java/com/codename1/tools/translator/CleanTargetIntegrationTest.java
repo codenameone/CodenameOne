@@ -556,6 +556,12 @@ class CleanTargetIntegrationTest {
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
+                // KotlinUiTest is registered as the prepended test exactly as the
+                // real Kotlin app entry point does (HelloCodenameOne.kt:
+                // Cn1ssDeviceRunner.addTest(KotlinUiTest())); it is not in
+                // DEFAULT_TEST_CLASSES, so without this the kotlin screenshot is
+                // never produced on the native Windows clean target.
+                "        Cn1ssDeviceRunner.addTest(new com.codenameone.examples.hellocodenameone.tests.KotlinUiTest());\n" +
                 // runSuite blocks polling each test; it must run off the EDT (it
                 // navigates forms via callSerially). The main thread owns the Win32
                 // pump (runMainEventLoop) so the EDT is woken to lay out + paint +
