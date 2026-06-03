@@ -1058,6 +1058,27 @@
     if (w <= 0 || h <= 0) {
       return null;
     }
+    // Cache the score per canvas, keyed on its last draw-op sequence. The
+    // scoring below does 9 getImageData() GPU readbacks; pickBestCanvasSnapshot
+    // runs it over EVERY tracked canvas, and the suite leaks hundreds of
+    // off-screen mutable-image canvases (FinalizationRegistry release never
+    // fires under back-to-back load), so a late capture would otherwise pay
+    // ~700x9 readbacks -- slow captures that pressure the worker<->host channel
+    // into the lost-response wedge. A canvas not drawn since its last score
+    // (stable lastSeq) returns the cached value; the display canvas is painted
+    // every frame so its lastSeq advances and it is always freshly scored.
+    var meta = getCanvasMeta(canvas);
+    if (meta && meta.__cn1ScoreSeq === meta.lastSeq && '__cn1ScoreVal' in meta) {
+      return meta.__cn1ScoreVal;
+    }
+    var result = canvasContentScoreCompute(canvas, w, h);
+    if (meta) {
+      meta.__cn1ScoreSeq = meta.lastSeq;
+      meta.__cn1ScoreVal = result;
+    }
+    return result;
+  }
+  function canvasContentScoreCompute(canvas, w, h) {
     var ctx = null;
     try {
       ctx = canvas.getContext('2d');
