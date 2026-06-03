@@ -324,7 +324,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         if (!"win".equals(Display.getInstance().getPlatformName())) {
             return false;
         }
-        return "PickerCancelRestoreTest".equals(testName);
+        // The lightweight Picker's 3D Scene now renders on the native Windows
+        // port (the affine transformPoint/transformPoints the wheel projection
+        // needs are implemented), so nothing is parked here anymore.
+        return false;
     }
 
     private boolean shouldForceTimeoutInHtml5(String testName) {

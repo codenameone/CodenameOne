@@ -418,6 +418,44 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return java.util.Arrays.equals((double[]) t1, (double[]) t2);
     }
 
+    // Apply the stored 2D affine [m00,m10,m01,m11,m02,m12] to a point. Without
+    // this (and transformPoints) the base implementation throws "Transforms not
+    // supported", which the lightweight Picker's 3D Scene hits while projecting
+    // its wheel bounds -- the throw propagates through the paint pipeline and
+    // wedges the EDT in a repaint loop. z (and any further coords) pass through
+    // unchanged since the port is affine-only (no perspective).
+    @Override
+    public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        double[] a = (double[]) nativeTransform;
+        float x = in[0];
+        float y = in.length > 1 ? in[1] : 0;
+        out[0] = (float) (a[0] * x + a[2] * y + a[4]);
+        if (out.length > 1) {
+            out[1] = (float) (a[1] * x + a[3] * y + a[5]);
+        }
+        for (int k = 2; k < out.length; k++) {
+            out[k] = k < in.length ? in[k] : 0;
+        }
+    }
+
+    @Override
+    public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        double[] a = (double[]) nativeTransform;
+        for (int i = 0; i < numPoints; i++) {
+            int si = srcPos + i * pointSize;
+            int di = destPos + i * pointSize;
+            float x = in[si];
+            float y = pointSize > 1 ? in[si + 1] : 0;
+            out[di] = (float) (a[0] * x + a[2] * y + a[4]);
+            if (pointSize > 1) {
+                out[di + 1] = (float) (a[1] * x + a[3] * y + a[5]);
+            }
+            for (int k = 2; k < pointSize; k++) {
+                out[di + k] = in[si + k];
+            }
+        }
+    }
+
     @Override
     public void setTransform(Object graphics, com.codename1.ui.Transform transform) {
         long g = peer(graphics);
