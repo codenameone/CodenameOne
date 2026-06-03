@@ -4657,14 +4657,32 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
         yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
-        yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
-          reason: "screenshot:" + normalizedTest,
-          maxFrames: 48,
-          stableFrames: 3,
-          quietFrames: 3
-        }]);
-        const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
-        capturedDataUrl = hostResult == null ? "" : String(hostResult);
+        // Serialize the canvas read against concurrent painters. The settle +
+        // capture host round-trips span many rAF frames during which the
+        // cooperative scheduler would otherwise run other green threads (the
+        // next test's show()/paint, or a dual-appearance second-stream emit)
+        // that draw onto codenameone-canvas mid-sample -- the screenshot
+        // off-by-one. Holding the capture gate defers those threads until the
+        // pixels are read. The present above runs BEFORE the gate, so the owner
+        // holds no monitor while gated (deadlock-safe), and endCaptureGate is in
+        // a finally so a watchdog-aborted/throwing capture still frees it.
+        if (typeof jvm.beginCaptureGate === "function") {
+          jvm.beginCaptureGate();
+        }
+        try {
+          yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+            reason: "screenshot:" + normalizedTest,
+            maxFrames: 48,
+            stableFrames: 3,
+            quietFrames: 3
+          }]);
+          const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+          capturedDataUrl = hostResult == null ? "" : String(hostResult);
+        } finally {
+          if (typeof jvm.endCaptureGate === "function") {
+            jvm.endCaptureGate();
+          }
+        }
       } catch (_hostCaptureErr) {
         capturedDataUrl = "";
       }

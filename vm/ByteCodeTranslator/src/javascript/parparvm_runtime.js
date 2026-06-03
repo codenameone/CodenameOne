@@ -750,6 +750,20 @@ const jvm = {
   // Form-transition logic from interleaving with a frame's canvas-op
   // chain and recursively producing more canvas ops.
   atomicThread: null,
+  // Screenshot-capture serialization. While a green thread is reading the
+  // visible canvas (the cn1ss emit's ``__cn1_wait_for_ui_settle__`` +
+  // ``__cn1_capture_canvas_png__`` host round-trips, which span up to ~24 rAF
+  // frames on the host), ANY other green thread that paints would draw onto
+  // codenameone-canvas mid-capture and the sampled PNG would show the wrong
+  // (next/previous) form -- the screenshot "off-by-one" that forces dual-stream
+  // tests (ChatInput/ChatView dual-appearance) to be parked. Unlike the dead
+  // ``atomicThread`` flag, this gate is set ONLY for the brief capture window
+  // (see beginCaptureGate/endCaptureGate) and is deadlock-safe: the owner parks
+  // solely on the host (never on a monitor held by a deferred thread), and the
+  // form present runs BEFORE the gate is taken, so the owner acquires no monitor
+  // while holding it. When null (the steady state) drain() behaves exactly as
+  // before -- the gate is inert outside captures.
+  captureGateOwner: null,
   pendingHostCalls: Object.create(null),
   // Batched fire-and-forget JSO bridge ops. Every canvas/DOM setter or
   // void method call inside a paint frame produces a HOST_CALL that
@@ -2539,6 +2553,27 @@ const jvm = {
     this.runnable.push(thread);
     this.drain();
   },
+  // Take the screenshot-capture gate for the CURRENT thread. Called
+  // synchronously (not yielded) by the cn1ss emit in port.js, immediately
+  // before the ``__cn1_wait_for_ui_settle__`` / ``__cn1_capture_canvas_png__``
+  // host round-trips and AFTER the form has already been presented. While held,
+  // drain() defers every other green thread so none can paint onto the canvas
+  // being sampled. Idempotent / last-writer-wins (captures are serialized by the
+  // runner, so re-entrancy shouldn't occur, but guarding costs nothing).
+  beginCaptureGate() {
+    this.captureGateOwner = this.currentThread || null;
+  },
+  // Release the capture gate. MUST be called from a finally so a watchdog-aborted
+  // or throwing capture still frees it. Re-arms drain so the threads deferred
+  // during the capture window get to run.
+  endCaptureGate() {
+    if (this.captureGateOwner && this.captureGateOwner !== this.currentThread) {
+      // A different thread is mid-capture; don't steal its gate.
+      return;
+    }
+    this.captureGateOwner = null;
+    this.scheduleDrain();
+  },
   schedulerNow() {
     if (typeof global.performance !== "undefined" && global.performance
             && typeof global.performance.now === "function") {
@@ -2564,11 +2599,23 @@ const jvm = {
     this.draining = true;
     const deadline = this.schedulerNow() + 8;
     let steps = 0;
+    // Threads held aside while the capture gate is owned by another thread (see
+    // captureGateOwner). They are NOT lost: restored to runnable in the finally,
+    // and endCaptureGate()/scheduleDrain re-runs them once the gate clears. Stays
+    // null on every non-capture drain, so the steady-state hot path is untouched.
+    let captureDeferred = null;
     try {
       while (this.runnable.length) {
         if (steps++ > 2048 || this.schedulerNow() >= deadline) {
           this.scheduleDrain();
           break;
+        }
+        // While a screenshot capture is reading the canvas, defer any OTHER
+        // thread so it can't paint mid-capture (the off-by-one race). The owner
+        // itself is never deferred, and the gate is null outside captures.
+        if (this.captureGateOwner && this.runnable[0] !== this.captureGateOwner) {
+          (captureDeferred || (captureDeferred = [])).push(this.runnable.shift());
+          continue;
         }
         // Atomic-thread mode (set by flushGraphics' begin/endGraphicsAtomic
         // pair) used to suppress dispatch of every other green thread.
@@ -2647,6 +2694,20 @@ const jvm = {
     } finally {
       this.currentThread = null;
       this.draining = false;
+      // Restore any threads deferred for the capture gate. They go back to the
+      // FRONT (preserving their relative order) so they don't lose their place
+      // behind threads enqueued during this burst. If the gate has since cleared
+      // (endCaptureGate ran while the owner resumed) re-arm a drain so they run;
+      // otherwise they sit harmlessly in runnable until the gate's own
+      // scheduleDrain (or the owner's host callback) fires.
+      if (captureDeferred && captureDeferred.length) {
+        for (let i = captureDeferred.length - 1; i >= 0; i--) {
+          this.runnable.unshift(captureDeferred[i]);
+        }
+        if (!this.captureGateOwner) {
+          this.scheduleDrain();
+        }
+      }
       // Drain burst is over -- ship any queued fire-and-forget JSO
       // ops to the host as a single batch postMessage. Saves
       // hundreds of structured-clone roundtrips per paint frame.
