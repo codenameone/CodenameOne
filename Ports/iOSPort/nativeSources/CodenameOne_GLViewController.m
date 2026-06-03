@@ -3751,9 +3751,24 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)drawFrame:(CGRect)rect
 {
+#if TARGET_OS_MACCATALYST
+    // A Mac app keeps rendering its window while it isn't the focused
+    // application -- only a truly backgrounded/occluded app stops. iOS, by
+    // contrast, must not touch the GPU outside the foreground-active state,
+    // hence the strict gate below. On Mac Catalyst that strict gate is wrong:
+    // during a long headless screenshot run the app routinely loses "active"
+    // status, after which every drawFrame would no-op and the Metal
+    // screenTexture (which Display.screenshot() reads back) would freeze on the
+    // last-active frame for the rest of the suite. Allow rendering whenever the
+    // app isn't backgrounded so the screen texture stays current.
+    if([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+        return;
+    }
+#else
     if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
+#endif
     [[self eaglView] setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {
