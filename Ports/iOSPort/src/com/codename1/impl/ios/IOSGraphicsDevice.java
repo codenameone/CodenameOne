@@ -112,6 +112,14 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     public void draw(Mesh mesh, Material material, float[] modelMatrix) {
+        boolean log = DRAW_LOG_COUNT < 3;
+        if (log) {
+            DRAW_LOG_COUNT++;
+            System.out.println("CN1SS:GL3D:draw enter ctx=" + contextPeer
+                    + " mesh=" + (mesh != null) + " material=" + (material != null)
+                    + " model=" + (modelMatrix != null) + " cam=" + (getCamera() != null)
+                    + " light=" + (getLight() != null));
+        }
         if (contextPeer == 0) {
             return;
         }
@@ -119,14 +127,20 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (log) {
+            System.out.println("CN1SS:GL3D:draw step1 type=" + type + " vb=" + (vb != null)
+                    + " fmt=" + (fmt != null) + " data=" + (vb != null && vb.getData() != null)
+                    + " rs=" + (material.getRenderState() != null));
+        }
 
         long vboHandle = uploadVertexBuffer(vb);
+        if (log) {
+            System.out.println("CN1SS:GL3D:draw step2 vbo=" + vboHandle);
+        }
         long pipeline = vboHandle == 0 ? 0 : getOrCreatePipeline(material, fmt);
-        if (DRAW_LOG_COUNT < 4) {
-            DRAW_LOG_COUNT++;
-            System.out.println("CN1SS:GL3D:javaDraw ctx=" + contextPeer + " vbo=" + vboHandle
-                    + " pipeline=" + pipeline + " indexed=" + mesh.isIndexed()
-                    + " stride=" + fmt.getStrideBytes() + " key=" + material.getShaderKey());
+        if (log) {
+            System.out.println("CN1SS:GL3D:draw step3 pipeline=" + pipeline
+                    + " indexed=" + mesh.isIndexed() + " stride=" + fmt.getStrideBytes());
         }
         if (vboHandle == 0) {
             return;
@@ -137,6 +151,9 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         packUniforms(material, model);
+        if (log) {
+            System.out.println("CN1SS:GL3D:draw step4 packed uniforms ok");
+        }
 
         long texHandle = 0;
         int texFilter = 0;
