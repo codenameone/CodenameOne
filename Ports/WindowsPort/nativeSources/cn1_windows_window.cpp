@@ -45,6 +45,7 @@
 #include <windowsx.h>   /* GET_X_LPARAM / GET_Y_LPARAM */
 #include <stdio.h>
 #include <string.h>
+#include <malloc.h>     /* _resetstkoflw (stack-overflow guard re-arm) */
 
 /* This unit is C++ (Direct2D has no C binding), but the ParparVM bridge
  * functions and the shared helpers must keep C linkage so the translated C
@@ -144,6 +145,131 @@ static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
     }
 #endif
     return EXCEPTION_EXECUTE_HANDLER;
+}
+
+/* ----------------------------------------- hardware fault -> Java exception
+ *
+ * The ParparVM "clean" C target only emits an NPE check for a method's `this`
+ * (and only at method entry, after the receiver's vtable has already been read
+ * for the virtual dispatch). A null *argument* deref, or a virtual call on a
+ * null receiver, therefore faults in native code as a raw EXCEPTION_ACCESS_-
+ * VIOLATION instead of a catchable NullPointerException -- and that hard-crashes
+ * the whole process (and, on CI, the entire screenshot suite) with no Java stack
+ * trace. The iOS port solves the same problem with a SIGSEGV handler that calls
+ * throwException(); this is the Win32 analog.
+ *
+ * A vectored exception handler fires first-chance, like a Unix signal. Rather
+ * than run throwException() in the kernel's exception-dispatch context (where a
+ * longjmp out is fragile), we redirect the faulting instruction pointer to a
+ * trampoline and resume: the trampoline then runs on the faulting thread's own
+ * stack, in a normal context, so throwException()'s longjmp to the nearest CN1
+ * try/catch frame behaves exactly as it would for a Java-thrown exception. The
+ * exception unwinds to the test runner's catch, which logs it (with Java method
+ * names, via printStackTrace) and moves on to the next test.
+ *
+ * As the iOS comment notes, this WILL interfere with a native debugger -- a
+ * debugger sees the first-chance AV before us. It is a release/CI resilience
+ * mechanism, not a debugging aid.
+ */
+
+/* Deliver `exc` to the nearest matching CN1 try/catch frame by restoring that
+ * frame's saved setjmp() register state directly into the faulting CONTEXT, then
+ * returning EXCEPTION_CONTINUE_EXECUTION so the kernel resumes at the setjmp()
+ * continuation. This is precisely what longjmp() does MINUS the SEH stack unwind
+ * (RtlUnwind) -- and that unwind is exactly what cannot be driven from a fault-
+ * handler context (it fast-fails and silently kills the process), so we bypass
+ * it and restore the registers ourselves from the jmp_buf (_JUMP_BUFFER).
+ *
+ * The block search mirrors throwException() in cn1_globals.c: synchronized-method
+ * monitors are exited as their frames are skipped, and a frame matches when its
+ * exceptionClass is <=0 (catch-all) or the thrown class is instanceof it.
+ * Returns 1 with ctx updated when a handler is found, 0 when none exists. */
+static int cn1WinDeliverViaContext(CONTEXT* ctx, struct ThreadLocalData* t, JAVA_OBJECT exc) {
+    java_lang_Throwable_fillInStack__(t, exc);
+    t->exception = exc;
+    int excClassId = exc->__codenameOneParentClsReference->classId;
+    t->tryBlockOffset--;
+    while (t->tryBlockOffset >= 0) {
+        struct TryBlock* blk = &t->blocks[t->tryBlockOffset];
+        if (blk->monitor != 0) {
+            monitorExitBlock(t, blk->monitor);
+            t->tryBlockOffset--;
+            continue;
+        }
+        if (blk->exceptionClass <= 0 || instanceofFunction(blk->exceptionClass, excClassId)) {
+            _JUMP_BUFFER* jb = (_JUMP_BUFFER*) blk->destination;
+#if defined(_M_ARM64)
+            for (int i = 19; i <= 28; i++) {     /* x19-x28 callee-saved */
+                ctx->X[i] = (&jb->X19)[i - 19];
+            }
+            ctx->Fp = jb->Fp;
+            ctx->Lr = jb->Lr;
+            ctx->Sp = jb->Sp;
+            ctx->Pc = jb->Lr;   /* setjmp resumes at its saved return address... */
+            ctx->X[0] = 1;      /* ...returning 1 (the longjmp value) */
+            return 1;
+#elif defined(_M_X64)
+            ctx->Rbx = jb->Rbx;
+            ctx->Rsp = jb->Rsp;
+            ctx->Rbp = jb->Rbp;
+            ctx->Rsi = jb->Rsi;
+            ctx->Rdi = jb->Rdi;
+            ctx->R12 = jb->R12;
+            ctx->R13 = jb->R13;
+            ctx->R14 = jb->R14;
+            ctx->R15 = jb->R15;
+            ctx->Rip = jb->Rip; /* the instruction after the setjmp() call */
+            ctx->Rax = 1;       /* setjmp returns 1 (the longjmp value) */
+            return 1;
+#else
+            return 0;
+#endif
+        }
+        t->tryBlockOffset--;
+    }
+    return 0;
+}
+
+static LONG WINAPI cn1WinFaultToException(EXCEPTION_POINTERS* info) {
+    DWORD code = info->ExceptionRecord->ExceptionCode;
+    struct ThreadLocalData* t;
+    JAVA_OBJECT exc;
+
+    if (code == EXCEPTION_ACCESS_VIOLATION) {
+        /* Only treat a genuine null-object deref (null + small field/vtable
+         * offset) as an NPE. A wild/large faulting address is real memory
+         * corruption -- leave it for the unhandled-exception logger so it stays
+         * diagnosable instead of being masked as an NPE. */
+        ULONG_PTR faultAddr = info->ExceptionRecord->NumberParameters >= 2
+                ? info->ExceptionRecord->ExceptionInformation[1] : (ULONG_PTR) ~0;
+        if (faultAddr >= 0x10000) {
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        t = getThreadLocalData();
+        if (t == NULL || t->tryBlockOffset <= 0) {
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        exc = __NEW_INSTANCE_java_lang_NullPointerException(t);
+    } else if (code == EXCEPTION_STACK_OVERFLOW) {
+        /* Re-arm the guard page the overflow consumed so the (small) work below
+         * has stack; the context restore then jumps to a frame high up the stack
+         * with room to spare. */
+        _resetstkoflw();
+        t = getThreadLocalData();
+        if (t == NULL || t->tryBlockOffset <= 0) {
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        exc = __NEW_INSTANCE_java_lang_StackOverflowError(t);
+    } else {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    if (cn1WinDeliverViaContext(info->ContextRecord, t, exc)) {
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+    /* No CN1 catch frame on this thread: fall through to the unhandled-exception
+     * logger, which records the fault and terminates. */
+    return EXCEPTION_CONTINUE_SEARCH;
 }
 
 /* ----------------------------------------------------------- string helper */
@@ -316,6 +442,15 @@ void cn1WinApplyPendingResize(void) {
     }
 }
 
+/* True when CN1_FAULT_SELFTEST is set in the environment. The clean target does
+ * not translate System.getenv, so the launcher's fault-handler self-test gate
+ * reads the environment here via Win32 instead. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    char buf[8];
+    DWORD n = GetEnvironmentVariableA("CN1_FAULT_SELFTEST", buf, (DWORD) sizeof(buf));
+    return (n > 0 && n < sizeof(buf)) ? JAVA_TRUE : JAVA_FALSE;
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3) {
     if (InterlockedCompareExchange(&cn1Win.initialized, 1, 0) != 0) {
@@ -324,6 +459,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     SetUnhandledExceptionFilter(cn1WinUnhandled);
+    /* First-chance: turn null-deref / stack-overflow faults into catchable Java
+     * exceptions (see cn1WinFaultToException). Installed first (FirstHandler=1)
+     * so it runs before the OS default, but it only redirects genuine null
+     * derefs / overflows with a CN1 catch frame and lets everything else pass
+     * through to the unhandled-exception logger above. */
+    AddVectoredExceptionHandler(1, cn1WinFaultToException);
 
     /* The clean target links as a console subsystem app (the translator keeps
      * stdout for the headless/test apps). For a GUI app that pops a stray console

@@ -44,6 +44,14 @@ public final class WindowsNative {
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
     public static native void nativeLog(String message);
 
+    /**
+     * True when the CN1_FAULT_SELFTEST environment variable is set. Read via the
+     * Win32 environment (the clean target does not translate System.getenv), it
+     * gates the launcher's deterministic check that a null deref surfaces as a
+     * catchable NullPointerException through the native fault handler.
+     */
+    public static native boolean faultSelfTestEnabled();
+
     /** Creates the main window plus the Direct2D/DirectWrite/WIC factories. */
     public static native void initDisplay(String title, int width, int height);
 

@@ -553,8 +553,29 @@ class CleanTargetIntegrationTest {
                 "import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner;\n" +
                 "import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;\n" +
                 "public class WinHelloMain {\n" +
+                "    static class Holder { int value; }\n" +
+                "    static Holder nullHolder() { return null; }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
+                // Deterministic validation for the native fault->exception handler
+                // (cn1WinFaultToException). initDisplay (called synchronously by
+                // Display.init above) installs the vectored handler, so a null deref
+                // here must surface as a catchable NullPointerException with a Java
+                // stack trace instead of a hard EXCEPTION_ACCESS_VIOLATION. A getfield
+                // on null is used because the clean target does not emit an NPE check
+                // for field derefs, so it genuinely faults and exercises the handler.
+                // Gated on an env var so it never affects normal/CI screenshot runs.
+                "        if (com.codename1.impl.windows.WindowsNative.faultSelfTestEnabled()) {\n" +
+                "            try {\n" +
+                "                Holder h = nullHolder();\n" +
+                "                com.codename1.impl.windows.WindowsNative.nativeLog(\"CN1_FAULT_SELFTEST: pre-deref value=\" + (h.value + 1));\n" +
+                "                com.codename1.impl.windows.WindowsNative.nativeLog(\"CN1_FAULT_SELFTEST: NO_EXCEPTION_BAD\");\n" +
+                "            } catch (Throwable t) {\n" +
+                "                com.codename1.impl.windows.WindowsNative.nativeLog(\"CN1_FAULT_SELFTEST: caught \" + t.getClass().getName() + \": \" + t.getMessage());\n" +
+                "                t.printStackTrace();\n" +
+                "            }\n" +
+                "            return;\n" +
+                "        }\n" +
                 // KotlinUiTest reaches kotlin.Unit only through its lambdas' return
                 // type, which the translator's reachability closure does not follow,
                 // so kotlin.Unit is never translated and KotlinUiTest.c fails to
