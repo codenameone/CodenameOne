@@ -12,16 +12,19 @@ import com.codename1.gpu.Texture;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 /// End-to-end screenshot test for a textured, unlit cube rendered through the
 /// portable 3D API. The texture is generated procedurally (a checkerboard) so
 /// the test has no asset dependency, and the cube is drawn at a fixed
 /// orientation for a deterministic capture.
 public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
+    private RenderView view;
+
     @Override
     public boolean runTest() {
         Form form = createForm("3D Textured", new BorderLayout(), "Gpu3DTexturedCube");
-        RenderView view = new RenderView(new Renderer() {
+        view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();
             private Mesh cube;
             private Material material;
@@ -58,6 +61,20 @@ public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
         }
         form.show();
         return true;
+    }
+
+    /// Force a fresh GPU frame before the screenshot so a cold GL surface cannot
+    /// produce a blank capture. See Gpu3DCubeScreenshotTest.
+    @Override
+    protected void registerReadyCallback(Form parent, final Runnable run) {
+        UITimer.timer(1000, false, parent, new Runnable() {
+            public void run() {
+                if (view != null) {
+                    view.requestRender();
+                }
+                UITimer.timer(500, false, parent, run);
+            }
+        });
     }
 
     private static int[] checker() {

@@ -12,16 +12,19 @@ import com.codename1.gpu.Renderer;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 /// End-to-end screenshot test for the portable 3D API (com.codename1.gpu). It
 /// hosts a {@link RenderView} in a normal form and renders a Phong-lit cube at a
 /// fixed orientation so the capture is deterministic. On platforms without a 3D
 /// backend the view shows its placeholder, which still screenshots cleanly.
 public class Gpu3DCubeScreenshotTest extends BaseTest {
+    private RenderView view;
+
     @Override
     public boolean runTest() {
         Form form = createForm("3D Cube", new BorderLayout(), "Gpu3DCube");
-        RenderView view = new RenderView(new Renderer() {
+        view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();
             private Mesh cube;
             private Material material;
@@ -59,5 +62,20 @@ public class Gpu3DCubeScreenshotTest extends BaseTest {
         }
         form.show();
         return true;
+    }
+
+    /// Force a fresh GPU frame to be rendered (and read back for capture) before
+    /// the screenshot fires, so a cold GL surface that has not drawn yet cannot
+    /// produce a blank capture.
+    @Override
+    protected void registerReadyCallback(Form parent, final Runnable run) {
+        UITimer.timer(1000, false, parent, new Runnable() {
+            public void run() {
+                if (view != null) {
+                    view.requestRender();
+                }
+                UITimer.timer(500, false, parent, run);
+            }
+        });
     }
 }
