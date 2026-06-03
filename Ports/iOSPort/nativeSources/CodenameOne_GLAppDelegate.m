@@ -30,6 +30,9 @@
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
 #import "CN1TapGestureRecognizer.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_impl_ios_IOSNative.h"
 #include "com_codename1_push_PushContent.h"
@@ -224,6 +227,15 @@ static void installSignalHandlers() {
 
 - (void)cn1ApplicationWillResignActive
 {
+#ifdef CN1_USE_METAL
+    // Back up the pixels of every mutable image into CPU memory while the app
+    // is still active (GPU use is legal here, unlike didEnterBackground). The
+    // private-storage textures backing them can otherwise be discarded during
+    // suspension and sampled as garbage on resume -- the FloatingActionButton
+    // "violet background" artifact (issue #5153). The textures are rebuilt
+    // lazily from the backup the next time each image is painted.
+    CN1MetalBackupMutableImagesForSuspend();
+#endif
     com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 

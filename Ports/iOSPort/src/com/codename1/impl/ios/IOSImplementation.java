@@ -368,6 +368,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         screenshotCallback = callback;
         try {
+            forceScreenRenderForCapture();
             nativeInstance.screenshot();
         } catch (Throwable t) {
             screenshotCallback = null;
@@ -378,6 +379,43 @@ public class IOSImplementation extends CodenameOneImplementation {
                     callback.onSucess(null);
                 }
             });
+        }
+    }
+
+    /// On Mac Catalyst (desktop) the native capture reads pixels back from the
+    /// Metal screenTexture (see cn1_copyMetalScreenTextureImage in IOSNative.m),
+    /// which is the genuine on-screen render target. On the headless Catalyst
+    /// window a static form's show() doesn't reliably re-drive a screen frame
+    /// (no display-link present), so the screenTexture can still hold an earlier
+    /// form. Animated screens flush continuously and are fine; static ones are
+    /// not. Force the current form through the real EDT screen-render pipeline
+    /// -- the same paintComponent-to-screen + flushGraphics that paintDirty()
+    /// runs -- so the texture reflects the live UI before we capture it. This
+    /// renders through the actual Metal draw path (not an off-screen re-paint),
+    /// so the screenshot remains a genuine test of the display pipeline.
+    private void forceScreenRenderForCapture() {
+        if (!isDesktop()) {
+            return;
+        }
+        final Runnable paintAndFlush = new Runnable() {
+            @Override
+            public void run() {
+                Form f = Display.getInstance().getCurrent();
+                if (f == null) {
+                    return;
+                }
+                Graphics wrapper = getCodenameOneGraphics();
+                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                wrapper.resetAffine();
+                wrapper.setClip(0, 0, getDisplayWidth(), getDisplayHeight());
+                f.paintComponent(wrapper, true);
+                flushGraphics();
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            paintAndFlush.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(paintAndFlush);
         }
     }
 

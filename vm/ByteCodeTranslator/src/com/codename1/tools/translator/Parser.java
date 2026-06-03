@@ -1237,30 +1237,12 @@ public class Parser extends ClassVisitor {
                 // Invoke implMethod
                 // Return result
 
-                // Handle Constructor Reference (special case)
+                // Determine how the implementation method is invoked up front:
+                // we need to know whether it has an implicit receiver (an
+                // instance call consumes the first captured arg as `this`)
+                // before we can line captured/SAM args up against the target
+                // parameter types for adaptation.
                 boolean isCtorRef = (implMethod.getTag() == Opcodes.H_NEWINVOKESPECIAL);
-                if (isCtorRef) {
-                    interfaceMethod.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
-                    interfaceMethod.addInstruction(Opcodes.DUP);
-                }
-
-                // Load captured args
-                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
-                for (int i = 0; i < capturedArgs.length; i++) {
-                    interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
-                    String fieldName = "arg$" + (i + 1);
-                    interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
-                }
-
-                // Load method args
-                Type[] samArgs = samMethodType.getArgumentTypes();
-                int localIndex = 1;
-                for (Type t : samArgs) {
-                    interfaceMethod.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
-                    localIndex += t.getSize();
-                }
-
-                // Invoke implMethod
                 int invokeOpcode;
                 switch (implMethod.getTag()) {
                     case Opcodes.H_INVOKESTATIC: invokeOpcode = Opcodes.INVOKESTATIC; break;
@@ -1273,15 +1255,79 @@ public class Parser extends ClassVisitor {
                         invokeOpcode = Opcodes.INVOKESTATIC;
                         break;// Fallback
                 }
+                boolean instanceCall = !isCtorRef &&
+                        (invokeOpcode == Opcodes.INVOKEVIRTUAL ||
+                         invokeOpcode == Opcodes.INVOKEINTERFACE ||
+                         invokeOpcode == Opcodes.INVOKESPECIAL);
 
+                // The values the implementation invocation consumes, in order:
+                // the receiver (for instance calls) followed by the declared
+                // parameter types. LambdaMetafactory adapts each captured/SAM
+                // argument to the matching target type (box, unbox, widen or
+                // cast) -- e.g. a SAM that hands us a Double bound to a method
+                // taking a primitive double must unbox via doubleValue(). We
+                // must replicate that here; loading the SAM args verbatim and
+                // invoking the impl method directly emits a C call that passes a
+                // JAVA_OBJECT where a primitive (or vice versa) is expected and
+                // fails to compile in the generated Xcode project.
+                Type[] implArgTypes = Type.getArgumentTypes(implMethod.getDesc());
+                Type[] targetTypes = new Type[(instanceCall ? 1 : 0) + implArgTypes.length];
+                int tIdx = 0;
+                if (instanceCall) {
+                    targetTypes[tIdx++] = Type.getObjectType(implMethod.getOwner());
+                }
+                for (Type t : implArgTypes) {
+                    targetTypes[tIdx++] = t;
+                }
+                Type[] samArgs = samMethodType.getArgumentTypes();
+                // Defensive: only adapt when our model of the consumed values
+                // matches the values we push (captured + SAM args). If it does
+                // not we fall back to the verbatim load/invoke below.
+                boolean adapt = targetTypes.length == capturedArgs.length + samArgs.length;
+
+                // Handle Constructor Reference (special case)
+                if (isCtorRef) {
+                    interfaceMethod.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
+                    interfaceMethod.addInstruction(Opcodes.DUP);
+                }
+
+                // Load captured args
+                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
+                int targetIndex = 0;
+                for (int i = 0; i < capturedArgs.length; i++) {
+                    interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
+                    String fieldName = "arg$" + (i + 1);
+                    interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
+                    if (adapt) {
+                        adaptLambdaType(interfaceMethod, capturedArgs[i], targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+
+                // Load method args
+                int localIndex = 1;
+                for (Type t : samArgs) {
+                    interfaceMethod.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                    localIndex += t.getSize();
+                    if (adapt) {
+                        adaptLambdaType(interfaceMethod, t, targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+
+                // Invoke implMethod
                 if (isCtorRef) {
                     interfaceMethod.addInvoke(Opcodes.INVOKESPECIAL, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), false);
                 } else {
                     interfaceMethod.addInvoke(invokeOpcode, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), implMethod.isInterface());
                 }
 
-                // Return
+                // Adapt the value left on the stack by the implementation method
+                // to the SAM's return type (unbox/box/widen/cast, or pop for a
+                // void SAM), then return per the SAM descriptor.
                 Type returnType = samMethodType.getReturnType();
+                Type implReturnType = isCtorRef ? Type.getObjectType(implMethod.getOwner()) : Type.getReturnType(implMethod.getDesc());
+                adaptLambdaType(interfaceMethod, implReturnType, returnType);
                 interfaceMethod.addInstruction(returnType.getOpcode(Opcodes.IRETURN));
                 interfaceMethod.setMaxes(20, 20); // Approximation
 
@@ -1327,6 +1373,130 @@ public class Parser extends ClassVisitor {
             }
 
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs); 
+        }
+
+        /**
+         * Emits the box / unbox / widen / cast instructions LambdaMetafactory
+         * inserts when adapting a value of type {@code from} to type {@code to}
+         * (e.g. when a method reference's parameter or return type differs from
+         * the functional interface's). A no-op when the types already match.
+         */
+        private void adaptLambdaType(BytecodeMethod m, Type from, Type to) {
+            if (from.equals(to)) {
+                return;
+            }
+            int toSort = to.getSort();
+            int fromSort = from.getSort();
+            if (toSort == Type.VOID) {
+                if (fromSort != Type.VOID) {
+                    m.addInstruction(from.getSize() == 2 ? Opcodes.POP2 : Opcodes.POP);
+                }
+                return;
+            }
+            if (fromSort == Type.VOID) {
+                return; // nothing on the stack to adapt
+            }
+            boolean toRef = toSort == Type.OBJECT || toSort == Type.ARRAY;
+            boolean fromRef = fromSort == Type.OBJECT || fromSort == Type.ARRAY;
+
+            if (!toRef && fromRef) {
+                // unbox: cast to the wrapper (when the source is Object/Number
+                // rather than the exact wrapper) then invoke its xxxValue()
+                String wrapper = wrapperType(toSort);
+                if (wrapper == null) {
+                    return;
+                }
+                if (!wrapper.equals(from.getInternalName())) {
+                    m.addTypeInstruction(Opcodes.CHECKCAST, wrapper);
+                }
+                m.addInvoke(Opcodes.INVOKEVIRTUAL, wrapper, unboxMethod(toSort), "()" + to.getDescriptor(), false);
+                return;
+            }
+            if (toRef && !fromRef) {
+                // box via Wrapper.valueOf(primitive); the boxed wrapper is
+                // assignment compatible with the reference target by contract
+                String wrapper = wrapperType(fromSort);
+                if (wrapper == null) {
+                    return;
+                }
+                m.addInvoke(Opcodes.INVOKESTATIC, wrapper, "valueOf", "(" + from.getDescriptor() + ")L" + wrapper + ";", false);
+                return;
+            }
+            if (!toRef && !fromRef) {
+                emitPrimitiveConversion(m, from, to);
+                return;
+            }
+            // both references: narrow with a checkcast (generic erasure)
+            if (!"java/lang/Object".equals(to.getInternalName())) {
+                m.addTypeInstruction(Opcodes.CHECKCAST, to.getInternalName());
+            }
+        }
+
+        private void emitPrimitiveConversion(BytecodeMethod m, Type from, Type to) {
+            int t = to.getSort();
+            int f = from.getSort();
+            // byte/short/char/boolean live as int on the operand stack
+            int fc = (f == Type.BOOLEAN || f == Type.BYTE || f == Type.SHORT || f == Type.CHAR) ? Type.INT : f;
+            switch (t) {
+                case Type.LONG:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2L);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2L);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2L);
+                    return;
+                case Type.FLOAT:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2F);
+                    else if (fc == Type.LONG) m.addInstruction(Opcodes.L2F);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2F);
+                    return;
+                case Type.DOUBLE:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2D);
+                    else if (fc == Type.LONG) m.addInstruction(Opcodes.L2D);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2D);
+                    return;
+                case Type.INT:
+                case Type.BYTE:
+                case Type.SHORT:
+                case Type.CHAR:
+                case Type.BOOLEAN:
+                    // bring the source down to int first, then narrow if needed
+                    if (fc == Type.LONG) m.addInstruction(Opcodes.L2I);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2I);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2I);
+                    if (t == Type.BYTE) m.addInstruction(Opcodes.I2B);
+                    else if (t == Type.SHORT) m.addInstruction(Opcodes.I2S);
+                    else if (t == Type.CHAR) m.addInstruction(Opcodes.I2C);
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        private String wrapperType(int sort) {
+            switch (sort) {
+                case Type.BOOLEAN: return "java/lang/Boolean";
+                case Type.BYTE: return "java/lang/Byte";
+                case Type.CHAR: return "java/lang/Character";
+                case Type.SHORT: return "java/lang/Short";
+                case Type.INT: return "java/lang/Integer";
+                case Type.LONG: return "java/lang/Long";
+                case Type.FLOAT: return "java/lang/Float";
+                case Type.DOUBLE: return "java/lang/Double";
+                default: return null;
+            }
+        }
+
+        private String unboxMethod(int sort) {
+            switch (sort) {
+                case Type.BOOLEAN: return "booleanValue";
+                case Type.BYTE: return "byteValue";
+                case Type.CHAR: return "charValue";
+                case Type.SHORT: return "shortValue";
+                case Type.INT: return "intValue";
+                case Type.LONG: return "longValue";
+                case Type.FLOAT: return "floatValue";
+                case Type.DOUBLE: return "doubleValue";
+                default: return null;
+            }
         }
 
         private void appendConcatLiteral(BytecodeMethod targetMethod, CharSequence literal) {
