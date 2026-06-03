@@ -4853,9 +4853,26 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
         for (var j = 0; j < ck.length; j++) {
           parts.push(ck[j] + "x" + counts[ck[j]]);
         }
+        // Dump each pending timed-wakeup: kind + how overdue/early it is +
+        // cancelled flag. With pendingHostCalls=0 the wedge is a timed-wakeup
+        // that never fires -- if its wakeAt is in the PAST (overdue) while the
+        // backing setTimeout is gone, the scheduler's _refreshTimedWakeupTimer
+        // lost the timer (a scheduler bug, not a lost host response).
+        var twNow = jvm.schedulerNow();
+        var twParts = [];
+        var tws = jvm.timedWakeups || [];
+        for (var t = 0; t < tws.length; t++) {
+          var w = tws[t];
+          twParts.push(String(w.kind || "?") + ":dueIn=" + Math.round((w.wakeAt | 0) - twNow)
+            + (w.cancelled ? ":cancelled" : ""));
+        }
         vmTrace("DIAG:WORKER_HB_FROZEN:pendingHostCalls=" + pk.length
           + ":symbols=" + (parts.length ? parts.join(",") : "none")
-          + ":timedWakeups=" + (jvm.timedWakeups ? jvm.timedWakeups.length : -1));
+          + ":timedWakeups=" + tws.length
+          + ":wakeups=[" + twParts.join(",") + "]"
+          + ":wakeupTimerSet=" + (jvm._wakeupTimer != null ? 1 : 0)
+          + ":wakeupAtIn=" + (jvm._wakeupAt != null && jvm._wakeupAt !== Infinity ? Math.round(jvm._wakeupAt - twNow) : "inf")
+          + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0));
       }
     } catch (e) {
       void e;
