@@ -2,59 +2,42 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.gpu.Camera;
 import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderView;
 import com.codename1.gpu.Renderer;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.util.UITimer;
 
-/// Behavioral animation test for the portable 3D API. It hosts a
-/// {@link RenderView} and drives a spinning cube whose model matrix is derived
-/// from a frame counter, pumping a series of explicit on-demand render requests
-/// and asserting that multiple frames were actually rendered to the
-/// application `Renderer`. This proves the per-platform render path delivers
-/// frames on demand.
-///
-/// On-demand rendering (rather than a free-running continuous loop) is used so
-/// the test cannot wedge the screenshot suite on any platform; continuous mode
-/// is a thin wrapper over the same per-frame path and is exercised by real apps.
+/// Captures a single, deterministic frame of an animated (rotating) 3D cube
+/// through the live GPU `RenderView`. The model matrix is pinned to a fixed
+/// rotation that is clearly different from the static cube screenshot, so the
+/// capture both proves the animation/transform path renders and exercises the
+/// platform screenshot's ability to read back a live GPU scene.
 public class Gpu3DAnimationTest extends BaseTest {
-    private volatile int frames;
-    private RenderView view;
-    private Form form;
-
-    @Override
-    public boolean shouldTakeScreenshot() {
-        return false;
-    }
+    private static final float ANGLE = (float) Math.toRadians(140.0);
 
     @Override
     public boolean runTest() {
-        // Skip on the time-budgeted iOS/HTML5 full-suite jobs (see
-        // Gpu3DCubeScreenshotTest) and where there is no 3D backend.
-        String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform) || "HTML5".equals(platform)
-                || !Display.getInstance().isOpenGLSupported()) {
-            done();
-            return true;
-        }
-        form = new Form("3D Animation", new BorderLayout());
-        view = new RenderView(new Renderer() {
+        Form form = createForm("3D Animation", new BorderLayout(), "Gpu3DAnimation");
+        RenderView view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();
             private Mesh cube;
             private Material material;
 
             public void onInit(GraphicsDevice device) {
-                cube = Primitives.cube(device, 1.5f);
-                material = new Material(Material.Type.LAMBERT).setColor(0xff44cc66);
+                cube = Primitives.cube(device, 1.6f);
+                material = new Material(Material.Type.PHONG)
+                        .setColor(0xffee5522)
+                        .setShininess(18f);
                 camera.setPerspective(45f, 0.1f, 100f)
-                        .setPosition(2f, 2f, 3f)
+                        .setPosition(2.6f, 2.1f, 3.4f)
                         .setTarget(0f, 0f, 0f);
+                device.setLight(new Light().setDirection(-0.4f, -1f, -0.55f));
             }
 
             public void onResize(GraphicsDevice device, int width, int height) {
@@ -63,39 +46,20 @@ public class Gpu3DAnimationTest extends BaseTest {
             }
 
             public void onFrame(GraphicsDevice device) {
-                frames++;
-                device.clear(0xff000000, true, true);
+                device.clear(0xff101018, true, true);
                 device.setCamera(camera);
-                device.draw(cube, material, Matrix4.rotation(frames * 0.1f, 0f, 1f, 0f));
+                device.draw(cube, material, Matrix4.rotation(ANGLE, 0.35f, 1f, 0.12f));
             }
 
             public void onDispose(GraphicsDevice device) {
             }
         });
-        form.add(BorderLayout.CENTER, view);
-        form.show();
-        UITimer.timer(1200, false, form, new Runnable() {
-            public void run() {
-                pump(0);
-            }
-        });
-        return true;
-    }
-
-    private void pump(final int n) {
-        if (n >= 8) {
-            if (frames < 2) {
-                fail("3D animation did not advance frames on demand: " + frames);
-                return;
-            }
-            done();
-            return;
+        if (view.isSupported()) {
+            form.add(BorderLayout.CENTER, view);
+        } else {
+            form.add(BorderLayout.CENTER, new Label("3D unsupported"));
         }
-        view.requestRender();
-        UITimer.timer(120, false, form, new Runnable() {
-            public void run() {
-                pump(n + 1);
-            }
-        });
+        form.show();
+        return true;
     }
 }

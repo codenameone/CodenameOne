@@ -9,7 +9,6 @@ import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderView;
 import com.codename1.gpu.Renderer;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
@@ -21,16 +20,6 @@ import com.codename1.ui.layouts.BorderLayout;
 public class Gpu3DCubeScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() {
-        // The iOS and HTML5 suites run the full screenshot set against a tight
-        // per-job time budget; the 3D path is exercised on the simulator
-        // backend (and the iOS Metal backend renders correctly, verified
-        // separately). Skip here to keep those suites within budget.
-        String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform) || "HTML5".equals(platform)) {
-            System.out.println("CN1SS:INFO:test=Gpu3DCube status=SKIPPED reason=screenshot-suite-time-budget");
-            done();
-            return true;
-        }
         Form form = createForm("3D Cube", new BorderLayout(), "Gpu3DCube");
         RenderView view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();

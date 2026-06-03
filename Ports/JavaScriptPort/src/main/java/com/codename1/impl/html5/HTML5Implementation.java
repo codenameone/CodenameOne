@@ -5156,6 +5156,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         drainPendingDisplayFrame();
         final CanvasRenderingContext2D context = (CanvasRenderingContext2D) outputCanvas.getContext("2d");
+        // 3D peers render to their own WebGL canvases overlaid on the output
+        // canvas; composite their current frames in so screenshots capture them.
+        HTML5GLSurface.compositeInto((com.codename1.html5.js.JSObject) context);
         final ImageData imageData = context.getImageData(0, 0, width, height);
         final Uint8ClampedArray data = imageData.getData();
         final int[] rgb = new int[width * height];

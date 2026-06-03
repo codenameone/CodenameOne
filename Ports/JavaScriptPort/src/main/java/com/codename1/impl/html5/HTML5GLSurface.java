@@ -23,6 +23,12 @@ import static com.codename1.impl.html5.HTML5Implementation.scaleCoord;
 /// renderer lifecycle callbacks (`onInit`, `onResize`, `onFrame`, `onDispose`)
 /// are driven from layout changes and a `requestAnimationFrame` loop.
 class HTML5GLSurface extends HTML5Peer {
+    /// Live WebGL peers, composited into screenshots by HTML5Implementation so
+    /// that 3D scenes (which render to their own canvas, separate from the
+    /// Codename One output canvas) appear in captured images.
+    static final java.util.List<HTML5GLSurface> ACTIVE =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<HTML5GLSurface>());
+
     private final RenderView view;
     private final Renderer renderer;
     private final HTMLCanvasElement canvas;
@@ -151,11 +157,38 @@ class HTML5GLSurface extends HTML5Peer {
     @Override
     protected void initComponent() {
         super.initComponent();
+        if (!ACTIVE.contains(this)) {
+            ACTIVE.add(this);
+        }
         if (!initialized) {
             renderFrame();
         }
         if (continuous) {
             scheduleFrame();
+        }
+    }
+
+    /// Composites the current frame of every live WebGL peer onto the supplied
+    /// 2D canvas context (the Codename One output canvas), at each peer's
+    /// absolute on-screen position. Called by the screenshot path so 3D content
+    /// is captured. Each peer is re-rendered first; the contexts are created with
+    /// `preserveDrawingBuffer` so the drawn frame survives the `drawImage` read.
+    static void compositeInto(JSObject context2d) {
+        java.util.List<HTML5GLSurface> peers;
+        synchronized (ACTIVE) {
+            peers = new java.util.ArrayList<HTML5GLSurface>(ACTIVE);
+        }
+        for (HTML5GLSurface s : peers) {
+            try {
+                if (s.contextLost || s.device == null) {
+                    continue;
+                }
+                s.renderFrame();
+                drawCanvasInto(context2d, s.canvas,
+                        scaleCoord(s.getAbsoluteX()), scaleCoord(s.getAbsoluteY()));
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
         }
     }
 
@@ -171,11 +204,13 @@ class HTML5GLSurface extends HTML5Peer {
     @Override
     protected void deinitialize() {
         cancelFrame();
+        ACTIVE.remove(this);
         super.deinitialize();
     }
 
     void disposeSurface() {
         cancelFrame();
+        ACTIVE.remove(this);
         if (initialized && !contextLost) {
             try {
                 renderer.onDispose(device);
@@ -187,7 +222,12 @@ class HTML5GLSurface extends HTML5Peer {
     }
 
     @JSBody(params = {"canvas"},
-            script = "try { return canvas.getContext('webgl') || canvas.getContext('experimental-webgl') || null; }"
+            script = "try { var o = { preserveDrawingBuffer: true };"
+                    + " return canvas.getContext('webgl', o) || canvas.getContext('experimental-webgl', o) || null; }"
                     + " catch (e) { return null; }")
     private static native JSObject getWebGLContext(HTMLCanvasElement canvas);
+
+    @JSBody(params = {"ctx", "canvas", "x", "y"},
+            script = "try { ctx.drawImage(canvas, x, y); } catch (e) {}")
+    private static native void drawCanvasInto(JSObject ctx, HTMLCanvasElement canvas, int x, int y);
 }

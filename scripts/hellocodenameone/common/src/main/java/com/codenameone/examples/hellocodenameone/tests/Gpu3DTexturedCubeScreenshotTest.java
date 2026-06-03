@@ -9,7 +9,6 @@ import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderView;
 import com.codename1.gpu.Renderer;
 import com.codename1.gpu.Texture;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
@@ -21,13 +20,6 @@ import com.codename1.ui.layouts.BorderLayout;
 public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() {
-        // See Gpu3DCubeScreenshotTest: skip on the time-budgeted iOS/HTML5 suites.
-        String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform) || "HTML5".equals(platform)) {
-            System.out.println("CN1SS:INFO:test=Gpu3DTexturedCube status=SKIPPED reason=screenshot-suite-time-budget");
-            done();
-            return true;
-        }
         Form form = createForm("3D Textured", new BorderLayout(), "Gpu3DTexturedCube");
         RenderView view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();
