@@ -180,6 +180,12 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     com_codename1_impl_ios_IOSGLSurface_onFrameNative___long_int_int(
         CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG) self.contextHandle, w, h);
 
+    static int cn1gl3dFrameLogCount = 0;
+    if (cn1gl3dFrameLogCount < 4) {
+        cn1gl3dFrameLogCount++;
+        NSLog(@"CN1SS:GL3D:renderFrame w=%d h=%d clearColor=(%.2f,%.2f,%.2f) hasViewport=%d depthTex=%p",
+              w, h, _clearColor.red, _clearColor.green, _clearColor.blue, (int) _hasViewport, _depthTexture);
+    }
     [encoder endEncoding];
     [cb presentDrawable:drawable];
     [cb commit];
@@ -569,6 +575,15 @@ void com_codename1_impl_ios_IOSNative_gl3dDrawIndexed___long_long_long_int_long_
     id<MTLBuffer> vbo = (__bridge id<MTLBuffer>)(void *) vboPeer;
     id<MTLBuffer> ibo = (__bridge id<MTLBuffer>)(void *) iboPeer;
     CN1GL3DBindCommon(view, p, vbo, uniforms, uniformFloats, (long) texturePeer, texFilter, texWrap);
+    static int cn1gl3dDrawLogCount = 0;
+    if (cn1gl3dDrawLogCount < 4) {
+        cn1gl3dDrawLogCount++;
+        JAVA_ARRAY_FLOAT *u = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) uniforms)->data;
+        NSLog(@"CN1SS:GL3D:drawIndexed count=%d prim=%d enc=%p pso=%p vbo=%p(len=%lu) ibo=%p(len=%lu) mvp0=%.3f mvp5=%.3f mvp15=%.3f",
+              (int) indexCount, (int) primitive, [view activeEncoder], p.pipelineState,
+              vbo, (unsigned long) vbo.length, ibo, (unsigned long) ibo.length,
+              u[0], u[5], u[15]);
+    }
     [[view activeEncoder] drawIndexedPrimitives:CN1GL3DPrimitive(primitive)
                                      indexCount:indexCount
                                       indexType:MTLIndexTypeUInt16
