@@ -503,6 +503,19 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_l
     return (JAVA_LONG)(__bridge void *) p;
 }
 
+// Plain (non _R_) symbol. ParparVM dispatches native methods that take object
+// (String) arguments through the un-suffixed name, so a non-void native needs
+// both this and the _R_<rettype> wrapper above (see createImageFromARGB in
+// IOSNative.m for the same pattern) or the call resolves to null at runtime.
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
+        JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
+        JAVA_INT depthTest, JAVA_INT depthWrite) {
+    return com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
+            CN1_THREAD_STATE_PASS_ARG instanceObject, contextPeer, key, mslSource,
+            blendMode, cullMode, depthTest, depthWrite);
+}
+
 void com_codename1_impl_ios_IOSNative_gl3dClear___long_int_boolean_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_INT argbColor, JAVA_BOOLEAN clearColor, JAVA_BOOLEAN clearDepth) {
@@ -637,6 +650,10 @@ void com_codename1_impl_ios_IOSNative_gl3dDisposeTexture___long(
 void com_codename1_impl_ios_IOSNative_gl3dDisposePipeline___long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pipelinePeer) {}
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
+        JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
+        JAVA_INT depthTest, JAVA_INT depthWrite) { return 0; }
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
         JAVA_INT depthTest, JAVA_INT depthWrite) { return 0; }
