@@ -25,20 +25,6 @@ abstract class AbstractStickyHeaderScreenshotTest extends AbstractAnimationScree
     protected StickyHeaderContainer sticky;
 
     @Override
-    public boolean runTest() throws Exception {
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            // The JS port truncates the 6-frame composite stream when chunked
-            // through console logging, so the reassembled PNG is missing
-            // bytes and the screenshot decoder rejects it. Skip on HTML5;
-            // iOS, Android and JavaSE still cover the visual contract.
-            System.out.println("CN1SS:INFO:test=" + getImageName() + " status=SKIPPED reason=js-port-chunk-truncation");
-            done();
-            return true;
-        }
-        return super.runTest();
-    }
-
-    @Override
     protected void prepareCapture(int frameWidth, int frameHeight) {
         super.prepareCapture(frameWidth, frameHeight);
         host = new Form(getDisplayTitle());
