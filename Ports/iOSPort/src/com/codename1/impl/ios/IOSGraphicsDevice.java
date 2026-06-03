@@ -61,7 +61,6 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // CN1Uniforms struct emitted by IOSMetalShaderGenerator and copied on the
     // native side: 4 mat4 (64 floats) + 4 vec4 (16 floats) + shininess + pad.
     // We pad to a multiple of 16 for the aligned allocator.
-    private static int DRAW_LOG_COUNT = 0;
     private static final int UNIFORM_FLOATS = 96;
     private final float[] uniforms = allocAligned(UNIFORM_FLOATS);
 
@@ -112,14 +111,6 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     public void draw(Mesh mesh, Material material, float[] modelMatrix) {
-        boolean log = DRAW_LOG_COUNT < 3;
-        if (log) {
-            DRAW_LOG_COUNT++;
-            System.out.println("CN1SS:GL3D:draw enter ctx=" + contextPeer
-                    + " mesh=" + (mesh != null) + " material=" + (material != null)
-                    + " model=" + (modelMatrix != null) + " cam=" + (getCamera() != null)
-                    + " light=" + (getLight() != null));
-        }
         if (contextPeer == 0) {
             return;
         }
@@ -127,33 +118,18 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
-        if (log) {
-            System.out.println("CN1SS:GL3D:draw step1 type=" + type + " vb=" + (vb != null)
-                    + " fmt=" + (fmt != null) + " data=" + (vb != null && vb.getData() != null)
-                    + " rs=" + (material.getRenderState() != null));
-        }
 
         long vboHandle = uploadVertexBuffer(vb);
-        if (log) {
-            System.out.println("CN1SS:GL3D:draw step2 vbo=" + vboHandle);
-        }
-        long pipeline = vboHandle == 0 ? 0 : getOrCreatePipeline(material, fmt);
-        if (log) {
-            System.out.println("CN1SS:GL3D:draw step3 pipeline=" + pipeline
-                    + " indexed=" + mesh.isIndexed() + " stride=" + fmt.getStrideBytes());
-        }
         if (vboHandle == 0) {
             return;
         }
+        long pipeline = getOrCreatePipeline(material, fmt);
         if (pipeline == 0) {
             return;
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         packUniforms(material, model);
-        if (log) {
-            System.out.println("CN1SS:GL3D:draw step4 packed uniforms ok");
-        }
 
         long texHandle = 0;
         int texFilter = 0;
@@ -221,37 +197,23 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     private long getOrCreatePipeline(Material material, VertexFormat fmt) {
-        boolean log = DRAW_LOG_COUNT <= 3;
         RenderState rs = material.getRenderState();
-        if (log) {
-            System.out.println("CN1SS:GL3D:pipe a rs=" + (rs != null) + " ni="
-                    + (IOSImplementation.nativeInstance != null) + " pipes=" + (pipelines != null));
-        }
         String key = material.getShaderKey()
                 + "|s" + fmt.getStrideBytes()
                 + "|b" + blendCode(rs.getBlendMode())
                 + "|c" + cullCode(rs.getCullMode())
                 + "|dt" + (rs.isDepthTest() ? 1 : 0)
                 + "|dw" + (rs.isDepthWrite() ? 1 : 0);
-        if (log) {
-            System.out.println("CN1SS:GL3D:pipe b key=" + key);
-        }
         Long existing = pipelines.get(key);
         if (existing != null) {
             return existing.longValue();
         }
         IOSMetalShaderGenerator gen = new IOSMetalShaderGenerator(material, fmt);
         String src = gen.getSource();
-        if (log) {
-            System.out.println("CN1SS:GL3D:pipe c srcLen=" + (src == null ? -1 : src.length()));
-        }
         long pipeline = IOSImplementation.nativeInstance.gl3dGetOrCreatePipeline(
                 contextPeer, key, src,
                 blendCode(rs.getBlendMode()), cullCode(rs.getCullMode()),
                 rs.isDepthTest() ? 1 : 0, rs.isDepthWrite() ? 1 : 0);
-        if (log) {
-            System.out.println("CN1SS:GL3D:pipe d pipeline=" + pipeline);
-        }
         pipelines.put(key, Long.valueOf(pipeline));
         return pipeline;
     }

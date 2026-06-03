@@ -67,7 +67,12 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
             return nil;
         }
         _commandQueue = [_device newCommandQueue];
-        _pipelineCache = [NSMutableDictionary dictionary];
+        // Owned (+1) allocation: the generated Codename One Objective-C is compiled
+        // without ARC, so an autoreleased [NSMutableDictionary dictionary] assigned
+        // straight to the strong ivar is never retained and gets freed when the
+        // autorelease pool drains. The first pipeline lookup then messages a freed
+        // object (a native crash the signal handler surfaces as a NullPointerException).
+        _pipelineCache = [[NSMutableDictionary alloc] init];
         _pendingClearColor = YES;
         _pendingClearDepth = YES;
         _clearColor = MTLClearColorMake(0, 0, 0, 1);
@@ -180,12 +185,6 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     com_codename1_impl_ios_IOSGLSurface_onFrameNative___long_int_int(
         CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG) self.contextHandle, w, h);
 
-    static int cn1gl3dFrameLogCount = 0;
-    if (cn1gl3dFrameLogCount < 4) {
-        cn1gl3dFrameLogCount++;
-        NSLog(@"CN1SS:GL3D:renderFrame w=%d h=%d clearColor=(%.2f,%.2f,%.2f) hasViewport=%d depthTex=%p",
-              w, h, _clearColor.red, _clearColor.green, _clearColor.blue, (int) _hasViewport, _depthTexture);
-    }
     [encoder endEncoding];
     [cb presentDrawable:drawable];
     [cb commit];
@@ -477,11 +476,7 @@ void com_codename1_impl_ios_IOSNative_gl3dDisposePipeline___long(
     // Pipelines are owned by the view's cache; nothing to release per handle.
 }
 
-// The real implementation lives in the plain (un-suffixed) symbol; the
-// _R_<rettype> form below is a thin wrapper. This matches the convention of the
-// existing String-argument non-void natives in IOSNative.m (createVideoComponent,
-// getResourceSize): ParparVM dispatches the call through the plain symbol.
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
         JAVA_INT depthTest, JAVA_INT depthWrite) {
@@ -505,15 +500,6 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_l
         return 0;
     }
     return (JAVA_LONG)(__bridge void *) p;
-}
-
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
-        JAVA_INT depthTest, JAVA_INT depthWrite) {
-    return com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
-            CN1_THREAD_STATE_PASS_ARG instanceObject, contextPeer, key, mslSource,
-            blendMode, cullMode, depthTest, depthWrite);
 }
 
 void com_codename1_impl_ios_IOSNative_gl3dClear___long_int_boolean_boolean(
@@ -588,15 +574,6 @@ void com_codename1_impl_ios_IOSNative_gl3dDrawIndexed___long_long_long_int_long_
     id<MTLBuffer> vbo = (__bridge id<MTLBuffer>)(void *) vboPeer;
     id<MTLBuffer> ibo = (__bridge id<MTLBuffer>)(void *) iboPeer;
     CN1GL3DBindCommon(view, p, vbo, uniforms, uniformFloats, (long) texturePeer, texFilter, texWrap);
-    static int cn1gl3dDrawLogCount = 0;
-    if (cn1gl3dDrawLogCount < 4) {
-        cn1gl3dDrawLogCount++;
-        JAVA_ARRAY_FLOAT *u = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) uniforms)->data;
-        NSLog(@"CN1SS:GL3D:drawIndexed count=%d prim=%d enc=%p pso=%p vbo=%p(len=%lu) ibo=%p(len=%lu) mvp0=%.3f mvp5=%.3f mvp15=%.3f",
-              (int) indexCount, (int) primitive, [view activeEncoder], p.pipelineState,
-              vbo, (unsigned long) vbo.length, ibo, (unsigned long) ibo.length,
-              u[0], u[5], u[15]);
-    }
     [[view activeEncoder] drawIndexedPrimitives:CN1GL3DPrimitive(primitive)
                                      indexCount:indexCount
                                       indexType:MTLIndexTypeUInt16
@@ -650,10 +627,6 @@ void com_codename1_impl_ios_IOSNative_gl3dDisposeTexture___long(
 void com_codename1_impl_ios_IOSNative_gl3dDisposePipeline___long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pipelinePeer) {}
 JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
-        JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
-        JAVA_INT depthTest, JAVA_INT depthWrite) { return 0; }
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
         JAVA_INT depthTest, JAVA_INT depthWrite) { return 0; }
