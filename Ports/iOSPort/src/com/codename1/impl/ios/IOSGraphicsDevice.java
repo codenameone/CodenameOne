@@ -221,22 +221,37 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     private long getOrCreatePipeline(Material material, VertexFormat fmt) {
+        boolean log = DRAW_LOG_COUNT <= 3;
         RenderState rs = material.getRenderState();
+        if (log) {
+            System.out.println("CN1SS:GL3D:pipe a rs=" + (rs != null) + " ni="
+                    + (IOSImplementation.nativeInstance != null) + " pipes=" + (pipelines != null));
+        }
         String key = material.getShaderKey()
                 + "|s" + fmt.getStrideBytes()
                 + "|b" + blendCode(rs.getBlendMode())
                 + "|c" + cullCode(rs.getCullMode())
                 + "|dt" + (rs.isDepthTest() ? 1 : 0)
                 + "|dw" + (rs.isDepthWrite() ? 1 : 0);
+        if (log) {
+            System.out.println("CN1SS:GL3D:pipe b key=" + key);
+        }
         Long existing = pipelines.get(key);
         if (existing != null) {
             return existing.longValue();
         }
         IOSMetalShaderGenerator gen = new IOSMetalShaderGenerator(material, fmt);
+        String src = gen.getSource();
+        if (log) {
+            System.out.println("CN1SS:GL3D:pipe c srcLen=" + (src == null ? -1 : src.length()));
+        }
         long pipeline = IOSImplementation.nativeInstance.gl3dGetOrCreatePipeline(
-                contextPeer, key, gen.getSource(),
+                contextPeer, key, src,
                 blendCode(rs.getBlendMode()), cullCode(rs.getCullMode()),
                 rs.isDepthTest() ? 1 : 0, rs.isDepthWrite() ? 1 : 0);
+        if (log) {
+            System.out.println("CN1SS:GL3D:pipe d pipeline=" + pipeline);
+        }
         pipelines.put(key, Long.valueOf(pipeline));
         return pipeline;
     }
