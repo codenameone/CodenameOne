@@ -86,6 +86,7 @@ class IOSGLSurface {
             }
             renderer.onFrame(device);
         } catch (Throwable t) {
+            System.out.println("CN1SS:GL3D:frameException=" + t);
             Log.e(t);
         }
     }

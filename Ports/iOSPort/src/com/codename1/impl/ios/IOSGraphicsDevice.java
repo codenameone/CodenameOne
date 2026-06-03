@@ -61,6 +61,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // CN1Uniforms struct emitted by IOSMetalShaderGenerator and copied on the
     // native side: 4 mat4 (64 floats) + 4 vec4 (16 floats) + shininess + pad.
     // We pad to a multiple of 16 for the aligned allocator.
+    private static int DRAW_LOG_COUNT = 0;
     private static final int UNIFORM_FLOATS = 96;
     private final float[] uniforms = allocAligned(UNIFORM_FLOATS);
 
@@ -120,11 +121,16 @@ class IOSGraphicsDevice extends GraphicsDevice {
         VertexFormat fmt = vb.getFormat();
 
         long vboHandle = uploadVertexBuffer(vb);
+        long pipeline = vboHandle == 0 ? 0 : getOrCreatePipeline(material, fmt);
+        if (DRAW_LOG_COUNT < 4) {
+            DRAW_LOG_COUNT++;
+            System.out.println("CN1SS:GL3D:javaDraw ctx=" + contextPeer + " vbo=" + vboHandle
+                    + " pipeline=" + pipeline + " indexed=" + mesh.isIndexed()
+                    + " stride=" + fmt.getStrideBytes() + " key=" + material.getShaderKey());
+        }
         if (vboHandle == 0) {
             return;
         }
-
-        long pipeline = getOrCreatePipeline(material, fmt);
         if (pipeline == 0) {
             return;
         }
