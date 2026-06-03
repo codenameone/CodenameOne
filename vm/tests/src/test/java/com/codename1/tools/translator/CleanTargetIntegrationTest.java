@@ -555,6 +555,13 @@ class CleanTargetIntegrationTest {
                 "public class WinHelloMain {\n" +
                 "    public static void main(String[] args) {\n" +
                 "        Display.init(null);\n" +
+                // KotlinUiTest reaches kotlin.Unit only through its lambdas' return
+                // type, which the translator's reachability closure does not follow,
+                // so kotlin.Unit is never translated and KotlinUiTest.c fails to
+                // compile (kotlin_Unit.h not found). A direct static-field reference
+                // forces it into the translation set (the Kotlin app entry point does
+                // this implicitly on the other ports).
+                "        if (kotlin.Unit.INSTANCE == null) { return; }\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 // KotlinUiTest is registered as the prepended test exactly as the
                 // real Kotlin app entry point does (HelloCodenameOne.kt:
@@ -670,6 +677,13 @@ class CleanTargetIntegrationTest {
         if (Files.exists(theme)) {
             Files.copy(theme, exe.resolveSibling("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
         }
+        // TODO(windows-port): stage the app theme.res so css-gradients passes and
+        // the *_dark/_light theme tests render with the real theme. Generating it
+        // with the headless NoCefCSSCLI produced a theme.res whose image encoding is
+        // incomplete (CSSTheme.save hits EncodedImage.getWidth), and loading that
+        // corrupts the heap -> a crash on the GC thread (gcMarkDrain) a few tests in.
+        // Needs a valid app theme.res (full CSS compiler, or fix the no-cef image
+        // path) before re-enabling.
         return exe;
     }
 
