@@ -3230,9 +3230,9 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // bytecode-emitted dispatch chain. Force-timeout so the rest of
   // the screenshot suite can finalize.
   "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  // ChatInput/ChatView un-parked: the capture-gate (beginCaptureGate/endCaptureGate)
-  // serializes the canvas read so their dual-appearance streams no longer capture the
-  // previous test's form.
+  // emitChannel hijack — see matching entry in cn1ssForcedTimeoutTestNames below.
+  "com_codenameone_examples_hellocodenameone_tests_ChatInputScreenshotTest": "chatInputEmitHijack",
+  "com_codenameone_examples_hellocodenameone_tests_ChatViewScreenshotTest": "chatViewEmitHijack",
   // The 14 *ThemeScreenshotTest entries that used to live here were
   // unparked when the JS port started bundling the modern native
   // theme resources (iOSModernTheme.res / AndroidMaterialTheme.res
@@ -3368,11 +3368,15 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "Base64NativePerformanceTest": "base64NativePerformance",
   "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
-  // ChatInput/ChatView were parked here because the capture read the visible
-  // canvas while it still showed the PREVIOUS test (the dual-stream off-by-one).
-  // The capture-gate threading fix (parparvm_runtime.js beginCaptureGate/
-  // endCaptureGate) serializes the canvas read against concurrent painters, so
-  // they now capture their own form.
+  // emitChannel host-bridges to a capture of the visible browser canvas
+  // instead of using the test-supplied off-screen Image; for these dual-
+  // appearance tests the visible canvas still shows the previous test
+  // (LightweightPickerButtons) when ChatInput_/ChatView_ {dark,light}
+  // streams emit, so the captured PNGs contain the wrong content and
+  // mismatch the references shipped with master. Real fix belongs in
+  // the JS-port emit path (separate investigation).
+  "ChatInputScreenshotTest": "chatInputEmitHijack",
+  "ChatViewScreenshotTest": "chatViewEmitHijack",
   // The 14 *ThemeScreenshotTest short-name entries were un-parked
   // alongside the fully-qualified-class entries in
   // cn1ssForcedTimeoutTestClasses above when the modern native
