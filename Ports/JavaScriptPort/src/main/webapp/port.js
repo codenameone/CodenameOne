@@ -3230,9 +3230,9 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // bytecode-emitted dispatch chain. Force-timeout so the rest of
   // the screenshot suite can finalize.
   "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  // emitChannel hijack — see matching entry in cn1ssForcedTimeoutTestNames below.
-  "com_codenameone_examples_hellocodenameone_tests_ChatInputScreenshotTest": "chatInputEmitHijack",
-  "com_codenameone_examples_hellocodenameone_tests_ChatViewScreenshotTest": "chatViewEmitHijack",
+  // ChatInput/ChatView un-parked: their dark-phase emit no longer spills into the
+  // next test now that awaitTestCompletion gives DualAppearanceBaseTest its full
+  // 30s on HTML5 (was clobbered to a flat 10s by the bridge).
   // The 14 *ThemeScreenshotTest entries that used to live here were
   // unparked when the JS port started bundling the modern native
   // theme resources (iOSModernTheme.res / AndroidMaterialTheme.res
@@ -3368,15 +3368,11 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "Base64NativePerformanceTest": "base64NativePerformance",
   "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
-  // emitChannel host-bridges to a capture of the visible browser canvas
-  // instead of using the test-supplied off-screen Image; for these dual-
-  // appearance tests the visible canvas still shows the previous test
-  // (LightweightPickerButtons) when ChatInput_/ChatView_ {dark,light}
-  // streams emit, so the captured PNGs contain the wrong content and
-  // mismatch the references shipped with master. Real fix belongs in
-  // the JS-port emit path (separate investigation).
-  "ChatInputScreenshotTest": "chatInputEmitHijack",
-  "ChatViewScreenshotTest": "chatViewEmitHijack",
+  // ChatInput/ChatView were parked because their dark-phase capture ran past the
+  // flat 10s deadline the bridge imposed, so the runner force-advanced and the
+  // pending dark emit captured the NEXT test (ChatInput_dark -> ImageViewer).
+  // Root cause fixed: awaitTestCompletion now computes the type-aware deadline
+  // (DualAppearanceBaseTest gets 30s on HTML5) instead of the bridge's flat 10s.
   // The 14 *ThemeScreenshotTest short-name entries were un-parked
   // alongside the fully-qualified-class entries in
   // cn1ssForcedTimeoutTestClasses above when the modern native
@@ -3806,13 +3802,18 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   try {
     const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
     if (typeof awaitMethod === "function") {
-      const deadline = Date.now() + cn1ssTestTimeoutMs;
+      // Pass 0 (sentinel) so awaitTestCompletion computes the TYPE-AWARE deadline
+      // itself via testTimeoutMs(testClass): DualAppearanceBaseTest tests need
+      // ~30s on HTML5 (light + dark phases each pay registerReadyCallback's
+      // 1500ms + settle + capture). Hard-coding the flat 10s cn1ssTestTimeoutMs
+      // here used to guillotine them mid-dark-phase, so the pending dark emit
+      // captured the NEXT test's form (e.g. ChatInput_dark -> ImageViewer).
       return yield* cn1_ivAdapt(awaitMethod(
         callTarget,
         effectiveIndex,
         effectiveTestObject,
         normalizedTestName,
-        deadline
+        0
       ));
     }
     emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionMissing=1");
