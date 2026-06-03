@@ -1775,6 +1775,75 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     return out;
 }
 
+// --------------- Mutable-image suspend/resume backup (issue #5153) ---------------
+//
+// Private-storage textures backing mutable images can have their contents
+// discarded while the app is suspended, so a cached mutable image (e.g. the
+// RoundBorder drop shadow under a FloatingActionButton) would sample garbage
+// on resume and render as a violet fill. We keep a weak registry of every
+// live mutable image and, on applicationWillResignActive, read each one back
+// into its UIImage backing and drop the volatile texture. The texture is
+// transparently rebuilt from that backing the next time the image is painted
+// or sampled (CN1MetalEnsureMutableTexture / GLUIImage.getMTLTexture both
+// re-seed from getImage), so the pixels survive the round trip.
+
+static NSHashTable *gMutableImageRegistry = nil; // weak refs, no ownership
+static id gMutableImageRegistryToken = nil;      // @synchronized lock token
+
+static void cn1EnsureMutableImageRegistry(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        gMutableImageRegistry = [[NSHashTable weakObjectsHashTable] retain];
+        gMutableImageRegistryToken = [[NSObject alloc] init];
+    });
+}
+
+void CN1MetalRegisterMutableImage(GLUIImage *image) {
+    if (image == nil) return;
+    cn1EnsureMutableImageRegistry();
+    @synchronized (gMutableImageRegistryToken) {
+        [gMutableImageRegistry addObject:image];
+    }
+}
+
+void CN1MetalUnregisterMutableImage(GLUIImage *image) {
+    if (image == nil || gMutableImageRegistry == nil) return;
+    @synchronized (gMutableImageRegistryToken) {
+        [gMutableImageRegistry removeObject:image];
+    }
+}
+
+void CN1MetalBackupMutableImagesForSuspend(void) {
+    if (gMutableImageRegistry == nil) return;
+    NSArray *snapshot;
+    @synchronized (gMutableImageRegistryToken) {
+        // allObjects returns a strong-referencing array, so the images stay
+        // alive for the duration of the loop even though the table is weak.
+        // Iterating the snapshot (not the table) also makes the mutations
+        // below -- which can unregister images -- safe.
+        snapshot = [gMutableImageRegistry allObjects];
+    }
+    for (GLUIImage *image in snapshot) {
+        if ([image mtlMutableTexture] == nil) {
+            continue;
+        }
+        // Read the current GPU pixels back into a UIImage *before* dropping
+        // the texture or its pending command buffer (the readback waits on
+        // that command buffer).
+        UIImage *backup = CN1MetalReadMutableImageAsUIImage(image);
+        if (backup == nil) {
+            // Readback failed -- keep the existing texture rather than lose
+            // the content outright; nothing better we can do here.
+            continue;
+        }
+        [image setMtlMutableCommandBuffer:nil];
+        [image setMtlMutableTexture:nil width:0 height:0];
+        // setImage: becomes the seed source for the lazy rebuild and also
+        // invalidates the read-only mtlTexture cache.
+        [image setImage:backup];
+    }
+}
+
 // --------------- Memory-pressure cache release ---------------
 //
 // METALView observes UIApplicationDidReceiveMemoryWarning and calls
