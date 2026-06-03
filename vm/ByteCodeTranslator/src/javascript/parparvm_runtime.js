@@ -4822,11 +4822,13 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
 // wakeup.
 if (VM_DIAG_ENABLED && typeof setInterval === "function") {
   let __cn1HbLastResumes = -1;
+  let __cn1HbFrozenStreak = 0;
   setInterval(function() {
     try {
       const rc = jvm.__cn1ResumeCount | 0;
       const frozen = rc === __cn1HbLastResumes;
       __cn1HbLastResumes = rc;
+      __cn1HbFrozenStreak = frozen ? (__cn1HbFrozenStreak + 1) : 0;
       vmTrace("DIAG:WORKER_HB:resumes=" + rc
         + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
         + ":draining=" + (jvm.draining ? 1 : 0)
@@ -4838,9 +4840,11 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
       // When the worker is wedged (frozen with nothing runnable) every green
       // thread is parked. Dump WHAT they are parked on so the lost-response /
       // deadlock can be isolated without worker-internal tracing (which
-      // Playwright can't attach to). The biggest suspect is a HOST_CALL whose
-      // callback never arrived -- list the pending symbols (and counts).
-      if (frozen && (jvm.runnable ? jvm.runnable.length : 0) === 0) {
+      // Playwright can't attach to). Only fire after a SUSTAINED freeze (>=5
+      // consecutive ~1.5s heartbeats = ~7.5s) so legitimate multi-second waits
+      // (__cn1_delay__ transitions, dual-appearance settle) don't pollute the
+      // signal -- a true wedge never recovers, so it keeps dumping.
+      if (frozen && __cn1HbFrozenStreak >= 5 && (jvm.runnable ? jvm.runnable.length : 0) === 0) {
         var pend = jvm.pendingHostCalls || {};
         var counts = {};
         var pk = Object.keys(pend);
