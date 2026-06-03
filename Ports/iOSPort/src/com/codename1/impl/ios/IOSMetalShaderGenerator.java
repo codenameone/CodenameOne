@@ -109,7 +109,14 @@ public final class IOSMetalShaderGenerator {
         sb.append("    CN1VertexIn in [[stage_in]],\n");
         sb.append("    constant CN1Uniforms& u [[buffer(1)]]) {\n");
         sb.append("  CN1VertexOut out;\n");
-        sb.append("  out.position = u.mvp * float4(in.position, 1.0);\n");
+        sb.append("  float4 clip = u.mvp * float4(in.position, 1.0);\n");
+        // Adapt the portable GL-convention clip space to Metal: flip Y (Metal's
+        // framebuffer origin is top-left, which also makes triangle winding match
+        // the GL/software backends so back-face culling keeps the right faces),
+        // and remap Z from GL's [-w, w] to Metal's [0, w] depth range.
+        sb.append("  clip.y = -clip.y;\n");
+        sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
+        sb.append("  out.position = clip;\n");
         if (lit) {
             sb.append("  out.worldNormal = (u.normalMatrix * float4(in.normal, 0.0)).xyz;\n");
             sb.append("  out.worldPos = (u.model * float4(in.position, 1.0)).xyz;\n");
