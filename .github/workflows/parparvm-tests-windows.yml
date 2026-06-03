@@ -206,8 +206,20 @@ jobs:
       - name: Set up Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
-      # JDK 8 builds codename1-core (source/target 1.5) and is also the JDK the
-      # translator harness uses (CompilerHelper auto-discovers JDK_8_HOME).
+      # JDK 17 compiles the hellocodenameone-common Java (release 17). Set up first
+      # so the JDK 8 below ends up the active JAVA_HOME.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 path
+        shell: pwsh
+        run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # JDK 8 builds codename1-core (source/target 1.5), runs the Kotlin 1.6.0
+      # compiler (it aborts on JDK 17+), and is the JDK the translator harness uses
+      # (CompilerHelper auto-discovers JDK_8_HOME). Set up last so it stays active.
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with:
@@ -220,27 +232,43 @@ jobs:
 
       # Build codenameone-core + the Windows port so the translator can read
       # their compiled classes (maven/core/target/classes, maven/windows/...).
-      # Also install the codenameone-maven-plugin (+ its upstream: java-runtime,
-      # css/svg/lottie transcoders) so the hellocodenameone-common module below can
-      # run its CN1 build goals (generate-gui-sources, css, process-annotations).
-      - name: Build core + Windows port + CN1 plugin (JDK 8)
+      - name: Build core + Windows port (JDK 8)
         working-directory: maven
         shell: pwsh
         # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
         # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
-        run: mvn -B -pl windows,codenameone-maven-plugin -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+        run: mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
-      # Build the real hellocodenameone screenshot app (the same module the other
-      # ports run): Kotlin + Java + all *ScreenshotTest classes -> common/target/
-      # classes, which the capture test translates into the native exe. The active
-      # runner JDK here is 8; the Kotlin 1.6.0 compiler fails on JDK 17+ (it calls
-      # the removed setIdeaIoUseFallback), so this MUST run on JDK 8/11 -- which is
-      # also why the arm64 leg cannot build it (JDK 21-only) and reuses the bytecode
-      # published below.
-      - name: Build hellocodenameone-common (screenshot suite app)
-        working-directory: scripts/hellocodenameone
+      # Build the real hellocodenameone screenshot app (Kotlin + Java + all
+      # *ScreenshotTest classes) into common/target/classes, which the capture test
+      # translates into the native exe. The module's Maven build pulls in the CN1
+      # app plugin (network bootstrap, GUI/CSS codegen, device tmpProject) and needs
+      # a JDK-17 toolchain for the Java sources while Kotlin 1.6.0 must run on a
+      # JDK <= 16 -- too entangled for CI. Instead compile directly, exactly as
+      # scripts/windows/build-hello.bat does: standalone kotlinc (JDK 8, joint with
+      # the Java sources for cross-references) emits the Kotlin classes, then javac
+      # (JDK 17, --release 17) compiles the Java against core + those classes.
+      - name: Build hellocodenameone-common (kotlinc + javac)
         shell: pwsh
-        run: mvn -B -pl common process-classes -DskipTests
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://github.com/JetBrains/kotlin/releases/download/v1.6.0/kotlin-compiler-1.6.0.zip' -OutFile kc.zip
+          Expand-Archive -Force kc.zip -DestinationPath kc
+          $core = "$PWD/maven/core/target/classes"
+          $common = "$PWD/scripts/hellocodenameone/common"
+          $out = "$common/target/classes"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $env:JAVA_HOME = $env:JDK_8_HOME
+          & "$PWD/kc/kotlinc/bin/kotlinc.bat" -d $out -classpath $core -jvm-target 1.8 "$common/src/main/kotlin" "$common/src/main/java"
+          if ($LASTEXITCODE -ne 0) { throw "kotlinc failed" }
+          $stdlib = "$PWD/kc/kotlinc/lib/kotlin-stdlib.jar"
+          $srcs = Get-ChildItem -Recurse "$common/src/main/java" -Filter *.java | ForEach-Object { $_.FullName }
+          & "$env:JDK_17_HOME/bin/javac" -nowarn -encoding UTF-8 --release 17 -cp "$core;$stdlib;$out" -d $out $srcs
+          if ($LASTEXITCODE -ne 0) { throw "javac failed" }
+          if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
 
       - name: Upload hellocodenameone-common classes
         uses: actions/upload-artifact@v4
