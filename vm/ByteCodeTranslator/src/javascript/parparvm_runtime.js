@@ -2829,7 +2829,7 @@ const jvm = {
     }
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
-      this.pendingHostCalls[yielded.id] = { thread: thread };
+      this.pendingHostCalls[yielded.id] = { thread: thread, symbol: yielded.symbol };
       const rawArgs = yielded.args || [];
       const safeArgs = new Array(rawArgs.length);
       for (let i = 0; i < rawArgs.length; i++) {
@@ -4832,8 +4832,31 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
         + ":draining=" + (jvm.draining ? 1 : 0)
         + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0)
         + ":frozen=" + (frozen ? 1 : 0)
+        + ":captureGate=" + (jvm.captureGateOwner ? 1 : 0)
         + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
         + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+      // When the worker is wedged (frozen with nothing runnable) every green
+      // thread is parked. Dump WHAT they are parked on so the lost-response /
+      // deadlock can be isolated without worker-internal tracing (which
+      // Playwright can't attach to). The biggest suspect is a HOST_CALL whose
+      // callback never arrived -- list the pending symbols (and counts).
+      if (frozen && (jvm.runnable ? jvm.runnable.length : 0) === 0) {
+        var pend = jvm.pendingHostCalls || {};
+        var counts = {};
+        var pk = Object.keys(pend);
+        for (var i = 0; i < pk.length; i++) {
+          var sym = (pend[pk[i]] && pend[pk[i]].symbol) ? String(pend[pk[i]].symbol) : "unknown";
+          counts[sym] = (counts[sym] | 0) + 1;
+        }
+        var parts = [];
+        var ck = Object.keys(counts);
+        for (var j = 0; j < ck.length; j++) {
+          parts.push(ck[j] + "x" + counts[ck[j]]);
+        }
+        vmTrace("DIAG:WORKER_HB_FROZEN:pendingHostCalls=" + pk.length
+          + ":symbols=" + (parts.length ? parts.join(",") : "none")
+          + ":timedWakeups=" + (jvm.timedWakeups ? jvm.timedWakeups.length : -1));
+      }
     } catch (e) {
       void e;
     }
