@@ -1002,16 +1002,19 @@ public class InteractionDialog extends Container implements AbstractDialog {
             if (placeBelow && spaceBelow > 0) {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
-                int height = Math.min(prefHeight, spaceBelow);
-                padOrientation(contentPaneStyle, TOP, 1);
+                // Grow the dialog by the arrow inset so the content keeps its full
+                // preferred height; otherwise the arrow space is taken out of the
+                // content pane and the last lines get clipped/scrollable (#5154).
+                int arrowInset = padOrientation(contentPaneStyle, TOP, 1);
+                int height = Math.min(prefHeight + arrowInset, spaceBelow);
                 show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
             } else if (!placeBelow && spaceAbove > 0) {
                 // popup upwards
-                int height = Math.min(prefHeight, spaceAbove);
+                int arrowInset = padOrientation(contentPaneStyle, BOTTOM, 1);
+                int height = Math.min(prefHeight + arrowInset, spaceAbove);
                 y = rect.getY() - height;
-                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, BOTTOM, -1);
             } else if (rect.getY() < availableHeight / 2) {
@@ -1020,16 +1023,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // rect fills the viewport top-to-bottom.
                 y = rect.getY() + CN.convertToPixels(3);
 
-                int height = Math.min(prefHeight, availableHeight - y);
-                padOrientation(contentPaneStyle, BOTTOM, 1);
+                int arrowInset = padOrientation(contentPaneStyle, BOTTOM, 1);
+                int height = Math.min(prefHeight + arrowInset, availableHeight - y);
                 show(y, Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, BOTTOM, -1);
             } else {
                 // popup over aligned with bottom of rect but inset a few mm
-                y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
-                int height = prefHeight;
-                padOrientation(contentPaneStyle, TOP, 1);
+                int arrowInset = padOrientation(contentPaneStyle, TOP, 1);
+                int height = prefHeight + arrowInset;
+                y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - height);
                 show(y, Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
@@ -1071,7 +1074,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
 
-    private void padOrientation(Style s, int orientation, int padding) {
+    /// Adjusts the padding of the dialog style on a single edge to reserve room
+    /// for the pointing arrow, returning the actual pixel delta that was applied.
+    /// Callers add this delta to the dialog height so the dialog grows by the
+    /// arrow thickness instead of the arrow space being stolen from the content
+    /// pane (see #5154).
+    private int padOrientation(Style s, int orientation, int padding) {
+        int before = s.getPadding(isRTL(), orientation);
         byte[] b = s.getPaddingUnit();
         byte unit = b == null ? Style.UNIT_TYPE_PIXELS : s.getPaddingUnit()[orientation];
         if (unit != Style.UNIT_TYPE_DIPS) {
@@ -1079,6 +1088,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         s.setPadding(orientation, s.getPaddingFloatValue(isRTL(),
                 orientation) + padding);
+        return s.getPadding(isRTL(), orientation) - before;
     }
 
     /// Returns the uiid of the dialog
