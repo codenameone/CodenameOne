@@ -477,7 +477,11 @@ void com_codename1_impl_ios_IOSNative_gl3dDisposePipeline___long(
     // Pipelines are owned by the view's cache; nothing to release per handle.
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
+// The real implementation lives in the plain (un-suffixed) symbol; the
+// _R_<rettype> form below is a thin wrapper. This matches the convention of the
+// existing String-argument non-void natives in IOSNative.m (createVideoComponent,
+// getResourceSize): ParparVM dispatches the call through the plain symbol.
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
         JAVA_INT depthTest, JAVA_INT depthWrite) {
@@ -503,15 +507,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_l
     return (JAVA_LONG)(__bridge void *) p;
 }
 
-// Plain (non _R_) symbol. ParparVM dispatches native methods that take object
-// (String) arguments through the un-suffixed name, so a non-void native needs
-// both this and the _R_<rettype> wrapper above (see createImageFromARGB in
-// IOSNative.m for the same pattern) or the call resolves to null at runtime.
-JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT key, JAVA_OBJECT mslSource, JAVA_INT blendMode, JAVA_INT cullMode,
         JAVA_INT depthTest, JAVA_INT depthWrite) {
-    return com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int_R_long(
+    return com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_lang_String_java_lang_String_int_int_int_int(
             CN1_THREAD_STATE_PASS_ARG instanceObject, contextPeer, key, mslSource,
             blendMode, cullMode, depthTest, depthWrite);
 }
