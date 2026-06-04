@@ -11,8 +11,12 @@ The desktop integration features make a desktop build *feel* like a desktop app:
 * A native window title bar that shows the `Form` title (instead of the in-app `Toolbar`).
 * A native menu bar populated from your `Command` objects, with per-command placement hints
   (About, File, Edit, Quit, ...).
-* Interactive scrollbars - a draggable thumb, click-to-page on the track, and an
-  always-visible (rather than fading) scrollbar.
+* Interactive scrollbars - a draggable thumb that highlights on hover and while dragged,
+  click-to-page on the track, a minimum thumb size so it stays grabbable on long content, a
+  reserved gutter so content isn't drawn under the bar, and an always-visible (rather than
+  fading) scrollbar.
+* Keyboard accelerators on the native menu items (Cmd+S / Ctrl+S, ...).
+* Native desktop notifications driven by the standard `LocalNotification` API.
 
 These behaviors are *opt-in*. They're switched on by default for newly generated projects
 (both the Maven archetype and the start.codenameone.com initializr) and stay completely
@@ -127,13 +131,49 @@ Each port maps the hint to its native structure: on Catalyst the command is inse
 TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it's inert on platforms that
 don't have a native menu bar - it's safe to set it unconditionally in shared code.
 
+==== Keyboard accelerators
+
+Give a command a keyboard accelerator with `Command.setDesktopShortcut(...)`. The shortcut is shown
+next to the menu item and triggers the command from the keyboard:
+
+[source,java]
+-----
+Command save = new Command("Save");
+save.setDesktopMenu(Command.DESKTOP_MENU_FILE);
+save.setDesktopShortcut('S');   // Cmd+S on macOS, Ctrl+S on Windows/Linux
+
+Command saveAs = new Command("Save As...");
+saveAs.setDesktopMenu(Command.DESKTOP_MENU_FILE);
+saveAs.setDesktopShortcut('S',
+        Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY | Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);
+-----
+
+The single-argument form uses the platform's *primary* modifier - Command on macOS, Control on
+Windows/Linux - which is the right default for most menu shortcuts. The
+two-argument form takes a bit-mask of `Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY`,
+`Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT` and `Command.DESKTOP_SHORTCUT_MODIFIER_ALT`. On the
+Java SE build the accelerator becomes a Swing `KeyStroke`; on Catalyst it becomes a `UIKeyCommand`.
+Like the placement hint, the accelerator is inert on platforms without a native menu bar, so it's
+safe to set unconditionally.
+
 === Interactive scrollbars
 
 Enabling `desktop.interactiveScrollbars` turns the scrollbar from a fading touch indicator into a
-desktop-style control: the thumb can be grabbed and dragged, clicking the track pages toward the
-pointer, and the scrollbar stays visible rather than fading out. This is a cross-platform core
-feature driven by the `interactiveScrollBool` theme constant, which the desktop ports inject only
-when `CN.isDesktop()` is true. Mouse-wheel scrolling continues to work as before.
+desktop-style control:
+
+* The thumb can be grabbed and dragged, and it *highlights* while the pointer hovers it and while
+  it's being dragged (the `DesktopScrollThumb` selected / pressed styles).
+* Clicking the track pages toward the pointer by about one viewport.
+* The thumb has a *minimum size* so it stays grabbable even when the content is far taller than the
+  viewport. The minimum (in pixels) is the `scrollThumbMinSizeInt` theme constant; when unset it
+  defaults to the equivalent of 4mm.
+* A *gutter* is reserved for the scrollbar so content isn't laid out underneath it. The gutter width
+  comes from the `DesktopScroll` / `DesktopHorizontalScroll` UIID padding (see below).
+* The scrollbar stays visible rather than fading out.
+
+This is a cross-platform core feature driven by the `interactiveScrollBool` theme constant, which
+the desktop ports inject only when `CN.isDesktop()` is true. Mouse-wheel scrolling continues to work
+as before.
 
 [#desktop-theme-uiids]
 === Theme UIIDs
@@ -145,10 +185,37 @@ mobile `Scroll` / `ScrollThumb` styling is never affected:
 |===
 |`DesktopScroll`, `DesktopScrollThumb`, `DesktopHorizontalScroll`, `DesktopHorizontalScrollThumb`
 |The interactive desktop scrollbar track and thumb. The horizontal-/vertical-scroll UIID's padding
-sets the scrollbar gutter width.
+sets the scrollbar gutter width. The thumb UIID's `.selected` and `.pressed` styles render the
+hover and drag highlight respectively.
 |===
 
 The modern native themes ship platform-conventional defaults for these UIIDs (macOS-style in the iOS
-theme, Material-style in the Android theme); see <<native-modern-themes>>. Override them in your
-app's `theme.css` like any other UIID. In `custom` mode the title bar is just the regular CN1
-`Toolbar`, so it's themed through the usual `Toolbar` / `Title` UIIDs.
+theme, Material-style in the Android theme), including the `.selected` / `.pressed` thumb highlight
+states; see <<native-modern-themes>>. Override them in your app's `theme.css` like any other UIID.
+The minimum thumb length is the `scrollThumbMinSizeInt` theme constant (pixels). In `custom` mode the
+title bar is just the regular CN1 `Toolbar`, so it's themed through the usual `Toolbar` / `Title`
+UIIDs.
+
+=== Desktop notifications
+
+The standard `com.codename1.notifications.LocalNotification` API works on the desktop. On the
+Java SE desktop build a scheduled notification surfaces as a native OS notification through the
+system tray (Notification Center on macOS, the notification area on Windows/Linux); on the
+macOS / Mac Catalyst build it goes through the same `UNUserNotificationCenter` path as iOS. Clicking
+the notification delivers it to your app's `LocalNotificationCallback`, exactly as on mobile, so the
+same scheduling and handling code is shared across phone and desktop:
+
+[source,java]
+-----
+LocalNotification n = new LocalNotification();
+n.setId("reminder-1");
+n.setAlertTitle("Reminder");
+n.setAlertBody("Your export has finished.");
+
+// fire in 5 seconds, no repeat
+Display.getInstance().scheduleLocalNotification(
+        n, System.currentTimeMillis() + 5000, LocalNotification.REPEAT_NONE);
+-----
+
+NOTE: On the Java SE build desktop notifications require an OS with system-tray support
+(`java.awt.SystemTray`); where it's unavailable the notification is logged and skipped.

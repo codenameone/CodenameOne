@@ -5,6 +5,8 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 import java.util.Hashtable;
@@ -137,5 +139,89 @@ class InteractiveScrollbarTest extends UITestBase {
         assertFalse(sc.isInteractiveScrollThumbGrabbed(),
                 "with interactiveScrollBool off, pressing the gutter must not grab the thumb");
         sc.pointerReleased(px, py);
+    }
+
+    @FormTest
+    void hoverHighlightsThumbThenClears() {
+        setInteractiveScroll(true);
+        Container sc = scrollableContainer(8000);
+        int thumbH = sc.getHeight() / 4;
+        injectVerticalThumb(sc, 0, thumbH);
+
+        int thumbCenterX = sc.getAbsoluteX() + sc.getWidth() - GUTTER / 2;
+        int thumbCenterY = sc.getAbsoluteY() + thumbH / 2;
+        assertFalse(sc.isVScrollThumbHover(), "thumb starts un-hovered");
+
+        sc.updateInteractiveScrollHover(thumbCenterX, thumbCenterY);
+        assertTrue(sc.isVScrollThumbHover(), "hovering the thumb must set the hover highlight");
+
+        // move well below the thumb (still in the track) -> hover clears
+        sc.updateInteractiveScrollHover(thumbCenterX, sc.getAbsoluteY() + sc.getHeight() - 2);
+        assertFalse(sc.isVScrollThumbHover(), "moving off the thumb must clear the hover highlight");
+    }
+
+    @FormTest
+    void hoverIsInertWhenDisabled() {
+        setInteractiveScroll(false);
+        Container sc = scrollableContainer(8000);
+        int thumbH = sc.getHeight() / 4;
+        injectVerticalThumb(sc, 0, thumbH);
+        sc.updateInteractiveScrollHover(sc.getAbsoluteX() + sc.getWidth() - GUTTER / 2,
+                sc.getAbsoluteY() + thumbH / 2);
+        assertFalse(sc.isVScrollThumbHover(), "hover highlight must be inert when interactive scroll is off");
+    }
+
+    @FormTest
+    void minThumbSizeClampsAndStaysInTrack() {
+        // pin the minimum thumb size to a known pixel value so the test is independent of sim DPI
+        int minThumb = 30;
+        Hashtable props = new Hashtable();
+        props.put("@interactiveScrollBool", "true");
+        props.put("@scrollThumbMinSizeInt", "" + minThumb);
+        UIManager.getInstance().addThemeProps(props);
+
+        Container sc = scrollableContainer(40000);
+        Image img = Image.createImage(Math.max(1, sc.getWidth()), Math.max(1, sc.getHeight()));
+        Graphics g = img.getGraphics();
+
+        // a tiny block-size ratio would paint a near-zero-height thumb without the minimum-size clamp
+        float blockSizeRatio = 0.004f;
+        int rawBlock = (int) (sc.getHeight() * blockSizeRatio) + 2;
+        assertTrue(rawBlock < minThumb, "test precondition: the raw thumb must be smaller than the minimum");
+
+        UIManager.getInstance().getLookAndFeel().drawVerticalScroll(g, sc, 0f, blockSizeRatio);
+        int thumbH = sc.getVScrollThumbHInternal();
+        assertEquals(minThumb, thumbH, "interactive thumb must be clamped up to the minimum size");
+
+        // at the very bottom the enlarged thumb must still sit fully inside the track
+        UIManager.getInstance().getLookAndFeel().drawVerticalScroll(g, sc, 1f - blockSizeRatio, blockSizeRatio);
+        int thumbBottom = sc.getVScrollThumbYInternal() + sc.getVScrollThumbHInternal();
+        int trackBottom = sc.getVScrollTrackYInternal() + sc.getVScrollTrackHInternal();
+        assertTrue(thumbBottom <= trackBottom + 1,
+                "remapped thumb must stay within the track at maximum scroll (thumbBottom=" + thumbBottom
+                        + ", trackBottom=" + trackBottom + ")");
+    }
+
+    @FormTest
+    void gutterIsReservedForInteractiveScrollbar() {
+        Hashtable props = new Hashtable();
+        props.put("@interactiveScrollBool", "true");
+        // give the DesktopScroll UIID a real horizontal padding so it defines a gutter width
+        props.put("DesktopScroll.padding", "0,0,8,8");
+        props.put("DesktopScroll.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        UIManager.getInstance().addThemeProps(props);
+
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        assertTrue(laf.isInteractiveScroll(), "interactive scroll must be enabled");
+        // the 8px left + 8px right DesktopScroll padding contributes a 16px gutter (any style margins
+        // add to that), so the scrollbar width must be at least that wide
+        assertTrue(laf.getVerticalScrollWidth() >= 16,
+                "gutter width must include the DesktopScroll padding, was " + laf.getVerticalScrollWidth());
+
+        Container sc = scrollableContainer(8000);
+        assertEquals(laf.getVerticalScrollWidth(), sc.getSideGap(),
+                "a scrollable container must reserve a layout gutter equal to the scrollbar width");
+        assertTrue(sc.getSideGap() > 0, "the reserved gutter must be non-zero");
     }
 }

@@ -349,6 +349,15 @@ DesktopScrollThumb {
     padding: 0;
     margin: 0;
 }
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb */
+DesktopScrollThumb.selected {
+    cn1-derive: DesktopScrollThumb;
+    background-color: #5f5b66;
+}
+DesktopScrollThumb.pressed {
+    cn1-derive: DesktopScrollThumb;
+    background-color: #49454f;
+}
 DesktopHorizontalScroll {
     background-color: #e7e0ec;
     padding: 1.2mm 0 1.2mm 0;
@@ -359,6 +368,14 @@ DesktopHorizontalScrollThumb {
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    cn1-derive: DesktopHorizontalScrollThumb;
+    background-color: #5f5b66;
+}
+DesktopHorizontalScrollThumb.pressed {
+    cn1-derive: DesktopHorizontalScrollThumb;
+    background-color: #49454f;
 }
 
 /* Material 3 top tabs: flat surface with selected tab underlined by
@@ -576,8 +593,12 @@ PopupContent {
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: #2b2930; }
     DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: #2b2930; }
     DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }

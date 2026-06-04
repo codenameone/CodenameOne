@@ -308,6 +308,16 @@ DesktopScrollThumb {
     padding: 0;
     margin: 0;
 }
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb,
+   the macOS-conventional interactive-scrollbar highlight */
+DesktopScrollThumb.selected {
+    cn1-derive: DesktopScrollThumb;
+    background-color: rgba(0,0,0,0.55);
+}
+DesktopScrollThumb.pressed {
+    cn1-derive: DesktopScrollThumb;
+    background-color: rgba(0,0,0,0.7);
+}
 DesktopHorizontalScroll {
     background-color: transparent;
     padding: 1mm 0 1mm 0;
@@ -318,6 +328,14 @@ DesktopHorizontalScrollThumb {
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    cn1-derive: DesktopHorizontalScrollThumb;
+    background-color: rgba(0,0,0,0.55);
+}
+DesktopHorizontalScrollThumb.pressed {
+    cn1-derive: DesktopHorizontalScrollThumb;
+    background-color: rgba(0,0,0,0.7);
 }
 
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
@@ -597,8 +615,12 @@ PopupContent {
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: transparent; }
     DesktopScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: rgba(255,255,255,0.6); cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: rgba(255,255,255,0.78); cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: transparent; }
     DesktopHorizontalScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: rgba(255,255,255,0.6); cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: rgba(255,255,255,0.78); cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: #1c1c1e; }
