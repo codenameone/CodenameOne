@@ -23,16 +23,67 @@ The supported formats are:
 * *Native* - assets you render with your own components
   (`com.codename1.ads.NativeAd`).
 
+=== Ad provider cn1libs
+
+Several provider libraries ship with the framework. They are released to Maven
+Central together with the core and the AI cn1libs, sharing the same version
+(`${cn1.version}`), so you never mix versions. Each declares its own native SDK
+dependencies (Pods / Gradle dependencies / permissions), applied automatically
+when the library is on the classpath; you don't edit build hints by hand,
+except for the per-app id described under <<_configuring_the_admob_application_id>>.
+
+[cols="1,1,2", options="header"]
+|===
+| cn1lib | Provider class | Provides
+
+| `cn1-admob` | `com.codename1.ads.admob.AdMobProvider` | Google AdMob on the
+Google Mobile Ads SDK (banner, interstitial, rewarded, rewarded interstitial,
+app open), with AdMob mediation behind it.
+| `cn1-applovin` | `com.codename1.ads.applovin.AppLovinProvider` | AppLovin MAX
+mediation (banner, interstitial, rewarded, app open).
+| `cn1-unity-levelplay` | `com.codename1.ads.levelplay.LevelPlayProvider` |
+Unity LevelPlay (ironSource) mediation (banner, interstitial, rewarded).
+| `cn1-ads-mock` | `com.codename1.ads.mock.MockAdProvider` | A deterministic,
+network-free provider that renders fixed labelled ads - for unit tests,
+screenshot tests and trying the API in the simulator.
+|===
+
+Add the matching dependency to your project's `common/pom.xml`. The provider
+libraries use a `-lib` aggregator with `<type>pom</type>` so Maven pulls in the
+per-platform classifier jars:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-admob-lib</artifactId>
+    <version>${cn1.version}</version>
+    <type>pom</type>
+</dependency>
+----
+
+`cn1-ads-mock` is a single cross-platform jar, so it needs no classifier:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-ads-mock</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+----
+
 === Enabling a provider
 
-Add an ad library to your project and enable it once at startup. Each library
-exposes a static `install()` method that registers its provider with
-`AdManager`:
+Enable a provider once at startup. Each library exposes a static `install()`
+method that registers its provider with `AdManager`:
 
 [source,java]
 ----
-// from the cn1-admob library
-AdMobProvider.install();
+AdMobProvider.install();    // from cn1-admob
+// AppLovinProvider.install();  // from cn1-applovin
+// LevelPlayProvider.install(); // from cn1-unity-levelplay
+// MockAdProvider.install();    // from cn1-ads-mock (tests / simulator)
 ----
 
 That single call binds the provider; the rest of your code uses only the
