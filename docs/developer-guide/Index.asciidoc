@@ -720,7 +720,7 @@ Once all that's in place Kotlin should work. This should be possible for more JV
 == 3D Graphics
 
 Codename One includes a portable 3D / GPU graphics API in the `com.codename1.gpu`
-package. It is designed for games and other hardware accelerated visuals and runs
+package. It's designed for games and other hardware accelerated visuals and runs
 on every supported platform from a single code base: the iOS backend renders with
 Metal, Android and the JavaScript port render with OpenGL ES / WebGL, and the
 simulator renders with a built in software rasterizer so the same scene is
@@ -738,8 +738,8 @@ your app.
 
 3D is rendered into a `RenderView`, a normal Codename One `Component` that you add
 to a `Form` like any other. It wraps a native GPU surface (a peer component) and
-drives a `Renderer` callback you implement. Because it is a regular component it
-participates in layouts, scrolling and transitions.
+drives a `Renderer` callback you implement. Because it's a regular component it
+participates in layouts, scrolling, and transitions.
 
 [source,java,title='A lit, rotating cube']
 ----
@@ -872,8 +872,8 @@ image::img/gpu-animation.png[Six rotation stages of an animated cube,scaledwidth
 === Capability detection
 
 The 3D API is available on all current Codename One ports, but you should still
-guard for it so the app degrades gracefully on any platform that does not provide
-a GPU backend (it returns `false` instead of crashing):
+guard for it so the app keeps working on any platform that doesn't provide a GPU
+backend (the check returns `false` rather than crashing):
 
 [source,java]
 ----
@@ -884,6 +884,6 @@ if (CN.isGpuSupported()) {
 }
 ----
 
-`GraphicsDevice.getCapabilities()` exposes finer grained limits (maximum texture
-size, vertex attribute count and so on) for code that needs to adapt to the
-device.
+`GraphicsDevice.getCapabilities()` exposes finer grained limits such as the
+maximum texture size and vertex attribute count for code that needs to adapt to
+the device.
