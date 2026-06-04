@@ -65,6 +65,15 @@
 #ifndef ID2D1GeometrySink_AddLine
 #define ID2D1GeometrySink_AddLine(This, ...) ((This)->AddLine(__VA_ARGS__))
 #endif
+#ifndef ID2D1GeometrySink_AddBezier
+#define ID2D1GeometrySink_AddBezier(This, ...) ((This)->AddBezier(__VA_ARGS__))
+#endif
+#ifndef ID2D1GeometrySink_AddQuadraticBezier
+#define ID2D1GeometrySink_AddQuadraticBezier(This, ...) ((This)->AddQuadraticBezier(__VA_ARGS__))
+#endif
+#ifndef ID2D1GeometrySink_SetFillMode
+#define ID2D1GeometrySink_SetFillMode(This, ...) ((This)->SetFillMode(__VA_ARGS__))
+#endif
 #ifndef ID2D1GeometrySink_BeginFigure
 #define ID2D1GeometrySink_BeginFigure(This, ...) ((This)->BeginFigure(__VA_ARGS__))
 #endif
