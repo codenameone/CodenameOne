@@ -181,6 +181,20 @@ public final class AiDependencyTable {
                 .androidGradle("androidx.camera:camera-video:1.3.4")
                 .description("Cross-platform camera (preview + frames + photo + video)"));
 
+        // Google AdMob provider for the modern advertising API. The GMA pod /
+        // Gradle dependency and the INTERNET permission are declared in the
+        // cn1-admob library's codenameone_library_required.properties (so they
+        // are not repeated here to avoid duplicate dependency lines). This entry
+        // injects the App Tracking Transparency prompt copy (overridable via the
+        // ios.NSUserTrackingUsageDescription build hint). The per-app AdMob
+        // application id is wired separately from the "admob.appId" build hint by
+        // IPhoneBuilder (GADApplicationIdentifier + SKAdNetworkItems) and
+        // AndroidGradleBuilder (APPLICATION_ID manifest meta-data).
+        e.add(new Entry("com/codename1/ads/admob/AdMobProvider")
+                .iosPlist("NSUserTrackingUsageDescription",
+                         "This identifier will be used to deliver personalized ads to you.")
+                .description("Google AdMob (modern advertising API)"));
+
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so
         // the cloud build server can abort early with a helpful

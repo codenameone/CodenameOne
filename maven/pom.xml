@@ -87,6 +87,7 @@
         <module>cn1-ai-tflite</module>
         <module>cn1-ai-whisper</module>
         <module>cn1-ai-stablediffusion</module>
+        <module>cn1-admob</module>
     </modules>
     <dependencyManagement>
         <dependencies>
