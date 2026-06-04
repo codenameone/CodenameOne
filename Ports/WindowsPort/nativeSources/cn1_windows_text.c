@@ -59,6 +59,47 @@ static wchar_t* cn1WinWideDup(const wchar_t* src) {
     return copy;
 }
 
+/* Builds the absolute path of a file shipped next to the executable (the
+ * directory bundled resources -- themes, fonts -- are staged in). Returns 1 on
+ * success. */
+static int cn1WinExeRelativePath(const wchar_t* fileName, wchar_t* out, int outLen) {
+    if (fileName == NULL || out == NULL || outLen <= 0) {
+        return 0;
+    }
+    wchar_t exePath[MAX_PATH];
+    DWORD n = GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) {
+        return 0;
+    }
+    wchar_t* slash = wcsrchr(exePath, L'\\');
+    if (slash == NULL) {
+        return 0;
+    }
+    slash[1] = L'\0';
+    if ((int) (wcslen(exePath) + wcslen(fileName) + 1) > outLen) {
+        return 0;
+    }
+    wcscpy(out, exePath);
+    wcscat(out, fileName);
+    return 1;
+}
+
+/* Case-insensitive ".ttf" suffix test. */
+static int cn1WinIsTtf(const wchar_t* name) {
+    if (name == NULL) {
+        return 0;
+    }
+    size_t len = wcslen(name);
+    if (len < 4) {
+        return 0;
+    }
+    const wchar_t* ext = name + (len - 4);
+    return ext[0] == L'.'
+            && (ext[1] == L't' || ext[1] == L'T')
+            && (ext[2] == L't' || ext[2] == L'T')
+            && (ext[3] == L'f' || ext[3] == L'F');
+}
+
 /* Builds a CN1Font for an explicit family / pixel size / style. */
 static CN1Font* cn1WinMakeFont(const wchar_t* family, float px, int face, int style) {
     int bold = (style & CN1_STYLE_BOLD) != 0;
@@ -175,31 +216,56 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawString___long_java_lang_S
 }
 
 /*
- * loadTrueTypeFont maps a Codename One font name to a DirectWrite family. The
- * "native:" scheme names (native:MainLight, native:ItalicBold, ...) resolve to
- * the platform UI family (Segoe UI) with weight/slant taken from the suffix;
- * any other name is treated as a literal family. The fileName argument is the
- * CN1 fallback path and is unused on Windows where families resolve by name.
+ * loadTrueTypeFont maps a Codename One font to a DirectWrite text format.
+ *
+ * A bundled TrueType *file* (fileName ends in .ttf -- material-design-font.ttf,
+ * which backs every FontImage glyph, or an app-supplied font) is loaded into a
+ * private DirectWrite font collection via cn1dwRegisterFontFile, because the
+ * family isn't installed system-wide and would otherwise silently fall back to
+ * Segoe UI (rendering no icon glyphs). The register call returns the font's real
+ * family name, which cn1WinMakeFont -> cn1dwCreateFormat binds to that private
+ * collection.
+ *
+ * Otherwise the name selects a system family: the "native:" scheme names
+ * (native:MainLight, native:ItalicBold, ...) resolve to the platform UI family
+ * (Segoe UI) with weight/slant from the suffix; any other name is a literal
+ * family.
  */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_String_java_lang_String_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     WCHAR* name = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, NULL);
-    const wchar_t* family = L"Segoe UI";
-    int style = 0;
-    if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
-        const wchar_t* suffix = name + 7;
-        if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
-            style |= CN1_STYLE_BOLD;
-        }
-        if (wcsstr(suffix, L"Italic") != NULL) {
-            style |= CN1_STYLE_ITALIC;
-        }
-    } else if (name != NULL && name[0] != L'\0') {
-        family = name;
-    }
+    WCHAR* fileName = cn1WinJavaStringToWide(threadStateData, __cn1Arg2, NULL);
     float dpi = cn1Win.dpiScale > 0.0f ? cn1Win.dpiScale : 1.0f;
-    CN1Font* font = cn1WinMakeFont(family, 15.0f * dpi, 0, style);
+    CN1Font* font = NULL;
+
+    if (cn1WinIsTtf(fileName)) {
+        wchar_t fullPath[MAX_PATH];
+        wchar_t registered[128];
+        registered[0] = L'\0';
+        if (cn1WinExeRelativePath(fileName, fullPath, MAX_PATH)
+                && cn1dwRegisterFontFile(fullPath, registered, 128) && registered[0] != L'\0') {
+            font = cn1WinMakeFont(registered, 15.0f * dpi, 0, 0);
+        }
+    }
+
+    if (font == NULL) {
+        const wchar_t* family = L"Segoe UI";
+        int style = 0;
+        if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
+            const wchar_t* suffix = name + 7;
+            if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
+                style |= CN1_STYLE_BOLD;
+            }
+            if (wcsstr(suffix, L"Italic") != NULL) {
+                style |= CN1_STYLE_ITALIC;
+            }
+        } else if (name != NULL && name[0] != L'\0') {
+            family = name;
+        }
+        font = cn1WinMakeFont(family, 15.0f * dpi, 0, style);
+    }
     free(name);
+    free(fileName);
     return (JAVA_LONG) (intptr_t) font;
 }
 

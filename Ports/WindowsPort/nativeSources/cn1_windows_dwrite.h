@@ -39,8 +39,18 @@
 extern "C" {
 #endif
 
-/* Creates an IDWriteTextFormat (opaque handle, NULL on failure). */
+/* Creates an IDWriteTextFormat (opaque handle, NULL on failure). If family
+ * matches a font previously registered with cn1dwRegisterFontFile the format is
+ * created against that bundled font's private collection; otherwise the family
+ * resolves against the installed system fonts. */
 void* cn1dwCreateFormat(const wchar_t* family, float sizePx, int bold, int italic);
+
+/* Registers a bundled TrueType file (e.g. material-design-font.ttf shipped next
+ * to the exe) as a private DirectWrite font collection so its glyphs render even
+ * though the family isn't installed system-wide. Returns 1 on success and copies
+ * the font's real family name into outFamily (use that name with cn1dwCreateFormat).
+ * Idempotent per family. Returns 0 if the file can't be loaded. */
+int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen);
 
 /* Vertical metrics, in DIPs, for a text format handle. */
 float cn1dwFontHeight(void* format);

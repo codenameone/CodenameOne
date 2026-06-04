@@ -37,6 +37,7 @@
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
+#include <dwrite_3.h>
 
 #include "cn1_windows_dwrite.h"
 
@@ -53,6 +54,102 @@ static IDWriteFactory* dwFactory() {
     return g_dwrite;
 }
 
+/*
+ * Bundled-font registry. Codename One ships icon/text fonts (notably
+ * material-design-font.ttf, the source of every FontImage glyph -- checkbox
+ * check, switch thumb, FAB "+", arrows, toast icon) as files next to the exe.
+ * Those families are not installed system-wide, so CreateTextFormat against the
+ * system collection finds nothing and silently substitutes Segoe UI (no glyphs).
+ * We load each such file into a private IDWriteFontCollection1 and remember it by
+ * its real family name; cn1dwCreateFormat then binds matching formats to the
+ * private collection. The set is tiny (material + maybe an app font), so a fixed
+ * array keyed by family name is enough.
+ */
+struct CN1CustomFont {
+    wchar_t family[128];
+    IDWriteFontCollection1* collection;
+};
+static CN1CustomFont g_customFonts[16];
+static int g_customFontCount = 0;
+
+static IDWriteFontCollection1* cn1dwFindCustom(const wchar_t* family) {
+    if (family == nullptr) {
+        return nullptr;
+    }
+    for (int i = 0; i < g_customFontCount; i++) {
+        if (wcscmp(g_customFonts[i].family, family) == 0) {
+            return g_customFonts[i].collection;
+        }
+    }
+    return nullptr;
+}
+
+extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen) {
+    IDWriteFactory* f = dwFactory();
+    if (f == nullptr || path == nullptr) {
+        return 0;
+    }
+    IDWriteFactory3* f3 = nullptr;
+    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory3), reinterpret_cast<void**>(&f3))) || f3 == nullptr) {
+        cn1WindowsLog("cn1dwRegisterFontFile: IDWriteFactory3 unavailable");
+        return 0;
+    }
+    int result = 0;
+    IDWriteFontFile* file = nullptr;
+    IDWriteFontSetBuilder* builder = nullptr;
+    IDWriteFontSet* set = nullptr;
+    IDWriteFontCollection1* coll = nullptr;
+    IDWriteFontFamily* fam = nullptr;
+    IDWriteLocalizedStrings* names = nullptr;
+    BOOL supported = FALSE;
+    DWRITE_FONT_FILE_TYPE fileType;
+    DWRITE_FONT_FACE_TYPE faceType;
+    UINT32 numFaces = 0;
+    if (SUCCEEDED(f3->CreateFontFileReference(path, nullptr, &file)) && file != nullptr &&
+            SUCCEEDED(file->Analyze(&supported, &fileType, &faceType, &numFaces)) && supported &&
+            SUCCEEDED(f3->CreateFontSetBuilder(&builder)) && builder != nullptr &&
+            SUCCEEDED(builder->AddFontFile(file)) &&
+            SUCCEEDED(builder->CreateFontSet(&set)) && set != nullptr &&
+            SUCCEEDED(f3->CreateFontCollectionFromFontSet(set, &coll)) && coll != nullptr &&
+            coll->GetFontFamilyCount() > 0 &&
+            SUCCEEDED(coll->GetFontFamily(0, &fam)) && fam != nullptr &&
+            SUCCEEDED(fam->GetFamilyNames(&names)) && names != nullptr) {
+        UINT32 idx = 0;
+        BOOL exists = FALSE;
+        names->FindLocaleName(L"en-us", &idx, &exists);
+        if (!exists) {
+            idx = 0;
+        }
+        wchar_t famName[128];
+        famName[0] = 0;
+        if (SUCCEEDED(names->GetString(idx, famName, 128))) {
+            if (cn1dwFindCustom(famName) == nullptr && g_customFontCount < 16) {
+                wcsncpy(g_customFonts[g_customFontCount].family, famName, 127);
+                g_customFonts[g_customFontCount].family[127] = 0;
+                coll->AddRef();
+                g_customFonts[g_customFontCount].collection = coll;
+                g_customFontCount++;
+            }
+            if (outFamily != nullptr && outLen > 0) {
+                wcsncpy(outFamily, famName, (size_t) (outLen - 1));
+                outFamily[outLen - 1] = 0;
+            }
+            result = 1;
+        }
+    }
+    if (names) { names->Release(); }
+    if (fam) { fam->Release(); }
+    if (coll) { coll->Release(); }
+    if (set) { set->Release(); }
+    if (builder) { builder->Release(); }
+    if (file) { file->Release(); }
+    f3->Release();
+    if (result == 0) {
+        cn1WindowsLog("cn1dwRegisterFontFile: failed to load bundled font file");
+    }
+    return result;
+}
+
 /* A very large layout box so metrics reflect the unconstrained run. */
 static const float CN1_DW_HUGE = 1.0e6f;
 
@@ -63,8 +160,11 @@ extern "C" void* cn1dwCreateFormat(const wchar_t* family, float sizePx, int bold
     }
     DWRITE_FONT_WEIGHT weight = bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL;
     DWRITE_FONT_STYLE style = italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL;
+    /* Bundled fonts (material-design-font.ttf, app TTFs) live in a private
+     * collection keyed by family name; system families pass nullptr. */
+    IDWriteFontCollection1* custom = cn1dwFindCustom(family);
     IDWriteTextFormat* fmt = nullptr;
-    HRESULT hr = f->CreateTextFormat(family ? family : L"Segoe UI", nullptr, weight, style,
+    HRESULT hr = f->CreateTextFormat(family ? family : L"Segoe UI", custom, weight, style,
             DWRITE_FONT_STRETCH_NORMAL, sizePx, L"", &fmt);
     if (FAILED(hr)) {
         cn1WindowsLog("cn1dwCreateFormat: CreateTextFormat failed");

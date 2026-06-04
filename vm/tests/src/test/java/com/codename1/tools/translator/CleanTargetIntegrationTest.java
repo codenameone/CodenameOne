@@ -583,6 +583,27 @@ class CleanTargetIntegrationTest {
                 // forces it into the translation set (the Kotlin app entry point does
                 // this implicitly on the other ports).
                 "        if (kotlin.Unit.INSTANCE == null) { return; }\n" +
+                // The transcoded SVG/Lottie images are pure-Java GeneratedSVGImage
+                // classes; the generated SVGRegistry maps each source file name
+                // (star.svg, lottie_spinner.json, ...) into the global image table
+                // so Resources.getImage(name) -- and the theme's url(*.svg)
+                // backgrounds -- resolve to the real animation instead of the 1x1
+                // placeholder the no-cef CSS compiler stored. On device this call
+                // lives in the per-build Stub (like IPhoneBuilder/AndroidGradleBuilder
+                // emit); the launcher is that stub here. The direct reference also
+                // forces the translator to retain the generated package (a
+                // Class.forName lookup would let it be dead-code-eliminated). It
+                // MUST run before initFirstTheme so the theme's SVG backgrounds bind
+                // to the generated images while the Style objects are built.
+                "        try { com.codename1.generated.svg.SVGRegistry.installGlobal(); } catch (Throwable __svg) { __svg.printStackTrace(); }\n" +
+                // Load the app theme (theme.css compiled to /theme.res). It carries
+                // @includeNativeBool:true, so buildTheme installs the Windows native
+                // theme (the full material look: styled checkbox/switch/tabs/text
+                // field/dialog/FAB + $Dark variants) as the base and layers the
+                // app's gradient/SVG/Button UIIDs on top. Without this the suite
+                // renders on the bare app theme (no component styling, no dark mode).
+                // initFirstTheme also sets the global Resources so getImage() works.
+                "        com.codename1.ui.plaf.UIManager.initFirstTheme(\"/theme\");\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 // KotlinUiTest is registered as the prepended test exactly as the
                 // real Kotlin app entry point does (HelloCodenameOne.kt:
@@ -695,14 +716,26 @@ class CleanTargetIntegrationTest {
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
         Path stagedTheme = exe.resolveSibling("windowsNativeTheme.res");
+        Path stagedAppTheme = exe.resolveSibling("theme.res");
 
-        // Compile the app's own theme.css (CSS gradients + native styles) with the
-        // headless no-cef CSS compiler and stage it as the native theme, so the
-        // suite exercises the real app theme -- css-gradients asserts the gradient
-        // styles round-trip, and the *_dark/_light theme tiles render with the
-        // app's look. Falls back to the generic material theme if the css-compiler
-        // jar isn't built or the compile fails, so this can never break the build.
-        boolean themeCompiled = false;
+        // The Windows native theme = the full material theme. The port has no
+        // built-in native look, so this is what gives every component its
+        // styling (checkbox, switch, tabs, text field, multi-button, dialog
+        // buttons, FAB, sheet, ...) and -- crucially -- the $Dark<UIID> variants
+        // that make the *_dark screenshot tiles actually render dark. It's the
+        // same theme Android ships. installNativeTheme() loads it; the app theme
+        // below layers over it via @includeNativeBool.
+        Path materialTheme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
+        if (Files.exists(materialTheme)) {
+            Files.copy(materialTheme, stagedTheme, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        // The app theme = the project's own theme.css compiled headless with the
+        // no-cef CSS compiler. It holds the CSS-gradient tiles + the SVG/Lottie
+        // url() background UIIDs + the Button font, and is loaded over the native
+        // theme by the launcher (UIManager.initFirstTheme("/theme")). If the
+        // css-compiler jar isn't built or the compile fails the app theme is
+        // simply absent -- the suite still runs on the material native look.
         try {
             Path cssDir = Paths.get("..", "..", "maven", "css-compiler", "target").normalize().toAbsolutePath();
             Path cssJar = null;
@@ -718,19 +751,24 @@ class CleanTargetIntegrationTest {
                 String javaBin = Paths.get(System.getProperty("java.home"), "bin",
                         CompilerHelper.executableName("java")).toString();
                 ProcessBuilder pb = new ProcessBuilder(javaBin, "-jar", cssJar.toString(),
-                        "-input", themeCss.toString(), "-output", stagedTheme.toString());
+                        "-input", themeCss.toString(), "-output", stagedAppTheme.toString());
                 pb.inheritIO();
-                int rc = pb.start().waitFor();
-                themeCompiled = rc == 0 && Files.exists(stagedTheme);
+                pb.start().waitFor();
             }
         } catch (Exception themeCompileFailed) {
-            themeCompiled = false;
+            // Non-fatal: the app theme is an overlay; the material native theme
+            // still drives the component look and dark mode.
         }
-        if (!themeCompiled) {
-            Path theme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
-            if (Files.exists(theme)) {
-                Files.copy(theme, stagedTheme, StandardCopyOption.REPLACE_EXISTING);
-            }
+
+        // The material icon font. The DirectWrite loader resolves bundled
+        // TrueType fonts by reading the ttf from the executable directory
+        // (cn1_windows_text.c loadTrueTypeFont), so FontImage glyphs -- the
+        // checkbox check, switch thumb, FAB "+", ImageViewer arrows, toast icon
+        // -- only render when this file sits next to the exe.
+        Path materialFont = Paths.get("..", "..", "CodenameOne", "src", "material-design-font.ttf")
+                .normalize().toAbsolutePath();
+        if (Files.exists(materialFont)) {
+            Files.copy(materialFont, exe.resolveSibling("material-design-font.ttf"), StandardCopyOption.REPLACE_EXISTING);
         }
         return exe;
     }
@@ -755,9 +793,11 @@ class CleanTargetIntegrationTest {
             if (Files.exists(pdb)) {
                 Files.copy(pdb, dest.resolve("WinHelloMain.pdb"), StandardCopyOption.REPLACE_EXISTING);
             }
-            Path themeSrc = exe.resolveSibling("windowsNativeTheme.res");
-            if (Files.exists(themeSrc)) {
-                Files.copy(themeSrc, dest.resolve("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+            for (String res : new String[] { "windowsNativeTheme.res", "theme.res", "material-design-font.ttf" }) {
+                Path src = exe.resolveSibling(res);
+                if (Files.exists(src)) {
+                    Files.copy(src, dest.resolve(res), StandardCopyOption.REPLACE_EXISTING);
+                }
             }
             System.out.println("CN1_HELLO_EXE_COPY=" + d.toAbsolutePath());
         } catch (IOException copyBlocked) {
