@@ -215,9 +215,11 @@ public class MockAdProvider implements AdProvider, NativeAdProvider {
 
         @Override
         protected Dimension calcPreferredSize() {
-            int height = bannerSize == BannerAd.SIZE_MEDIUM_RECTANGLE
-                    ? CN.convertToPixels(250) : CN.convertToPixels(50);
-            return new Dimension(CN.convertToPixels(320), height);
+            // convertToPixels takes a dip count (roughly millimetres), not dp:
+            // a ~50dp anchored banner is ~8mm tall, a 300x250 rectangle ~48x40mm.
+            boolean rect = bannerSize == BannerAd.SIZE_MEDIUM_RECTANGLE;
+            return new Dimension(CN.convertToPixels(rect ? 48 : 50),
+                    CN.convertToPixels(rect ? 40 : 8));
         }
     }
 

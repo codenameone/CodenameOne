@@ -33,7 +33,7 @@ image::img/ads-native-feed.png[Advertising sample,scaledwidth=55%]
 
 === Ad provider cn1libs
 
-Several provider libraries ship with the framework. They are released to Maven
+Several provider libraries ship with the framework. They're released to Maven
 Central together with the core and the AI cn1libs, sharing the same version
 (`${cn1.version}`), so you never mix versions. Each declares its own native SDK
 dependencies (Pods / Gradle dependencies / permissions), applied automatically
