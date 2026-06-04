@@ -31,6 +31,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
 
 /**
@@ -1145,11 +1147,38 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return "win";
     }
 
+    /** English long month names; index 0 = January. */
+    private static final String[] LONG_MONTHS = {
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+    };
+
     @Override
     public L10NManager getLocalizationManager() {
         if (l10n == null) {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
+                /*
+                 * The base L10NManager resolves month names by formatting the
+                 * date with formatDateLongStyle() (which here returns
+                 * Date.toString()) and scanning for the first word -- on the
+                 * clean target that yields the weekday or no word at all, so the
+                 * date Picker's month wheel renders "null". Worse, the fallback
+                 * routes back through DateFormatSymbols.getMonths() -> this same
+                 * method, risking unbounded recursion. Resolve the month name
+                 * directly from the calendar instead; getShortMonthName() derives
+                 * from this, so the abbreviated form is fixed too.
+                 */
+                @Override
+                public String getLongMonthName(Date date) {
+                    Calendar c = Calendar.getInstance();
+                    c.setTime(date);
+                    int m = c.get(Calendar.MONTH);
+                    if (m < 0 || m > 11) {
+                        m = 0;
+                    }
+                    return LONG_MONTHS[m];
+                }
             };
         }
         return l10n;

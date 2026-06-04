@@ -583,19 +583,13 @@ class CleanTargetIntegrationTest {
                 // forces it into the translation set (the Kotlin app entry point does
                 // this implicitly on the other ports).
                 "        if (kotlin.Unit.INSTANCE == null) { return; }\n" +
-                // The transcoded SVG/Lottie images are pure-Java GeneratedSVGImage
-                // classes; the generated SVGRegistry maps each source file name
-                // (star.svg, lottie_spinner.json, ...) into the global image table
-                // so Resources.getImage(name) -- and the theme's url(*.svg)
-                // backgrounds -- resolve to the real animation instead of the 1x1
-                // placeholder the no-cef CSS compiler stored. On device this call
-                // lives in the per-build Stub (like IPhoneBuilder/AndroidGradleBuilder
-                // emit); the launcher is that stub here. The direct reference also
-                // forces the translator to retain the generated package (a
-                // Class.forName lookup would let it be dead-code-eliminated). It
-                // MUST run before initFirstTheme so the theme's SVG backgrounds bind
-                // to the generated images while the Style objects are built.
-                "        try { com.codename1.generated.svg.SVGRegistry.installGlobal(); } catch (Throwable __svg) { __svg.printStackTrace(); }\n" +
+                // NOTE: SVG/Lottie registration (com.codename1.generated.svg.SVGRegistry
+                // .installGlobal()) belongs here -- it maps the transcoded
+                // GeneratedSVGImage classes onto the theme's url(*.svg) backgrounds.
+                // It's deferred until the CI build generates + compiles those classes
+                // (the hellocodenameone-common step runs raw kotlinc/javac over
+                // src/main/java and doesn't run the transcode-svg goal yet), so a
+                // direct reference here wouldn't compile. Tracked as follow-up.
                 // Load the app theme (theme.css compiled to /theme.res). It carries
                 // @includeNativeBool:true, so buildTheme installs the Windows native
                 // theme (the full material look: styled checkbox/switch/tabs/text

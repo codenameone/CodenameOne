@@ -38,6 +38,7 @@
 #include <d2d1.h>
 #include <dwrite.h>
 #include <dwrite_3.h>
+#include <wchar.h>
 
 #include "cn1_windows_dwrite.h"
 
@@ -97,6 +98,7 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
     int result = 0;
     IDWriteFontFile* file = nullptr;
     IDWriteFontSetBuilder* builder = nullptr;
+    IDWriteFontSetBuilder1* builder1 = nullptr;
     IDWriteFontSet* set = nullptr;
     IDWriteFontCollection1* coll = nullptr;
     IDWriteFontFamily* fam = nullptr;
@@ -105,10 +107,15 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
     DWRITE_FONT_FILE_TYPE fileType;
     DWRITE_FONT_FACE_TYPE faceType;
     UINT32 numFaces = 0;
+    /* AddFontFile(IDWriteFontFile*) is on IDWriteFontSetBuilder1, not the base
+     * IDWriteFontSetBuilder (which only takes a font-face reference), so query
+     * for it. CreateFontSet stays on the base interface (same object). */
     if (SUCCEEDED(f3->CreateFontFileReference(path, nullptr, &file)) && file != nullptr &&
             SUCCEEDED(file->Analyze(&supported, &fileType, &faceType, &numFaces)) && supported &&
             SUCCEEDED(f3->CreateFontSetBuilder(&builder)) && builder != nullptr &&
-            SUCCEEDED(builder->AddFontFile(file)) &&
+            SUCCEEDED(builder->QueryInterface(__uuidof(IDWriteFontSetBuilder1),
+                    reinterpret_cast<void**>(&builder1))) && builder1 != nullptr &&
+            SUCCEEDED(builder1->AddFontFile(file)) &&
             SUCCEEDED(builder->CreateFontSet(&set)) && set != nullptr &&
             SUCCEEDED(f3->CreateFontCollectionFromFontSet(set, &coll)) && coll != nullptr &&
             coll->GetFontFamilyCount() > 0 &&
@@ -141,6 +148,7 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
     if (fam) { fam->Release(); }
     if (coll) { coll->Release(); }
     if (set) { set->Release(); }
+    if (builder1) { builder1->Release(); }
     if (builder) { builder->Release(); }
     if (file) { file->Release(); }
     f3->Release();
