@@ -44,6 +44,45 @@ The tool loads the latest `codenameone-core` jar from `~/.m2` and invokes the co
 
 This is **not** a substitute for running the simulator and looking at the result; it catches CSS *syntax* errors and unsupported properties, but a syntactically-valid file that styles the wrong UIID will still pass. Use it as a fast pre-flight before `mvn -pl common cn1:run`.
 
+### `CompareToMockup.java`
+
+Scores how closely a rendered screen matches a designer mockup and prints a similarity percentage.
+Reports two numbers: `STRUCTURAL` (an SSIM-style perceptual score — the headline) and `PIXEL` (the
+fraction of pixels within the framework's channel-delta tolerance). The render is auto-resized to
+the mockup's dimensions first. Pure JDK — it does **not** need the CN1 jars in `~/.m2`.
+
+```bash
+java tools/CompareToMockup.java render.png mockup.png
+# STRUCTURAL 0.912  PIXEL 0.874   (compared ... )
+
+# Partial mode — mask device chrome the mockup includes but you don't render:
+java tools/CompareToMockup.java render.png mockup.png --ignore-top 8% --diff diff.png
+java tools/CompareToMockup.java render.png mockup.png --region 24,120,327,180
+```
+
+Options: `--region X,Y,W,H`, `--ignore X,Y,W,H` (repeatable), `--ignore-top N[%]`,
+`--ignore-bottom N[%]`, `--resize fit|none`, `--diff out.png`, `--min 0..1` (exit 1 if structural
+score is below it), `--json`. Exit codes: `0` compared (and above `--min`), `1` below `--min`,
+`2` usage/IO error. See `references/mockup-comparison.md` for the full loop.
+
+### `DesignImport.java`
+
+Parses a Figma / Sketch / Adobe XD design into a **starter** CN1 style: `theme.css`, `tokens.json`,
+and `layout.md`. Fully self-contained (embedded JSON parser, JDK only); Figma mode needs a token +
+network, the local formats need neither.
+
+```bash
+# Local ZIP+JSON formats
+java tools/DesignImport.java design.sketch --out target/design-import
+java tools/DesignImport.java design.xd     --out target/design-import
+# Figma over its REST API
+java tools/DesignImport.java figma --token "$FIGMA_TOKEN" --file FILE_KEY --out target/design-import
+```
+
+The output is a starting point — refine it, validate the CSS with `java tools/IsCssValid.java
+target/design-import/theme.css`, and measure convergence with `CompareToMockup.java`. Exit codes:
+`0` imported, `1` nothing recognisable found, `2` usage/IO/network error.
+
 ## Adding more tools
 
 The pattern is intentionally minimal — drop a new `.java` file into this directory and document it in this README. Constraints:
