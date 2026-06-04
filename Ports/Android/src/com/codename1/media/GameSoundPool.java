@@ -65,8 +65,8 @@ public class GameSoundPool implements SoundPoolPeer {
 
     private Object loadFromFile(File f) {
         int soundId = pool.load(f.getAbsolutePath(), 1);
-        tempFiles.put(new Integer(soundId), f);
-        return new Integer(soundId);
+        tempFiles.put(Integer.valueOf(soundId), f);
+        return Integer.valueOf(soundId);
     }
 
     private File copyToTemp(InputStream data) throws IOException {
@@ -126,16 +126,16 @@ public class GameSoundPool implements SoundPoolPeer {
         if (streamId == 0) {
             return -1;
         }
-        state.put(new Integer(streamId), new float[]{volume, pan});
+        state.put(Integer.valueOf(streamId), new float[]{volume, pan});
         return streamId;
     }
 
     public void setVolume(int voiceId, float volume) {
-        float[] s = (float[]) state.get(new Integer(voiceId));
+        float[] s = (float[]) state.get(Integer.valueOf(voiceId));
         float pan = s == null ? 0f : s[1];
         float[] g = gains(volume, pan);
         pool.setVolume(voiceId, g[0], g[1]);
-        state.put(new Integer(voiceId), new float[]{volume, pan});
+        state.put(Integer.valueOf(voiceId), new float[]{volume, pan});
     }
 
     public void setRate(int voiceId, float rate) {
@@ -143,11 +143,11 @@ public class GameSoundPool implements SoundPoolPeer {
     }
 
     public void setPan(int voiceId, float pan) {
-        float[] s = (float[]) state.get(new Integer(voiceId));
+        float[] s = (float[]) state.get(Integer.valueOf(voiceId));
         float vol = s == null ? 1f : s[0];
         float[] g = gains(vol, pan);
         pool.setVolume(voiceId, g[0], g[1]);
-        state.put(new Integer(voiceId), new float[]{vol, pan});
+        state.put(Integer.valueOf(voiceId), new float[]{vol, pan});
     }
 
     public void pauseVoice(int voiceId) {
@@ -160,7 +160,7 @@ public class GameSoundPool implements SoundPoolPeer {
 
     public void stopVoice(int voiceId) {
         pool.stop(voiceId);
-        state.remove(new Integer(voiceId));
+        state.remove(Integer.valueOf(voiceId));
     }
 
     public void stopAll() {
@@ -179,10 +179,8 @@ public class GameSoundPool implements SoundPoolPeer {
     public void unloadSound(Object sound) {
         int soundId = ((Integer) sound).intValue();
         pool.unload(soundId);
-        File f = (File) tempFiles.remove(new Integer(soundId));
-        if (f != null) {
-            f.delete();
-        }
+        File f = (File) tempFiles.remove(Integer.valueOf(soundId));
+        deleteQuietly(f);
     }
 
     public void release() {
@@ -190,8 +188,16 @@ public class GameSoundPool implements SoundPoolPeer {
         state.clear();
         java.util.Iterator it = tempFiles.values().iterator();
         while (it.hasNext()) {
-            ((File) it.next()).delete();
+            deleteQuietly((File) it.next());
         }
         tempFiles.clear();
+    }
+
+    /// Best-effort delete of a temp file; a failed delete is not actionable here
+    /// (the OS cleans the cache dir), so the return value is intentionally consumed.
+    private static void deleteQuietly(File f) {
+        if (f != null && !f.delete()) {
+            f.deleteOnExit();
+        }
     }
 }

@@ -107,7 +107,7 @@ class JavaSESoundPool implements SoundPoolPeer {
                     if (active[v].sound != null) {
                         active[w++] = active[v];
                     } else {
-                        voices.remove(new Integer(active[v].voiceId));
+                        voices.remove(Integer.valueOf(active[v].voiceId));
                     }
                 }
                 for (int v = w; v < activeCount; v++) {
@@ -241,7 +241,7 @@ class JavaSESoundPool implements SoundPoolPeer {
         applyGains(v, volume, pan);
         v.voiceId = nextVoiceId++;
         active[activeCount++] = v;
-        voices.put(new Integer(v.voiceId), v);
+        voices.put(Integer.valueOf(v.voiceId), v);
         return v.voiceId;
     }
 
@@ -266,7 +266,7 @@ class JavaSESoundPool implements SoundPoolPeer {
     }
 
     public synchronized void setVolume(int voiceId, float volume) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
             // recover current pan from gains then re-apply
             float pan = panOf(v);
@@ -275,14 +275,14 @@ class JavaSESoundPool implements SoundPoolPeer {
     }
 
     public synchronized void setRate(int voiceId, float rate) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null && rate > 0) {
             v.rate = rate;
         }
     }
 
     public synchronized void setPan(int voiceId, float pan) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
             float vol = (float) Math.sqrt(v.gainL * v.gainL + v.gainR * v.gainR);
             applyGains(v, vol, pan);
@@ -296,21 +296,21 @@ class JavaSESoundPool implements SoundPoolPeer {
     }
 
     public synchronized void pauseVoice(int voiceId) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
             v.paused = true;
         }
     }
 
     public synchronized void resumeVoice(int voiceId) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
             v.paused = false;
         }
     }
 
     public synchronized void stopVoice(int voiceId) {
-        Voice v = (Voice) voices.get(new Integer(voiceId));
+        Voice v = (Voice) voices.get(Integer.valueOf(voiceId));
         if (v != null) {
             v.sound = null; // compacted out on next mixer pass
         }

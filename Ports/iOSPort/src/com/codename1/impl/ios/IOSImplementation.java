@@ -4757,7 +4757,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public Object loadSound(InputStream data, String mimeType) throws IOException {
             byte[] bytes = com.codename1.io.Util.readInputStream(data);
             com.codename1.io.Util.cleanup(data);
-            return new Long(nativeInstance.nativeLoadSound(pool, bytes, ringSize));
+            return Long.valueOf(nativeInstance.nativeLoadSound(pool, bytes, ringSize));
         }
 
         public Object loadSound(String uri) throws IOException {
