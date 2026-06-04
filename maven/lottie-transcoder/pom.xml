@@ -37,6 +37,32 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
+            <!-- Runnable jar-with-dependencies so build environments without the
+                 codenameone-maven-plugin (e.g. the native Windows port CI) can
+                 transcode SVG/Lottie assets via TranscoderCli, the same way the
+                 css-compiler is run as a standalone jar. -->
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.codename1.lottie.transcoder.TranscoderCli</mainClass>
+                        </manifest>
+                    </archive>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-cli</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 

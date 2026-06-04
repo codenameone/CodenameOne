@@ -239,6 +239,16 @@ jobs:
         # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
         run: mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
+      # Build the standalone SVG/Lottie transcoder CLI (jar-with-dependencies).
+      # The common-build step below runs it to emit the GeneratedSVGImage +
+      # SVGRegistry classes that make the SVG / Lottie screenshots render -- the
+      # raw kotlinc/javac app build doesn't run the codenameone-maven-plugin
+      # transcode-svg goal that produces them otherwise.
+      - name: Build the SVG/Lottie transcoder CLI
+        shell: pwsh
+        run: mvn -B -f maven/pom.xml -pl lottie-transcoder -am package -DskipTests '-Dmaven.javadoc.skip=true'
+        continue-on-error: true
+
       # Build the real hellocodenameone screenshot app (Kotlin + Java + all
       # *ScreenshotTest classes) into common/target/classes, which the capture test
       # translates into the native exe. The module's Maven build pulls in the CN1
@@ -265,7 +275,22 @@ jobs:
           & "$PWD/kc/kotlinc/bin/kotlinc.bat" -d $out -classpath $core -jvm-target 1.8 "$common/src/main/kotlin" "$common/src/main/java"
           if ($LASTEXITCODE -ne 0) { throw "kotlinc failed" }
           $stdlib = "$PWD/kc/kotlinc/lib/kotlin-stdlib.jar"
-          $srcs = Get-ChildItem -Recurse "$common/src/main/java" -Filter *.java | ForEach-Object { $_.FullName }
+          # Transcode SVG/Lottie assets -> com.codename1.generated.svg.* + SVGRegistry
+          # so SVGRegistry.installGlobal (called by the launcher) registers the real
+          # GeneratedSVGImage instances and the SVG/Lottie screenshots render.
+          # Best-effort: if the CLI jar is absent the suite still runs with the 1x1
+          # placeholders the CSS compiler left.
+          $gen = "$common/target/generated-svg"
+          New-Item -ItemType Directory -Force $gen | Out-Null
+          $cli = Get-ChildItem "$PWD/maven/lottie-transcoder/target" -Filter "*-jar-with-dependencies.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($cli) {
+            & "$env:JDK_17_HOME/bin/java" -jar $cli.FullName "$common/src/main/css" $gen "com.codename1.generated.svg"
+            if ($LASTEXITCODE -ne 0) { Write-Host "transcoder CLI failed (continuing with SVG placeholders)" }
+          } else {
+            Write-Host "transcoder CLI jar not found (continuing with SVG placeholders)"
+          }
+          $srcs = @(Get-ChildItem -Recurse "$common/src/main/java" -Filter *.java | ForEach-Object { $_.FullName })
+          $srcs += @(Get-ChildItem -Recurse $gen -Filter *.java -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
           & "$env:JDK_17_HOME/bin/javac" -nowarn -encoding UTF-8 --release 17 -cp "$core;$stdlib;$out" -d $out $srcs
           if ($LASTEXITCODE -ne 0) { throw "javac failed" }
           if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
