@@ -560,7 +560,35 @@ public final class Matrix {
             return val;
         }
         
-        public static native void transformPoints(float[] data, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+        // Project numPoints points (pointSize components each) through the 4x4
+        // column-major matrix, performing the homogeneous (w) divide so a
+        // perspective matrix foreshortens. iOS implements this natively; the
+        // Windows clean target has no JNI, so it is plain Java here.
+        public static void transformPoints(float[] data, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+            for (int i = 0; i < numPoints; i++) {
+                int si = srcPos + i * pointSize;
+                int di = destPos + i * pointSize;
+                float x = in[si];
+                float y = pointSize > 1 ? in[si + 1] : 0f;
+                float z = pointSize > 2 ? in[si + 2] : 0f;
+                float ox = data[M00] * x + data[M01] * y + data[M02] * z + data[M03];
+                float oy = data[M10] * x + data[M11] * y + data[M12] * z + data[M13];
+                float oz = data[M20] * x + data[M21] * y + data[M22] * z + data[M23];
+                float ow = data[M30] * x + data[M31] * y + data[M32] * z + data[M33];
+                if (ow != 0f && ow != 1f) {
+                    ox /= ow;
+                    oy /= ow;
+                    oz /= ow;
+                }
+                out[di] = ox;
+                if (pointSize > 1) {
+                    out[di + 1] = oy;
+                }
+                if (pointSize > 2) {
+                    out[di + 2] = oz;
+                }
+            }
+        }
         
         /**
          * Temporary memory for operations that need temporary matrix data.
@@ -591,8 +619,8 @@ public final class Matrix {
          * if resultOffset + 16 > result.length or lhsOffset + 16 > lhs.length
          * or rhsOffset + 16 > rhs.length.
          */
-        public native static void multiplyMM(float[] result, int resultOffset,
-                float[] lhs, int lhsOffset, float[] rhs, int rhsOffset);/* {
+        public static void multiplyMM(float[] result, int resultOffset,
+                float[] lhs, int lhsOffset, float[] rhs, int rhsOffset) {
                 float[] tmp = result;
                 float[] mata = lhs;
                 float[] matb = rhs;
@@ -602,26 +630,23 @@ public final class Matrix {
             
                 
                 
-            tmp[M00+resultOffset] = clamp(mata[M00+a0] * matb[M00+b0] + mata[M01] * matb[M10+b0] + mata[M02+a0] * matb[M20+b0] + mata[M03+a0] * matb[M30+b0]);
-            tmp[M01+resultOffset] = clamp(mata[M00+a0] * matb[M01+b0] + mata[M01] * matb[M11+b0] + mata[M02+a0] * matb[M21+b0] + mata[M03+a0] * matb[M31+b0]);
-            tmp[M02+resultOffset] = clamp(mata[M00+a0] * matb[M02+b0] + mata[M01] * matb[M12+b0] + mata[M02+a0] * matb[M22+b0] + mata[M03+a0] * matb[M32+b0]);
-            tmp[M03+resultOffset] = clamp(mata[M00+a0] * matb[M03+b0] + mata[M01] * matb[M13+b0] + mata[M02+a0] * matb[M23+b0] + mata[M03+a0] * matb[M33+b0]);
-            tmp[M10+resultOffset] = clamp(mata[M10+a0] * matb[M00+b0] + mata[M11] * matb[M10+b0] + mata[M12+a0] * matb[M20+b0] + mata[M13+a0] * matb[M30+b0]);
-            tmp[M11+resultOffset] = clamp(mata[M10+a0] * matb[M01+b0] + mata[M11] * matb[M11+b0] + mata[M12+a0] * matb[M21+b0] + mata[M13+a0] * matb[M31+b0]);
-            tmp[M12+resultOffset] = clamp(mata[M10+a0] * matb[M02+b0] + mata[M11] * matb[M12+b0] + mata[M12+a0] * matb[M22+b0] + mata[M13+a0] * matb[M32+b0]);
-            tmp[M13+resultOffset] = clamp(mata[M10+a0] * matb[M03+b0] + mata[M11] * matb[M13+b0] + mata[M12+a0] * matb[M23+b0] + mata[M13+a0] * matb[M33+b0]);
-            tmp[M20+resultOffset] = clamp(mata[M20+a0] * matb[M00+b0] + mata[M21] * matb[M10+b0] + mata[M22+a0] * matb[M20+b0] + mata[M23+a0] * matb[M30+b0]);
-            tmp[M21+resultOffset] = clamp(mata[M20+a0] * matb[M01+b0] + mata[M21] * matb[M11+b0] + mata[M22+a0] * matb[M21+b0] + mata[M23+a0] * matb[M31+b0]);
-            tmp[M22+resultOffset] = clamp(mata[M20+a0] * matb[M02+b0] + mata[M21] * matb[M12+b0] + mata[M22+a0] * matb[M22+b0] + mata[M23+a0] * matb[M32+b0]);
-            tmp[M23+resultOffset] = clamp(mata[M20+a0] * matb[M03+b0] + mata[M21] * matb[M13+b0] + mata[M22+a0] * matb[M23+b0] + mata[M23+a0] * matb[M33+b0]);
-            tmp[M30+resultOffset] = clamp(mata[M30+a0] * matb[M00+b0] + mata[M31] * matb[M10+b0] + mata[M32+a0] * matb[M20+b0] + mata[M33+a0] * matb[M30+b0]);
-            tmp[M31+resultOffset] = clamp(mata[M30+a0] * matb[M01+b0] + mata[M31] * matb[M11+b0] + mata[M32+a0] * matb[M21+b0] + mata[M33+a0] * matb[M31+b0]);
-            tmp[M32+resultOffset] = clamp(mata[M30+a0] * matb[M02+b0] + mata[M31] * matb[M12+b0] + mata[M32+a0] * matb[M22+b0] + mata[M33+a0] * matb[M32+b0]);
-            tmp[M33+resultOffset] = clamp(mata[M30+a0] * matb[M03+b0] + mata[M31] * matb[M13+b0] + mata[M32+a0] * matb[M23+b0] + mata[M33+a0] * matb[M33+b0]);
-           
-            
-
-        }*/
+            tmp[M00+resultOffset] = clamp(mata[M00+a0] * matb[M00+b0] + mata[M01+a0] * matb[M10+b0] + mata[M02+a0] * matb[M20+b0] + mata[M03+a0] * matb[M30+b0]);
+            tmp[M01+resultOffset] = clamp(mata[M00+a0] * matb[M01+b0] + mata[M01+a0] * matb[M11+b0] + mata[M02+a0] * matb[M21+b0] + mata[M03+a0] * matb[M31+b0]);
+            tmp[M02+resultOffset] = clamp(mata[M00+a0] * matb[M02+b0] + mata[M01+a0] * matb[M12+b0] + mata[M02+a0] * matb[M22+b0] + mata[M03+a0] * matb[M32+b0]);
+            tmp[M03+resultOffset] = clamp(mata[M00+a0] * matb[M03+b0] + mata[M01+a0] * matb[M13+b0] + mata[M02+a0] * matb[M23+b0] + mata[M03+a0] * matb[M33+b0]);
+            tmp[M10+resultOffset] = clamp(mata[M10+a0] * matb[M00+b0] + mata[M11+a0] * matb[M10+b0] + mata[M12+a0] * matb[M20+b0] + mata[M13+a0] * matb[M30+b0]);
+            tmp[M11+resultOffset] = clamp(mata[M10+a0] * matb[M01+b0] + mata[M11+a0] * matb[M11+b0] + mata[M12+a0] * matb[M21+b0] + mata[M13+a0] * matb[M31+b0]);
+            tmp[M12+resultOffset] = clamp(mata[M10+a0] * matb[M02+b0] + mata[M11+a0] * matb[M12+b0] + mata[M12+a0] * matb[M22+b0] + mata[M13+a0] * matb[M32+b0]);
+            tmp[M13+resultOffset] = clamp(mata[M10+a0] * matb[M03+b0] + mata[M11+a0] * matb[M13+b0] + mata[M12+a0] * matb[M23+b0] + mata[M13+a0] * matb[M33+b0]);
+            tmp[M20+resultOffset] = clamp(mata[M20+a0] * matb[M00+b0] + mata[M21+a0] * matb[M10+b0] + mata[M22+a0] * matb[M20+b0] + mata[M23+a0] * matb[M30+b0]);
+            tmp[M21+resultOffset] = clamp(mata[M20+a0] * matb[M01+b0] + mata[M21+a0] * matb[M11+b0] + mata[M22+a0] * matb[M21+b0] + mata[M23+a0] * matb[M31+b0]);
+            tmp[M22+resultOffset] = clamp(mata[M20+a0] * matb[M02+b0] + mata[M21+a0] * matb[M12+b0] + mata[M22+a0] * matb[M22+b0] + mata[M23+a0] * matb[M32+b0]);
+            tmp[M23+resultOffset] = clamp(mata[M20+a0] * matb[M03+b0] + mata[M21+a0] * matb[M13+b0] + mata[M22+a0] * matb[M23+b0] + mata[M23+a0] * matb[M33+b0]);
+            tmp[M30+resultOffset] = clamp(mata[M30+a0] * matb[M00+b0] + mata[M31+a0] * matb[M10+b0] + mata[M32+a0] * matb[M20+b0] + mata[M33+a0] * matb[M30+b0]);
+            tmp[M31+resultOffset] = clamp(mata[M30+a0] * matb[M01+b0] + mata[M31+a0] * matb[M11+b0] + mata[M32+a0] * matb[M21+b0] + mata[M33+a0] * matb[M31+b0]);
+            tmp[M32+resultOffset] = clamp(mata[M30+a0] * matb[M02+b0] + mata[M31+a0] * matb[M12+b0] + mata[M32+a0] * matb[M22+b0] + mata[M33+a0] * matb[M32+b0]);
+            tmp[M33+resultOffset] = clamp(mata[M30+a0] * matb[M03+b0] + mata[M31+a0] * matb[M13+b0] + mata[M32+a0] * matb[M23+b0] + mata[M33+a0] * matb[M33+b0]);
+        }
 
         /**
          * Multiplies a 4 element vector by a 4x4 matrix and stores the result
@@ -711,8 +736,8 @@ public final class Matrix {
          * @param mOffset an offset into m where the input matrix is stored.
          * @return true if the matrix could be inverted, false if it could not.
          */
-        public native static boolean invertM(float[] mInv, int mInvOffset, float[] m,
-                int mOffset);/* {
+        public static boolean invertM(float[] mInv, int mInvOffset, float[] m,
+                int mOffset) {
         // Invert a 4 x 4 matrix using Cramer's Rule
 
             // transpose matrix
@@ -831,8 +856,8 @@ public final class Matrix {
             mInv[15 + mInvOffset] = clamp(dst15 * invdet);
 
             return true;
-        
-        }*/
+
+        }
 
         /**
          * Computes an orthographic projection matrix.
