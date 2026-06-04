@@ -57,9 +57,9 @@ public class AdsScreenshotTest extends BaseTest {
         row.getAllStyles().setMargin(0, 4, 0, 0);
         row.getAllStyles().setPadding(6, 6, 6, 6);
         Label t = new Label(title);
-        t.getAllStyles().setFgColor(0xf9fafb);
+        styleText(t, 0xf9fafb);
         Label b = new Label(body);
-        b.getAllStyles().setFgColor(0x9ca3af);
+        styleText(b, 0x9ca3af);
         row.add(t);
         row.add(b);
         return row;
@@ -74,13 +74,13 @@ public class AdsScreenshotTest extends BaseTest {
         row.getAllStyles().setPadding(6, 6, 6, 6);
 
         Label sponsored = new Label("Sponsored");
-        sponsored.getAllStyles().setFgColor(0xfbbf24);
+        styleText(sponsored, 0xfbbf24);
 
         Label headline = new Label(ad.getHeadline());
-        headline.getAllStyles().setFgColor(0xf9fafb);
+        styleText(headline, 0xf9fafb);
 
         Label body = new Label(ad.getBody());
-        body.getAllStyles().setFgColor(0x9ca3af);
+        styleText(body, 0x9ca3af);
 
         Button cta = new Button(ad.getCallToAction());
         cta.getAllStyles().setFgColor(0xffffff);
@@ -92,5 +92,12 @@ public class AdsScreenshotTest extends BaseTest {
         row.add(body);
         row.add(cta);
         return row;
+    }
+
+    /// Foreground colour on a transparent background so the dark feed shows
+    /// through (the default Label UIID paints an opaque background).
+    private static void styleText(Label l, int fg) {
+        l.getAllStyles().setFgColor(fg);
+        l.getAllStyles().setBgTransparency(0);
     }
 }

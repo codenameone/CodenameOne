@@ -23,6 +23,14 @@ The supported formats are:
 * *Native* - assets you render with your own components
   (`com.codename1.ads.NativeAd`).
 
+The screenshot below is the advertising sample running in the simulator against
+the deterministic mock provider (`cn1-ads-mock`): a news feed with an in-feed
+native ad (the "Sponsored" row, rendered with the app's own components) and an
+anchored banner at the bottom.
+
+.The advertising sample in the simulator: an in-feed native ad and a banner
+image::img/ads-native-feed.png[Advertising sample,scaledwidth=55%]
+
 === Ad provider cn1libs
 
 Several provider libraries ship with the framework. They are released to Maven
