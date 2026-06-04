@@ -3383,7 +3383,16 @@ const _L0 = _LL(0, 0);
 const _L1 = _LL(1, 0);
 const _LMIN = _LL(0, -2147483648);          // 0x8000000000000000
 const _LMAX = _LL(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
-function _LfromInt(v) { v = v | 0; return _LL(v, v < 0 ? -1 : 0); }
+const _LintCache = new Array(384); // cache small int->long (-128..255) to cut hot-path allocation
+function _LfromInt(v) {
+  v = v | 0;
+  if (v >= -128 && v <= 255) {
+    let c = _LintCache[v + 128];
+    if (c === undefined) { c = _LintCache[v + 128] = _LL(v, v < 0 ? -1 : 0); }
+    return c;
+  }
+  return _LL(v, v < 0 ? -1 : 0);
+}
 function _LfromNumber(v) {
   v = Number(v);
   if (isNaN(v)) return _L0;
@@ -3416,7 +3425,20 @@ function _Ladd(a, b) {
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
 function _Lneg(a) { a = _Lc(a); return _Leq(a, _LMIN) ? _LMIN : _Ladd(_LL(~a.l, ~a.h), _L1); }
-function _Lsub(a, b) { return _Ladd(_Lc(a), _Lneg(b)); }
+function _Lsub(a, b) {
+  // a - b = a + ~b + 1, inlined as a single 16-bit add chain (one allocation
+  // instead of _Lneg+_Ladd's two) -- LSUB is hot in timing/loops.
+  a = _Lc(a); b = _Lc(b);
+  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
+  const nl = ~b.l, nh = ~b.h;
+  const b48 = nh >>> 16, b32 = nh & 0xFFFF, b16 = nl >>> 16, b00 = nl & 0xFFFF;
+  let c00 = a00 + b00 + 1, c16 = 0, c32 = 0, c48 = 0; // +1 = the two's-complement carry-in
+  c16 += c00 >>> 16; c00 &= 0xFFFF;
+  c16 += a16 + b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
+  c32 += a32 + b32; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c48 += a48 + b48; c48 &= 0xFFFF;
+  return _LL((c16 << 16) | c00, (c48 << 16) | c32);
+}
 function _Lmul(a, b) {
   a = _Lc(a); b = _Lc(b);
   const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
@@ -3433,11 +3455,12 @@ function _Lmul(a, b) {
 }
 function _Lcmp(a, b) {
   a = _Lc(a); b = _Lc(b);
-  if (_Leq(a, b)) return 0;
-  const an = _LisNeg(a), bn = _LisNeg(b);
-  if (an && !bn) return -1;
-  if (!an && bn) return 1;
-  return _LisNeg(_Lsub(a, b)) ? -1 : 1;
+  // Allocation-free: the high word is signed, so it orders the full value; on a
+  // tie compare the low words as unsigned. Comparisons dominate loops/timing, so
+  // avoiding the _Lsub object churn here is the main hi/lo perf win.
+  if (a.h !== b.h) return a.h < b.h ? -1 : 1;
+  const al = a.l >>> 0, bl = b.l >>> 0;
+  return al === bl ? 0 : (al < bl ? -1 : 1);
 }
 function _Ldiv(a, b) {
   a = _Lc(a); b = _Lc(b);
