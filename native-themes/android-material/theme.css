@@ -349,14 +349,20 @@ DesktopScrollThumb {
     padding: 0;
     margin: 0;
 }
-/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb */
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb.
+   Properties are re-declared rather than cn1-derive'd from the base UIID,
+   which would be a self-referential derive cycle. */
 DesktopScrollThumb.selected {
-    cn1-derive: DesktopScrollThumb;
     background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopScrollThumb.pressed {
-    cn1-derive: DesktopScrollThumb;
     background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopHorizontalScroll {
     background-color: #e7e0ec;
@@ -370,12 +376,16 @@ DesktopHorizontalScrollThumb {
     margin: 0;
 }
 DesktopHorizontalScrollThumb.selected {
-    cn1-derive: DesktopHorizontalScrollThumb;
     background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopHorizontalScrollThumb.pressed {
-    cn1-derive: DesktopHorizontalScrollThumb;
     background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 
 /* Material 3 top tabs: flat surface with selected tab underlined by

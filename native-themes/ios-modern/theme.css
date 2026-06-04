@@ -309,14 +309,20 @@ DesktopScrollThumb {
     margin: 0;
 }
 /* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb,
-   the macOS-conventional interactive-scrollbar highlight */
+   the macOS-conventional interactive-scrollbar highlight. Properties are
+   re-declared (not cn1-derive'd from the base UIID, which would be a
+   self-referential derive cycle). */
 DesktopScrollThumb.selected {
-    cn1-derive: DesktopScrollThumb;
     background-color: rgba(0,0,0,0.55);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopScrollThumb.pressed {
-    cn1-derive: DesktopScrollThumb;
     background-color: rgba(0,0,0,0.7);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopHorizontalScroll {
     background-color: transparent;
@@ -330,12 +336,16 @@ DesktopHorizontalScrollThumb {
     margin: 0;
 }
 DesktopHorizontalScrollThumb.selected {
-    cn1-derive: DesktopHorizontalScrollThumb;
     background-color: rgba(0,0,0,0.55);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 DesktopHorizontalScrollThumb.pressed {
-    cn1-derive: DesktopHorizontalScrollThumb;
     background-color: rgba(0,0,0,0.7);
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
 }
 
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
