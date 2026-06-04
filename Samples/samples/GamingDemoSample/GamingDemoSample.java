@@ -1,10 +1,9 @@
 package com.codename1.samples;
 
 import com.codename1.gaming.GameView;
-import com.codename1.gaming.Scene;
-import com.codename1.gaming.Sprite;
 import com.codename1.gaming.SoundEffect;
 import com.codename1.gaming.SoundPool;
+import com.codename1.gaming.Sprite;
 import com.codename1.gaming.physics.BodyType;
 import com.codename1.gaming.physics.PhysicsBody;
 import com.codename1.gaming.physics.PhysicsWorld;
@@ -13,14 +12,16 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.io.ByteArrayInputStream;
 
-/// Demonstrates the {@code com.codename1.gaming} package end to end: a {@link GameView}
-/// game loop, sprite rendering, Box2D physics and a low latency {@link SoundPool}.
+/// Demonstrates the {@code com.codename1.gaming} package end to end: a GPU driven
+/// {@link GameView} loop, sprite rendering on the {@code com.codename1.gpu} layer,
+/// Box2D physics and a low latency {@link SoundPool}.
 ///
 /// Tap anywhere to drop a ball; it falls under gravity, bounces off the floor and
 /// walls and plays a short blip whose pitch varies per drop.
@@ -40,8 +41,11 @@ public class GamingDemoSample {
             return;
         }
         Form f = new Form("Gaming Demo", new BorderLayout());
-        f.add(BorderLayout.CENTER, new PhysicsDemoView());
+        f.add(BorderLayout.NORTH, new Label("Tap to drop bouncing balls"));
+        PhysicsDemoView game = new PhysicsDemoView();
+        f.add(BorderLayout.CENTER, game);
         f.show();
+        game.start();
     }
 
     public void stop() {
@@ -51,45 +55,32 @@ public class GamingDemoSample {
     public void destroy() {
     }
 
-    /// The actual game surface.
+    /// The actual game surface: a GPU `GameView` whose `Scene` is drawn for us; we
+    /// only position sprites and step the physics world.
     static class PhysicsDemoView extends GameView {
         private PhysicsWorld world;
-        private Scene scene;
         private SoundPool sfx;
         private SoundEffect blip;
-        private Image ballImage;
+        private final Image ballImage;
         private int rateSeed;
         private boolean ready;
-        private double fps;
 
         PhysicsDemoView() {
-            ballImage = makeBall(28, 0xff5a5f);
+            ballImage = makeBall(28, 0xffff5a5f);
+            setClearColor(0xff101826);
             sfx = SoundPool.create(12);
             try {
                 blip = sfx.load(new ByteArrayInputStream(makeBlipWav(660, 120)), "audio/wav");
             } catch (Exception e) {
                 Log.e(e);
             }
-            setTargetFramerate(60);
-            // start once attached; init() (component lifecycle) fires after the form shows
-        }
-
-        protected void initComponent() {
-            super.initComponent();
-            start();
-        }
-
-        protected void deinitialize() {
-            stop();
-            super.deinitialize();
         }
 
         private void setupWorld() {
             int w = getWidth();
             int h = getHeight();
             world = new PhysicsWorld(0, 900); // gravity, pixels/s^2 downward
-            scene = new Scene();
-            // floor + side walls (static), positioned in view-local coordinates
+            // floor + side walls (static), in view-local pixel coordinates
             world.createBox(w / 2f, h - 10, w, 20, BodyType.STATIC);
             world.createBox(-10, h / 2f, 20, h * 2f, BodyType.STATIC);
             world.createBox(w + 10, h / 2f, 20, h * 2f, BodyType.STATIC);
@@ -97,15 +88,12 @@ public class GamingDemoSample {
         }
 
         private void dropBall(float x, float y) {
-            if (!ready) {
-                return;
-            }
             PhysicsBody body = world.createCircle(x, y, 14, BodyType.DYNAMIC);
             body.setRestitution(0.6f);
             Sprite s = new Sprite(ballImage);
             s.setPosition(x, y);
             body.setLinkedSprite(s);
-            scene.add(s);
+            getScene().add(s);
             if (blip != null) {
                 float rate = 0.7f + ((rateSeed++ % 8) * 0.12f); // vary pitch per drop
                 sfx.play(blip, 0.9f, 0f, rate, 0);
@@ -120,29 +108,10 @@ public class GamingDemoSample {
                     return;
                 }
             }
-            if (dt > 0) {
-                fps = fps * 0.9 + (1.0 / dt) * 0.1;
-            }
             if (getInput().wasPointerPressed()) {
                 dropBall(getInput().getPointerX(), getInput().getPointerY());
             }
             world.step((float) dt);
-        }
-
-        protected void render(Graphics g) {
-            int ox = getX();
-            int oy = getY();
-            g.setColor(0x101826);
-            g.fillRect(ox, oy, getWidth(), getHeight());
-            g.translate(ox, oy);
-            if (scene != null) {
-                scene.render(g);
-            }
-            g.translate(-ox, -oy);
-            g.setColor(0xffffff);
-            g.drawString("Tap to drop a ball  |  balls: "
-                    + (scene == null ? 0 : scene.size())
-                    + "  |  fps: " + Math.round(fps), ox + 10, oy + 10);
         }
     }
 
@@ -169,17 +138,17 @@ public class GamingDemoSample {
         writeIntLE(out, 4, 36 + dataLen);
         writeStr(out, 8, "WAVE");
         writeStr(out, 12, "fmt ");
-        writeIntLE(out, 16, 16);          // fmt chunk size
-        writeShortLE(out, 20, 1);         // PCM
-        writeShortLE(out, 22, 1);         // mono
+        writeIntLE(out, 16, 16);
+        writeShortLE(out, 20, 1);
+        writeShortLE(out, 22, 1);
         writeIntLE(out, 24, sampleRate);
         writeIntLE(out, 28, sampleRate * 2);
-        writeShortLE(out, 32, 2);         // block align
-        writeShortLE(out, 34, 16);        // bits per sample
+        writeShortLE(out, 32, 2);
+        writeShortLE(out, 34, 16);
         writeStr(out, 36, "data");
         writeIntLE(out, 40, dataLen);
         for (int i = 0; i < samples; i++) {
-            double env = 1.0 - (double) i / samples;           // linear decay
+            double env = 1.0 - (double) i / samples;
             double v = Math.sin(2 * Math.PI * freq * i / sampleRate) * env;
             int s = (int) (v * 30000);
             writeShortLE(out, 44 + i * 2, s);

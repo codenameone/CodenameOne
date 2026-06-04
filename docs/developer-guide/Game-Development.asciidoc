@@ -2,57 +2,41 @@
 
 Codename One is a general purpose UI toolkit, but it ships with a package built
 specifically for games: https://www.codenameone.com/javadoc/com/codename1/gaming/package-summary.html[`com.codename1.gaming`].
-It gives you the things games need -- a tight update/render loop, sprite
-primitives, pollable input, low latency sound effects and rigid body physics --
-while building entirely on top of the existing Codename One facilities (the
-animation system, the `Graphics` pipeline and the media APIs) rather than
-replacing them. Everything written here runs unchanged on every Codename One
-target, including iOS.
+It gives you the things games need -- a tight update loop, sprite primitives,
+pollable input, low latency sound effects and rigid body physics -- and renders on
+the GPU through the <<3D Graphics and Shaders,`com.codename1.gpu`>> package.
+Everything written here runs unchanged on every Codename One target, including iOS.
 
 TIP: This chapter covers the real time game surface. For the "casual game"
 approach -- building game elements out of regular `Component`s and letting the
 layout system render them -- the techniques in the <<Animations>> chapter are
-often a better fit. Reach for `com.codename1.gaming` when you want a frame rate
-driven loop and direct rendering.
-
-=== Why a game loop on top of the EDT?
-
-Codename One runs all painting and events on a single thread, the
-<<The-EDT---Event-Dispatch-Thread,Event Dispatch Thread (EDT)>>. The framework's
-animation system already separates "advance one tick" from "draw a frame" --
-exactly the shape of a game loop. The gaming package wraps that machinery in a
-familiar `update`/`render` façade so you never touch the EDT plumbing directly,
-and exposes input as state you poll rather than events you react to.
-
-The one rule to keep in mind: because your `update` and `render` methods run on
-the EDT, they must never block. Offload asset loading, networking or other long
-work to a background thread and hand the result back with
-https://www.codenameone.com/javadoc/com/codename1/ui/CN.html#callSerially-java.lang.Runnable-[`CN.callSerially`].
+often a better fit. Reach for `com.codename1.gaming` when you want a frame driven
+loop and GPU sprite rendering.
 
 === The game loop: `GameView`
 
 https://www.codenameone.com/javadoc/com/codename1/gaming/GameView.html[`GameView`]
-is a `Component` that drives the loop. Subclass it, implement `update(double
-deltaSeconds)` to advance the game and `render(Graphics g)` to draw a frame, add
-it to a `Form`, then call `start()`:
+is the heart of the package. It's a GPU surface (a
+https://www.codenameone.com/javadoc/com/codename1/gpu/RenderView.html[`RenderView`])
+that runs the frame loop for you -- a display link on device, the dependency-free
+software rasterizer in the simulator -- so there's no EDT busy loop and no frame
+rate to manage. You build your world by adding `Sprite`s to its `Scene`, advance
+the game in `update(double)`, and the view draws the scene every frame.
 
 [source,java]
 ----
-public class MyGame extends GameView {
-    private final Sprite player = new Sprite(playerImage);
+class MyGame extends GameView {
+    final Sprite player = new Sprite(playerImage);
 
-    @Override
+    MyGame() {
+        getScene().add(player);
+        player.setPosition(160, 240);
+    }
+
     protected void update(double dt) {
         if (getInput().isGameKeyDown(Display.GAME_RIGHT)) {
             player.setX(player.getX() + 200 * dt);   // 200 px/second
         }
-    }
-
-    @Override
-    protected void render(Graphics g) {
-        g.setColor(0x101020);
-        g.fillRect(getX(), getY(), getWidth(), getHeight());
-        player.draw(g);
     }
 }
 
@@ -63,36 +47,26 @@ f.show();
 game.start();
 ----
 
-The `deltaSeconds` passed to `update` is the wall clock time since the previous
-frame. Multiplying movement by it keeps your game running at the same speed
-regardless of the actual frame rate ("delta timing").
+The `dt` passed to `update` is the wall clock time since the previous frame.
+Multiplying movement by it keeps the game running at the same speed regardless of
+the actual frame rate ("delta timing"). Notice there's no draw method -- positioning
+sprites is all you do; the GPU renderer handles the rest (see <<Sprites>>).
 
 ==== Lifecycle
 
-`start()` registers the view with the form's animation system and raises the
-frame rate; `stop()` deregisters it and restores the previous frame rate. `pause()`
-and `resume()` suspend updates without tearing the loop down (resuming resets the
-frame clock so the pause gap doesn't produce one huge `dt`). The view also
-releases its frame rate hold automatically when it's removed from the form, so a
-backgrounded game doesn't keep the device awake.
+`start()` begins continuous rendering, `stop()` halts it, and `pause()`/`resume()`
+suspend `update` while the view keeps drawing the last frame. `start()` is safe to
+call before or after the form is shown.
 
 [source,java]
 ----
-game.start();   // begin the loop (call after the form is shown)
-game.pause();   // freeze updates, keep the view live
+game.start();   // begin the loop
+game.pause();   // freeze game logic, keep rendering
 game.resume();  // continue
-game.stop();    // end the loop, restore the frame rate
+game.stop();    // end the loop
 ----
 
-==== Frame rate and battery
-
-`setTargetFramerate(int fps)` (default 60) controls how often the loop runs. The
-frame rate is a global Codename One setting; `GameView` saves and restores it
-around the game so the rest of your UI is unaffected.
-
-`setNoSleep(true)` makes the EDT never idle between frames for the highest
-possible frame rate -- at a steep battery cost. Leave it off (the default) and
-rely on a capped-but-high target frame rate unless you have a specific reason.
+`setClearColor(int argb)` sets the background the view is cleared to each frame.
 
 ==== Fixed timestep and interpolation
 
@@ -106,8 +80,14 @@ rendered positions between physics states:
 [source,java]
 ----
 game.setFixedTimestep(1.0 / 120.0);   // step physics at a steady 120Hz
-// in render(): blend previous and current state by getInterpolationAlpha()
 ----
+
+==== Threading
+
+`update(double)` runs on the render thread, together with drawing. Keep it
+non-blocking -- offload asset loading, networking or other long work to a background
+thread and hand the result back with
+https://www.codenameone.com/javadoc/com/codename1/ui/CN.html#callSerially-java.lang.Runnable-[`CN.callSerially`].
 
 === Input: `GameInput`
 
@@ -135,17 +115,21 @@ if (in.isGameKeyDown(Display.GAME_FIRE)) { fire(); }
 if (in.wasPointerPressed()) { spawnAt(in.getPointerX(), in.getPointerY()); }
 ----
 
-All input state is read and written on the EDT, so no synchronization is needed in
-your game code.
-
 === Sprites
 
 A https://www.codenameone.com/javadoc/com/codename1/gaming/Sprite.html[`Sprite`]
-is an image with position, rotation, scale, alpha and a normalized anchor. Its
+is a lightweight data holder: an image plus position, rotation, scale, a normalized
+anchor and an ARGB tint. It describes *what* and *where*; a
+https://www.codenameone.com/javadoc/com/codename1/gaming/SpriteRenderer.html[`SpriteRenderer`]
+turns it into a GPU textured quad each frame using the `com.codename1.gpu` package
+-- an orthographic camera mapping one world unit to one pixel, a
+`com.codename1.gpu.Material.Type#SPRITE` material and alpha blending. Because a
+sprite never touches the GPU directly you create one with just an
+`com.codename1.ui.Image`; the renderer uploads and caches the matching texture on
+demand.
+
 `getX()`/`getY()` is the location of the anchor point (the image center by
-default), and rotation and scale pivot around that anchor. `draw(Graphics g)`
-renders it through the graphics affine transform, falling back to a plain image
-draw (ignoring rotation/scale) on the rare platform without transform support.
+default), and rotation and scale pivot around that anchor.
 
 [source,java]
 ----
@@ -153,13 +137,31 @@ Sprite ship = new Sprite(shipImage);
 ship.setPosition(160, 240);
 ship.setRotation(45);          // degrees, clockwise
 ship.setScale(2f);
-ship.setAlpha(200);            // 0..255
-// in render():
-ship.draw(g);
+ship.setAlpha(200);            // 0 (transparent) to 255 (opaque)
+getScene().add(ship);
 ----
 
 `getBounds()` returns the axis aligned bounding box and `intersects(Sprite)` does a
 quick box overlap test, handy for broad phase collision before you involve physics.
+
+==== Scenes
+
+A https://www.codenameone.com/javadoc/com/codename1/gaming/Scene.html[`Scene`] is a
+z-ordered collection of sprites with an optional camera offset, drawn for you by
+the renderer. Sprites are drawn from lowest to highest `zOrder`, so higher z-order
+sprites appear on top; the camera offset (`setCamera(int, int)`) scrolls the whole
+scene. `GameView.getScene()` is the scene the view draws.
+
+You don't need a `GameView` to render sprites: a `SpriteRenderer` is itself a
+`com.codename1.gpu.Renderer`, so you can host one in a plain `RenderView`.
+
+[source,java]
+----
+SpriteRenderer r = new SpriteRenderer();
+r.getScene().add(mySprite);
+RenderView view = new RenderView(r).setContinuous(true);
+form.add(BorderLayout.CENTER, view);
+----
 
 ==== Sprite sheets and animation
 
@@ -168,8 +170,8 @@ slices one atlas image into a grid of equally sized frames, cutting and caching
 each frame on first use (cutting a sub image copies pixels, so caching matters).
 
 https://www.codenameone.com/javadoc/com/codename1/gaming/AnimatedSprite.html[`AnimatedSprite`]
-is a `Sprite` that cycles through a sequence of frames over time; it advances in
-`onUpdate(double)`, so adding it to a `Scene` (below) drives playback.
+is a `Sprite` that cycles through a sequence of frames over time; the scene advances
+it every frame, so adding it to the scene is all you need.
 
 [source,java]
 ----
@@ -177,27 +179,7 @@ SpriteSheet sheet = new SpriteSheet(explosionImage, 64, 64);
 AnimatedSprite boom = new AnimatedSprite(
         sheet, new int[]{0, 1, 2, 3, 4, 5}, 0.05); // 50ms per frame
 boom.setLooping(false);
-----
-
-==== Scenes
-
-https://www.codenameone.com/javadoc/com/codename1/gaming/Scene.html[`Scene`] is a
-z-ordered collection of sprites with an optional camera offset. Call its
-`update(double)` from your loop's `update` (it advances every sprite's
-`onUpdate`) and its `render(Graphics)` from your `render` (it draws sprites from
-lowest to highest `zOrder`, re-sorting only when the contents change). The camera
-offset (`setCamera(int, int)`) scrolls the whole scene.
-
-[source,java]
-----
-private final Scene scene = new Scene();
-// ...
-scene.add(player);
-scene.add(boom);
-// in update():
-scene.update(dt);
-// in render():
-scene.render(g);
+getScene().add(boom);
 ----
 
 === Low latency audio: `SoundPool`
@@ -283,16 +265,16 @@ respond to `setLinearVelocity`, `applyForce`, `applyLinearImpulse`, `applyTorque
 A body can drive a sprite directly. `Sprite` implements
 https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsLinkable.html[`PhysicsLinkable`],
 so linking the two means `world.step(...)` updates the sprite's position and
-rotation automatically (in pixels, screen space) -- you just draw it:
+rotation automatically (in pixels, screen space) -- and the scene draws it there:
 
 [source,java]
 ----
 Sprite crateSprite = new Sprite(crateImage);
 crate.setLinkedSprite(crateSprite);
-scene.add(crateSprite);
+getScene().add(crateSprite);
 
-// update():  world.step((float) dt);   // moves crate, which moves crateSprite
-// render():  scene.render(g);          // draws crateSprite at its new spot
+// in update(double dt):
+world.step((float) dt);   // moves crate, which moves crateSprite, which the scene draws
 ----
 
 ==== Collisions
@@ -323,19 +305,18 @@ work in meters, y up).
 
 The `GamingDemoSample` in the samples project ties the whole package together in
 under 200 lines: a `GameView` running a `PhysicsWorld` with a floor and walls,
-tap-to-drop balls that bounce, each ball a `Sprite` linked to its body and drawn
-through a `Scene`, and a `SoundPool` blip whose pitch varies per drop. It generates
-its sprite images and its sound at runtime, so it needs no assets -- a compact,
-copyable starting point for your own game.
+tap-to-drop balls that bounce, each ball a `Sprite` linked to its body, and a
+`SoundPool` blip whose pitch varies per drop. It generates its sprite images and
+its sound at runtime, so it needs no assets -- a compact, copyable starting point
+for your own game.
 
 === Performance notes
 
-* Keep `update` and `render` non-blocking -- they run on the EDT. Load assets off
-the EDT and hand them back with `CN.callSerially`.
-* Prefer a high target frame rate over `setNoSleep(true)`; the latter drains the
-battery and can cause thermal throttling on devices.
-* Cache cut sprite frames (use `SpriteSheet`, which does it for you) rather than
-re-slicing every frame.
+* Keep `update` non-blocking -- it runs on the render thread. Load assets off the
+render thread and hand them back with `CN.callSerially`.
+* Reuse images: the renderer caches one GPU texture per `Image`, so sharing an image
+across many sprites uploads it once. Cache cut sprite frames (use `SpriteSheet`,
+which does it for you) rather than re-slicing every frame.
 * Load every `SoundEffect` up front and reuse it.
 * Tune `setPixelsPerMeter` so your moving bodies are on the order of a meter
 (tens of pixels) in size; bodies far larger or smaller than that make the

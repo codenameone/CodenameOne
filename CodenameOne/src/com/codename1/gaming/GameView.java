@@ -22,33 +22,24 @@
  */
 package com.codename1.gaming;
 
-import com.codename1.ui.Component;
-import com.codename1.ui.Display;
-import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.geom.Dimension;
+import com.codename1.gpu.RenderView;
 
-/// A `com.codename1.ui.Component` that drives a game loop on top of the Codename
-/// One animation system.
+/// A GPU accelerated game surface: a `com.codename1.gpu.RenderView` that hosts a
+/// `SpriteRenderer` over a `Scene` and calls your `#update(double)` once per frame.
 ///
-/// Subclass it and implement `#update(double)` (advance the game) and
-/// `#render(com.codename1.ui.Graphics)` (draw a frame). Add the view to a
-/// `com.codename1.ui.Form` -- typically as the center of a `BorderLayout` -- and
-/// call `#start()`:
+/// Subclass it, build your world by adding `Sprite`s to `#getScene()`, advance the
+/// game in `#update(double)`, add the view to a `com.codename1.ui.Form` and call
+/// `#start()`:
 ///
 /// ```java
 /// class MyGame extends GameView {
-///     Sprite player = new Sprite(playerImage);
+///     final Sprite player = new Sprite(playerImage);
+///     MyGame() { getScene().add(player); player.setPosition(160, 240); }
 ///
 ///     protected void update(double dt) {
 ///         if (getInput().isGameKeyDown(Display.GAME_RIGHT)) {
-///             player.setX(player.getX() + 200 * dt);
+///             player.setX(player.getX() + 200 * dt);   // 200 px/second
 ///         }
-///     }
-///     protected void render(Graphics g) {
-///         g.setColor(0x101020);
-///         g.fillRect(getX(), getY(), getWidth(), getHeight());
-///         player.draw(g);
 ///     }
 /// }
 ///
@@ -59,27 +50,22 @@ import com.codename1.ui.geom.Dimension;
 /// game.start();
 /// ```
 ///
-/// While running, the view registers itself with the form's animation system and
-/// raises the framerate (`#setTargetFramerate(int)`, default 60), restoring the
-/// previous framerate when stopped. `#update(double)` is given the elapsed time in
-/// seconds since the previous frame; with `#setFixedTimestep(double)` the update is
-/// instead stepped at a fixed interval (good for deterministic physics) and
-/// `#getInterpolationAlpha()` gives the render side a 0..1 blend factor.
+/// Rendering is GPU driven: the underlying `RenderView` runs the frame loop (a
+/// display link on device, the software rasterizer in the simulator), so there is
+/// no EDT busy loop. Drawing is handled for you by the `SpriteRenderer` -- you only
+/// position sprites. The `deltaSeconds` passed to `#update(double)` is the wall
+/// clock time since the previous frame; multiply movement by it to stay framerate
+/// independent. With `#setFixedTimestep(double)` the update is stepped at a fixed
+/// interval for deterministic physics, and `#getInterpolationAlpha()` gives a 0..1
+/// blend factor.
 ///
-/// Input is available as pollable state through `#getInput()`.
-///
-/// **Both `#update(double)` and `#render(com.codename1.ui.Graphics)` run on the
-/// Codename One EDT.** They must not block -- offload asset loading or other long
-/// work to a background thread and hand the result back with
-/// `com.codename1.ui.CN#callSerially(java.lang.Runnable)`.
-public abstract class GameView extends Component {
+/// `#update(double)` runs on the render thread together with drawing. Keep it non
+/// blocking -- offload asset loading to a background thread and hand the result
+/// back with `com.codename1.ui.CN#callSerially(java.lang.Runnable)`.
+public abstract class GameView extends RenderView implements SpriteRenderer.Updatable {
+    private final Scene scene;
     private boolean running;
     private boolean paused;
-    private boolean attached;
-    private long lastTime;
-    private int targetFramerate = 60;
-    private int savedFramerate = -1;
-    private boolean noSleepWhileRunning;
     private double fixedTimestep;
     private double accumulator;
     private double interpolationAlpha = 1;
@@ -87,64 +73,63 @@ public abstract class GameView extends Component {
     private final GameInput input = new GameInput();
 
     public GameView() {
+        super(new SpriteRenderer());
+        SpriteRenderer r = (SpriteRenderer) getRenderer();
+        r.setUpdatable(this);
+        this.scene = r.getScene();
         setFocusable(true);
-        setGrabsPointerEvents(true);
     }
 
     /// Advance the game by the given amount of time. Called once per frame (or
     /// repeatedly at a fixed interval when `#setFixedTimestep(double)` is used).
-    ///
-    /// #### Parameters
-    ///
-    /// - `deltaSeconds`: elapsed time since the previous update, in seconds
     protected abstract void update(double deltaSeconds);
 
-    /// Draw a frame. The graphics context is clipped to this component; draw
-    /// relative to `#getX()`/`#getY()`.
-    protected abstract void render(Graphics g);
+    /// The scene drawn by this view; add and remove `Sprite`s here.
+    public Scene getScene() {
+        return scene;
+    }
 
     /// The pollable input state for this view.
     public GameInput getInput() {
         return input;
     }
 
-    /// Starts the game loop. Safe to call after the view has been shown; if the
-    /// view is not yet attached to a form the loop attaches automatically once it
-    /// is.
+    /// Sets the ARGB color the view is cleared to each frame.
+    public void setClearColor(int argb) {
+        ((SpriteRenderer) getRenderer()).setClearColor(argb);
+    }
+
+    /// Starts the game loop (continuous rendering). Safe to call before or after the
+    /// view is shown.
     public void start() {
         if (running) {
             return;
         }
         running = true;
         paused = false;
-        lastTime = System.currentTimeMillis();
         accumulator = 0;
-        attach();
+        setContinuous(true);
         requestFocus();
+        requestRender();
     }
 
-    /// Stops the game loop and restores the previous framerate.
+    /// Stops the game loop (no further frames until `#start()`).
     public void stop() {
         if (!running) {
             return;
         }
         running = false;
-        detach();
+        setContinuous(false);
     }
 
-    /// Pauses updates without tearing down the loop. The view stays registered but
-    /// `#update(double)` is not called until `#resume()`.
+    /// Pauses updates; frames still render but `#update(double)` is not called.
     public void pause() {
         paused = true;
     }
 
-    /// Resumes after `#pause()`, resetting the frame clock so the pause gap does
-    /// not produce a large delta.
+    /// Resumes after `#pause()`.
     public void resume() {
-        if (paused) {
-            paused = false;
-            lastTime = System.currentTimeMillis();
-        }
+        paused = false;
     }
 
     public boolean isRunning() {
@@ -155,38 +140,9 @@ public abstract class GameView extends Component {
         return paused;
     }
 
-    /// Sets the target framerate applied while the game runs. The framerate is a
-    /// global Codename One setting; the previous value is restored on `#stop()`.
-    public void setTargetFramerate(int fps) {
-        targetFramerate = fps;
-        if (attached) {
-            Display.getInstance().setFramerate(fps);
-        }
-    }
-
-    public int getTargetFramerate() {
-        return targetFramerate;
-    }
-
-    /// When true the EDT does not sleep between frames while the game runs, trading
-    /// battery for the highest possible framerate. Defaults to false; rely on
-    /// `#setTargetFramerate(int)` for a capped but smooth rate. Always restored on
-    /// `#stop()` and when the view is detached.
-    public void setNoSleep(boolean noSleep) {
-        noSleepWhileRunning = noSleep;
-        if (attached) {
-            Display.getInstance().setNoSleep(noSleep);
-        }
-    }
-
-    public boolean isNoSleep() {
-        return noSleepWhileRunning;
-    }
-
-    /// Sets a fixed update interval in seconds (0 disables, the default, giving a
-    /// variable timestep). With a fixed timestep `#update(double)` may be called
-    /// several times per frame to catch up, and `#getInterpolationAlpha()` returns
-    /// the leftover fraction for render side interpolation.
+    /// Sets a fixed update interval in seconds (0 disables, the default). With a
+    /// fixed timestep `#update(double)` may be called several times per frame to
+    /// catch up, and `#getInterpolationAlpha()` returns the leftover fraction.
     public void setFixedTimestep(double seconds) {
         fixedTimestep = seconds < 0 ? 0 : seconds;
     }
@@ -195,105 +151,46 @@ public abstract class GameView extends Component {
         return fixedTimestep;
     }
 
-    /// The 0..1 fraction of a fixed step left in the accumulator after the last
-    /// update, for interpolating rendered positions between physics states. Always
-    /// 1 when a variable timestep is in use.
+    /// The 0..1 fraction of a fixed step left after the last update, for
+    /// interpolating rendered positions. Always 1 with a variable timestep.
     public double getInterpolationAlpha() {
         return interpolationAlpha;
     }
 
-    private void attach() {
-        if (attached) {
-            return;
-        }
-        Form f = getComponentForm();
-        if (f == null) {
-            return;
-        }
-        f.registerAnimated(this);
-        savedFramerate = Display.getInstance().getFrameRate();
-        Display.getInstance().setFramerate(targetFramerate);
-        if (noSleepWhileRunning) {
-            Display.getInstance().setNoSleep(true);
-        }
-        attached = true;
-    }
-
-    private void detach() {
-        if (!attached) {
-            return;
-        }
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
-        }
-        if (savedFramerate > 0) {
-            Display.getInstance().setFramerate(savedFramerate);
-        }
-        if (noSleepWhileRunning) {
-            Display.getInstance().setNoSleep(false);
-        }
-        attached = false;
-    }
-
+    /// {@inheritDoc} Re-applies the running state once the GPU peer exists.
     protected void initComponent() {
         super.initComponent();
         if (running) {
-            attach();
+            setContinuous(true);
             requestFocus();
-            lastTime = System.currentTimeMillis();
         }
     }
 
-    protected void deinitialize() {
-        // Release the framerate/no-sleep hold while detached so a backgrounded
-        // game does not keep the EDT hot; running state is preserved so the loop
-        // resumes if the view is shown again.
-        detach();
-        super.deinitialize();
-    }
-
-    /// {@inheritDoc}
-    public boolean animate() {
-        if (!running || paused) {
-            return false;
-        }
-        long now = System.currentTimeMillis();
-        double dt = (now - lastTime) / 1000.0;
-        lastTime = now;
-        if (dt < 0) {
-            dt = 0;
-        }
-        if (dt > 0.25) {
-            // clamp huge gaps (GC pause, app backgrounded) to avoid a spiral of death
-            dt = 0.25;
-        }
-        if (fixedTimestep <= 0) {
-            update(dt);
-            interpolationAlpha = 1;
-        } else {
-            accumulator += dt;
-            int steps = 0;
-            while (accumulator >= fixedTimestep && steps < MAX_FIXED_STEPS) {
-                update(fixedTimestep);
-                accumulator -= fixedTimestep;
-                steps++;
+    /// {@inheritDoc} Drives game logic each frame -- invoked by the `SpriteRenderer`
+    /// before the scene is drawn.
+    public void frame(double deltaSeconds) {
+        if (running && !paused) {
+            if (fixedTimestep <= 0) {
+                update(deltaSeconds);
+                interpolationAlpha = 1;
+            } else {
+                accumulator += deltaSeconds;
+                int steps = 0;
+                while (accumulator >= fixedTimestep && steps < MAX_FIXED_STEPS) {
+                    update(fixedTimestep);
+                    accumulator -= fixedTimestep;
+                    steps++;
+                }
+                if (accumulator > fixedTimestep) {
+                    accumulator = fixedTimestep;
+                }
+                interpolationAlpha = accumulator / fixedTimestep;
             }
-            if (accumulator > fixedTimestep) {
-                // drop backlog beyond the step cap
-                accumulator = fixedTimestep;
-            }
-            interpolationAlpha = accumulator / fixedTimestep;
         }
         input.clearFrameEdges();
-        return true;
     }
 
-    /// {@inheritDoc}
-    public void paint(Graphics g) {
-        g.setAntiAliased(true);
-        render(g);
-    }
+    // ---- input capture ---------------------------------------------------
 
     /// While running the view consumes all key events (including the directional
     /// pad and fire button) so they are not stolen for focus traversal.
@@ -319,10 +216,5 @@ public abstract class GameView extends Component {
 
     public void pointerReleased(int x, int y) {
         input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), false, false, true);
-    }
-
-    protected Dimension calcPreferredSize() {
-        Display d = Display.getInstance();
-        return new Dimension(d.getDisplayWidth(), d.getDisplayHeight());
     }
 }

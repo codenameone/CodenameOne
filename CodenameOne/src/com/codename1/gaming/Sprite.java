@@ -23,23 +23,23 @@
 package com.codename1.gaming;
 
 import com.codename1.gaming.physics.PhysicsLinkable;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 
-/// A drawable image with position, rotation, scale, alpha and a normalized anchor.
+/// A drawable image with position, rotation, scale, tint and a normalized anchor.
 ///
-/// A sprite draws itself through the `com.codename1.ui.Graphics` affine transform:
-/// its `#getX()`/`#getY()` position is the location of its anchor point (the center
-/// of the image by default), and rotation and scale pivot around that anchor. When
-/// the platform does not support affine transforms the sprite falls back to a plain
-/// `com.codename1.ui.Graphics#drawImage(com.codename1.ui.Image, int, int)` that
-/// honours position and anchor but ignores rotation and scale.
+/// A sprite is a lightweight data holder: it describes *what* and *where*, while a
+/// `SpriteRenderer` turns it into a GPU textured quad each frame (using the
+/// `com.codename1.gpu` package -- an orthographic camera in pixel space, a
+/// `com.codename1.gpu.Material.Type#SPRITE` material and alpha blending). Because a
+/// sprite never touches the GPU directly you can create one with just an
+/// `com.codename1.ui.Image` -- the renderer uploads and caches the matching
+/// `com.codename1.gpu.Texture` on demand.
 ///
-/// `Sprite` implements `com.codename1.gaming.physics.PhysicsLinkable` so a physics
-/// body can drive its position and rotation directly -- see
-/// `com.codename1.gaming.physics.PhysicsWorld`.
+/// `#getX()`/`#getY()` is the location of the anchor point (the image center by
+/// default); rotation and scale pivot around that anchor. `Sprite` implements
+/// `com.codename1.gaming.physics.PhysicsLinkable` so a physics body can drive it --
+/// see `com.codename1.gaming.physics.PhysicsWorld`.
 public class Sprite implements PhysicsLinkable {
     private Image image;
     private double x;
@@ -48,10 +48,14 @@ public class Sprite implements PhysicsLinkable {
     private float rotation;
     private float scaleX = 1;
     private float scaleY = 1;
-    private int alpha = 255;
+    /// ARGB tint multiplied with the texture; opaque white means "draw as-is".
+    private int color = 0xffffffff;
     /// normalized anchor (0..1) within the image; 0.5,0.5 is the center.
     private double anchorX = 0.5;
     private double anchorY = 0.5;
+    /// explicit quad size in pixels, or <= 0 to use the image's own size.
+    private float width = -1;
+    private float height = -1;
     private boolean visible = true;
     private int zOrder;
     private Object userData;
@@ -65,65 +69,34 @@ public class Sprite implements PhysicsLinkable {
         this.image = image;
     }
 
-    /// Draws the sprite into the given graphics context.
-    ///
-    /// The graphics context is expected to already be translated to the coordinate
-    /// space the sprite's `#getX()`/`#getY()` are expressed in (for a sprite drawn
-    /// directly by a `GameView` that is the view's own coordinate space).
-    public void draw(Graphics g) {
-        if (!visible || image == null) {
-            return;
-        }
-        int w = image.getWidth();
-        int h = image.getHeight();
-        float anchorPxX = (float) (anchorX * w);
-        float anchorPxY = (float) (anchorY * h);
-
-        int oldAlpha = g.getAlpha();
-        if (alpha != 255) {
-            g.setAlpha(alpha);
-        }
-
-        boolean transformed = (rotation != 0 || scaleX != 1 || scaleY != 1) && g.isTransformSupported();
-        if (transformed) {
-            Transform restore = g.getTransform();
-            Transform t = restore.copy();
-            t.translate((float) x, (float) y);
-            if (rotation != 0) {
-                t.rotate((float) Math.toRadians(rotation), 0, 0);
-            }
-            if (scaleX != 1 || scaleY != 1) {
-                t.scale(scaleX, scaleY);
-            }
-            g.setTransform(t);
-            g.drawImage(image, Math.round(-anchorPxX), Math.round(-anchorPxY));
-            g.setTransform(restore);
-        } else {
-            g.drawImage(image, (int) Math.round(x - anchorPxX), (int) Math.round(y - anchorPxY));
-        }
-
-        if (alpha != 255) {
-            g.setAlpha(oldAlpha);
-        }
-    }
-
     /// Per frame update hook. The default implementation does nothing; subclasses
     /// such as `AnimatedSprite` override it to advance over time. `Scene#update(double)`
     /// invokes this for every sprite it contains.
-    ///
-    /// #### Parameters
-    ///
-    /// - `deltaSeconds`: time elapsed since the previous frame, in seconds
     protected void onUpdate(double deltaSeconds) {
+    }
+
+    /// The width in pixels the sprite renders at before scaling -- an explicit size
+    /// if one was set, otherwise the image width.
+    public float getRenderWidth() {
+        if (width > 0) {
+            return width;
+        }
+        return image == null ? 0 : image.getWidth();
+    }
+
+    /// The height in pixels the sprite renders at before scaling.
+    public float getRenderHeight() {
+        if (height > 0) {
+            return height;
+        }
+        return image == null ? 0 : image.getHeight();
     }
 
     /// Returns the axis aligned bounding box of the (scaled) sprite, ignoring
     /// rotation. Useful for broad phase collision checks.
     public Rectangle getBounds() {
-        int w = image == null ? 0 : image.getWidth();
-        int h = image == null ? 0 : image.getHeight();
-        float sw = w * scaleX;
-        float sh = h * scaleY;
+        float sw = getRenderWidth() * scaleX;
+        float sh = getRenderHeight() * scaleY;
         int bx = (int) Math.round(x - anchorX * sw);
         int by = (int) Math.round(y - anchorY * sh);
         return new Rectangle(bx, by, Math.round(sw), Math.round(sh));
@@ -136,16 +109,11 @@ public class Sprite implements PhysicsLinkable {
 
     // ---- PhysicsLinkable -------------------------------------------------
 
-    /// Sets the sprite position from a physics body. The coordinates are the body
-    /// center in pixels; with the default center anchor this places the sprite so
-    /// its center matches the body.
     public void setPhysicsPosition(float xPx, float yPx) {
         this.x = xPx;
         this.y = yPx;
     }
 
-    /// Sets the sprite rotation from a physics body, converting radians to the
-    /// degrees `Sprite` uses internally.
     public void setPhysicsRotation(float radians) {
         this.rotation = (float) Math.toDegrees(radians);
     }
@@ -208,13 +176,31 @@ public class Sprite implements PhysicsLinkable {
         this.scaleY = scaleY;
     }
 
-    /// The alpha applied while drawing, 0 (transparent) to 255 (opaque).
+    /// Overrides the rendered size in pixels (before scaling). Pass values <= 0 to
+    /// revert to the image's own dimensions.
+    public void setSize(float widthPx, float heightPx) {
+        this.width = widthPx;
+        this.height = heightPx;
+    }
+
+    /// The ARGB tint multiplied with the texture (opaque white = no tint).
+    public int getColor() {
+        return color;
+    }
+
+    public void setColor(int argb) {
+        this.color = argb;
+    }
+
+    /// The alpha applied while drawing, 0 (transparent) to 255 (opaque). Stored in
+    /// the high byte of `#getColor()`.
     public int getAlpha() {
-        return alpha;
+        return (color >>> 24) & 0xff;
     }
 
     public void setAlpha(int alpha) {
-        this.alpha = alpha < 0 ? 0 : (alpha > 255 ? 255 : alpha);
+        int a = alpha < 0 ? 0 : (alpha > 255 ? 255 : alpha);
+        color = (a << 24) | (color & 0xffffff);
     }
 
     public double getAnchorX() {

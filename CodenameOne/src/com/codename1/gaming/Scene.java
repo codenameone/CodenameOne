@@ -22,7 +22,6 @@
  */
 package com.codename1.gaming;
 
-import com.codename1.ui.Graphics;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,26 +29,25 @@ import java.util.List;
 
 /// A z-ordered collection of sprites with an optional camera offset.
 ///
-/// A typical `GameView` keeps a `Scene`, calls `#update(double)` from its update
-/// loop and `#render(com.codename1.ui.Graphics)` from its render method. Sprites
-/// are drawn from lowest to highest `Sprite#getZOrder()`, so higher z-order sprites
-/// appear on top. The list is only re-sorted when it changes, not every frame.
-///
-/// The camera offset (`#setCamera(int, int)`) is subtracted from every sprite's
-/// position while rendering, which scrolls the whole scene.
+/// A `Scene` is the model a `SpriteRenderer` draws: it holds the sprites, keeps
+/// them sorted by `Sprite#getZOrder()` (higher draws on top, re-sorted only when
+/// the contents change) and applies a camera offset that scrolls the whole scene.
+/// `#update(double)` advances every sprite (driving `AnimatedSprite` playback).
 public class Scene {
     private final List sprites = new ArrayList();
     private boolean sortDirty;
     private int cameraX;
     private int cameraY;
 
-    private static final Comparator Z_ORDER = new Comparator() {
+    private static final Comparator Z_ORDER = new ZComparator();
+
+    private static final class ZComparator implements Comparator {
         public int compare(Object a, Object b) {
             int za = ((Sprite) a).getZOrder();
             int zb = ((Sprite) b).getZOrder();
             return za < zb ? -1 : (za > zb ? 1 : 0);
         }
-    };
+    }
 
     /// Adds a sprite to the scene.
     public void add(Sprite s) {
@@ -83,25 +81,16 @@ public class Scene {
         }
     }
 
-    /// Renders every visible sprite in z-order, applying the camera offset.
-    public void render(Graphics g) {
+    /// Sorts the sprites by z-order if the contents changed. Called by the renderer
+    /// before drawing.
+    void ensureSorted() {
         if (sortDirty) {
             Collections.sort(sprites, Z_ORDER);
             sortDirty = false;
         }
-        boolean cam = cameraX != 0 || cameraY != 0;
-        if (cam) {
-            g.translate(-cameraX, -cameraY);
-        }
-        for (int i = 0; i < sprites.size(); i++) {
-            ((Sprite) sprites.get(i)).draw(g);
-        }
-        if (cam) {
-            g.translate(cameraX, cameraY);
-        }
     }
 
-    /// Forces a re-sort on the next render. Call this after changing a sprite's
+    /// Forces a re-sort on the next frame. Call this after changing a sprite's
     /// z-order so the new ordering takes effect.
     public void markSortDirty() {
         sortDirty = true;
