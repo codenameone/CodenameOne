@@ -28,6 +28,10 @@ to a predictable path for the comparison tool to read.
         --token "$FIGMA_TOKEN" --file ABC123 --out target/design-import
    # Sketch / Adobe XD (local files, no token, no network)
    java .claude/skills/codename-one/tools/DesignImport.java design.sketch --out target/design-import
+   # HTML / React design (e.g. a Claude-generated mockup): point it at the
+   # design's tokens.css / styles.css, or the directory that contains it.
+   java .claude/skills/codename-one/tools/DesignImport.java path/to/tokens.css --out target/design-import
+   java .claude/skills/codename-one/tools/DesignImport.java path/to/design-dir/ --out target/design-import
    ```
    Then validate the emitted CSS before using it:
    ```bash
@@ -123,9 +127,42 @@ Format support:
 | Figma | `api.figma.com` REST API | a personal access token (`--token`) + file key (`--file`); network |
 | Sketch (`.sketch`) | unzipped JSON (`pages/*.json`) | nothing - fully local |
 | Adobe XD (`.xd`) | unzipped JSON (`graphicContent.agc`) | nothing - fully local |
+| CSS tokens (`tokens.css` / `styles.css`, or a dir containing one) | CSS custom properties (`--name: value`) | nothing - fully local |
 
 Photoshop PSD is **not** supported (opaque layered binary). Flatten-export it to PNG and use the
 `CompareToMockup` path instead.
+
+### HTML / React designs (e.g. Claude-generated mockups)
+
+Modern AI-generated designs ship as an HTML/React bundle: an `Initializr.html`, some `*.jsx`
+components, and CSS broken into a **`tokens.css`** (design tokens as CSS custom properties:
+`--color-*`, `--fs-*`, `--space-*`, `--radius-*`) plus a `styles.css`. There is no layer tree, so
+DesignImport's **CSS-token mode** extracts the palette/type-scale/spacing from the custom properties
+(first value wins, so the light theme under `:root` beats a later `[data-theme="dark"]` override) and
+seeds `Form`/`Title`/`Label`/`Button`. It defaults to `--px-per-mm 3.78` (1x CSS px) instead of the
+`11.8` used for retina raster exports.
+
+Then build the **mockup PNG** by rendering the design's own HTML headlessly and screenshot it - that
+raster becomes the independent reference for `CompareToMockup`:
+
+```bash
+# Render the design to a PNG at the width you are targeting (light + dark via colorScheme).
+# Any headless browser works; Playwright is convenient:
+npx playwright screenshot --viewport-size=1440,2000 path/to/Initializr.html design-light.png
+# (serve the dir over http if the page fetches sibling .jsx/.css with CORS)
+```
+
+Map the design's web layout to CN1 by hand - CN1 CSS has **no variables, flex, or grid**, so each
+`--color-*` becomes a hardcoded hex per UIID, a `flex-direction:row` becomes `BoxLayout.x()`, a
+`display:grid` becomes `GridLayout`, and every light token gets a parallel `FooDark` UIID for dark
+mode (toggled by re-skinning the tree, since CN1 bakes one theme at a time).
+
+> Capturing the **CN1 render** for the comparison is the same `templates/MockupComparisonTest.java`
+> flow, but note the simulator runs at a phone skin (high DPI): the desktop two-column layout only
+> appears when the display is wide. To capture it, grab the built `Form` directly (not
+> `Display.getCurrent()`, which the test harness keeps on an earlier form because a second
+> `show()` cannot transition while a test holds the EDT), set its size, `layoutContainer()`, and
+> `paintComponent()` it onto an `Image` of your chosen desktop dimensions.
 
 ## Common pitfalls
 

@@ -94,6 +94,15 @@ SideCommandDark {
     }
 }
 
+/* ==========================================================================
+   Initializr - Codename One design language
+   Light tokens:  bg-app #F3F4F7  panel #FFFFFF  border #D9DEE8  text #112247
+                  muted #7F8AA3   soft  #A0A8BA  accent #2F6BFF  accent-soft #E8F0FF
+   Dark tokens:   bg-app #071B4D  panel #102B66  border #2A4A8A  text #F5F8FF
+                  muted #A8B8DA   soft  #7E93BC  accent #4D86FF  accent-soft #15336B
+   ========================================================================== */
+
+/* ---------- App shell ---------- */
 InitializrForm {
     background-color: #F3F4F7;
 }
@@ -103,48 +112,78 @@ InitializrFormDark {
 }
 
 InitializrRoot {
-    padding: 2.2mm;
+    padding: 1.6mm;
+    background-color: #F3F4F7;
 }
 
 InitializrRootDark {
-    padding: 2.2mm;
+    padding: 1.6mm;
+    background-color: #071B4D;
 }
 
-InitializrHeaderCard {
-    background-color: #F7F8FB;
-    padding: 2.5mm;
-    margin: 1.2mm;
+InitializrColumn {
+    padding: 0;
+    margin: 0;
 }
 
-InitializrHeaderCardDark {
-    background-color: #163575;
-    padding: 2.5mm;
-    margin: 1.2mm;
+InitializrColumnDark {
+    padding: 0;
+    margin: 0;
 }
 
-InitializrCard {
-    background-color: #ffffff;
-    padding: 2.5mm;
-    margin: 1.2mm;
+/* ---------- Top bar ---------- */
+InitializrTopbar {
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #D9DEE8;
+    padding: 2.2mm 3mm;
 }
 
-InitializrCardDark {
+InitializrTopbarDark {
     background-color: #102B66;
-    padding: 2.5mm;
+    border-bottom: 1px solid #24407F;
+    padding: 2.2mm 3mm;
+}
+
+InitializrWordmark {
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+}
+
+InitializrWordmarkDark {
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+}
+
+/* ---------- Hero ---------- */
+InitializrHero {
+    background-color: #FFFFFF;
+    border: 1px solid #D9DEE8;
+    border-radius: 2mm;
+    padding: 3mm 3.4mm;
+    margin: 1.2mm;
+}
+
+InitializrHeroDark {
+    background-color: #102B66;
+    border: 1px solid #2A4A8A;
+    border-radius: 2mm;
+    padding: 3mm 3.4mm;
     margin: 1.2mm;
 }
 
 InitializrHeroTitle {
     color: #112247;
     font-family: "native:MainBold";
-    font-size: 4.5mm;
+    font-size: 4.8mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroTitleDark {
     color: #F5F8FF;
     font-family: "native:MainBold";
-    font-size: 4.5mm;
+    font-size: 4.8mm;
     padding: 0 0 1mm 0;
 }
 
@@ -160,6 +199,114 @@ InitializrHeroSubtitleDark {
     font-size: 2.8mm;
 }
 
+InitializrPill {
+    color: #2F6BFF;
+    background-color: #E8F0FF;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    border-radius: 4mm;
+    padding: 0.8mm 1.8mm;
+}
+
+InitializrPillDark {
+    color: #6FA0FF;
+    background-color: #15336B;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    border-radius: 4mm;
+    padding: 0.8mm 1.8mm;
+}
+
+/* ---------- Collapsible panel (card) ---------- */
+InitializrPanel {
+    background-color: #FFFFFF;
+    border: 1px solid #D9DEE8;
+    border-radius: 2mm;
+    margin: 1.2mm;
+    padding: 0;
+}
+
+InitializrPanelDark {
+    background-color: #102B66;
+    border: 1px solid #2A4A8A;
+    border-radius: 2mm;
+    margin: 1.2mm;
+    padding: 0;
+}
+
+InitializrPanelHeader {
+    background-color: transparent;
+    border: none;
+    padding: 2mm 2.6mm;
+    margin: 0;
+}
+
+InitializrPanelHeaderDark {
+    background-color: transparent;
+    border: none;
+    padding: 2mm 2.6mm;
+    margin: 0;
+}
+
+InitializrPanelTitle {
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0;
+}
+
+InitializrPanelTitleDark {
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0;
+}
+
+InitializrPanelSubtitle {
+    color: #7F8AA3;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0 0 0 1.6mm;
+}
+
+InitializrPanelSubtitleDark {
+    color: #A8B8DA;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0 0 0 1.6mm;
+}
+
+InitializrPanelChevron {
+    cn1-derive: Button;
+    color: #A0A8BA;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.4mm;
+}
+
+InitializrPanelChevronDark {
+    cn1-derive: Button;
+    color: #7E93BC;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.4mm;
+}
+
+InitializrPanelBody {
+    background-color: transparent;
+    border-top: 1px solid #D9DEE8;
+    padding: 1.4mm 2.6mm 2.4mm 2.6mm;
+}
+
+InitializrPanelBodyDark {
+    background-color: transparent;
+    border-top: 1px solid #2A4A8A;
+    padding: 1.4mm 2.6mm 2.4mm 2.6mm;
+}
+
+/* ---------- Section title (Essentials, non-collapsible) ---------- */
 InitializrSectionTitle {
     color: #112247;
     font-family: "native:MainBold";
@@ -174,37 +321,40 @@ InitializrSectionTitleDark {
     padding: 0 0 1.2mm 0;
 }
 
+/* ---------- Fields ---------- */
 InitializrFieldLabel {
     color: #7F8AA3;
     font-family: "native:MainRegular";
-    font-size: 2.4mm;
-    padding: 0.4mm 0;
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 0.2mm;
 }
 
 InitializrFieldLabelDark {
     color: #A8B8DA;
     font-family: "native:MainRegular";
-    font-size: 2.4mm;
-    padding: 0.4mm 0;
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 0.2mm;
 }
 
 InitializrField, InitializrFieldHint {
     color: #112247;
     font-family: "native:MainRegular";
-    font-size: 2.8mm;
-    background-color: #ffffff;
+    font-size: 2.9mm;
+    background-color: #FFFFFF;
     border: 1px solid #D9DEE8;
-    padding: 1.1mm;
+    border-radius: 1.5mm;
+    padding: 1.4mm;
     margin: 0 0 1.4mm 0;
 }
 
 InitializrFieldDark, InitializrFieldHintDark {
     color: #F5F8FF;
     font-family: "native:MainRegular";
-    font-size: 2.8mm;
+    font-size: 2.9mm;
     background-color: #0E2A61;
-    border: 1px solid #4C6EA8;
-    padding: 1.1mm;
+    border: 1px solid #3A5694;
+    border-radius: 1.5mm;
+    padding: 1.4mm;
     margin: 0 0 1.4mm 0;
 }
 
@@ -212,95 +362,70 @@ InitializrChoicesGrid {
     margin: 0 0 1.2mm 0;
 }
 
-AccordionItemDark {
-    cn1-derive: Button;
-    color: #F5F8FF;
-    background-color: #163575;
-    border: 1px solid #4C6EA8;
-    margin: 0.6mm 0;
-    padding: 1.2mm;
+InitializrChoicesGridDark {
+    margin: 0 0 1.2mm 0;
 }
 
-AccordionItemDark.pressed {
-    cn1-derive: Button;
-    color: #F5F8FF;
-    background-color: #112F70;
-    border: 1px solid #7390C0;
-}
-
-AccordionContentDark {
-    cn1-derive: Container;
-    background-color: #102B66;
-    border: 1px solid #4C6EA8;
-    padding: 1.2mm;
-}
-
-AccordionArrowDark {
-    cn1-derive: AccordionArrow;
-    color: #F5F8FF;
-    background-color: #163575;
-}
-
-AccordionOpenCloseIconDark {
-    cn1-derive: AccordionOpenCloseIcon;
-    color: #A8B8DA;
-    background-color: transparent;
-}
-
+/* ---------- Choice toggles ---------- */
 InitializrChoice {
-    color: #112247;
-    background-color: #E8F0FF;
-    font-family: "native:MainRegular";
+    color: #7F8AA3;
+    background-color: #FFFFFF;
+    font-family: "native:MainBold";
     font-size: 2.6mm;
     border: 1px solid #D9DEE8;
-    margin: 0.7mm;
-    padding: 1.1mm;
+    border-radius: 1.5mm;
+    margin: 0.6mm;
+    padding: 1.5mm;
     text-align: center;
 }
 
 InitializrChoice.pressed {
-    color: #ffffff;
+    color: #FFFFFF;
     background-color: #2F6BFF;
     border: 1px solid #2F6BFF;
     text-align: center;
 }
 
 InitializrChoiceDark {
-    color: #F5F8FF;
-    background-color: #163575;
-    font-family: "native:MainRegular";
+    color: #A8B8DA;
+    background-color: #0E2A61;
+    font-family: "native:MainBold";
     font-size: 2.6mm;
-    border: 1px solid #4C6EA8;
-    margin: 0.7mm;
-    padding: 1.1mm;
+    border: 1px solid #3A5694;
+    border-radius: 1.5mm;
+    margin: 0.6mm;
+    padding: 1.5mm;
     text-align: center;
 }
 
 InitializrChoiceDark.pressed {
-    color: #ffffff;
+    color: #FFFFFF;
     background-color: #4D86FF;
     border: 1px solid #4D86FF;
     text-align: center;
 }
 
+/* ---------- Summary / current settings ---------- */
 InitializrSummary {
     color: #112247;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: #FAFAFC;
+    background-color: #F3F4F7;
     border: 1px solid #D9DEE8;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    border-radius: 1.5mm;
+    padding: 1.6mm;
+    margin: 1mm 0 0 0;
 }
 
 InitializrSummaryDark {
-    color: #F5F8FF;
+    color: #DCE6FB;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: #112F70;
-    border: 1px solid #4C6EA8;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    background-color: #0B2459;
+    border: 1px solid #2A4A8A;
+    border-radius: 1.5mm;
+    padding: 1.6mm;
+    margin: 1mm 0 0 0;
 }
 
 InitializrTip {
@@ -318,22 +443,22 @@ InitializrTipDark {
 }
 
 InitializrValidationError {
-    color: #b42318;
+    color: #B42318;
     font-family: "native:MainRegular";
-    font-size: 2.2mm;
-    padding: 0 0 0.8mm 0;
+    font-size: 2.3mm;
+    padding: 0 0 0.8mm 0.2mm;
 }
 
 InitializrValidationErrorDark {
-    color: #f87171;
+    color: #F87171;
     font-family: "native:MainRegular";
-    font-size: 2.2mm;
-    padding: 0 0 0.8mm 0;
+    font-size: 2.3mm;
+    padding: 0 0 0.8mm 0.2mm;
 }
 
 InitializrHelpButton {
     cn1-derive: Button;
-    color: #7F8AA3;
+    color: #A0A8BA;
     background-color: transparent;
     border: none;
     margin: 0;
@@ -342,48 +467,173 @@ InitializrHelpButton {
 
 InitializrHelpButtonDark {
     cn1-derive: Button;
-    color: #A8B8DA;
+    color: #7E93BC;
     background-color: transparent;
     border: none;
     margin: 0;
     padding: 0.2mm;
 }
 
+/* ---------- Generate bar + primary button ---------- */
+InitializrGenerateBar {
+    background-color: #F3F4F7;
+    border-top: 1px solid #D9DEE8;
+    padding: 1.6mm 2.4mm;
+}
+
+InitializrGenerateBarDark {
+    background-color: #071B4D;
+    border-top: 1px solid #24407F;
+    padding: 1.6mm 2.4mm;
+}
+
+InitializrGenerateInfo {
+    color: #7F8AA3;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+}
+
+InitializrGenerateInfoDark {
+    color: #A8B8DA;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+}
+
+InitializrPrimaryButton {
+    color: #1A2614;
+    background-color: #B8D532;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 2mm 3.4mm;
+    margin: 0;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+InitializrPrimaryButton.pressed {
+    color: #1A2614;
+    background-color: #A2BF2C;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+InitializrPrimaryButton.disabled {
+    color: #8A9472;
+    background-color: #DDE6BC;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark {
+    color: #1A2614;
+    background-color: #B8D532;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 2mm 3.4mm;
+    margin: 0;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark.pressed {
+    color: #1A2614;
+    background-color: #A2BF2C;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark.disabled {
+    color: #5E6B49;
+    background-color: #5C6B2A;
+    border: none;
+    border-radius: 1.5mm;
+    text-align: center;
+}
+
+/* ---------- Live preview panel ---------- */
+InitializrPreviewWrap {
+    background-color: #FFFFFF;
+    border: 1px solid #D9DEE8;
+    border-radius: 2mm;
+    margin: 1.2mm;
+    padding: 2.4mm;
+}
+
+InitializrPreviewWrapDark {
+    background-color: #102B66;
+    border: 1px solid #2A4A8A;
+    border-radius: 2mm;
+    margin: 1.2mm;
+    padding: 2.4mm;
+}
+
+InitializrPreviewTitle {
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 0 0 0 1.2mm;
+}
+
+InitializrPreviewTitleDark {
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 0 0 0 1.2mm;
+}
+
+InitializrLiveDot {
+    color: #B8D532;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+InitializrLiveDotDark {
+    color: #B8D532;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+InitializrCard {
+    background-color: #FAFAFC;
+    border: 1px solid #D9DEE8;
+    border-radius: 1.5mm;
+    padding: 2mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrCardDark {
+    background-color: #112F70;
+    border: 1px solid #2A4A8A;
+    border-radius: 1.5mm;
+    padding: 2mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrPreviewHolder {
+    background-color: transparent;
+    padding: 0;
+}
+
+InitializrPreviewHolderDark {
+    background-color: transparent;
+    padding: 0;
+}
+
+/* ---------- Live (phone) preview internals ---------- */
 Images {
     background-image: url(images/grub.png),
         url(images/tweet.png);
 }
 
-InitializrPrimaryButton {
-    color: #ffffff;
-    background-color: #B8D532;
-    font-family: "native:MainBold";
-    font-size: 2.9mm;
-    padding: 1.7mm;
-    margin: 1.4mm 1.2mm;
-    border: none;
-    text-align: center;
-}
-
-InitializrPrimaryButton.pressed {
-    color: #ffffff;
-    background-color: #A2BF2C;
-    border: 1px solid #A2BF2C;
-    text-align: center;
-}
-
-InitializrSecondaryButton {
-    color: #112247;
-    background-color: #F7F8FB;
-    font-family: "native:MainRegular";
-    font-size: 2.6mm;
-    padding: 1.3mm;
-    margin: 0.8mm 0 0 0;
-    border: 1px solid #D9DEE8;
-}
-
 InitializrLiveFrame {
-    margin: 0 0 1.2mm 0;
+    margin: 0;
     border: 1px solid #D9DEE8;
     padding: 2mm;
 }

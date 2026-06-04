@@ -67,14 +67,18 @@ score is below it), `--json`. Exit codes: `0` compared (and above `--min`), `1` 
 
 ### `DesignImport.java`
 
-Parses a Figma / Sketch / Adobe XD design into a **starter** CN1 style: `theme.css`, `tokens.json`,
-and `layout.md`. Fully self-contained (embedded JSON parser, JDK only); Figma mode needs a token +
-network, the local formats need neither.
+Parses a Figma / Sketch / Adobe XD design — or an HTML/React design's CSS tokens (`tokens.css` /
+`styles.css`, e.g. a Claude-generated mockup) — into a **starter** CN1 style: `theme.css`,
+`tokens.json`, and `layout.md`. Fully self-contained (embedded JSON parser, JDK only); Figma mode
+needs a token + network, the local formats need neither.
 
 ```bash
 # Local ZIP+JSON formats
 java tools/DesignImport.java design.sketch --out target/design-import
 java tools/DesignImport.java design.xd     --out target/design-import
+# HTML/React design tokens (a tokens.css/styles.css, or a dir containing one)
+java tools/DesignImport.java tokens.css    --out target/design-import   # defaults to --px-per-mm 3.78
+java tools/DesignImport.java design-dir/   --out target/design-import
 # Figma over its REST API
 java tools/DesignImport.java figma --token "$FIGMA_TOKEN" --file FILE_KEY --out target/design-import
 ```
