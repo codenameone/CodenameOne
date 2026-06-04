@@ -124,7 +124,7 @@ public class JavaScriptBuilder extends Executor {
             File portClassesStaged = stageJavaScriptPort(request, portSources, stageClasses, portClasses);
 
             String translatorAppName = sanitizeIdentifier(request.getMainClass()) + "JavaScriptMain";
-            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass());
+            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses);
             compileLauncher(launcherJava, stageClasses, portClassesStaged);
 
             File parparvmCompilerJar = extractParparVMCompiler();
@@ -346,7 +346,14 @@ public class JavaScriptBuilder extends Executor {
         return "javac";
     }
 
-    private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass) throws IOException {
+    private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass, File stageClasses) throws IOException {
+        // If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry
+        // for this app, register the transcoded SVGs at startup -- the JS-port analogue of
+        // JavaSEPort.init's reflective installGlobal(). A DIRECT call (not reflection) is
+        // used so ParparVM's dead-code elimination keeps installGlobal reachable; it is
+        // emitted ONLY when the class exists so apps without SVGs still compile.
+        boolean hasGeneratedSvg = stageClasses != null
+                && new File(stageClasses, "com/codename1/generated/svg/SVGRegistry.class").exists();
         File f = new File(workDir, launcherName + ".java");
         PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8));
         try {
@@ -355,6 +362,9 @@ public class JavaScriptBuilder extends Executor {
             pw.println();
             pw.println("public final class " + launcherName + " {");
             pw.println("    public static void main(String[] args) {");
+            if (hasGeneratedSvg) {
+                pw.println("        com.codename1.generated.svg.SVGRegistry.installGlobal();");
+            }
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
             pw.println("    }");
             pw.println("}");

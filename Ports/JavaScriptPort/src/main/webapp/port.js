@@ -3275,10 +3275,13 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // Chart{CombinedXY,Transform,Rotated} un-parked: their prior render/capture
-  // hang was driven by chart axis/range math that the old lossy-double longs
-  // corrupted (the same bug that left chart goldens with no axis labels). Exact
-  // 64-bit longs fixed chart rendering, so re-test these here.
+  // ChartCombinedXY re-parked: exact longs did NOT fix it -- it still hangs the
+  // suite in a non-terminating form-construction/layout loop (runTest never
+  // returns, so the per-test deadline never arms). Distinct from the chart
+  // axis-label bug that exact longs DID fix. Needs its own non-termination fix.
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
+  // Transform + Rotated kept UN-parked -- never reached on the prior run
+  // (CombinedXY hung first); testing whether they render now.
   // Two more late-suite tests that hit the canvas-accumulation
   // threshold and hang waiting for SCREENSHOT_DONE. On the run that
   // didn't get this far they finish cleanly, but the canary-test
@@ -3381,8 +3384,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // Chart{CombinedXY,Transform,Rotated} un-parked -- see note in
-  // cn1ssForcedTimeoutTestClasses above (exact-long fix to chart rendering).
+  // ChartCombinedXY re-parked (non-terminating layout loop); Transform + Rotated
+  // kept un-parked -- see note in cn1ssForcedTimeoutTestClasses above.
+  "ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
   "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
