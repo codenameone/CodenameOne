@@ -578,6 +578,7 @@ InitializrHelpPopupTitle {
     color: #112247;
     font-family: "Inter SemiBold";
     font-size: 2.9mm;
+    text-align: center;
 }
 
 InitializrHelpPopupTitleDark {
@@ -585,6 +586,7 @@ InitializrHelpPopupTitleDark {
     color: #F5F8FF;
     font-family: "Inter SemiBold";
     font-size: 2.9mm;
+    text-align: center;
 }
 
 InitializrHelpPopupBody {
