@@ -1037,7 +1037,7 @@ const jvm = {
             // suspended; if one ever does land here it will just
             // misbehave, same as before).
             if (step.value && (
-                (step.value.op === "sleep" && (step.value.millis | 0) > 0)
+                (step.value.op === "sleep" && (Number(step.value.millis) | 0) > 0)
                 || step.value.op === "wait")) {
               throw new Error("Blocking static initializers are not supported in javascript backend");
             }
@@ -2827,7 +2827,9 @@ const jvm = {
       return;
     }
     if (yielded.op === "sleep") {
-      const millis = Math.max(0, yielded.millis | 0);
+      // millis originates from Thread.sleep(long) -> BigInt; coerce to a Number
+      // before the scheduler's Number-domain timer arithmetic (avoids BigInt mix).
+      const millis = Math.max(0, Number(yielded.millis) | 0);
       if (millis === 0) {
         // Thread.yield / Thread.sleep(0) is just a co-operative hand-off
         // to the next runnable green thread; no real-time delay needed.
@@ -2842,8 +2844,10 @@ const jvm = {
     if (yielded.op === "wait") {
       const waiter = { thread: thread, monitor: yielded.monitor, reentryCount: yielded.reentryCount };
       yielded.monitor.__monitor.waiters.push(waiter);
-      if (yielded.timeout > 0) {
-        const entry = { kind: "wait", waiter: waiter, wakeAt: this.schedulerNow() + yielded.timeout, cancelled: false };
+      // timeout originates from Object.wait(long) -> BigInt; coerce to Number.
+      const waitTimeout = Number(yielded.timeout) | 0;
+      if (waitTimeout > 0) {
+        const entry = { kind: "wait", waiter: waiter, wakeAt: this.schedulerNow() + waitTimeout, cancelled: false };
         waiter.timedEntry = entry;
         this._scheduleTimedWakeup(entry);
       }
@@ -2980,7 +2984,7 @@ const jvm = {
       monitor.count = next.reentryCount;
       this.enqueue(next.thread, next.resumeValue);
     }
-    return { op: "wait", monitor: obj, timeout: timeout | 0, reentryCount: reentryCount };
+    return { op: "wait", monitor: obj, timeout: Number(timeout) | 0, reentryCount: reentryCount };
   },
   notifyOne(obj) {
     const monitor = obj.__monitor || (obj.__monitor = this.createMonitor());
@@ -4007,6 +4011,7 @@ function normalizeTimeZoneId(name) {
   return value ? value : defaultTimeZoneId();
 }
 function timezoneDateParts(timeZone, millis) {
+  millis = Number(millis); // millis may be a Java long (BigInt); Date needs a Number
   const format = new Intl.DateTimeFormat("en-US", {
     timeZone: timeZone,
     year: "numeric",
@@ -4027,6 +4032,7 @@ function timezoneDateParts(timeZone, millis) {
   return out;
 }
 function timezoneOffsetMillis(timeZone, millis) {
+  millis = Number(millis); // millis may be a Java long (BigInt)
   if (timeZone === "GMT" || typeof Intl === "undefined" || !Intl.DateTimeFormat) {
     return 0;
   }
@@ -4453,7 +4459,7 @@ bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___lon
 bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function*() { return null; });
 bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function*(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
 bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function*(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
-bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return jvm.currentThread ? jvm.currentThread.id : 0; });
+bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return BigInt(jvm.currentThread ? jvm.currentThread.id : 0); });
 bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function*() { return null; });
 bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], function*(__cn1ThisObject) {
   const tid = jvm.nextThreadId;
