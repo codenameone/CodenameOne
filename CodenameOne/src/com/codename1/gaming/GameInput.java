@@ -62,7 +62,7 @@ public class GameInput {
     }
 
     void keyDown(int keyCode) {
-        Integer k = new Integer(keyCode);
+        Integer k = Integer.valueOf(keyCode);
         if (!keysDown.contains(k)) {
             keysDown.add(k);
             pressedEdge.add(k);
@@ -70,7 +70,7 @@ public class GameInput {
     }
 
     void keyUp(int keyCode) {
-        Integer k = new Integer(keyCode);
+        Integer k = Integer.valueOf(keyCode);
         keysDown.remove(k);
         releasedEdge.add(k);
     }
@@ -103,17 +103,17 @@ public class GameInput {
     /// - `keyCode`: a Codename One key code as delivered to
     /// `com.codename1.ui.Component#keyPressed(int)`
     public boolean isKeyDown(int keyCode) {
-        return keysDown.contains(new Integer(keyCode));
+        return keysDown.contains(Integer.valueOf(keyCode));
     }
 
     /// Returns true during the single frame in which the given key went down.
     public boolean wasKeyPressed(int keyCode) {
-        return pressedEdge.contains(new Integer(keyCode));
+        return pressedEdge.contains(Integer.valueOf(keyCode));
     }
 
     /// Returns true during the single frame in which the given key was released.
     public boolean wasKeyReleased(int keyCode) {
-        return releasedEdge.contains(new Integer(keyCode));
+        return releasedEdge.contains(Integer.valueOf(keyCode));
     }
 
     /// Returns true while any currently held key maps to the given game action.

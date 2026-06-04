@@ -70,6 +70,24 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         Slot[] ring;
     }
 
+    /// Restarts a looping voice from the EDT (scheduled from the off-EDT media
+    /// completion callback).
+    private static final class RestartVoice implements Runnable {
+        private final Slot slot;
+
+        RestartVoice(Slot slot) {
+            this.slot = slot;
+        }
+
+        public void run() {
+            try {
+                slot.media.setTime(0);
+            } catch (Throwable t) {
+            }
+            slot.media.play();
+        }
+    }
+
     private Media newMedia(Sound s, final Slot slot) throws IOException {
         Runnable onComplete = new Runnable() {
             public void run() {
@@ -138,7 +156,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         free.busy = true;
         free.voiceId = vid;
         free.loopsRemaining = loop;
-        voices.put(new Integer(vid), free);
+        voices.put(Integer.valueOf(vid), free);
         activeVoices++;
         applyVolume(free.media, volume);
         try {
@@ -161,18 +179,10 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
                 if (slot.loopsRemaining > 0) {
                     slot.loopsRemaining--;
                 }
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        try {
-                            slot.media.setTime(0);
-                        } catch (Throwable t) {
-                        }
-                        slot.media.play();
-                    }
-                });
+                Display.getInstance().callSerially(new RestartVoice(slot));
                 return;
             }
-            voices.remove(new Integer(slot.voiceId));
+            voices.remove(Integer.valueOf(slot.voiceId));
             slot.busy = false;
             activeVoices--;
         }
@@ -193,7 +203,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
     }
 
     public synchronized void setVolume(int voiceId, float volume) {
-        Slot slot = (Slot) voices.get(new Integer(voiceId));
+        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
             applyVolume(slot.media, volume);
         }
@@ -208,21 +218,21 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
     }
 
     public synchronized void pauseVoice(int voiceId) {
-        Slot slot = (Slot) voices.get(new Integer(voiceId));
+        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
             slot.media.pause();
         }
     }
 
     public synchronized void resumeVoice(int voiceId) {
-        Slot slot = (Slot) voices.get(new Integer(voiceId));
+        Slot slot = (Slot) voices.get(Integer.valueOf(voiceId));
         if (slot != null) {
             slot.media.play();
         }
     }
 
     public synchronized void stopVoice(int voiceId) {
-        Slot slot = (Slot) voices.remove(new Integer(voiceId));
+        Slot slot = (Slot) voices.remove(Integer.valueOf(voiceId));
         if (slot != null && slot.busy) {
             stopSlot(slot);
             activeVoices--;
@@ -279,7 +289,7 @@ class MediaSoundPoolPeer implements SoundPoolPeer {
         for (int j = 0; j < s.ring.length; j++) {
             Slot slot = s.ring[j];
             if (slot.busy) {
-                voices.remove(new Integer(slot.voiceId));
+                voices.remove(Integer.valueOf(slot.voiceId));
                 activeVoices--;
                 slot.busy = false;
             }

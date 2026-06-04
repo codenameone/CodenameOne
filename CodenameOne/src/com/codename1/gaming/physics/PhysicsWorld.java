@@ -206,7 +206,7 @@ public class PhysicsWorld {
     /// Fans Box2D contact callbacks out to the registered CN1 listeners. Box2D calls
     /// these from inside step(), i.e. on the game loop / EDT, so no marshalling is
     /// needed.
-    private final class ContactDispatcher implements com.codename1.gaming.physics.box2d.callbacks.ContactListener {
+    private static final class ContactDispatcher implements com.codename1.gaming.physics.box2d.callbacks.ContactListener {
         private final List listeners = new ArrayList();
 
         void add(ContactListener l) {
