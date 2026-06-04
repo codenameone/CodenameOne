@@ -15,7 +15,7 @@ The desktop integration features make a desktop build *feel* like a desktop app:
   click-to-page on the track, a minimum thumb size so it stays easy to grab on long content, a
   reserved gutter so content isn't drawn under the bar, and an always-visible (rather than
   fading) scrollbar.
-* Keyboard accelerators on the native menu items (Cmd+S / Ctrl+S, ...).
+* Keyboard accelerators on the native menu items (a Save shortcut, a Quit shortcut, and so on).
 * Native desktop notifications driven by the standard `LocalNotification` API.
 
 These behaviors are *opt-in*. They're switched on by default for newly generated projects
