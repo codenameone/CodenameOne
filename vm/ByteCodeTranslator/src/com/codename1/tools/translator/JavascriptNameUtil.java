@@ -167,6 +167,10 @@ final class JavascriptNameUtil {
         }
         char type = desc.charAt(0);
         switch (type) {
+            // Java long == JS BigInt: a long field/local/array default is 0n, not 0,
+            // so it never enters long arithmetic as a Number (avoids BigInt/Number mix).
+            case 'J':
+                return "0n";
             case 'Z':
             case 'C':
             case 'F':
@@ -174,7 +178,6 @@ final class JavascriptNameUtil {
             case 'B':
             case 'S':
             case 'I':
-            case 'J':
                 return "0";
             default:
                 return "null";

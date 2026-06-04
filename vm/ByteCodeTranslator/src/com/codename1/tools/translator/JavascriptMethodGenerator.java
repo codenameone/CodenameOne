@@ -757,6 +757,10 @@ final class JavascriptMethodGenerator {
         if (value instanceof Boolean) {
             return ((Boolean) value).booleanValue() ? "1" : "0";
         }
+        if (value instanceof Long) {
+            // Java long == JS BigInt: a static final long constant is a BigInt literal.
+            return value.toString() + "n";
+        }
         if (value instanceof Number) {
             return value.toString();
         }
@@ -2922,10 +2926,10 @@ final class JavascriptMethodGenerator {
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getOpcode() - Opcodes.ICONST_0))).append(";\n");
                 return true;
             case Opcodes.LCONST_0:
-                out.append("  ").append(ctx.push("0")).append(";\n");
+                out.append("  ").append(ctx.push("0n")).append(";\n");
                 return true;
             case Opcodes.LCONST_1:
-                out.append("  ").append(ctx.push("1")).append(";\n");
+                out.append("  ").append(ctx.push("1n")).append(";\n");
                 return true;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -3065,66 +3069,72 @@ final class JavascriptMethodGenerator {
             case Opcodes.IMUL:
                 return emitBinary(out, ctx, "((%s|0) * (%s|0))");
             case Opcodes.LADD:
+                return emitBinary(out, ctx, "_Ladd(%s, %s)");
             case Opcodes.FADD:
             case Opcodes.DADD:
                 return emitBinary(out, ctx, "(%s + %s)");
             case Opcodes.LSUB:
+                return emitBinary(out, ctx, "_Lsub(%s, %s)");
             case Opcodes.FSUB:
             case Opcodes.DSUB:
                 return emitBinary(out, ctx, "(%s - %s)");
             case Opcodes.LMUL:
+                return emitBinary(out, ctx, "_Lmul(%s, %s)");
             case Opcodes.FMUL:
             case Opcodes.DMUL:
                 return emitBinary(out, ctx, "(%s * %s)");
             case Opcodes.IDIV:
                 return emitBinary(out, ctx, "(((%s|0) / (%s|0)) | 0)");
             case Opcodes.LDIV:
-                return emitBinary(out, ctx, "Math.trunc(%s / %s)");
+                return emitBinary(out, ctx, "_Ldiv(%s, %s)");
             case Opcodes.FDIV:
             case Opcodes.DDIV:
                 return emitBinary(out, ctx, "(%s / %s)");
             case Opcodes.IREM:
                 return emitBinary(out, ctx, "((%s|0) %% (%s|0))");
             case Opcodes.LREM:
+                return emitBinary(out, ctx, "_Lrem(%s, %s)");
             case Opcodes.FREM:
             case Opcodes.DREM:
                 return emitBinary(out, ctx, "(%s %% %s)");
             case Opcodes.INEG:
                 return emitUnary(out, ctx, "-(%s|0)");
             case Opcodes.LNEG:
+                return emitUnary(out, ctx, "_Lneg(%s)");
             case Opcodes.FNEG:
             case Opcodes.DNEG:
                 return emitUnary(out, ctx, "-%s");
             case Opcodes.ISHL:
                 return emitBinary(out, ctx, "((%s|0) << (%s & 31))");
             case Opcodes.LSHL:
-                return emitBinary(out, ctx, "(%s * Math.pow(2, %s & 63))");
+                return emitBinary(out, ctx, "_Lshl(%s, %s)");
             case Opcodes.ISHR:
                 return emitBinary(out, ctx, "((%s|0) >> (%s & 31))");
             case Opcodes.LSHR:
-                return emitBinary(out, ctx, "Math.trunc(%s / Math.pow(2, %s & 63))");
+                return emitBinary(out, ctx, "_Lshr(%s, %s)");
             case Opcodes.IUSHR:
                 return emitBinary(out, ctx, "((%s >>> (%s & 31)) | 0)");
             case Opcodes.LUSHR:
-                return emitBinary(out, ctx, "Math.floor((%s < 0 ? %s + 18446744073709551616 : %s) / Math.pow(2, %s & 63))",
-                        true);
+                return emitBinary(out, ctx, "_Lushr(%s, %s)");
             case Opcodes.IAND:
                 return emitBinary(out, ctx, "((%s|0) & (%s|0))");
             case Opcodes.LAND:
-                return emitBinary(out, ctx, "(%s & %s)");
+                return emitBinary(out, ctx, "_Land(%s, %s)");
             case Opcodes.IOR:
                 return emitBinary(out, ctx, "((%s|0) | (%s|0))");
             case Opcodes.LOR:
-                return emitBinary(out, ctx, "(%s | %s)");
+                return emitBinary(out, ctx, "_Lor(%s, %s)");
             case Opcodes.IXOR:
                 return emitBinary(out, ctx, "((%s|0) ^ (%s|0))");
             case Opcodes.LXOR:
-                return emitBinary(out, ctx, "(%s ^ %s)");
+                return emitBinary(out, ctx, "_Lxor(%s, %s)");
             case Opcodes.I2L:
-            case Opcodes.I2F:
-            case Opcodes.I2D:
+                return emitUnary(out, ctx, "_Li2l(%s)");
             case Opcodes.L2F:
             case Opcodes.L2D:
+                return emitUnary(out, ctx, "_Ll2d(%s)");
+            case Opcodes.I2F:
+            case Opcodes.I2D:
             case Opcodes.F2D:
             case Opcodes.D2F:
                 return true;
@@ -3135,14 +3145,15 @@ final class JavascriptMethodGenerator {
             case Opcodes.I2S:
                 return emitUnary(out, ctx, "((%s << 16) >> 16)");
             case Opcodes.L2I:
+                return emitUnary(out, ctx, "_Ll2i(%s)");
             case Opcodes.F2I:
             case Opcodes.D2I:
                 return emitUnary(out, ctx, "(%s | 0)");
             case Opcodes.F2L:
             case Opcodes.D2L:
-                return true;
+                return emitUnary(out, ctx, "_Ld2l(%s)");
             case Opcodes.LCMP:
-                return emitBinary(out, ctx, "(%s < %s ? -1 : (%s > %s ? 1 : 0))", true);
+                return emitBinary(out, ctx, "_Lcmp(%s, %s)");
             case Opcodes.FCMPL:
             case Opcodes.DCMPL:
                 return emitBinary(out, ctx, "((isNaN(%s) || isNaN(%s)) ? -1 : (%s < %s ? -1 : (%s > %s ? 1 : 0)))", true);
@@ -3257,7 +3268,13 @@ final class JavascriptMethodGenerator {
             out.append("  ").append(ctx.push("_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
             return true;
         }
-        if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
+        if (value instanceof Long) {
+            // Java long == JS BigInt: emit a BigInt literal (``123n``). value.toString()
+            // never has a fractional part, so "<digits>n" / "-<digits>n" is always valid.
+            out.append("  ").append(ctx.push(value.toString() + "n")).append(";\n");
+            return true;
+        }
+        if (value instanceof Integer || value instanceof Float || value instanceof Double) {
             out.append("  ").append(ctx.push(value.toString())).append(";\n");
             return true;
         }
@@ -4182,10 +4199,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_0:
-                out.append("        stack.p(0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(0n); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_1:
-                out.append("        stack.p(1); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(1n); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -4259,13 +4276,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) * (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LADD:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a + b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ladd(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSUB:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a - b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lsub(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LMUL:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lmul(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FADD:
             case Opcodes.DADD:
@@ -4283,7 +4300,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LDIV:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.trunc(a / b)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Ldiv(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FDIV:
             case Opcodes.DDIV:
@@ -4293,7 +4310,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LREM:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a % b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lrem(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FREM:
             case Opcodes.DREM:
@@ -4303,7 +4320,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p(-(stack.q()|0)); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LNEG:
-                out.append("        stack.p(-stack.q()); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(_Lneg(stack.q())); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FNEG:
             case Opcodes.DNEG:
@@ -4313,39 +4330,41 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) << (b & 31)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSHL:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a * Math.pow(2, b & 63)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lshl(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.ISHR:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) >> (b & 31)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LSHR:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.trunc(a / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lshr(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IUSHR:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a >>> (b & 31)) | 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LUSHR:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(Math.floor((a < 0 ? a + 18446744073709551616 : a) / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lushr(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IAND:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) & (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LAND:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a & b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Land(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IOR:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) | (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LOR:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a | b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lor(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IXOR:
                 out.append("        { let b = stack.q(); let a = stack.q(); stack.p((a|0) ^ (b|0)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LXOR:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a ^ b); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lxor(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.I2L:
+                out.append("        stack.p(_Li2l(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
             case Opcodes.F2D:
             case Opcodes.D2F:
                 out.append("        pc = ").append(index + 1).append("; break;\n");
@@ -4360,20 +4379,26 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 out.append("        stack.p((stack.q() << 16) >> 16); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.L2I:
+                out.append("        stack.p(_Ll2i(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
             case Opcodes.F2I:
             case Opcodes.D2I:
                 out.append("        stack.p(stack.q() | 0); pc = ").append(index + 1).append("; break;\n");
                 return;
-            case Opcodes.I2F:
-            case Opcodes.I2D:
             case Opcodes.L2F:
             case Opcodes.L2D:
+                out.append("        stack.p(_Ll2d(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
             case Opcodes.F2L:
             case Opcodes.D2L:
+                out.append("        stack.p(_Ld2l(stack.q())); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.I2F:
+            case Opcodes.I2D:
                 out.append("        pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCMP:
-                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(a < b ? -1 : (a > b ? 1 : 0)); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { let b = stack.q(); let a = stack.q(); stack.p(_Lcmp(a, b)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.FCMPL:
             case Opcodes.DCMPL:
@@ -4495,7 +4520,12 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     .append(JavascriptNameUtil.escapeJs((String) value)).append("\")); pc = ").append(index + 1).append("; break;\n");
             return;
         }
-        if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
+        if (value instanceof Long) {
+            // Java long == JS BigInt: emit a BigInt literal.
+            out.append("        stack.p(").append(value.toString()).append("n); pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (value instanceof Integer || value instanceof Float || value instanceof Double) {
             out.append("        stack.p(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }

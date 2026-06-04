@@ -3360,6 +3360,41 @@ global._A = jvm.aL;
 global._T = jvm.aS;
 global._N = jvm.aN;
 global._F = jvm.fr;
+// === Exact 64-bit Java long arithmetic (Java ``long`` == JS BigInt) ===
+// The JS port historically modelled ``long`` as a double, so any 64-bit math
+// (SHA-384/512, bit twiddling, large timestamps) silently lost precision past
+// 2^53 and bitwise long ops truncated to 32 bits. Longs are now BigInt.
+// ``_Lc`` coerces any value entering a long op to BigInt and is deliberately
+// tolerant: a Number (ints share the value space with longs because I2L used
+// to be a no-op), null (an uninitialised long[] element or long field/local
+// default), or an already-BigInt long. This tolerance is what keeps a single
+// missed widening from throwing "Cannot mix BigInt and other types".
+const _Lc = (x) => typeof x === 'bigint' ? x : (x == null ? 0n : BigInt(typeof x === 'number' ? Math.trunc(x) : x));
+const _Lw = (x) => BigInt.asIntN(64, x); // wrap to signed 64-bit (Java overflow semantics)
+global._Lc = _Lc;
+global._Ladd = (a, b) => _Lw(_Lc(a) + _Lc(b));
+global._Lsub = (a, b) => _Lw(_Lc(a) - _Lc(b));
+global._Lmul = (a, b) => _Lw(_Lc(a) * _Lc(b));
+global._Ldiv = (a, b) => _Lw(_Lc(a) / _Lc(b)); // BigInt / truncates toward zero, matching Java
+global._Lrem = (a, b) => _Lw(_Lc(a) % _Lc(b));
+global._Lneg = (a) => _Lw(-_Lc(a));
+global._Land = (a, b) => _Lw(_Lc(a) & _Lc(b));
+global._Lor = (a, b) => _Lw(_Lc(a) | _Lc(b));
+global._Lxor = (a, b) => _Lw(_Lc(a) ^ _Lc(b));
+global._Lshl = (a, b) => _Lw(_Lc(a) << (_Lc(b) & 63n));
+global._Lshr = (a, b) => _Lw(_Lc(a) >> (_Lc(b) & 63n)); // arithmetic (sign-propagating) shift
+global._Lushr = (a, b) => _Lw(BigInt.asUintN(64, _Lc(a)) >> (_Lc(b) & 63n));
+global._Lcmp = (a, b) => { const x = _Lc(a), y = _Lc(b); return x < y ? -1 : (x > y ? 1 : 0); }; // -> int
+global._Li2l = (x) => _Lw(BigInt(x | 0)); // int -> long
+global._Ll2i = (x) => Number(BigInt.asIntN(32, _Lc(x))); // long -> int (low 32 bits)
+global._Ll2d = (x) => Number(_Lc(x)); // long -> float/double
+global._Ld2l = (x) => { // float/double -> long (NaN->0, saturate to range, truncate toward zero)
+  if (typeof x === 'bigint') return _Lw(x);
+  if (Number.isNaN(x)) return 0n;
+  if (x >= 9223372036854775807) return 9223372036854775807n;
+  if (x <= -9223372036854775808) return -9223372036854775808n;
+  return BigInt(Math.trunc(x));
+};
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration
 // (1590 calls, 3-char savings).
@@ -3892,10 +3927,9 @@ function* runtimeFormatTokenValue(token, value) {
   }
   if (token === "%d" || token === "%i") {
     const primitive = runtimeBoxedPrimitiveValue(value);
-    if (primitive != null) {
-      return String(Math.trunc(Number(primitive)));
-    }
-    return String(Math.trunc(Number(value == null ? 0 : value)));
+    const numeric = primitive != null ? primitive : (value == null ? 0 : value);
+    // A long is a BigInt -- print it exactly; Number(bigint) would lose >2^53.
+    return typeof numeric === "bigint" ? numeric.toString() : String(Math.trunc(Number(numeric)));
   }
   if (token === "%f") {
     const primitive = runtimeBoxedPrimitiveValue(value);
@@ -3945,17 +3979,18 @@ function floatFromIntBits(bits) {
 }
 function longBitsFromDouble(value) {
   const view = new DataView(new ArrayBuffer(8));
-  view.setFloat64(0, value, false);
+  view.setFloat64(0, Number(value), false);
   const hi = view.getUint32(0, false);
   const lo = view.getUint32(4, false);
-  return (hi * 4294967296) + lo;
+  // long == BigInt: combine the halves exactly (the old ``hi*2^32+lo`` Number
+  // could not represent the full 64-bit pattern -> the SHA-512 garbage).
+  return BigInt.asIntN(64, (BigInt(hi) << 32n) | BigInt(lo));
 }
 function doubleFromLongBits(bits) {
-  const hi = Math.floor(bits / 4294967296);
-  const lo = bits >>> 0;
+  const u = BigInt.asUintN(64, _Lc(bits));
   const view = new DataView(new ArrayBuffer(8));
-  view.setUint32(0, hi >>> 0, false);
-  view.setUint32(4, lo, false);
+  view.setUint32(0, Number(u >> 32n) >>> 0, false);
+  view.setUint32(4, Number(u & 0xffffffffn) >>> 0, false);
   return view.getFloat64(0, false);
 }
 function defaultTimeZoneId() {
@@ -4445,7 +4480,7 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   jvm.spawn(__cn1ThisObject, generator);
   return null;
 });
-bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return Date.now(); });
+bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return BigInt(Date.now()); });
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
@@ -4455,8 +4490,8 @@ bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], f
 bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function*() { return null; });
 bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function*() { return 0; });
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function*(status) { jvm.finish(status); return null; });
-bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return 67108864; });
-bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return 33554432; });
+bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return 67108864n; });
+bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return 33554432n; });
 bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) {
   const prevLimit = Error.stackTraceLimit;
   try { Error.stackTraceLimit = 200; } catch (_l) {}
@@ -4468,17 +4503,17 @@ bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function*(__
 bindNative(["cn1_java_lang_Math_abs_double_R_double"], function*(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_float_R_float"], function*(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_int_R_int"], function*(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { const x = _Lc(v); return BigInt.asIntN(64, x < 0n ? -x : x); });
 bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function*(v) { return Math.ceil(v); });
 bindNative(["cn1_java_lang_Math_floor_double_R_double"], function*(v) { return Math.floor(v); });
 bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function*(a, b) { return Math.max(a, b); });
 bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function*(a, b) { return Math.max(a, b); });
 bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function*(a, b) { return Math.max(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { const x = _Lc(a), y = _Lc(b); return x > y ? x : y; });
 bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function*(a, b) { return Math.min(a, b); });
 bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function*(a, b) { return Math.min(a, b); });
 bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function*(a, b) { return Math.min(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { const x = _Lc(a), y = _Lc(b); return x < y ? x : y; });
 bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function*(a, b) { return Math.pow(a, b); });
 bindNative(["cn1_java_lang_Math_cos_double_R_double"], function*(v) { return Math.cos(v); });
 bindNative(["cn1_java_lang_Math_sin_double_R_double"], function*(v) { return Math.sin(v); });
@@ -4487,7 +4522,7 @@ bindNative(["cn1_java_lang_Math_tan_double_R_double"], function*(v) { return Mat
 bindNative(["cn1_java_lang_Math_atan_double_R_double"], function*(v) { return Math.atan(v); });
 bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function*(v) { return createJavaString(String(v | 0)); });
 bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function*(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(Math.trunc(v).toString((radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(_Lc(v).toString((radix | 0) || 10)); });
 bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function*(v) { return intBitsFromFloat(v); });
@@ -4498,7 +4533,7 @@ bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function*(bi
 bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function*(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(Math.trunc(value))); });
+bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _Lc(value).toString()); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function*(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
 bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function*(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
