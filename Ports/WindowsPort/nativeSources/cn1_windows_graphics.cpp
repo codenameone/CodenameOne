@@ -429,6 +429,16 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fillRoundRect___long_int_int_
 static ID2D1PathGeometry* cn1WinBuildArcGeometry(CN1Graphics* g, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT startAngle, JAVA_INT arcAngle, JAVA_BOOLEAN pie) {
     ID2D1PathGeometry* geom = NULL;
     ID2D1GeometrySink* sink = NULL;
+    /* A zero/negative-size arc draws nothing in AWT/Codename One -- but feeding a
+     * negative radius into D2D1_ARC_SEGMENT yields an invalid arc that faults the
+     * sink and poisons the whole render-target batch (every later draw in the same
+     * BeginDraw/EndDraw is then silently dropped). graphics-draw-arc shrinks the
+     * arc to w-iter*2 / h-iter*2, which goes negative once iter passes h/2 in a
+     * landscape cell; without this guard the first cell's degenerate inner arcs
+     * killed every later grid cell painted into the same mutable-image frame. */
+    if (w <= 0 || h <= 0) {
+        return NULL;
+    }
     float cx = (float)x + (float)w / 2.0f;
     float cy = (float)y + (float)h / 2.0f;
     float rx = (float)w / 2.0f;
