@@ -69,6 +69,12 @@ public class NativeAdLoader {
     /// - `onError`: invoked on failure
     public void load(AdRequest request, final SuccessCallback<NativeAd> onSuccess,
                      final SuccessCallback<AdError> onError) {
+        loadInternal(adUnitId, request, onSuccess, onError);
+    }
+
+    private static void loadInternal(String adUnitId, AdRequest request,
+                                     final SuccessCallback<NativeAd> onSuccess,
+                                     final SuccessCallback<AdError> onError) {
         AdProvider provider = AdManager.getProvider();
         if (!(provider instanceof NativeAdProvider) || !provider.isFormatSupported(AdFormat.NATIVE)) {
             AbstractFullScreenAd.runOnEdt(new Runnable() {
