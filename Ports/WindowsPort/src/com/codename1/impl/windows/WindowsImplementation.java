@@ -488,7 +488,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isPerspectiveTransformSupported() {
-        return false;
+        return true;
     }
 
     @Override
@@ -498,81 +498,149 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isPerspectiveTransformSupported(Object graphics) {
-        return false;
+        return true;
     }
 
+    // The transform SPI is backed by Matrix (a pure-Java 4x4, shared with the iOS
+    // port). A 4x4 is required because the 3D test content (graphics-transform-
+    // perspective / -camera) composes makeIdentity -> translate/scale/rotate over
+    // a real z axis -> concatenate(makePerspective) and projects the model corners
+    // through transformPoint, which performs the homogeneous (w) divide. The
+    // Direct2D render target itself stays a 2D affine: setTransform(graphics, ...)
+    // extracts the affine sub-matrix for the native layer, while any perspective
+    // projection happens here in Java (transformPoint) before a primitive is drawn.
     @Override
     public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
-        return new double[] { m00, m10, m01, m11, m02, m12 };
+        return Matrix.make(new float[] {
+            (float) m00, (float) m10, 0, 0,
+            (float) m01, (float) m11, 0, 0,
+            0, 0, 1, 0,
+            (float) m02, (float) m12, 0, 1
+        });
     }
 
     @Override
     public void setTransformAffine(Object nt, double m00, double m10, double m01, double m11, double m02, double m12) {
-        setAff((double[]) nt, m00, m10, m01, m11, m02, m12);
+        ((Matrix) nt).setData(new float[] {
+            (float) m00, (float) m10, 0, 0,
+            (float) m01, (float) m11, 0, 0,
+            0, 0, 1, 0,
+            (float) m02, (float) m12, 0, 1
+        });
     }
 
     @Override
     public Object makeTransformTranslation(float x, float y, float z) {
-        return new double[] { 1, 0, 0, 1, x, y };
+        return Matrix.makeTranslation(x, y, z);
     }
 
     @Override
     public void setTransformTranslation(Object nt, float x, float y, float z) {
-        setAff((double[]) nt, 1, 0, 0, 1, x, y);
+        ((Matrix) nt).setTranslation(x, y, z);
     }
 
     @Override
     public Object makeTransformScale(float sx, float sy, float sz) {
-        return new double[] { sx, 0, 0, sy, 0, 0 };
+        Matrix out = Matrix.makeIdentity();
+        out.scale(sx, sy, sz);
+        return out;
     }
 
     @Override
     public void setTransformScale(Object nt, float sx, float sy, float sz) {
-        setAff((double[]) nt, sx, 0, 0, sy, 0, 0);
+        Matrix out = (Matrix) nt;
+        out.setIdentity();
+        out.scale(sx, sy, sz);
     }
 
     @Override
     public Object makeTransformRotation(float angle, float x, float y, float z) {
-        return rot(angle, x, y);
+        return Matrix.makeRotation(angle, x, y, z);
     }
 
     @Override
     public void setTransformRotation(Object nt, float angle, float x, float y, float z) {
-        System.arraycopy(rot(angle, x, y), 0, (double[]) nt, 0, 6);
+        Matrix m = (Matrix) nt;
+        m.setIdentity();
+        m.rotate(angle, x, y, z);
+    }
+
+    @Override
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        return Matrix.makePerspective(fovy, aspect, zNear, zFar);
+    }
+
+    @Override
+    public void setTransformPerspective(Object nt, float fovy, float aspect, float zNear, float zFar) {
+        ((Matrix) nt).setPerspective(fovy, aspect, zNear, zFar);
+    }
+
+    @Override
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        return Matrix.makeOrtho(left, right, bottom, top, near, far);
+    }
+
+    @Override
+    public void setTransformOrtho(Object nt, float left, float right, float bottom, float top, float near, float far) {
+        ((Matrix) nt).setOrtho(left, right, bottom, top, near, far);
+    }
+
+    @Override
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        return Matrix.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
+
+    @Override
+    public void setTransformCamera(Object nt, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        ((Matrix) nt).setCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
+
+    @Override
+    public void transformRotate(Object nt, float angle, float x, float y, float z) {
+        ((Matrix) nt).rotate(angle, x, y, z);
+    }
+
+    @Override
+    public void transformTranslate(Object nt, float x, float y, float z) {
+        ((Matrix) nt).translate(x, y, z);
+    }
+
+    @Override
+    public void transformScale(Object nt, float x, float y, float z) {
+        ((Matrix) nt).scale(x, y, z);
     }
 
     @Override
     public Object makeTransformIdentity() {
-        return new double[] { 1, 0, 0, 1, 0, 0 };
+        return Matrix.makeIdentity();
     }
 
     @Override
     public void setTransformIdentity(Object nt) {
-        setAff((double[]) nt, 1, 0, 0, 1, 0, 0);
+        ((Matrix) nt).setIdentity();
     }
 
     @Override
     public Object makeTransformInverse(Object nt) {
-        return invert((double[]) nt);
+        Matrix copy = ((Matrix) nt).copy();
+        return copy.invert() ? copy : null;
     }
 
     @Override
     public void setTransformInverse(Object nt) throws com.codename1.ui.Transform.NotInvertibleException {
-        double[] r = invert((double[]) nt);
-        if (r == null) {
+        if (!((Matrix) nt).invert()) {
             throw new com.codename1.ui.Transform.NotInvertibleException();
         }
-        System.arraycopy(r, 0, (double[]) nt, 0, 6);
     }
 
     @Override
     public void copyTransform(Object src, Object dest) {
-        System.arraycopy((double[]) src, 0, (double[]) dest, 0, 6);
+        ((Matrix) dest).setData(((Matrix) src).getData());
     }
 
     @Override
     public void concatenateTransform(Object t1, Object t2) {
-        System.arraycopy(mul((double[]) t1, (double[]) t2), 0, (double[]) t1, 0, 6);
+        ((Matrix) t1).concatenate((Matrix) t2);
     }
 
     @Override
@@ -583,45 +651,22 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (t2 == null) {
             return false;
         }
-        return java.util.Arrays.equals((double[]) t1, (double[]) t2);
+        return java.util.Arrays.equals(((Matrix) t1).getData(), ((Matrix) t2).getData());
     }
 
-    // Apply the stored 2D affine [m00,m10,m01,m11,m02,m12] to a point. Without
-    // this (and transformPoints) the base implementation throws "Transforms not
-    // supported", which the lightweight Picker's 3D Scene hits while projecting
-    // its wheel bounds -- the throw propagates through the paint pipeline and
-    // wedges the EDT in a repaint loop. z (and any further coords) pass through
-    // unchanged since the port is affine-only (no perspective).
+    // Project a point through the 4x4, performing the homogeneous (w) divide so a
+    // perspective transform foreshortens correctly. The base implementation throws
+    // "Transforms not supported", which the lightweight Picker's 3D Scene hits
+    // while projecting its wheel bounds -- the throw propagates through paint and
+    // wedges the EDT in a repaint loop.
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
-        double[] a = (double[]) nativeTransform;
-        float x = in[0];
-        float y = in.length > 1 ? in[1] : 0;
-        out[0] = (float) (a[0] * x + a[2] * y + a[4]);
-        if (out.length > 1) {
-            out[1] = (float) (a[1] * x + a[3] * y + a[5]);
-        }
-        for (int k = 2; k < out.length; k++) {
-            out[k] = k < in.length ? in[k] : 0;
-        }
+        ((Matrix) nativeTransform).transformPoints(Math.min(3, in.length), in, 0, out, 0, 1);
     }
 
     @Override
     public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
-        double[] a = (double[]) nativeTransform;
-        for (int i = 0; i < numPoints; i++) {
-            int si = srcPos + i * pointSize;
-            int di = destPos + i * pointSize;
-            float x = in[si];
-            float y = pointSize > 1 ? in[si + 1] : 0;
-            out[di] = (float) (a[0] * x + a[2] * y + a[4]);
-            if (pointSize > 1) {
-                out[di + 1] = (float) (a[1] * x + a[3] * y + a[5]);
-            }
-            for (int k = 2; k < pointSize; k++) {
-                out[di + k] = in[si + k];
-            }
-        }
+        ((Matrix) nativeTransform).transformPoints(pointSize, in, srcPos, out, destPos, numPoints);
     }
 
     @Override
@@ -633,8 +678,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return;
         }
         graphicsTransforms.put(Long.valueOf(g), transform.copy());
-        double[] a = (double[]) transform.getNativeTransform();
-        WindowsNative.setTransform(g, (float) a[0], (float) a[1], (float) a[2], (float) a[3], (float) a[4], (float) a[5]);
+        // Pull the 2D affine sub-matrix out of the 4x4 (column-major: m00,m10 at
+        // [0],[1]; m01,m11 at [4],[5]; m02,m12 -- the translation -- at [12],[13]).
+        // The render target is affine-only; any perspective term is applied in Java
+        // (transformPoint) before drawing, never pushed down to Direct2D.
+        float[] d = ((Matrix) transform.getNativeTransform()).getData();
+        WindowsNative.setTransform(g, d[0], d[1], d[4], d[5], d[12], d[13]);
     }
 
     @Override
@@ -677,45 +726,6 @@ public class WindowsImplementation extends CodenameOneImplementation {
         com.codename1.ui.Transform t = getTransform(graphics);
         t.rotate(angle, pivotX, pivotY);
         setTransform(graphics, t);
-    }
-
-    private static void setAff(double[] a, double m00, double m10, double m01, double m11, double m02, double m12) {
-        a[0] = m00; a[1] = m10; a[2] = m01; a[3] = m11; a[4] = m02; a[5] = m12;
-    }
-
-    /** Rotation by {@code angle} radians about pivot (px,py). */
-    private static double[] rot(float angle, float px, float py) {
-        double cos = Math.cos(angle), sin = Math.sin(angle);
-        double[] r = { cos, sin, -sin, cos, 0, 0 };
-        if (px != 0 || py != 0) {
-            return mul(mul(new double[] { 1, 0, 0, 1, px, py }, r), new double[] { 1, 0, 0, 1, -px, -py });
-        }
-        return r;
-    }
-
-    /** Returns A*B (B applied first, then A). */
-    private static double[] mul(double[] a, double[] b) {
-        return new double[] {
-            a[0] * b[0] + a[2] * b[1],
-            a[1] * b[0] + a[3] * b[1],
-            a[0] * b[2] + a[2] * b[3],
-            a[1] * b[2] + a[3] * b[3],
-            a[0] * b[4] + a[2] * b[5] + a[4],
-            a[1] * b[4] + a[3] * b[5] + a[5]
-        };
-    }
-
-    /** Inverse of a 2D affine, or null if singular. */
-    private static double[] invert(double[] m) {
-        double det = m[0] * m[3] - m[1] * m[2];
-        if (Math.abs(det) < 1e-12) {
-            return null;
-        }
-        double id = 1.0 / det;
-        double na = m[3] * id, nb = -m[1] * id, nc = -m[2] * id, nd = m[0] * id;
-        double ne = -(m[4] * na + m[5] * nc);
-        double nf = -(m[4] * nb + m[5] * nd);
-        return new double[] { na, nb, nc, nd, ne, nf };
     }
 
     /* ------------------------------------------------------- graphics state */
@@ -883,6 +893,42 @@ public class WindowsImplementation extends CodenameOneImplementation {
         FlatPath fp = flattenShape(shape);
         float lineWidth = stroke != null ? stroke.getLineWidth() : 1f;
         WindowsNative.drawShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule, lineWidth);
+    }
+
+    /*
+     * The base fillPolygon / drawPolygon are software scanline fills built on
+     * drawLine -- aliased, and slow (one drawLine per raster row). Route them
+     * through the Direct2D path geometry instead so polygons (e.g. the projected
+     * 3D quads in graphics-transform-perspective / -camera, which transformPoint
+     * has already projected to screen-space corners) fill anti-aliased and match
+     * the AA goldens the other ports produce.
+     */
+    @Override
+    public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        if (nPoints <= 0) {
+            return;
+        }
+        com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
+        p.moveTo(xPoints[0], yPoints[0]);
+        for (int i = 1; i < nPoints; i++) {
+            p.lineTo(xPoints[i], yPoints[i]);
+        }
+        p.closePath();
+        fillShape(graphics, p);
+    }
+
+    @Override
+    public void drawPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        if (nPoints <= 0) {
+            return;
+        }
+        com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
+        p.moveTo(xPoints[0], yPoints[0]);
+        for (int i = 1; i < nPoints; i++) {
+            p.lineTo(xPoints[i], yPoints[i]);
+        }
+        p.closePath();
+        drawShape(graphics, p, new Stroke(1f, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1f));
     }
 
     /** Flattened path data handed to the native geometry builder. */
