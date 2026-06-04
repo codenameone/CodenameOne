@@ -2,6 +2,7 @@ package com.codename1.initializr;
 
 import static com.codename1.ui.CN.*;
 
+import com.codename1.components.InteractionDialog;
 import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.initializr.model.GeneratorModel;
@@ -17,7 +18,6 @@ import com.codename1.ui.CheckBox;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -52,7 +52,7 @@ public class Initializr extends Lifecycle {
             "InitializrValidationError", "InitializrHelpButton", "InitializrGenerateBar",
             "InitializrGenerateInfo", "InitializrPrimaryButton", "InitializrPreviewWrap",
             "InitializrPreviewTitle", "InitializrLiveDot", "InitializrCard", "InitializrPreviewHolder",
-            "InitializrSummaryText"
+            "InitializrSummaryText", "InitializrPhoneStage", "InitializrLiveFrame"
     };
 
     @Override
@@ -144,7 +144,7 @@ public class Initializr extends Lifecycle {
                 javaPanel, settingsPanel, previewWrap);
         column.setUIID("InitializrColumn");
         column.setScrollableY(true);
-        column.setScrollVisible(false);
+        column.setScrollVisible(true);
 
         // ----- generate bar -----
         final Button generateButton = new Button("Generate Project");
@@ -223,8 +223,6 @@ public class Initializr extends Lifecycle {
 
         Label pill = new Label("READY");
         pill.setUIID("InitializrPill");
-        FontImage.setMaterialIcon(pill, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 1.6f);
-        pill.setGap(convertToPixels(1f));
 
         Container pillHolder = new Container(new BorderLayout());
         pillHolder.add(BorderLayout.NORTH, FlowRight(pill));
@@ -379,10 +377,19 @@ public class Initializr extends Lifecycle {
         title.setUIID("InitializrPreviewTitle");
         Container head = BoxLayout.encloseX(dot, title);
 
+        // Size the live preview like a phone (portrait ~1:2) and centre it, so it
+        // reads as a device mockup instead of a shrunken strip.
+        Component preview = previewPanel.getComponent();
+        preview.setPreferredW(convertToPixels(60f));
+        preview.setPreferredH(convertToPixels(120f));
+        Container phoneStage = new Container(new com.codename1.ui.layouts.FlowLayout(Component.CENTER));
+        phoneStage.setUIID("InitializrPhoneStage");
+        phoneStage.add(preview);
+
         Container wrap = new Container(new BorderLayout());
         wrap.setUIID("InitializrPreviewWrap");
         wrap.add(BorderLayout.NORTH, head);
-        wrap.add(BorderLayout.CENTER, previewPanel.getComponent());
+        wrap.add(BorderLayout.CENTER, phoneStage);
         return wrap;
     }
 
@@ -457,11 +464,26 @@ public class Initializr extends Lifecycle {
         Button help = new Button();
         help.setUIID("InitializrHelpButton");
         FontImage.setMaterialIcon(help, FontImage.MATERIAL_HELP_OUTLINE, 2.8f);
-        help.addActionListener(e -> Dialog.show(helpTitle, helpBody, "OK", null));
+        help.addActionListener(e -> showHelpPopup(help, helpTitle, helpBody));
         Container header = new Container(new BorderLayout());
         header.add(BorderLayout.CENTER, l);
         header.add(BorderLayout.EAST, help);
         return BoxLayout.encloseY(header, input);
+    }
+
+    /** Shows the field help as a fluid InteractionDialog popup anchored to the
+     *  help button, instead of a blocking modal Dialog. */
+    private void showHelpPopup(Component source, String title, String body) {
+        InteractionDialog dlg = new InteractionDialog(title);
+        dlg.setUIID(darkMode ? "InitializrHelpPopupDark" : "InitializrHelpPopup");
+        dlg.setLayout(new BorderLayout());
+        SpanLabel content = new SpanLabel(body);
+        content.setUIID(darkMode ? "InitializrHelpPopupBodyDark" : "InitializrHelpPopupBody");
+        content.setTextUIID(darkMode ? "InitializrHelpPopupBodyDark" : "InitializrHelpPopupBody");
+        content.setPreferredW(convertToPixels(58f));
+        dlg.add(BorderLayout.CENTER, content);
+        dlg.setDisposeWhenPointerOutOfBounds(true);
+        dlg.showPopupDialog(source);
     }
 
     private ProjectOptions.PreviewLanguage findLanguageByLabel(String label) {

@@ -2,6 +2,9 @@
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
+    /* Keep the application scrollbar permanently visible (don't fade it out)
+       so the single scrolling column reads like a desktop/web app. */
+    fadeScrollBarBool: false;
 }
 
 /** Style for Button class */
@@ -182,7 +185,7 @@ InitializrHero {
     background-color: #FFFFFF;
     border: 2px solid #D2D9E6;
     border-radius: 1mm;
-    padding: 3mm 3.4mm;
+    padding: 3mm 2.8mm;
     margin: 1.1mm;
 }
 
@@ -190,7 +193,7 @@ InitializrHeroDark {
     background-color: #102B66;
     border: 2px solid #2F508F;
     border-radius: 1mm;
-    padding: 3mm 3.4mm;
+    padding: 3mm 2.8mm;
     margin: 1.1mm;
 }
 
@@ -215,6 +218,7 @@ InitializrHeroSubtitle {
     color: #7F8AA3;
     font-family: "Inter";
     font-size: 2.8mm;
+    padding: 0;
 }
 
 InitializrHeroSubtitleDark {
@@ -222,6 +226,7 @@ InitializrHeroSubtitleDark {
     color: #A8B8DA;
     font-family: "Inter";
     font-size: 2.8mm;
+    padding: 0;
 }
 
 InitializrPill {
@@ -229,8 +234,10 @@ InitializrPill {
     background-color: #E8F0FF;
     font-family: "Inter Bold";
     font-size: 2.2mm;
-    border-radius: 5mm;
-    padding: 1mm 2mm;
+    border: none;
+    border-radius: 2mm;
+    padding: 0.7mm 2.4mm;
+    text-align: center;
 }
 
 InitializrPillDark {
@@ -238,8 +245,10 @@ InitializrPillDark {
     background-color: #15336B;
     font-family: "Inter Bold";
     font-size: 2.2mm;
-    border-radius: 5mm;
-    padding: 1mm 2mm;
+    border: none;
+    border-radius: 2mm;
+    padding: 0.7mm 2.4mm;
+    text-align: center;
 }
 
 /* ---------- Collapsible panel (card) ---------- */
@@ -525,6 +534,37 @@ InitializrHelpButtonDark {
     padding: 0.2mm;
 }
 
+/* ---------- Field help popup (InteractionDialog) ---------- */
+InitializrHelpPopup {
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+}
+
+InitializrHelpPopupDark {
+    background-color: #102B66;
+    border: 2px solid #2F508F;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+}
+
+InitializrHelpPopupBody {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 1.6mm;
+}
+
+InitializrHelpPopupBodyDark {
+    background-color: transparent;
+    color: #DCE6FB;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 1.6mm;
+}
+
 /* ---------- Generate bar + primary button ---------- */
 InitializrGenerateBar {
     background-color: #F3F4F7;
@@ -625,6 +665,22 @@ InitializrPreviewWrapDark {
     padding: 2.6mm;
 }
 
+InitializrPhoneStage {
+    background-color: #F1F3F8;
+    border: 2px solid #E5EAF2;
+    border-radius: 1mm;
+    padding: 2.4mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrPhoneStageDark {
+    background-color: #0B2459;
+    border: 2px solid #20407D;
+    border-radius: 1mm;
+    padding: 2.4mm;
+    margin: 1.2mm 0 0 0;
+}
+
 InitializrPreviewTitle {
     background-color: transparent;
     color: #112247;
@@ -681,6 +737,23 @@ InitializrPreviewHolderDark {
     padding: 0;
 }
 
+/* ---------- Application scrollbar ----------
+   The scrollbar UIID is global (set by the look-and-feel, not in the component
+   tree the dark re-skin walks), so use one neutral slate thumb that reads on
+   both the light and the dark surface, with a transparent track. */
+Scroll {
+    background-color: transparent;
+    padding: 0 0.4mm 0 0.4mm;
+    margin: 0;
+}
+
+ScrollThumb {
+    background-color: #9AA7C0;
+    border-radius: 1mm;
+    padding: 0 0.6mm 0 0.6mm;
+    margin: 0;
+}
+
 /* ---------- Live (phone) preview internals ---------- */
 Images {
     background-image: url(images/grub.png),
@@ -689,8 +762,19 @@ Images {
 
 InitializrLiveFrame {
     margin: 0;
-    border: 1px solid #D9DEE8;
-    padding: 2mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    padding: 0;
+    background-color: transparent;
+}
+
+InitializrLiveFrameDark {
+    cn1-derive: Container;
+    margin: 0;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    padding: 0;
+    background-color: transparent;
 }
 
 InitializrLiveContentDark {
@@ -708,11 +792,13 @@ InitializrLiveToolbarDark {
 InitializrLiveTitleDark {
     cn1-derive: Title;
     color: #F5F8FF;
+    background-color: transparent;
 }
 
 InitializrLiveMenuDark {
     cn1-derive: Command;
     color: #F5F8FF;
+    background-color: transparent;
 }
 
 InitializrLiveButtonDarkClean {
