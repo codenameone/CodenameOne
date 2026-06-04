@@ -2777,7 +2777,13 @@ const jvm = {
     this._wakeupTimer = setTimeout(function() {
       self._wakeupTimer = null;
       self._wakeupAt = Infinity;
-      self._processExpiredTimedWakeups();
+      // ALWAYS reschedule remaining wakeups, even if processing one throws --
+      // otherwise an exception here breaks the single-timer chain and any other
+      // pending sleep/wait never fires, wedging the worker (no green thread is
+      // running to re-arm it). _processExpiredTimedWakeups refreshes on its own
+      // success path; the finally guarantees it on the throw path too.
+      try { self._processExpiredTimedWakeups(); }
+      finally { if (self._wakeupTimer == null) self._refreshTimedWakeupTimer(); }
     }, delay);
   },
   _processExpiredTimedWakeups() {
@@ -5107,6 +5113,20 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
           + ":wakeupTimerSet=" + (jvm._wakeupTimer != null ? 1 : 0)
           + ":wakeupAtIn=" + (jvm._wakeupAt != null && jvm._wakeupAt !== Infinity ? Math.round(jvm._wakeupAt - twNow) : "inf")
           + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0));
+        // Recovery backstop: the worker is wedged but has pending timed wakeups,
+        // which means the single wakeup setTimeout was lost/stalled (no green
+        // thread is running to re-arm it). Force-clear and re-arm it, process any
+        // now-expired wakeups, and re-trigger drain. Safe + idempotent: it only
+        // re-creates the timer and fires genuinely-expired sleeps/waits.
+        if (tws.length > 0) {
+          try {
+            if (jvm._wakeupTimer != null) { clearTimeout(jvm._wakeupTimer); jvm._wakeupTimer = null; jvm._wakeupAt = Infinity; }
+            jvm._processExpiredTimedWakeups();
+            jvm._refreshTimedWakeupTimer();
+            if (typeof jvm.scheduleDrain === "function") jvm.scheduleDrain();
+            vmTrace("DIAG:WORKER_HB_FROZEN:recovery=rearmed-timer");
+          } catch (_rec) { void _rec; }
+        }
       }
     } catch (e) {
       void e;
