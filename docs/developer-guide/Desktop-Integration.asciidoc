@@ -12,7 +12,7 @@ The desktop integration features make a desktop build *feel* like a desktop app:
 * A native menu bar populated from your `Command` objects, with per-command placement hints
   (About, File, Edit, Quit, ...).
 * Interactive scrollbars - a draggable thumb that highlights on hover and while dragged,
-  click-to-page on the track, a minimum thumb size so it stays grabbable on long content, a
+  click-to-page on the track, a minimum thumb size so it stays easy to grab on long content, a
   reserved gutter so content isn't drawn under the bar, and an always-visible (rather than
   fading) scrollbar.
 * Keyboard accelerators on the native menu items (Cmd+S / Ctrl+S, ...).
@@ -164,7 +164,7 @@ desktop-style control:
 * The thumb can be grabbed and dragged, and it *highlights* while the pointer hovers it and while
   it's being dragged (the `DesktopScrollThumb` selected / pressed styles).
 * Clicking the track pages toward the pointer by about one viewport.
-* The thumb has a *minimum size* so it stays grabbable even when the content is far taller than the
+* The thumb has a *minimum size* so it stays easy to grab even when the content is far taller than the
   viewport. The minimum (in pixels) is the `scrollThumbMinSizeInt` theme constant; when unset it
   defaults to the equivalent of 4mm.
 * A *gutter* is reserved for the scrollbar so content isn't laid out underneath it. The gutter width
