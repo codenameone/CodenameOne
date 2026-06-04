@@ -804,6 +804,7 @@ non 3D fallback for platforms that report no GPU backend.
 <6> By default a `RenderView` renders on demand; call `setContinuous(true)` for an
 animation loop, or call `requestRender()` to draw a single new frame.
 
+.A Phong lit cube rendered by RenderView
 image::img/gpu-cube.png[A Phong lit cube rendered by RenderView,scaledwidth=40%]
 
 === Textures
@@ -858,6 +859,7 @@ straight into any built in `Material`.
 The model below is the Khronos "BoomBox" glTF sample loaded this way (a CC0 model
 that carries its own base-color texture) and drawn Phong lit:
 
+.The Khronos BoomBox glTF sample loaded with GltfLoader and drawn Phong lit
 image::img/gpu-model.png[A textured glTF model loaded with GltfLoader,scaledwidth=40%]
 
 === Animation
@@ -867,6 +869,7 @@ A continuous `RenderView` calls `onFrame` every frame; an on demand view redraws
 when you call `requestRender()`. The grid below captures six fixed rotation stages
 of a spinning cube, each rendered into its own viewport in a single frame:
 
+.Six rotation stages of an animated cube captured in one frame
 image::img/gpu-animation.png[Six rotation stages of an animated cube,scaledwidth=40%]
 
 === Capability detection

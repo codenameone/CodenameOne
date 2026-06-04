@@ -10,6 +10,7 @@
 package com.codename1.gpu;
 
 import com.codename1.io.JSONParser;
+import com.codename1.io.Util;
 import com.codename1.ui.Image;
 import com.codename1.util.Base64;
 
@@ -78,10 +79,7 @@ public final class GltfLoader {
         try {
             return load(device, readFully(in));
         } finally {
-            try {
-                in.close();
-            } catch (IOException ignore) {
-            }
+            Util.cleanup(in);
         }
     }
 
@@ -130,10 +128,7 @@ public final class GltfLoader {
         try {
             return loadModel(device, readFully(in));
         } finally {
-            try {
-                in.close();
-            } catch (IOException ignore) {
-            }
+            Util.cleanup(in);
         }
     }
 
