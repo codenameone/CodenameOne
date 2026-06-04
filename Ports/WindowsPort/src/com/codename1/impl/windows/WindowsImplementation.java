@@ -368,6 +368,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    /* The port fully supports 2D affine transforms (setTransform + the legacy
+     * scale/rotate below). The base default is false, which made every test that
+     * guards on g.isAffineSupported() (Rotate, Scale, AffineScale, ...) bail out
+     * and draw "Affine unsupported" instead of the transformed content. */
+    @Override
+    public boolean isAffineSupported() {
+        return true;
+    }
+
+    @Override
+    public void resetAffine(Object graphics) {
+        setTransform(graphics, com.codename1.ui.Transform.makeIdentity());
+    }
+
     @Override
     public boolean isPerspectiveTransformSupported() {
         return false;
