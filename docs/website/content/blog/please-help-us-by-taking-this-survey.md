@@ -30,9 +30,9 @@ you can also win prizes as a result! VisionMobile has launched a new Developer E
   
   
   
-Also – respondents who complete the survey and opt-in to VisionMobile’s panel can access the Developer Benchmarks, a visualised scorecard of how they compare to other developers in their country or region, across platforms used, revenue models, app categories and more.  
+Also – respondents who complete the survey and opt-in to VisionMobile’s panel can access the Developer Benchmarks, a visualized scorecard of how they compare to other developers in their country or region, across platforms used, revenue models, app categories and more.  
   
-The survey results will be available for free download on January 2014. 
+The survey results will be available for free download in January 2014. 
 
   
 This is really important to us, it allows us to improve our positioning and awareness within the industry. Regardless of your subscription level it would be very helpful for us if you take those 10 minutes and click  

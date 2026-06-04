@@ -91,7 +91,7 @@ I’ve made a quick walkthru video of the new plugin, check it out:
 
 ### Migration & Availability
 
-While we belive this should be maintained across versions we can’t be 100% sure about this. As with all rewrites  
+While we believe this should be maintained across versions we can’t be 100% sure about this. As with all rewrites  
 regressions probably exist. We will release the new plugin this Friday as part of our standard Friday release cycle.
 
 If you run into regressions we suggest creating a new project with the new plugin and migrating your code/settings  

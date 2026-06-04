@@ -54,7 +54,7 @@ This works by setting the track component property on border. When that’s done
 
 `InfiniteContainer` and `InfiniteAdapter` work great for most use cases but they have a bit of an ["undefined" behavior when it comes to failure](https://github.com/codenameone/CodenameOne/issues/2721). E.g. if we have a network error and don’t have anything to fetch as a result.
 
-to solve this we added this method to `InfiniteContainer`:
+To solve this we added this method to `InfiniteContainer`:
     
     
     public void continueFetching();

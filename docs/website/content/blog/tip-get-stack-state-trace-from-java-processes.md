@@ -16,7 +16,7 @@ you are not in the debugger when you did that. My kingdom for a stack trace…�
 But this is also pretty frustrating when you work on a tool like Codename One’s designer or GUIBuilder and they  
 suddenly freeze with no visible error. How do you provide a viable bug report for that?
 
-This was pretty obvious for me but I’ve programmed in Java from the age that predated IDE’s and surprisingly  
+This was pretty obvious for me but I’ve programmed in Java from the age that predated IDEs and surprisingly  
 this isn’t common knowledge. On Windows you can just do a ctrl → Break on a Java process and get the  
 full JVM dump which includes everything you need to debug the issue. With Mac/Linux you can send a  
 `kill -QUIT` message for the same effect which is slightly more of an effort but in some ways more rewarding.
@@ -26,7 +26,7 @@ To do this open your console/terminal and type in:
     
     ps auxw | grep java
 
-This should provide you with the list of Java processes ID’s, identify the one that is relevant and use:
+This should provide you with the list of Java process IDs, identify the one that is relevant and use:
     
     
     kill -QUIT process-id
@@ -309,7 +309,7 @@ This tool is pretty powerful and can provide a lot of insight into the on-goings
 
 When you run into an issue that might benefit from the stacks in the simulator it’s the time to pull out these  
 tools and point them at the process. An issue that includes the full JVM stack states would often be easier to  
-solve especially if it’s a deadlock issues.
+solve especially if it’s a deadlock issue.
 
 If you have an issue on an Android device check out [this stackoverflow thread](http://stackoverflow.com/questions/13589074/how-to-make-java-thread-dump-in-android)  
 where you can see some information on listing the thread states on a physical device.

@@ -31,7 +31,7 @@ If the app is available as a native app, in the Play store, you can indicate thi
 
 Figure 2. Add native app banner
 
-__ |  The PWA standard requires that you host your app on over HTTPS. For testing purposes, it will also work when accessed at a `localhost` address. You can use the [Lighthoust PWA analysis tool](https://developers.google.com/web/ilt/pwa/lighthouse-pwa-analysis-tool) to ensure compliance.   
+__ |  The PWA standard requires that you host your app over HTTPS. For testing purposes, it will also work when accessed at a `localhost` address. You can use the [Lighthouse PWA analysis tool](https://developers.google.com/web/ilt/pwa/lighthouse-pwa-analysis-tool) to ensure compliance.   
 ---|---  
   
 For more information about Progressive Web Apps see [Google’s introduction to the subject](https://developers.google.com/web/progressive-web-apps/).
@@ -77,7 +77,7 @@ Clicking the "Add button" prompts the user for the name they wish the app to app
 
 Figure 4. Add to shelf prompt
 
-Upon submission, Chrome will generate a real application (on Mac, it will be a ".app", on Windows, an "exe", etc..) which the user can double click to open the app directly in the Chrome. And, importantly, the app will still work when the user is offline.
+Upon submission, Chrome will generate a real application (on Mac, it will be a ".app", on Windows, an "exe", etc..) which the user can double click to open the app directly in Chrome. And, importantly, the app will still work when the user is offline.
 
 The app will also appear in their "Shelf" which you can always access at `chrome://apps`, or by opening the "Chrome App Launcher" app (on OS X this is located in "~/Applications/Chrome Apps/Application Launcher").
 

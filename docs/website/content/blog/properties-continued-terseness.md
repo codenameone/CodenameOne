@@ -41,7 +41,7 @@ Which is way better than:
     c.addComponent(mySecondCmp);
     c.addComponent(myThirdCmp);
 
-But its still not great, the part that bothered me is the layout creation code… What we really need is the layout  
+But it’s still not great, the part that bothered me is the layout creation code… What we really need is the layout  
 and this allowed me to re-think this API and instead come up with this: 
     
     
@@ -69,7 +69,7 @@ solve that issue and reduce a line of code.
 
 And finally I also added an `add(Image)` method to `Container` which is similar  
 to the `add(String)` method and is really a shorthand for `add(new Label(img))`.  
-Its not a big deal but small things like that make the code slightly more readable.
+It’s not a big deal but small things like that make the code slightly more readable.
 ---
 
 ## Archived Comments

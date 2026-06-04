@@ -23,7 +23,7 @@ You want to detect whether the device your app is running on is Jailbroken or Ro
 
 ## Solution
 
-While there is no way to know whether the device is rooted with 100% certainty, you can use the [CN1JailbreakDetect](https://github.com/shannah/CN1JailbreakDetect) cn1lib to to make a good guess.
+While there is no way to know whether the device is rooted with 100% certainty, you can use the [CN1JailbreakDetect](https://github.com/shannah/CN1JailbreakDetect) cn1lib to make a good guess.
 
 This cn1lib acts as a thin wrapper around the [RootBeer](https://github.com/scottyab/rootbeer) Android library, and [DTTJailbreakDetection](https://github.com/thii/DTTJailbreakDetection) iOS library, which employ heuristics to determine whether the device has likely been jailbroken.
 

@@ -15,7 +15,7 @@ We’ve had a very challenging week with a lot of backend work for some enterpri
 much done as we do most weeks. I can say that I’ve seen some of the apps in the pipeline and I’m very excited  
 about the things to come…​
 
-Todays update includes many bug fixes on Android, UWP but not much in terms of new features.
+Today’s update includes many bug fixes on Android, UWP but not much in terms of new features.
 
 On stack overflow things were pretty standard:
 
@@ -97,7 +97,7 @@ We rely heavily on the fact that `Container` is transparent and has 0 padding/ma
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39545709/recommended-way-to-change-the-size-of-the-toolbar-in-codename-one)
 
-### Change CodenameOne InfiniteContainer PullToRefresh Behaviour
+### Change CodenameOne InfiniteContainer PullToRefresh Behavior
 
 You can override the refresh method in that class
 

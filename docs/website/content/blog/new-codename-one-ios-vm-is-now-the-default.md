@@ -36,7 +36,7 @@ author: Shai Almog
   
 New builds sent for iOS will now use the new iOS VM by default, this will deliver a lot of new features: stack traces, 64 bit, xcode 6+ support, iPhone 6/6+ native resolution, no stall GC etc.  
   
-We spent a great deal of time stabalizing the new VM but obviously it can’t be as mature as our existing XMLVM backend and so it is quite possible that you would run into issues that occur purely in the new VM. You can test that this is a new VM issue by building against the old VM using the build argument ios.newVM=false, assuming this is indeed a new VM issue please  
+We spent a great deal of time stabilizing the new VM but obviously it can’t be as mature as our existing XMLVM backend and so it is quite possible that you would run into issues that occur purely in the new VM. You can test that this is a new VM issue by building against the old VM using the build argument ios.newVM=false, assuming this is indeed a new VM issue please  
 [  
 file a bug  
 ](http://code.google.com/p/codenameone/issues/)  

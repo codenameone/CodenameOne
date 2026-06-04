@@ -33,7 +33,7 @@ We hope to add automated iOS tests for better stability of Codename One but as I
 
 We already discussed CI support for your project but not the full TDD process. Now that we have a bit more experience with these device farms we hope to leverage that experience to make TDD trivial in Codename One.
 
-This is hugely important, when you build multiple applications TDD allows you to change code rapidly without concern that you might run into a regression. This is hugely important in the volatile world of mobile development where new mobile OS’s/devices come out on a daily basis. Codename One does a lot of the heavy lifting here but no technology is perfect. With this approach you can instantly test on devices that you don’t have in your possession and instantly get a notice if a commit of your broke something.
+This is hugely important, when you build multiple applications TDD allows you to change code rapidly without concern that you might run into a regression. This is hugely important in the volatile world of mobile development where new mobile OS’s/devices come out on a daily basis. Codename One does a lot of the heavy lifting here but no technology is perfect. With this approach you can instantly test on devices that you don’t have in your possession and instantly get a notice if a commit of yours broke something.
 
 That’s pretty cool…​
 

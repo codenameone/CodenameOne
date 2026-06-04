@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/different-icons/kitchensink-2-flat.jpg)
 
-When we designed the icon for the new Kitchen Sink demo we tried to use material design principals. We thought it  
+When we designed the icon for the new Kitchen Sink demo we tried to use material design principles. We thought it  
 would look reasonable on iOS but it looked awful. So we decided to adapt the design and create a separate  
 yet similar icon for iOS.
 

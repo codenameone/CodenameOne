@@ -11,12 +11,12 @@ author: Steve Hannah
 
 ![Header Image](/blog/new-improved-native-google-maps/maps.jpg)
 
-One of the primary use-cases that benefits from our recent improvements for native peer integration, is "map apps". That is, apps that use native maps in some shape or form. This is an extremely common uses case for mobile apps these days. Codename One has supported native maps for quite some time, but (up until recently), they were limited by a couple of factors:
+One of the primary use-cases that benefits from our recent improvements for native peer integration, is "map apps". That is, apps that use native maps in some shape or form. This is an extremely common use case for mobile apps these days. Codename One has supported native maps for quite some time, but (up until recently), they were limited by a couple of factors:
 
   1. **Native Widgets Were Always In Front** – Since Google Maps were "native" widgets Codename One couldn’t paint over top of the map. Native widgets were always placed in front of the Codename One UI. We could place markers on the map, and draw paths using MapContainer APIs (which were backed by native code on each platform), but we couldn’t, for example, place a Button over top of the map.
   2. **The Simulator Still Used the Old MapComponent** – The simulator didn’t have support for native maps. It would just use the light-weight Codename One MapComponent, which uses tiles (rather than vector graphics like the native maps), and didn’t behave the same as native maps in some cases. E.g. you **could** draw over top of the MapComponent, which would cause a bit of a surprise if you were counting on that, only to find out after building for iOS that your beautiful buttons were rendered behind the map.
 
-I am happy to announce that on Friday we released an update for the Google maps library the resolves both of these issues.
+I am happy to announce that on Friday we released an update for the Google maps library that resolves both of these issues.
 
   1. **You Can Place CN1 Widgets In Front of the Map Now** – Now, you can integrate your native maps into your UI seamlessly with the rest of your Codename One UI. Place your codename one widgets under, over, beside, and around your maps…​ but especially **over** your maps. You don’t need to do anything special for this to happen. The recent native peer improvements cause native peers to **just work**.
   2. **The Simulator Now Behaves More Like Actual Devices** – The simulator now uses an internal BrowserComponent with the GoogleMaps Javascript API, which behaves much more like then native maps on device. (Don’t worry, you don’t have to use any Javascript…​ the Java <→ Javascript interop is all hidden. You just use the `MapContainer` API, and it will take care of the rest.
@@ -155,9 +155,9 @@ Now you’re ready to use native maps. Here is a sample app that demonstrates ad
         }
     }
 
-![Native Maps Demo App Screensshot](/blog/new-improved-native-google-maps/google-maps-test-app-screenshot.png)
+![Native Maps Demo App Screenshot](/blog/new-improved-native-google-maps/google-maps-test-app-screenshot.png)
 
-Figure 1. Native Maps Demo App Screensshot
+Figure 1. Native Maps Demo App Screenshot
 
 You can view the Javascript version of this app [here](/demos/GoogleMaps/index/).
 

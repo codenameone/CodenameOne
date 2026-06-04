@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/new-low-level-microphone-api/new-low-level-microphone-api.jpg)
 
-Today’s blog post will delve further into our new media features. We’ve recently added an API to access raw PCM data from the device’s microphone. Previously, the media recording API could only be configured to save audio to a file. This is fine for most use cases, but sometimes it is necessary to access the the raw PCM stream directly. For example for voice recognition, or audio processing, or audio visualization.
+Today’s blog post will delve further into our new media features. We’ve recently added an API to access raw PCM data from the device’s microphone. Previously, the media recording API could only be configured to save audio to a file. This is fine for most use cases, but sometimes it is necessary to access the raw PCM stream directly. For example for voice recognition, or audio processing, or audio visualization.
 
 ### How it works
 

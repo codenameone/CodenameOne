@@ -28,7 +28,7 @@ You may also try out an [Android build](https://github.com/shannah/RADChatRoom/r
 
 ### About the ChatRoomView Component
 
-The ChatRoomView component is the first in a new breed of Codename One UI components which go beyond the the fundamental building blocks of user interfaces to provide a rich, fully-functional user experience out of the box. It is built on top of the new [CodeRAD](https://github.com/shannah/CodeRAD) library which enables a new level of code-reuse based on the tried-and-true MVC (Model-View-Controller) design pattern. As you’ll see, adding a chat feature to your app is not difficult. All of the minutiae of UI details come working and ready to go. You just need to bind it to your view model and controller.
+The ChatRoomView component is the first in a new breed of Codename One UI components which go beyond the fundamental building blocks of user interfaces to provide a rich, fully functional user experience out of the box. It is built on top of the new [CodeRAD](https://github.com/shannah/CodeRAD) library which enables a new level of code-reuse based on the tried-and-true MVC (Model-View-Controller) design pattern. As you’ll see, adding a chat feature to your app is not difficult. All of the minutiae of UI details come working and ready to go. You just need to bind it to your view model and controller.
 
 ### Prerequisites
 

@@ -21,7 +21,7 @@ whereas a `Tree` makes more sense as a tool to map data e.g. filesystem structur
 
 Note that the `Accordion` like many composite components in Codename One is scrollable by default which  
 means you should use it within a non-scrollable hierarchy. If you wish to add it into a scrollable `Container` you  
-should disable it’s default scrollability using `setScrollable(false)`.
+should disable its default scrollability using `setScrollable(false)`.
     
     
     Form f = new Form("Accordion", new BorderLayout());

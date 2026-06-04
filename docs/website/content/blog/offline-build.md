@@ -58,7 +58,7 @@ E.g. if you installed an offline builder then installed a newer version and the 
 __ |  Installation requires an enterprise account, you might need to re-login in the Codename One Settings UI   
 ---|---  
   
-To install an offline builder open the Codename One Preferences (settings) UI by right clicking the project and selecting Codename One → Codname One Settings.
+To install an offline builder open the Codename One Preferences (settings) UI by right clicking the project and selecting Codename One → Codename One Settings.
 
 ![Open Codename One settings](/blog/offline-build/newsettings-ui.png)
 
@@ -79,7 +79,7 @@ This should launch the settings UI which would be blank the first time around:
 
 Figure 3. Offline builds setting UI
 
-When you ar e in this form you can press the download button to download the current version from the build server. If there is no update nothing will happen. If there is the latest version will download and tag with a version number/date.
+When you are in this form you can press the download button to download the current version from the build server. If there is no update nothing will happen. If there is the latest version will download and tag with a version number/date.
 
 You can see/change the selected version in this UI. This allows building against an older version. You can also delete older builds to save space.
 

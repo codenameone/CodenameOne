@@ -50,7 +50,7 @@ the fact that the browser is single threaded. Essentially every call to `wait`/`
 code that allows the VM to switch co-operatively to other code. For 98% of the code this is totally seamless as  
 proper code would eventually block somewhere.
 
-However, static initializers are a bit of a special case here. It seems that its impossible to split them in a way  
+However, static initializers are a bit of a special case here. It seems that it’s impossible to split them in a way  
 that allows this functionality. So you can still use static initializers but you can’t call `wait`/`notify` etc. within them.
 
 Normally that’s not a big deal, however it becomes a big deal when you realize that this also applies to code you  

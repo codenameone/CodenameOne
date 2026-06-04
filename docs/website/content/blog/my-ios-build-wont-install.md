@@ -22,7 +22,7 @@ If you have access to a Mac you can connect a cable and open xcode where you can
 __ |  Devices prior to iPad Air & iPhone 5s were 32 bit devices so iPhone 5s won’t need that flag but iPhone 5 or iPhone 5c will need it   
 ---|---  
   
-  * Check the the UDID is correct – if you got the UDID from an app then it’s probably wrong as apps don’t have access to the device UDID anymore. The way to get the UDID is either thru iOS Settings app or itunes
+  * Check the UDID is correct – if you got the UDID from an app then it’s probably wrong as apps don’t have access to the device UDID anymore. The way to get the UDID is either thru iOS Settings app or itunes
 
   * Make sure the device isn’t locked for installing 3rd party apps. I’ve had this when trying to install on my kids tablet which I configured to be child safe. This is configured in the settings as parental controls
 

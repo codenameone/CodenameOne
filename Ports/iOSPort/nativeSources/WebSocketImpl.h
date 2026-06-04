@@ -36,7 +36,7 @@ API_AVAILABLE(ios(13.0))
 }
 
 -(instancetype)initWithId:(int)cid url:(NSString*)urlString;
--(void)connectWithTimeoutMs:(int)timeoutMs;
+-(void)connectWithTimeoutMs:(int)timeoutMs protocols:(NSArray*)protocols;
 -(void)closeConnection;
 -(void)sendText:(NSString*)message;
 -(void)sendBinary:(NSData*)data;

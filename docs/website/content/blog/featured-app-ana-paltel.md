@@ -26,7 +26,7 @@ device capabilities.
 
 The app is shipping both on [iOS](https://itunes.apple.com/dm/app/ana-paltel/id1131291631) & on  
 [Android](https://play.google.com/store/apps/details?id=com.paltel.mobapp) and as of this time  
-it’s open to users in other regions so I was able to install it and take it to a spin. Even thought I couldn’t  
+it’s open to users in other regions so I was able to install it and take it to a spin. Even though I couldn’t  
 physically login there is a lot of functionality that’s exposed on the guest account.
 
 ---

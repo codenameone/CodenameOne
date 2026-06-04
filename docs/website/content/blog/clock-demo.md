@@ -18,7 +18,7 @@ some reason which is a shame because it’s probably our only low level graphics
 **Check out a live preview of the demo on the right here thanks to our JavaScript port!**
 
 This demo was developed by Steve as part of a tutorial to teach low level graphics programming, this tutorial  
-was folded into the [developer guide graphics section](/manual/graphics.html). Due to it’s nature there is  
+was folded into the [developer guide graphics section](/manual/graphics.html). Due to its nature there is  
 not much we can improve about the demo. It’s a wonderful demo both in simplicity and scope.
 
 Still we modernized some of the boilerplate code that was improved since the original demo.  

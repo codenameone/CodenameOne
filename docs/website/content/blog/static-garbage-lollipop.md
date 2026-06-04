@@ -31,7 +31,7 @@ As
 [  
 we wrote before  
 ](https://www.voxxed.com/blog/2014/10/beating-the-arc/)  
-our new Garbage Collector is designed for amazing speed an never locks, this worked really well for most cases but we started running into weird crashes that took us deep into the seemingly simple GC code and exposed flaw in our "no locking" approach. It seems that our assumption that we can just mark all the static objects was flawed since a thread might mutate the static (global) object while the GC is running.  
+our new Garbage Collector is designed for amazing speed and never locks, this worked really well for most cases but we started running into weird crashes that took us deep into the seemingly simple GC code and exposed a flaw in our "no locking" approach. It seems that our assumption that we can just mark all the static objects was flawed since a thread might mutate the static (global) object while the GC is running.  
   
 So we ended up creating a rather elaborate patch that marks the statics over again when cycling over all the threads. This slows the GC thread slightly but should have no impact on app performance. 
 

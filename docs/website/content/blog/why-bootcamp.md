@@ -26,7 +26,7 @@ I have several goals with the bootcamp:
 
   * I plan to improve my video skills. I hope the production deadlines will help me generate better videos at a much faster pace than I currently do. This is important for the general video production in the website
 
-  * This will also force me to work on course materials which are in a dire straits and need replacements
+  * This will also force me to work on course materials which are in dire straits and need replacements
 
 To give you a sense, this is a part of the precourse material (before the bootcamp) it’s one of the tutorials I did about UI design and we built it from scratch:
 

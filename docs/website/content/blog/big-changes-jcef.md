@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/big-changes-jcef/generic-java-2.jpg)
 
-Today we released one of the biggest changes to Codename Ones simulator in ages. We added the ability to use CEF (Chrome Embedding Framework). This is **currently** off by default but even if you don’t use it you might feel the impact so it’s crucial that you read this post.
+Today we released one of the biggest changes to Codename One’s simulator in ages. We added the ability to use CEF (Chrome Embedding Framework). This is **currently** off by default but even if you don’t use it you might feel the impact so it’s crucial that you read this post.
 
 __ |  Updated July 31st with additional platform instructions below   
 ---|---  
@@ -115,7 +115,7 @@ Up until now the JavaSE port had one version which was `JavaSEPort`. This is now
 
   * **JavaFX** — a compatibility mode implementation which is currently the default.
 
-  * **CEF** — the new mode which will run if the cef directory is available/
+  * **CEF** — the new mode which will run if the cef directory is available.
 
   * **JMF** — a special case that uses Java Media Framework for media playback instead of JavaFX or JCEF. It has the advantage of being very small. It works very similarly to the CEF approach by searching for the JMF jar in the `.codenameone` directory and using it if it’s available. We’re not sure this is a use case worth pursuing.
 

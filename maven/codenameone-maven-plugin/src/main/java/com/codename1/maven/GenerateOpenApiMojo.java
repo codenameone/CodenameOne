@@ -267,12 +267,22 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         }
 
         void run() throws IOException {
-            // Build per-schema info up front so the unification map is ready
-            // before any operation references a schema by name.
+            // Pass 1: classify `enum` schemas first so property/parameter type
+            // resolution can tell an enum `$ref` from an object `$ref`.
             for (Map.Entry<String, Object> e : schemas.entrySet()) {
                 if (!(e.getValue() instanceof Map)) continue;
                 @SuppressWarnings("unchecked")
                 Map<String, Object> schema = (Map<String, Object>) e.getValue();
+                if (isEnumSchema(schema)) {
+                    schemaByName.put(e.getKey(), buildEnumInfo(e.getKey(), schema));
+                }
+            }
+            // Pass 2: object schemas, now able to resolve enum references.
+            for (Map.Entry<String, Object> e : schemas.entrySet()) {
+                if (!(e.getValue() instanceof Map)) continue;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> schema = (Map<String, Object>) e.getValue();
+                if (isEnumSchema(schema)) continue;
                 SchemaInfo info = buildSchemaInfo(e.getKey(), schema);
                 if (info == null) continue;
                 schemaByName.put(e.getKey(), info);
@@ -313,10 +323,19 @@ public class GenerateOpenApiMojo extends AbstractMojo {
             ensureDir(modelDir);
             // Iterate canonical schemas only (unification dropped duplicates).
             Set<String> emittedCanonical = new HashSet<String>();
+            int enumCount = 0;
             for (SchemaInfo info : schemaByName.values()) {
                 if (!info.isCanonical) continue;
                 if (!emittedCanonical.add(info.javaName)) continue;
-                emitModel(modelDir, info);
+                if (info.isEnum) {
+                    if (info.enumGeneratable) {
+                        emitEnum(modelDir, info);
+                        enumCount++;
+                    }
+                    // Non-generatable enums degrade to String -- nothing to emit.
+                } else {
+                    emitModel(modelDir, info);
+                }
             }
 
             // Emit @RestClient interfaces -- one per tag.
@@ -326,7 +345,8 @@ public class GenerateOpenApiMojo extends AbstractMojo {
                 emitApi(apiDir, e.getKey(), e.getValue());
             }
 
-            log.info("Generated " + emittedCanonical.size() + " model(s) and "
+            log.info("Generated " + (emittedCanonical.size() - enumCount) + " model(s), "
+                    + enumCount + " enum(s), and "
                     + opsByTag.size() + " @RestClient interface(s) under " + outputDir);
         }
 
@@ -375,11 +395,54 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         }
 
         private static String shapeOf(SchemaInfo s) {
+            if (s.isEnum) {
+                return " enum:" + s.enumGeneratable + ":" + s.enumValues;
+            }
             StringBuilder sb = new StringBuilder();
             for (PropInfo p : s.props) {
                 sb.append(p.specName).append(':').append(p.javaType).append(';');
             }
             return sb.toString();
+        }
+
+        /// `true` when the schema is a string enumeration (an `enum` array on a
+        /// `string`-typed -- or untyped -- schema). Integer/number enums keep
+        /// their numeric Java type and are not turned into Java enums.
+        private static boolean isEnumSchema(Map<String, Object> schema) {
+            Object e = schema.get("enum");
+            if (!(e instanceof List) || ((List<?>) e).isEmpty()) return false;
+            Object type = schema.get("type");
+            return type == null || "string".equals(type);
+        }
+
+        private SchemaInfo buildEnumInfo(String name, Map<String, Object> schema) {
+            SchemaInfo s = new SchemaInfo();
+            s.specName = name;
+            s.javaName = sanitizeClassName(name);
+            s.isCanonical = true;
+            s.isEnum = true;
+            for (Object v : (List<?>) schema.get("enum")) {
+                if (v != null) s.enumValues.add(String.valueOf(v));
+            }
+            s.enumGeneratable = enumValuesAreJavaConstants(s.enumValues);
+            return s;
+        }
+
+        /// An enum can be emitted as a Java enum only when each value is already
+        /// a valid (non-reserved) Java identifier, because the JSON mapper binds
+        /// enum constants by their `name()` -- the constant must equal the wire
+        /// value verbatim. Otherwise the field degrades to `String`.
+        private static boolean enumValuesAreJavaConstants(List<String> values) {
+            if (values.isEmpty()) return false;
+            for (String v : values) {
+                if (v.length() == 0) return false;
+                if (!Character.isJavaIdentifierStart(v.charAt(0))) return false;
+                for (int i = 1; i < v.length(); i++) {
+                    if (!Character.isJavaIdentifierPart(v.charAt(i))) return false;
+                }
+                if (isJavaReservedWord(v)) return false;
+            }
+            return true;
         }
 
         // ----------------------------------------------------------------
@@ -524,8 +587,13 @@ public class GenerateOpenApiMojo extends AbstractMojo {
                 int slash = r.lastIndexOf('/');
                 if (slash >= 0 && r.startsWith("#/components/schemas/")) {
                     String specName = r.substring(slash + 1);
+                    SchemaInfo target = schemaByName.get(specName);
+                    if (target != null && target.isEnum && !target.enumGeneratable) {
+                        return "String";
+                    }
                     String alias = nameAliases.get(specName);
-                    String name = alias != null ? alias : sanitizeClassName(specName);
+                    String name = alias != null ? alias
+                            : (target != null ? target.javaName : sanitizeClassName(specName));
                     return modelPackage + "." + name;
                 }
                 return "Object";
@@ -568,6 +636,24 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         // ----------------------------------------------------------------
         // Source emit
         // ----------------------------------------------------------------
+
+        private void emitEnum(File dir, SchemaInfo info) throws IOException {
+            File f = new File(dir, info.javaName + ".java");
+            if (f.exists() && !overwrite) {
+                log.debug("skip existing " + f);
+                return;
+            }
+            StringBuilder sb = new StringBuilder(512);
+            sb.append("// Generated by cn1:generate-openapi.\n");
+            sb.append("package ").append(modelPackage).append(";\n\n");
+            sb.append("public enum ").append(info.javaName).append(" {\n");
+            for (int i = 0; i < info.enumValues.size(); i++) {
+                sb.append("    ").append(info.enumValues.get(i));
+                sb.append(i == info.enumValues.size() - 1 ? "\n" : ",\n");
+            }
+            sb.append("}\n");
+            writeFile(f, sb.toString());
+        }
 
         private void emitModel(File dir, SchemaInfo info) throws IOException {
             File f = new File(dir, info.javaName + ".java");
@@ -827,6 +913,13 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         String javaName;       // sanitized Java identifier (post-unification)
         boolean isCanonical;   // false when this entry is aliased to another
         final List<PropInfo> props = new ArrayList<PropInfo>();
+        /// `true` when this schema is a string `enum`.
+        boolean isEnum;
+        /// `true` when every enum value is a valid Java constant name, so it
+        /// can be emitted as a Java enum and bound via `name()`. Otherwise the
+        /// enum degrades to `String`.
+        boolean enumGeneratable;
+        final List<String> enumValues = new ArrayList<String>();
     }
 
     static final class PropInfo {

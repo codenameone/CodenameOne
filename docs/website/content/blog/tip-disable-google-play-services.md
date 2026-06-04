@@ -16,7 +16,7 @@ In recent years more and more features go into Google Play Services making it ha
 
 In our effort to "do the right thing" we include some of the Google Play Services tools into applications to remain  
 compatible with code that requires these libraries. This also makes some features (such as location) work better.  
-However,if you don’t use: Ads, Push, Maps or Location then you might not need Google Play Services at all…​
+However, if you don’t use: Ads, Push, Maps or Location then you might not need Google Play Services at all…​
 
 At this time the overhead of including this subset of Google play services is 1.5mb to your final APK size. This  
 isn’t much but if your app isn’t big then this might double its size and slow down the cloud build process.

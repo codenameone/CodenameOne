@@ -16,7 +16,7 @@ Let’s face it, your app is probably a commodity. As noted by [Wikipedia](http:
 that is, the market treats its instances as equivalent or nearly so with no regard to who produced them." In basic English  
 it means that your product can be easily replaced in part or completely by another to satisfy the needs of the market.  
 For 99% of apps out there this means that if a user doesn’t find your app, they’ll pick another one that they think fills  
-the need they’re looking to satisfy. This the same whether your app is a game, a productivity app or any other category. 
+the need they’re looking to satisfy. This is the same whether your app is a game, a productivity app or any other category. 
 
 As the app ecosystem has evolved the challenge of reaching consumers for app developers has grown more and more difficult.  
 From a technical perspective the promise of reduced fragmentation hasn’t panned out even with so many OSs  
@@ -32,12 +32,12 @@ getting on the shelf is the easy part, it’s much more important to get people 
 choose to shop than it is to drive people into the iTunes or Google Play stores. Getting on their shelves is a basic requirement but far from sufficient for success. Remember, your app is a commodity – if it’s not available when and where users are shopping then it’s a missed opportunity. We often hear the question "why does anyone use anything other than Google Play?". In reality that’s precisely the wrong question to ask. The correct question is "Do you want your app to miss out on the 100s of millions of downloads that are taking place outside of Google Play?" 
 
 Even with a quality app, like any startup business, your odds of being successful aren’t very good. The One Platform Foundation’s  
-[Android AppStore Market Overview](http://www.onepf.org/appstores/) noted that alternative app stores significantly improve the chances of your app being discovered by consumers. "Submitting your app to alternative appstores will increase your chances of being featured by more than 20 times." The job of any small business owners is to give their business the best chance to be successful in a highly competitive marketplace. This has never been more important than for app publishers today. 
+[Android AppStore Market Overview](http://www.onepf.org/appstores/) noted that alternative app stores significantly improve the chances of your app being discovered by consumers. "Submitting your app to alternative appstores will increase your chances of being featured by more than 20 times." The job of any small business owner is to give their business the best chance to be successful in a highly competitive marketplace. This has never been more important than for app publishers today. 
 
 #### Don’t ignore the global audience
 
 Being everywhere really means "Think global – act local". Do not forget about language localization and the importance of this.  
-[Case studies from online gaming](http://blog.xsolla.com/2014/03/05/localization/) has shown  
+[Case studies from online gaming](http://blog.xsolla.com/2014/03/05/localization/) have shown  
 that bounce rates can drop significantly and conversion and revenue drastically. For instance, 5% of the apps in Russia are localized, yet generate  
 [70% of the revenue](http://blog.codengo.com/2012/07/going-local-the-importance-of-language-for-mobile-app-revenues/). 
 

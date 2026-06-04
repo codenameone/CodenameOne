@@ -13,11 +13,11 @@ author: Shai Almog
 
 We are on a mid-bootcamp break so the blog is back to life during this time (and there is so much to write!), more on that tomorrow but for now I’d like to write about fixing & tracking issues with the designer (resource editor) and the GUI builder.
 
-Both of these tools have issues most of which resolve around their connection to the IDE. The reason for this is that they are external tools that aren’t a part of the IDE, this allows us to support all 3 IDE’s without too much of an effort but also creates some issues that are often hard to debug.
+Both of these tools have issues most of which revolve around their connection to the IDE. The reason for this is that they are external tools that aren’t a part of the IDE, this allows us to support all 3 IDE’s without too much of an effort but also creates some issues that are often hard to debug.
 
 When you open either the designer or the GUI builder we install a JAR file within your system. This JAR file is located under the `.codenameone` directory in your home directory. E.g. on Linux/Mac it would be `~` but for Windows it can be under several hierarchies, see [this](https://en.wikipedia.org/wiki/Home_directory).
 
-Once you locate the home directory peak inside, you should see two files: `designer_1.jar` & `guibuilder_1.jar`.
+Once you locate the home directory peek inside, you should see two files: `designer_1.jar` & `guibuilder_1.jar`.
 
 __ |  Both will only exist if you opened the designer and GUI builder, also notice that the `_1` part of the file name might be missing   
 ---|---  
@@ -62,7 +62,7 @@ There are several reasons for this and we try to address them with newer release
 
 The important attributes here are `file` and `javaFile`. The former represents the XML gui file and the latter represents the Java source file related to that. If the path is invalid the GUI builder won’t find the right files and won’t know what to do.
 
-The content of the `.gui` file might also be important if the GUI builder suddently stops working for a specific file.
+The content of the `.gui` file might also be important if the GUI builder suddenly stops working for a specific file.
 
 ### Finally
 

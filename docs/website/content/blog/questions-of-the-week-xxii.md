@@ -38,7 +38,7 @@ You can select the size in megabytes in advance but you can monitor the size and
 ### Java 8 and Java time
 
 Codename One supports a subset of Java 8 with subset being an important keyword here…​ I’d like to explain this  
-into greater details, perhapse with a blog post
+into greater details, perhaps with a blog post
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39362030/java-8-and-java-time)
 

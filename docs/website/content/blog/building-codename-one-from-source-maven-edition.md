@@ -66,7 +66,7 @@ I demonstrate this in the video by creating a new project with the [Codename One
 
 > Check out my [Video tutorial on Codename One initializr](https://sjhannah.medium.com/preview-online-tool-to-generate-ios-android-app-starter-project-c9f27c47850b) if you haven’t seen it yet.
 
-After downloading and extracting the project, I open its `pom.xml` file and and look for the `<cn1.version>` and `<cn1.plugin.version>` properties:
+After downloading and extracting the project, I open its `pom.xml` file and look for the `<cn1.version>` and `<cn1.plugin.version>` properties:
 
 ...
 

@@ -19,7 +19,7 @@ blog post from Andreas Gal](http://andreasgal.com/2016/01/05/oracle-sinks-its-cl
 [Google’s move to OpenJDK](/blog/analysis-google-moving-to-openjdk-what-that-really-means.html).  
 Then Mr. Eich picked it up: 
 
-> .[@mosheeshel](https://twitter.com/mosheeshel) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) [@Codename_One](https://twitter.com/Codename_One) We don't know enough yet, but I agree with [@andreasgal](https://twitter.com/andreasgal) that code changes show cost+risk go up.
+> .[@mosheeshel](https://twitter.com/mosheeshel) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) [@Codename_One](https://twitter.com/Codename_One) We don’t know enough yet, but I agree with [@andreasgal](https://twitter.com/andreasgal) that code changes show cost+risk go up.
 > 
 > — BrendanEich (@BrendanEich) [January 5, 2016](https://twitter.com/BrendanEich/status/684454476028227584)
 
@@ -71,7 +71,7 @@ no real difference.
 
 #### All this code and technology churn will have massive implications for Android
 
-> [@Codename_One](https://twitter.com/Codename_One) [@deanrl](https://twitter.com/deanrl) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) To recap, [@andreasgal](https://twitter.com/andreasgal) & I say MLOCs of forced change carry hi incompat risk, all agree that'd suck.
+> [@Codename_One](https://twitter.com/Codename_One) [@deanrl](https://twitter.com/deanrl) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) To recap, [@andreasgal](https://twitter.com/andreasgal) & I say MLOCs of forced change carry hi incompat risk, all agree that’d suck.
 > 
 > — BrendanEich (@BrendanEich) [January 6, 2016](https://twitter.com/BrendanEich/status/684609887817445376)
 
@@ -109,7 +109,7 @@ than this change.
 Device compatibility with no-brand devices on the far east market and non-google devices are also far bigger problems  
 for an Android developer than this will ever be. 
 
-> [@deanrl](https://twitter.com/deanrl) [@Codename_One](https://twitter.com/Codename_One) [@mosheeshel](https://twitter.com/mosheeshel) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) [@andreasgal](https://twitter.com/andreasgal) 2/ Bill Joy of Sun persuaded us to kill Kipp's VM as bug4bug is impossible.
+> [@deanrl](https://twitter.com/deanrl) [@Codename_One](https://twitter.com/Codename_One) [@mosheeshel](https://twitter.com/mosheeshel) [@enleeten](https://twitter.com/enleeten) [@hhariri](https://twitter.com/hhariri) [@andreasgal](https://twitter.com/andreasgal) 2/ Bill Joy of Sun persuaded us to kill Kipp’s VM as bug4bug is impossible.
 > 
 > — BrendanEich (@BrendanEich) [January 6, 2016](https://twitter.com/BrendanEich/status/684526309540679681)
 
@@ -140,7 +140,7 @@ peace process and more collaboration to benefit everyone.
 
 I think this sums up a lot of the claims. Yes this will take Google some effort. Yes a few apps might be  
 affected, I’d wager this would be far less than those affected by the Marshmallow changes and Google  
-has the tools to alleviate a lot of that problems (sdk version hints).  
+has the tools to alleviate a lot of those problems (sdk version hints).  
 Would Google have done it without the lawsuit?  
 Maybe… If there was no lawsuit and Java 8 was out, maybe Google would have adopted OpenJDK or maybe  
 they would have dedicated the engineering effort to add this support into Android’s Harmony. Either way  

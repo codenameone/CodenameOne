@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-xi/qanda-friday.jpg)
 
-We just released an updated set of plugins with many bug fixes and enhancement mostly revolving around  
+We just released an updated set of plugins with many bug fixes and enhancements mostly revolving around  
 the new settings UI but also a lot of the functionality required for proper Windows UWP support…​
 
 This has been a very busy week for us although most of the stuff we did was "under the hood" and not as  
@@ -23,7 +23,7 @@ Stackoverflow was quieter this week when compared to the previous one:
 ### Background image scaled and in center of container
 
 If you use the `scaled()` method on an `Image` it creates a new copy, when that `Image` is a `URLImage` you will  
-lose it’s ability to fetch the image data dynamically.
+lose its ability to fetch the image data dynamically.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37980653/background-image-scaled-and-in-center-of-container-codenameone)
 

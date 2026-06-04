@@ -61,7 +61,7 @@ If you have DDMS you can connect the device to your machine and see the printout
   
 This will return the hash only  
   
-on Android ofcourse.
+on Android of course.
 
   
 You can take this hash and paste it into the section marked Key Hashes in the native android app section. Notice you can have multiple hashes if you have more than one certificates or applications.  

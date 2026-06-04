@@ -17,7 +17,7 @@ This website/blog has gotten really long in the tooth, we would have replaced it
 
 But I want to talk to you about something different and rather cool I discovered: [JBake](http://jbake.org/). 
 
-Don’t let the spartan website fool you. Its a really cool and rather complete tool that’s meant to be Java’s answer to Jekyll.
+Don’t let the spartan website fool you. It’s a really cool and rather complete tool that’s meant to be Java’s answer to Jekyll.
 
 In case you aren’t very familiar with the current fashion in website development, the current trend is static websites that can be super scalable and easy to deploy. Thanks to modern day JavaScript, such static websites are still very dynamic and interactive while providing levels of performance/scalability that are ridiculously high with CDN’s. 
 

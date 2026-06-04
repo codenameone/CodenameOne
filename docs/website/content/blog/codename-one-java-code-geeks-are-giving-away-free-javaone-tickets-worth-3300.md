@@ -25,7 +25,7 @@ Would you like to go to
 [  
 JavaOne  
 ](https://www.oracle.com/javaone/index.html)  
-? Besides being a cool conference its loads of fun with shows and events thru-out the city.  
+? Besides being a cool conference it’s loads of fun with shows and events thru-out the city.  
   
   
   

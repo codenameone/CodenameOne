@@ -310,7 +310,7 @@ FaceDetector.detect(jpeg).onResult((boxes, err) -> {
 });
 ```
 
-#### `cn1-ai-mlkit-labeling`: image labelling
+#### `cn1-ai-mlkit-labeling`: image labeling
 
 **TL;DR.** "What is in this picture." Returns a list of descriptive labels for the image content.
 
@@ -470,7 +470,7 @@ StableDiffusion.generate("a teal hot-air balloon over Lisbon, watercolour",
 
 The core gets the AI plumbing every app that adopts AI at all wants: the LLM client, streaming, the chat UI, the secure storage primitive for credentials, the simulator Ollama redirect for offline iteration.
 
-The cn1libs above are specialised verticals. Barcode scanning, document scanning, face detection, smart reply, pose detection, on-device translation, transcription, on-device image generation, each is genuinely useful, but only for some apps. They also each bring a non-trivial native dependency. The Google ML Kit Android frameworks are large; the iOS pods carry their own weight; the bundled `libwhisper.a` and the Stable Diffusion model are big. Pulling all of them into core would tax every app whether the feature is used or not.
+The cn1libs above are specialized verticals. Barcode scanning, document scanning, face detection, smart reply, pose detection, on-device translation, transcription, on-device image generation, each is genuinely useful, but only for some apps. They also each bring a non-trivial native dependency. The Google ML Kit Android frameworks are large; the iOS pods carry their own weight; the bundled `libwhisper.a` and the Stable Diffusion model are big. Pulling all of them into core would tax every app whether the feature is used or not.
 
 The Stable Diffusion cn1lib in particular is large enough that the cloud build server cannot accept the upload at all (it trips the 2 GB pre-upload guard). That kind of opt-in does not belong in a dependency every app inherits.
 
@@ -649,7 +649,7 @@ btn.setShareResultListener(result -> {
 });
 ```
 
-iOS routes through `UIActivityViewController.completionWithItemsHandler`; Android through `Intent.createChooser` with an `IntentSender` callback (API 22+). The framework normalises the platform values into `SHARED_TO(packageName)`, `DISMISSED`, or `FAILED`.
+iOS routes through `UIActivityViewController.completionWithItemsHandler`; Android through `Intent.createChooser` with an `IntentSender` callback (API 22+). The framework normalizes the platform values into `SHARED_TO(packageName)`, `DISMISSED`, or `FAILED`.
 
 ### Appearing in other apps' share menus
 

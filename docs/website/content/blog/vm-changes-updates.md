@@ -34,13 +34,12 @@ Since Java is based mostly on heap this could have a huge impact on performance 
 
 You can try it right now by setting the build hint `ios.rpmalloc=true`.
 
-Notice that if you set this flag to true (which will be the default soon) the iOS deployment target will be set to 8.0+ so if you use the build hint `ios.deployment_target` with a lower value or if you need support for older devices/OS’s you will need to explictly set this to false!
+Notice that if you set this flag to true (which will be the default soon) the iOS deployment target will be set to 8.0+ so if you use the build hint `ios.deployment_target` with a lower value or if you need support for older devices/OS’s you will need to explicitly set this to false!
 
 #### Faster UTF-8
 
 This might seem like a smaller feature but string decoding is probably one of the biggest bottlenecks in app logic.
 
-In fact it was such a big bottleneck that we optimized UTF-8 decoding with a special case that detected ASCII code and used a special case fast decode. This worked great for ASCII but not as great for localized text. If you had an app that did a lot of character decoding from a source that wasn’t English  
 In fact it was such a big bottleneck that we optimized UTF-8 decoding with a special case that detected ASCII code and used a special case fast decode. This worked great for ASCII but not as great for localized text. If you had an app that did a lot of character decoding from a source that wasn’t of the lower 7 bit ASCII table you paid a penalty in terms of performance as parsing was delegated to Objective-C code.
 
 Steve wrote a fast C based UTF-8 decoding function that should remove that significant bottleneck that might impact a lot of apps.

@@ -44,8 +44,8 @@ increased the overall footprint of the JVM for things like AOT compilation.
 
 With Codename One we went to the other extreme which is probably not ideal either (but somewhat hard  
 to fix in retrospect) of using `ActionListener`/`ActionEvent` for everything.  
-This has advantages such as really simple and generic event binding, however it creats a situation where  
-the generic code to process an events can’t easily distinguish one type of event from another.  
+This has advantages such as really simple and generic event binding, however it creates a situation where  
+the generic code to process an event can’t easily distinguish one type of event from another.  
 Dave Dyer contributed a  
 [pull request](https://github.com/codenameone/CodenameOne/commit/43237332b308e169ef4034a7b436e7e35518549a)  
 that added a new type attribute to action events together with a `Type` enum. 
@@ -87,7 +87,7 @@ We now have two ways to do this that are simpler:
     int paddingPixels = style.getPaddingTop();
 
 This obviously applies to the sides/bottom as well.  
-The main motivation isn’t just the shorter amount of code and intuitive nature of the API. Its also slightly faster  
+The main motivation isn’t just the shorter amount of code and intuitive nature of the API. It’s also slightly faster  
 as some checks become unnecessary by the specific code. 
 
 #### Centering the Toolbar

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-use-native-edt/tip.jpg)
 
-The bootcamp is winding down and I’m finally back to our usual scheduled posts. I’d like to open with a common practice that isn’t nearly documented enough: use the native main/EDT threads. Our EDT serves many purposes but one of it’s biggest roles is portability. By having an EDT we get consistent behavior across platforms.
+The bootcamp is winding down and I’m finally back to our usual scheduled posts. I’d like to open with a common practice that isn’t nearly documented enough: use the native main/EDT threads. Our EDT serves many purposes but one of its biggest roles is portability. By having an EDT we get consistent behavior across platforms.
 
 iOS, Android & pretty much any modern OS has an EDT like thread that handles events etc. The problem is that they differ in their nuanced behavior. E.g. Android will usually respect calls off of the EDT and iOS will often crash. Some OS’s enforce EDT access rigidly and will throw an exception when you violate that…​
 

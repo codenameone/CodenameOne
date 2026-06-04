@@ -24,7 +24,7 @@ What the??! He said it was 1 inch squared. How will I ever see what is on this i
 What I needed to do was convert this image to a multi-image so that it would display at the proper size on my device, and all devices. So I imported the image into my Codename One resource file, specifying a source density of "Very Low". Then created a simple app using the Codename One GUI builder, that displays a single label. The source to display the multi-image roughly as follows (Please excuse the crudity of this model. I didn’t have time to build it to scale or paint it):
     
     
-    System.out.println("I'm your density: "+ Display.getInstance().getDeviceDensity());
+    System.out.println("I’m your density: "+ Display.getInstance().getDeviceDensity());
     
     Label image = new Label(theme.getImage("AlmanacClipping.png"));
     theForm.addComponent(image);
@@ -37,7 +37,7 @@ After loading the app onto my phone, I can finally see the message: "Chicago Cub
 
 Hmm. Good thing I didn’t bet on the Blue Jays, as I had planned to do. On the bright side, my app works. It displays the image in the correct size on all devices. I finally invent something that works! Perhaps I should submit this to the iTunes store and Google Play.
 
-But what if I send in the app in and they don’t like it? What if they say I’m no good? What if they say, "Get out of here kid. You’ve got no future"? I mean, I just don’t think I can take that kind of rejection.
+But what if I send in the app and they don’t like it? What if they say I’m no good? What if they say, "Get out of here kid. You’ve got no future"? I mean, I just don’t think I can take that kind of rejection.
 
 ## Behind the Scenes: The Making of this Post
 

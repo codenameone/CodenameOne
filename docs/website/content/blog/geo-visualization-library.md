@@ -134,7 +134,7 @@ The default painter will just render the map with black outlines and white fills
 
 For the full example, check out the [GeoViz Demo](https://github.com/shannah/GeoVizDemo).
 
-You can also check out the Javadocs for the the library [here](https://rawgit.com/shannah/CN1GeoViz/master/dist/javadoc/index.html).
+You can also check out the Javadocs for the library [here](https://rawgit.com/shannah/CN1GeoViz/master/dist/javadoc/index.html).
 ---
 
 ## Archived Comments

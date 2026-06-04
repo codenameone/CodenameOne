@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app/psd_to_app_title_image.jpg)
 
-This past Thursday morning, I hosted our third tech-talk/webinar for the community. The first two included tutorials that were targeted at absolute beginners. This time I wanted drill down and cover a more advanced topic: creating themes.
+This past Thursday morning, I hosted our third tech-talk/webinar for the community. The first two included tutorials that were targeted at absolute beginners. This time I wanted to drill down and cover a more advanced topic: creating themes.
 
 Codename One provides extensive support for designing beautiful user interfaces, but it isn’t necessarily obvious to new developers how to achieve their desired results. A common workflow for app design includes a PSD file with mock-ups of the UI, created by a professional designer.
 
@@ -31,7 +31,7 @@ I found this nice sign-up form in [this PSD file](http://freebiesbug.com/psd-fre
 
   4. Extracted the fonts, colors, and styles we needed to reproduce the design in Codename One.
 
-  5. Imported images into our Codename one project, and defined theme styles so that are component matches the look of the original design.
+  5. Imported images into our Codename one project, and defined theme styles so that our component matches the look of the original design.
 
 Here is a screenshot of the resulting component running inside the Codename One simulator:
 
@@ -39,7 +39,7 @@ Here is a screenshot of the resulting component running inside the Codename One 
 
 I also built this demo project using the Codename One Javascript port and have posted it online with simulated densities for the iPhone 3G, iPhone 4, and iPhone 5, so you can try out the form, and see how it adjusts to different screen densities and resolutions.
 
-[Click here to try out the this component in your browser](http://solutions.weblite.ca/codename1/demos/CSSDemo.html).
+[Click here to try out this component in your browser](http://solutions.weblite.ca/codename1/demos/CSSDemo.html).
 
 __ |  Currently only Chrome, Firefox, and Safari are supported.   
 ---|---  
@@ -48,9 +48,9 @@ Here is a video of the tutorial:
 
 By applying just a few simple techniques, you can spice up your App’s UI and set it apart from all the rest.
 
-## Sneak Peak at CSS Support
+## Sneak Peek at CSS Support
 
-Near the end of the tutorial, I gave a sneak peak at the upcoming CSS theming support, and showed how we can produce the same design using CSS instead of using the resource editor. Personally I prefer to use a text-based format like CSS for defining my themes. It is easier to re-use styles between projects and share themes with other developers. Once you are well-versed in CSS, it is generally also much faster than working with a GUI tool.
+Near the end of the tutorial, I gave a sneak peek at the upcoming CSS theming support, and showed how we can produce the same design using CSS instead of using the resource editor. Personally I prefer to use a text-based format like CSS for defining my themes. It is easier to re-use styles between projects and share themes with other developers. Once you are well-versed in CSS, it is generally also much faster than working with a GUI tool.
 
 Just to give you a taste of what is involved in theming a component with CSS, here is the Java source for my SignUpForm component. Pay special note to the `setUIID()` calls which register components with specific IDs that I target from CSS:
     

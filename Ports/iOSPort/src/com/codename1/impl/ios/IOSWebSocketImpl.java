@@ -60,7 +60,23 @@ class IOSWebSocketImpl extends WebSocketImpl {
 
     @Override
     public void connect(int connectTimeoutMs) {
-        IOSImplementation.nativeInstance.connectWebSocketNative(nativePtr, connectTimeoutMs);
+        IOSImplementation.nativeInstance.connectWebSocketNative(
+                nativePtr, connectTimeoutMs, subprotocolsCsv());
+    }
+
+    /// Comma-joined view of the requested subprotocols (or null), split
+    /// back into an NSArray by the native task creation.
+    private String subprotocolsCsv() {
+        String[] subs = requestedSubprotocols();
+        if (subs == null || subs.length == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < subs.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(subs[i]);
+        }
+        return sb.toString();
     }
 
     @Override
@@ -95,12 +111,14 @@ class IOSWebSocketImpl extends WebSocketImpl {
 
     /* ---------- static dispatch from native code ---------- */
 
-    public static void fireConnect(int connectionId) {
+    public static void fireConnect(int connectionId, String selectedProtocol) {
         IOSWebSocketImpl ws = lookup(connectionId);
         if (ws == null) {
             return;
         }
         ws.state = WebSocketState.OPEN;
+        ws.setSelectedSubprotocol(selectedProtocol == null
+                || selectedProtocol.length() == 0 ? null : selectedProtocol);
         ws.sink().onConnect();
     }
 

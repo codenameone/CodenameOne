@@ -37,10 +37,10 @@ We’ve added five methods that create this type to container:
     public ComponentAnimation createAnimateHierarchyFade(int duration, int startingOpacity);
     public ComponentAnimation createAnimateLayoutFade(int duration, int startingOpacity);
 
-__ |  `createStyleAnimation` has been around since 3.4 so it isn’t listed, but we fixed a some bugs there…​   
+__ |  `createStyleAnimation` has been around since 3.4 so it isn’t listed, but we fixed some bugs there…​   
 ---|---  
   
-You will notice that there are no `AndWait` version since you add these animations to the animation queue thru the [AnimationManager](/javadoc/com/codename1/ui/AnimationManager/) API which has both `addAnimation` & `addAnimationAndBlock` allowing both use cases.
+You will notice that there are no `AndWait` versions since you add these animations to the animation queue thru the [AnimationManager](/javadoc/com/codename1/ui/AnimationManager/) API which has both `addAnimation` & `addAnimationAndBlock` allowing both use cases.
 
 The code above uses the `compoundAnimation` static method to merge together animations (you can merge any number of animations not just two). You can also use the `sequentialAnimation` method to merge an animation sequence which might be more convenient than `AndWait` or `AndBlock`.
 

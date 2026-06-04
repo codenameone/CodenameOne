@@ -345,5 +345,32 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
 // the mutable's pixels through CG / CIImage on Metal builds.
 UIImage * _Nullable CN1MetalReadMutableImageAsUIImage(GLUIImage *image);
 
+// -------- Mutable-image suspend/resume backup (issue #5153) --------
+//
+// MTLStorageModePrivate textures that back mutable images may have their
+// contents discarded by the system while the app is suspended in the
+// background. A mutable image that survives the suspension (anything cached
+// and re-displayed without being redrawn -- e.g. the RoundBorder shadow used
+// by FloatingActionButton) would then sample uninitialised GPU memory on
+// resume, rendering as a violet/garbage fill.
+//
+// To make mutable images survive suspension we keep a weak registry of every
+// GLUIImage that currently owns a mutable texture. The register/unregister
+// hooks are called from GLUIImage as its mutable texture comes and goes.
+
+// Add/remove a GLUIImage from the live mutable-image registry. The registry
+// holds weak references (no ownership); dealloc'd images drop out
+// automatically. Safe to call from any thread.
+void CN1MetalRegisterMutableImage(GLUIImage *image);
+void CN1MetalUnregisterMutableImage(GLUIImage *image);
+
+// Read every registered mutable image back into its CPU-side UIImage backing
+// and drop the volatile GPU texture. Called from applicationWillResignActive
+// while the app is still active (so GPU use is legal). The texture is rebuilt
+// from the backing on the next paint/sample after resume -- see
+// CN1MetalEnsureMutableTexture and GLUIImage.getMTLTexture, both of which
+// re-seed from getImage. Must be called on the main thread.
+void CN1MetalBackupMutableImagesForSuspend(void);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

@@ -1975,6 +1975,21 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Time-sensitive / critical notification entitlements. These require a
+            // matching capability to be enabled on the Apple App ID, so auto-injecting them
+            // from mere notification usage would break code signing for apps that have not
+            // provisioned the capability. They are therefore opt-in via build hints:
+            //   ios.timeSensitiveNotifications=true -> com.apple.developer.usernotifications.time-sensitive
+            //   ios.criticalAlerts=true             -> com.apple.developer.usernotifications.critical-alerts
+            if ("true".equals(request.getArg("ios.timeSensitiveNotifications", "false"))
+                    && request.getArg("ios.entitlements.com.apple.developer.usernotifications.time-sensitive", null) == null) {
+                request.putArgument("ios.entitlements.com.apple.developer.usernotifications.time-sensitive", "true");
+            }
+            if ("true".equals(request.getArg("ios.criticalAlerts", "false"))
+                    && request.getArg("ios.entitlements.com.apple.developer.usernotifications.critical-alerts", null) == null) {
+                request.putArgument("ios.entitlements.com.apple.developer.usernotifications.critical-alerts", "true");
+            }
+
             // Deeper-network connectivity (WiFi info / NEHotspotConfiguration
             // / Bonjour). Each block is gated on a scanner flag so apps that
             // never touch the API see no entitlement or plist changes -- this
@@ -2126,6 +2141,15 @@ public class IPhoneBuilder extends Executor {
                     } else {
                         addLibs += ";UserNotifications.framework";
                     }
+                }
+
+                // BackgroundTasks.framework (BGTaskScheduler / BGProcessingTaskRequest,
+                // iOS 13+) is referenced unconditionally by the IOSNative background
+                // processing bridge, so it must always be linked.
+                if (addLibs == null) {
+                    addLibs = "BackgroundTasks.framework";
+                } else if (!addLibs.toLowerCase().contains("backgroundtasks")) {
+                    addLibs += ";BackgroundTasks.framework";
                 }
 
                 if (request.getArg("ios.useJavascriptCore", "false").equalsIgnoreCase("true")) {
@@ -3517,6 +3541,21 @@ public class IPhoneBuilder extends Executor {
             }
         }
 
+        // Constraint-aware background work / BackgroundTask map to BGTaskScheduler. The
+        // permitted identifiers are declared via ios.backgroundProcessingIds (comma list,
+        // default <packageName>.processing). Their presence implies the "processing"
+        // background mode.
+        String backgroundProcessingIds = request.getArg("ios.backgroundProcessingIds", null);
+        if (backgroundProcessingIds == null && "true".equals(request.getArg("ios.usesBackgroundProcessing", "false"))) {
+            backgroundProcessingIds = request.getPackageName() + ".processing";
+        }
+        if (backgroundProcessingIds != null && backgroundProcessingIds.trim().length() > 0) {
+            if (backgroundModesStr == null || !backgroundModesStr.contains("processing")) {
+                backgroundModesStr = (backgroundModesStr == null || backgroundModesStr.trim().length() == 0)
+                        ? "processing" : backgroundModesStr + ",processing";
+            }
+        }
+
         if (backgroundModesStr != null) {
             String[] backgroundModes = backgroundModesStr.split(",");
             if (!inject.contains("UIBackgroundModes")) {
@@ -3533,8 +3572,28 @@ public class IPhoneBuilder extends Executor {
                 inject += "</array>";
             } else {
                 throw new IOException("You cannot use both ios.background_modes build hint and use UIBackgroundModes in the ios.plistInject build hint.  Choose one or the other");
-                
+
             }
+        }
+
+        // BGTaskScheduler permitted identifiers (iOS 13+). Required or iOS throws when the
+        // app registers/submits a background processing task.
+        if (backgroundProcessingIds != null && backgroundProcessingIds.trim().length() > 0
+                && !inject.contains("BGTaskSchedulerPermittedIdentifiers")) {
+            inject += "\n<key>BGTaskSchedulerPermittedIdentifiers</key><array>";
+            for (String id : backgroundProcessingIds.split(",")) {
+                if (id.trim().length() > 0) {
+                    inject += "<string>" + id.trim() + "</string>";
+                }
+            }
+            inject += "</array>";
+        }
+
+        // Receive-shared-content: the host app reads the shared payload from this App Group
+        // suite (written by the share extension). See ios.shareAppGroup build hint.
+        String shareAppGroup = request.getArg("ios.shareAppGroup", null);
+        if (shareAppGroup != null && shareAppGroup.trim().length() > 0 && !inject.contains("CN1ShareAppGroup")) {
+            inject += "\n<key>CN1ShareAppGroup</key><string>" + shareAppGroup.trim() + "</string>";
         }
 
         BufferedReader infoReader = new BufferedReader(new InputStreamReader(

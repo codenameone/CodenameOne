@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/migrations-new-plugin/s3-logo.png)
 
-We are in the process of migrating the storage implementation from App Engine to Amazons S3 storage as part  
+We are in the process of migrating the storage implementation from App Engine to Amazon’s S3 storage as part  
 of our bigger [migration away from App Engine](/blog/migrating-away-from-app-engine.html). If  
 you experience issues related to build results please let us know so we can iron out potential regressions.  
 We are deploying this change in a way that makes it very easy to toggle this on/off and in case S3 builds prove to  

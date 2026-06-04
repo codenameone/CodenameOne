@@ -25,7 +25,7 @@ This will request using an HTTP GET method from the url. It will set the accepts
 
 ### Content Type
 
-An important ommission was the content type setting, you could use the `header()` value to achieve that but content type is an important header and deserves its own method:
+An important omission was the content type setting, you could use the `header()` value to achieve that but content type is an important header and deserves its own method:
     
     
     Map<String, Object> jsonData = Rest.

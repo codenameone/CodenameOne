@@ -15,7 +15,7 @@ author: Shai Almog
 
 ### SOP and CORS
 
-SOP is the "Same Origin Policy" enforced by browsers. It’s prevents CSRF (Cross Site Request Forgery) which essentially lets a site pretend it’s a different site.
+SOP is the "Same Origin Policy" enforced by browsers. It prevents CSRF (Cross Site Request Forgery) which essentially lets a site pretend it’s a different site.
 
 SOP makes sure all requests to the site come from the same origin, it’s enforced by the browser and essentially blocks manipulations across domains. This sounds great but if you need to communicate between two sites it might be a problem. That’s where CORS comes in.
 
@@ -25,7 +25,7 @@ CORS (Cross Origin Resource Sharing) is essentially the SOP compliant way for a 
 
 So lets say we have a browser component from a different domain embedded in our app. Normally in a native app that’s no problem. We can inject JavaScript into it and do whatever we want.
 
-However with the JavaScript port this becomes a bit of an issue because of SOP. `postMessage` makes the communication between the two origins possible but to get it to work you need to have code that handles sends the messages on both sides.
+However with the JavaScript port this becomes a bit of an issue because of SOP. `postMessage` makes the communication between the two origins possible but to get it to work you need to have code that handles sending the messages on both sides.
 
 For this we now have the following API’s in `BrowserComponent`:
     
@@ -35,7 +35,7 @@ For this we now have the following API’s in `BrowserComponent`:
 __ |  This API will work correctly in native apps as well so you can still enjoy portability   
 ---|---  
   
-This method Calls the `postMessage()` method on the webpage’s `window` object.  
+This method calls the `postMessage()` method on the webpage’s `window` object.  
 To receive a message, the web page should register a "message" event listener, just as it would to receive messages from other windows in the browser. See [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) for `postMessage()` for more information.
 
 ---

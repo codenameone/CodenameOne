@@ -22,17 +22,17 @@ It also handles the emails we send out offering help or pointing out information
 
 ### Why does it Suck
 
-Intercom is a **bad** product and to make things worse it’s expensive. It does the basic things reasonably well but it’s UX and UI are very badly designed for us and our audience.
+Intercom is a **bad** product and to make things worse it’s expensive. It does the basic things reasonably well but its UX and UI are very badly designed for us and our audience.
 
 Despite Intercom’s many shortcomings we were lazy on the issue of migration as there is always something more important to do. Thankfully Intercom decided to change their pricing model so we’d pay 5x the already inflated price which was the perfect incentive for us to discover [crisp](https://crisp.chat/en/) which is far cheaper and seems like a better product altogether.
 
-With this you should already see the new chat widget below and should be able to interact with us there…​ You can also check out the new <https://help.codenameone.com/> website that was generated as apart of the process. Hopefully we’ll strengthen it with a bigger knowledge base.
+With this you should already see the new chat widget below and should be able to interact with us there…​ You can also check out the new <https://help.codenameone.com/> website that was generated as a part of the process. Hopefully we’ll strengthen it with a bigger knowledge base.
 
 ### Where Next
 
-Unfortunately this is just the tip of the iceberg. Intercoms code is embedded deep into the backend systems. The problem is we still have some app engine servers running and it’s really hard to update them as Google effectively killed off the system we were using. So we are finally doing what we procrastinated on for 3 years and removing app engine completely from our stack!
+Unfortunately this is just the tip of the iceberg. Intercom’s code is embedded deep into the backend systems. The problem is we still have some app engine servers running and it’s really hard to update them as Google effectively killed off the system we were using. So we are finally doing what we procrastinated on for 3 years and removing app engine completely from our stack!
 
-This is a **HUGE** move, I can’t over state it. All our user logs and everything is in app engine. That might mean that if you had an old "dormant" account that you haven’t used in years it might get deleted in the migration as we won’t be able to migrate it. That’s not a big deal since such accounts would typically be free accounts and you could just re-create that account. The bigger benefit is that we would be able to implement a lot of the features we always wanted to and couldn’t because of the problems in our backend!
+This is a **HUGE** move, I can’t overstate it. All our user logs and everything is in app engine. That might mean that if you had an old "dormant" account that you haven’t used in years it might get deleted in the migration as we won’t be able to migrate it. That’s not a big deal since such accounts would typically be free accounts and you could just re-create that account. The bigger benefit is that we would be able to implement a lot of the features we always wanted to and couldn’t because of the problems in our backend!
 
 You might notice some kinks in the migration let us know in the comments or the chat if things don’t work well. Setting up the automated emails from scratch will be a nightmare but it has to be done.
 

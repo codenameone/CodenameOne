@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/the-sad-state-of-android-performance-tooling/profiling-in-android-ios.png)
 
-Historically, we didn’t use Androids profiling tools often. They were pretty awful and the only tools that we really  
+Historically, we didn’t use Android’s profiling tools often. They were pretty awful and the only tools that we really  
 used extensively were the on-device GPU profiling tools which were reasonably good. In recent years Android’s  
 native story improved by leaps and bounds with the introduction of Android Studio and 3rd party tools developing  
 native Android apps has improved a lot. But the CPU profiling tools are still stuck in the stone age and this is  
@@ -35,11 +35,11 @@ Better looking and more functional
 
 ### Android Profiler
 
-Both unattractive and disfunctional
+Both unattractive and dysfunctional
 
 ### Android Profiler
 
-Both unattractive and disfunctional
+Both unattractive and dysfunctional
 
 [![NetBeans Profiler](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)
 

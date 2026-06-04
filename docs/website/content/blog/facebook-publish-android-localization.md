@@ -28,7 +28,7 @@ The Facebook native SDK for iOS and Android is difficult. It layers a great deal
   
 Not the most intuitive approach although understandable in terms of data security,  
   
-but it is badly implemented and to make matters worse its horribly broken in some SDK versions (Chen spent the day just because the version we used happened to be such a version). Regardless, we now have the ability to elevate Facebook permissions as part of the Facebook connect API in the social package. You just need to ask for publish permissions and once the callback is invoked with a success message you can write to the Facebook wall.  
+but it is badly implemented and to make matters worse it’s horribly broken in some SDK versions (Chen spent the day just because the version we used happened to be such a version). Regardless, we now have the ability to elevate Facebook permissions as part of the Facebook connect API in the social package. You just need to ask for publish permissions and once the callback is invoked with a success message you can write to the Facebook wall.  
   
   
   

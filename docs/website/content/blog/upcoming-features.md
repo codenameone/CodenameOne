@@ -30,7 +30,7 @@ did on a
 [  
 socket library  
 ](https://github.com/shannah/CN1Sockets)  
-for Codname One. Its also a great reference implementation on how one would write a native library implementation!
+for Codename One. It’s also a great reference implementation on how one would write a native library implementation!
 
 We have a separate socket implementation of our own which has a somewhat different approach, we should be releasing it at some point before 2.1 and it is on our roadmap for the next couple of months. Currently we plan to only support TCP streams and we might support server sockets on select platforms (currently iOS server socket isn’t planned).
 

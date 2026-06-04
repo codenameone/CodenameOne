@@ -26,7 +26,7 @@ There is a workaround mentioned in the stackoverflow [answer](https://stackoverf
 
 ### On Top Sidemenu
 
-We switched this this on by default this weekend and already found a regression that eluded us before with the overflow menu. This is now fixed in the GIT but there might be more issues, hopefully we’ll be able to resolve everything before the code freeze so please check your code and report back to us ASAP if you encounter issues!
+We switched this on by default this weekend and already found a regression that eluded us before with the overflow menu. This is now fixed in the GIT but there might be more issues, hopefully we’ll be able to resolve everything before the code freeze so please check your code and report back to us ASAP if you encounter issues!
 
 ### Automated Tests
 

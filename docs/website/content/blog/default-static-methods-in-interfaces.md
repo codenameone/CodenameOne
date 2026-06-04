@@ -41,7 +41,7 @@ boost as it will allow us to add methods to older interfaces such as [PushCallba
 ### What are Static Interface Methods
 
 Static interface methods are generally just static methods. In many cases we just hide static methods within  
-clases but sometimes that doesn’t make sense. E.g. the [Push](/javadoc/com/codename1/push/Push/) class  
+classes but sometimes that doesn’t make sense. E.g. the [Push](/javadoc/com/codename1/push/Push/) class  
 is entirely composed of static methods and doesn’t make much sense as a standalone class. We could have  
 rolled all the methods within the class into the interface as static methods and eliminated the class entirely.
 
@@ -71,7 +71,7 @@ builds use Java 8 features and switch the internal code base to use it.
 
 Even if you use an old Java 5 project the builds should still work fine after such a transition and you won’t be forced  
 to switch, however, this will allow us to use features such as default methods to implement some capabilities we  
-need. It will also make out lives slightly easier by allowing us to use lambdas in our core implementation.
+need. It will also make our lives slightly easier by allowing us to use lambdas in our core implementation.
 
 ---
 

@@ -27,7 +27,7 @@ For most normal cases I think using native interfaces would still be better but 
 
 If you want to see a usage example check out his new [scandit library](https://github.com/shannah/cn1-codescan-scandit) which uses the [Scandit barcode/QR code scanning API](https://www.scandit.com/products/barcode-scanner/).
 
-Scandit provides much faster barcode/QR code scanning speeds but it comes at a price. You need to pay per seat licensing fees that can be a bit high. The worst part of it is that we can’t redistribute their binaries or use them with cocoapods/gradle. This means we can’t distribute a precompiled cn1lib for this product. However, if you need professional grade bardcode scanning this should work rather well.
+Scandit provides much faster barcode/QR code scanning speeds but it comes at a price. You need to pay per seat licensing fees that can be a bit high. The worst part of it is that we can’t redistribute their binaries or use them with cocoapods/gradle. This means we can’t distribute a precompiled cn1lib for this product. However, if you need professional grade barcode scanning this should work rather well.
 
 __ |  We implemented this library based on a request from an enterprise subscriber   
 ---|---  
@@ -38,7 +38,7 @@ We added a lot of new features over the time I’ve taken away from blogging. I�
 
 In the simulator you can now open a window that will help you debug push applications. E.g. you can press a button to send a registration success callback where you will get a push key. You can also send a registration error and send a message.
 
-Notice that there is no message type option as that’s mostly seamless for the client. E.g. if you send a type 3 message it’s really just two separate message.
+Notice that there is no message type option as that’s mostly seamless for the client. E.g. if you send a type 3 message it’s really just two separate messages.
 
 Type 2 or 1 etc. are all meaningless in the simulator as we only simulate the running application and not background behavior. Still I found it very useful to simulate these messages and was able to debug some nuanced behavior in NetBeans.
 
@@ -46,7 +46,7 @@ Type 2 or 1 etc. are all meaningless in the simulator as we only simulate the ru
 
 I was hoping that the [Uber module](/blog/uber-clone-trickling-down.html) would be completely finished by now but it isn’t. I’m pretty close though.
 
-I’ve done 30 lessons by now and uploaded 23. I’m guessing 40 or 45 lessons should be the final number when I’m done. I thought I’d finish by next Sunday but that’s already pushed back to Tuesday and I’m not sure I can make that deadline either. I’m doing everything I can to finish this before the end of the month as we need to start preparing to the 4.0 release which is already looming.
+I’ve done 30 lessons by now and uploaded 23. I’m guessing 40 or 45 lessons should be the final number when I’m done. I thought I’d finish by next Sunday but that’s already pushed back to Tuesday and I’m not sure I can make that deadline either. I’m doing everything I can to finish this before the end of the month as we need to start preparing for the 4.0 release which is already looming.
 
 The reasons this is taking so long have a lot to do with the amount of extra work I need to do but they also have a lot to do with how I divide my time. I have some administrative tasks in the company that just keep me from finishing this process.
 

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/removing-old-preferences/generic-java-2.jpg)
 
-A while back we introduced Codename One Settings which superceded the old approach built in the IDE itself. This allowed us to consolidate code and move faster. That’s how we were able to implement more wizards for things like CSS support etc.
+A while back we introduced Codename One Settings which superseded the old approach built in the IDE itself. This allowed us to consolidate code and move faster. That’s how we were able to implement more wizards for things like CSS support etc.
 
 Up until now we just left the old UI in place. People are still used to it. But it has a lot of bugs and causes confusion as developers launch the old UI instead of the new one. So with version 5.0 we’ll remove the old preferences UI and leave Codename One Settings.
 

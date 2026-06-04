@@ -15,7 +15,7 @@ It’s been a hectic month getting the academy up and orchestrating the release.
 
 ### Kotlin
 
-As you recall I published a Kotlin survey a while back and we didn’t publish the results. Some of the result were a bit surprising…​ Lets review some of the answers.
+As you recall I published a Kotlin survey a while back and we didn’t publish the results. Some of the results were a bit surprising…​ Let’s review some of the answers.
 
 ![How do you use Kotlin today?](/blog/survey-results-kotlin-updates-news/survey-how-kotlin-today.png)
 
@@ -47,7 +47,7 @@ I don’t care much about the GUI builder language/code. I’m not sure how much
 
 #### What’s next for Kotlin
 
-I’m not sure if we’ll do the whole Kotlin code in the GUI builder. It shouldn’t impact development as you can still write Kotlin code everywhere but a GUI builder form will probably a java form for now. I’d like to push something out relatively quickly rather than spend time on things like the GUI builder support.
+I’m not sure if we’ll do the whole Kotlin code in the GUI builder. It shouldn’t impact development as you can still write Kotlin code everywhere but a GUI builder form will probably be a java form for now. I’d like to push something out relatively quickly rather than spend time on things like the GUI builder support.
 
 I’m not sure when this will be out as we have a lot on our plate for 3.8.
 

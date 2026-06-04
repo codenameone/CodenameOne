@@ -30,6 +30,7 @@
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
+#import "METALView.h"
 #endif
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -140,6 +141,7 @@ extern int popoverSupported();
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
 #endif
+#import <BackgroundTasks/BackgroundTasks.h>
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 #ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
@@ -6209,6 +6211,95 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+// Reads the Metal renderer's persistent screenTexture back into a CGImage.
+// screenTexture is exactly the frame presentFramebuffer blits into the
+// CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
+// -drawViewHierarchyInRect: / -snapshotViewAfterScreenUpdates:, reading it
+// back does not depend on a CADisplayLink present cycle -- which never fires
+// on headless Mac Catalyst CI -- so it always reflects the latest committed
+// frame rather than a stale one. The blit is submitted on the same command
+// queue METALView renders on (CN1MetalCommandQueue), so FIFO ordering
+// guarantees it runs after the frame's render work; waitUntilCompleted then
+// makes the pixels readable. Returns NULL if Metal isn't initialised yet.
+static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
+    if (mv == nil) {
+        return NULL;
+    }
+    id<MTLTexture> src = mv.screenTexture;
+    if (src == nil) {
+        return NULL;
+    }
+    NSUInteger w = src.width;
+    NSUInteger h = src.height;
+    if (w == 0 || h == 0) {
+        return NULL;
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (device == nil || queue == nil) {
+        return NULL;
+    }
+    // screenTexture is MTLStorageModePrivate -- the CPU can't getBytes from it
+    // directly. Blit it into a CPU-visible staging texture and synchronize.
+    // Managed storage is used (not Shared) because it is the one mode valid on
+    // both Apple-silicon and Intel Mac GPUs under Catalyst; synchronizeResource
+    // makes the managed copy CPU-visible (a no-op on unified memory).
+    MTLTextureDescriptor *desc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                           width:w height:h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeManaged;
+    id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
+    if (staging == nil) {
+        return NULL;
+    }
+    id<MTLCommandBuffer> cb = [queue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:src
+              sourceSlice:0 sourceLevel:0
+             sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(w, h, 1)
+                toTexture:staging
+         destinationSlice:0 destinationLevel:0
+        destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit synchronizeResource:staging];
+    [blit endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+
+    NSUInteger bytesPerRow = w * 4;
+    void *bytes = malloc(h * bytesPerRow);
+    if (bytes == NULL) {
+#ifndef CN1_USE_ARC
+        [staging release];
+#endif
+        return NULL;
+    }
+    [staging getBytes:bytes
+          bytesPerRow:bytesPerRow
+           fromRegion:MTLRegionMake2D(0, 0, w, h)
+          mipmapLevel:0];
+#ifndef CN1_USE_ARC
+    [staging release];
+#endif
+
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    // BGRA8Unorm in memory (B,G,R,A) is a 0xAARRGGBB little-endian word, which
+    // Core Graphics consumes as byteOrder32Little | premultipliedFirst (ARGB).
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little;
+    CGContextRef cgctx = CGBitmapContextCreate(bytes, w, h, 8, bytesPerRow, cs, bitmapInfo);
+    CGColorSpaceRelease(cs);
+    CGImageRef img = NULL;
+    if (cgctx != NULL) {
+        img = CGBitmapContextCreateImage(cgctx);
+        CGContextRelease(cgctx);
+    }
+    free(bytes);
+    return img;
+}
+#endif
+
 static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
@@ -6316,6 +6407,28 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+    // The Metal screen view: capture from the renderer's screenTexture, the
+    // exact pixels presented to the drawable. On headless Mac Catalyst the
+    // display link never presents, so -drawViewHierarchyInRect: below would
+    // snapshot a stale CALayer frame. The screenTexture readback is always the
+    // latest committed frame, so it is both correct and deterministic.
+    if (!drawn && [renderView isKindOfClass:[METALView class]]) {
+        CGImageRef cg = cn1_copyMetalScreenTextureImage((METALView *)renderView);
+        if (cg != NULL) {
+            // screenTexture row 0 is the top of the screen; Core Graphics draws
+            // bottom-up, so flip vertically to keep it upright in the
+            // (top-left-origin) UIGraphics capture context.
+            CGContextSaveGState(ctx);
+            CGContextTranslateCTM(ctx, 0, localBounds.size.height);
+            CGContextScaleCTM(ctx, 1.0, -1.0);
+            CGContextDrawImage(ctx, CGRectMake(0, 0, localBounds.size.width, localBounds.size.height), cg);
+            CGContextRestoreGState(ctx);
+            CGImageRelease(cg);
+            drawn = YES;
+        }
+    }
+#endif
     if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
         // afterScreenUpdates:NO — YES can stall indefinitely under UIScene on
         // iPhone/iPad waiting for a scene display-link cycle that never fires
@@ -6323,8 +6436,8 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         // different and YES is required: the live screenTexture isn't
         // committed by CADisplayLink between form.show() and the screenshot
         // callback, so afterScreenUpdates:NO captures the previous form's
-        // framebuffer (see Cn1ssDeviceRunnerHelper's repaint-before-capture
-        // dance which alone isn't enough).
+        // framebuffer. (The Metal screen view is handled by the screenTexture
+        // readback above; this fallback only runs for non-Metal peer views.)
 #if TARGET_OS_MACCATALYST
         drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
 #else
@@ -9261,10 +9374,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWebSocketNative___int_java_lang
     return (JAVA_LONG)impl;
 }
 
-void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs) {
+void com_codename1_impl_ios_IOSNative_connectWebSocketNative___long_int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG handle, JAVA_INT timeoutMs, JAVA_OBJECT subprotocolsCsv) {
     POOL_BEGIN();
     CN1WebSocketImpl* impl = (BRIDGE_CAST CN1WebSocketImpl*)((void *)handle);
-    [impl connectWithTimeoutMs:timeoutMs];
+    NSString* csv = subprotocolsCsv == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG subprotocolsCsv);
+    NSArray* protocols = (csv != nil && [csv length] > 0)
+        ? [csv componentsSeparatedByString:@","] : nil;
+    [impl connectWithTimeoutMs:timeoutMs protocols:protocols];
     POOL_END();
 }
 
@@ -11127,6 +11243,244 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_S
     dispatch_sync(dispatch_get_main_queue(), ^{
         cn1CancelScheduledLocalNotificationById(nsId);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Enriched local notifications, permission, BGTaskScheduler and shared content
+// ---------------------------------------------------------------------------
+
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+// Builds and registers a UNNotificationCategory from the packed actions string. Field
+// separator is U+0001 and record separator is U+0002 (see IOSImplementation).
+static NSString* cn1RegisterLocalNotificationCategory(NSString *categoryId, NSString *actionsEncoded) API_AVAILABLE(ios(10.0)) {
+    if (categoryId == nil || actionsEncoded == nil || [actionsEncoded length] == 0) {
+        return nil;
+    }
+    NSString *recSep = [NSString stringWithFormat:@"%C", (unichar)2];
+    NSString *fldSep = [NSString stringWithFormat:@"%C", (unichar)1];
+    NSMutableArray *actions = [[NSMutableArray alloc] init];
+    for (NSString *rec in [actionsEncoded componentsSeparatedByString:recSep]) {
+        NSArray *parts = [rec componentsSeparatedByString:fldSep];
+        if ([parts count] < 2) {
+            continue;
+        }
+        NSString *aid = parts[0];
+        NSString *title = parts[1];
+        NSString *placeholder = [parts count] > 2 ? parts[2] : @"";
+        NSString *button = [parts count] > 3 ? parts[3] : @"";
+        if ([placeholder length] > 0 || [button length] > 0) {
+            if ([button length] == 0) { button = @"Reply"; }
+            [actions addObject:[UNTextInputNotificationAction actionWithIdentifier:aid title:title options:UNNotificationActionOptionNone textInputButtonTitle:button textInputPlaceholder:placeholder]];
+        } else {
+            [actions addObject:[UNNotificationAction actionWithIdentifier:aid title:title options:UNNotificationActionOptionForeground]];
+        }
+    }
+    UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:categoryId actions:actions intentIdentifiers:@[] options:UNNotificationCategoryOptionNone];
+    UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+    [center getNotificationCategoriesWithCompletionHandler:^(NSSet<UNNotificationCategory *> * _Nonnull existing) {
+        NSMutableSet *merged = existing == nil ? [[NSMutableSet alloc] init] : [existing mutableCopy];
+        [merged addObject:category];
+        [center setNotificationCategories:merged];
+    }];
+    return categoryId;
+}
+#endif
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int_boolean_java_lang_String_java_lang_String_boolean_java_lang_String_java_lang_String( CN1_THREAD_STATE_MULTI_ARG
+    JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground,
+    JAVA_OBJECT categoryId, JAVA_OBJECT threadId, JAVA_BOOLEAN timeSensitive, JAVA_OBJECT imageAttachmentPath, JAVA_OBJECT actionsEncoded) {
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+    if (@available(iOS 10, *)) {
+        NSString *title = alertTitle == NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle);
+        NSString *body = alertBody == NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG alertBody);
+        body = [body stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
+
+        NSString *notificationIdString = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
+        NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+        [dict setObject:notificationIdString forKey:@"__ios_id__"];
+        if (foreground) {
+            [dict setObject:@"true" forKey:@"foreground"];
+        }
+
+        UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+        content.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
+        content.body = [NSString localizedUserNotificationStringForKey:body arguments:nil];
+        if (alertSound != NULL) {
+            NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
+            if (soundName != nil && [soundName length] > 0) {
+                content.sound = [UNNotificationSound soundNamed:soundName];
+            }
+        }
+        if (badgeNumber >= 0) {
+            content.badge = [NSNumber numberWithInt:badgeNumber];
+        }
+        content.userInfo = dict;
+        if (threadId != NULL) {
+            NSString *t = toNSString(CN1_THREAD_STATE_PASS_ARG threadId);
+            if ([t length] > 0) {
+                content.threadIdentifier = t;
+            }
+        }
+        if (timeSensitive) {
+            if (@available(iOS 15.0, *)) {
+                content.interruptionLevel = UNNotificationInterruptionLevelTimeSensitive;
+            }
+        }
+        NSString *cat = categoryId == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG categoryId);
+        NSString *acts = actionsEncoded == NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG actionsEncoded);
+        NSString *registered = cn1RegisterLocalNotificationCategory(cat, acts);
+        if (registered != nil) {
+            content.categoryIdentifier = registered;
+        }
+        if (imageAttachmentPath != NULL) {
+            NSString *imgPath = toNSString(CN1_THREAD_STATE_PASS_ARG imageAttachmentPath);
+            if (imgPath != nil && [imgPath length] > 0) {
+                NSURL *url = nil;
+                if ([imgPath hasPrefix:@"file://"]) {
+                    url = [NSURL URLWithString:imgPath];
+                } else {
+                    NSString *clean = [imgPath hasPrefix:@"/"] ? [imgPath substringFromIndex:1] : imgPath;
+                    NSString *resPath = [[NSBundle mainBundle] pathForResource:[clean stringByDeletingPathExtension] ofType:[clean pathExtension]];
+                    if (resPath != nil) {
+                        url = [NSURL fileURLWithPath:resPath];
+                    }
+                }
+                if (url != nil) {
+                    NSError *attErr = nil;
+                    UNNotificationAttachment *att = [UNNotificationAttachment attachmentWithIdentifier:@"image" URL:url options:nil error:&attErr];
+                    if (att != nil) {
+                        content.attachments = @[att];
+                    }
+                }
+            }
+        }
+
+        UNNotificationTrigger *trigger = cn1CreateNotificationTrigger(fireDate, repeatType);
+        UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:notificationIdString content:content trigger:trigger];
+        UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+            completionHandler:^(BOOL granted, NSError * _Nullable authError) {
+                if (authError != nil) {
+                    CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                }
+        }];
+        cn1CancelScheduledLocalNotificationById(notificationIdString);
+        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+            if (error != nil) {
+                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+            }
+        }];
+    } else {
+        CN1Log(@"Ignoring local notification request on iOS versions below 10");
+    }
+#endif
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT optionsMask) {
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+    if (@available(iOS 10, *)) {
+        UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        UNAuthorizationOptions opts = (UNAuthorizationOptions)optionsMask;
+        [center requestAuthorizationWithOptions:opts completionHandler:^(BOOL granted, NSError * _Nullable error) {
+            [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+                int level = 1; // denied
+                switch (settings.authorizationStatus) {
+                    case UNAuthorizationStatusNotDetermined: level = 0; break;
+                    case UNAuthorizationStatusDenied: level = 1; break;
+                    case UNAuthorizationStatusAuthorized: level = 2; break;
+                    default: break;
+                }
+                if (@available(iOS 12.0, *)) {
+                    if (settings.authorizationStatus == UNAuthorizationStatusProvisional) { level = 3; }
+                }
+                if (@available(iOS 14.0, *)) {
+                    if (settings.authorizationStatus == UNAuthorizationStatusEphemeral) { level = 4; }
+                }
+                BOOL g = (level == 2 || level == 3 || level == 4);
+                com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG g ? JAVA_TRUE : JAVA_FALSE, level);
+            }];
+        }];
+        return;
+    }
+#endif
+    com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, 2);
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+    if (@available(iOS 13.0, *)) {
+        NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
+        [[BGTaskScheduler sharedScheduler] registerForTaskWithIdentifier:taskId usingQueue:nil launchHandler:^(BGTask * _Nonnull task) {
+            task.expirationHandler = ^{
+                [task setTaskCompletedWithSuccess:NO];
+            };
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                com_codename1_impl_ios_IOSImplementation_runBackgroundProcessing___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG taskId));
+                [task setTaskCompletedWithSuccess:YES];
+            });
+        }];
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java_lang_String_double_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier, JAVA_DOUBLE earliest, JAVA_BOOLEAN requiresNetwork, JAVA_BOOLEAN requiresPower) {
+    if (@available(iOS 13.0, *)) {
+        NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
+        BGProcessingTaskRequest *request = [[BGProcessingTaskRequest alloc] initWithIdentifier:taskId];
+        request.requiresNetworkConnectivity = requiresNetwork ? YES : NO;
+        request.requiresExternalPower = requiresPower ? YES : NO;
+        if (earliest > 0) {
+            request.earliestBeginDate = [NSDate dateWithTimeIntervalSince1970:earliest];
+        }
+        NSError *submitError = nil;
+        [[BGTaskScheduler sharedScheduler] submitTaskRequest:request error:&submitError];
+        if (submitError != nil) {
+            CN1Log(@"Failed to submit background processing task %@: %@", taskId, submitError.localizedDescription);
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+    if (@available(iOS 13.0, *)) {
+        NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
+        [[BGTaskScheduler sharedScheduler] cancelTaskRequestWithIdentifier:taskId];
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 13.0, *)) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appGroupId) {
+    if (appGroupId == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    NSString *group = toNSString(CN1_THREAD_STATE_PASS_ARG appGroupId);
+    if (group == nil || [group length] == 0) {
+        return JAVA_NULL;
+    }
+    NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:group];
+    id payload = [defaults objectForKey:@"cn1.shareExtension.payload"];
+    if (payload == nil) {
+        return JAVA_NULL;
+    }
+    [defaults removeObjectForKey:@"cn1.shareExtension.payload"];
+    [defaults synchronize];
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    if (jsonData == nil) {
+        return JAVA_NULL;
+    }
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG jsonString);
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT appGroupId) {
+    return com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String(CN1_THREAD_STATE_PASS_ARG me, appGroupId);
 }
 
 // BEGIN IOSImplementation native code, this is used to optimize various "heavy" IOSImplementation methods

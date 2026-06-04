@@ -17,7 +17,7 @@ We have added a new property sheet and a JavaDocs button to the toolbar of the P
 
 To continue the theme of improving the development experience in the simulator, you will find a few new features landing on Friday.
 
-Firstly, we have added a new property sheet that shows you the value of all of the properties of the selected component in the component tree. This is useful for checking whether a container is scrollable, or what text property of a button is set to, or pretty much anything else you’d like to know about a component’s state.
+Firstly, we have added a new property sheet that shows you the value of all of the properties of the selected component in the component tree. This is useful for checking whether a container is scrollable, or what the text property of a button is set to, or pretty much anything else you’d like to know about a component’s state.
 
 ![](/blog/new-property-sheet-and-javadocs/property-sheet-in-simulator.png) 
 

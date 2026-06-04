@@ -164,7 +164,7 @@ __**2** | Here we actually bind the listener, this allows us to grab one SMS and
   
 ### Callbacks
 
-Up until now the code wasn’t very usable so lets abstract it a bit. But first we need to implement the callback class to which SMS’s and errors are sent from the code above:
+Up until now the code wasn’t very usable so let’s abstract it a bit. But first we need to implement the callback class to which SMS’s and errors are sent from the code above:
     
     
     package com.codename1.sms.intercept; __**(1)**
@@ -174,7 +174,7 @@ Up until now the code wasn’t very usable so lets abstract it a bit. But first 
     import static com.codename1.ui.CN.*;
     
     /**
-     * This is an internal class, it's package protect to hide that
+     * This is an internal class, it’s package protect to hide that
      */
     class SMSCallback {
         static SuccessCallback<String> onSuccess;

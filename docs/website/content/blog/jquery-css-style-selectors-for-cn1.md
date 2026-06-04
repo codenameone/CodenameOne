@@ -15,11 +15,11 @@ The `ComponentSelector` class is a new class that brings the power of jQuery to 
 
 jQuery is a javascript library, created by John Resig in 2006, that has become a staple of browser-based UI development. As of March 2017, over 70% of web sites are using jQuery. The initial problem that jQuery solved was browser incompatibility issues. It provided a consistent API for most useful DOM methods so that the developer didn’t have to spend all their days and nights fighting with browser compatibility issues. In a way, it did for Javascript, what Codename One does for mobile apps.
 
-The other thing that jQuery did, was provide an elegant way to select and manipulate DOM elements (i.e. HTML tags in a web page). It enabled developers to easily form sets of elements using a CSS-like syntax, and to operate on all elements of those sets, as if they were single elements, and they provided a fluent API to enable developers to chain multiple calls together, and delay onset of carpel tunnel for at least a few extra years.
+The other thing that jQuery did, was provide an elegant way to select and manipulate DOM elements (i.e. HTML tags in a web page). It enabled developers to easily form sets of elements using a CSS-like syntax, and to operate on all elements of those sets, as if they were single elements, and they provided a fluent API to enable developers to chain multiple calls together, and delay onset of carpal tunnel for at least a few extra years.
 
 With the new `ComponentSelector` class, I have adopted the following aspects of jQuery:
 
-  1. **CSS-like Selection Sytax** – Support for a CSS-like syntax for "selecting" Components to be included in a set.
+  1. **CSS-like Selection Syntax** – Support for a CSS-like syntax for "selecting" Components to be included in a set.
 
   2. **Fluent API** – The API is fluent, meaning you can chain multiple method calls together and reduce typing.
 
@@ -160,7 +160,7 @@ Were we setting these values on the "selected" style, the "unselected" style, th
         c.getStyle().setBgColor(0xcccccc);
     }
 
-If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc…​ What if we wanted to specifically change the styles in the "pressed" state. Then we would call `selectPressedStyle()` prior calling our style mutation methods. E.g.
+If a component was in "selected" state, then this would change the selected style. If it was in pressed state, then it would change the "pressed" style. Etc…​ What if we wanted to specifically change the styles in the "pressed" state. Then we would call `selectPressedStyle()` prior calling our style mutation methods. E.g.
     
     
     $(".even", table)
@@ -245,7 +245,7 @@ __**7** | We use a cover transition for the replacement.
   
 ## Component Method Wrappers
 
-Most mutator methods in `Component` and `Container` include a corresponding wrapper method in `ComponentSelector`. Some of the more common component subclasses have corresponding wrappers as well. E.g. `addActionListener(event)` will add add the event to all Buttons in the set. `setText(txt)` will set the text on all labels, text areas, and buttons. If there are other commonly used methods that you would like to see included in ComponentSelector, let me know, but I think you’ll find the current state to be fairly comprehensive.
+Most mutator methods in `Component` and `Container` include a corresponding wrapper method in `ComponentSelector`. Some of the more common component subclasses have corresponding wrappers as well. E.g. `addActionListener(event)` will add the event to all Buttons in the set. `setText(txt)` will set the text on all labels, text areas, and buttons. If there are other commonly used methods that you would like to see included in ComponentSelector, let me know, but I think you’ll find the current state to be fairly comprehensive.
 
 ### Tree Navigation
 

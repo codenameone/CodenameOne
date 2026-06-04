@@ -14,14 +14,14 @@ author: Shai Almog
 Codename One 3.2 is scheduled for Tuesday the 27th of October. In keeping with our successful 3.1 release we’ll  
 use a very short one week code freeze on the 20th of October at which point we will only commit crucial fixes  
 with code review. I hope we can land quite a few new features for the release, the GUI builder is getting  
-very close although its still a very rough product and will only be featured as a "technology preview" showing  
+very close although it’s still a very rough product and will only be featured as a "technology preview" showing  
 the direction we are heading rather than a final product. 
 
 #### New Approach To Demos
 
 Up until now we always thought about demos as developers often do: "As a tool to show how to program using  
 a set of features in the tool".  
-Recently, after working on my spouses Yoga Studio management app I came to the epiphany that this isn’t  
+Recently, after working on my spouse’s Yoga Studio management app I came to the epiphany that this isn’t  
 the best way for mobile app demos. The main problem is that we can’t upload these demos to app stores  
 and show them running on a device. So with that in mind we are rethinking some future demos starting with  
 a quick and dirty [Solitaire Klondike demo](/solitaire-klondike/) that we made within a weekend  

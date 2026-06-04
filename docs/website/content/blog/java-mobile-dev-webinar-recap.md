@@ -15,7 +15,7 @@ Tuesday morning I held a webinar on Java mobile development using Codename One. 
 
 Since most of the people who signed up for the webinar indicated that they had no experience with Codename One, I spent the first 10 minutes or so introducing the framework, and showing some demos of some existing apps to give participants an idea of the possibilities.
 
-The rest of the presentation was spent building custom social media app similar to facebook. I created a simple PHP/MySQL server-side application before hand and deployed it on the internet so that the mobile app would be able to connect to it from anywhere in the world. Therefore, the finished result, is actually a usable social network – though it is only "demo" grade, and I’ll probably take it down in a few months.
+The rest of the presentation was spent building a custom social media app similar to facebook. I created a simple PHP/MySQL server-side application before hand and deployed it on the internet so that the mobile app would be able to connect to it from anywhere in the world. Therefore, the finished result, is actually a usable social network – though it is only "demo" grade, and I’ll probably take it down in a few months.
 
 Here are some screenshots of the app:
 

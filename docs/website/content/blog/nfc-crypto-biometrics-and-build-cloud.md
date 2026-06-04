@@ -222,7 +222,7 @@ So a typical Bluetooth iteration loop looks like this:
 2. Open **Bluetooth -> Add demo peripheral**. Your scan picks up a fake peripheral. Step through your discovery code.
 3. Open **Bluetooth → Push demo notification**. Your characteristic listener fires. Step through your handler.
 4. Open **Bluetooth → Toggle adapter on/off**. Your "adapter off" branch runs. Step through it.
-5. When you are happy with the in-simulator behaviour, open **Bluetooth → Switch backend → native BLE (real hardware)** and your laptop's actual Bluetooth radio takes over. Same app, same code, real peripherals.
+5. When you are happy with the in-simulator behavior, open **Bluetooth → Switch backend → native BLE (real hardware)** and your laptop's actual Bluetooth radio takes over. Same app, same code, real peripherals.
 
 Compare that to the conventional Bluetooth iteration loop on iOS or Android. You need a real device. You need a real peripheral. The simulator does not have a BLE stack at all on iOS, and Android's emulator has a partial one that does not match real hardware. You end up doing every change on device, with cables, and the moment something goes wrong you have to figure out whether the bug is in your code, the peripheral firmware, the OS BLE stack, or some interaction between all three.
 
@@ -260,11 +260,11 @@ The fix replaces the recursive mark with an iterative one over an explicit work 
 
 ### [PR #4985](https://github.com/codenameone/CodenameOne/pull/4985) — Don't rely on C arg eval order in `PUTFIELD` / `MULTIANEWARRAY`
 
-Issue [#3108](https://github.com/codenameone/CodenameOne/issues/3108) is the other one. Several `PUTFIELD` and `MULTIANEWARRAY` translation paths emitted C code that depended on argument evaluation order. C does not specify an evaluation order for function arguments. Different compilers, different optimisation levels, sometimes the same compiler at different `-O` levels produced different orderings, and the visible result was occasional, "miscompiled", "field was assigned the wrong value", "array dimension came out negative" bugs that nobody could reproduce reliably.
+Issue [#3108](https://github.com/codenameone/CodenameOne/issues/3108) is the other one. Several `PUTFIELD` and `MULTIANEWARRAY` translation paths emitted C code that depended on argument evaluation order. C does not specify an evaluation order for function arguments. Different compilers, different optimization levels, sometimes the same compiler at different `-O` levels produced different orderings, and the visible result was occasional, "miscompiled", "field was assigned the wrong value", "array dimension came out negative" bugs that nobody could reproduce reliably.
 
 The fix is unglamorous: hoist the operand evaluations into named local variables before the storing call, so the evaluation order is fixed by the C abstract machine instead of being left to the compiler. The kind of thing where the code change is small, the testing is hard, and the symptom is "the platform feels more solid" rather than any specific feature.
 
-I am calling these out separately from the rest because both are issues you have probably bumped into without realising it, and both are the kind of plumbing that does not show up in a feature list but quietly raises the floor under every app on iOS.
+I am calling these out separately from the rest because both are issues you have probably bumped into without realizing it, and both are the kind of plumbing that does not show up in a feature list but quietly raises the floor under every app on iOS.
 
 ## Hardware keyboard and mouse on iOS and Android — [PR #4982](https://github.com/codenameone/CodenameOne/pull/4982)
 
@@ -276,7 +276,7 @@ This is structural for two reasons. Android wants to replace ChromeOS for the la
 
 ## Expanded CSS gradients and blurs — [PR #4957](https://github.com/codenameone/CodenameOne/pull/4957)
 
-The CSS compiler used to reject anything past two-stop linear gradients at the four cardinal angles and two-stop radial gradients at the center, falling back to a CEF-rasterised bitmap for everything else. `filter` and `backdrop-filter` were ignored entirely. The bitmap fallback worked but it cost you the GPU path and it could not scale with the component.
+The CSS compiler used to reject anything past two-stop linear gradients at the four cardinal angles and two-stop radial gradients at the center, falling back to a CEF-rasterized bitmap for everything else. `filter` and `backdrop-filter` were ignored entirely. The bitmap fallback worked but it cost you the GPU path and it could not scale with the component.
 
 This PR moves the full CSS gradient range and `filter: blur(...)` into native primitives end-to-end. You get multi-stop linear and radial gradients, conic gradients, repeating linear and repeating radial, the full shape and extent grammar, and Gaussian blur on both `filter` and `backdrop-filter`. Drawn on the GPU. Composable with everything else.
 
@@ -300,7 +300,7 @@ The above is the kind of thing you would write today on a modern web stack. Code
 
 I said previously that I wanted to flip `ios.metal=true` to the default *this* week. That flip did not happen — and I want to be clear about why, because the reason is the best version of what we are trying to be.
 
-The community got there first. The combination of bug reports, screenshots from real apps, and pull requests against issues people found themselves did the work of a paid QA pass. The remaining regression list is much shorter than I expected it to be a week ago. Most of the items left are subtle (specific blend modes against specific backdrops, a clip-under-rotation edge case the diagnostic test from PR #4924 has already localised, one corner case in font fallback when the device locale changes mid-session). None are showstoppers.
+The community got there first. The combination of bug reports, screenshots from real apps, and pull requests against issues people found themselves did the work of a paid QA pass. The remaining regression list is much shorter than I expected it to be a week ago. Most of the items left are subtle (specific blend modes against specific backdrops, a clip-under-rotation edge case the diagnostic test from PR #4924 has already localized, one corner case in font fallback when the device locale changes mid-session). None are showstoppers.
 
 So instead of forcing the flip on a deadline, we are now going to flip it when the regression list reads zero. That will not be very long — within one to three weeks at the pace we are closing things — and the apps that flip first will land on a Metal default that has been tested against more real screens than any rendering migration we have done before.
 
