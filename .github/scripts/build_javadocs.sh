@@ -57,19 +57,29 @@ public class ImplementationFactory {
 }
 EOF
 
-find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" \
-  | /usr/bin/xargs "$JAVADOC_CMD" \
+# Pass every source file to a SINGLE javadoc invocation via an @argfile.
+# Piping `find` through `xargs` splits the list into multiple javadoc calls
+# once the command line grows past the platform's xargs limit, and each call
+# then sees only a subset of the sources -- producing a cascade of spurious
+# "cannot find symbol" / "package does not exist" errors and no output. An
+# argfile keeps the whole source set in one invocation regardless of size.
+SOURCES_FILE="$CN1_DIR/build/javadoc-sources.txt"
+find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" > "$SOURCES_FILE"
+
+"$JAVADOC_CMD" \
     --allow-script-in-comments \
     --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
     --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
     --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
     --release 8 \
     -exclude com.codename1.impl \
+    -exclude com.codename1.gaming.physics.box2d \
     -Xdoclint:none \
     -quiet \
     -protected \
     -d "$CN1_DIR/dist/javadoc" \
-    -windowtitle "Codename One API" || true
+    -windowtitle "Codename One API" \
+    "@$SOURCES_FILE" || true
 
 (
   cd "$CN1_DIR/dist/javadoc"
