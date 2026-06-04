@@ -17,6 +17,11 @@ public interface HTMLCanvasElement extends HTMLElement {
     void setWidth(int width);
     void setHeight(int height);
     CanvasRenderingContext2D getContext(String contextId);
+    /// Generic context accessor returning the raw context object. Used for WebGL,
+    /// where the context is not a 2D context and a context-attributes object
+    /// (e.g. `{preserveDrawingBuffer:true}`) must be supplied. Maps to the
+    /// standard `HTMLCanvasElement.getContext(contextType, attributes)`.
+    JSObject getContext(String contextId, JSObject options);
     String toDataURL(String type);
     String toDataURL(String type, double quality);
 }

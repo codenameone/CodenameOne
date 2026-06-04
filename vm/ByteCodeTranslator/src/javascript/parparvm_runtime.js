@@ -2360,6 +2360,18 @@ const jvm = {
       }
       return null;
     }
+    // Typed arrays / ArrayBuffers are structured-cloneable; pass them through
+    // verbatim so a worker-built typed array reaches the host with its bytes
+    // intact. Without this a Float32Array/Uint16Array fails Array.isArray, has
+    // no __cn1HostRef/__jsValue, and falls through to the object-iteration path
+    // below -- arriving on the host as a plain {0:..,1:..} object. (The GPU
+    // backend instead passes Java primitive arrays, which serialize as plain
+    // number arrays that the host re-wraps; this remains the correct, defensive
+    // behavior for any code that does hand a typed array to a host call.)
+    if (typeof ArrayBuffer !== "undefined"
+        && (ArrayBuffer.isView(value) || value instanceof ArrayBuffer)) {
+      return value;
+    }
     if (Array.isArray(value)) {
       const out = new Array(value.length);
       for (let i = 0; i < value.length; i++) {
