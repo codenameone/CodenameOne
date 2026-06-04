@@ -827,32 +827,38 @@ public void onInit(GraphicsDevice device) {
 === Loading models
 
 Built in primitives (`Primitives.cube`, `Primitives.quad`) are handy for getting
-started, but real scenes use authored geometry. `GltfLoader` loads a `Mesh` from a
-glTF 2.0 model, both the binary `.glb` container and the JSON `.gltf` form with
-embedded buffers:
+started, but real scenes use authored geometry. `GltfLoader` loads a model from a
+glTF 2.0 file, both the binary `.glb` container and the JSON `.gltf` form with
+embedded buffers. `loadModel` returns the mesh together with the base-color
+texture taken from the model's own material, so a textured model renders with no
+extra setup:
 
-[source,java,title='Loading a glTF model']
+[source,java,title='Loading a glTF model with its texture']
 ----
 public void onInit(GraphicsDevice device) {
-    byte[] glb = readBytes("/torus.glb");              // your loading of choice
-    Mesh model = GltfLoader.load(device, glb);          // POSITION + NORMAL + UV
+    InputStream in = Display.getInstance().getResourceAsStream(getClass(), "/boombox.glb");
+    GltfLoader.GltfModel loaded = GltfLoader.loadModel(device, in);   // <1>
 
-    Texture tex = device.createTexture(checkerImage);
-    tex.setWrap(Texture.Wrap.REPEAT);
-    material = new Material(Material.Type.PHONG)
-            .setTexture(tex)
-            .setShininess(20f);
+    material = new Material(Material.Type.PHONG).setShininess(16f);
+    if (loaded.getBaseColorTexture() != null) {
+        material.setTexture(loaded.getBaseColorTexture());           // <2>
+    }
+    model = loaded.getMesh();
     // ... camera, light ...
 }
 ----
-
-The loader reads the first triangle primitive of the first mesh, mapping its
+<1> `loadModel` parses the geometry and decodes the model's embedded base-color
+image into a `Texture`. Use `GltfLoader.load(device, bytes)` instead when you only
+want the geometry.
+<2> The loader reads the first triangle primitive of the first mesh, mapping its
 `POSITION`, `NORMAL` (flat normals are computed when the model has none) and
 `TEXCOORD_0` into the engine's standard vertex layout, so the result drops
-straight into any built in `Material`. The torus below is a glTF model loaded this
-way and drawn with a repeating checker texture and Phong lighting:
+straight into any built in `Material`.
 
-image::img/gpu-model.png[A textured glTF torus loaded with GltfLoader,scaledwidth=40%]
+The model below is the Khronos "BoomBox" glTF sample loaded this way (a CC0 model
+that carries its own base-color texture) and drawn Phong lit:
+
+image::img/gpu-model.png[A textured glTF model loaded with GltfLoader,scaledwidth=40%]
 
 === Animation
 

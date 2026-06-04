@@ -32,9 +32,7 @@ public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
             public void onInit(GraphicsDevice device) {
                 cube = Primitives.cube(device, 1.6f);
                 Texture tex = device.createTexture(64, 64, checker());
-                // Smooth (bilinear) filtering here; the model test exercises the
-                // crisp NEAREST path, so between them both filter modes are covered.
-                tex.setFilter(Texture.Filter.LINEAR);
+                tex.setFilter(Texture.Filter.NEAREST);
                 material = new Material(Material.Type.UNLIT).setTexture(tex);
                 camera.setPerspective(45f, 0.1f, 100f)
                         .setPosition(2.6f, 2.1f, 3.4f)

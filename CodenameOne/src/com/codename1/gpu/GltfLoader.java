@@ -10,6 +10,7 @@
 package com.codename1.gpu;
 
 import com.codename1.io.JSONParser;
+import com.codename1.ui.Image;
 import com.codename1.util.Base64;
 
 import java.io.ByteArrayInputStream;
@@ -96,6 +97,47 @@ public final class GltfLoader {
     ///
     /// the loaded mesh
     public static Mesh load(GraphicsDevice device, byte[] data) {
+        Object[] parsed = parse(data);
+        return build(device, (Map) parsed[0], (byte[]) parsed[1]);
+    }
+
+    /// Loads a model together with its base-color texture from in-memory `.glb`
+    /// or `.gltf` bytes. Use this (rather than `load`) when the model carries its
+    /// own texture and you want it applied automatically.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that allocates the mesh buffers and texture
+    ///
+    /// - `data`: the raw model bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh plus its base-color texture (null texture if the model
+    /// has none)
+    public static GltfModel loadModel(GraphicsDevice device, byte[] data) {
+        Object[] parsed = parse(data);
+        Map root = (Map) parsed[0];
+        byte[] binChunk = (byte[]) parsed[1];
+        Mesh mesh = build(device, root, binChunk);
+        Texture baseColor = loadBaseColorTexture(device, root, binChunk);
+        return new GltfModel(mesh, baseColor);
+    }
+
+    /// Reads all bytes from the stream and loads the model with its base-color
+    /// texture. The stream is closed.
+    public static GltfModel loadModel(GraphicsDevice device, InputStream in) throws IOException {
+        try {
+            return loadModel(device, readFully(in));
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignore) {
+            }
+        }
+    }
+
+    private static Object[] parse(byte[] data) {
         if (data == null || data.length < 4) {
             throw new IllegalArgumentException("empty glTF data");
         }
@@ -113,7 +155,7 @@ public final class GltfLoader {
         try {
             Map root = new JSONParser().parseJSON(
                     new InputStreamReader(new ByteArrayInputStream(utf8Bytes(json)), "UTF-8"));
-            return build(device, root, binChunk);
+            return new Object[] { root, binChunk };
         } catch (IOException ex) {
             throw new RuntimeException("Failed to parse glTF JSON: " + ex.getMessage());
         }
@@ -351,6 +393,72 @@ public final class GltfLoader {
         }
     }
 
+    /// Reads the base-color texture of the first primitive's material and uploads
+    /// it through the device. Returns null when the model carries no base-color
+    /// texture. Only embedded images (a glTF `bufferView` or a `data:` URI) are
+    /// supported; external image files are not fetched.
+    private static Texture loadBaseColorTexture(GraphicsDevice device, Map root, byte[] binChunk) {
+        List materials = (List) root.get("materials");
+        if (materials == null || materials.isEmpty()) {
+            return null;
+        }
+        Map primitive = (Map) ((List) ((Map) ((List) root.get("meshes")).get(0)).get("primitives")).get(0);
+        int materialIndex = primitive.containsKey("material") ? asInt(primitive.get("material")) : 0;
+        if (materialIndex < 0 || materialIndex >= materials.size()) {
+            return null;
+        }
+        Map pbr = (Map) ((Map) materials.get(materialIndex)).get("pbrMetallicRoughness");
+        if (pbr == null) {
+            return null;
+        }
+        Map baseColorTexture = (Map) pbr.get("baseColorTexture");
+        if (baseColorTexture == null) {
+            return null;
+        }
+        List textures = (List) root.get("textures");
+        List images = (List) root.get("images");
+        if (textures == null || images == null) {
+            return null;
+        }
+        Map texture = (Map) textures.get(asInt(baseColorTexture.get("index")));
+        Map image = (Map) images.get(asInt(texture.get("source")));
+        byte[] imageBytes = readImageBytes(image, root, binChunk);
+        if (imageBytes == null) {
+            return null;
+        }
+        Image img = Image.createImage(imageBytes, 0, imageBytes.length);
+        if (img == null) {
+            return null;
+        }
+        Texture result = device.createTexture(img);
+        result.setFilter(Texture.Filter.LINEAR);
+        return result;
+    }
+
+    private static byte[] readImageBytes(Map image, Map root, byte[] binChunk) {
+        Object uri = image.get("uri");
+        if (uri != null) {
+            String u = uri.toString();
+            int comma = u.indexOf(',');
+            if (u.startsWith("data:") && comma >= 0) {
+                return Base64.decode(utf8Bytes(u.substring(comma + 1)));
+            }
+            return null; // external image files are not fetched
+        }
+        if (!image.containsKey("bufferView")) {
+            return null;
+        }
+        List bufferViews = (List) root.get("bufferViews");
+        List buffers = (List) root.get("buffers");
+        Map view = (Map) bufferViews.get(asInt(image.get("bufferView")));
+        byte[] buffer = resolveBuffer(view, buffers, binChunk);
+        int offset = view.containsKey("byteOffset") ? asInt(view.get("byteOffset")) : 0;
+        int length = asInt(view.get("byteLength"));
+        byte[] out = new byte[length];
+        System.arraycopy(buffer, offset, out, 0, length);
+        return out;
+    }
+
     private static int asInt(Object o) {
         if (o instanceof Number) {
             return ((Number) o).intValue();
@@ -391,5 +499,27 @@ public final class GltfLoader {
             out.write(buf, 0, r);
         }
         return out.toByteArray();
+    }
+
+    /// A loaded glTF model: its geometry plus the base-color texture extracted
+    /// from the model's first material, if any. Returned by `loadModel`.
+    public static final class GltfModel {
+        private final Mesh mesh;
+        private final Texture baseColorTexture;
+
+        GltfModel(Mesh mesh, Texture baseColorTexture) {
+            this.mesh = mesh;
+            this.baseColorTexture = baseColorTexture;
+        }
+
+        /// The model geometry.
+        public Mesh getMesh() {
+            return mesh;
+        }
+
+        /// The base-color texture, or null when the model has none.
+        public Texture getBaseColorTexture() {
+            return baseColorTexture;
+        }
     }
 }
