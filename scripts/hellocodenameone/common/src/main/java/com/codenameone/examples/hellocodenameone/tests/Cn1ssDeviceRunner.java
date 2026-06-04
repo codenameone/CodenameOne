@@ -412,6 +412,16 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
+        if (deadline <= 0L) {
+            // Sentinel from the JS-port bridge (port.js runCn1ssResolvedTest):
+            // it can't see testTimeoutMs()'s DualAppearance widening and used to
+            // hard-code a flat 10s, which guillotined dual-appearance tests
+            // mid-dark-phase so their pending emit spilled into the NEXT test
+            // (ChatInput_dark captured the following ImageViewer form). Compute
+            // the type-aware deadline here instead, so a DualAppearanceBaseTest
+            // gets its full 30s on HTML5 too.
+            deadline = System.currentTimeMillis() + testTimeoutMs(testClass);
+        }
         if (testClass.isDone()) {
             finalizeTest(index, testClass, testName, false);
             return;
@@ -420,7 +430,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             finalizeTest(index, testClass, testName, true);
             return;
         }
-        CN.setTimeout(TEST_POLL_INTERVAL_MS, () -> awaitTestCompletion(index, testClass, testName, deadline));
+        final long fixedDeadline = deadline;
+        CN.setTimeout(TEST_POLL_INTERVAL_MS, () -> awaitTestCompletion(index, testClass, testName, fixedDeadline));
     }
 
     private void finalizeTest(int index, BaseTest testClass, String testName, boolean timedOut) {

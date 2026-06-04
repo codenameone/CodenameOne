@@ -65,8 +65,12 @@ jobs:
       # suite were timing out before any tests could be diff'd. 1200s
       # absorbs the variance without re-introducing the
       # silently-dropped-test workaround.
-      CN1_JS_TIMEOUT_SECONDS: "1800"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
+      # 1800 -> 2400: un-skipping the StickyHeader (x3) + StatusBar grid
+      # composites (now that WebSocket transport handles their large payloads)
+      # adds wall-clock; 2400 absorbs the extra tests plus the cross-recovery
+      # retry overhead.
+      CN1_JS_TIMEOUT_SECONDS: "2400"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "2340"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
       # Strict, matching the native ports. The "variable tail of dropped

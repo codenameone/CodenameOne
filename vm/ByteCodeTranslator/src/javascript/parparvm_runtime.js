@@ -118,32 +118,22 @@ function emitVmMessage(message) {
   global.postMessage(safeMessage);
 }
 // --- Host-ref lifecycle (worker side) --------------------------------------
-// browser_bridge.js retains every host object (canvas / image / DOM node) the
-// worker references in a strong ``hostRefById`` map that never evicts. The
-// per-test off-screen screenshot / mutable-image canvases (~4 MB backing store
-// each) piled up for the life of the page, so by ~test 66 the main thread was
-// thrashing: canvas.toBlob stalled, the worker<->host bridge began returning
-// degenerate receivers ("Missing JS member ...", chartDocumentStaleness) and
-// the suite wedged. We close the leak by telling the host to drop a host ref
-// once the LAST worker-side wrapper for it has been garbage-collected.
-// ``jsObjectWrappers`` is a WeakMap, so a wrapper becomes collectable when its
-// owning Java object dies; a FinalizationRegistry then fires and we post a
-// batched ``releaseHostRef``.
+// The host (browser_bridge.js) keeps a HARD reference to every host object
+// (canvas / image / DOM node) in hostRefById and -- exactly like the C/iOS
+// backend, which has no GC on the native side -- never garbage-collects on its
+// own. Cleanup is the JAVA side's responsibility: when a Java object that OWNS
+// a host resource (a NativeImage's backing canvas/image) is collected, its
+// finalizer releases the one host id it owns. We implement that finalizer with
+// a FinalizationRegistry keyed on the OWNING Java object: ``registerNativeResource``
+// is called from the JS-port image natives at creation time, and on the owner's
+// collection we post a batched ``releaseHostRef`` for its id.
 //
-// The GC signal is the crucial property: a canvas that is still REUSED (a
-// cached theme image, a pooled scratch buffer) keeps a live Java reference, so
-// its wrapper is never collected and it is never released -- only genuinely
-// dead canvases are reclaimed. (Time-idle reclamation, by contrast, cannot
-// tell "done" from "idle but reused" and corrupts the bridge.)
-//
-// Multiple wrappers can transiently exist for one host id (the host keeps a
-// stable id per object via its own WeakMap, but each postMessage receipt
-// deserialises a fresh proxy -> fresh wrapper). We refcount per id and only
-// release when the count reaches zero, so a still-live wrapper can never have
-// its ref pulled out from under it. The host side additionally releases ONLY
-// canvases, so a non-canvas ref whose raw ``__jsValue`` marker outlived its
-// wrapper (some @JSBody natives stash the unwrapped marker) is never dropped.
-const hostRefWorkerCount = typeof Object.create === "function" ? Object.create(null) : {};
+// Keying on the owner (not on JSO wrappers) is the correct altitude: the owner
+// is the SOLE holder of that resource's id, so releasing when it dies can never
+// pull a ref out from under a live user. (The earlier wrapper-refcount approach
+// raced: the host dedups one id across many re-created worker wrappers, and a
+// raw ``__jsValue`` marker could outlive the wrappers, so refcount-zero
+// released canvases that were still referenced -> "Missing host receiver".)
 let pendingHostRefReleases = [];
 let hostRefReleaseFlushScheduled = false;
 function flushHostRefReleases() {
@@ -168,31 +158,134 @@ function scheduleHostRefReleaseFlush() {
     flushHostRefReleases();
   }
 }
-const hostRefFinalizer = (typeof FinalizationRegistry === "function")
+const nativeResourceFinalizer = (typeof FinalizationRegistry === "function")
   ? new FinalizationRegistry(function(hostId) {
-      const count = hostRefWorkerCount[hostId];
-      if (count == null) {
+      if (hostId == null || hostId === 0) {
         return;
       }
-      if (count <= 1) {
-        delete hostRefWorkerCount[hostId];
-        pendingHostRefReleases.push(hostId);
-        scheduleHostRefReleaseFlush();
-      } else {
-        hostRefWorkerCount[hostId] = count - 1;
-      }
+      pendingHostRefReleases.push(hostId);
+      scheduleHostRefReleaseFlush();
     })
   : null;
-function trackHostRefWrapper(wrapper, value) {
-  if (!hostRefFinalizer || value == null) {
+// Register that ``owner`` (a Java object) owns the host resource identified by
+// ``hostId`` (or by the host-ref marker / wrapper ``hostResource``). When the
+// owner is GC'd the host id is released. Idempotent-safe: registering the same
+// owner twice just arms two finalizer callbacks for (possibly) different ids.
+function registerNativeResource(owner, hostResource) {
+  if (!nativeResourceFinalizer || owner == null || typeof owner !== "object") {
     return;
   }
-  const hostId = value.__cn1HostRef;
+  let hostId = null;
+  if (typeof hostResource === "number") {
+    hostId = hostResource;
+  } else if (hostResource != null && typeof hostResource === "object") {
+    if (hostResource.__cn1HostRef != null) {
+      hostId = hostResource.__cn1HostRef;
+    } else if (hostResource.__jsValue != null && hostResource.__jsValue.__cn1HostRef != null) {
+      hostId = hostResource.__jsValue.__cn1HostRef;
+    }
+  }
   if (hostId == null || hostId === 0) {
     return;
   }
-  hostRefWorkerCount[hostId] = (hostRefWorkerCount[hostId] || 0) + 1;
-  hostRefFinalizer.register(wrapper, hostId);
+  nativeResourceFinalizer.register(owner, hostId);
+}
+// Object-returning JSO methods that are SAFE to re-issue when their result
+// comes back degraded (see invokeJsoBridge). All are side-effect-free reads or
+// create a fresh detached/standalone object (no DOM mutation, no state change),
+// so repeating one on the rare crossed-response path can't corrupt anything.
+const JSO_RETRYABLE_READ_METHODS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getElementById: true,
+  querySelector: true, getBoundingClientRect: true, getComputedStyle: true,
+  createPattern: true, createLinearGradient: true, createRadialGradient: true,
+  // canvas -> PNG/data-URL encode used by the screenshot emit path. A cross on
+  // the canvas receiver throws "Missing JS member toDataURL" / returns a
+  // degraded value; encoding is a pure read (no canvas mutation) so re-issuing
+  // is safe. Not covering it let an emit-time cross escape and deadlock the EDT.
+  toDataURL: true, toBlob: true
+};
+// Max re-issues for a degraded idempotent read before giving up. A response
+// CROSS comes in BURSTS (a cluster of concurrent numeric getters whose replies
+// cross object reads); 4 was too few to outlast a sustained burst (createElement
+// observed exhausting all 4 in CI). With a backoff sleep between tries -- which
+// lets the in-flight numeric getters finish so they can't re-cross -- a dozen
+// tries clears realistic bursts while staying bounded (only on the degraded
+// path, ~0.5s worst case).
+const JSO_MAX_RETRY = 12;
+// Lost-response watchdog timeouts, keyed by host-call symbol (see the watchdog
+// armed in dispatchYield). Only BOUNDED host natives are listed: a fast
+// JSO-bridge DOM/canvas read (resolves in <100ms), the screenshot UI-settle
+// wait (a bounded rAF loop, ~maxFrames), and the canvas->PNG capture (rAF +
+// encode, sub-second). If the host channel drops their response the worker
+// would otherwise park forever; on expiry we resume the thread with a transient
+// error so the caller recovers (JSO reads re-issue via the retry; capture/
+// settle callers catch and emit a placeholder / advance). UNBOUNDED natives
+// (image load over the network, fetch, the screenshot WebSocket) are
+// deliberately ABSENT -- they legitimately run as long as the app/network
+// needs and must never be aborted by a timer.
+const HOST_CALL_WATCHDOG_MS = {
+  "__cn1_jso_bridge__": 2000,
+  "__cn1_dom_window_current__": 5000,
+  "__cn1_create_custom_event__": 5000,
+  "__cn1_hide_splash__": 5000,
+  "__cn1_load_truetype_font__": 15000,
+  "__cn1_wait_for_ui_settle__": 8000,
+  "__cn1_capture_canvas_png__": 10000
+};
+// Retryable reads that can NEVER legitimately return null/undefined: for these
+// a null result is itself a degraded read (a lost/crossed response delivered
+// null instead of the element/context) and must be re-issued. createElement on
+// a real document always returns an element; getContext('2d') always returns a
+// context; createPattern/createLinearGradient/createRadialGradient always
+// return an object; getImageData/measureText/getBoundingClientRect always
+// return their result object. getElementById/querySelector are deliberately
+// EXCLUDED -- null is their legitimate "not found" answer.
+const JSO_NEVER_NULL_READS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getBoundingClientRect: true,
+  getComputedStyle: true,
+  createLinearGradient: true, createRadialGradient: true,
+  toDataURL: true
+};
+// A degraded object read: a NUMBER where an object was expected (a crossed
+// numeric getter response), a truthy empty {} that lost its host-ref marker on
+// the round-trip, OR null/undefined from a method that can never legitimately
+// return null (see JSO_NEVER_NULL_READS -- this is the transport-cross case
+// where createElement resumed with another call's null/void response). A plain
+// null from a nullable read (getElementById, a getter) is NOT degraded and
+// passes through untouched.
+function isDegradedObjectResult(r, bridge) {
+  if (typeof r === "number") {
+    return true;
+  }
+  if (r && typeof r === "object" && !Array.isArray(r)
+      && r.__cn1HostRef == null
+      && Object.getOwnPropertyNames(r).length === 0) {
+    return true;
+  }
+  if (r == null && bridge && bridge.kind === "method"
+      && JSO_NEVER_NULL_READS[bridge.member] === true) {
+    return true;
+  }
+  return false;
+}
+// A transient host-bridge error worth re-issuing an idempotent read for: the
+// host momentarily failed to resolve the receiver (its host-ref crossed with a
+// concurrent call and pointed at a degraded value), so a member lookup / method
+// call threw rather than running. The same read usually succeeds once the
+// crossed response drains. Matches the exact throw strings the host bridge
+// emits (browser_bridge.js: "Missing JS member ...", "Missing host receiver
+// ...") plus the generic "is not a function" a degraded receiver produces.
+function isTransientHostBridgeError(e) {
+  const m = e == null ? "" : (e.message != null ? String(e.message) : String(e));
+  if (!m) {
+    return false;
+  }
+  return m.indexOf("Missing JS member") >= 0
+      || m.indexOf("Missing host receiver") >= 0
+      || m.indexOf("is not a function") >= 0
+      || m.indexOf("host call timed out") >= 0;
 }
 // An entry in ``cls.methods`` may be either a function (the common
 // case) or a STRING naming another translated function. Inherited
@@ -657,6 +750,20 @@ const jvm = {
   // Form-transition logic from interleaving with a frame's canvas-op
   // chain and recursively producing more canvas ops.
   atomicThread: null,
+  // Screenshot-capture serialization. While a green thread is reading the
+  // visible canvas (the cn1ss emit's ``__cn1_wait_for_ui_settle__`` +
+  // ``__cn1_capture_canvas_png__`` host round-trips, which span up to ~24 rAF
+  // frames on the host), ANY other green thread that paints would draw onto
+  // codenameone-canvas mid-capture and the sampled PNG would show the wrong
+  // (next/previous) form -- the screenshot "off-by-one" that forces dual-stream
+  // tests (ChatInput/ChatView dual-appearance) to be parked. Unlike the dead
+  // ``atomicThread`` flag, this gate is set ONLY for the brief capture window
+  // (see beginCaptureGate/endCaptureGate) and is deadlock-safe: the owner parks
+  // solely on the host (never on a monitor held by a deferred thread), and the
+  // form present runs BEFORE the gate is taken, so the owner acquires no monitor
+  // while holding it. When null (the steady state) drain() behaves exactly as
+  // before -- the gate is inert outside captures.
+  captureGateOwner: null,
   pendingHostCalls: Object.create(null),
   // Batched fire-and-forget JSO bridge ops. Every canvas/DOM setter or
   // void method call inside a paint frame produces a HOST_CALL that
@@ -1398,14 +1505,81 @@ const jvm = {
         // A round-trip is about to fire; the host must see all
         // previously-queued fire-and-forget ops first to keep
         // canvas state consistent.
-        self.flushPendingFireAndForget();
-        const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+        const jsoRequest = {
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
           kind: bridge.kind,
           member: bridge.member,
           args: transferableArgs
-        }]);
+        };
+        const __retRC = bridge.returnClass;
+        const __expectsObject = __retRC != null && __retRC !== "int" && __retRC !== "byte"
+            && __retRC !== "short" && __retRC !== "char" && __retRC !== "long"
+            && __retRC !== "float" && __retRC !== "double" && __retRC !== "boolean"
+            && __retRC !== "void" && __retRC !== "v";
+        const __retryableRead = bridge.kind === "getter"
+            || (bridge.kind === "method" && JSO_RETRYABLE_READ_METHODS[bridge.member] === true);
+        // DEGRADED-READ RECOVERY (the getDocument-null / canvasContextWipe /
+        // "Missing JS member getContext" family). A round-trip object read for
+        // an IDEMPOTENT member can come back corrupted four ways when its
+        // response crosses with a concurrent host call in a dense paint burst:
+        // (a) a NUMBER where an object was expected, (b) an empty {} that lost
+        // its host-ref marker, (c) null/undefined from a never-null method
+        // (createElement/getContext), or (d) a THROWN "Missing JS member" /
+        // "Missing host receiver" because the receiver momentarily resolved to
+        // a degraded value on the host. All four are transient -- RE-ISSUE the
+        // identical read; the re-issue is another suspend/resume so the crossed
+        // response drains first. Idempotent reads have no observable side
+        // effect (createElement just makes a throwaway detached node) so
+        // repeating is safe. Bounded: a genuinely persistent failure falls
+        // through to substitute-null below or re-throws, and never loops.
+        let hostResult;
+        let __attempt = 0;
+        for (;;) {
+          if (__attempt > 0) {
+            // Backoff before re-issuing: yield long enough for the concurrent
+            // numeric getters whose responses crossed into this read to finish,
+            // so the re-issue isn't immediately re-crossed by the same in-flight
+            // burst. Grows with the attempt (capped) so a sustained storm gets
+            // progressively more room to drain.
+            yield { op: "sleep", millis: Math.min(8 * __attempt, 64) };
+          }
+          let __threw = null;
+          try {
+            // The host must see all previously-queued fire-and-forget ops
+            // first to keep canvas state consistent before this round-trip.
+            self.flushPendingFireAndForget();
+            hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [jsoRequest]);
+          } catch (__hostErr) {
+            __threw = __hostErr;
+          }
+          if (__threw != null) {
+            // A transient throw ("Missing JS member"/"Missing host receiver"/
+            // timeout) means the host call NEVER EXECUTED -- the receiver
+            // momentarily resolved to a degraded value -- so re-issuing is safe
+            // for ANY round-trip method (not just the idempotent-read allowlist;
+            // nothing ran, so there's no side effect to repeat). This is what
+            // catches an emit-time canvas.toDataURL() cross that would otherwise
+            // escape and deadlock the EDT.
+            if (__attempt < JSO_MAX_RETRY && isTransientHostBridgeError(__threw)) {
+              __attempt++;
+              if (VM_DIAG_ENABLED) {
+                try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":throw:attempt=" + __attempt); } catch (_e) {}
+              }
+              continue;
+            }
+            throw __threw;
+          }
+          if (__expectsObject && __retryableRead && __attempt < JSO_MAX_RETRY
+              && isDegradedObjectResult(hostResult, bridge)) {
+            __attempt++;
+            if (VM_DIAG_ENABLED) {
+              try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":attempt=" + __attempt); } catch (_e) {}
+            }
+            continue;
+          }
+          break;
+        }
         // canvasContextWipe RECOVERY: when hostResult is a NUMBER but
         // the expected return class is an object type, substitute null.
         // The downstream code would otherwise treat the number as a
@@ -1998,11 +2172,6 @@ const jvm = {
     if (jsObjectWrappers) {
       jsObjectWrappers.set(value, wrapper);
     }
-    // Track this wrapper so the host can release the underlying host ref once
-    // every worker-side wrapper for it has been GC'd (see the host-ref
-    // lifecycle block near emitVmMessage). Only host-backed values (carrying
-    // ``__cn1HostRef``) are tracked; pure worker objects never leak.
-    trackHostRefWrapper(wrapper, value);
     this.enhanceJsWrapper(wrapper, resolvedClass);
     if (expectedClass && expectedClass !== resolvedClass) {
       this.enhanceJsWrapper(wrapper, expectedClass);
@@ -2105,10 +2274,21 @@ const jvm = {
   invokeHostNative(symbol, args) {
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
   },
+  // Arm the owning-object finalizer so the host releases ``hostResource``'s id
+  // when the Java ``owner`` is GC'd. See the host-ref lifecycle block above.
+  registerNativeResource(owner, hostResource) {
+    registerNativeResource(owner, hostResource);
+  },
   resolveHostCall(id, success, value, error) {
     const pending = this.pendingHostCalls[id];
     if (!pending) {
       return false;
+    }
+    // Disarm the lost-response watchdog (if this was a JSO-bridge round-trip) --
+    // the response arrived, so the timeout must not later fire a false abort.
+    if (pending.timeoutEntry) {
+      this._removeTimedWakeup(pending.timeoutEntry);
+      pending.timeoutEntry = null;
     }
     // Main-thread host callbacks fire on every async bridge call (image
     // load, fetch, BrowserComponent, etc.). The :ok branch is gated
@@ -2373,6 +2553,27 @@ const jvm = {
     this.runnable.push(thread);
     this.drain();
   },
+  // Take the screenshot-capture gate for the CURRENT thread. Called
+  // synchronously (not yielded) by the cn1ss emit in port.js, immediately
+  // before the ``__cn1_wait_for_ui_settle__`` / ``__cn1_capture_canvas_png__``
+  // host round-trips and AFTER the form has already been presented. While held,
+  // drain() defers every other green thread so none can paint onto the canvas
+  // being sampled. Idempotent / last-writer-wins (captures are serialized by the
+  // runner, so re-entrancy shouldn't occur, but guarding costs nothing).
+  beginCaptureGate() {
+    this.captureGateOwner = this.currentThread || null;
+  },
+  // Release the capture gate. MUST be called from a finally so a watchdog-aborted
+  // or throwing capture still frees it. Re-arms drain so the threads deferred
+  // during the capture window get to run.
+  endCaptureGate() {
+    if (this.captureGateOwner && this.captureGateOwner !== this.currentThread) {
+      // A different thread is mid-capture; don't steal its gate.
+      return;
+    }
+    this.captureGateOwner = null;
+    this.scheduleDrain();
+  },
   schedulerNow() {
     if (typeof global.performance !== "undefined" && global.performance
             && typeof global.performance.now === "function") {
@@ -2398,11 +2599,23 @@ const jvm = {
     this.draining = true;
     const deadline = this.schedulerNow() + 8;
     let steps = 0;
+    // Threads held aside while the capture gate is owned by another thread (see
+    // captureGateOwner). They are NOT lost: restored to runnable in the finally,
+    // and endCaptureGate()/scheduleDrain re-runs them once the gate clears. Stays
+    // null on every non-capture drain, so the steady-state hot path is untouched.
+    let captureDeferred = null;
     try {
       while (this.runnable.length) {
         if (steps++ > 2048 || this.schedulerNow() >= deadline) {
           this.scheduleDrain();
           break;
+        }
+        // While a screenshot capture is reading the canvas, defer any OTHER
+        // thread so it can't paint mid-capture (the off-by-one race). The owner
+        // itself is never deferred, and the gate is null outside captures.
+        if (this.captureGateOwner && this.runnable[0] !== this.captureGateOwner) {
+          (captureDeferred || (captureDeferred = [])).push(this.runnable.shift());
+          continue;
         }
         // Atomic-thread mode (set by flushGraphics' begin/endGraphicsAtomic
         // pair) used to suppress dispatch of every other green thread.
@@ -2421,6 +2634,16 @@ const jvm = {
           continue;
         }
         this.currentThread = thread;
+        // Worker-liveness probe feeding the heartbeat timer below: a frozen
+        // resume count with a live heartbeat means parked/starved, a stopped
+        // heartbeat means a synchronous infinite loop in this step. The resume
+        // counter is a trivial increment; the (string-building) label is only
+        // recorded under diag so production pays nothing.
+        this.__cn1ResumeCount = (this.__cn1ResumeCount | 0) + 1;
+        if (VM_DIAG_ENABLED) {
+          this.__cn1LastResumeLabel = thread.id + ":" + threadDebugLabel(thread.object);
+          this.__cn1LastResumeTs = this.schedulerNow();
+        }
         if (!thread.__cn1LoggedFirstStep && shouldTraceThread(thread)) {
           thread.__cn1LoggedFirstStep = true;
           vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
@@ -2432,45 +2655,82 @@ const jvm = {
         // ``_Y`` / ``__cn1TickReset`` block at the top of this
         // file for the rationale.
         __cn1TickReset();
-        if (thread.resumeError) {
-          const resumeError = thread.resumeError;
-          thread.resumeError = null;
-          result = thread.generator.throw(resumeError);
-        } else {
-          result = thread.generator.next(thread.resumeValue);
-        }
-        thread.resumeValue = undefined;
-        if (result.done) {
-          thread.done = true;
-          // Always-on lifecycle log: when the MAIN thread completes,
-          // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
-          // lifecycle.start, and runApp() all returned. We post a
-          // ``lifecycle`` VM message back to the main-thread bridge
-          // so it can flip ``window.cn1Started = true`` (the @JSBody-
-          // driven flag set inside ParparVMBootstrap.setStarted lives
-          // on the WORKER's window, not the main thread's, so the
-          // headless-test ``page.evaluate(() => window.cn1Started)``
-          // would never see it without this round trip).
-          if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
-            vmLifecycle("main-thread-completed");
-            emitVmMessage({
-              type: this.protocol.messages.LIFECYCLE || "lifecycle",
-              phase: "started"
-            });
+        try {
+          if (thread.resumeError) {
+            const resumeError = thread.resumeError;
+            thread.resumeError = null;
+            result = thread.generator.throw(resumeError);
+          } else {
+            result = thread.generator.next(thread.resumeValue);
           }
+          thread.resumeValue = undefined;
+          if (result.done) {
+            thread.done = true;
+            // Always-on lifecycle log: when the MAIN thread completes,
+            // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
+            // lifecycle.start, and runApp() all returned. We post a
+            // ``lifecycle`` VM message back to the main-thread bridge
+            // so it can flip ``window.cn1Started = true`` (the @JSBody-
+            // driven flag set inside ParparVMBootstrap.setStarted lives
+            // on the WORKER's window, not the main thread's, so the
+            // headless-test ``page.evaluate(() => window.cn1Started)``
+            // would never see it without this round trip).
+            if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
+              vmLifecycle("main-thread-completed");
+              emitVmMessage({
+                type: this.protocol.messages.LIFECYCLE || "lifecycle",
+                phase: "started"
+              });
+            }
+            if (thread.object) {
+              thread.object[CN1_THREAD_ALIVE] = 0;
+              this.notifyAll(thread.object);
+            }
+            continue;
+          }
+          this.handleYield(thread, result.value);
+        } catch (threadErr) {
+          // An uncaught exception in a green thread TERMINATES THAT THREAD
+          // (Java semantics: Thread.run() unwinds, other threads keep running)
+          // -- it must NOT halt the whole cooperative scheduler. The previous
+          // behaviour let the error propagate out of the drain loop into the
+          // outer catch -> fail(), which stopped dispatch entirely and wedged
+          // the worker (frozen=1/runnable=0): a single __cn1_jso_bridge__
+          // watchdog timeout (main thread briefly blocked by a heavy capture),
+          // resumed into the parked thread as an uncaught RuntimeException, took
+          // down the ENTIRE screenshot suite with no error surfaced to the host.
+          // Terminate just this thread, wake any joiners, record the failure for
+          // diagnostics, and continue draining the rest.
+          thread.done = true;
+          thread.resumeError = null;
+          thread.resumeValue = undefined;
           if (thread.object) {
             thread.object[CN1_THREAD_ALIVE] = 0;
             this.notifyAll(thread.object);
           }
+          this.fail(threadErr);
           continue;
         }
-        this.handleYield(thread, result.value);
       }
     } catch (err) {
       this.fail(err);
     } finally {
       this.currentThread = null;
       this.draining = false;
+      // Restore any threads deferred for the capture gate. They go back to the
+      // FRONT (preserving their relative order) so they don't lose their place
+      // behind threads enqueued during this burst. If the gate has since cleared
+      // (endCaptureGate ran while the owner resumed) re-arm a drain so they run;
+      // otherwise they sit harmlessly in runnable until the gate's own
+      // scheduleDrain (or the owner's host callback) fires.
+      if (captureDeferred && captureDeferred.length) {
+        for (let i = captureDeferred.length - 1; i >= 0; i--) {
+          this.runnable.unshift(captureDeferred[i]);
+        }
+        if (!this.captureGateOwner) {
+          this.scheduleDrain();
+        }
+      }
       // Drain burst is over -- ship any queued fire-and-forget JSO
       // ops to the host as a single batch postMessage. Saves
       // hundreds of structured-clone roundtrips per paint frame.
@@ -2540,6 +2800,18 @@ const jvm = {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
         this.resumeWaiter(w.waiter);
+      } else if (w.kind === "hostcall") {
+        // A JSO-bridge round-trip whose host response never arrived (see the
+        // watchdog armed in dispatchYield). If it is still pending, fail it
+        // with a transient error so the parked thread resumes and the
+        // invokeJsoBridge retry re-issues the read. If it already resolved,
+        // resolveHostCall cancelled this entry, so this is a no-op.
+        if (this.pendingHostCalls[w.id]) {
+          if (VM_DIAG_ENABLED) {
+            try { vmDiag("HOSTCALL_TIMEOUT", "id", String(w.id)); } catch (_e) {}
+          }
+          this.resolveHostCall(w.id, false, null, "host call timed out (jso bridge)");
+        }
       }
     }
     this._refreshTimedWakeupTimer();
@@ -2580,7 +2852,7 @@ const jvm = {
     }
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
-      this.pendingHostCalls[yielded.id] = { thread: thread };
+      this.pendingHostCalls[yielded.id] = { thread: thread, symbol: yielded.symbol };
       const rawArgs = yielded.args || [];
       const safeArgs = new Array(rawArgs.length);
       for (let i = 0; i < rawArgs.length; i++) {
@@ -2591,6 +2863,27 @@ const jvm = {
       // op against an out-of-date canvas state.
       this.flushPendingFireAndForget();
       emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
+      // LOST-RESPONSE WATCHDOG. The host is a thin, dumb pixel sink (mirroring
+      // the C/iOS native backend) and the worker<->host postMessage channel can
+      // drop or never deliver a callback under load -- when it does, this green
+      // thread parks on pendingHostCalls[id] forever and the whole suite wedges
+      // with no error (the lightweight-popup / DualAppearance capture hangs).
+      // For BOUNDED host natives only (see HOST_CALL_WATCHDOG_MS), arm a timeout
+      // matched to that op's worst-case latency: on expiry resume the thread
+      // with a transient error so the caller recovers (JSO reads re-issue via
+      // invokeJsoBridge's retry; capture/settle callers catch and advance).
+      // Unbounded natives (image load, fetch, the screenshot WebSocket) are not
+      // in the map, so they are never aborted. On a healthy channel the call
+      // resolves well within the timeout and this never fires.
+      const __watchdogMs = HOST_CALL_WATCHDOG_MS[yielded.symbol];
+      if (__watchdogMs != null) {
+        const pendingEntry = this.pendingHostCalls[yielded.id];
+        if (pendingEntry) {
+          const timeoutEntry = { kind: "hostcall", id: yielded.id, wakeAt: this.schedulerNow() + __watchdogMs, cancelled: false };
+          pendingEntry.timeoutEntry = timeoutEntry;
+          this._scheduleTimedWakeup(timeoutEntry);
+        }
+      }
       return;
     }
     if (yielded.op === "monitor_enter") {
@@ -4543,4 +4836,74 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
   const event = jvm.eventQueue.shift();
   return event && event.code != null ? (event.code | 0) : -1;
 });
+
+// Worker liveness heartbeat (diag-only). If the worker wedges in a synchronous
+// green-thread step this timer CANNOT fire (single-threaded) and the heartbeat
+// STOPS; if the worker is merely parked/starved (idle, a host callback not
+// delivered) the heartbeat keeps firing with runnable==0 and a frozen resume
+// count. The timer is created ONLY under diag so production has no perpetual
+// wakeup.
+if (VM_DIAG_ENABLED && typeof setInterval === "function") {
+  let __cn1HbLastResumes = -1;
+  let __cn1HbFrozenStreak = 0;
+  setInterval(function() {
+    try {
+      const rc = jvm.__cn1ResumeCount | 0;
+      const frozen = rc === __cn1HbLastResumes;
+      __cn1HbLastResumes = rc;
+      __cn1HbFrozenStreak = frozen ? (__cn1HbFrozenStreak + 1) : 0;
+      vmTrace("DIAG:WORKER_HB:resumes=" + rc
+        + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
+        + ":draining=" + (jvm.draining ? 1 : 0)
+        + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0)
+        + ":frozen=" + (frozen ? 1 : 0)
+        + ":captureGate=" + (jvm.captureGateOwner ? 1 : 0)
+        + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
+        + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+      // When the worker is wedged (frozen with nothing runnable) every green
+      // thread is parked. Dump WHAT they are parked on so the lost-response /
+      // deadlock can be isolated without worker-internal tracing (which
+      // Playwright can't attach to). Only fire after a SUSTAINED freeze (>=5
+      // consecutive ~1.5s heartbeats = ~7.5s) so legitimate multi-second waits
+      // (__cn1_delay__ transitions, dual-appearance settle) don't pollute the
+      // signal -- a true wedge never recovers, so it keeps dumping.
+      if (frozen && __cn1HbFrozenStreak >= 5 && (jvm.runnable ? jvm.runnable.length : 0) === 0) {
+        var pend = jvm.pendingHostCalls || {};
+        var counts = {};
+        var pk = Object.keys(pend);
+        for (var i = 0; i < pk.length; i++) {
+          var sym = (pend[pk[i]] && pend[pk[i]].symbol) ? String(pend[pk[i]].symbol) : "unknown";
+          counts[sym] = (counts[sym] | 0) + 1;
+        }
+        var parts = [];
+        var ck = Object.keys(counts);
+        for (var j = 0; j < ck.length; j++) {
+          parts.push(ck[j] + "x" + counts[ck[j]]);
+        }
+        // Dump each pending timed-wakeup: kind + how overdue/early it is +
+        // cancelled flag. With pendingHostCalls=0 the wedge is a timed-wakeup
+        // that never fires -- if its wakeAt is in the PAST (overdue) while the
+        // backing setTimeout is gone, the scheduler's _refreshTimedWakeupTimer
+        // lost the timer (a scheduler bug, not a lost host response).
+        var twNow = jvm.schedulerNow();
+        var twParts = [];
+        var tws = jvm.timedWakeups || [];
+        for (var t = 0; t < tws.length; t++) {
+          var w = tws[t];
+          twParts.push(String(w.kind || "?") + ":dueIn=" + Math.round((w.wakeAt | 0) - twNow)
+            + (w.cancelled ? ":cancelled" : ""));
+        }
+        vmTrace("DIAG:WORKER_HB_FROZEN:pendingHostCalls=" + pk.length
+          + ":symbols=" + (parts.length ? parts.join(",") : "none")
+          + ":timedWakeups=" + tws.length
+          + ":wakeups=[" + twParts.join(",") + "]"
+          + ":wakeupTimerSet=" + (jvm._wakeupTimer != null ? 1 : 0)
+          + ":wakeupAtIn=" + (jvm._wakeupAt != null && jvm._wakeupAt !== Infinity ? Math.round(jvm._wakeupAt - twNow) : "inf")
+          + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0));
+      }
+    } catch (e) {
+      void e;
+    }
+  }, 1500);
+}
 })(self);

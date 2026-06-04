@@ -1599,6 +1599,25 @@ bindNative([
   return null;
 });
 
+// Java-side finalizer hook: arm release of an image's front-end resource
+// (backing canvas / HTMLImageElement). ``owner`` is the long-lived Java image
+// (NativeImage) and ``resource`` is its host wrapper; the finalizer is keyed on
+// the OWNER, not the wrapper, because the worker re-wraps host refs on demand
+// (the JSO wrapper table is a WeakMap) -- keying on a transient wrapper would
+// release the id while the canvas/image is still in use. When the owning image
+// becomes unreachable the host drops the resource's id. Keeps the JS host a
+// dumb hard-reference table whose cleanup is driven entirely by Java GC --
+// mirroring the C/iOS backend.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource_java_lang_Object_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerImageResource___java_lang_Object_com_codename1_html5_js_JSObject"
+], function*(owner, resource) {
+  if (owner != null && resource != null && jvm && typeof jvm.registerNativeResource === "function") {
+    jvm.registerNativeResource(owner, resource);
+  }
+  return null;
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
@@ -3211,9 +3230,9 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // bytecode-emitted dispatch chain. Force-timeout so the rest of
   // the screenshot suite can finalize.
   "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  // emitChannel hijack — see matching entry in cn1ssForcedTimeoutTestNames below.
-  "com_codenameone_examples_hellocodenameone_tests_ChatInputScreenshotTest": "chatInputEmitHijack",
-  "com_codenameone_examples_hellocodenameone_tests_ChatViewScreenshotTest": "chatViewEmitHijack",
+  // ChatInput/ChatView un-parked: their dark-phase emit no longer spills into the
+  // next test now that awaitTestCompletion gives DualAppearanceBaseTest its full
+  // 30s on HTML5 (was clobbered to a flat 10s by the bridge).
   // The 14 *ThemeScreenshotTest entries that used to live here were
   // unparked when the JS port started bundling the modern native
   // theme resources (iOSModernTheme.res / AndroidMaterialTheme.res
@@ -3288,13 +3307,20 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // a dim/blur layer persists across forms. Separate test-isolation
   // bug worth chasing; for now park here so the suite is reliable.
   "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
-  // ValidatorLightweightPicker and LightweightPickerButtons run at
-  // suite indices 70-71 -- close to the canvas-accumulation
-  // threshold, and which of them hangs the SUITE:FINISHED wait
-  // drifts run-to-run. Park both alongside the chart tail so the
-  // suite reliably reaches comparison.
+  // LightweightPickerButtons HARD-parks the worker (heartbeat keeps firing
+  // but the green scheduler goes fully idle: runnable=0, resumes frozen, NOT
+  // a jso-bridge cross -- RETRIES/HOSTCALL_TIMEOUT both 0). It is the
+  // lightweight-popup capture deadlock: Picker.setUseLightweightPopup(true) +
+  // startEditingAsync() opens a popup whose animating date wheels never settle,
+  // and the nested callSerially -> emitCurrentFormScreenshot -> stopEditing()
+  // chain waits on a paint that the popup animation starves. This is a
+  // test/popup-lifecycle deadlock, distinct from the chartDocumentStaleness
+  // response-cross (now handled by the invokeJsoBridge retry + host-call
+  // watchdog), so the retry can't rescue it -- park it so the suite reaches
+  // comparison. ValidatorLightweightPicker, which DID drift here previously,
+  // now runs clean once the cross is recovered, so it stays un-parked.
   //"com_codenameone_examples_hellocodenameone_tests_ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
-  //"com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
+  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "lightweightPopupCaptureDeadlock",
   // CssGradients lands at suite index ~92 -- well past the canvas-
   // accumulation threshold that exhausts the JS port's
   // Document.createElement host-receiver cache. The failure manifests
@@ -3342,15 +3368,11 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "Base64NativePerformanceTest": "base64NativePerformance",
   "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
-  // emitChannel host-bridges to a capture of the visible browser canvas
-  // instead of using the test-supplied off-screen Image; for these dual-
-  // appearance tests the visible canvas still shows the previous test
-  // (LightweightPickerButtons) when ChatInput_/ChatView_ {dark,light}
-  // streams emit, so the captured PNGs contain the wrong content and
-  // mismatch the references shipped with master. Real fix belongs in
-  // the JS-port emit path (separate investigation).
-  "ChatInputScreenshotTest": "chatInputEmitHijack",
-  "ChatViewScreenshotTest": "chatViewEmitHijack",
+  // ChatInput/ChatView were parked because their dark-phase capture ran past the
+  // flat 10s deadline the bridge imposed, so the runner force-advanced and the
+  // pending dark emit captured the NEXT test (ChatInput_dark -> ImageViewer).
+  // Root cause fixed: awaitTestCompletion now computes the type-aware deadline
+  // (DualAppearanceBaseTest gets 30s on HTML5) instead of the bridge's flat 10s.
   // The 14 *ThemeScreenshotTest short-name entries were un-parked
   // alongside the fully-qualified-class entries in
   // cn1ssForcedTimeoutTestClasses above when the modern native
@@ -3780,13 +3802,18 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   try {
     const awaitMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerAwaitTestCompletionMethodId);
     if (typeof awaitMethod === "function") {
-      const deadline = Date.now() + cn1ssTestTimeoutMs;
+      // Pass 0 (sentinel) so awaitTestCompletion computes the TYPE-AWARE deadline
+      // itself via testTimeoutMs(testClass): DualAppearanceBaseTest tests need
+      // ~30s on HTML5 (light + dark phases each pay registerReadyCallback's
+      // 1500ms + settle + capture). Hard-coding the flat 10s cn1ssTestTimeoutMs
+      // here used to guillotine them mid-dark-phase, so the pending dark emit
+      // captured the NEXT test's form (e.g. ChatInput_dark -> ImageViewer).
       return yield* cn1_ivAdapt(awaitMethod(
         callTarget,
         effectiveIndex,
         effectiveTestObject,
         normalizedTestName,
-        deadline
+        0
       ));
     }
     emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:awaitTestCompletionMissing=1");
@@ -4631,14 +4658,32 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
         yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
-        yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
-          reason: "screenshot:" + normalizedTest,
-          maxFrames: 48,
-          stableFrames: 3,
-          quietFrames: 3
-        }]);
-        const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
-        capturedDataUrl = hostResult == null ? "" : String(hostResult);
+        // Serialize the canvas read against concurrent painters. The settle +
+        // capture host round-trips span many rAF frames during which the
+        // cooperative scheduler would otherwise run other green threads (the
+        // next test's show()/paint, or a dual-appearance second-stream emit)
+        // that draw onto codenameone-canvas mid-sample -- the screenshot
+        // off-by-one. Holding the capture gate defers those threads until the
+        // pixels are read. The present above runs BEFORE the gate, so the owner
+        // holds no monitor while gated (deadlock-safe), and endCaptureGate is in
+        // a finally so a watchdog-aborted/throwing capture still frees it.
+        if (typeof jvm.beginCaptureGate === "function") {
+          jvm.beginCaptureGate();
+        }
+        try {
+          yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
+            reason: "screenshot:" + normalizedTest,
+            maxFrames: 48,
+            stableFrames: 3,
+            quietFrames: 3
+          }]);
+          const hostResult = yield jvm.invokeHostNative("__cn1_capture_canvas_png__", []);
+          capturedDataUrl = hostResult == null ? "" : String(hostResult);
+        } finally {
+          if (typeof jvm.endCaptureGate === "function") {
+            jvm.endCaptureGate();
+          }
+        }
       } catch (_hostCaptureErr) {
         capturedDataUrl = "";
       }

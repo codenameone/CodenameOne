@@ -159,9 +159,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean shiftKeyDown;
     private BufferedGraphics graphics;
     Window window;
+    // The document is a stable singleton for the life of the page. Resolve it
+    // ONCE (at __init, with no concurrent barrier traffic) and reuse the cached
+    // reference forever. Calling doc() on every createCanvas /
+    // createElement is a barrier round-trip whose object response can be crossed
+    // by a concurrent numeric getter (canvas getWidth/getHeight) deep in a
+    // dense paint burst -- the worker then resumes getDocument() with a number
+    // (null after the object cast) and createCanvas NPEs, silently killing the
+    // EDT / the running screenshot test and wedging the suite. The worker holds
+    // this as a hard ref so its host id is never released; re-query is never
+    // needed (mirrors the C/iOS backend, which keeps the document handle once).
+    private HTMLDocument document;
     private HTMLCanvasElement canvas;
     private HTMLCanvasElement scratchBuffer;
+    // Current dimensions of the reused scratch buffer, tracked Java-side so the
+    // grow check in getCanvasBuffer never reads canvas.getWidth()/getHeight()
+    // back across the barrier (a hot crossing during image scaling).
+    private int scratchBufferWidth;
+    private int scratchBufferHeight;
     HTMLCanvasElement outputCanvas;
+    // Cached display backing-store dimensions and the output canvas 2D context.
+    // The Java side OWNS these values -- it sets them in updateCanvasSize() --
+    // so it must never round-trip across the worker<->host barrier to read them
+    // back. Querying canvas.getWidth()/getHeight()/getContext() on every layout
+    // and paint frame produced a continuous storm of barrier calls whose
+    // responses intermittently crossed into concurrent object reads
+    // (getDocument/getContext returning a width/height number). The host stays
+    // dumb; the Java side keeps and reuses what it already knows.
+    private CanvasRenderingContext2D outputContext;
+    private int displayWidth;
+    private int displayHeight;
     private final JavaScriptRenderingBackend renderingBackend = new BrowserDomRenderingBackend();
     private EventListener onMouseDown, onMouseUp, onTouchStart, onTouchEnd, onMouseMove, onTouchMove, hitTest, onPaste;
     
@@ -240,7 +267,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private class BrowserDomRenderingBackend implements JavaScriptRenderingBackend {
         @Override
         public HTMLCanvasElement createCanvas(int width, int height) {
-            HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
+            HTMLCanvasElement canvas = (HTMLCanvasElement)doc().createElement("canvas");
             canvas.setWidth(width);
             canvas.setHeight(height);
             return canvas;
@@ -248,7 +275,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         @Override
         public HTMLImageElement createImageElement() {
-            return (HTMLImageElement)window.getDocument().createElement("img");
+            return (HTMLImageElement)doc().createElement("img");
         }
 
         @Override
@@ -265,8 +292,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
-        public HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas) {
-            return new HTML5Graphics(implementation, canvas);
+        public HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas, int width, int height) {
+            return new HTML5Graphics(implementation, canvas, width, height);
         }
 
         @Override
@@ -412,7 +439,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @JSBody(params={"handler"}, script="window.onbeforeunload=handler")
     private native static void setBeforeUnloadHandler(JSObject handler);
-    
+
+    // Arm the Java-side finalizer that frees a front-end resource (an image's
+    // backing canvas or HTMLImageElement). The JS host keeps a HARD reference
+    // to every such resource and never GCs it -- exactly like the C/iOS native
+    // backend. When the owning Java image becomes unreachable, the worker
+    // finalizer releases this resource's host id.
+    //
+    // ``owner`` MUST be the long-lived Java object whose lifecycle gates the
+    // resource (the NativeImage), NOT the ``resource`` wrapper itself: the
+    // worker re-wraps host refs on demand (the JSO wrapper table is a WeakMap),
+    // so a transient wrapper for the resource's host id can be collected while
+    // the canvas/image is still in active use. Keying the finalizer on that
+    // wrapper would release the id out from under a live user (a getContext on
+    // the dropped id then returns the number/null fallback and the worker
+    // wedges). Keying on the NativeImage -- the sole owner of the id -- means
+    // release happens exactly when the image is unreachable, never sooner.
+    // Overridden by the port.js bindNative; the empty @JSBody is just the
+    // translate-time linkage.
+    @JSBody(params={"owner", "resource"}, script="")
+    private native static void registerImageResource(Object owner, JSObject resource);
+
     private int getClientX(MouseEvent evt) {
         int x = evt.getClientX();
         if (x == -1) {
@@ -432,7 +479,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private boolean hitTest(int x, int y) {
          if (outputCanvas != null) {
-            CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
+            CanvasRenderingContext2D ctx = getOutputContext();
             if (ctx != null) {
                 try {
                     ImageData p = ctx.getImageData(x, y, 1, 1);
@@ -623,7 +670,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
         void uninstall() {
             if (el != null) {
-                window.getDocument().getBody().removeChild((HTMLInputElement)el);
+                doc().getBody().removeChild((HTMLInputElement)el);
             }
         }
         
@@ -697,11 +744,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             this.ta = taIn;
             final HTMLInputElement inputEl;
             if (!ta.isSingleLineTextArea()){
-                inputEl = (HTMLInputElement)window.getDocument().createElement("textarea");
+                inputEl = (HTMLInputElement)doc().createElement("textarea");
                 isEditingSingleLine = true;
 
             } else {
-                inputEl = (HTMLInputElement)window.getDocument().createElement("input");
+                inputEl = (HTMLInputElement)doc().createElement("input");
                 inputEl.setType("text");
                 isEditingSingleLine = false;
 
@@ -913,7 +960,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             
 
-            window.getDocument().getBody().appendChild(inputEl);
+            doc().getBody().appendChild(inputEl);
         }
 
         int lastX;
@@ -1075,7 +1122,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             outputCanvas.getStyle().setProperty("cursor", cursorStr);
             canvas.getStyle().setProperty("cursor", cursorStr);
             peersContainer.getStyle().setProperty("cursor", cursorStr);
-            window.getDocument().getBody().getStyle().setProperty("cursor", cursorStr);
+            doc().getBody().getStyle().setProperty("cursor", cursorStr);
         }
         
         
@@ -1134,7 +1181,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         inited = true;
         instance=this;
         window = Window.current();
-        HTMLDocument document = window.getDocument();
+        document = window.getDocument();
         canvas = (HTMLCanvasElement)document.createElement("canvas");
         outputCanvas = (HTMLCanvasElement)document.getElementById("codenameone-canvas");
         outputCanvas.getStyle().setProperty("pointer-events", "none");
@@ -1148,7 +1195,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         //outputCanvas.getStyle().setProperty("opacity", "0.5");
         updateCanvasSize();
         defaultFont = (NativeFont)createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
-        graphics = new BufferedGraphics(this, canvas);
+        graphics = new BufferedGraphics(this, canvas, getDisplayWidth(), getDisplayHeight());
         
         // Normalize browser locale
         String blang = getBrowserLanguage();
@@ -1365,7 +1412,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         JavaScriptEventWiring.registerDocumentEvents(new JavaScriptEventWiring.DocumentRegistrar() {
             @Override
             public void add(String eventName, Object listener) {
-                window.getDocument().addEventListener(eventName, (EventListener) listener);
+                doc().addEventListener(eventName, (EventListener) listener);
             }
         }, onPaste);
         
@@ -2308,7 +2355,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (frame.isEmpty()) {
             return false;
         }
-        CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
+        CanvasRenderingContext2D context = getOutputContext();
         context.save();
         // Reset to identity BEFORE the crop clip is set. Without this, if
         // the prior drain ended with a non-identity transform on the
@@ -2349,8 +2396,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // happen to fall inside the union but who are NOT in the dirty
         // list keep their previous pixels.
         if (frame.getCropX() == 0 && frame.getCropY() == 0
-                && frame.getCropW() >= outputCanvas.getWidth()
-                && frame.getCropH() >= outputCanvas.getHeight()) {
+                && frame.getCropW() >= displayWidth
+                && frame.getCropH() >= displayHeight) {
             context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         }
 
@@ -2592,13 +2639,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private void updateCanvasSize() {
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
-                window.getDocument().getBody().getClientWidth(),
+                doc().getBody().getClientWidth(),
                 window.getInnerHeight(),
                 getDevicePixelRatio());
         canvas.setWidth(dimensions.getBackingWidth());
         canvas.setHeight(dimensions.getBackingHeight());
         outputCanvas.setWidth(dimensions.getBackingWidth());
         outputCanvas.setHeight(dimensions.getBackingHeight());
+        // Record the dimensions we just applied so getDisplayWidth/Height never
+        // have to read them back across the barrier.
+        displayWidth = dimensions.getBackingWidth();
+        displayHeight = dimensions.getBackingHeight();
         peersContainer.getStyle().setProperty("height", dimensions.getCssHeight() + "px");
         peersContainer.getStyle().setProperty("width", dimensions.getCssWidth() + "px");
         if (dimensions.getStyleWidth() != null) {
@@ -2801,27 +2852,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 new JavaScriptCanvasImageBufferLifecycle.ScratchCanvasFactory<HTMLCanvasElement>() {
                     @Override
                     public HTMLCanvasElement createScratchCanvas() {
-                        return (HTMLCanvasElement)window.getDocument().createElement("canvas");
+                        return (HTMLCanvasElement)doc().createElement("canvas");
                     }
                 }, new JavaScriptCanvasImageBufferLifecycle.CanvasSizeAccess<HTMLCanvasElement>() {
                     @Override
                     public int getWidth(HTMLCanvasElement canvas) {
-                        return canvas.getWidth();
+                        return scratchBufferWidth;
                     }
 
                     @Override
                     public int getHeight(HTMLCanvasElement canvas) {
-                        return canvas.getHeight();
+                        return scratchBufferHeight;
                     }
 
                     @Override
                     public void setWidth(HTMLCanvasElement canvas, int canvasWidth) {
                         canvas.setWidth(canvasWidth);
+                        scratchBufferWidth = canvasWidth;
                     }
 
                     @Override
                     public void setHeight(HTMLCanvasElement canvas, int canvasHeight) {
                         canvas.setHeight(canvasHeight);
+                        scratchBufferHeight = canvasHeight;
                     }
                 });
         return scratchBuffer;
@@ -3135,12 +3188,41 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getDisplayWidth() {
-        return canvas.getWidth();
+        // Cached Java-side (updateCanvasSize); only fall back to a single
+        // barrier read if queried before the first layout.
+        if (displayWidth <= 0) {
+            displayWidth = canvas.getWidth();
+        }
+        return displayWidth;
     }
 
     @Override
     public int getDisplayHeight() {
-        return canvas.getHeight();
+        if (displayHeight <= 0) {
+            displayHeight = canvas.getHeight();
+        }
+        return displayHeight;
+    }
+
+    // Lazily cache and reuse the output canvas 2D context. getContext('2d')
+    // returns the same context object for a canvas across its lifetime (a
+    // resize resets the context state but not its identity), so there is no
+    // reason to re-request it across the barrier on every paint frame.
+    private CanvasRenderingContext2D getOutputContext() {
+        if (outputContext == null && outputCanvas != null) {
+            outputContext = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
+        }
+        return outputContext;
+    }
+
+    // Cached document accessor. Never re-query doc() across the
+    // barrier (see the ``document`` field comment). Lazy fallback only covers
+    // the impossible case of a call before __init resolved it.
+    private HTMLDocument doc() {
+        if (document == null && window != null) {
+            document = window.getDocument();
+        }
+        return document;
     }
 
     @Override
@@ -4045,26 +4127,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
             TextArea ta = (TextArea)cmp;
             final Form.TabIterator tabber = cmp.getComponentForm().getTabIterator(cmp);
             if (!ta.isSingleLineTextArea()){
-                preemptiveFocusTextField = (HTMLInputElement)window.getDocument().createElement("textarea");
+                preemptiveFocusTextField = (HTMLInputElement)doc().createElement("textarea");
 
 
             } else {
-                preemptiveFocusTextField = (HTMLInputElement)window.getDocument().createElement("input");
+                preemptiveFocusTextField = (HTMLInputElement)doc().createElement("input");
                 preemptiveFocusTextField.setType("text");
 
             }
             preemptiveFocusTextField.setAttribute("class", "cn1-edit-string preemptive");
             preemptiveFocusTextField.setTabIndex(2);
             
-            window.getDocument().getBody().appendChild(preemptiveFocusTextField);
+            doc().getBody().appendChild(preemptiveFocusTextField);
 
             if (dummyNextTextField != null) {
-                window.getDocument().getBody().removeChild(dummyNextTextField);
+                doc().getBody().removeChild(dummyNextTextField);
                 dummyNextTextField = null;
             }
             if (tabber.hasNext()) {
                 Component next = tabber.getNext();
-                dummyNextTextField = (HTMLInputElement)window.getDocument().createElement("input");
+                dummyNextTextField = (HTMLInputElement)doc().createElement("input");
                 dummyNextTextField.setAttribute("class", "cn1-edit-string dummy-next");
                 dummyNextTextField.getStyle().setProperty("pointer-events", "none");
                 dummyNextTextField.getStyle().setProperty("opacity", "0");
@@ -4107,7 +4189,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                         if (!nextEditPending) {
                             outputCanvas.focus();
-                            window.getDocument().getBody().removeChild(dummyNextTextField);
+                            doc().getBody().removeChild(dummyNextTextField);
                             dummyNextTextField = null;
                         }
                     }
@@ -4164,18 +4246,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                 });
-                window.getDocument().getBody().appendChild(dummyNextTextField);
+                doc().getBody().appendChild(dummyNextTextField);
             }
             
             //----- prev start
             
             if (dummyPrevTextField != null) {
-                window.getDocument().getBody().removeChild(dummyPrevTextField);
+                doc().getBody().removeChild(dummyPrevTextField);
                 dummyPrevTextField = null;
             }
             if (tabber.hasPrevious()) {
                 Component prev = tabber.getPrevious();
-                dummyPrevTextField = (HTMLInputElement)window.getDocument().createElement("input");
+                dummyPrevTextField = (HTMLInputElement)doc().createElement("input");
                 dummyPrevTextField.setAttribute("class", "cn1-edit-string dummy-prev");
                 dummyPrevTextField.getStyle().setProperty("pointer-events", "none");
                 dummyPrevTextField.getStyle().setProperty("opacity", "0");
@@ -4218,7 +4300,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                         if (!prevEditPending) {
                             outputCanvas.focus();
-                            window.getDocument().getBody().removeChild(dummyPrevTextField);
+                            doc().getBody().removeChild(dummyPrevTextField);
                             dummyPrevTextField = null;
                         }
                     }
@@ -4250,7 +4332,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                 });
-                window.getDocument().getBody().appendChild(dummyPrevTextField);
+                doc().getBody().appendChild(dummyPrevTextField);
             }
             
             //----- prev end
@@ -4461,13 +4543,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             final boolean hasDoneListener = ta.getDoneListener() != null;
             if (inputEl == null || preemptiveFocusTextField != null) {
                 if (preemptiveFocusTextField != null && inputEl != null) {
-                    window.getDocument().getBody().removeChild(inputEl);
+                    doc().getBody().removeChild(inputEl);
                 }
                 if (!ta.isSingleLineTextArea()){
                     if (preemptiveFocusTextField != null) {
                         inputEl = textArea = preemptiveFocusTextField;
                     } else {
-                        inputEl = textArea = (HTMLInputElement)window.getDocument().createElement("textarea");
+                        inputEl = textArea = (HTMLInputElement)doc().createElement("textarea");
                     }
                     
 
@@ -4475,7 +4557,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (preemptiveFocusTextField != null) {
                         inputEl = textField = preemptiveFocusTextField;
                     } else {
-                        inputEl = textField = (HTMLInputElement)window.getDocument().createElement("input");
+                        inputEl = textField = (HTMLInputElement)doc().createElement("input");
                         inputEl.setType("text");
                     }
                     
@@ -4551,7 +4633,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 });
                 
                 if (preemptiveFocusTextField == null) {
-                    window.getDocument().getBody().appendChild(inputEl);
+                    doc().getBody().appendChild(inputEl);
                 } else {
                     preemptiveFocusTextField = null;
                 }
@@ -5283,8 +5365,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
                             }
 
                             @Override
@@ -5613,6 +5695,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private void attachMutableImageSurface(final NativeImage image, HTML5Graphics graphics) {
         image.mutableGraphics = graphics;
+        // Single chokepoint for every mutable-image backing canvas. Tie the
+        // host canvas's lifetime to this Java image: when the image is GC'd the
+        // worker finalizer releases the canvas's host id (the ~4MB backing
+        // store). The host never reclaims on its own.
+        registerImageResource(image, graphics.getCanvas());
         image.mutableGraphics.setMutationListener(new Runnable() {
             @Override
             public void run() {
@@ -5631,6 +5718,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final String url = _url;
         final NativeImage im = new NativeImage();
         im.img = renderingBackend.createCrossOriginImageElement(url);
+        registerImageResource(im, im.img);
         im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
@@ -5668,6 +5756,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final String url = _url;
         final NativeImage im = new NativeImage();
         im.img = renderingBackend.createCrossOriginImageElement(url);
+        registerImageResource(im, im.img);
         im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
@@ -5724,6 +5813,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final String url = _url;
         final NativeImage im = new NativeImage();
         im.img = renderingBackend.createCrossOriginImageElement(url);
+        registerImageResource(im, im.img);
         im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
@@ -5781,6 +5871,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             NativeImage im = new NativeImage();
             Blob blob = openFileAsBlob(path);
             im.img = renderingBackend.createBlobImageElement(blob);
+            registerImageResource(im, im.img);
             im.load();
             return im;
         } else {
@@ -5861,8 +5952,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
                             }
 
                             @Override
@@ -5926,8 +6017,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
                             }
 
                             @Override
@@ -6127,8 +6218,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
                             }
 
                             @Override
@@ -7842,7 +7933,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // In ParparVM worker/host bridging, createElement("iframe") can be surfaced as a
         // generic HTMLElement wrapper. Keep this typed as HTMLElement to avoid strict cast
         // failures while still constructing the browser peer correctly.
-        HTMLElement el = window.getDocument().createElement("iframe");
+        HTMLElement el = doc().createElement("iframe");
         //HTMLIFrameElement el = createBlankIFrame();
         
         HTML5BrowserComponent browser = new HTML5BrowserComponent(el, browserComponent);
@@ -8351,6 +8442,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Blob blob = BlobUtil.createBlob(arr, "image/png");
         NativeImage nimg = new NativeImage();
         nimg.img = renderingBackend.createBlobImageElement(blob);
+        registerImageResource(nimg, nimg.img);
         nimg.load();
         return nimg;
     }

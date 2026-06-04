@@ -167,6 +167,9 @@
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  // Count of host refs the owning-object finalizer has released (see
+  // releaseHostRefs); retained as a lightweight liveness counter.
+  var __cn1HostRefReleased = 0;
   var canvasMetaNextId = 1;
   var canvasMetaByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
   var canvasMetaById = {};
@@ -395,19 +398,15 @@
     return false;
   }
 
-  // Drop host refs the worker reported as dead -- every worker-side wrapper for
-  // them was garbage-collected, so they are unreachable from the worker and
-  // safe to evict, letting the browser reclaim the element AND its multi-MB
-  // backing store. This is the host half of the host-ref leak fix (see
-  // parparvm_runtime.js); without it ``hostRefById`` grew unbounded and the
-  // late-suite canvas-accumulation thrash starved the worker<->host bridge.
-  //
-  // We release CANVASES ONLY. The GC signal already guarantees a reused canvas
-  // (still referenced by a live Java image) is never reported dead. Non-canvas
-  // refs (DOM nodes, events, the WebSocket) are left intact because some
-  // @JSBody natives stash a raw ``__jsValue`` host-ref marker that can outlive
-  // its wrapper -- dropping those produced "Missing host receiver for JSO
-  // bridge" errors and stalled the screenshot WebSocket send.
+  // Drop the host refs the worker's Java-side finalizer reported dead. Each id
+  // belongs to a front-end resource (an image's backing canvas / HTMLImageElement)
+  // whose owning Java image has been GC'd -- the owner was the sole holder of
+  // the id (see parparvm_runtime.js registerNativeResource), so the resource is
+  // genuinely unreachable and safe to evict, freeing the element and its
+  // multi-MB backing store. We release whatever id the owner owned (canvas or
+  // image); the only guard is the never-release singleton allowlist
+  // (window/document/body/the display canvas), which a real image owner can
+  // never legitimately report.
   function releaseHostRefs(ids) {
     if (!ids || !ids.length || !hostRefById) {
       return;
@@ -415,10 +414,11 @@
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i];
       var value = hostRefById[id];
-      if (value == null || isProtectedHostRef(value) || !isCanvasLike(value)) {
+      if (value == null || isProtectedHostRef(value)) {
         continue;
       }
       delete hostRefById[id];
+      __cn1HostRefReleased++;
       if (hostRefByObject && typeof hostRefByObject.delete === 'function') {
         try {
           hostRefByObject.delete(value);
@@ -1058,6 +1058,27 @@
     if (w <= 0 || h <= 0) {
       return null;
     }
+    // Cache the score per canvas, keyed on its last draw-op sequence. The
+    // scoring below does 9 getImageData() GPU readbacks; pickBestCanvasSnapshot
+    // runs it over EVERY tracked canvas, and the suite leaks hundreds of
+    // off-screen mutable-image canvases (FinalizationRegistry release never
+    // fires under back-to-back load), so a late capture would otherwise pay
+    // ~700x9 readbacks -- slow captures that pressure the worker<->host channel
+    // into the lost-response wedge. A canvas not drawn since its last score
+    // (stable lastSeq) returns the cached value; the display canvas is painted
+    // every frame so its lastSeq advances and it is always freshly scored.
+    var meta = getCanvasMeta(canvas);
+    if (meta && meta.__cn1ScoreSeq === meta.lastSeq && '__cn1ScoreVal' in meta) {
+      return meta.__cn1ScoreVal;
+    }
+    var result = canvasContentScoreCompute(canvas, w, h);
+    if (meta) {
+      meta.__cn1ScoreSeq = meta.lastSeq;
+      meta.__cn1ScoreVal = result;
+    }
+    return result;
+  }
+  function canvasContentScoreCompute(canvas, w, h) {
     var ctx = null;
     try {
       ctx = canvas.getContext('2d');
