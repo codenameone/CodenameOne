@@ -30,6 +30,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/swing-comparison.md` — Mapping Swing concepts and code to Codename One. Read this when porting Swing code.
 - `references/html-css-cheatsheet.md` — Converting common HTML/CSS snippets to CN1 components + CSS.
 - `references/android-to-cn1.md` — Porting Android (XML + Kotlin/Java) screens to Codename One.
+- `references/react-to-cn1.md` — Bringing a **React / JSX + CSS design** (e.g. a Claude-generated bundle: `*.jsx` + `tokens.css` + `styles.css`) into Codename One: the component/hook/CSS mapping, the `tokens.css` -> `theme.css` token workflow, dark-mode re-skinning, and the **render-on-desktop-then-inspect** loop. Read this when the user hands you a React/HTML design to rebuild in CN1.
 - `references/testing-and-screenshots.md` — `AbstractTest`, `TestUtils`, `screenshotTest`, the `cn1:test` Maven goal, the screenshot tolerance algorithm.
 - `references/mockup-comparison.md` — Building a screen to **match a designer mockup**: `tools/CompareToMockup.java` scores a render against a mockup image and prints a similarity % (with partial/region masking so device chrome doesn't sabotage the score), and `tools/DesignImport.java` turns a Figma/Sketch/Adobe XD file **or an HTML/React design's `tokens.css`/`styles.css`** (e.g. a Claude-generated mockup) into a starter `theme.css` + tokens + layout map. Read this when the user gives you a mockup, a Figma/Sketch/XD file, an HTML/CSS design bundle, or asks "how close is this screen to the design".
 - `references/junit-testing.md` — Standard JUnit 5 tests against the simulator via `@CodenameOneTest`. Annotations (`@RunOnEdt`, `@Theme`, `@DarkMode`, `@LargerText`, `@Orientation`, `@RTL`, `@SimulatorProperty`), how it coexists with `cn1:test`, and why a headless CI runner has to be configured with Xvfb (or accepts that JUnit test classes will be skipped).
@@ -39,7 +40,7 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/ai-and-speech.md` — LLM client (`com.codename1.ai`), `ChatView`, `SpeechRecognizer`, `TextToSpeech`, non-prompting `SecureStorage` overloads, the ML Kit cn1libs, and the simulator's offline Ollama redirect. Read this when the user asks for chat, voice, embeddings, image generation, barcode/document/face detection, or wants to store an LLM API key.
 - `references/snapshot-builds.md` — Edge case: compiling against a Codename One SNAPSHOT from git.
 - `references/debugging.md` — `jdb`-attach workflow for an agent: start the simulator paused, set breakpoints, dump locals, drive the session non-interactively from a script.
-- `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?"; `tools/CompareToMockup.java` scores a rendered screenshot against a designer mockup (similarity %, with region masking); `tools/DesignImport.java` turns a Figma/Sketch/Adobe XD design — or an HTML/React design's `tokens.css`/`styles.css` (Claude-generated mockups) — into starter CN1 CSS + tokens + a layout map. Run with `java tools/<Name>.java <args>`.
+- `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?"; `tools/CompareToMockup.java` scores a rendered screenshot against a designer mockup (similarity %, with region masking); `tools/DesignImport.java` turns a Figma/Sketch/Adobe XD design — or an HTML/React design's `tokens.css`/`styles.css` (Claude-generated mockups) — into starter CN1 CSS + tokens + a layout map. **`tools/DumpForm.java`** boots the app in **desktop mode** and dumps a model of the current screen, which **`tools/DescribeForm.java`** (vision-free outline), **`tools/AlignmentCheck.java`** (designer alignment guides) and **`tools/GuiLint.java`** (nested scroll, opaque text/containers, image borders) analyse. **`tools/UpdateSkills.java`** self-updates this whole skill from GitHub. Run with `java tools/<Name>.java <args>`.
 
 When the user's task hits any one of those topics, **read the matching reference before generating code**. Do not paste large snippets without checking.
 
@@ -289,6 +290,7 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Make this look like X" / CSS tweaks | `references/css.md` |
 | "Port this from Swing" / Swing idioms | `references/swing-comparison.md` |
 | "I have HTML/CSS, convert it" | `references/html-css-cheatsheet.md` |
+| "I have a React/JSX design (jsx + tokens.css), rebuild it in CN1" / "match this Claude design" | `references/react-to-cn1.md` |
 | "I have Android XML/Kotlin/Java, convert it" | `references/android-to-cn1.md` |
 | "Generate a client for this OpenAPI spec / `.proto` / GraphQL schema" / `@RestClient`, `@GrpcClient`, `@GraphQLClient` | `references/api-clients.md` |
 | "Write a test for this screen" / "Compare to a baseline" | `references/testing-and-screenshots.md` |
@@ -307,3 +309,5 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
 | Quick yes/no check: "is this `java.*` class supported", "does my `theme.css` compile" | `tools/` directory — `java tools/IsApiSupported.java <class>` / `java tools/IsCssValid.java <file>` |
 | "Score this screen against a mockup" / "Import a Figma/Sketch/XD design" | `tools/` directory — `java tools/CompareToMockup.java <render> <mockup>` / `java tools/DesignImport.java <design>` (see `references/mockup-comparison.md`) |
+| "Describe this screen" / "are these elements aligned" / "lint this UI for bugs" | `tools/` — `java -cp <cp> tools/DumpForm.java <MainClass>` then `tools/DescribeForm.java` / `tools/AlignmentCheck.java` / `tools/GuiLint.java` on the model (see `references/mockup-comparison.md`) |
+| "Update / refresh the Codename One skill to the latest" | `tools/` — `java tools/UpdateSkills.java [--dry-run]` |

@@ -164,6 +164,48 @@ mode (toggled by re-skinning the tree, since CN1 bakes one theme at a time).
 > `paintComponent()` it onto an `Image`. (2) To see a tall scrolling screen in one shot, paint at a
 > height larger than the skin (the scrollable column lays out to whatever height you give the form).
 
+## Render it as a DESKTOP app, not a phone skin
+
+The single biggest time-sink: a desktop/web-style UI (a wizard, a form, anything
+that is wide on a browser) **must be rendered on the desktop simulator**, not a
+phone skin. Phone skins are high-DPI, so `mm`-sized chrome blows up and the
+responsive layout never reaches its wide form - it will look nothing like the
+design and you will chase phantom problems. Boot it like the generated desktop
+stub: `Display.init(JFrame contentPane)` with **no skin** and
+`JavaSEPort.setDefaultPixelMilliRatio(screenDPI/25.4 * retina)`. `tools/DumpForm.java`
+does exactly this (and `DesktopRenderMain`-style harnesses can capture PNGs the same
+way).
+
+## Inspecting a screen without vision
+
+Once it renders, you do not need screenshots to reason about layout. `tools/DumpForm.java`
+boots the app in desktop mode and writes a flat model of the current `Form` (every
+component: UIID, absolute bounds, scrolling, opacity, background, border type,
+layout, text). Three self-contained tools read that model:
+
+```bash
+CP="common/target/classes:$(mvn -q -pl common dependency:build-classpath -Dmdep.outputFile=/dev/stdout | tail -1)"
+java -cp "$CP" tools/DumpForm.java com.example.MyApp --out target/form-model.tsv   # capture (desktop mode)
+java tools/DescribeForm.java   target/form-model.tsv   # concise designer-language outline of the screen
+java tools/AlignmentCheck.java target/form-model.tsv   # the alignment grid + elements nudged just off it
+java tools/GuiLint.java        target/form-model.tsv   # static bug check (see below)
+```
+
+- **DescribeForm** turns the model into an indented outline (`role "uiid" 'text'
+  @x,y WxH bg/border/scroll`) so an LLM can "see" the structure and iterate without
+  a screenshot.
+- **AlignmentCheck** reports the shared left/right edge "guides" (the grid the design
+  settled on) and flags elements whose edge sits a few px off a guide - the
+  designer-guide check for "this one is nudged 10px right". Tune `--tol`,
+  `--min-shared`, `--min-off`.
+- **GuiLint** flags runtime/cross-theme bugs that are invisible in a screenshot:
+  nested scrolling, **opaque text labels** and **opaque structural containers** (the
+  dark-mode white-box trap), CSS-generated **image borders**, a restyled base
+  `Container` UIID, and zero-size components that still carry text.
+
+These complement `CompareToMockup` (pixel/structural fidelity): use the inspectors to
+get the structure and styling right, and `CompareToMockup` to converge on the pixels.
+
 ## Common pitfalls
 
 | Symptom | Cause / fix |

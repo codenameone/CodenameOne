@@ -144,11 +144,13 @@ InitializrRootDark {
 }
 
 InitializrColumn {
+    background-color: transparent;
     padding: 0;
     margin: 0;
 }
 
 InitializrColumnDark {
+    background-color: transparent;
     padding: 0;
     margin: 0;
 }
@@ -425,10 +427,12 @@ InitializrFieldDark, InitializrFieldHintDark {
 }
 
 InitializrChoicesGrid {
+    background-color: transparent;
     margin: 0 0 1.2mm 0;
 }
 
 InitializrChoicesGridDark {
+    background-color: transparent;
     margin: 0 0 1.2mm 0;
 }
 
