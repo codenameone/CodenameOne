@@ -302,6 +302,14 @@ jobs:
       # WebSocket), waits for CN1SS:SUITE:FINISHED, and copies every received PNG
       # to CN1_SHOT_OUTPUT_DIR (~112 images). This is the CI equivalent of
       # scripts/windows/run-hello.bat.
+      # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
+      # the app's theme.css into the staged native theme (css-gradients + themed
+      # tiles). Non-fatal: if it fails the build falls back to the material theme.
+      - name: Build the no-cef CSS compiler (compiles the app theme.css)
+        continue-on-error: true
+        shell: pwsh
+        run: mvn -B -f maven/pom.xml -pl css-compiler -am package -DskipTests '-Dmaven.javadoc.skip=true'
+
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm
         shell: pwsh
@@ -381,6 +389,14 @@ jobs:
           if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
           if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
           Write-Host "Restored core + Windows port + common classes OK"
+
+      # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
+      # the app's theme.css into the staged native theme (css-gradients + themed
+      # tiles). Non-fatal: if it fails the build falls back to the material theme.
+      - name: Build the no-cef CSS compiler (compiles the app theme.css)
+        continue-on-error: true
+        shell: pwsh
+        run: mvn -B -f maven/pom.xml -pl css-compiler -am package -DskipTests '-Dmaven.javadoc.skip=true'
 
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm

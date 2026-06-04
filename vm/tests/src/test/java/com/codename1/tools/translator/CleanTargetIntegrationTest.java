@@ -694,17 +694,44 @@ class CleanTargetIntegrationTest {
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
-        Path theme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
-        if (Files.exists(theme)) {
-            Files.copy(theme, exe.resolveSibling("windowsNativeTheme.res"), StandardCopyOption.REPLACE_EXISTING);
+        Path stagedTheme = exe.resolveSibling("windowsNativeTheme.res");
+
+        // Compile the app's own theme.css (CSS gradients + native styles) with the
+        // headless no-cef CSS compiler and stage it as the native theme, so the
+        // suite exercises the real app theme -- css-gradients asserts the gradient
+        // styles round-trip, and the *_dark/_light theme tiles render with the
+        // app's look. Falls back to the generic material theme if the css-compiler
+        // jar isn't built or the compile fails, so this can never break the build.
+        boolean themeCompiled = false;
+        try {
+            Path cssDir = Paths.get("..", "..", "maven", "css-compiler", "target").normalize().toAbsolutePath();
+            Path cssJar = null;
+            if (Files.isDirectory(cssDir)) {
+                try (java.util.stream.Stream<Path> s = Files.list(cssDir)) {
+                    cssJar = s.filter(p -> p.getFileName().toString().endsWith("-jar-with-dependencies.jar"))
+                            .findFirst().orElse(null);
+                }
+            }
+            Path themeCss = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "src", "main", "css", "theme.css")
+                    .normalize().toAbsolutePath();
+            if (cssJar != null && Files.exists(themeCss)) {
+                String javaBin = Paths.get(System.getProperty("java.home"), "bin",
+                        CompilerHelper.executableName("java")).toString();
+                ProcessBuilder pb = new ProcessBuilder(javaBin, "-jar", cssJar.toString(),
+                        "-input", themeCss.toString(), "-output", stagedTheme.toString());
+                pb.inheritIO();
+                int rc = pb.start().waitFor();
+                themeCompiled = rc == 0 && Files.exists(stagedTheme);
+            }
+        } catch (Exception themeCompileFailed) {
+            themeCompiled = false;
         }
-        // TODO(windows-port): stage the app theme.res so css-gradients passes and
-        // the *_dark/_light theme tests render with the real theme. Generating it
-        // with the headless NoCefCSSCLI produced a theme.res whose image encoding is
-        // incomplete (CSSTheme.save hits EncodedImage.getWidth), and loading that
-        // corrupts the heap -> a crash on the GC thread (gcMarkDrain) a few tests in.
-        // Needs a valid app theme.res (full CSS compiler, or fix the no-cef image
-        // path) before re-enabling.
+        if (!themeCompiled) {
+            Path theme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
+            if (Files.exists(theme)) {
+                Files.copy(theme, stagedTheme, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
         return exe;
     }
 
