@@ -8,6 +8,12 @@ rem the port has not implemented yet.
 setlocal
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=arm64 -no_logo || exit /b 1
 
+rem WebView2 SDK for the BrowserComponent peer (cn1_windows_browser.cpp). Fetch it
+rem if absent and point the translator's CMake at it via WEBVIEW2_SDK_DIR. The
+rem build degrades gracefully (browser natives compile as stubs) if this is unset.
+set WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native
+if not exist "%WEBVIEW2_SDK_DIR%\include\WebView2.h" powershell -NoProfile -Command "iex (Get-Content Y:\scripts\windows\fetch-webview2-sdk.ps1 -Raw)"
+
 rem Recompile the Windows port Java against the already-built core classes.
 cd /d Y:\ || exit /b 1
 if not exist "Y:\maven\windows\target\classes" mkdir "Y:\maven\windows\target\classes"

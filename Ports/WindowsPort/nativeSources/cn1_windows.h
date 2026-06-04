@@ -190,6 +190,12 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 int  cn1WinPollEvent(CN1Event* out);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+/* BrowserComponent / WebView2 peer (cn1_windows_browser.cpp). The EDT-facing
+ * native methods marshal each WebView2 operation to the main (pump) thread by
+ * posting WM_CN1_BROWSER to cn1Win.hwnd; cn1WinWndProc forwards it here. */
+#define WM_CN1_BROWSER (WM_APP + 17)
+void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam);
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);

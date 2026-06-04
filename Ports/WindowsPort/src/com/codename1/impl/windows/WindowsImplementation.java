@@ -245,6 +245,33 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
     }
 
+    /* ------------------------------------------- BrowserComponent (WebView2) */
+
+    @Override
+    public boolean isNativeBrowserComponentSupported() {
+        return WindowsNative.browserSupported();
+    }
+
+    @Override
+    public com.codename1.ui.PeerComponent createBrowserComponent(Object browserComponent) {
+        return new WindowsBrowserComponent((com.codename1.ui.BrowserComponent) browserComponent);
+    }
+
+    @Override
+    public void setBrowserPage(com.codename1.ui.PeerComponent browserPeer, String html, String baseUrl) {
+        ((WindowsBrowserComponent) browserPeer).setHtml(html);
+    }
+
+    @Override
+    public void setBrowserURL(com.codename1.ui.PeerComponent browserPeer, String url) {
+        ((WindowsBrowserComponent) browserPeer).setUrl(url);
+    }
+
+    @Override
+    public void browserExecute(com.codename1.ui.PeerComponent browserPeer, String javaScript) {
+        ((WindowsBrowserComponent) browserPeer).execute(javaScript);
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();

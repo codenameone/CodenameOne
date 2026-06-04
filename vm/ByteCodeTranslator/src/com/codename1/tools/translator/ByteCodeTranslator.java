@@ -612,6 +612,25 @@ public class ByteCodeTranslator {
                 // legs (windows-latest / windows-11-arm).
                 writer.append("if(WIN32)\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 uuid)\n");
+                // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
+                // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
+                // Microsoft.Web.WebView2 build/native folder we link the static
+                // loader (arch-specific) and define CN1_HAVE_WEBVIEW2; otherwise the
+                // browser natives compile as stubs and the port reports the browser
+                // as unsupported. version/shell32/advapi32/shlwapi back the loader.
+                writer.append("    if(DEFINED ENV{WEBVIEW2_SDK_DIR} AND EXISTS \"$ENV{WEBVIEW2_SDK_DIR}/include/WebView2.h\")\n");
+                writer.append("        target_include_directories(${PROJECT_NAME} PRIVATE \"$ENV{WEBVIEW2_SDK_DIR}/include\")\n");
+                writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_HAVE_WEBVIEW2=1)\n");
+                // VsDevCmd sets VSCMD_ARG_TGT_ARCH to the *target* arch (arm64/x64),
+                // which is what we must match for the static loader -- the host-based
+                // CMAKE_SYSTEM_PROCESSOR can disagree on the arm64 dev VM.
+                writer.append("        if(\"$ENV{VSCMD_ARG_TGT_ARCH}\" STREQUAL \"arm64\" OR CMAKE_SYSTEM_PROCESSOR MATCHES \"[Aa][Rr][Mm]64|aarch64\")\n");
+                writer.append("            target_link_libraries(${PROJECT_NAME} \"$ENV{WEBVIEW2_SDK_DIR}/arm64/WebView2LoaderStatic.lib\")\n");
+                writer.append("        else()\n");
+                writer.append("            target_link_libraries(${PROJECT_NAME} \"$ENV{WEBVIEW2_SDK_DIR}/x64/WebView2LoaderStatic.lib\")\n");
+                writer.append("        endif()\n");
+                writer.append("        target_link_libraries(${PROJECT_NAME} shlwapi version shell32 advapi32)\n");
+                writer.append("    endif()\n");
                 // Emit a PDB (clang-cl /Zi + linker /DEBUG) so native crash
                 // addresses in this dev/test executable symbolize to function
                 // names (llvm-symbolizer). Optimizations stay on.

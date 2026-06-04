@@ -302,6 +302,20 @@ jobs:
       # WebSocket), waits for CN1SS:SUITE:FINISHED, and copies every received PNG
       # to CN1_SHOT_OUTPUT_DIR (~112 images). This is the CI equivalent of
       # scripts/windows/run-hello.bat.
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # Non-fatal: if it fails the browser natives compile as stubs and the
+      # BrowserComponent screenshot is simply absent (no regression).
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
+            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
       # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
       # the app's theme.css into the staged native theme (css-gradients + themed
       # tiles). Non-fatal: if it fails the build falls back to the material theme.
@@ -389,6 +403,20 @@ jobs:
           if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
           if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
           Write-Host "Restored core + Windows port + common classes OK"
+
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # Non-fatal: if it fails the browser natives compile as stubs and the
+      # BrowserComponent screenshot is simply absent (no regression).
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
+            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
 
       # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
       # the app's theme.css into the staged native theme (css-gradients + themed

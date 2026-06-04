@@ -374,6 +374,10 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             EndPaint(hwnd, &ps);
             return 0;
         }
+        case WM_CN1_BROWSER:
+            /* WebView2 operation marshaled from the EDT (cn1_windows_browser.cpp). */
+            cn1WinBrowserHandleMessage(wParam, lParam);
+            return 0;
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);

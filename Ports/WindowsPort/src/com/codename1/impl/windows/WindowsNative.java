@@ -52,6 +52,30 @@ public final class WindowsNative {
      */
     public static native boolean faultSelfTestEnabled();
 
+    /* ----------------------------------------- BrowserComponent (WebView2) */
+
+    /** True when WebView2 is compiled in (the SDK was present at build time). */
+    public static native boolean browserSupported();
+
+    /** Creates a WebView2-backed browser peer; returns an opaque native handle. */
+    public static native long browserCreate(int width, int height);
+
+    public static native void browserSetHtml(long peer, String html);
+
+    public static native void browserSetUrl(long peer, String url);
+
+    public static native void browserExecute(long peer, String js);
+
+    public static native void browserSetBounds(long peer, int x, int y, int w, int h);
+
+    /** Next queued browser event ("LOAD" or "NAV|<url>"), or null when none. */
+    public static native String browserPollEvent(long peer);
+
+    /** PNG bytes of the current WebView2 content, or null if not captured yet. */
+    public static native byte[] browserCapturePng(long peer);
+
+    public static native void browserDestroy(long peer);
+
     /** Creates the main window plus the Direct2D/DirectWrite/WIC factories. */
     public static native void initDisplay(String title, int width, int height);
 
