@@ -811,8 +811,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (shape == null) {
             return;
         }
-        FlatPath fp = flattenShape(shape);
-        WindowsNative.setClipShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule);
+        /* Match the reference (mac-native / iOS) ports: a non-rectangular setClip
+         * narrows to the shape's axis-aligned bounding box rather than the precise
+         * geometry. The golden for graphics-clip fills the whole pane with the blue
+         * triangle's bbox (pixel-verified), and the SVG clip goldens follow the same
+         * convention, so a precise geometric clip would diff against every one of
+         * them. A true rectangle still clips exactly. */
+        com.codename1.ui.geom.Rectangle b = shape.getBounds();
+        WindowsNative.setClip(peer(graphics), b.getX(), b.getY(), b.getWidth(), b.getHeight());
     }
 
     /* Clip stack. The base pushClip/popClip are unimplemented no-ops, so a
