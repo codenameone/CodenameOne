@@ -106,7 +106,7 @@ you choose seamlessly.
 
 However, we wanted developers to be able to preview their build results easily without requiring a specific server  
 setup. To that end we generate a monolithic HTML file build result that we provide as a "preview" that you can  
-open using the QR code or preview link as a result of the build. Its not as optimized as the actual result but you  
+open using the QR code or preview link as a result of the build. It’s not as optimized as the actual result but you  
 can see it instantly without setting up a server.
 
 ## Availability

@@ -22,9 +22,9 @@ We suggest using a proper communication protocol e.g. WebSockets. You should use
 
 E.g. in [Codename One Build](/blog/build-app-on-ios/) we use networking as such:
 
-  * Most logic is handled through WebServices – these are use easy to build/maintain and debug
+  * Most logic is handled through WebServices – these are easy to build/maintain and debug
 
-  * Events such as a new build are sent thorough a WebSocket connection – that removes the need for polling and is very fast
+  * Events such as a new build are sent through a WebSocket connection – that removes the need for polling and is very fast
 
   * When a build is completed we send a push notification and a WebSocket event – if the app is running the WebSocket event will work. If it isn’t you will get push notification notice. If you disable push notifications everything would still work
 

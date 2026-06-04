@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/uwp-update/uwp-on-codenameone.jpg)
 
-> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+> **Historical note:** Codename One’s UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
 
 We’ve mentioned the progress we made with the Universal Windows Platform support in the past. This support  
 is moving at a very fast pace…​  
@@ -21,7 +21,7 @@ the initial beta. At this rate we think that 3.6 can actually include a producti
 Other than that we also added support for things such as native OS sharing on UWP as well as low level graphics  
 transforms. We also fixed many bugs in the port with text positioning, missing status bar, crashes etc.
 
-We’re confident that we will see many new Codename One apps poping up in the Microsoft appstore  
+We’re confident that we will see many new Codename One apps popping up in the Microsoft appstore  
 in the coming months.
 
 One of the problems we discovered is that the Nokia Lumia simulator that we sometimes used to debug windows  

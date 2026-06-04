@@ -35,7 +35,7 @@ You can define a constraint in Java or use some of the builtin constraints such 
 Masking isn’t a part of validation per se but it is such a common concept that I feel its use is warranted in this  
 short tutorial. Masking allows us to define input with a given structure e.g. credit card comprising of 16 digits  
 split into groups of 4. This is common for date entry and many other types of input, we’d love to offer a more  
-powerful masked input API in the future but for now you can implement a poor mans solution by using a  
+powerful masked input API in the future but for now you can implement a poor man’s solution by using a  
 `DataChangedListener` and stopping the current editing/moving to the next field based on  
 constraints. We implemented such masking as a sample in the code below together with a rather complete  
 validation sample. 

@@ -13,7 +13,7 @@ author: Steve Hannah
 
 ![](/blog/codename-one-graphics-low-level-animations/clock_small.png)
 
-In my previous post, I created a static analog clock component. In this post, I will use Codename One’s animation API to update the clock every continually so that it will keep time correctly. 
+In my previous post, I created a static analog clock component. In this post, I will use Codename One’s animation API to update the clock continually so that it will keep time correctly. 
 
 #### How Animation Works in Codename One
 

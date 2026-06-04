@@ -39,7 +39,7 @@ Layered layout – this is a more "modern" approach we take where we essentially
 
 Generally the glass pane is not interactive (it just draws) where the layered layout can actually grab input etc. we made use of the layered layout in a previous post (  
 [  
-when a dialog is no a dialog  
+when a dialog isn’t a dialog  
 ](http:///3/post/2013/06/when-a-dialog-isnt-a-dialog.html)  
 ). In this case though, I chose to use a glass pane mostly because I was too lazy to go back to every form and add a layered layout to the hierarchy
 

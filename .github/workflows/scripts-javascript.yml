@@ -85,13 +85,13 @@ jobs:
       CN1SS_ALLOWED_MISSING: "0"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
@@ -99,7 +99,7 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Set up Java 8 for ParparVM
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '8'
@@ -114,19 +114,19 @@ jobs:
         run: mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
       - name: Cache npm modules for scripts/
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: scripts/node_modules
           key: ${{ runner.os }}-scripts-npm-playwright-v1
@@ -135,7 +135,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-v2
@@ -239,7 +239,7 @@ jobs:
 
       - name: Upload JavaScript lifecycle artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: javascript-lifecycle-tests
           path: artifacts/javascript-lifecycle-tests
@@ -253,7 +253,7 @@ jobs:
 
       - name: Upload JavaScript screenshot artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: javascript-ui-tests
           path: artifacts/javascript-ui-tests

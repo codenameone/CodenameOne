@@ -303,9 +303,20 @@ void cn1FireStatusBarTap() {
     cn1StatusBarTapLastY = yArray[0];
     pointerPressedC(xArray, yArray, 1);
     pointerReleasedC(xArray, yArray, 1);
-    if (cn1StatusBarTapProxy != nil) {
-        cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
-    }
+    // Re-arm the proxy for the NEXT status-bar tap. iOS only routes the tap to
+    // a scroll view whose contentOffset.y > 0 ("scrolled away from top"); after
+    // it dispatches scrollViewShouldScrollToTop: it settles the proxy back to
+    // the top. Doing the reset synchronously here (we are called from inside
+    // that delegate while UIKit is still mid-tap) gets clobbered, so the proxy
+    // stays at offset 0 and iOS never delivers a second tap until the next
+    // viewDidAppear re-pins it -- the "scroll-to-top only works once per Form"
+    // bug (#5163). Bouncing the reset to the next main-queue turn lets UIKit
+    // finish the gesture first so the (0,1) re-arm actually sticks.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cn1StatusBarTapProxy != nil) {
+            cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+        }
+    });
 }
 
 
@@ -3751,9 +3762,24 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)drawFrame:(CGRect)rect
 {
+#if TARGET_OS_MACCATALYST
+    // A Mac app keeps rendering its window while it isn't the focused
+    // application -- only a truly backgrounded/occluded app stops. iOS, by
+    // contrast, must not touch the GPU outside the foreground-active state,
+    // hence the strict gate below. On Mac Catalyst that strict gate is wrong:
+    // during a long headless screenshot run the app routinely loses "active"
+    // status, after which every drawFrame would no-op and the Metal
+    // screenTexture (which Display.screenshot() reads back) would freeze on the
+    // last-active frame for the rest of the suite. Allow rendering whenever the
+    // app isn't backgrounded so the screen texture stays current.
+    if([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+        return;
+    }
+#else
     if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
+#endif
     [[self eaglView] setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {

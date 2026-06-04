@@ -44,7 +44,7 @@ where he gives some insights about why the mobile web/JavaScript is slow and wil
   
 But first lets start with who I am (Shai Almog) and what I did, I wrote a lot of Java VM code when consulting for Sun Microsystems. I did this on mobile devices that had a fracti  
   
-on of the RAM/CPU available for today’s devices. Today I’m the co-founder of Codename One where I regularly write low level Android, iOS, RIM, Windows Phone etc. code to allow out platform to work everywhere seamlessly. So I have pretty decent qualification to discuss devices, their performance issues etc.
+on of the RAM/CPU available for today’s devices. Today I’m the co-founder of Codename One where I regularly write low level Android, iOS, RIM, Windows Phone etc. code to allow our platform to work everywhere seamlessly. So I have pretty decent qualification to discuss devices, their performance issues etc.
 
 Lets start by the bottom line of my opinion:  
 
@@ -141,7 +141,7 @@ CPU cache utilization is one of the most important advantages of native code whe
 a CPU cache, but a large/complex application that makes use of external modules is problematic. But I digress….
 
   
-Proving that JavaScripts strictness is problematic is really easy all we need to do is look at  
+Proving that JavaScript’s strictness is problematic is really easy all we need to do is look at  
 [  
 the work Mozilla did with ASM.js  
 ](http://arstechnica.com/information-technology/2013/05/native-level-performance-on-the-web-a-brief-examination-of-asm-js/)  

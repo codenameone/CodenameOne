@@ -18,7 +18,7 @@ great service) and finally to utter confusion (where do I go from here and what 
 and an upcoming rewrite of  
 [Medex](https://play.google.com/store/apps/details?id=com.mosync.app_Medex) for which I was planning to use  
 Parse.com as backend?). A few months down the line, a lot has happened such as the release of the open source  
-Parse Server (yay!) and subsequently the Parse Dashboard. However, I still had to decide what do with my apps  
+Parse Server (yay!) and subsequently the Parse Dashboard. However, I still had to decide what to do with my apps  
 and I guess you have to as well.
 
 By now, the imminent shutdown of Parse.com must have hit home for you as well: You wish it was merely a bad dream but unfortunately it’s a stark reality. You’ve got just a few months left to migrate your existing apps and obviously do not want to face another shutdown. Nearly every major MBaaS vendor is brandishing a banner that directly or indirect says "Parse.com let you down but you’re safe with us". However, whom can you trust? Or maybe you should just host your own Parse Server? How about migrating away from anything Parse-like and settling for a completely different MBaaS.
@@ -55,7 +55,7 @@ Note that I cannot ascertain how up-to-date it is…​
   
 Undoubtedly, this category of Parse.com alternatives will be attractive to most of the users who chose Parse.com in the first place because of its ease of use, rich feature set and/or intuitive dashboard. Although Parse Server is not a clone of Parse.com, it is quite similar in terms of features and even has some new features like live queries which were not present in Parse.com. As such Parse Server is definitely an alternative worth considering!
 
-As already mentioned above, there are several providers in this category. If you take this route, you’ll need to choose one of them. While there is no silver bullet or crystal ball to help you make that choice, I’ll highlight important aspect that you must take into consideration while choosing your Parse.com replacement. But first, let’s consider the third category of Parse.com alternatives.
+As already mentioned above, there are several providers in this category. If you take this route, you’ll need to choose one of them. While there is no silver bullet or crystal ball to help you make that choice, I’ll highlight important aspects that you must take into consideration while choosing your Parse.com replacement. But first, let’s consider the third category of Parse.com alternatives.
 
 #### Other MBaaS solutions
 
@@ -118,7 +118,7 @@ and open sourced. However, that is definitely not the case. While Parse Server h
 it is only a look-alike and not a clone as clearly indicated in  
 [this discussion](https://github.com/ParsePlatform/parse-server/issues/765) involving Parse.com engineers.
 
-So bear in mind that there are difference some of which are listed on the Parse Server  
+So bear in mind that there are differences some of which are listed on the Parse Server  
 [wiki](https://github.com/ParsePlatform/parse-server/wiki/Compatibility-with-Hosted-Parse). If your app relies  
 heavily on any of those features (e.g. background jobs or push notification support for Windows Phone), then Parse Server as-is does not (yet) meet your needs. The good news is that, now that it’s open source, you can (and should) contribute to making Parse Server better. You don’t have to wait until someone else builds it; you can make Parse Server richer by contributing new features! Alternatively, you could look for other ways to realize the missing functionality. Going back to the background jobs example, you could find other means to schedule background jobs or use a Parse Server provider like back4app which already implements that feature. Similarly, you could consider a separate service for multi-platform push notifications which can later be integrated with Parse Server via the  
 [PushAdapter](https://github.com/parse-server-modules/parse-server-push-adapter) mechanism.

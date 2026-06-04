@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/map-string-performance-javascript-native/performance.jpg)
 
-We’ve been spending a lot of times looking at performance for one of our enterprise customers. As part of the investigation  
+We’ve been spending a lot of time looking at performance for one of our enterprise customers. As part of the investigation  
 he came up with an interesting and very important find… He found that `hashMap.get("String")` was much  
-slower under the new VM than under the old VM. Its these sort of "simple" finds that help narrow down bigger issues  
+slower under the new VM than under the old VM. It’s these sort of "simple" finds that help narrow down bigger issues  
 in performance that might impact a lot of things in Codename One, since HashMap is so ubiquitous the implications  
 of improving it can be huge. 
 

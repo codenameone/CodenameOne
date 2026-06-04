@@ -363,6 +363,8 @@ If no `Mapper<T>` is registered for `Class<T>` (typical cause: the class isn't `
 
 For **bulk REST clients** (an existing OpenAPI 3.x spec, dozens of endpoints), use the `cn1:generate-openapi` Maven goal — it emits `@Mapped` records / classes per schema and one `@RestClient`-annotated interface per OpenAPI tag into `common/src/main/java`. The annotation processors run on the next compile and write the wire impls into generated-sources, so the implementation isn't part of the project source. Call sites instantiate via the generated `<Tag>Api.of(baseUrl)` static factory.
 
+This is one of **three** "spec to typed client" generators that share the same architecture — the others are **gRPC** (`cn1:generate-grpc` + `@GrpcClient`, over gRPC-Web) and **GraphQL** (`cn1:generate-graphql` + `@GraphQLClient`, with subscriptions over WebSocket). When the backend has a `.proto` or a GraphQL schema instead of (or alongside) an OpenAPI spec, read `references/api-clients.md` for the goal, the annotations, the response envelopes (`Response<T>` / `GrpcResponse<T>` / `GraphQLResponse<T>`), and enum support.
+
 ### Writing JSON — `JSONWriter`
 
 For ad-hoc request bodies use `com.codename1.io.JSONWriter`. Two access modes:

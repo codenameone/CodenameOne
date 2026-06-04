@@ -45,7 +45,7 @@ Let’s look at an example:
         Playing = (evt.getNewState() == State.Playing);
     });
 
-This code is a complete example of how you can keep track of the playing state of your media. It keeps track of both whether there is a play request pending, and whether it is currently playing. Technically you don’t need to keep your own variable for keeping track of the the "playing" state, as you can just call `media.isPlaying()`, or `media.getState()` at any time. I use a separate playing variable here just to illustrate how to synchronize your application state with the state of your media.
+This code is a complete example of how you can keep track of the playing state of your media. It keeps track of both whether there is a play request pending, and whether it is currently playing. Technically you don’t need to keep your own variable for keeping track of the "playing" state, as you can just call `media.isPlaying()`, or `media.getState()` at any time. I use a separate playing variable here just to illustrate how to synchronize your application state with the state of your media.
 
 #### How it works
 

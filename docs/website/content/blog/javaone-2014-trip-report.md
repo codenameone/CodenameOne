@@ -108,7 +108,7 @@ On Monday thru Wednesday we spent all day in the booth talking to people and tel
   
 
   
-Since the booth work was so busy we don’t have that much pictures other than this one taken by Geertjan (on the left you see Chen, Steve Hannah & me), we did give away all of the suitcase load full of shirts and brochures we brought to JavaOne and we also had a raffle to win a Moto 360 smartwatch Geertjan graciously did the name draw among the contestants and Chen handed the watch to the winner, in all the excitement we completely forgot to write down his name or details but we have his picture and the draw below.  
+Since the booth work was so busy we don’t have that many pictures other than this one taken by Geertjan (on the left you see Chen, Steve Hannah & me), we did give away all of the suitcase load full of shirts and brochures we brought to JavaOne and we also had a raffle to win a Moto 360 smartwatch Geertjan graciously did the name draw among the contestants and Chen handed the watch to the winner, in all the excitement we completely forgot to write down his name or details but we have his picture and the draw below.  
   
 
 * * *

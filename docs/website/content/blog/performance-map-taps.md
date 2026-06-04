@@ -34,7 +34,7 @@ The
 [  
 native map implementation  
 ](http://www.codenameone.com/3/post/2014/03/mapping-natively.html)  
-had an issue with detecting pointer events, since its a  
+had an issue with detecting pointer events, since it’s a  
 [  
 peer component  
 ](http://www.codenameone.com/3/post/2014/05/understanding-peer-native-components-why-codename-one-is-so-portable.html)  

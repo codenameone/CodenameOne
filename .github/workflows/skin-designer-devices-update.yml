@@ -25,15 +25,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
       - name: Restore HTML scrape cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: scripts/skindesigner/tools/devicedb/cache
           key: skin-designer-devicedb-cache-${{ github.run_id }}

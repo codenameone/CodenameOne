@@ -20,13 +20,13 @@ author: Shai Almog
   
   
 
-One of the things we’ve been missing is a simple "navigate" feature that allows you to launch the devices native navigation software with a fixed destination. This was relatively simple to hack together using Display.execute but that’s not the same as an official API. Chen just added two methods to Display that should really help in this process: isOpenNativeNavigationAppSupported & openNativeNavigationApp(lat, lon). This should launch the device navigation software (e.g. Google Maps) with the given destination.  
+One of the things we’ve been missing is a simple "navigate" feature that allows you to launch the device’s native navigation software with a fixed destination. This was relatively simple to hack together using Display.execute but that’s not the same as an official API. Chen just added two methods to Display that should really help in this process: isOpenNativeNavigationAppSupported & openNativeNavigationApp(lat, lon). This should launch the device navigation software (e.g. Google Maps) with the given destination.  
   
   
   
   
   
-As you might recall building an iOS native app requires 7 screenshots, this slows the build a bit (depends on your apps functionality though), to slightly speed up your build you can use the build argument ios.fastbuild=true which will use hardcoded splash screen images (notice that this will only work for debug builds not for appstore builds). For the kitchen sink this shaves roughly 15 seconds from the startup time, but it might shave minutes off your build for a complex app.  
+As you might recall building an iOS native app requires 7 screenshots, this slows the build a bit (depends on your app’s functionality though), to slightly speed up your build you can use the build argument ios.fastbuild=true which will use hardcoded splash screen images (notice that this will only work for debug builds not for appstore builds). For the kitchen sink this shaves roughly 15 seconds from the startup time, but it might shave minutes off your build for a complex app.  
   
   
   

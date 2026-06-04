@@ -15,7 +15,7 @@ Working with threads is usually ranked as one of the least intuitive and painful
 
 This is possible in Java but non-trivial, the thing is that this is relatively easy to do in Codename One with tools such as `callSerially` I can let arbitrary code run on the EDT. Why not offer that to any random thread?
 
-That’s why I created `EasyThread` which takes some of the concepts of Codeame One’s threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and easily synchronize the data back into the EDT as needed…​
+That’s why I created `EasyThread` which takes some of the concepts of Codename One’s threading and makes them more accessible to an arbitrary thread. This way you can move things like resource loading into a separate thread and easily synchronize the data back into the EDT as needed…​
 
 Easy thread can be created like this:
     

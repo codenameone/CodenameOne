@@ -27,7 +27,7 @@ I’ll try to cover the user experience of using Kotlin. But let’s start with 
 
   * This will increase your jar size by roughly 730kb which might make it harder for free tier users
 
-Having said all that we got a couple of apps working on iOS, Android and on the web (using the JavaScript port) without a problem. This is still a beta thought so we might have missed some functionality.
+Having said all that we got a couple of apps working on iOS, Android and on the web (using the JavaScript port) without a problem. This is still a beta though so we might have missed some functionality.
 
 ### Hello World
 

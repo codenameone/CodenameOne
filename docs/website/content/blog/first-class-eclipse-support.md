@@ -25,7 +25,7 @@ As part of this work I was very impressed by the improvements made in eclipse ne
 
 If you run into weird errors or regressions in the new eclipse plugin update please let us know ASAP. These might be related to the codebase transition and it’s important we get a handle on them quickly!
 
-__ |  **Update:** It seems older versions of eclipse didn’t react well to the new plugin so with the new plugin we requite Neon and Java 8   
+__ |  **Update:** It seems older versions of eclipse didn’t react well to the new plugin so with the new plugin we require Neon and Java 8   
 ---|---  
   
 ### New Updates to All Plugins

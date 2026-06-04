@@ -29,7 +29,7 @@ to allow web login. The web login option is essential for simulator login thus c
 need to follow the instructions for [Android](https://developers.google.com/+/mobile/android/getting-started)  
 and [iOS](https://developers.google.com/+/mobile/ios/getting-started) respectively. 
 
-The login framework should serve as the basis can can be extended easily via cn1lib’s, we hope to provide such  
+The login framework should serve as the basis and can be extended easily via cn1lib’s, we hope to provide such  
 login frameworks for various services out there and also to migrate some of the existing oAuth usages by cn1lib’s to  
 use this framework instead of the mix and match options we have right now.
 ---

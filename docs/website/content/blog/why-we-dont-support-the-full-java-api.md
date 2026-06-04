@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/why-we-dont-support-the-full-java-api/generic-java-1.jpg)
 
-This is something we run into every week. A new Codename One user writes asks why "feature X" from Java isn’t  
+This is something we run into every week. A new Codename One user asks why "feature X" from Java isn’t  
 supported. In this post we’d like to explain the "bigger picture" or why less is more…​
 
 Supporting the full Java API in Codename One would be a mistake that will lead us down a problematic path.  
@@ -62,7 +62,7 @@ Obfuscation is recommended by Google and an important performance tool reducing 
 it collides with some features in Java such as reflection and dynamic class loading.
 
 Dynamic class loading is also redundant as all classes must be packaged in advance and known during compile.  
-Using tools such as `Class.forName()` creates redundant indirection that problems with obfuscation/optimization,  
+Using tools such as `Class.forName()` creates redundant indirection that causes problems with obfuscation/optimization,  
 these can be replaced with class literals e.g. `MyClass.class`. Class literals don’t suffer from these problems and provide  
 similar flexibility in devices.
 
@@ -72,7 +72,7 @@ There are two HUGE markets of Java developers: Java EE & Android developers.
 
 All other markets (Swing/FX/JavaME/Embedded etc.) are [small and shrinking](/blog/should-oracle-spring-clean-javafx.html).
 
-Java EE developers can’t reuse code "as is" anyway so the point of compatibility is mute, you would need to do  
+Java EE developers can’t reuse code "as is" anyway so the point of compatibility is moot, you would need to do  
 a lot of work to move code from Java EE so doing a bit more shouldn’t be a deal breaker.
 
 Reusing Android code to some extent is an attractive proposition, however the real value we can provide is in reusing  
@@ -91,7 +91,7 @@ stable on devices such as iOS. The fact is that this couldn’t be further from 
 E.g. iOS has some limitations on networking that are unintuitive. Code would seem to work on device and  
 simulator but would fail to work in some conditions in the field…​
 
-Codename One avoids this fate by brining in code in small pieces in a way designed for portability.
+Codename One avoids this fate by bringing in code in small pieces in a way designed for portability.
 
 ### Portability
 
@@ -171,13 +171,13 @@ sockets and when they do they might have some issues associated with them (e.g. 
 
 It’s impossible to implement `java.net` in a compliant way while still working correctly on devices!
 
-In the future we might introduce a higher level abstractions that implements some common use cases of `java.net`  
+In the future we might introduce a higher level abstraction that implements some common use cases of `java.net`  
 but aren’t compliant. This would just mean changing the package name for 99% of the code to get it to work.  
 It’s the 1% of unique functionality that is problematic.
 
 #### `java.io.File`
 
-Mobile devices don’t have filesystems in the same way that desktops do. There are areas to you are restricted to  
+Mobile devices don’t have filesystems in the same way that desktops do. There are areas you are restricted to  
 and apps are typically "isolated" from one another. We might provide a compatibility migration API similar to the one  
 we might include for `java.net` code.
 

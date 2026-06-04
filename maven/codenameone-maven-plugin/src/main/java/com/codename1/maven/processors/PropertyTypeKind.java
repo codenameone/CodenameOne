@@ -62,6 +62,15 @@ public final class PropertyTypeKind {
         this.elementBinaryName = elementBinaryName;
     }
 
+    /// Reclassifies a reference type as [Kind#ENUM]. The base classifier
+    /// in [#of(FieldInfo)] never reflects, so it cannot tell an enum from
+    /// any other reference type; the processor that owns the compiled
+    /// class index calls this once it confirms the referenced class
+    /// carries the `ACC_ENUM` flag.
+    public static PropertyTypeKind enumType(String binaryName) {
+        return new PropertyTypeKind(Kind.ENUM, binaryName, null);
+    }
+
     public static PropertyTypeKind of(FieldInfo field) {
         String desc = field.getDescriptor();
         if (desc == null || desc.length() == 0) {

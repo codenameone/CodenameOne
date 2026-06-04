@@ -40,7 +40,7 @@ perform some tasks. Turns out that adding a GUI to do a task sometimes makes it 
 ### How to share a link to your app?
 
 This is a very common use case, the native share functionality is crucial for viral application growth but it requires  
-another small step to scale reasonable for a cross platform framework.
+another small step to scale reasonably for a cross platform framework.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/36568553/codename-one-how-to-share-a-link-to-your-app/36571381)
 

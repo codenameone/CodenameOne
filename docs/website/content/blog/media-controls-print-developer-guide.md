@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/media-controls-print-developer-guide/new-features-2.jpg)
 
-I did a lot of work on the developer guide PDF making it more suitable to print, as part of this work I submitted the guide to Amazons KDP which means you can now order a physical book of the developer guide. I reduced the page count significantly for lower cost and image size requirements. As a result the book is much smaller but contains the exact same information in a denser package.
+I did a lot of work on the developer guide PDF making it more suitable to print, as part of this work I submitted the guide to Amazon’s KDP which means you can now order a physical book of the developer guide. I reduced the page count significantly for lower cost and image size requirements. As a result the book is much smaller but contains the exact same information in a denser package.
 
 You can [order the book on Amazon](https://www.amazon.com/dp/1549910035), make sure you select the print edition.
 

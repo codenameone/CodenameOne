@@ -15,7 +15,7 @@ I wrote about [properties](/blog/properties.html) before but I got a sense most 
 
 To recap properties are high level attributes of an object that expose a mutable getter/setter which we can observe/introspect. I discussed these terms in the [previous article](/blog/properties.html) so you can check there for a deeper recap. In this article I’ll show a cool demo and make it cooler with every stage!
 
-Lets assume I have an object called `Contacts` which includes contact information of contact e.g.:
+Let’s assume I have an object called `Contacts` which includes contact information of contact e.g.:
     
     
     public class Contact implements PropertyBusinessObject {
@@ -288,7 +288,7 @@ Figure 1. Properties form for the contact
 
 #### Binding Object & Auto Commit
 
-I skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. That’s a bit advanced for now but I might discuss this later.
+I skipped a couple of facts about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. That’s a bit advanced for now but I might discuss this later.
 
 However, the big thing I "skipped" was the return value…​ `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows us to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
 
@@ -321,7 +321,7 @@ This still carries most of the flexibilities of the regular binding e.g. I can s
     
     UiBinding.Binding b = iui.getBindings(cnt);
 
-You might not have noticed this but in the previous vebose code we had lines like:
+You might not have noticed this but in the previous verbose code we had lines like:
     
     
     emailTf.setConstraint(TextField.EMAILADDR);

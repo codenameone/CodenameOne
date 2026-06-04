@@ -43,7 +43,7 @@ Then you can use the web browser component like this:
 
 Notice that the path is relative to the html directory and starts with `/` but inside the HTML files  
 you should use relative (not absolute) paths. Also notice that an `IOException` can be thrown due  
-to the process of untarring. Its unlikely to happen but is entirely possible. 
+to the process of untarring. It’s unlikely to happen but is entirely possible. 
 
 ### Codename One 3.0
 
@@ -57,7 +57,7 @@ like to have a 2 week code freeze to improve stability and bring the docs up to 
 code freeze on April 13th next week! This means some features/issues will be delayed to post 3.0 but we are also trying to cram as many fixes as possible  
 into this release and are working hard on the issue tracker. 
 
-When we release so rarely its a big problem and makes releases harder to produce, we are now thinking of  
+When we release so rarely it’s a big problem and makes releases harder to produce, we are now thinking of  
 migrating towards a Chrome/Mozilla like release schedule and release every 3 months on a fixed freeze/release  
 schedule. If you have thoughts on this please feel free to chime in. 
 

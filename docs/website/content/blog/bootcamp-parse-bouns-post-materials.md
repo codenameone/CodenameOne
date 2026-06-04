@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/bootcamp-parse-bouns-post-materials/full-stack-java-bootcamp.jpg)
 
-I might have been unclear with about the bootcamp materials. It’s possible I implied that the materials will be available later. They won’t…​  
+I might have been unclear about the bootcamp materials. It’s possible I implied that the materials will be available later. They won’t…​  
 It would be unfair to our bootcamp participants if the thing they pay for is then made available for free. There will be some content that we will make available some content that will be available as paid material (a course) and some content that will be 100% exclusive.
 
 I don’t think we’ll offer anything remotely close to the deal we have with the bootcamp…​

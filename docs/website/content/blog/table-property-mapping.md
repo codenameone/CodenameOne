@@ -206,7 +206,7 @@ A lot of the power of this class is enabled via the new `AbstractTableModel` cla
 
 Had we migrated the core of Codename One to Java 8 we might have used default methods. Instead we added a new abstract class that implements all the new API’s we need from `TableModel`. Table now has special cases internally for `AbstractTableModel`.
 
-Most of the API’s in `AbstractTableModel` map directly to the functionality you see above. E.g. `public Class getCellType(int row, int column)` allows the `Table` to to generate the right cell type by default.
+Most of the API’s in `AbstractTableModel` map directly to the functionality you see above. E.g. `public Class getCellType(int row, int column)` allows the `Table` to generate the right cell type by default.
 
 ### Final Word
 

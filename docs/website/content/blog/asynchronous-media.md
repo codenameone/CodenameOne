@@ -23,7 +23,7 @@ You will notice the usage of `AsyncResource` which is similar to a future or a p
 
 ### Rendering Hints
 
-One of the API’s I dislike in JavaSE is the `Graphics2D` rendering hints. It’s a bit opaque in the choices it exposes. I want fast and good looking graphics but the tradeoff isn’t always clear. How much would I "pay" for good looking in this case in terms of speed and visa versa.
+One of the API’s I dislike in JavaSE is the `Graphics2D` rendering hints. It’s a bit opaque in the choices it exposes. I want fast and good looking graphics but the tradeoff isn’t always clear. How much would I "pay" for good looking in this case in terms of speed and vice versa.
 
 Now we also have one rendering hint in our graphics:
     

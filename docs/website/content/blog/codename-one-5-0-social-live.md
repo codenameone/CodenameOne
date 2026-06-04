@@ -50,7 +50,7 @@ The top 5 features of this release are covered in this short video, check out fu
 
   * **Rich Push Notifications** — Push notification was overhauled, we moved the last of the functionality from GCM to FCM. We now support [rich push notifications](/blog/tich-push-notification-improved-validation/) that can include images and complex functionality
 
-  * **Launch Screen Storyboards** — Historically iOS used screenshots of apps to fake fast application launches. Codename One automated that process in the past, it’s now discoraged by newer iOS features such as side-by-side multi-tasking. As such we now use [storyboard launch files](/blog/version-4-1-launch-screen-storyboards/). This allows side-by-side multi-tasking and as a bonus speeds up compilation while reducing the app size further
+  * **Launch Screen Storyboards** — Historically iOS used screenshots of apps to fake fast application launches. Codename One automated that process in the past, it’s now discouraged by newer iOS features such as side-by-side multi-tasking. As such we now use [storyboard launch files](/blog/version-4-1-launch-screen-storyboards/). This allows side-by-side multi-tasking and as a bonus speeds up compilation while reducing the app size further
 
   * **New JDK/OpenJDK** Support — [We now support JDK’s 8 to 11](/blog/uber-book-is-out-jdk-11/) this includes OpenJDK
 

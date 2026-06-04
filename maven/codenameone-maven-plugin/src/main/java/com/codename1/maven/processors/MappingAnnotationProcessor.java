@@ -166,6 +166,17 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             MappedField mf = new MappedField();
             mf.name = f.getName();
             mf.kind = PropertyTypeKind.of(f);
+            // The base classifier never reflects, so an enum-typed field
+            // arrives here as REFERENCE (and a List<Enum> as a LIST whose
+            // element is unrecognised). Upgrade them using the compiled
+            // class index so enums serialise as their name().
+            if (mf.kind.kind == PropertyTypeKind.Kind.REFERENCE
+                    && isEnumType(mf.kind.binaryName, ctx)) {
+                mf.kind = PropertyTypeKind.enumType(mf.kind.binaryName);
+            } else if (mf.kind.kind == PropertyTypeKind.Kind.LIST
+                    && isEnumType(mf.kind.elementBinaryName, ctx)) {
+                mf.elementIsEnum = true;
+            }
             mf.useAccessor = useAccessor;
             mf.getterName = getterName;
             mf.setterName = setterName;
@@ -311,6 +322,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case REFERENCE:
             case PROPERTY:
             case LIST_PROPERTY:
+            case ENUM:
                 return f.kind.binaryName;
             case LIST:       return "java.util.List<" + f.kind.elementBinaryName + ">";
             default:
@@ -511,6 +523,10 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("        m.put(").append(key).append(", ").append(read)
                         .append(" == null ? null : com.codename1.util.Base64.encode(").append(read).append("));\n");
                 return;
+            case ENUM:
+                sb.append("        m.put(").append(key).append(", ").append(read)
+                        .append(" == null ? null : ").append(read).append(".name());\n");
+                return;
             case PROPERTY:
                 sb.append("        m.put(").append(key).append(", ").append(read).append(".get());\n");
                 return;
@@ -524,7 +540,10 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 }
                 sb.append("            if (_src != null) {\n");
                 sb.append("                for (Object _e : _src) {\n");
-                if (isScalarBinary(f.kind.elementBinaryName)) {
+                if (f.elementIsEnum) {
+                    sb.append("                    _l.add(_e == null ? null : ((")
+                            .append(f.kind.elementBinaryName).append(") _e).name());\n");
+                } else if (isScalarBinary(f.kind.elementBinaryName)) {
                     sb.append("                    _l.add(_e);\n");
                 } else if ("java.util.Date".equals(f.kind.elementBinaryName)) {
                     sb.append("                    _l.add(_e == null ? null : Long.valueOf(((java.util.Date) _e).getTime()));\n");
@@ -598,6 +617,16 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case PROPERTY:
                 emitPropertySetFromJsonValue(sb, f, isRecord);
                 break;
+            case ENUM: {
+                String bin = f.kind.binaryName;
+                sb.append("                if (_v instanceof ").append(bin).append(") {\n");
+                sb.append("                    ").append(writeStmt(f, isRecord, "(" + bin + ") _v")).append("\n");
+                sb.append("                } else {\n");
+                sb.append("                    try { ").append(writeStmt(f, isRecord, bin + ".valueOf(_v.toString())")).append(" }\n");
+                sb.append("                    catch (IllegalArgumentException _ex) { ").append(writeStmt(f, isRecord, "null")).append(" }\n");
+                sb.append("                }\n");
+                break;
+            }
             case REFERENCE:
                 sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
                 sb.append("                if (_nm != null && _v instanceof java.util.Map) {\n");
@@ -610,7 +639,17 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 // a record's LIST we materialize a local _l and assign it to
                 // the per-component local that later feeds the canonical ctor.
                 sb.append("                if (_v instanceof java.util.List) {\n");
-                if (isScalarBinary(f.kind.elementBinaryName)) {
+                if (f.elementIsEnum) {
+                    String elem = f.kind.elementBinaryName;
+                    if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
+                        sb.append("                    java.util.ArrayList<").append(elem).append("> _l = new java.util.ArrayList<").append(elem).append(">();\n");
+                        emitEnumListLoop(sb, elem, "_l");
+                        sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
+                    } else {
+                        sb.append("                    ").append(readExpr(f, isRecord)).append(".clear();\n");
+                        emitEnumListLoop(sb, elem, readExpr(f, isRecord));
+                    }
+                } else if (isScalarBinary(f.kind.elementBinaryName)) {
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<").append(f.kind.elementBinaryName).append("> _l = new java.util.ArrayList<").append(f.kind.elementBinaryName).append(">();\n");
                         sb.append("                    for (Object _e : (java.util.List) _v) { _l.add((").append(f.kind.elementBinaryName).append(") _e); }\n");
@@ -650,6 +689,18 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
         sb.append("            }\n");
         sb.append("        }\n");
+    }
+
+    /// Emits a loop that converts a `List` of JSON values into enum
+    /// constants (`name()` strings, or pass-through enum instances),
+    /// adding each to `sink`. Unknown names decode to null.
+    private static void emitEnumListLoop(StringBuilder sb, String elem, String sink) {
+        sb.append("                    for (Object _e : (java.util.List) _v) {\n");
+        sb.append("                        ").append(elem).append(" _ev = null;\n");
+        sb.append("                        if (_e instanceof ").append(elem).append(") { _ev = (").append(elem).append(") _e; }\n");
+        sb.append("                        else if (_e != null) { try { _ev = ").append(elem).append(".valueOf(_e.toString()); } catch (IllegalArgumentException _ex) { _ev = null; } }\n");
+        sb.append("                        ").append(sink).append(".add(_ev);\n");
+        sb.append("                    }\n");
     }
 
     private static void emitPropertySetFromJsonValue(StringBuilder sb, MappedField f, boolean isRecord) {
@@ -699,6 +750,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         switch (f.kind.kind) {
             case STRING: case INT: case LONG: case SHORT: case BYTE: case CHAR:
             case DOUBLE: case FLOAT: case BOOLEAN: case DATE: case BYTE_ARRAY:
+            case ENUM:
             case PROPERTY:
                 sb.append("        {\n");
                 sb.append("            String _s = ");
@@ -732,7 +784,12 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("            if (_src != null) {\n");
                 sb.append("                for (Object _e : _src) {\n");
                 sb.append("                    com.codename1.xml.Element _el = new com.codename1.xml.Element(\"").append(escape(f.xmlName)).append("\");\n");
-                if (isScalarBinary(f.kind.elementBinaryName) || "java.util.Date".equals(f.kind.elementBinaryName)) {
+                if (f.elementIsEnum) {
+                    sb.append("                    if (_e != null) {\n");
+                    sb.append("                        _el.addChild(new com.codename1.xml.Element(((")
+                            .append(f.kind.elementBinaryName).append(") _e).name(), true));\n");
+                    sb.append("                    }\n");
+                } else if (isScalarBinary(f.kind.elementBinaryName) || "java.util.Date".equals(f.kind.elementBinaryName)) {
                     sb.append("                    if (_e != null) {\n");
                     if ("java.util.Date".equals(f.kind.elementBinaryName)) {
                         sb.append("                        _el.addChild(new com.codename1.xml.Element(String.valueOf(((java.util.Date) _e).getTime()), true));\n");
@@ -805,7 +862,12 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
     private static void emitListElementFromXml(StringBuilder sb, MappedField f, String elemVar, String sink) {
         String elem = f.kind.elementBinaryName;
-        if (isScalarBinary(elem)) {
+        if (f.elementIsEnum) {
+            sb.append("                String _s = textOf(").append(elemVar).append(");\n");
+            sb.append("                if (_s != null) { try { ").append(sink).append(".add(")
+                    .append(elem).append(".valueOf(_s)); } catch (IllegalArgumentException _ex) { ")
+                    .append(sink).append(".add(null); } }\n");
+        } else if (isScalarBinary(elem)) {
             sb.append("                String _s = textOf(").append(elemVar).append(");\n");
             sb.append("                if (_s != null) {\n");
             if ("java.lang.String".equals(elem)) {
@@ -841,6 +903,8 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case INT: case LONG: case SHORT: case BYTE: case CHAR:
             case DOUBLE: case FLOAT: case BOOLEAN:
                 sb.append("String.valueOf(").append(read).append(")"); break;
+            case ENUM:
+                sb.append(read).append(" == null ? null : ").append(read).append(".name()"); break;
             case DATE:
                 sb.append(read).append(" == null ? null : String.valueOf(").append(read).append(".getTime())"); break;
             case BYTE_ARRAY:
@@ -886,6 +950,12 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                ").append(writeStmt(f, isRecord, "new java.util.Date(Long.parseLong(" + src + "))")).append("\n"); break;
             case BYTE_ARRAY:
                 sb.append("                ").append(writeStmt(f, isRecord, "com.codename1.util.Base64.decode(" + src + ".getBytes())")).append("\n"); break;
+            case ENUM: {
+                String bin = f.kind.binaryName;
+                sb.append("                try { ").append(writeStmt(f, isRecord, bin + ".valueOf(" + src + ")")).append(" }\n");
+                sb.append("                catch (IllegalArgumentException _ex) { ").append(writeStmt(f, isRecord, "null")).append(" }\n");
+                break;
+            }
             case PROPERTY: {
                 String elem = f.kind.elementBinaryName;
                 if ("java.lang.String".equals(elem)) {
@@ -926,6 +996,16 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 || "java.lang.Double".equals(binary)
                 || "java.lang.Float".equals(binary)
                 || "java.lang.Boolean".equals(binary);
+    }
+
+    /// True when `binaryName` names a Java enum present in the compiled
+    /// class index. Returns false for enums outside the annotation scan
+    /// (e.g. library enums) -- those stay REFERENCE and behave as before.
+    private static boolean isEnumType(String binaryName, ProcessorContext ctx) {
+        if (binaryName == null || binaryName.length() == 0) return false;
+        com.codename1.maven.annotations.AnnotatedClass c =
+                ctx.lookup(binaryName.replace('.', '/'));
+        return c != null && c.isEnum();
     }
 
     private static boolean canBeAttribute(PropertyTypeKind k) {
@@ -1091,5 +1171,8 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         /// mutate through their own `.set(...)` / `.add(...)` API; the
         /// field reference itself is not replaced).
         String setterName;
+        /// `true` when this field is a `List<E>` whose element type `E`
+        /// is a Java enum -- elements serialise as their `name()`.
+        boolean elementIsEnum;
     }
 }

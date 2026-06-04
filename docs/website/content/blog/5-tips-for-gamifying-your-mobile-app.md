@@ -36,7 +36,7 @@ Mobile apps are in fierce competition these days. There are over one million app
 ![Picture](/blog/5-tips-for-gamifying-your-mobile-app/5-tips-for-gamifying-your-mobile-app-1.png)  
 ](/img/blog/old_posts/5-tips-for-gamifying-your-mobile-app-large-3.png)
 
-This is one of the main reasons why app developers need to invest a lot of resources in engaging the users and increasing the average length of activity for the users. One interesting way of doing that is through the user of gamification. Games are very popular in smartphones and most users are already accustomed to playing games on their mobile devices so the fit seems very natural here. 
+This is one of the main reasons why app developers need to invest a lot of resources in engaging the users and increasing the average length of activity for the users. One interesting way of doing that is through the use of gamification. Games are very popular in smartphones and most users are already accustomed to playing games on their mobile devices so the fit seems very natural here. 
 
 Digging a bit deeper into gamification, there are a few basic game mechanics that are suited for gamifying most mobile apps: Goals or Achievements, Problem Solving and Awards. I’m deliberately leaving social out since it is not a purely game related. It is present in some games and in some apps. On top of the game mechanics gamification is also about making elements more responsive and providing instant gratification. These are easier to do on touch devices but not all apps are utilizing the power of this approach. 
 
@@ -56,7 +56,7 @@ Here is how we can combine all of these together:
 
 ## Tip 1 – Creating Engagement Opportunities for the User  
 
-This is a key component in creating the engagement loop. You app needs to have elements that allow users to invest time and get more out of the app. One easy example for this is profile building. In apps that provide social interaction, investing time in your profile is not a required step but the more a user invests time in it, the better his experience will be. Same goes for apps that allow you to import your friends from other social networks. The more time you invest, the more engaging the app is likely to be for you.
+This is a key component in creating the engagement loop. Your app needs to have elements that allow users to invest time and get more out of the app. One easy example for this is profile building. In apps that provide social interaction, investing time in your profile is not a required step but the more a user invests time in it, the better his experience will be. Same goes for apps that allow you to import your friends from other social networks. The more time you invest, the more engaging the app is likely to be for you.
 
 ## Tip 2 – Encouraging Your Users to Invest the Time through Achievements  
 
@@ -64,7 +64,7 @@ While the user does get value from investing his time, he doesn’t get it right
 
 ## Tip 3 – Guide Users about the Value They Can Receive  
 
-Once your app users invested time and unlocked more value. You can add responsive UX that guides them about opportunities to get more value as they appear. This could be anything from friend recommendations to relaying on the app for day to day tasks. If we take one example, a task management app can encourage users to connect the app with the calendar app through achievements and awards. Once the calendar app is connected, the task management app can recommend the user to add tasks after a meeting.
+Once your app users invested time and unlocked more value. You can add responsive UX that guides them about opportunities to get more value as they appear. This could be anything from friend recommendations to relying on the app for day to day tasks. If we take one example, a task management app can encourage users to connect the app with the calendar app through achievements and awards. Once the calendar app is connected, the task management app can recommend the user to add tasks after a meeting.
 
 ## Tip 4 – Getting Rid of Clutter via Smart Unlocking  
 

@@ -19,7 +19,7 @@ The birthday of 3.7 will be on Tuesday June 27th…​ Up to then all new commit
 
 Assuming the release candidate will become the final release all will be well, but we might need to push additional updates to fix regressions or issues so this week might include several server updates. Because of that we will skip the next two Friday releases and will push as needed. We should get back to our regular Friday updates by July 7th.
 
-We might release several plugin updates in the near future to iron out bugs and regressions with the release so bare with us during this tumultuous week.
+We might release several plugin updates in the near future to iron out bugs and regressions with the release so bear with us during this tumultuous week.
 ---
 
 ## Archived Comments

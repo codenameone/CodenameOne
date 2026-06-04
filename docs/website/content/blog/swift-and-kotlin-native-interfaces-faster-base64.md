@@ -16,7 +16,7 @@ This is still highly experimental like most of the new features you read about i
 
 ## Native Interfaces Now Support Swift and Kotlin
 
-Native interfaces are one of the most important features in Codename One. They guarantee you won't be stuck if you need something that we can't/won't deliver. They let our community extend Codename One in ways we couldn't possibly imagine.
+Native interfaces are one of the most important features in Codename One. They guarantee you won’t be stuck if you need something that we can’t/won’t deliver. They let our community extend Codename One in ways we couldn’t possibly imagine.
 
 Native interfaces let us keep the application in shared Java code, while still reaching into native APIs when we need platform-specific functionality. 
 
@@ -68,7 +68,7 @@ If Swift generation is enabled, it will produce:
 
 The main detail to keep in mind is that the runtime still expects the same implementation naming convention. So if you implement the class in Swift, you should keep the generated implementation name and annotate it with `@objc(...)` so the runtime can discover it properly.
 
-That's an important detail that gives us the best of both worlds. The runtime model stays stable, while developers get to write the native side in Swift instead of Objective-C.
+That’s an important detail that gives us the best of both worlds. The runtime model stays stable, while developers get to write the native side in Swift instead of Objective-C.
 
 ### Kotlin on Android
 
@@ -90,7 +90,7 @@ Some Android APIs, SDK samples, and documentation are Kotlin-first now. When you
 
 Kotlin support makes native interfaces feel much more at home in the Android ecosystem.
 
-As a sidenote, native Android Java code should also support JDK 17 level syntax with current builds. This is something we introduced a while back, but it didn't make it to the blog because we couldn't find the relevant issue.
+As a sidenote, native Android Java code should also support JDK 17 level syntax with current builds. This is something we introduced a while back, but it didn’t make it to the blog because we couldn’t find the relevant issue.
 
 ## Base64 Performance Improved Dramatically
 
@@ -118,7 +118,7 @@ After these improvements:
 - encode is **73.4% faster**
 - decode is **61.3% faster**
 
-That is a very significant swing, especially on decoding. But I especially love how our API beats the pants off of Android's native API...
+That is a very significant swing, especially on decoding. But I especially love how our API beats the pants off of Android’s native API...
 
 ### iOS Results
 
@@ -142,7 +142,7 @@ It is also one of those cases where platform internals matter a lot. Base64 on i
 
 Our current goal on this front is to beat the native iOS performance too, which we plan to achieve with SIMD support in ParparVM. We have some work in progress on that front which I hope will land soon. 
 
-I think ParparVM should outperform "native" Objective-C/Swift since it doesn't have the overhead of ARC or message passing. It does have the GC overhead, but that shouldn't impact most applications since our gc is concurrent. Based on these results, we're not there yet.
+I think ParparVM should outperform "native" Objective-C/Swift since it doesn’t have the overhead of ARC or message passing. It does have the GC overhead, but that shouldn’t impact most applications since our gc is concurrent. Based on these results, we’re not there yet.
 
 ## Playground Keeps Getting Better
 
@@ -202,7 +202,7 @@ If those fonts are not available on the host machine, it falls back to bundled *
 
 That gives us a better approximation of real iOS rendering without making the simulator fragile.
 
-### Can Codename One Bundle Apple's Fonts?
+### Can Codename One Bundle Apple’s Fonts?
 
 No.
 
@@ -231,7 +231,7 @@ If your app uses things like:
 
 Then you have probably run into situations where a normal `Dialog` can trigger odd behaviors such as the background suddenly turning white.
 
-This happens because a `Dialog` is technically a separate `Form` that grabs a screenshot of the previous `Form` and shows it in the background. That works well for simple cases, but since native components are rendered in a separate thread/ hierarchy, we can't reliably grab a screenshot of them.
+This happens because a `Dialog` is technically a separate `Form` that grabs a screenshot of the previous `Form` and shows it in the background. That works well for simple cases, but since native components are rendered in a separate thread/ hierarchy, we can’t reliably grab a screenshot of them.
 
 The workaround is to avoid `Dialog` altogether in such cases. We have `InteractionDialog` which relies on layered panes to provide the same experience as a `Dialog` and even allows "floating dialog" behavior (hence the "interaction" part). The problem is that `Dialog.show()` variants are common in the code and very convenient to use.
 
@@ -265,9 +265,9 @@ A few smaller fixes in this update are worth mentioning too:
 
 ## Closing Thoughts
 
-Thanks to those who took the time to annotate the issues that they found important in the issue tracker. Despite adding new RFEs this week were still able to reduce the issue count to 499, which is fantastic. 
+Thanks to those who took the time to annotate the issues that they found important in the issue tracker. Despite adding new RFEs this week we were still able to reduce the issue count to 499, which is fantastic. 
 
-If you submitted an issue in the past, please go to the [issue tracker](https://github.com/codenameone/CodenameOne/issues) and filter based on your account. Make sure that all your issues are still applicable. Close what's irrelevant and comment on what isn't. We're doing that work ourselves, and it's a slow-tedious task.
+If you submitted an issue in the past, please go to the [issue tracker](https://github.com/codenameone/CodenameOne/issues) and filter based on your account. Make sure that all your issues are still applicable. Close what’s irrelevant and comment on what isn’t. We’re doing that work ourselves, and it’s a slow-tedious task.
 
 Thank you!
 

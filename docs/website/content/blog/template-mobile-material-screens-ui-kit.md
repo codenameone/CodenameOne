@@ -23,14 +23,14 @@ compromises etc. You can study the source code/theme and ask questions in the co
 I achieved is unclear.
 
 This time I will port the [Mobile Screens Material UI PSD](https://epic-pxls.s3.amazonaws.com/downloads/item/f193df5e-6130-4cf1-838e-097bcb0b42d6.zip).  
-This is not from Google but it based on the Material design principals.
+This is not from Google but it is based on the Material design principles.
 
 You can check out the full source code on github [here](https://github.com/codenameone/MaterialScreensUIKit).
 
 ### The End Result
 
 I’m pretty pleased with the end result, this took me about a day and a half of work to do. The app build is 478kb  
-well bellow the free quota limit and this is with full HD resources. The resulting Android APK is 1.8mb which is  
+well below the free quota limit and this is with full HD resources. The resulting Android APK is 1.8mb which is  
 pretty small for an app like this.
 
 Check out a preview of this UI running on the right here thanks to the JavaScript port of Codename One,  
@@ -47,7 +47,7 @@ You can see the PSD’s we used as a base in this [directory](https://github.com
 I extracted very few images from the PSD’s and mostly used the colors and components where possible, you can  
 see the exact image resources I extracted and used  
 [here](https://github.com/codenameone/MaterialScreensUIKit/tree/master/psds/resources). Notice I provided  
-a duke image of our own since the swipe tutorial only had one page designed in the PSD and I had to makeup  
+a duke image of our own since the swipe tutorial only had one page designed in the PSD and I had to make up  
 another page.
 
 Below are screenshots of this app running on my OPO Android device:
@@ -60,7 +60,7 @@ Figure 1. Login screen
 
 Figure 2. Welcome wizard page 1
 
-![I designed another page for the welcome wizard so we'll have 2 pages...](/blog/template-mobile-material-screens-ui-kit/3.png)
+![I designed another page for the welcome wizard so we’ll have 2 pages...](/blog/template-mobile-material-screens-ui-kit/3.png)
 
 Figure 3. I designed another page for the welcome wizard so we’ll have 2 pages…​
 

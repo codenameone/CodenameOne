@@ -37,12 +37,12 @@ Native Facebook SDK support (ideally with native sharing on iOS too)
   *   
 Fixes for Windows Phone issues  
 
-There are a many issues and features which we would like to push into the release so we will try to get as many of them out there. Time permitting we would like to add a new solution for ad’s that would hopefully solve those pains once and for all.
+There are many issues and features which we would like to push into the release so we will try to get as many of them out there. Time permitting we would like to add a new solution for ad’s that would hopefully solve those pains once and for all.
 
   
-Once this is out we can probably start debating on the wishlist for 2.1, feel free to he  
+Once this is out we can probably start debating on the wishlist for 2.1, feel free to  
   
-chime in in the discussion here.  
+chime in the discussion here.  
   
   
 If you have an issue that you feel is particularly important and should be addressed for 2.0 please comment on that within the issue so we won’t miss it.  

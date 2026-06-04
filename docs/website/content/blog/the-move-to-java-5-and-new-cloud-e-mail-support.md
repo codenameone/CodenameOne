@@ -44,7 +44,7 @@ How important would this be to you guys?
 Do you want to see our common interfaces generified?  
 
   
-As a side note we also added an ability in our cloud server to send email messages directly from the app, which can be pretty useful since it doesn’t require a working email account or permissions other than networking. Its only available for pro accounts or higher, and allows you to use the Message API’s methods to send an HTML or plain text email directly through our build cloud server. Notice that due to spam issues all emails will arrive from a Codename One address (although you can customize the name of the sender) E.g. to send an email you can do something like this:  
+As a side note we also added an ability in our cloud server to send email messages directly from the app, which can be pretty useful since it doesn’t require a working email account or permissions other than networking. It’s only available for pro accounts or higher, and allows you to use the Message API’s methods to send an HTML or plain text email directly through our build cloud server. Notice that due to spam issues all emails will arrive from a Codename One address (although you can customize the name of the sender) E.g. to send an email you can do something like this:  
   
 
 * * *

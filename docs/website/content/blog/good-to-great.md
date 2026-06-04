@@ -46,7 +46,7 @@ Notice I’ve made a specific distinction for "launch material", for the next tw
 
 This isn’t exactly a question that was asked but it was an underlying current.
 
-The answer is yes. We are are working on improving the default look for applications so if you create a hello world and start adding components without knowing much you should get something that looks decent.
+The answer is yes. We are working on improving the default look for applications so if you create a hello world and start adding components without knowing much you should get something that looks decent.
 
 This material would still be valuable even as we improve the basic look, everything that I teach would be just as applicable in the future as it is now. I’ll also update materials with newer details as features and enhancements make their way out.
 

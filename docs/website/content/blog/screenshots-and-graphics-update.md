@@ -48,7 +48,7 @@ We’ve been working for a while on a new Graphics pipeline and Shapes API which
 
 The API will also expose a proper Affine Transform and potentially a perspective transform allowing for high performance rotation effects and 3D effects. This is all slated for 2.1 which we hope to release before Java One.
 
-We will have a booth at this years Java One hopefully some of the sessions we submitted will also go thru.  
+We will have a booth at this year’s Java One hopefully some of the sessions we submitted will also go thru.  
 
 * * *
 

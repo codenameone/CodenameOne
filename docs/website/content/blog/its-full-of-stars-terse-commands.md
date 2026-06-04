@@ -71,7 +71,7 @@ size.
 
 In this code you will notice we allow selecting a value between 0 & 10 where 10 is really 5 stars. This allows us  
 to pick values like 4.5 stars and just divide the actual value. However, most ranking systems don’t allow a value  
-below 1 star. To solve this you can just use a `Label` to represent the first star and use a the `Slider` for the remaining  
+below 1 star. To solve this you can just use a `Label` to represent the first star and use the `Slider` for the remaining  
 4 stars. In which case the values would be between 0 – 8.
 
 ### Terse commands
@@ -108,7 +108,7 @@ And to make things even simpler I created helper methods that do that implicitly
         myCodeHere();
     });
 
-Notice that the version of this method that accepts a the action listener also returns the created `Command` instance  
+Notice that the version of this method that accepts the action listener also returns the created `Command` instance  
 which might be useful if you want to do something with the command later on (e.g. remove it). So this should work:
     
     

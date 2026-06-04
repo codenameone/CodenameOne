@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -53,6 +54,23 @@ class WebSocketTest {
         assertEquals(1, connectCount.get());
         assertSame(ws, seenInOpen.get(), "handler receives the WebSocket instance");
         assertEquals(Arrays.asList("hello", "world"), messages);
+    }
+
+    @Test
+    void subprotocolsAreOfferedAndSelectionSurfaced() {
+        WebSocket ws = WebSocket.build("ws://test")
+                .subprotocols("graphql-transport-ws", "chat")
+                .connect();
+
+        // The facade hands the offered list to the impl before connect.
+        assertArrayEquals(new String[] { "graphql-transport-ws", "chat" },
+                mockImpl.testRequestedSubprotocols());
+
+        // The platform records the server's pick before firing onConnect;
+        // the facade surfaces it.
+        mockImpl.testSelect("graphql-transport-ws");
+        mockImpl.testSink().onConnect();
+        assertEquals("graphql-transport-ws", ws.getSelectedSubprotocol());
     }
 
     @Test
@@ -235,6 +253,15 @@ class WebSocketTest {
         /// the final method.
         WebSocketEventSink testSink() {
             return super.sink();
+        }
+
+        /// Test-only accessors for the subprotocol plumbing on the base.
+        String[] testRequestedSubprotocols() {
+            return super.requestedSubprotocols();
+        }
+
+        void testSelect(String protocol) {
+            super.setSelectedSubprotocol(protocol);
         }
     }
 }

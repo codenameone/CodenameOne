@@ -27,7 +27,7 @@ Version 3.5 is a **huge** release that includes the long awaited Windows Univers
 
   * **Seamless support for Android Marshmallow permissions** – This requires [no code changes](/blog/switching-on-android-marshmallow-permission-prompts/) for most applications. We also support this in the [simulator & native code](/blog/marshmallow-permissions-in-the-simulator-and-native-code/).
 
-  * **Removed Skins from Simulator** – We [moved skins to the more menu](/blog/unskin-proxy-support/) where you can be download them dynamically. We also added new skins and a [skin designer tool](/blog/skin-designer/)…​  
+  * **Removed Skins from Simulator** – We [moved skins to the more menu](/blog/unskin-proxy-support/) where you can download them dynamically. We also added new skins and a [skin designer tool](/blog/skin-designer/)…​  
 This reduced the size of our distribution by almost 30MB!
 
   * **Added Background Fetch Support** – This allows [downloading in the background in iOS/Android](http://www.codenameone.com/blog/background-fetch.html)

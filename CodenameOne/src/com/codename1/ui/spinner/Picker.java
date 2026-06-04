@@ -43,6 +43,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.VirtualInputDevice;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -862,6 +863,21 @@ public class Picker extends Button {
                 Form form = getComponentForm();
                 if (form == null) {
                     throw new RuntimeException("Attempt to show interaction dialog while button is not on form.  Illegal state");
+                }
+
+                // The popup is anchored to the very bottom of the screen, so on devices with a
+                // bottom inset (e.g. the iPhone home indicator) its bottom-most row would be drawn
+                // underneath the inset. Reserve that inset as bottom padding so the whole popup stays
+                // inside the safe area. When BELOW_SPINNER custom buttons exist the padding goes on
+                // their bar (so the bar's background extends through the inset and the buttons remain
+                // tappable above it); otherwise it goes on the content pane. See issue #5152.
+                Rectangle safeArea = form.getSafeArea();
+                int bottomInset = Display.getInstance().getDisplayHeight() - (safeArea.getY() + safeArea.getHeight());
+                if (bottomInset > 0) {
+                    Container insetTarget = bottomCustomButtons != null ? bottomCustomButtons : dlg.getContentPane();
+                    Style insetStyle = insetTarget.getAllStyles();
+                    insetStyle.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+                    insetStyle.setPaddingBottom(insetTarget.getStyle().getPaddingBottom() + bottomInset);
                 }
 
                 final int top = Math.max(0, form.getContentPane().getHeight() - dlg.getPreferredH());

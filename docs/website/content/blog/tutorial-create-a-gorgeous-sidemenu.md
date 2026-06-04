@@ -90,7 +90,7 @@ The iOS version of the side command inherits a border style so we must "remove" 
 
 Figure 7. Border must be defined as Empty
 
-Next we need to pick a good looking font and make sure it’s large enough. We use millimeters size it correctly for all OS’s and override the derived text decoration which has a value in the iOS native theme so it can impact the final look.
+Next we need to pick a good looking font and make sure it’s large enough. We use millimeters to size it correctly for all OS’s and override the derived text decoration which has a value in the iOS native theme so it can impact the final look.
 
 ![Pick a good looking font for the side command](/blog/tutorial-create-a-gorgeous-sidemenu/styled-sidemenu-7.png)
 

@@ -31,7 +31,7 @@ Figure 3. Contact us form
 
 If you own a restaurant or know someone who does and is interested in this or giving feedback by joining the beta please let us know in the website chat. Just add the email there and we’ll follow up with you.
 
-I’d like to make this into a real world application and part of doing that is gathering feedback from real users. Notice that billing is done thru braintree directly to your account. Since braintree only works in some countries you need to verify if works for yours, it doesn’t work for mine!
+I’d like to make this into a real world application and part of doing that is gathering feedback from real users. Notice that billing is done thru braintree directly to your account. Since braintree only works in some countries you need to verify if it works for yours, it doesn’t work for mine!
 
 To check if you qualify see the braintree [faq](https://www.braintreepayments.com/faq), currently these are the supported countries: United States, Canada, Australia, Europe, Singapore, Hong Kong, Malaysia, and New Zealand.
 

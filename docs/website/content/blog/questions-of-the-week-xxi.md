@@ -95,7 +95,7 @@ Java 8 support is painful under Eclipse where the ini needs to be edited
 
 ### UWP app name can’t chinese. name change to?
 
-There was an issue with setting UWP application names to some locales this should be fixed in todays builds
+There was an issue with setting UWP application names to some locales this should be fixed in today’s builds
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39182370/codename-one-uwp-app-app-name-cant-chinese-name-change-to)
 

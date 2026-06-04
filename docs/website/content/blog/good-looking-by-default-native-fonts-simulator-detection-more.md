@@ -93,7 +93,7 @@ log to us by email, its restricted to pro developers as part of the crash protec
 
 We added a lot of new terse layout API’s into the layout class specifically `LayeredLayout` now  
 has an `encloseIn` method of its own. So does `FlowLayout`, however it also added  
-many methods to allow enclosing in all the available variation of flow loyout types, specifically:  
+many methods to allow enclosing in all the available variation of flow layout types, specifically:  
 `encloseCenter`, `encloseRight`, `encloseMiddle`,  
 `encloseCenterMiddle`, `encloseRightMiddle`, `encloseBottom`,  
 `encloseCenterBottom`, `encloseRightBottom`. 

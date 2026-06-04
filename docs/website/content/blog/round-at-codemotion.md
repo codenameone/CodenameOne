@@ -35,7 +35,7 @@ Codemotion Tel Aviv
 ](http://telaviv.codemotionworld.com/)  
 , one of the things that surprised me about the conference is that the sessions are so short (40 minutes) which gives very little time to actually get into code. So to fit both details about Codename One, Demo etc. and an app I had to narrow this down to the most barebone Codename One demo I could think of that could still be valuable.  
   
-Enter Rounder, its a trivial demo of Codename One that just uses the camera to grab a photo and make it into a round photo. Not exactly useful but it shows the usage of graphics, masking and image capture in a trivial app.  
+Enter Rounder, it’s a trivial demo of Codename One that just uses the camera to grab a photo and make it into a round photo. Not exactly useful but it shows the usage of graphics, masking and image capture in a trivial app.  
   
 The full code is posted below and can help you if you are looking into image masking.  
   

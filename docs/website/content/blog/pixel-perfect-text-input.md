@@ -102,7 +102,7 @@ These were both pretty easy to fix in the designer tool, I just edited the Andro
 
 ### Colors
 
-One of the problem in the simulator screenshot process is that it hides the currently editing text, in the picture below it isn’t clear that the text we are editing is black while the line is blue and the label on top is also blue.
+One of the problems in the simulator screenshot process is that it hides the currently editing text, in the picture below it isn’t clear that the text we are editing is black while the line is blue and the label on top is also blue.
 
 ![The editing line and label have the same color](/blog/pixel-perfect-text-input/pixel-perfect-text-field-android-codenameone-colors.png)
 
@@ -110,7 +110,7 @@ Figure 4. The editing line and label have the same color
 
 Right now we don’t have any way to define a standard color palette in the theme. So I can’t pick a color constant and need to pick a specific color for the border to work with. This is something we should probably address in the theme toolchain but it’s not a trivial fix and requires some thought. In general I’d like to define a color scheme and automatically generate the native Android `colors.xml` etc. to create a more uniform UX.
 
-In terms of focus I had to do a bit more work. I added a new method to `Component` `shouldRenderSelection()` which can be overriden to indicate whether selection is shown. Normally in touch devices the selected state only appears when touching the screen so this is essential for this case.
+In terms of focus I had to do a bit more work. I added a new method to `Component` `shouldRenderSelection()` which can be overridden to indicate whether selection is shown. Normally in touch devices the selected state only appears when touching the screen so this is essential for this case.
 
 ### Fonts
 

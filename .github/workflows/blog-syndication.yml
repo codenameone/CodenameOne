@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Token with write scope so the post-run commit can push the state file.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -88,7 +88,7 @@ jobs:
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: syndication-screenshots
           path: docs/website/reports/syndication-screenshots/

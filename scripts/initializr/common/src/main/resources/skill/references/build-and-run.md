@@ -64,6 +64,24 @@ mvn -pl common cn1:generate-openapi \
   -Dcn1.openapi.spec=petstore.json \
   -Dcn1.openapi.basePackage=com.example.petstore
 
+# Generate a typed gRPC-Web client from a .proto. Writes @ProtoMessage models
+# (+ @ProtoEnum) and one @GrpcClient interface per service. Same processor
+# pipeline as above. See references/api-clients.md.
+mvn -pl common cn1:generate-grpc \
+  -Dcn1.grpc.proto=catalog.proto \
+  -Dcn1.grpc.basePackage=com.example.catalog
+
+# Generate a typed GraphQL client from a schema (+ optional named operations).
+# Writes @Mapped models, schema enums, and a @GraphQLClient interface with
+# @Query/@Mutation/@Subscription methods. With an operations file the generated
+# methods/response models are precise; without one it falls back to a
+# bounded-depth (cn1.graphql.maxDepth, default 2) selection set per root field.
+mvn -pl common cn1:generate-graphql \
+  -Dcn1.graphql.schema=schema.graphqls \
+  -Dcn1.graphql.operations=operations.graphql \
+  -Dcn1.graphql.basePackage=com.example.catalog \
+  -Dcn1.graphql.clientName=CatalogGraphApi
+
 # --- Cloud builds (need a Codename One account; some need Enterprise tier) ---
 
 # Native iOS app (.ipa). Cloud-built.

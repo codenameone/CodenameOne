@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/z-order-peers-in-ios-javascript/maps.jpg)
 
-Just last week [I mentioned](/blog/html-maps-z-order-peer-properties-update.html) the effort we were taking to bring the z-ordered peer components into other platforms and I’m pretty happy to report that tomorrows update should include support for iOS & the JavaScript ports for z-ordering.
+Just last week [I mentioned](/blog/html-maps-z-order-peer-properties-update.html) the effort we were taking to bring the z-ordered peer components into other platforms and I’m pretty happy to report that tomorrow’s update should include support for iOS & the JavaScript ports for z-ordering.
 
 What this means is that peer components (e.g. maps, videos, browser etc.) can reside below a component in the Codename One hierarchy and won’t **always** be on top as it is now. This opens up Codename One for a huge set of use cases and makes building some types of apps (e.g. Maps) **much** easier!
 

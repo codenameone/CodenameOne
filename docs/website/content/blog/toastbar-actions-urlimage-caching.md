@@ -51,7 +51,7 @@ That’s exactly what the new method of `URLImage` does:
 
 There are a few important things you need to notice about this method:
 
-  * It returns **Image** and not **URLImage**. This is crucial. Down casting to `URLImage* will work on the simulator but might fail in some platforms (e.g. JavaScript) so don’t do that!  
+  * It returns **Image** and not **URLImage**. This is crucial. Down casting to `URLImage` will work on the simulator but might fail in some platforms (e.g. JavaScript) so don’t do that!  
 Since this is implemented natively in JavaScript we need a different abstraction for that platform.
 
   * It doesn’t support image adapters and instead uses a simplified resize rule. Image adapters work on `URLImage` since we have a lot of control in that class. However, in the browser our control is limited and so an adapter won’t work.

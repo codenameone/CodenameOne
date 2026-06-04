@@ -19,7 +19,7 @@ __ |  The Wowza cn1lib has been deprecated since the publication of this post
   
 However, live events are not trivial. That’s why you should read this README carefully: <https://github.com/jsfan3/CN1Libs-WowzaLiveStreaming/blob/master/README.md>
 
-This CN1Lib lets you to broadcast a live video streaming event from a mobile app. The streaming is identified by a unique id which is automatically assigned. You can then play the live video stream with a given id and an adaptive bitrate;
+This CN1Lib lets you broadcast a live video streaming event from a mobile app. The streaming is identified by a unique id which is automatically assigned. You can then play the live video stream with a given id and an adaptive bitrate;
 
 You can also record live streams to watch later.
 

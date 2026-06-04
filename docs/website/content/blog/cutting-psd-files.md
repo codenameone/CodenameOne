@@ -15,7 +15,7 @@ This post is inspired by a great post written by
 [  
 Tope  
 ](http://www.appdesignvault.com/photoshop-crop)  
-, covering the slicing of a PSD image to produce small PNG images which you can later on use as image borders, backgrounds, icons etc. Tope’s technique is pretty simple and works rather well but I’d like to offer another technique as well as a better way to detect the proper layer you with to cut.
+, covering the slicing of a PSD image to produce small PNG images which you can later on use as image borders, backgrounds, icons etc. Tope’s technique is pretty simple and works rather well but I’d like to offer another technique as well as a better way to detect the proper layer you wish to cut.
 
   
   
@@ -31,7 +31,7 @@ This post assumes you have a recent version of Photoshop installed and assumes y
   
 You can see the layer view by selecting Windows->Layers from the photoshop menu, on the right you can see the layers of a simple iPhone design that I have here. You will notice that every entry is collapsible.  
   
-A common paradigm designers use is to create multiple screens/forms in a singled PSD  
+A common paradigm designers use is to create multiple screens/forms in a single PSD  
   
 and thus represent a "screen" (Form) of its own within the design.  
   

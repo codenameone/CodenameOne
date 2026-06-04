@@ -31,7 +31,7 @@ To help alleviate this difficulty Chen built a tool right into the Codename One 
 You can query various application scopes, if you don’t enter an object type you will receive all objects but only for the private/application scopes (otherwise you would just get too much information). Notice that when you sort based on an index if the index is missing an entry just won’t appear so keep that in mind.  
 
   
-We have great plans for this API, including features for map-reduce like functionality to allow you to build complex data manipulation logic without having to setup any server infrastructure.  
+We have great plans for this API, including features for map-reduce like functionality to allow you to build complex data manipulation logic without having to set up any server infrastructure.  
   
 
 * * *

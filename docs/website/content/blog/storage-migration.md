@@ -22,7 +22,7 @@ losing all the data it kept in storage… So we decided to go about this in a ra
 We defined a new build argument which will be on by default for all new projects: `ios.newStorageLocation`
 
 This build argument effectively means that we should use the documents directory as storage and the app is ready  
-to deal with it. Its useful for apps that aren’t already in users hands. If you don’t define that flag we will automatically  
+to deal with it. It’s useful for apps that aren’t already in users’ hands. If you don’t define that flag we will automatically  
 migrate the app to the documents directory on the first usage of `Storage`, we will detect if our  
 storage directory exists under documents and if not we will move all files to that directory. This should maintain  
 compatibility with a small performance overhead on the first activation for new installs and possibly the first  

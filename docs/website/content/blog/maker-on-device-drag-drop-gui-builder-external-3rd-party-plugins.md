@@ -60,18 +60,18 @@ in action.
   
 So how do we build a hello world plugin?
 
-I created a simple Twitter feed plugin just to show the basic principals (see the full project at the bottom of this post). To start off we need to create a new Library Project in NetBeans (sorry currently Eclipse doesn’t support Library projects although its theoretically possible to work with it to build these projects).  
+I created a simple Twitter feed plugin just to show the basic principles (see the full project at the bottom of this post). To start off we need to create a new Library Project in NetBeans (sorry currently Eclipse doesn’t support Library projects although its theoretically possible to work with it to build these projects).  
   
 We can remove the hello world code and create a new package with our company and name of the plugin, then we need to implement the plugin. The plugin is a class that derives from MakerPlugin here is the simple Twitter plugin from the code below.  
 
-Notice the overriden methods above are a part of the plugin interface, once we are in the plugin itself we can just write any Codename One code that we want although keep in mind that I try not to block the execution thread… Otherwise I might create an unpleasant experience when building a tabs based application.  
+Notice the overridden methods above are a part of the plugin interface, once we are in the plugin itself we can just write any Codename One code that we want although keep in mind that I try not to block the execution thread… Otherwise I might create an unpleasant experience when building a tabs based application.  
   
   
 Also notice that I enable scrollability since the parent form won’t be accessible we disabled scrolling there (to avoid nested scrolling issues), if you need scrolling you need to explicitly declare it.  
   
   
   
-Its probably obvious but bares stating that the plugin class must be public, have a no argument constructor (or no constructor which is the same thing) and mustn’t be abstract.  
+Its probably obvious but bears stating that the plugin class must be public, have a no argument constructor (or no constructor which is the same thing) and mustn’t be abstract.  
 
   
 You will also need one more file which is the xml descriptor file, in my case its twitter.mplugin (in the root of the downloaded file) which you can see right here:  

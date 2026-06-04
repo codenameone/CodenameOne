@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/further-refined-cross-platform-mobile-gui-builder/new-gui-builder.jpg)
 
-Chen has been working quite a bit on the new GUI Builder and made some significant changes both to it’s look and  
+Chen has been working quite a bit on the new GUI Builder and made some significant changes both to its look and  
 functionality. These changes are wide reaching covering the appearance, functionality and stability of the GUI Builder.
 
 ![Starting page after recent changes see if you can spot them all...](/blog/further-refined-cross-platform-mobile-gui-builder/new-ux-for-gui-builder.png)

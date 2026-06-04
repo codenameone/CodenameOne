@@ -50,7 +50,7 @@ We want
   
 intellisense  
   
-code completion to work properly (include the javadoc when you use the library) while this is possible with jar’s its not automatic.  
+code completion to work properly (include the javadoc when you use the library) while this is possible with jar’s it’s not automatic.  
 
   *   
 We want everything to integrate with the Codename One designer tool (this is work in progress, more on that later).  

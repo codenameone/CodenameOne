@@ -98,7 +98,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Free Disk Space
@@ -110,7 +110,7 @@ jobs:
           sudo rm -rf /usr/share/swift
       - name: Setup JDK
         if: matrix.id != 'default'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java_version }}
           distribution: 'temurin'
@@ -124,14 +124,14 @@ jobs:
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
           echo "CN1SS_SKIP_COVERAGE=1" >> $GITHUB_ENV
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
           restore-keys: |
             ${{ runner.os }}-cn1-tools-
       - name: Cache Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-m2-android-${{ matrix.id }}-${{ hashFiles('**/pom.xml') }}
@@ -139,7 +139,7 @@ jobs:
             ${{ runner.os }}-m2-android-${{ matrix.id }}-
             ${{ runner.os }}-m2-
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -173,7 +173,7 @@ jobs:
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always() && matrix.id == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: emulator-screenshot
           path: artifacts/*.png
@@ -182,7 +182,7 @@ jobs:
           compression-level: 6
       - name: Upload Android Gradle logs
         if: always() && matrix.id == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-gradle-logs
           path: artifacts/*gradle*.log
@@ -197,7 +197,7 @@ jobs:
       # un-debuggable: keep it.
       - name: Upload Android instrumentation logs
         if: always() && matrix.id == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs
           path: artifacts/connectedAndroidTest*.log
@@ -206,7 +206,7 @@ jobs:
           compression-level: 6
       - name: Upload Android test report
         if: always() && matrix.id == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-test-report
           path: artifacts/android-test-report
@@ -215,7 +215,7 @@ jobs:
           compression-level: 6
       - name: Upload Android Jacoco coverage report
         if: always() && matrix.id == 'default'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-jacoco-coverage
           path: artifacts/android-coverage-report

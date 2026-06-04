@@ -103,7 +103,7 @@ is a bit of a big subject
 
 ### How to mock server / http requests in Codename One for testing?
 
-Our mock testing tools are non-existant which is a shame. We should have a mock implementation of Codename One  
+Our mock testing tools are non-existent which is a shame. We should have a mock implementation of Codename One  
 and it should be pretty trivial to build…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40057677/how-to-mock-server-http-requests-in-codename-one-for-testing)

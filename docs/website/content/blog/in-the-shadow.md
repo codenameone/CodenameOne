@@ -36,7 +36,7 @@ We ended up with this code which is usable but probably not as intuitive for mos
     
     hi.show();
 
-The effect is attractive and commonplace so I think it would be great to add it universally so we added two methods which will be a part of the coming update. These methods are in the `Effects` class and are both simple utility methods. Once creates a shadow and incorporates it into a new image at the given location. The other returns the shadow alone which you can shift/position as you see fit (e.g. if you have similarly shaped images this might also be useful in terms of CPU/RAM).
+The effect is attractive and commonplace so I think it would be great to add it universally so we added two methods which will be a part of the coming update. These methods are in the `Effects` class and are both simple utility methods. One creates a shadow and incorporates it into a new image at the given location. The other returns the shadow alone which you can shift/position as you see fit (e.g. if you have similarly shaped images this might also be useful in terms of CPU/RAM).
     
     
     /**

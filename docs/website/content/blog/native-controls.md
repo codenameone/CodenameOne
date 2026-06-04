@@ -15,7 +15,7 @@ We supported native widgets within the [native interface](/how-do-i---access-nat
 
 E.g. for text fields we implicitly convert the field to a native field as necessary.
 
-However, if you wish to use the password manager of the device this won’t work. To solve this Steve introduced a new cn1lib: [cn1-native-controls](https://github.com/shannah/cn1-native-controls). This library wraps some native widgets and lets us use some features that might be tricky without them. Good use cases for this include the password managers which need a native text widget constantly in that sport. Another use case would be iOS’s SMS interception text field that can automatically intercept the next incoming SMS and set it to a special native text field.
+However, if you wish to use the password manager of the device this won’t work. To solve this Steve introduced a new cn1lib: [cn1-native-controls](https://github.com/shannah/cn1-native-controls). This library wraps some native widgets and lets us use some features that might be tricky without them. Good use cases for this include the password managers which need a native text widget constantly in that spot. Another use case would be iOS’s SMS interception text field that can automatically intercept the next incoming SMS and set it to a special native text field.
 
 There are currently two widgets in this library:
 

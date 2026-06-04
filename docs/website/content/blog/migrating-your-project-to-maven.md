@@ -16,7 +16,7 @@ description: As you may know, we are moving to Maven for our build tool. As part
 
 As you may know, we are moving to Maven for our build tool. As part of this transition, we are moving towards a single Maven project structure, and away from separate structures for each IDE. This will be easier to maintain, and will also make it easier to collaborate on projects with other developers who use a different IDE (or no IDE at all).
 
-We have also introduced a online new tool for creating new app projects called [Codename One initializr](https://start.codenameone.com/). Alternatively, you can create new projects using the cn1app-archetype (for App projects), and cn1lib-archetype for library projects.
+We have also introduced an online new tool for creating new app projects called [Codename One initializr](https://start.codenameone.com/). Alternatively, you can create new projects using the cn1app-archetype (for App projects), and cn1lib-archetype for library projects.
 
 That’s great for **new** projects. But what about my existing application project? Is there an easy way to convert my old Ant project into a new Maven project?
 
@@ -103,7 +103,7 @@ When you click "OK", it will also open the new project directory in the Finder o
 
 You can open this project in any IDE that is compatible with Maven. I recommend IntelliJ, but Eclipse and NetBeans will work well also. You can also work with it from the command-line.
 
-Find our more about the project structure, including running, building, and modifying it in [this tutorial](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html).
+Find out more about the project structure, including running, building, and modifying it in [this tutorial](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html).
 
 ### Migrating the Filechooser Library Project
 
@@ -135,7 +135,7 @@ The Codename One Maven plugin provides a Maven goal that will generate a new app
 
 ## Note:
 
-> For the purposees of this post, I’m going to use a tag I created for the KitchenSink repository so that the examples here continue to work in the future, even if the KitchenSink app structure is changed.
+> For the purposes of this post, I’m going to use a tag I created for the KitchenSink repository so that the examples here continue to work in the future, even if the KitchenSink app structure is changed.
 
 Download the [source code](https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip) for the Kitchen Sink project and extract it. Once extracted you’ll have the project in a directory named "KitchenSink-1.0-cn17.0.11"
 
@@ -161,7 +161,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
 
 ## Note:
 
-> This command is formatted for the bash prompt (e.g. Linux or Mac). It will work on Windows also if you use bash. If you are on Windows and are using PowerShell or the regular command prompt, then you’ll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+> This command is formatted for the bash prompt (e.g. Linux or Mac). It will work on Windows also if you use bash. If you are on Windows and are using PowerShell or the regular command prompt, then you’ll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 This will generate a new Maven project in a directory named "kitchensink", because of the -DartifactId=kitchensink option.
 

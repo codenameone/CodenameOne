@@ -15,7 +15,7 @@ In this last minute before 3.2 finally comes out we have a batch of new features
 the last minute features that went into Codename One include: shorter more terse syntax for creating forms,  
 migration wizard for the new GUI builder & dialog adaptive sizing. 
 
-#### Better Syntax For Populating Containers and Toogle Buttons
+#### Better Syntax For Populating Containers and Toggle Buttons
 
 Codename One is slightly verbose. In part its due to Java’s tradition of verbosity but some of that comes from  
 the fact that we never considered terse to be a virtue. Obviously a lot of developers disagree with that notion  
@@ -47,7 +47,7 @@ which is equivalent to `addComponent(new Label("String"))`:
 
 The thing I really like about the code above is that its short enough to place the label and component side  
 by side to each other without side scrolling in the IDE window.  
-Another feature we added in the same vain is a simple factory method for `RadioButton`/  
+Another feature we added in the same vein is a simple factory method for `RadioButton`/  
 `ToggleButton` creation. Up until now if we wanted to create a toggle button we would do something like: 
     
     

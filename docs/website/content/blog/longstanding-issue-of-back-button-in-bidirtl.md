@@ -41,7 +41,7 @@ So I added a method into the image class called mirror() which you can now invok
   
   
 
-As a side note, we will not be traveling to Java One this year as all our talks got rejected. This is after having packed rooms and rock star trophy from the previous Java One. Its a shame that Oracle is such a monocolture where you can’t talk about alternative approaches within their conference. I can’t say I’m too disappointed about not going, since leaving Moscone Java One hasn’t been the same.  
+As a side note, we will not be traveling to Java One this year as all our talks got rejected. This is after having packed rooms and rock star trophy from the previous Java One. It’s a shame that Oracle is such a monoculture where you can’t talk about alternative approaches within their conference. I can’t say I’m too disappointed about not going, since leaving Moscone Java One hasn’t been the same.  
   
   
   

@@ -15,7 +15,7 @@ WebSockets changed the way I do networking code. I combine them with WebServices
 
 With WebSockets a disconnect can be painful, up until recently I used a rather elaborate strategy of error detection and timers. With the latest update to the [WebSocket cn1lib](https://github.com/shannah/cn1-websockets/) we now have a better solution: `autoReconnect(int)`.
 
-It’s exactly as it sounds, once you create a websocket you can invoke `autoReconnect(5000)` on it to retry the connection ever 5 seconds in case of a disconnect.
+It’s exactly as it sounds, once you create a websocket you can invoke `autoReconnect(5000)` on it to retry the connection every 5 seconds in case of a disconnect.
 
 If you have an existing WebSocket app you should probably add this call.
 

@@ -59,7 +59,7 @@ Not yet.
 
 Though this is something I’m personally conflicted with. The designer tool is showing its age so it makes sense to minimize its usage. I don’t think we’ll deprecate the designer soon as it’s still convenient to work with.
 
-Personally I find the designer more convenient probably due to habit. However, CSS has a few big advantages, for me personally the biggest advantages is documentation. I did the Uber clone app using the designer tool and while that was pretty easy to implement, the tutorial became untenable…​  
+Personally I find the designer more convenient probably due to habit. However, CSS has a few big advantages, for me personally the biggest advantage is documentation. I did the Uber clone app using the designer tool and while that was pretty easy to implement, the tutorial became untenable…​  
 I had to grab screenshots of every UI setting and if I wanted to revise something later I had to redo the screenshots. This was sometimes complicated as it required reverting existing changes to make the shots real. Since CSS is based on code it’s far easier to walk through the CSS changes I made like I would do with any other block of source code. That’s why the Facebook Clone uses CSS and it’s indeed far more convenient in that sense.
 ---
 

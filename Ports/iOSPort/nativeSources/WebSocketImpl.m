@@ -53,7 +53,7 @@ extern JAVA_OBJECT fromNSString(CN1_THREAD_STATE_MULTI_ARG NSString* str);
     [super dealloc];
 }
 
--(void)connectWithTimeoutMs:(int)timeoutMs {
+-(void)connectWithTimeoutMs:(int)timeoutMs protocols:(NSArray*)protocols {
     if (closed || url == nil) {
         return;
     }
@@ -63,7 +63,11 @@ extern JAVA_OBJECT fromNSString(CN1_THREAD_STATE_MULTI_ARG NSString* str);
     }
     if (@available(iOS 13.0, *)) {
         session = [[NSURLSession sessionWithConfiguration:cfg delegate:self delegateQueue:nil] retain];
-        task = [[session webSocketTaskWithURL:url] retain];
+        if (protocols != nil && [protocols count] > 0) {
+            task = [[session webSocketTaskWithURL:url protocols:protocols] retain];
+        } else {
+            task = [[session webSocketTaskWithURL:url] retain];
+        }
         [task resume];
         [self armReceive];
     }
@@ -168,8 +172,10 @@ extern JAVA_OBJECT fromNSString(CN1_THREAD_STATE_MULTI_ARG NSString* str);
 
 -(void)URLSession:(NSURLSession*)sess webSocketTask:(NSURLSessionWebSocketTask*)t
      didOpenWithProtocol:(NSString*)protocol API_AVAILABLE(ios(13.0)) {
-    com_codename1_impl_ios_IOSWebSocketImpl_fireConnect___int(
-        CN1_THREAD_GET_STATE_PASS_ARG connectionId);
+    JAVA_OBJECT jprotocol = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+        (protocol != nil ? protocol : @""));
+    com_codename1_impl_ios_IOSWebSocketImpl_fireConnect___int_java_lang_String(
+        CN1_THREAD_GET_STATE_PASS_ARG connectionId, jprotocol);
 }
 
 -(void)URLSession:(NSURLSession*)sess webSocketTask:(NSURLSessionWebSocketTask*)t

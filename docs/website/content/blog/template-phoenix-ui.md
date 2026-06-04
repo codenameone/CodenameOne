@@ -22,7 +22,7 @@ action button gradient color and the round look of the walkthru UI.
 I’m pretty happy with the result though, notice that the JavaScript version you see on the right isn’t quite perfect  
 so scroll down to the device screenshots below to see how it looks on my Android OPO device.
 
-Due to time constraints I didn’t port all th forms, I also converted one of the "forms" to a side menu which wasn’t  
+Due to time constraints I didn’t port all the forms, I also converted one of the "forms" to a side menu which wasn’t  
 very clear from the design but worked well in production.
 
 Unlike previous demos I chose to use the GUI builder for most of this demo, as an experienced developer using  
@@ -84,7 +84,7 @@ The inbox form has a unique floating action behavior that is inconsistent with t
 Figure 4. Floating Action Button popup
 
 At first I thought about implementing it as a special layout but since this is a very special case I eventually decided  
-to use padding to position the components in the the various locations. Since the UI can’t contain more than 3 elements  
+to use padding to position the components in the various locations. Since the UI can’t contain more than 3 elements  
 this sort of hack is pretty easy.
 
 ### Status Form

@@ -30,7 +30,7 @@ I wanted to go a step further, though, so that users could launch MemeMaker dire
 
 ### How to Register an App to open a File Type
 
-Registering your app to open a a file type involves two parts:
+Registering your app to open a file type involves two parts:
 
   1. Add some build hints to inject the appropriate metadata into each native platform config files (e.g. The info.plist on iOS, the manifest file on Android, etc..) to inform the native platform that the app can open the specified file types.
 
@@ -227,7 +227,7 @@ On the desktop, this will open a sidebar with a list of applications to which th
 
 ![Windows 10 share sidebar](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/windows-10-share-sidebar.png)
 
-In the above screenshot, notice that Meme Maker is listed as one of the apps. This version of MemeMaker was built using an some additional options in the `windows.extensions` build hint:
+In the above screenshot, notice that Meme Maker is listed as one of the apps. This version of MemeMaker was built using some additional options in the `windows.extensions` build hint:
     
     
     <uap:Extension Category="windows.shareTarget">

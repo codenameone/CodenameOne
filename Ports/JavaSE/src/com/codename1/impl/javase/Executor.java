@@ -264,7 +264,8 @@ public class Executor {
                                 System.exit(1);
                             }
                             app = c.newInstance();
-                            
+                            CodenameOneImplementation.setCurrentApplicationInstance(app);
+
                             if(app instanceof PushCallback) {
                                 CodenameOneImplementation.setPushCallback((PushCallback)app);
                             }

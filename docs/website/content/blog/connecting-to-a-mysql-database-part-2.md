@@ -46,7 +46,7 @@ We’ll install both into our database with the following commands.
     $ mysql -u root -p < sakila-schema.sql
     $ mysql -u root -p < sakila-data.sql
 
-Once these have executed, you should be able to log into mysql and see see the tables listed:
+Once these have executed, you should be able to log into mysql and see the tables listed:
     
     
     $mysql -u root -p
@@ -185,7 +185,7 @@ Since Customer_List is a view, Netbeans doesn’t know which column is the "id",
 
 ![Compile error](/blog/connecting-to-a-mysql-database-part-2/sakila-customerlist-id-compile-error.png)
 
-You’ll need to add the `@Id` annotation to the "ID" field declaration. Netbeans will assist you with this if you expant the little light bulb icon in the left column of the error line.
+You’ll need to add the `@Id` annotation to the "ID" field declaration. Netbeans will assist you with this if you expand the little light bulb icon in the left column of the error line.
 
 ### A Look at the Web Service Facades
 
@@ -280,11 +280,11 @@ Full class can be seen [here](https://github.com/shannah/cn1-mysql-java-restful-
 
 In the project explorer, right click on the SakilaRESTServer project and select "Run". This should automatically start the bundled GlassFish server, and deploy our app.
 
-If all wend well, it should open your web browser to the index page which says "Hello World!".
+If all went well, it should open your web browser to the index page which says "Hello World!".
 
 Next, we’ll test out the actual webservices.
 
-In the project explorer, uner the "RESTful Web Services" folder, you should see two web services listed. Right click on either of them and select "Test Resoure Uri" as shown here:
+In the project explorer, under the "RESTful Web Services" folder, you should see two web services listed. Right click on either of them and select "Test Resoure Uri" as shown here:
 
 ![Testing resource uri](/blog/connecting-to-a-mysql-database-part-2/sakila-test-resource-uri.png)
 
@@ -292,7 +292,7 @@ This should open up your web browser with an XML feed of all of the records in t
 
 ## The Client App
 
-I’m changing very little of the Client app from the Xataface client version shown in my previous post. Instead of the [CN1Xataface library](https://github.com/shannah/cn1-xataface), which is designed to consume a [Xataface](http://xataface.com)-powered web-service, I’m using the GenericWebserviceClient.cn1lib which is designed to consume a generic web service, with APIs like the web service that we just created. This library should be applicable to a most of the APIs in production today.
+I’m changing very little of the Client app from the Xataface client version shown in my previous post. Instead of the [CN1Xataface library](https://github.com/shannah/cn1-xataface), which is designed to consume a [Xataface](http://xataface.com)-powered web-service, I’m using the GenericWebserviceClient.cn1lib which is designed to consume a generic web service, with APIs like the web service that we just created. This library should be applicable to most of the APIs in production today.
 
 The [GenericWebserviceClient.cn1lib](https://github.com/shannah/cn1-generic-webservice-client) includes a `RESTfulWebServiceClient` class with the following main methods:
     
@@ -479,10 +479,10 @@ The client App source is as follows (redacted for clarity):
          * Creates a single row for the contact list that encapsulates the provided
          * contact.
          * @param c The contact to represent with this row.
-         * @param parent The parent container to which the row is to be added.  This method doesn't actually add the
+         * @param parent The parent container to which the row is to be added.  This method doesn’t actually add the
          * row to the parent, but it does need to reference it for some of the listeners that are added to the row.  The caller
          * should add the resulting row to the parent after calling this method.
-         * @return A container encapsulating the row, or null if the contact didn't have a name.
+         * @return A container encapsulating the row, or null if the contact didn’t have a name.
          */
         private Container createContactRow(Contact c, Container parent) {
             // redacted same 'ol same 'ol

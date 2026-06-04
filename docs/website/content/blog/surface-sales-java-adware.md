@@ -13,7 +13,7 @@ author: Shai Almog
 
 Both [TechCrunch](https://techcrunch.com/2016/10/20/microsofts-surface-business-skyrockets-as-the-ipads-slow/) &  
 [Engaget](https://www.engadget.com/2016/10/20/microsofts-surface-business-is-still-booming/) report that  
-surface sold well during the last quarter when contrasting it’s sales of 926M to 4.9B iPad sales.
+surface sold well during the last quarter when contrasting its sales of 926M to 4.9B iPad sales.
 
 But the number is a bit misleading as the surface is really comparable to the iPad pro line in terms of pricing/target market  
 and I would guess the sales are very close and might have exceeded those of the Apple device.
@@ -22,7 +22,7 @@ This is important since both devices target the very lucrative enterprise/profes
 touch friendly apps. Both are hard to reach for Java developers and as such Codename One is the only solution  
 that can properly **natively** address both…​
 
-This is fact is further highlighted by the recent news that  
+This fact is further highlighted by the recent news that  
 [Oracle is now bundling adware into the JRE distribution](https://www.reddit.com/r/java/comments/58j5el/oracles_java_jre_updater_for_windows_now_installs/)  
 making [Java even less viable on the desktop](/blog/should-oracle-spring-clean-javafx.html).
 

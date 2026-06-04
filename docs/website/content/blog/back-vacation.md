@@ -56,7 +56,7 @@ He also contributed [TextComponentPassword](https://github.com/codenameone/Coden
 
 ### Error Callbacks for URLImage
 
-It’s hard to handle errors in `URLImage` objects. Because they are so "seamless" the point for exception handling is deep withing the class. To solve issue [2703](https://github.com/codenameone/CodenameOne/issues/2703) we had to do something different.
+It’s hard to handle errors in `URLImage` objects. Because they are so "seamless" the point for exception handling is deep within the class. To solve issue [2703](https://github.com/codenameone/CodenameOne/issues/2703) we had to do something different.
 
 You can now use the static method `setExceptionHandler` on `URLImage`. It accepts the inner interface `ErrorCallback` which has a single method:
     

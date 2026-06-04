@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/image-overriding/clock-image.gif)
 
-I hoped todays post would cover the new Kitchen Sink demo but due to a couple of bugs we decided to postpone that to next week. In the meantime I’d like to discuss something I did there which is actually pretty cool and most developers have no idea that we can do: Image Overriding.
+I hoped today’s post would cover the new Kitchen Sink demo but due to a couple of bugs we decided to postpone that to next week. In the meantime I’d like to discuss something I did there which is actually pretty cool and most developers have no idea that we can do: Image Overriding.
 
 The new kitchen sink renders a set of icons like the old demo. In this version of the demo we wanted to show off graphics drawing which is an important feature missing from the old demo. Steve’s clock demo is a great example of that!
 

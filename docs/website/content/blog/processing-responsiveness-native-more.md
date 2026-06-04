@@ -22,9 +22,9 @@ author: Shai Almog
 
 Some of you have already noticed a build error when building for iOS if you used the processing package. This is due to a small change we made to the package where we replaced all usage of Hashtable/Vector with Map/List. That allows the processing package to work with the new parseJSON method that returns the new collection code and thus be MUCH faster on iOS. 
 
-Unfortunately due to the way java codes method signatures you need to update the libraries in order to for this change to work, we automatically update the libraries when you send the build but that means you will need to send again if you get that failure.
+Unfortunately due to the way java codes method signatures you need to update the libraries in order for this change to work, we automatically update the libraries when you send the build but that means you will need to send again if you get that failure.
 
-We also improved button responsiveness on iOS, this was a very hard to track issue which we’ve been following for a while. Older iOS devices are somewhat overeager with pointer dragged events and tend to send them all over the place. Unfortunately this triggered a release of a button in some cases making it feel unresponsive. Normally dragging a pressed button should not release it but we had some very old pre-Codename One code that did just that for some cases. This code is now remove and hopefully your UI’s will just "magically" become more responsive.
+We also improved button responsiveness on iOS, this was a very hard to track issue which we’ve been following for a while. Older iOS devices are somewhat overeager with pointer dragged events and tend to send them all over the place. Unfortunately this triggered a release of a button in some cases making it feel unresponsive. Normally dragging a pressed button should not release it but we had some very old pre-Codename One code that did just that for some cases. This code is now removed and hopefully your UI’s will just "magically" become more responsive.
 
 If you do any native interfaces programming in Android you should be familiar with our AndroidUtil class which allows you to access native device functionality more easily from the native code. E.g. many Android API’s need access to the Activity which you can get by calling `AndroidNativeUtil.getActivity()` which is much simpler than the alternative approaches.
 
@@ -38,13 +38,13 @@ AndroidNativeUtil.addLifecycleListener/removeLifecycleListener
   
   
   
-AndroidNativeUtil.registerViewRenderer – PeerComponent’s are usually shown on top of the UI since they are rendered within their own thread outside of the EDT cycle. So when we need to show a Dialog on top of the peer we grab a screenshot of the peer, hide it and then show the dialog with the image as the background (the same applies for transitions). Unfortunately some components (specifically the MapView) might not render properly and require custom code to implement the transferal to a native Bitmap, this API allows you to do just that. Esoteric but if you need it then its a lifesaver!  
+AndroidNativeUtil.registerViewRenderer – PeerComponent’s are usually shown on top of the UI since they are rendered within their own thread outside of the EDT cycle. So when we need to show a Dialog on top of the peer we grab a screenshot of the peer, hide it and then show the dialog with the image as the background (the same applies for transitions). Unfortunately some components (specifically the MapView) might not render properly and require custom code to implement the transferal to a native Bitmap, this API allows you to do just that. Esoteric but if you need it then it’s a lifesaver!  
   
   
   
   
   
-Last but not least is AndroidImplementation.runOnUiThreadAndBlock(Runnable) – this is such a common pattern that we had to generalize it into a public static method. Its identical to Activity.runOnUiThread but blocks until the runnable finishes execution. Very important.  
+Last but not least is AndroidImplementation.runOnUiThreadAndBlock(Runnable) – this is such a common pattern that we had to generalize it into a public static method. It’s identical to Activity.runOnUiThread but blocks until the runnable finishes execution. Very important.  
   
   
   

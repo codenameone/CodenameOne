@@ -47,7 +47,7 @@ method as well as a [varargs constructor](/javadoc/com/codename1/ui/ButtonGroup/
 
 ### ComponentGroup enclose
 
-`ComponentGroup` didn’t have an `enclose` method which is one of those things that beg for a fix since its **the**  
+`ComponentGroup` didn’t have an `enclose` method which is one of those things that beg for a fix since it’s **the**  
 `Container` for that sort of API.
 
 So we added two enclose methods:

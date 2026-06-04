@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/new-android-peer-mode/native-peer-revisited.png)
 
 As [we mentioned recently](/blog/peering-revisited.html) we have a new idea on how peering can be improved  
-and we just deployed a this into our build servers in the weekend update. This is highly experimental and might  
+and we just deployed this into our build servers in the weekend update. This is highly experimental and might  
 crash instantly which is why we hope you give it a test drive and see how it feels before we switch it on by default.
 
 To recap: Peers (or heavyweight components) are OS native widgets. E.g. when you use the `BrowserComponent`  

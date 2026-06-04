@@ -33,7 +33,7 @@ here
   
 Very cool. 
 
-We are hard at work for my workshop at JavaZone which will teach the creation of a Codename One application from start to finish, if you haven’t signed up you should. JavaZone is one of the best produced conference I’ve attended and its loads of fun with great humor, music, food and alcohol. Definitely worth the trip.  
+We are hard at work for my workshop at JavaZone which will teach the creation of a Codename One application from start to finish, if you haven’t signed up you should. JavaZone is one of the best produced conferences I’ve attended and it’s loads of fun with great humor, music, food and alcohol. Definitely worth the trip.  
 
 * * *
 

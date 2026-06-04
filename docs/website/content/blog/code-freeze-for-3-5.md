@@ -27,7 +27,7 @@ The new peer components implementation isnâ€™t yet ready for primetime and isnâ€
 
 ### How does the Code Freeze Work?
 
-The pieces of Codename One that we freeze are effectively the entire github repository except for the Codename One designer and JavaDoc comments. That means that we will avoid any non-critical commits to that change anything other than the designer or docs until next Tuesday.
+The pieces of Codename One that we freeze are effectively the entire github repository except for the Codename One designer and JavaDoc comments. That means that we will avoid any non-critical commits that change anything other than the designer or docs until next Tuesday.
 
 Notice that plugins etc. move at their own pace and are a separate entity from the release cycle.
 

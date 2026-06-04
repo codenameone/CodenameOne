@@ -28,7 +28,7 @@ Missing entries included:
 
 All of those devices fell through to the unknown-device fallback, which was a 2014-era value of `19.25429416` (roughly the iPhone 6 Plus at 401 ppi). For anything `mm`-based in your theme — borders, padding expressed in physical units, icon sizes measured that way — the rendered dimensions were off by a noticeable margin on every modern non-Plus iPhone.
 
-The table is now current, and the fallback for unknown 3× devices defaults to 460 ppi. Apple has held that density steady for every non-Plus iPhone since the iPhone 12, so when a new model ships with an unrecognised resolution, the fallback will be correct to within a few percent instead of off by thirty.
+The table is now current, and the fallback for unknown 3× devices defaults to 460 ppi. Apple has held that density steady for every non-Plus iPhone since the iPhone 12, so when a new model ships with an unrecognized resolution, the fallback will be correct to within a few percent instead of off by thirty.
 
 If you were compensating for this in your own theme with magic numbers, this is a good moment to reassess.
 
@@ -54,7 +54,7 @@ The rewrite models scroll physics in three explicit stages, each tunable via the
 2. **After the finger lifts, while there is still velocity**, the `ScrollMotion` constant picks the model. `DECAY` (the default) uses exponential velocity decay with a time constant of `ScrollMotionTimeConstantInt` milliseconds (default `500`) and a distance scale of `DecayMotionScaleFactorInt` (default `950`). The legacy linear-friction model is still available by setting `ScrollMotion=FRICTION`.
 3. **When the scroll comes to rest past an edge**, a tensile snap animates the content back. `tensileSnapMotion=SPRING` applies a critically-damped envelope that settles softly (this is the new default when `iosScrollMotionBool=true`); `DECELERATION` keeps the legacy quadratic ease-out.
 
-`iosScrollMotionBool` is the single switch that flips stage 1 and the default of stage 3 to the iOS-matching behaviour. It defaults to `true` on iOS only, but every individual constant is independently overridable. If you want iOS physics on Android for consistency, set `iosScrollMotionBool=true` explicitly. If you specifically want the nonlinear rubber band but the old quadratic snap-back, that combination is also available.
+`iosScrollMotionBool` is the single switch that flips stage 1 and the default of stage 3 to the iOS-matching behavior. It defaults to `true` on iOS only, but every individual constant is independently overridable. If you want iOS physics on Android for consistency, set `iosScrollMotionBool=true` explicitly. If you specifically want the nonlinear rubber band but the old quadratic snap-back, that combination is also available.
 
 If this version finally feels right on your devices, I would love to hear about it. If it does not, the constants above are where to start looking.
 
@@ -74,7 +74,7 @@ On Android, the build generates locale-qualified resources (`drawable-<lang>[-r<
 
 iOS does not natively localize launcher icons, so we wire up alternate icons instead. The build emits per-locale images at `@2x`, `@3x`, and iPad sizes; injects a `CFBundleIcons` / `CFBundleIcons~ipad` block into `Info.plist` with a `CFBundleAlternateIcons` dictionary; and patches the app delegate to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch based on `[NSLocale preferredLanguages]`. It tries the full `<lang>_<COUNTRY>` key first, falls back to the language-only variant, and reverts to the default if nothing matches.
 
-One thing to be aware of: iOS displays a system alert the first time an app switches to an alternate icon. That is platform-standard behaviour. We cannot suppress it, and we shouldn't try.
+One thing to be aware of: iOS displays a system alert the first time an app switches to an alternate icon. That is platform-standard behavior. We cannot suppress it, and we shouldn't try.
 
 ## `UIManager.zoomFonts(factor)`
 
@@ -115,7 +115,7 @@ The diagram below is the whole idea in one picture. On the left, a normal scalar
 
 ![Scalar versus SIMD: four scalar cycles collapse into a single SIMD cycle](/blog/simd-scalar-vs-parallel.svg)
 
-For workloads where the operation per element is simple and identical — Base64 encode/decode, pixel blending, alpha masks, colour-channel manipulation, table lookups, UTF-8 validation, checksums — this typically means a 3× to 10× speedup over the scalar version. For workloads with per-element branching, pointer chasing, or buffers smaller than a single SIMD register, it means nothing. SIMD is a data-parallel hammer; it is not a general-purpose one.
+For workloads where the operation per element is simple and identical — Base64 encode/decode, pixel blending, alpha masks, color-channel manipulation, table lookups, UTF-8 validation, checksums — this typically means a 3× to 10× speedup over the scalar version. For workloads with per-element branching, pointer chasing, or buffers smaller than a single SIMD register, it means nothing. SIMD is a data-parallel hammer; it is not a general-purpose one.
 
 ### The Benefits We Are Eagerly Waiting For in Java
 
@@ -200,7 +200,7 @@ Image processing follows a similar curve. Same SIMD on / SIMD off comparison on 
 | `modifyAlpha` (removeColor)| 136 ms   | 63 ms   | 53.7% faster    |
 | PNG encode                 | 919 ms   | 762 ms  | 17.1% faster    |
 
-The PNG encode number is the most honest one in the table. PNG is dominated by DEFLATE, which is inherently serial and resists vectorisation. A 17% improvement is what SIMD can do for the compositing and filtering stages around the compressor; the compressor itself stays where it was. That asymmetry is a good reminder of what SIMD is and is not.
+The PNG encode number is the most honest one in the table. PNG is dominated by DEFLATE, which is inherently serial and resists vectorization. A 17% improvement is what SIMD can do for the compositing and filtering stages around the compressor; the compressor itself stays where it was. That asymmetry is a good reminder of what SIMD is and is not.
 
 Everywhere the operation is genuinely data-parallel, the speedup is in the 50–80% range. That is what we were after.
 
@@ -210,7 +210,7 @@ For a long time Codename One's implicit pitch was "as good as native, but cross-
 
 We have spent enough years narrowing the gap that the gap, in the areas we most care about, is gone or going. Performance: `Base64` on iOS is now faster in Codename One than in Apple's own implementation, and SIMD gives us the headroom to push that across more of the image and codec paths over the coming months. Ease of development: the compliance work, the Playground rebuild, the simulator's accessibility preview, and the way our tooling stays honest to the device — all of that adds up to a cross-platform loop that is meaningfully *easier* than wrangling two separate native toolchains and trying to keep them in sync. Next week I am hoping to push another part of the story forward in the area that has lagged the longest — look and feel — but more on that when it lands.
 
-The pitch is no longer "as good as native." The pitch is that cross-platform should be the *better* choice. Better for developers, because you ship one codebase, own your toolchain, and iterate faster. Better for end users, because the performance is genuinely there, the look-and-feel gap is closing fast, and the accessibility and localisation story now extends all the way down to things like per-locale launcher icons and Dynamic Type previews.
+The pitch is no longer "as good as native." The pitch is that cross-platform should be the *better* choice. Better for developers, because you ship one codebase, own your toolchain, and iterate faster. Better for end users, because the performance is genuinely there, the look-and-feel gap is closing fast, and the accessibility and localization story now extends all the way down to things like per-locale launcher icons and Dynamic Type previews.
 
 Next week we will talk more about the biggest pain point in Codename One: look and feel... and how it can exceed native too.
 
