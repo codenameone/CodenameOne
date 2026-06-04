@@ -207,12 +207,27 @@ public class WindowsImplementation extends CodenameOneImplementation {
      * framework hook (UIManager calls it for {@code @includeNativeBool} themes);
      * init() also calls it so an app with no theme of its own still gets it.
      */
+    private boolean installingNativeTheme;
+
     @Override
     public void installNativeTheme() {
+        // Re-entrancy guard. UIManager.buildTheme() calls installNativeTheme()
+        // for any theme carrying @includeNativeBool: true. The bundled native
+        // theme can itself carry that flag -- a CSS theme staged as the native
+        // theme keeps `includeNativeBool: true` from the app's #Constants -- so
+        // setThemeProps() below would recurse straight back into this method and
+        // re-open/re-apply the resource forever: the EDT never returns and the
+        // heap is exhausted before the first frame (observed as the native theme
+        // resource being loaded hundreds of times until a GC-thread crash). The
+        // native theme only needs to install once; the nested request is a no-op.
+        if (installingNativeTheme) {
+            return;
+        }
         InputStream in = getResourceAsStream(WindowsImplementation.class, "/" + NATIVE_THEME_RES);
         if (in == null) {
             return;
         }
+        installingNativeTheme = true;
         try {
             com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(in);
             String[] names = r.getThemeResourceNames();
@@ -222,6 +237,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
         } catch (Throwable t) {
             // A bad/absent theme must not stop the app from starting.
         } finally {
+            installingNativeTheme = false;
             try {
                 in.close();
             } catch (IOException ignore) {

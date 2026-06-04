@@ -1074,6 +1074,20 @@ public class Resources {
                         // we need to trigger multi image logic  in the  resource editor
                         if (key.endsWith("Image")) {
                             o = getImage((String) value);
+                        } else if (((String) value).startsWith("native:")) {
+                            // A "native:" font is resolved at runtime, not stored as
+                            // a resource entry, so resources.get() returns null for it.
+                            // Resolve it as a native TrueType font instead of throwing
+                            // below: an uncaught throw here leaves the theme flagged
+                            // "uninitialized" so it is re-wired on every access, and a
+                            // CSS theme that references native: fonts (the no-cef CSS
+                            // compiler stores them by name) never finishes initializing.
+                            // Full-designer themes store the font pre-resolved and never
+                            // reach this path.
+                            o = Font.createTrueTypeFont((String) value);
+                            if (o == null) {
+                                o = Font.getDefaultFont();
+                            }
                         } else {
                             o = resources.get(value);
                         }
