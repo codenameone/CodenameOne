@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/**
+/*
  * A 2-by-2 matrix. Stored in column-major order.
  */
 public class Mat22 implements Serializable {
@@ -33,7 +33,7 @@ public class Mat22 implements Serializable {
 
   public final Vec2 ex, ey;
 
-  /** Convert the matrix to printable format. */
+  /* Convert the matrix to printable format. */
   public String toString() {
     String s = "";
     s += "[" + ex.x + "," + ey.x + "]\n";
@@ -41,7 +41,7 @@ public class Mat22 implements Serializable {
     return s;
   }
 
-  /**
+  /*
    * Construct zero matrix. Note: this is NOT an identity matrix! djm fixed double allocation
    * problem
    */
@@ -50,7 +50,7 @@ public class Mat22 implements Serializable {
     ey = new Vec2();
   }
 
-  /**
+  /*
    * Create a matrix with given vectors as columns.
    * 
    * @param c1 Column 1 of matrix
@@ -61,7 +61,7 @@ public class Mat22 implements Serializable {
     ey = c2.clone();
   }
 
-  /**
+  /*
    * Create a matrix from four floats.
    * 
    * @param exx
@@ -74,7 +74,7 @@ public class Mat22 implements Serializable {
     ey = new Vec2(col2x, col2y);
   }
 
-  /**
+  /*
    * Set as a copy of another matrix.
    * 
    * @param m Matrix to copy
@@ -95,7 +95,7 @@ public class Mat22 implements Serializable {
     return this;
   }
 
-  /**
+  /*
    * Return a clone of this matrix. djm fixed double allocation
    */
   // @Override // annotation omitted for GWT-compatibility
@@ -103,7 +103,7 @@ public class Mat22 implements Serializable {
     return new Mat22(ex, ey);
   }
 
-  /**
+  /*
    * Set as a matrix representing a rotation.
    * 
    * @param angle Rotation (in radians) that matrix represents.
@@ -116,7 +116,7 @@ public class Mat22 implements Serializable {
     ey.y = c;
   }
 
-  /**
+  /*
    * Set as the identity matrix.
    */
   public final void setIdentity() {
@@ -126,7 +126,7 @@ public class Mat22 implements Serializable {
     ey.y = 1.0f;
   }
 
-  /**
+  /*
    * Set as the zero matrix.
    */
   public final void setZero() {
@@ -136,7 +136,7 @@ public class Mat22 implements Serializable {
     ey.y = 0.0f;
   }
 
-  /**
+  /*
    * Extract the angle from this matrix (assumed to be a rotation matrix).
    * 
    * @return
@@ -145,7 +145,7 @@ public class Mat22 implements Serializable {
     return MathUtils.atan2(ex.y, ex.x);
   }
 
-  /**
+  /*
    * Set by column vectors.
    * 
    * @param c1 Column 1
@@ -158,7 +158,7 @@ public class Mat22 implements Serializable {
     ey.y = c2.y;
   }
 
-  /** Returns the inverted Mat22 - does NOT invert the matrix locally! */
+  /* Returns the inverted Mat22 - does NOT invert the matrix locally! */
   public final Mat22 invert() {
     final float a = ex.x, b = ey.x, c = ex.y, d = ey.y;
     final Mat22 B = new Mat22();
@@ -199,7 +199,7 @@ public class Mat22 implements Serializable {
 
 
 
-  /**
+  /*
    * Return the matrix composed of the absolute values of all elements. djm: fixed double allocation
    * 
    * @return Absolute value matrix
@@ -215,7 +215,7 @@ public class Mat22 implements Serializable {
     ey.absLocal();
   }
 
-  /**
+  /*
    * Return the matrix composed of the absolute values of all elements.
    * 
    * @return Absolute value matrix
@@ -232,7 +232,7 @@ public class Mat22 implements Serializable {
     out.ey.y = MathUtils.abs(R.ey.y);
   }
 
-  /**
+  /*
    * Multiply a vector by this matrix.
    * 
    * @param v Vector to multiply by matrix.
@@ -255,7 +255,7 @@ public class Mat22 implements Serializable {
   }
 
 
-  /**
+  /*
    * Multiply another matrix by this one (this one on left). djm optimized
    * 
    * @param R
@@ -299,7 +299,7 @@ public class Mat22 implements Serializable {
     out.ey.y = this.ex.y * R.ey.x + this.ey.y * R.ey.y;
   }
 
-  /**
+  /*
    * Multiply another matrix by the transpose of this one (transpose of this one on left). djm:
    * optimized
    * 
@@ -351,7 +351,7 @@ public class Mat22 implements Serializable {
     out.ey.y = this.ey.x * B.ey.x + this.ey.y * B.ey.y;
   }
 
-  /**
+  /*
    * Multiply a vector by the transpose of this matrix.
    * 
    * @param v
@@ -372,7 +372,7 @@ public class Mat22 implements Serializable {
     out.x = tempx;
   }
 
-  /**
+  /*
    * Add this matrix to B, return the result.
    * 
    * @param B
@@ -388,7 +388,7 @@ public class Mat22 implements Serializable {
     return m;
   }
 
-  /**
+  /*
    * Add B to this matrix locally.
    * 
    * @param B
@@ -404,7 +404,7 @@ public class Mat22 implements Serializable {
     return this;
   }
 
-  /**
+  /*
    * Solve A * x = b where A = this matrix.
    * 
    * @return The vector x that solves the above equation.

@@ -12,16 +12,16 @@ target, including iOS.
 TIP: This chapter covers the real time game surface. For the "casual game"
 approach -- building game elements out of regular `Component`s and letting the
 layout system render them -- the techniques in the <<Animations>> chapter are
-often a better fit. Reach for `com.codename1.gaming` when you want a framerate
+often a better fit. Reach for `com.codename1.gaming` when you want a frame rate
 driven loop and direct rendering.
 
 === Why a game loop on top of the EDT?
 
 Codename One runs all painting and events on a single thread, the
 <<The-EDT---Event-Dispatch-Thread,Event Dispatch Thread (EDT)>>. The framework's
-animation system already separates "advance one tick" from "draw a frame", which
-is exactly the shape of a game loop. The gaming package wraps that machinery in a
-familiar `update`/`render` facade so you never touch the EDT plumbing directly,
+animation system already separates "advance one tick" from "draw a frame" --
+exactly the shape of a game loop. The gaming package wraps that machinery in a
+familiar `update`/`render` façade so you never touch the EDT plumbing directly,
 and exposes input as state you poll rather than events you react to.
 
 The one rule to keep in mind: because your `update` and `render` methods run on
@@ -65,42 +65,42 @@ game.start();
 
 The `deltaSeconds` passed to `update` is the wall clock time since the previous
 frame. Multiplying movement by it keeps your game running at the same speed
-regardless of the actual framerate ("delta timing").
+regardless of the actual frame rate ("delta timing").
 
 ==== Lifecycle
 
 `start()` registers the view with the form's animation system and raises the
-framerate; `stop()` deregisters it and restores the previous framerate. `pause()`
+frame rate; `stop()` deregisters it and restores the previous frame rate. `pause()`
 and `resume()` suspend updates without tearing the loop down (resuming resets the
 frame clock so the pause gap doesn't produce one huge `dt`). The view also
-releases its framerate hold automatically when it is removed from the form, so a
-backgrounded game does not keep the device awake.
+releases its frame rate hold automatically when it's removed from the form, so a
+backgrounded game doesn't keep the device awake.
 
 [source,java]
 ----
 game.start();   // begin the loop (call after the form is shown)
 game.pause();   // freeze updates, keep the view live
 game.resume();  // continue
-game.stop();    // end the loop, restore the framerate
+game.stop();    // end the loop, restore the frame rate
 ----
 
-==== Framerate and battery
+==== Frame rate and battery
 
 `setTargetFramerate(int fps)` (default 60) controls how often the loop runs. The
-framerate is a global Codename One setting; `GameView` saves and restores it
+frame rate is a global Codename One setting; `GameView` saves and restores it
 around the game so the rest of your UI is unaffected.
 
 `setNoSleep(true)` makes the EDT never idle between frames for the highest
-possible framerate -- at a steep battery cost. Leave it off (the default) and
-rely on a capped-but-high target framerate unless you have a specific reason.
+possible frame rate -- at a steep battery cost. Leave it off (the default) and
+rely on a capped-but-high target frame rate unless you have a specific reason.
 
 ==== Fixed timestep and interpolation
 
-Variable timesteps are simple but make physics non deterministic. Call
+Variable time steps are simple but make physics nondeterministic. Call
 `setFixedTimestep(seconds)` to have `update` invoked at a fixed interval instead;
 the loop accumulates real time and may call `update` several times in one frame to
 catch up (capped to avoid a "spiral of death" after a long pause). The leftover
-fraction is available from `getInterpolationAlpha()` (0..1) so you can interpolate
+fraction is available from `getInterpolationAlpha()` (0 to 1) so you can interpolate
 rendered positions between physics states:
 
 [source,java]
@@ -219,7 +219,7 @@ sfx.setVolume(voice, 0.5f);                     // adjust a playing voice
 ----
 
 `play` returns a voice id (or `-1` if the pool is momentarily exhausted -- it never
-blocks on the hot path). The parameters are: `volume` 0..1, `pan` -1 (left) to 1
+blocks on the hot path). The parameters are: `volume` 0 to 1, `pan` -1 (left) to 1
 (right), `rate` playback speed/pitch (1.0 is normal), and `loop` (0 once, -1
 forever, n extra repeats). `stop`, `pause`, `resume`, `stopAll`, `autoPause` and
 `autoResume` manage playback; `release()` frees the pool.
@@ -236,15 +236,15 @@ the game. Decoding on the fly defeats the purpose.
 === Physics
 
 The https://www.codenameone.com/javadoc/com/codename1/gaming/physics/package-summary.html[`com.codename1.gaming.physics`]
-package adds 2D rigid body physics. It is an idiomatic wrapper around a pure Java
+package adds 2D rigid body physics. It's an idiomatic wrapper around a pure Java
 port of the well known Box2D engine, so it runs on every platform -- including
-iOS, where it is translated to C with no native code.
+iOS, where it's translated to C with no native code.
 
-==== Units: pixels, meters and the y axis
+==== Units: Pixels, meters and the y-axis
 
 Box2D is tuned for objects a few meters across, so the world works in *meters*
 internally while exposing *pixels* to you. The conversion is governed by
-`setPixelsPerMeter(float)` (default 30). The wrapper also flips the y axis -- Box2D
+`setPixelsPerMeter(float)` (default 30). The wrapper also flips the y-axis -- Box2D
 points y up, the screen points y down -- so your code stays in screen coordinates.
 The practical consequence: a positive gravity y pulls bodies *down* the screen.
 
@@ -315,7 +315,7 @@ world.addContactListener(new ContactListener() {
 });
 ----
 
-If you need a feature the wrapper does not expose, `PhysicsWorld.getNativeWorld()`
+If you need a feature the wrapper doesn't expose, `PhysicsWorld.getNativeWorld()`
 and `PhysicsBody.getNativeBody()` give you the underlying engine objects (which
 work in meters, y up).
 
@@ -330,17 +330,17 @@ copyable starting point for your own game.
 
 === Performance notes
 
-* Keep `update` and `render` non blocking -- they run on the EDT. Load assets off
+* Keep `update` and `render` non-blocking -- they run on the EDT. Load assets off
 the EDT and hand them back with `CN.callSerially`.
-* Prefer a high target framerate over `setNoSleep(true)`; the latter drains the
+* Prefer a high target frame rate over `setNoSleep(true)`; the latter drains the
 battery and can cause thermal throttling on devices.
 * Cache cut sprite frames (use `SpriteSheet`, which does it for you) rather than
 re-slicing every frame.
 * Load every `SoundEffect` up front and reuse it.
 * Tune `setPixelsPerMeter` so your moving bodies are on the order of a meter
-(tens of pixels) in size; very large or very small bodies make the simulation
-unstable.
+(tens of pixels) in size; bodies far larger or smaller than that make the
+simulation unstable.
 
 The physics engine in `com.codename1.gaming.physics.box2d` is a derived work of
-JBox2D (a Java port of Erin Catto's Box2D), used under the BSD 2-Clause license;
+JBox2D (a Java port of the Box2D engine), used under the BSD 2-Clause license;
 see the project `NOTICE` file for attribution.

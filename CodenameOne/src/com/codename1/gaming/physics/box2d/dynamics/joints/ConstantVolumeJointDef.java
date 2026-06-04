@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -27,7 +27,7 @@ import java.util.ArrayList;
 
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/**
+/*
  * Definition for a {@link ConstantVolumeJoint}, which connects a group a bodies together so they
  * maintain a constant volume within them.
  */
@@ -47,7 +47,7 @@ public class ConstantVolumeJointDef extends JointDef {
     dampingRatio = 0.0f;
   }
 
-  /**
+  /*
    * Adds a body to the group
    * 
    * @param argBody
@@ -62,7 +62,7 @@ public class ConstantVolumeJointDef extends JointDef {
     }
   }
 
-  /**
+  /*
    * Adds a body and the pre-made distance joint. Should only be used for deserialization.
    */
   public void addBodyAndJoint(Body argBody, DistanceJoint argJoint) {

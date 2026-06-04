@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -26,7 +26,7 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/**
+/*
  * Prismatic joint definition. This requires defining a line of
  * motion using an axis and an anchor point. The definition uses local
  * anchor points and a local axis so that the initial configuration
@@ -40,52 +40,52 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 public class PrismaticJointDef extends JointDef {
 
 
-	/**
+	/*
 	 * The local anchor point relative to body1's origin.
 	 */
 	public final Vec2 localAnchorA;
 
-	/**
+	/*
 	 * The local anchor point relative to body2's origin.
 	 */
 	public final Vec2 localAnchorB;
 
-	/**
+	/*
 	 * The local translation axis in body1.
 	 */
 	public final Vec2 localAxisA;
 
-	/**
+	/*
 	 * The constrained angle between the bodies: body2_angle - body1_angle.
 	 */
 	public float referenceAngle;
 
-	/**
+	/*
 	 * Enable/disable the joint limit.
 	 */
 	public boolean enableLimit;
 
-	/**
+	/*
 	 * The lower translation limit, usually in meters.
 	 */
 	public float lowerTranslation;
 
-	/**
+	/*
 	 * The upper translation limit, usually in meters.
 	 */
 	public float upperTranslation;
 
-	/**
+	/*
 	 * Enable/disable the joint motor.
 	 */
 	public boolean enableMotor;
 
-	/**
+	/*
 	 * The maximum motor torque, usually in N-m.
 	 */
 	public float maxMotorForce;
 
-	/**
+	/*
 	 * The desired motor speed in radians per second.
 	 */
 	public float motorSpeed;
@@ -105,7 +105,7 @@ public class PrismaticJointDef extends JointDef {
 	}
 
 	
-	/**
+	/*
 	 * Initialize the bodies, anchors, axis, and reference angle using the world
 	 * anchor and world axis.
 	 */

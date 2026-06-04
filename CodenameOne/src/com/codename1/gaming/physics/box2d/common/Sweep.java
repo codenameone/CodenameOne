@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/**
+/*
  * This describes the motion of a body/shape for TOI computation. Shapes are defined with respect to
  * the body origin, which may no coincide with the center of mass. However, to support dynamics we
  * must interpolate the center of mass position.
@@ -33,14 +33,14 @@ import java.io.Serializable;
 public class Sweep implements Serializable {
   private static final long serialVersionUID = 1L;
 
-  /** Local center of mass position */
+  /* Local center of mass position */
   public final Vec2 localCenter;
-  /** Center world positions */
+  /* Center world positions */
   public final Vec2 c0, c;
-  /** World angles */
+  /* World angles */
   public float a0, a;
 
-  /** Fraction of the current time step in the range [0,1] c0 and a0 are the positions at alpha0. */
+  /* Fraction of the current time step in the range [0,1] c0 and a0 are the positions at alpha0. */
   public float alpha0;
 
   public String toString() {
@@ -71,7 +71,7 @@ public class Sweep implements Serializable {
     return this;
   }
 
-  /**
+  /*
    * Get the interpolated transform at a specific time.
    * 
    * @param xf the result is placed here - must not be null
@@ -102,7 +102,7 @@ public class Sweep implements Serializable {
     xf.p.y -= q.s * localCenter.x + q.c * localCenter.y;
   }
 
-  /**
+  /*
    * Advance the sweep forward, yielding a new initial state.
    * 
    * @param alpha the new initial time.

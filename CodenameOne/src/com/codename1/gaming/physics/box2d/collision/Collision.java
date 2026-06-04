@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -36,7 +36,7 @@ import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/**
+/*
  * Functions used for computing contact points, distance queries, and TOI queries. Collision methods
  * are non-static for pooling speed, retrieve a collision object from the {@link SingletonPool}.
  * Should not be finalructed.
@@ -62,7 +62,7 @@ public class Collision {
   private final SimplexCache cache = new SimplexCache();
   private final DistanceOutput output = new DistanceOutput();
 
-  /**
+  /*
    * Determine if two generic shapes overlap.
    * 
    * @param shapeA
@@ -86,7 +86,7 @@ public class Collision {
     return output.distance < 10.0f * Settings.EPSILON;
   }
 
-  /**
+  /*
    * Compute the point states given two manifolds. The states pertain to the transition from
    * manifold1 to manifold2. So state1 is either persist or remove while state2 is either add or
    * persist.
@@ -133,7 +133,7 @@ public class Collision {
     }
   }
 
-  /**
+  /*
    * Clipping for contact manifolds. Sutherland-Hodgman clipping.
    * 
    * @param vOut
@@ -190,7 +190,7 @@ public class Collision {
   // djm pooling
   private static Vec2 d = new Vec2();
 
-  /**
+  /*
    * Compute the collision manifold between two circles.
    * 
    * @param manifold
@@ -236,7 +236,7 @@ public class Collision {
 
   // djm pooling, and from above
 
-  /**
+  /*
    * Compute the collision manifold between a polygon and a circle.
    * 
    * @param manifold
@@ -425,7 +425,7 @@ public class Collision {
     }
   }
 
-  /**
+  /*
    * Find the separation between poly1 and poly2 for a given edge normal on poly1.
    * 
    * @param poly1
@@ -505,7 +505,7 @@ public class Collision {
   // djm pooling, and from above
   private final Vec2 temp = new Vec2();
 
-  /**
+  /*
    * Find the max separation between poly1 and poly2 using edge normals from poly1.
    * 
    * @param edgeIndex
@@ -685,7 +685,7 @@ public class Collision {
   private final ClipVertex[] clipPoints1 = new ClipVertex[2];
   private final ClipVertex[] clipPoints2 = new ClipVertex[2];
 
-  /**
+  /*
    * Compute the collision manifold between two polygons.
    * 
    * @param manifold
@@ -982,7 +982,7 @@ public class Collision {
 
 
 
-  /**
+  /*
    * Java-specific class for returning edge results
    */
   private static class EdgeResults {
@@ -990,7 +990,7 @@ public class Collision {
     public int edgeIndex;
   }
 
-  /**
+  /*
    * Used for computing contact manifolds.
    */
   public static class ClipVertex {
@@ -1014,31 +1014,31 @@ public class Collision {
     }
   }
 
-  /**
+  /*
    * This is used for determining the state of contact points.
    * 
    * @author Daniel Murphy
    */
   public static enum PointState {
-    /**
+    /*
      * point does not exist
      */
     NULL_STATE,
-    /**
+    /*
      * point was added in the update
      */
     ADD_STATE,
-    /**
+    /*
      * point persisted across the update
      */
     PERSIST_STATE,
-    /**
+    /*
      * point was removed in the update
      */
     REMOVE_STATE
   }
 
-  /**
+  /*
    * This structure is used to keep track of the best separating axis.
    */
   static class EPAxis {
@@ -1051,7 +1051,7 @@ public class Collision {
     float separation;
   }
 
-  /**
+  /*
    * This holds polygon B expressed in frame A.
    */
   static class TempPolygon {
@@ -1067,7 +1067,7 @@ public class Collision {
     }
   }
 
-  /**
+  /*
    * Reference face used for clipping
    */
   static class ReferenceFace {
@@ -1083,7 +1083,7 @@ public class Collision {
     float sideOffset2;
   }
 
-  /**
+  /*
    * This class collides and edge and a polygon, taking into account edge adjacency.
    */
   static class EPCollider {

@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -29,7 +29,7 @@ import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * A shape is used for collision detection. You can create a shape however you like. Shapes used for
  * simulation in World are created automatically when a Fixture is created. Shapes may encapsulate a
  * one or more child shapes.
@@ -43,7 +43,7 @@ public abstract class Shape {
     this.m_type = type;
   }
 
-  /**
+  /*
    * Get the type of this shape. You can use this to down cast to the concrete shape.
    * 
    * @return the shape type.
@@ -52,7 +52,7 @@ public abstract class Shape {
     return m_type;
   }
 
-  /**
+  /*
    * The radius of the underlying shape. This can refer to different things depending on the shape
    * implementation
    * 
@@ -62,7 +62,7 @@ public abstract class Shape {
     return m_radius;
   }
 
-  /**
+  /*
    * Sets the radius of the underlying shape. This can refer to different things depending on the
    * implementation
    * 
@@ -72,14 +72,14 @@ public abstract class Shape {
     this.m_radius = radius;
   }
 
-  /**
+  /*
    * Get the number of child primitives
    * 
    * @return
    */
   public abstract int getChildCount();
 
-  /**
+  /*
    * Test a point for containment in this shape. This only works for convex shapes.
    * 
    * @param xf the shape world transform.
@@ -87,7 +87,7 @@ public abstract class Shape {
    */
   public abstract boolean testPoint(final Transform xf, final Vec2 p);
 
-  /**
+  /*
    * Cast a ray against a child shape.
    * 
    * @param argOutput the ray-cast results.
@@ -100,7 +100,7 @@ public abstract class Shape {
       int childIndex);
 
 
-  /**
+  /*
    * Given a transform, compute the associated axis aligned bounding box for a child shape.
    * 
    * @param argAabb returns the axis aligned box.
@@ -108,7 +108,7 @@ public abstract class Shape {
    */
   public abstract void computeAABB(final AABB aabb, final Transform xf, int childIndex);
 
-  /**
+  /*
    * Compute the mass properties of this shape using its dimensions and density. The inertia tensor
    * is computed about the local origin.
    * 

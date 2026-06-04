@@ -7,7 +7,7 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.SolverData;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/**
+/*
  * A rope joint enforces a maximum distance between two points on two bodies. It has no other
  * effect. Warning: if you attempt to change the maximum length during the simulation you will get
  * some non-physical behavior. A model that would allow you to dynamically modify the length would

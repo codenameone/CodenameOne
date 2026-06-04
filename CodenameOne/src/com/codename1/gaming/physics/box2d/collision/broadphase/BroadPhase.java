@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -33,7 +33,7 @@ import com.codename1.gaming.physics.box2d.collision.AABB;
 import com.codename1.gaming.physics.box2d.collision.RayCastInput;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * The broad-phase is used for computing pairs and performing volume queries and ray casts. This
  * broad-phase does not persist pairs. Instead, this reports potentially new pairs. It is up to the
  * client to consume the new pairs and to track subsequent overlap.
@@ -76,7 +76,7 @@ public class BroadPhase implements TreeCallback {
     m_queryProxyId = NULL_PROXY;
   }
 
-  /**
+  /*
    * Create a proxy with an initial AABB. Pairs are not reported until updatePairs is called.
    * 
    * @param aabb
@@ -90,7 +90,7 @@ public class BroadPhase implements TreeCallback {
     return proxyId;
   }
 
-  /**
+  /*
    * Destroy a proxy. It is up to the client to remove any pairs.
    * 
    * @param proxyId
@@ -101,7 +101,7 @@ public class BroadPhase implements TreeCallback {
     m_tree.destroyProxy(proxyId);
   }
 
-  /**
+  /*
    * Call MoveProxy as many times as you like, then when you are done call UpdatePairs to finalized
    * the proxy pairs (for your time step).
    */
@@ -139,7 +139,7 @@ public class BroadPhase implements TreeCallback {
     return true;
   }
 
-  /**
+  /*
    * Get the number of proxies.
    * 
    * @return
@@ -152,7 +152,7 @@ public class BroadPhase implements TreeCallback {
     m_tree.drawTree(argDraw);
   }
 
-  /**
+  /*
    * Update the pairs. This results in pair callbacks. This can only add pairs.
    * 
    * @param callback
@@ -211,7 +211,7 @@ public class BroadPhase implements TreeCallback {
     // m_tree.rebalance(Settings.TREE_REBALANCE_STEPS);
   }
 
-  /**
+  /*
    * Query an AABB for overlapping proxies. The callback class is called for each proxy that
    * overlaps the supplied AABB.
    * 
@@ -222,7 +222,7 @@ public class BroadPhase implements TreeCallback {
     m_tree.query(callback, aabb);
   }
 
-  /**
+  /*
    * Ray-cast against the proxies in the tree. This relies on the callback to perform a exact
    * ray-cast in the case were the proxy contains a shape. The callback also performs the any
    * collision filtering. This has performance roughly equal to k * log(n), where k is the number of
@@ -235,7 +235,7 @@ public class BroadPhase implements TreeCallback {
     m_tree.raycast(callback, input);
   }
 
-  /**
+  /*
    * Get the height of the embedded tree.
    * 
    * @return
@@ -273,7 +273,7 @@ public class BroadPhase implements TreeCallback {
   }
 
   // private final PairStack pairStack = new PairStack();
-  /**
+  /*
    * This is called from DynamicTree::query when we are gathering pairs.
    */
   public final boolean treeCallback(int proxyId) {

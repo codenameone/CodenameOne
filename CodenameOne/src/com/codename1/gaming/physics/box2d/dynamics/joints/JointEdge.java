@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/**
+/*
  * A joint edge is used to connect bodies and joints together
  * in a joint graph where each body is a node and each joint
  * is an edge. A joint edge belongs to a doubly linked list
@@ -35,22 +35,22 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
  */
 public class JointEdge {
 	
-	/**
+	/*
 	 * Provides quick access to the other body attached
 	 */
 	public Body other = null;
 	
-	/**
+	/*
 	 * the joint
 	 */
 	public Joint joint = null;
 	
-	/**
+	/*
 	 * the previous joint edge in the body's joint list
 	 */
 	public JointEdge prev = null;
 	
-	/**
+	/*
 	 * the next joint edge in the body's joint list
 	 */
 	public JointEdge next = null;

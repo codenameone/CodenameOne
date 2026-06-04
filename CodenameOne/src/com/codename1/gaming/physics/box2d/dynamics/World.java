@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -64,7 +64,7 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 import com.codename1.gaming.physics.box2d.pooling.arrays.Vec2Array;
 import com.codename1.gaming.physics.box2d.pooling.normal.DefaultWorldPool;
 
-/**
+/*
  * The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
  * world also contains efficient memory management facilities.
  * 
@@ -103,7 +103,7 @@ public class World {
 
   private final IWorldPool pool;
 
-  /**
+  /*
    * This is used to compute the time step ratio to support a variable time step.
    */
   private float m_inv_dt0;
@@ -121,7 +121,7 @@ public class World {
   private ContactRegister[][] contactStacks =
       new ContactRegister[ShapeType.values().length][ShapeType.values().length];
 
-  /**
+  /*
    * Construct a world object.
    * 
    * @param gravity the world gravity vector.
@@ -130,7 +130,7 @@ public class World {
     this(gravity, new DefaultWorldPool(WORLD_POOL_SIZE, WORLD_POOL_CONTAINER_SIZE));
   }
 
-  /**
+  /*
    * Construct a world object.
    * 
    * @param gravity the world gravity vector.
@@ -258,7 +258,7 @@ public class World {
     return pool;
   }
 
-  /**
+  /*
    * Register a destruction listener. The listener is owned by you and must remain in scope.
    * 
    * @param listener
@@ -267,7 +267,7 @@ public class World {
     m_destructionListener = listener;
   }
 
-  /**
+  /*
    * Register a contact filter to provide specific control over collision. Otherwise the default
    * filter is used (_defaultFilter). The listener is owned by you and must remain in scope.
    * 
@@ -277,7 +277,7 @@ public class World {
     m_contactManager.m_contactFilter = filter;
   }
 
-  /**
+  /*
    * Register a contact event listener. The listener is owned by you and must remain in scope.
    * 
    * @param listener
@@ -286,7 +286,7 @@ public class World {
     m_contactManager.m_contactListener = listener;
   }
 
-  /**
+  /*
    * Register a routine for debug drawing. The debug draw functions are called inside with
    * World.DrawDebugData method. The debug draw object is owned by you and must remain in scope.
    * 
@@ -296,7 +296,7 @@ public class World {
     m_debugDraw = debugDraw;
   }
 
-  /**
+  /*
    * create a rigid body given a definition. No reference to the definition is retained.
    * 
    * @warning This function is locked during callbacks.
@@ -323,7 +323,7 @@ public class World {
     return b;
   }
 
-  /**
+  /*
    * destroy a rigid body given a definition. No reference to the definition is retained. This
    * function is locked during callbacks.
    * 
@@ -397,7 +397,7 @@ public class World {
     // TODO djm recycle body
   }
 
-  /**
+  /*
    * create a joint to constrain bodies together. No reference to the definition is retained. This
    * may cause the connected bodies to cease colliding.
    * 
@@ -463,7 +463,7 @@ public class World {
     return j;
   }
 
-  /**
+  /*
    * destroy a joint. This may cause the connected bodies to begin colliding.
    * 
    * @warning This function is locked during callbacks.
@@ -555,7 +555,7 @@ public class World {
   private final Timer stepTimer = new Timer();
   private final Timer tempTimer = new Timer();
 
-  /**
+  /*
    * Take a time step. This performs collision detection, integration, and constraint solution.
    * 
    * @param timeStep the amount of time to simulate, this should not vary.
@@ -620,7 +620,7 @@ public class World {
     m_profile.step = stepTimer.getMilliseconds();
   }
 
-  /**
+  /*
    * Call this after you are done with time steps to clear the forces. You normally call this after
    * each call to Step, unless you are performing sub-steps. By default, forces will be
    * automatically cleared, so you don't need to call this function.
@@ -640,7 +640,7 @@ public class World {
   private final Vec2 cB = new Vec2();
   private final Vec2Array avs = new Vec2Array();
 
-  /**
+  /*
    * Call this to draw shapes and other debug draw data.
    */
   public void drawDebugData() {
@@ -729,7 +729,7 @@ public class World {
 
   private final WorldQueryWrapper wqwrapper = new WorldQueryWrapper();
 
-  /**
+  /*
    * Query the world for all fixtures that potentially overlap the provided AABB.
    * 
    * @param callback a user implemented callback class.
@@ -744,7 +744,7 @@ public class World {
   private final WorldRayCastWrapper wrcwrapper = new WorldRayCastWrapper();
   private final RayCastInput input = new RayCastInput();
 
-  /**
+  /*
    * Ray-cast the world for all fixtures in the path of the ray. Your callback controls whether you
    * get the closest point, any point, or n-points. The ray-cast ignores shapes that contain the
    * starting point.
@@ -762,7 +762,7 @@ public class World {
     m_contactManager.m_broadPhase.raycast(wrcwrapper, input);
   }
 
-  /**
+  /*
    * Get the world body list. With the returned body, use Body.getNext to get the next body in the
    * world list. A null body indicates the end of the list.
    * 
@@ -772,7 +772,7 @@ public class World {
     return m_bodyList;
   }
 
-  /**
+  /*
    * Get the world joint list. With the returned joint, use Joint.getNext to get the next joint in
    * the world list. A null joint indicates the end of the list.
    * 
@@ -782,7 +782,7 @@ public class World {
     return m_jointList;
   }
 
-  /**
+  /*
    * Get the world contact list. With the returned contact, use Contact.getNext to get the next
    * contact in the world list. A null contact indicates the end of the list.
    * 
@@ -802,7 +802,7 @@ public class World {
     m_allowSleep = sleepingAllowed;
   }
 
-  /**
+  /*
    * Enable/disable warm starting. For testing.
    * 
    * @param flag
@@ -815,7 +815,7 @@ public class World {
     return m_warmStarting;
   }
 
-  /**
+  /*
    * Enable/disable continuous physics. For testing.
    * 
    * @param flag
@@ -830,7 +830,7 @@ public class World {
 
 
 
-  /**
+  /*
    * Get the number of broad-phase proxies.
    * 
    * @return
@@ -839,7 +839,7 @@ public class World {
     return m_contactManager.m_broadPhase.getProxyCount();
   }
 
-  /**
+  /*
    * Get the number of bodies.
    * 
    * @return
@@ -848,7 +848,7 @@ public class World {
     return m_bodyCount;
   }
 
-  /**
+  /*
    * Get the number of joints.
    * 
    * @return
@@ -857,7 +857,7 @@ public class World {
     return m_jointCount;
   }
 
-  /**
+  /*
    * Get the number of contacts (each may have 0 or more contact points).
    * 
    * @return
@@ -866,7 +866,7 @@ public class World {
     return m_contactManager.m_contactCount;
   }
 
-  /**
+  /*
    * Gets the height of the dynamic tree
    * 
    * @return
@@ -875,7 +875,7 @@ public class World {
     return m_contactManager.m_broadPhase.getTreeHeight();
   }
 
-  /**
+  /*
    * Gets the balance of the dynamic tree
    * 
    * @return
@@ -884,7 +884,7 @@ public class World {
     return m_contactManager.m_broadPhase.getTreeBalance();
   }
 
-  /**
+  /*
    * Gets the quality of the dynamic tree
    * 
    * @return
@@ -893,7 +893,7 @@ public class World {
     return m_contactManager.m_broadPhase.getTreeQuality();
   }
 
-  /**
+  /*
    * Change the global gravity vector.
    * 
    * @param gravity
@@ -902,7 +902,7 @@ public class World {
     m_gravity.set(gravity);
   }
 
-  /**
+  /*
    * Get the global gravity vector.
    * 
    * @return
@@ -911,7 +911,7 @@ public class World {
     return m_gravity;
   }
 
-  /**
+  /*
    * Is the world locked (in the middle of a time step).
    * 
    * @return
@@ -920,7 +920,7 @@ public class World {
     return (m_flags & LOCKED) == LOCKED;
   }
 
-  /**
+  /*
    * Set flag to control automatic clearing of forces after each time step.
    * 
    * @param flag
@@ -933,7 +933,7 @@ public class World {
     }
   }
 
-  /**
+  /*
    * Get the flag that controls automatic clearing of forces after each time step.
    * 
    * @return
@@ -942,7 +942,7 @@ public class World {
     return (m_flags & CLEAR_FORCES) == CLEAR_FORCES;
   }
 
-  /**
+  /*
    * Get the contact manager for testing purposes
    * 
    * @return

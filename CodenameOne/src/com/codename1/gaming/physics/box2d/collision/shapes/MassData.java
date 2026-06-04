@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -50,16 +50,16 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 
 // Updated to rev 100
 
-/** This holds the mass data computed for a shape. */
+/* This holds the mass data computed for a shape. */
 public class MassData {
-	/** The mass of the shape, usually in kilograms. */
+	/* The mass of the shape, usually in kilograms. */
 	public float mass;
-	/** The position of the shape's centroid relative to the shape's origin. */
+	/* The position of the shape's centroid relative to the shape's origin. */
 	public final Vec2 center;
-	/** The rotational inertia of the shape about the local origin. */
+	/* The rotational inertia of the shape about the local origin. */
 	public float I;
 	
-	/**
+	/*
 	 * Blank mass data
 	 */
 	public MassData() {
@@ -67,7 +67,7 @@ public class MassData {
 		center = new Vec2();
 	}
 	
-	/**
+	/*
 	 * Copies from the given mass data
 	 * 
 	 * @param md
@@ -85,7 +85,7 @@ public class MassData {
 		center.set(md.center);
 	}
 	
-	/** Return a copy of this object. */
+	/* Return a copy of this object. */
 	public MassData clone() {
 		return new MassData(this);
 	}

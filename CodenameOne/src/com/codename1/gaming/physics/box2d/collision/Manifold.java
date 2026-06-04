@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -26,7 +26,7 @@ package com.codename1.gaming.physics.box2d.collision;
 import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * A manifold for two touching convex shapes. Box2D supports multiple types of contact:
  * <ul>
  * <li>clip point versus plane with radius</li>
@@ -54,21 +54,21 @@ public class Manifold {
     CIRCLES, FACE_A, FACE_B
   }
 
-  /** The points of contact. */
+  /* The points of contact. */
   public final ManifoldPoint[] points;
 
-  /** not use for Type::e_points */
+  /* not use for Type::e_points */
   public final Vec2 localNormal;
 
-  /** usage depends on manifold type */
+  /* usage depends on manifold type */
   public final Vec2 localPoint;
 
   public ManifoldType type;
 
-  /** The number of manifold points. */
+  /* The number of manifold points. */
   public int pointCount;
 
-  /**
+  /*
    * creates a manifold with 0 points, with it's points array full of instantiated ManifoldPoints.
    */
   public Manifold() {
@@ -81,7 +81,7 @@ public class Manifold {
     pointCount = 0;
   }
 
-  /**
+  /*
    * Creates this manifold as a copy of the other
    * 
    * @param other
@@ -98,7 +98,7 @@ public class Manifold {
     }
   }
 
-  /**
+  /*
    * copies this manifold from the given one
    * 
    * @param cp manifold to copy from

@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.dynamics;
 
 import com.codename1.gaming.physics.box2d.collision.AABB;
 
-/**
+/*
  * This proxy is used internally to connect fixtures to the broad-phase.
  * 
  * @author Daniel

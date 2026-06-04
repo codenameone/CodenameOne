@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -49,7 +49,7 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
-/**
+/*
  *  Revolute joint definition. This requires defining an
  *  anchor point where the bodies are joined. The definition
  *  uses local anchor points so that the initial configuration
@@ -66,47 +66,47 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 public class RevoluteJointDef extends JointDef {
 	
 
-	/**
+	/*
 	 *  The local anchor point relative to body1's origin.
 	 */
 	public Vec2 localAnchorA;
 
-	/**
+	/*
 	 *  The local anchor point relative to body2's origin.
 	 */
 	public Vec2 localAnchorB;
 
-	/**
+	/*
 	 *  The body2 angle minus body1 angle in the reference state (radians).
 	 */
 	public float referenceAngle;
 
-	/**
+	/*
 	 *  A flag to enable joint limits.
 	 */
 	public boolean enableLimit;
 
-	/**
+	/*
 	 *  The lower angle for the joint limit (radians).
 	 */
 	public float lowerAngle;
 
-	/**
+	/*
 	 *  The upper angle for the joint limit (radians).
 	 */
 	public float upperAngle;
 
-	/**
+	/*
 	 *  A flag to enable the joint motor.
 	 */
 	public boolean enableMotor;
 
-	/**
+	/*
 	 *  The desired motor speed. Usually in radians per second.
 	 */
 	public float motorSpeed;
 
-	/**
+	/*
 	 *  The maximum motor torque used to achieve the desired motor speed.
 	 *  Usually in N-m.
 	 */
@@ -125,7 +125,7 @@ public class RevoluteJointDef extends JointDef {
 		enableMotor = false;
 	}
 
-	/**
+	/*
 	 * Initialize the bodies, anchors, and reference angle using the world
 	 * anchor.
 	 * @param b1

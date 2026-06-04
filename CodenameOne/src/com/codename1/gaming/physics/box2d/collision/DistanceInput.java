@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -26,7 +26,7 @@ package com.codename1.gaming.physics.box2d.collision;
 import com.codename1.gaming.physics.box2d.collision.Distance.DistanceProxy;
 import com.codename1.gaming.physics.box2d.common.Transform;
 
-/**
+/*
  * Input for Distance.
  * You have to option to use the shape radii
  * in the computation.

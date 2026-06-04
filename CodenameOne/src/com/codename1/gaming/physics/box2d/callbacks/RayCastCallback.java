@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -21,7 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/**
+/*
  * Created at 4:33:10 AM Jul 15, 2010
  */
 package com.codename1.gaming.physics.box2d.callbacks;
@@ -30,14 +30,14 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 
 // updated to rev 100;
-/**
+/*
  * Callback class for ray casts.
  * See World.rayCast
  * @author Daniel Murphy
  */
 public interface RayCastCallback {
 
-	/**
+	/*
 	 * Called for each fixture found in the query. You control how the ray cast
 	 * proceeds by returning a float:
 	 * return -1: ignore this fixture and continue

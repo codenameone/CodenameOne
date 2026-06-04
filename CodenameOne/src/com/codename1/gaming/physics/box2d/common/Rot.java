@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/**
+/*
  * Represents a rotation
  * 
  * @author Daniel

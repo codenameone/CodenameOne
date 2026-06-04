@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -31,7 +31,7 @@ import com.codename1.gaming.physics.box2d.collision.broadphase.BroadPhaseStrateg
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 
-/**
+/*
  * Delegate of World.
  * 
  * @author Daniel Murphy
@@ -55,7 +55,7 @@ public class ContactManager implements PairCallback {
     pool = argPool;
   }
 
-  /**
+  /*
    * Broad-phase callback.
    * 
    * @param proxyUserDataA
@@ -227,7 +227,7 @@ public class ContactManager implements PairCallback {
     --m_contactCount;
   }
 
-  /**
+  /*
    * This is the top level collision call for the time step. Here all the narrow phase collision is
    * processed for the world contact list.
    */

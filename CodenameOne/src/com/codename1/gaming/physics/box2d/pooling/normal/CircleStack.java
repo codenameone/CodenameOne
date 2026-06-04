@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -68,6 +68,6 @@ public abstract class CircleStack<E> implements IOrderedStack<E>{
 
   public void push(int argNum) {}
 
-  /** Creates a new instance of the object contained by this stack. */
+  /* Creates a new instance of the object contained by this stack. */
   protected abstract E newInstance();
 }

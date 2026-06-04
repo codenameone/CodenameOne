@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -23,7 +23,7 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.pooling;
 
-/**
+/*
  * Same functionality of a regular java.util stack.  Object
  * return order does not matter.
  * @author Daniel
@@ -32,13 +32,13 @@ package com.codename1.gaming.physics.box2d.pooling;
  */
 public interface IDynamicStack<E> {
 
-	/**
+	/*
 	 * Pops an item off the stack
 	 * @return
 	 */
 	public E pop();
 
-	/**
+	/*
 	 * Pushes an item back on the stack
 	 * @param argObject
 	 */

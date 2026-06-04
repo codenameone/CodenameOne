@@ -9,7 +9,7 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 
 public interface BroadPhaseStrategy {
 
-  /**
+  /*
    * Create a proxy. Provide a tight fitting AABB and a userData pointer.
    * 
    * @param aabb
@@ -18,14 +18,14 @@ public interface BroadPhaseStrategy {
    */
   int createProxy(AABB aabb, Object userData);
 
-  /**
+  /*
    * Destroy a proxy
    * 
    * @param proxyId
    */
   void destroyProxy(int proxyId);
 
-  /**
+  /*
    * Move a proxy with a swepted AABB. If the proxy has moved outside of its fattened AABB, then the
    * proxy is removed from the tree and re-inserted. Otherwise the function returns immediately.
    * 
@@ -37,7 +37,7 @@ public interface BroadPhaseStrategy {
 
   AABB getFatAABB(int proxyId);
 
-  /**
+  /*
    * Query an AABB for overlapping proxies. The callback class is called for each proxy that
    * overlaps the supplied AABB.
    * 
@@ -46,7 +46,7 @@ public interface BroadPhaseStrategy {
    */
   void query(TreeCallback callback, AABB aabb);
 
-  /**
+  /*
    * Ray-cast against the proxies in the tree. This relies on the callback to perform a exact
    * ray-cast in the case were the proxy contains a shape. The callback also performs the any
    * collision filtering. This has performance roughly equal to k * log(n), where k is the number of
@@ -57,19 +57,19 @@ public interface BroadPhaseStrategy {
    */
   void raycast(TreeRayCastCallback callback, RayCastInput input);
 
-  /**
+  /*
    * Compute the height of the tree.
    */
   int computeHeight();
 
-  /**
+  /*
    * Compute the height of the binary tree in O(N) time. Should not be called often.
    * 
    * @return
    */
   int getHeight();
 
-  /**
+  /*
    * Get the maximum balance of an node in the tree. The balance is the difference in height of the
    * two children of a node.
    * 
@@ -77,7 +77,7 @@ public interface BroadPhaseStrategy {
    */
   int getMaxBalance();
 
-  /**
+  /*
    * Get the ratio of the sum of the node areas to the root area.
    * 
    * @return

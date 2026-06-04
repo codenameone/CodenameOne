@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -33,7 +33,7 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
  * can use inside and outside collision. Therefore, you may use any winding order. Since there may
  * be many vertices, they are allocated using Alloc. Connectivity information is used to create
@@ -61,7 +61,7 @@ public class ChainShape extends Shape {
     return m_count - 1;
   }
 
-  /**
+  /*
    * Get a child edge.
    */
   public void getChildEdge(EdgeShape edge, int index) {
@@ -164,7 +164,7 @@ public class ChainShape extends Shape {
     return clone;
   }
 
-  /**
+  /*
    * Create a loop. This automatically adjusts connectivity.
    * 
    * @param vertices an array of vertices, these are copied
@@ -193,7 +193,7 @@ public class ChainShape extends Shape {
     m_hasNextVertex = true;
   }
 
-  /**
+  /*
    * Create a chain with isolated end vertices.
    * 
    * @param vertices an array of vertices, these are copied
@@ -219,7 +219,7 @@ public class ChainShape extends Shape {
     m_hasNextVertex = false;
   }
 
-  /**
+  /*
    * Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
    * 
    * @param prevVertex
@@ -229,7 +229,7 @@ public class ChainShape extends Shape {
     m_hasPrevVertex = true;
   }
 
-  /**
+  /*
    * Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
    * 
    * @param nextVertex

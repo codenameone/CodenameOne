@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -21,7 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/**
+/*
  * Created at 7:27:32 AM Jan 20, 2011
  */
 package com.codename1.gaming.physics.box2d.dynamics.joints;
@@ -33,7 +33,7 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.SolverData;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/**
+/*
  * @author Daniel Murphy
  */
 public class FrictionJoint extends Joint {
@@ -115,7 +115,7 @@ public class FrictionJoint extends Joint {
     return m_maxTorque;
   }
 
-  /**
+  /*
    * @see com.codename1.gaming.physics.box2d.dynamics.joints.Joint#initVelocityConstraints(com.codename1.gaming.physics.box2d.dynamics.TimeStep)
    */
   public void initVelocityConstraints(final SolverData data) {

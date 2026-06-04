@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -23,24 +23,24 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-/**
+/*
  * Timer for profiling
  * 
  * @author Daniel
  */
 public class Timer {
 
-  private long resetNanos;
+  private long resetMillis;
 
   public Timer() {
     reset();
   }
 
   public void reset() {
-    resetNanos = System.nanoTime();
+    resetMillis = System.currentTimeMillis();
   }
 
   public float getMilliseconds() {
-    return (System.nanoTime() - resetNanos) / 1000 * 1f / 1000;
+    return System.currentTimeMillis() - resetMillis;
   }
 }

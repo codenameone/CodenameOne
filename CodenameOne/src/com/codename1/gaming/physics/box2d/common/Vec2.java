@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/**
+/*
  * A 2D column vector
  */
 public class Vec2 implements Serializable {
@@ -46,105 +46,105 @@ public class Vec2 implements Serializable {
     this(toCopy.x, toCopy.y);
   }
 
-  /** Zero out this vector. */
+  /* Zero out this vector. */
   public final void setZero() {
     x = 0.0f;
     y = 0.0f;
   }
 
-  /** Set the vector component-wise. */
+  /* Set the vector component-wise. */
   public final Vec2 set(float x, float y) {
     this.x = x;
     this.y = y;
     return this;
   }
 
-  /** Set this vector to another vector. */
+  /* Set this vector to another vector. */
   public final Vec2 set(Vec2 v) {
     this.x = v.x;
     this.y = v.y;
     return this;
   }
 
-  /** Return the sum of this vector and another; does not alter either one. */
+  /* Return the sum of this vector and another; does not alter either one. */
   public final Vec2 add(Vec2 v) {
     return new Vec2(x + v.x, y + v.y);
   }
 
 
 
-  /** Return the difference of this vector and another; does not alter either one. */
+  /* Return the difference of this vector and another; does not alter either one. */
   public final Vec2 sub(Vec2 v) {
     return new Vec2(x - v.x, y - v.y);
   }
 
-  /** Return this vector multiplied by a scalar; does not alter this vector. */
+  /* Return this vector multiplied by a scalar; does not alter this vector. */
   public final Vec2 mul(float a) {
     return new Vec2(x * a, y * a);
   }
 
-  /** Return the negation of this vector; does not alter this vector. */
+  /* Return the negation of this vector; does not alter this vector. */
   public final Vec2 negate() {
     return new Vec2(-x, -y);
   }
 
-  /** Flip the vector and return it - alters this vector. */
+  /* Flip the vector and return it - alters this vector. */
   public final Vec2 negateLocal() {
     x = -x;
     y = -y;
     return this;
   }
 
-  /** Add another vector to this one and returns result - alters this vector. */
+  /* Add another vector to this one and returns result - alters this vector. */
   public final Vec2 addLocal(Vec2 v) {
     x += v.x;
     y += v.y;
     return this;
   }
 
-  /** Adds values to this vector and returns result - alters this vector. */
+  /* Adds values to this vector and returns result - alters this vector. */
   public final Vec2 addLocal(float x, float y) {
     this.x += x;
     this.y += y;
     return this;
   }
 
-  /** Subtract another vector from this one and return result - alters this vector. */
+  /* Subtract another vector from this one and return result - alters this vector. */
   public final Vec2 subLocal(Vec2 v) {
     x -= v.x;
     y -= v.y;
     return this;
   }
 
-  /** Multiply this vector by a number and return result - alters this vector. */
+  /* Multiply this vector by a number and return result - alters this vector. */
   public final Vec2 mulLocal(float a) {
     x *= a;
     y *= a;
     return this;
   }
 
-  /** Get the skew vector such that dot(skew_vec, other) == cross(vec, other) */
+  /* Get the skew vector such that dot(skew_vec, other) == cross(vec, other) */
   public final Vec2 skew() {
     return new Vec2(-y, x);
   }
 
-  /** Get the skew vector such that dot(skew_vec, other) == cross(vec, other) */
+  /* Get the skew vector such that dot(skew_vec, other) == cross(vec, other) */
   public final void skew(Vec2 out) {
     out.x = -y;
     out.y = x;
   }
 
-  /** Return the length of this vector. */
+  /* Return the length of this vector. */
   public final float length() {
     return MathUtils.sqrt(x * x + y * y);
   }
 
-  /** Return the squared length of this vector. */
+  /* Return the squared length of this vector. */
   public final float lengthSquared() {
     return (x * x + y * y);
   }
 
-  /** Normalize this vector and return the length before normalization. Alters this vector. */
+  /* Normalize this vector and return the length before normalization. Alters this vector. */
   public final float normalize() {
     float length = length();
     if (length < Settings.EPSILON) {
@@ -157,12 +157,12 @@ public class Vec2 implements Serializable {
     return length;
   }
 
-  /** True if the vector represents a pair of valid, non-infinite floating point numbers. */
+  /* True if the vector represents a pair of valid, non-infinite floating point numbers. */
   public final boolean isValid() {
     return !Float.isNaN(x) && !Float.isInfinite(x) && !Float.isNaN(y) && !Float.isInfinite(y);
   }
 
-  /** Return a new vector that has positive components. */
+  /* Return a new vector that has positive components. */
   public final Vec2 abs() {
     return new Vec2(MathUtils.abs(x), MathUtils.abs(y));
   }
@@ -173,7 +173,7 @@ public class Vec2 implements Serializable {
   }
 
   // @Override // annotation omitted for GWT-compatibility
-  /** Return a copy of this vector. */
+  /* Return a copy of this vector. */
   public final Vec2 clone() {
     return new Vec2(x, y);
   }
@@ -258,7 +258,7 @@ public class Vec2 implements Serializable {
     out.y = a.y > b.y ? a.y : b.y;
   }
 
-  /**
+  /*
    * @see java.lang.Object#hashCode()
    */
   public int hashCode() { // automatically generated by Eclipse
@@ -269,7 +269,7 @@ public class Vec2 implements Serializable {
     return result;
   }
 
-  /**
+  /*
    * @see java.lang.Object#equals(java.lang.Object)
    */
   public boolean equals(Object obj) { // automatically generated by Eclipse

@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -36,7 +36,7 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 
-/**
+/*
  * A fixture is used to attach a shape to a body for collision detection. A fixture inherits its
  * transform from its parent. Fixtures hold additional non-geometric data such as friction,
  * collision filters, etc. Fixtures are created via Body::CreateFixture.
@@ -76,7 +76,7 @@ public class Fixture {
     m_filter = new Filter();
   }
 
-  /**
+  /*
    * Get the type of the child shape. You can use this to down cast to the concrete shape.
    * 
    * @return the shape type.
@@ -85,7 +85,7 @@ public class Fixture {
     return m_shape.getType();
   }
 
-  /**
+  /*
    * Get the child shape. You can modify the child shape, however you should not change the number
    * of vertices because this will crash some collision caching mechanisms.
    * 
@@ -95,7 +95,7 @@ public class Fixture {
     return m_shape;
   }
 
-  /**
+  /*
    * Is this fixture a sensor (non-solid)?
    * 
    * @return the true if the shape is a sensor.
@@ -105,7 +105,7 @@ public class Fixture {
     return m_isSensor;
   }
 
-  /**
+  /*
    * Set if this fixture is a sensor.
    * 
    * @param sensor
@@ -117,7 +117,7 @@ public class Fixture {
     }
   }
 
-  /**
+  /*
    * Set the contact filtering data. This is an expensive operation and should not be called
    * frequently. This will not update contacts until the next time step when either parent body is
    * awake. This automatically calls refilter.
@@ -130,7 +130,7 @@ public class Fixture {
     refilter();
   }
 
-  /**
+  /*
    * Get the contact filtering data.
    * 
    * @return
@@ -139,7 +139,7 @@ public class Fixture {
     return m_filter;
   }
 
-  /**
+  /*
    * Call this if you want to establish collision that was previously disabled by
    * ContactFilter::ShouldCollide.
    */
@@ -173,7 +173,7 @@ public class Fixture {
     }
   }
 
-  /**
+  /*
    * Get the parent body of this fixture. This is NULL if the fixture is not attached.
    * 
    * @return the parent body.
@@ -183,7 +183,7 @@ public class Fixture {
     return m_body;
   }
 
-  /**
+  /*
    * Get the next fixture in the parent body's fixture list.
    * 
    * @return the next shape.
@@ -202,7 +202,7 @@ public class Fixture {
     return m_density;
   }
 
-  /**
+  /*
    * Get the user data that was assigned in the fixture definition. Use this to store your
    * application specific data.
    * 
@@ -212,7 +212,7 @@ public class Fixture {
     return m_userData;
   }
 
-  /**
+  /*
    * Set the user data. Use this to store your application specific data.
    * 
    * @param data
@@ -221,7 +221,7 @@ public class Fixture {
     m_userData = data;
   }
 
-  /**
+  /*
    * Test a point for containment in this fixture. This only works for convex shapes.
    * 
    * @param p a point in world coordinates.
@@ -231,7 +231,7 @@ public class Fixture {
     return m_shape.testPoint(m_body.m_xf, p);
   }
 
-  /**
+  /*
    * Cast a ray against this shape.
    * 
    * @param output the ray-cast results.
@@ -243,7 +243,7 @@ public class Fixture {
     return m_shape.raycast(output, input, m_body.m_xf, childIndex);
   }
 
-  /**
+  /*
    * Get the mass data for this fixture. The mass data is based on the density and the shape. The
    * rotational inertia is about the shape's origin.
    * 
@@ -253,7 +253,7 @@ public class Fixture {
     m_shape.computeMass(massData, m_density);
   }
 
-  /**
+  /*
    * Get the coefficient of friction.
    * 
    * @return
@@ -262,7 +262,7 @@ public class Fixture {
     return m_friction;
   }
 
-  /**
+  /*
    * Set the coefficient of friction. This will _not_ change the friction of existing contacts.
    * 
    * @param friction
@@ -271,7 +271,7 @@ public class Fixture {
     m_friction = friction;
   }
 
-  /**
+  /*
    * Get the coefficient of restitution.
    * 
    * @return
@@ -280,7 +280,7 @@ public class Fixture {
     return m_restitution;
   }
 
-  /**
+  /*
    * Set the coefficient of restitution. This will _not_ change the restitution of existing
    * contacts.
    * 
@@ -290,7 +290,7 @@ public class Fixture {
     m_restitution = restitution;
   }
 
-  /**
+  /*
    * Get the fixture's AABB. This AABB may be enlarge and/or stale. If you need a more accurate
    * AABB, compute it using the shape and the body transform.
    * 
@@ -301,7 +301,7 @@ public class Fixture {
     return m_proxies[childIndex].aabb;
   }
 
-  /**
+  /*
    * Dump this fixture to the log file.
    * 
    * @param bodyIndex
@@ -387,7 +387,7 @@ public class Fixture {
     }
   }
 
-  /**
+  /*
    * Internal method
    * 
    * @param broadPhase
@@ -407,7 +407,7 @@ public class Fixture {
   private final AABB pool2 = new AABB();
   private final Vec2 displacement = new Vec2();
 
-  /**
+  /*
    * Internal method
    * 
    * @param broadPhase

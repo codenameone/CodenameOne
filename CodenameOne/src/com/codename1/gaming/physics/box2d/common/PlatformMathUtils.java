@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -23,7 +23,7 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-/**
+/*
  * Contains methods from MathUtils that rely on JVM features. These are separated out from
  * MathUtils so that they can be overridden when compiling for GWT.
  */
@@ -33,7 +33,9 @@ class PlatformMathUtils {
   private static final float INV_SHIFT23 = 1.0f / SHIFT23;
 
   public static final float fastPow(float a, float b) {
-    float x = Float.floatToRawIntBits(a);
+    // The Codename One VM (CLDC/ParparVM) provides floatToIntBits but not the
+    // raw variant; they differ only in NaN canonicalization, irrelevant here.
+    float x = Float.floatToIntBits(a);
     x *= INV_SHIFT23;
     x -= 127;
     float y = x - (x >= 0 ? (int) x : (int) x - 1);

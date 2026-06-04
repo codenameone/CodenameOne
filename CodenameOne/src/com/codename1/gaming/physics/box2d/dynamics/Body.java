@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -35,7 +35,7 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 import com.codename1.gaming.physics.box2d.dynamics.joints.JointEdge;
 
-/**
+/*
  * A rigid body. These are created via World.createBody.
  * 
  * @author Daniel Murphy
@@ -55,12 +55,12 @@ public class Body {
 
   public int m_islandIndex;
 
-  /**
+  /*
    * The body origin transform.
    */
   public final Transform m_xf = new Transform();
 
-  /**
+  /*
    * The swept motion for CCD
    */
   public final Sweep m_sweep = new Sweep();
@@ -168,7 +168,7 @@ public class Body {
     m_fixtureCount = 0;
   }
 
-  /**
+  /*
    * Creates a fixture and attach it to this body. Use this function if you need to set some fixture
    * parameters, like friction. Otherwise you can create the fixture directly from a shape. If the
    * density is non-zero, this function automatically updates the mass of the body. Contacts are not
@@ -212,7 +212,7 @@ public class Body {
 
   private final FixtureDef fixDef = new FixtureDef();
 
-  /**
+  /*
    * Creates a fixture from a shape and attach it to this body. This is a convenience function. Use
    * FixtureDef if you need to set parameters like friction, restitution, user data, or filtering.
    * If the density is non-zero, this function automatically updates the mass of the body.
@@ -228,7 +228,7 @@ public class Body {
     return createFixture(fixDef);
   }
 
-  /**
+  /*
    * Destroy a fixture. This removes the fixture from the broad-phase and destroys all contacts
    * associated with this fixture. This will automatically adjust the mass of the body if the body
    * is dynamic and the fixture has positive density. All fixtures attached to a body are implicitly
@@ -302,7 +302,7 @@ public class Body {
     resetMassData();
   }
 
-  /**
+  /*
    * Set the position of the body's origin and rotation. This breaks any contacts and wakes the
    * other bodies. Manipulating a body's transform may cause non-physical behavior.
    * 
@@ -333,7 +333,7 @@ public class Body {
     m_world.m_contactManager.findNewContacts();
   }
 
-  /**
+  /*
    * Get the body transform for the body's origin.
    * 
    * @return the world transform of the body's origin.
@@ -342,7 +342,7 @@ public class Body {
     return m_xf;
   }
 
-  /**
+  /*
    * Get the world body origin position. Do not modify.
    * 
    * @return the world position of the body's origin.
@@ -351,7 +351,7 @@ public class Body {
     return m_xf.p;
   }
 
-  /**
+  /*
    * Get the angle in radians.
    * 
    * @return the current world rotation angle in radians.
@@ -360,21 +360,21 @@ public class Body {
     return m_sweep.a;
   }
 
-  /**
+  /*
    * Get the world position of the center of mass. Do not modify.
    */
   public final Vec2 getWorldCenter() {
     return m_sweep.c;
   }
 
-  /**
+  /*
    * Get the local position of the center of mass. Do not modify.
    */
   public final Vec2 getLocalCenter() {
     return m_sweep.localCenter;
   }
 
-  /**
+  /*
    * Set the linear velocity of the center of mass.
    * 
    * @param v the new linear velocity of the center of mass.
@@ -391,7 +391,7 @@ public class Body {
     m_linearVelocity.set(v);
   }
 
-  /**
+  /*
    * Get the linear velocity of the center of mass. Do not modify, instead use
    * {@link #setLinearVelocity(Vec2)}.
    * 
@@ -401,7 +401,7 @@ public class Body {
     return m_linearVelocity;
   }
 
-  /**
+  /*
    * Set the angular velocity.
    * 
    * @param omega the new angular velocity in radians/second.
@@ -418,7 +418,7 @@ public class Body {
     m_angularVelocity = w;
   }
 
-  /**
+  /*
    * Get the angular velocity.
    * 
    * @return the angular velocity in radians/second.
@@ -427,7 +427,7 @@ public class Body {
     return m_angularVelocity;
   }
 
-  /**
+  /*
    * Get the gravity scale of the body.
    * 
    * @return
@@ -436,7 +436,7 @@ public class Body {
     return m_gravityScale;
   }
 
-  /**
+  /*
    * Set the gravity scale of the body.
    * 
    * @param gravityScale
@@ -445,7 +445,7 @@ public class Body {
     this.m_gravityScale = gravityScale;
   }
 
-  /**
+  /*
    * Apply a force at a world point. If the force is not applied at the center of mass, it will
    * generate a torque and affect the angular velocity. This wakes up the body.
    * 
@@ -472,7 +472,7 @@ public class Body {
     m_torque += (point.x - m_sweep.c.x) * force.y - (point.y - m_sweep.c.y) * force.x;
   }
 
-  /**
+  /*
    * Apply a force to the center of mass. This wakes up the body.
    * 
    * @param force the world force vector, usually in Newtons (N).
@@ -490,7 +490,7 @@ public class Body {
     m_force.y += force.y;
   }
 
-  /**
+  /*
    * Apply a torque. This affects the angular velocity without affecting the linear velocity of the
    * center of mass. This wakes up the body.
    * 
@@ -508,7 +508,7 @@ public class Body {
     m_torque += torque;
   }
 
-  /**
+  /*
    * Apply an impulse at a point. This immediately modifies the velocity. It also modifies the
    * angular velocity if the point of application is not at the center of mass. This wakes up the
    * body.
@@ -539,7 +539,7 @@ public class Body {
         m_invI * ((point.x - m_sweep.c.x) * impulse.y - (point.y - m_sweep.c.y) * impulse.x);
   }
 
-  /**
+  /*
    * Apply an angular impulse.
    * 
    * @param impulse the angular impulse in units of kg*m*m/s
@@ -555,7 +555,7 @@ public class Body {
     m_angularVelocity += m_invI * impulse;
   }
 
-  /**
+  /*
    * Get the total mass of the body.
    * 
    * @return the mass, usually in kilograms (kg).
@@ -564,7 +564,7 @@ public class Body {
     return m_mass;
   }
 
-  /**
+  /*
    * Get the central rotational inertia of the body.
    * 
    * @return the rotational inertia, usually in kg-m^2.
@@ -576,7 +576,7 @@ public class Body {
             * m_sweep.localCenter.y);
   }
 
-  /**
+  /*
    * Get the mass data of the body. The rotational inertia is relative to the center of mass.
    * 
    * @return a struct containing the mass, inertia and center of the body.
@@ -596,7 +596,7 @@ public class Body {
     data.center.y = m_sweep.localCenter.y;
   }
 
-  /**
+  /*
    * Set the mass properties to override the mass properties of the fixtures. Note that this changes
    * the center of mass position. Note that creating or destroying fixtures can also alter the mass.
    * This function has no effect if the body isn't dynamic.
@@ -651,7 +651,7 @@ public class Body {
 
   private final MassData pmd = new MassData();
 
-  /**
+  /*
    * This resets the mass properties to the sum of the mass properties of the fixtures. This
    * normally does not need to be called unless you called setMassData to override the mass and you
    * later want to reset the mass.
@@ -731,7 +731,7 @@ public class Body {
     m_world.getPool().pushVec2(3);
   }
 
-  /**
+  /*
    * Get the world coordinates of a point given the local coordinates.
    * 
    * @param localPoint a point on the body measured relative the the body's origin.
@@ -747,7 +747,7 @@ public class Body {
     Transform.mulToOut(m_xf, localPoint, out);
   }
 
-  /**
+  /*
    * Get the world coordinates of a vector given the local coordinates.
    * 
    * @param localVector a vector fixed in the body.
@@ -767,7 +767,7 @@ public class Body {
     Rot.mulToOutUnsafe(m_xf.q, localVector, out);
   }
 
-  /**
+  /*
    * Gets a local point relative to the body's origin given a world point.
    * 
    * @param a point in world coordinates.
@@ -783,7 +783,7 @@ public class Body {
     Transform.mulTransToOut(m_xf, worldPoint, out);
   }
 
-  /**
+  /*
    * Gets a local vector given a world vector.
    * 
    * @param a vector in world coordinates.
@@ -803,7 +803,7 @@ public class Body {
     Rot.mulTransUnsafe(m_xf.q, worldVector, out);
   }
 
-  /**
+  /*
    * Get the world linear velocity of a world point attached to this body.
    * 
    * @param a point in world coordinates.
@@ -821,7 +821,7 @@ public class Body {
     out.addLocal(m_linearVelocity);
   }
 
-  /**
+  /*
    * Get the world velocity of a local point.
    * 
    * @param a point in local coordinates.
@@ -838,22 +838,22 @@ public class Body {
     getLinearVelocityFromWorldPointToOut(out, out);
   }
 
-  /** Get the linear damping of the body. */
+  /* Get the linear damping of the body. */
   public final float getLinearDamping() {
     return m_linearDamping;
   }
 
-  /** Set the linear damping of the body. */
+  /* Set the linear damping of the body. */
   public final void setLinearDamping(float linearDamping) {
     m_linearDamping = linearDamping;
   }
 
-  /** Get the angular damping of the body. */
+  /* Get the angular damping of the body. */
   public final float getAngularDamping() {
     return m_angularDamping;
   }
 
-  /** Set the angular damping of the body. */
+  /* Set the angular damping of the body. */
   public final void setAngularDamping(float angularDamping) {
     m_angularDamping = angularDamping;
   }
@@ -862,7 +862,7 @@ public class Body {
     return m_type;
   }
 
-  /**
+  /*
    * Set the type of this body. This may alter the mass and velocity.
    * 
    * @param type
@@ -913,12 +913,12 @@ public class Body {
     }
   }
 
-  /** Is this body treated like a bullet for continuous collision detection? */
+  /* Is this body treated like a bullet for continuous collision detection? */
   public final boolean isBullet() {
     return (m_flags & e_bulletFlag) == e_bulletFlag;
   }
 
-  /** Should this body be treated like a bullet for continuous collision detection? */
+  /* Should this body be treated like a bullet for continuous collision detection? */
   public final void setBullet(boolean flag) {
     if (flag) {
       m_flags |= e_bulletFlag;
@@ -927,7 +927,7 @@ public class Body {
     }
   }
 
-  /**
+  /*
    * You can disable sleeping on this body. If you disable sleeping, the body will be woken.
    * 
    * @param flag
@@ -941,7 +941,7 @@ public class Body {
     }
   }
 
-  /**
+  /*
    * Is this body allowed to sleep
    * 
    * @return
@@ -950,7 +950,7 @@ public class Body {
     return (m_flags & e_autoSleepFlag) == e_autoSleepFlag;
   }
 
-  /**
+  /*
    * Set the sleep state of the body. A sleeping body has very low CPU cost.
    * 
    * @param flag set to true to put body to sleep, false to wake it.
@@ -972,7 +972,7 @@ public class Body {
     }
   }
 
-  /**
+  /*
    * Get the sleeping state of this body.
    * 
    * @return true if the body is sleeping.
@@ -981,7 +981,7 @@ public class Body {
     return (m_flags & e_awakeFlag) == e_awakeFlag;
   }
 
-  /**
+  /*
    * Set the active state of the body. An inactive body is not simulated and cannot be collided with
    * or woken up. If you pass a flag of true, all fixtures will be added to the broad-phase. If you
    * pass a flag of false, all fixtures will be removed from the broad-phase and all contacts will
@@ -1030,7 +1030,7 @@ public class Body {
     }
   }
 
-  /**
+  /*
    * Get the active state of the body.
    * 
    * @return
@@ -1039,7 +1039,7 @@ public class Body {
     return (m_flags & e_activeFlag) == e_activeFlag;
   }
 
-  /**
+  /*
    * Set this body to have fixed rotation. This causes the mass to be reset.
    * 
    * @param flag
@@ -1054,7 +1054,7 @@ public class Body {
     resetMassData();
   }
 
-  /**
+  /*
    * Does this body have fixed rotation?
    * 
    * @return
@@ -1063,17 +1063,17 @@ public class Body {
     return (m_flags & e_fixedRotationFlag) == e_fixedRotationFlag;
   }
 
-  /** Get the list of all fixtures attached to this body. */
+  /* Get the list of all fixtures attached to this body. */
   public final Fixture getFixtureList() {
     return m_fixtureList;
   }
 
-  /** Get the list of all joints attached to this body. */
+  /* Get the list of all joints attached to this body. */
   public final JointEdge getJointList() {
     return m_jointList;
   }
 
-  /**
+  /*
    * Get the list of all contacts attached to this body.
    * 
    * @warning this list changes during the time step and you may miss some collisions if you don't
@@ -1083,24 +1083,24 @@ public class Body {
     return m_contactList;
   }
 
-  /** Get the next body in the world's body list. */
+  /* Get the next body in the world's body list. */
   public final Body getNext() {
     return m_next;
   }
 
-  /** Get the user data pointer that was provided in the body definition. */
+  /* Get the user data pointer that was provided in the body definition. */
   public final Object getUserData() {
     return m_userData;
   }
 
-  /**
+  /*
    * Set the user data. Use this to store your application specific data.
    */
   public final void setUserData(Object data) {
     m_userData = data;
   }
 
-  /**
+  /*
    * Get the parent world of this body.
    */
   public final World getWorld() {
@@ -1144,7 +1144,7 @@ public class Body {
     m_xf.p.y = m_sweep.c.y - q.s * v.x - q.c * v.y;
   }
 
-  /**
+  /*
    * This is used to prevent connected bodies from colliding. It may lie, depending on the
    * collideConnected flag.
    * 

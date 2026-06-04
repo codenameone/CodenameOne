@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -23,7 +23,7 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.common;
 
-/**
+/*
  * Orientated bounding box viewport transform
  * 
  * @author Daniel Murphy
@@ -52,7 +52,7 @@ public class OBBViewportTransform implements IViewportTransform {
     yFlip = vpt.yFlip;
   }
 
-  /**
+  /*
    * @see IViewportTransform#setCamera(float, float, float)
    */
   public void setCamera(float x, float y, float scale) {
@@ -60,49 +60,49 @@ public class OBBViewportTransform implements IViewportTransform {
     Mat22.createScaleTransform(scale, box.R);
   }
 
-  /**
+  /*
    * @see IViewportTransform#getExtents()
    */
   public Vec2 getExtents() {
     return box.extents;
   }
 
-  /**
+  /*
    * @see IViewportTransform#setExtents(Vec2)
    */
   public void setExtents(Vec2 argExtents) {
     box.extents.set(argExtents);
   }
 
-  /**
+  /*
    * @see IViewportTransform#setExtents(float, float)
    */
   public void setExtents(float argHalfWidth, float argHalfHeight) {
     box.extents.set(argHalfWidth, argHalfHeight);
   }
 
-  /**
+  /*
    * @see IViewportTransform#getCenter()
    */
   public Vec2 getCenter() {
     return box.center;
   }
 
-  /**
+  /*
    * @see IViewportTransform#setCenter(Vec2)
    */
   public void setCenter(Vec2 argPos) {
     box.center.set(argPos);
   }
 
-  /**
+  /*
    * @see IViewportTransform#setCenter(float, float)
    */
   public void setCenter(float x, float y) {
     box.center.set(x, y);
   }
 
-  /**
+  /*
    * gets the transform of the viewport, transforms around the center. Not a copy.
    * 
    * @return
@@ -111,7 +111,7 @@ public class OBBViewportTransform implements IViewportTransform {
     return box.R;
   }
 
-  /**
+  /*
    * Sets the transform of the viewport. Transforms about the center.
    * 
    * @param transform
@@ -120,7 +120,7 @@ public class OBBViewportTransform implements IViewportTransform {
     box.R.set(transform);
   }
 
-  /**
+  /*
    * Multiplies the obb transform by the given transform
    * 
    * @param argTransform
@@ -129,14 +129,14 @@ public class OBBViewportTransform implements IViewportTransform {
     box.R.mulLocal(argTransform);
   }
 
-  /**
+  /*
    * @see IViewportTransform#isYFlip()
    */
   public boolean isYFlip() {
     return yFlip;
   }
 
-  /**
+  /*
    * @see IViewportTransform#setYFlip(boolean)
    */
   public void setYFlip(boolean yFlip) {
@@ -146,7 +146,7 @@ public class OBBViewportTransform implements IViewportTransform {
   // djm pooling
   private final Mat22 inv = new Mat22();
 
-  /**
+  /*
    * @see IViewportTransform#getScreenVectorToWorld(Vec2, Vec2)
    */
   public void getScreenVectorToWorld(Vec2 argScreen, Vec2 argWorld) {
@@ -158,7 +158,7 @@ public class OBBViewportTransform implements IViewportTransform {
     }
   }
 
-  /**
+  /*
    * @see IViewportTransform#getWorldVectorToScreen(Vec2, Vec2)
    */
   public void getWorldVectorToScreen(Vec2 argWorld, Vec2 argScreen) {
@@ -181,7 +181,7 @@ public class OBBViewportTransform implements IViewportTransform {
 
   private final Mat22 inv2 = new Mat22();
 
-  /**
+  /*
    * @see IViewportTransform#getScreenToWorld(Vec2, Vec2)
    */
   public void getScreenToWorld(Vec2 argScreen, Vec2 argWorld) {

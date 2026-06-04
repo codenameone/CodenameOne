@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -49,7 +49,7 @@ package com.codename1.gaming.physics.box2d.collision;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
 // updated to rev 100
-/**
+/*
  * A manifold point is a contact point belonging to a contact
  * manifold. It holds details related to the geometry and dynamics
  * of the contact points.
@@ -62,16 +62,16 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
  * provide reliable contact forces, especially for high speed collisions.
  */
 public class ManifoldPoint {
-	/** usage depends on manifold type */
+	/* usage depends on manifold type */
 	public final Vec2 localPoint;
-	/** the non-penetration impulse */
+	/* the non-penetration impulse */
 	public float normalImpulse;
-	/** the friction impulse */
+	/* the friction impulse */
 	public float tangentImpulse;
-	/** uniquely identifies a contact point between two shapes */
+	/* uniquely identifies a contact point between two shapes */
 	public final ContactID id;
 
-	/**
+	/*
 	 * Blank manifold point with everything zeroed out.
 	 */
 	public ManifoldPoint() {
@@ -80,7 +80,7 @@ public class ManifoldPoint {
 		id = new ContactID();
 	}
 
-	/**
+	/*
 	 * Creates a manifold point as a copy of the given point
 	 * @param cp point to copy from
 	 */
@@ -91,7 +91,7 @@ public class ManifoldPoint {
 		id = new ContactID(cp.id);
 	}
 
-	/**
+	/*
 	 * Sets this manifold point form the given one
 	 * @param cp the point to copy from
 	 */

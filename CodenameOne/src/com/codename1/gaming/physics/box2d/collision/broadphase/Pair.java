@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -24,7 +24,7 @@
 package com.codename1.gaming.physics.box2d.collision.broadphase;
 
 // updated to rev 100
-/**
+/*
  * Java note: at the "creation" of each node, a random key is given to that node, and that's what we
  * sort from.
  */

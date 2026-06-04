@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -51,7 +51,7 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 
 //Updated to rev 56->130->142 of b2DistanceJoint.cpp/.h
 
-/**
+/*
  * Distance joint definition. This requires defining an
  * anchor point on both bodies and the non-zero length of the
  * distance joint. The definition uses local anchor points
@@ -60,21 +60,21 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
  * @warning Do not use a zero or short length.
  */
 public class DistanceJointDef extends JointDef {
-	/** The local anchor point relative to body1's origin. */
+	/* The local anchor point relative to body1's origin. */
 	public final Vec2 localAnchorA;
 
-	/** The local anchor point relative to body2's origin. */
+	/* The local anchor point relative to body2's origin. */
 	public final Vec2 localAnchorB;
 
-	/** The equilibrium length between the anchor points. */
+	/* The equilibrium length between the anchor points. */
 	public float length;
 
-	/**
+	/*
 	 * The mass-spring-damper frequency in Hertz.
 	 */
 	public float frequencyHz;
 
-	/**
+	/*
 	 * The damping ratio. 0 = no damping, 1 = critical damping.
 	 */
 	public float dampingRatio;
@@ -88,7 +88,7 @@ public class DistanceJointDef extends JointDef {
 		dampingRatio = 0.0f;
 	}
 
-	/**
+	/*
 	 * Initialize the bodies, anchors, and length using the world
 	 * anchors.
 	 * @param b1 First body

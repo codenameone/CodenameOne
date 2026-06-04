@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -33,7 +33,7 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * A circle shape.
  */
 public class CircleShape extends Shape {
@@ -58,7 +58,7 @@ public class CircleShape extends Shape {
     return 1;
   }
 
-  /**
+  /*
    * Get the supporting vertex index in the given direction.
    * 
    * @param d
@@ -68,7 +68,7 @@ public class CircleShape extends Shape {
     return 0;
   }
 
-  /**
+  /*
    * Get the supporting vertex in the given direction.
    * 
    * @param d
@@ -78,7 +78,7 @@ public class CircleShape extends Shape {
     return m_p;
   }
 
-  /**
+  /*
    * Get the vertex count.
    * 
    * @return
@@ -87,7 +87,7 @@ public class CircleShape extends Shape {
     return 1;
   }
 
-  /**
+  /*
    * Get a vertex by index.
    * 
    * @param index

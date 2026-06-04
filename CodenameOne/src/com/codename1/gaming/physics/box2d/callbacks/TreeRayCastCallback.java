@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -28,13 +28,13 @@ import com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree;
 
 // updated to rev 100
 
-/**
+/*
  * callback for {@link DynamicTree}
  * @author Daniel Murphy
  *
  */
 public interface TreeRayCastCallback {
-	/**
+	/*
 	 * 
 	 * @param input
 	 * @param nodeId

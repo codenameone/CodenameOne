@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -101,7 +101,7 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 //Now compute impulse to be applied:
 //df = f2 - f1
 
-/**
+/*
  * A prismatic joint. This joint provides one degree of freedom: translation along an axis fixed in
  * bodyA. Relative rotation is prevented. You can use a joint limit to restrict the range of motion
  * and a joint motor to drive the motion or to model joint friction.
@@ -195,7 +195,7 @@ public class PrismaticJoint extends Joint {
     return inv_dt * m_impulse.y;
   }
 
-  /**
+  /*
    * Get the current joint translation, usually in meters.
    */
   public float getJointSpeed() {
@@ -253,7 +253,7 @@ public class PrismaticJoint extends Joint {
     return translation;
   }
 
-  /**
+  /*
    * Is the joint limit enabled?
    * 
    * @return
@@ -262,7 +262,7 @@ public class PrismaticJoint extends Joint {
     return m_enableLimit;
   }
 
-  /**
+  /*
    * Enable/disable the joint limit.
    * 
    * @param flag
@@ -276,7 +276,7 @@ public class PrismaticJoint extends Joint {
     }
   }
 
-  /**
+  /*
    * Get the lower joint limit, usually in meters.
    * 
    * @return
@@ -285,7 +285,7 @@ public class PrismaticJoint extends Joint {
     return m_lowerTranslation;
   }
 
-  /**
+  /*
    * Get the upper joint limit, usually in meters.
    * 
    * @return
@@ -294,7 +294,7 @@ public class PrismaticJoint extends Joint {
     return m_upperTranslation;
   }
 
-  /**
+  /*
    * Set the joint limits, usually in meters.
    * 
    * @param lower
@@ -311,7 +311,7 @@ public class PrismaticJoint extends Joint {
     }
   }
 
-  /**
+  /*
    * Is the joint motor enabled?
    * 
    * @return
@@ -320,7 +320,7 @@ public class PrismaticJoint extends Joint {
     return m_enableMotor;
   }
 
-  /**
+  /*
    * Enable/disable the joint motor.
    * 
    * @param flag
@@ -331,7 +331,7 @@ public class PrismaticJoint extends Joint {
     m_enableMotor = flag;
   }
 
-  /**
+  /*
    * Set the motor speed, usually in meters per second.
    * 
    * @param speed
@@ -342,7 +342,7 @@ public class PrismaticJoint extends Joint {
     m_motorSpeed = speed;
   }
 
-  /**
+  /*
    * Get the motor speed, usually in meters per second.
    * 
    * @return
@@ -351,7 +351,7 @@ public class PrismaticJoint extends Joint {
     return m_motorSpeed;
   }
 
-  /**
+  /*
    * Set the maximum motor force, usually in N.
    * 
    * @param force
@@ -362,7 +362,7 @@ public class PrismaticJoint extends Joint {
     m_maxMotorForce = force;
   }
 
-  /**
+  /*
    * Get the current motor force, usually in N.
    * 
    * @param inv_dt

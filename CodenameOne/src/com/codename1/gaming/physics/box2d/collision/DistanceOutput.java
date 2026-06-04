@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,19 +25,19 @@ package com.codename1.gaming.physics.box2d.collision;
 
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * Output for Distance.
  * @author Daniel
  */
 public class DistanceOutput {
-	/** Closest point on shapeA */
+	/* Closest point on shapeA */
 	public final Vec2 pointA = new Vec2();
 	
-	/** Closest point on shapeB */
+	/* Closest point on shapeB */
 	public final Vec2 pointB = new Vec2();
 	
 	public float distance;
 	
-	/** number of gjk iterations used */
+	/* number of gjk iterations used */
 	public int iterations;
 }

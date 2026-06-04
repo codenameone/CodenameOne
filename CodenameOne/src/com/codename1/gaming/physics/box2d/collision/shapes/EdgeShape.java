@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -31,7 +31,7 @@ import com.codename1.gaming.physics.box2d.common.Settings;
 import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * A line segment (edge) shape. These can be connected in chains or loops to other edge shapes. The
  * connectivity information is used to ensure correct contact normals.
  * 
@@ -39,20 +39,20 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
  */
 public class EdgeShape extends Shape {
 
-  /**
+  /*
    * edge vertex 1
    */
   public final Vec2 m_vertex1 = new Vec2();
-  /**
+  /*
    * edge vertex 2
    */
   public final Vec2 m_vertex2 = new Vec2();
 
-  /**
+  /*
    * optional adjacent vertex 1. Used for smooth collision
    */
   public final Vec2 m_vertex0 = new Vec2();
-  /**
+  /*
    * optional adjacent vertex 2. Used for smooth collision
    */
   public final Vec2 m_vertex3 = new Vec2();

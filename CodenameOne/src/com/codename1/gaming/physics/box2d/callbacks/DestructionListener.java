@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -21,7 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/**
+/*
  * Created at 4:23:30 AM Jul 15, 2010
  */
 package com.codename1.gaming.physics.box2d.callbacks;
@@ -30,7 +30,7 @@ import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
 
 // updated to rev 100
-/**
+/*
  * Joints and fixtures are destroyed when their associated
  * body is destroyed. Implement this listener so that you
  * may nullify references to these joints and shapes.
@@ -38,14 +38,14 @@ import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
  */
 public interface DestructionListener {
 	
-	/**
+	/*
 	 * Called when any joint is about to be destroyed due
 	 * to the destruction of one of its attached bodies.
 	 * @param joint
 	 */
 	public void sayGoodbye(Joint joint);
 	
-	/**
+	/*
 	 * Called when any fixture is about to be destroyed due
 	 * to the destruction of its parent body.
 	 * @param fixture

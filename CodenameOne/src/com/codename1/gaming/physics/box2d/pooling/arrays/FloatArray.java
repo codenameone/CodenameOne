@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.pooling.arrays;
 
 import java.util.HashMap;
 
-/**
+/*
  * Not thread safe float[] pooling.
  * @author Daniel
  */

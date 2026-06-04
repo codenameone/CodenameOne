@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -23,7 +23,7 @@
  ******************************************************************************/
 package com.codename1.gaming.physics.box2d.collision.shapes;
 
-/**
+/*
  * Types of shapes
  * @author Daniel
  */

@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -27,45 +27,45 @@ import java.io.Serializable;
 
 // updated to rev 100
 
-/**
+/*
  * A transform contains translation and rotation. It is used to represent the position and
  * orientation of rigid frames.
  */
 public class Transform implements Serializable {
   private static final long serialVersionUID = 1L;
 
-  /** The translation caused by the transform */
+  /* The translation caused by the transform */
   public final Vec2 p;
 
-  /** A matrix representing a rotation */
+  /* A matrix representing a rotation */
   public final Rot q;
 
-  /** The default constructor. */
+  /* The default constructor. */
   public Transform() {
     p = new Vec2();
     q = new Rot();
   }
 
-  /** Initialize as a copy of another transform. */
+  /* Initialize as a copy of another transform. */
   public Transform(final Transform xf) {
     p = xf.p.clone();
     q = xf.q.clone();
   }
 
-  /** Initialize using a position vector and a rotation matrix. */
+  /* Initialize using a position vector and a rotation matrix. */
   public Transform(final Vec2 _position, final Rot _R) {
     p = _position.clone();
     q = _R.clone();
   }
 
-  /** Set this to equal another transform. */
+  /* Set this to equal another transform. */
   public final Transform set(final Transform xf) {
     p.set(xf.p);
     q.set(xf.q);
     return this;
   }
 
-  /**
+  /*
    * Set this based on the position and angle.
    * 
    * @param p
@@ -76,7 +76,7 @@ public class Transform implements Serializable {
     q.set(angle);
   }
 
-  /** Set this to the identity transform. */
+  /* Set this to the identity transform. */
   public final void setIdentity() {
     p.setZero();
     q.setIdentity();

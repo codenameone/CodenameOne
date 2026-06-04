@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -25,7 +25,7 @@ package com.codename1.gaming.physics.box2d.common;
 
 import java.io.Serializable;
 
-/**
+/*
  * A 3-by-3 matrix. Stored in column-major order.
  * 
  * @author Daniel Murphy
@@ -93,7 +93,7 @@ public class Mat33 implements Serializable {
     out.z = v.x * A.ex.z + v.y * A.ey.z + v.z * A.ez.z;
   }
 
-  /**
+  /*
    * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
    * in one-shot cases.
    * 
@@ -106,7 +106,7 @@ public class Mat33 implements Serializable {
     return x;
   }
 
-  /**
+  /*
    * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
    * in one-shot cases.
    * 
@@ -124,7 +124,7 @@ public class Mat33 implements Serializable {
   }
 
   // djm pooling from below
-  /**
+  /*
    * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
    * in one-shot cases.
    * 
@@ -137,7 +137,7 @@ public class Mat33 implements Serializable {
     return x;
   }
 
-  /**
+  /*
    * Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
    * in one-shot cases.
    * 

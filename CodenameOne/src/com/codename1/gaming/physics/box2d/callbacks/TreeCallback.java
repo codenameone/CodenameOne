@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -26,14 +26,14 @@ package com.codename1.gaming.physics.box2d.callbacks;
 import com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree;
 
 // update to rev 100
-/**
+/*
  * callback for {@link DynamicTree}
  * @author Daniel Murphy
  *
  */
 public interface TreeCallback {
 	
-	/**
+	/*
 	 * Callback from a query request.  
 	 * @param proxyId the id of the proxy
 	 * @return if the query should be continued

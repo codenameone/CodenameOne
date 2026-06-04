@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -29,14 +29,14 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 import com.codename1.gaming.physics.box2d.pooling.normal.DefaultWorldPool;
 
-/** An axis-aligned bounding box. */
+/* An axis-aligned bounding box. */
 public class AABB {
-  /** Bottom left vertex of bounding box. */
+  /* Bottom left vertex of bounding box. */
   public final Vec2 lowerBound;
-  /** Top right vertex of bounding box. */
+  /* Top right vertex of bounding box. */
   public final Vec2 upperBound;
 
-  /**
+  /*
    * Creates the default object, with vertices at 0,0 and 0,0.
    */
   public AABB() {
@@ -44,7 +44,7 @@ public class AABB {
     upperBound = new Vec2();
   }
 
-  /**
+  /*
    * Copies from the given object
    * 
    * @param copy the object to copy from
@@ -53,7 +53,7 @@ public class AABB {
     this(copy.lowerBound, copy.upperBound);
   }
 
-  /**
+  /*
    * Creates an AABB object using the given bounding vertices.
    * 
    * @param lowerVertex the bottom left vertex of the bounding box
@@ -64,7 +64,7 @@ public class AABB {
     this.upperBound = upperVertex.clone();
   }
 
-  /**
+  /*
    * Sets this object from the given object
    * 
    * @param aabb the object to copy from
@@ -78,7 +78,7 @@ public class AABB {
     upperBound.y = v1.y;
   }
 
-  /** Verify that the bounds are sorted */
+  /* Verify that the bounds are sorted */
   public final boolean isValid() {
     final float dx = upperBound.x - lowerBound.x;
     if (dx < 0f) {
@@ -91,7 +91,7 @@ public class AABB {
     return lowerBound.isValid() && upperBound.isValid();
   }
 
-  /**
+  /*
    * Get the center of the AABB
    * 
    * @return
@@ -108,7 +108,7 @@ public class AABB {
     out.y = (lowerBound.y + upperBound.y) * .5f;
   }
 
-  /**
+  /*
    * Get the extents of the AABB (half-widths).
    * 
    * @return
@@ -134,7 +134,7 @@ public class AABB {
     argRay[3].x -= upperBound.x - lowerBound.x;
   }
 
-  /**
+  /*
    * Combine two AABBs into this one.
    * 
    * @param aabb1
@@ -147,7 +147,7 @@ public class AABB {
     upperBound.y = aabb1.upperBound.y > aab.upperBound.y ? aabb1.upperBound.y : aab.upperBound.y;
   }
 
-  /**
+  /*
    * Gets the perimeter length
    * 
    * @return
@@ -156,7 +156,7 @@ public class AABB {
     return 2.0f * (upperBound.x - lowerBound.x + upperBound.y - lowerBound.y);
   }
 
-  /**
+  /*
    * Combines another aabb with this one
    * 
    * @param aabb
@@ -168,7 +168,7 @@ public class AABB {
     upperBound.y = upperBound.y > aabb.upperBound.y ? upperBound.y : aabb.upperBound.y;
   }
 
-  /**
+  /*
    * Does this aabb contain the provided AABB.
    * 
    * @return
@@ -185,7 +185,7 @@ public class AABB {
         && aabb.upperBound.x > upperBound.x && aabb.upperBound.y > upperBound.y;
   }
 
-  /**
+  /*
    * @deprecated please use {@link #raycast(RayCastOutput, RayCastInput, IWorldPool)} for better
    *             performance
    * @param output
@@ -196,7 +196,7 @@ public class AABB {
     return raycast(output, input, new DefaultWorldPool(4, 4));
   }
 
-  /**
+  /*
    * From Real-time Collision Detection, p179.
    * 
    * @param output

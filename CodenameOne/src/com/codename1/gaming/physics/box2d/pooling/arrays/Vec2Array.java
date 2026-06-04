@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -27,7 +27,7 @@ import java.util.HashMap;
 
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
-/**
+/*
  * not thread safe Vec2[] pool
  * @author dmurph
  *

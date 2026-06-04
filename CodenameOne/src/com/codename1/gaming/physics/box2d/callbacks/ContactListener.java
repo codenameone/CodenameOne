@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -27,7 +27,7 @@ import com.codename1.gaming.physics.box2d.collision.Manifold;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 
 // updated to rev 100
-/**
+/*
  * Implement this class to get contact information. You can use these results for
  * things like sounds and game logic. You can also get contact results by
  * traversing the contact lists after the time step. However, you might miss
@@ -42,19 +42,19 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
  */
 public interface ContactListener {
 
-	/**
+	/*
 	 * Called when two fixtures begin to touch.
 	 * @param contact
 	 */
 	public void beginContact(Contact contact);
 	
-	/**
+	/*
 	 * Called when two fixtures cease to touch.
 	 * @param contact
 	 */
 	public void endContact(Contact contact);
 	
-	/**
+	/*
 	 * This is called after a contact is updated. This allows you to inspect a
 	 * contact before it goes to the solver. If you are careful, you can modify the
 	 * contact manifold (e.g. disable contact).
@@ -72,7 +72,7 @@ public interface ContactListener {
 	 */
 	public void preSolve(Contact contact, Manifold oldManifold);
 	
-	/**
+	/*
 	 * This lets you inspect a contact after the solver is finished. This is useful
 	 * for inspecting impulses.
 	 * Note: the contact manifold does not include time of impact impulses, which can be

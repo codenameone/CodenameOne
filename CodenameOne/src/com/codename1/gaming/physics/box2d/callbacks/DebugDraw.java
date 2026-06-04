@@ -1,4 +1,4 @@
-/*******************************************************************************
+/*
  * Copyright (c) 2013, Daniel Murphy
  * All rights reserved.
  * 
@@ -21,7 +21,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
-/**
+/*
  * Created at 4:35:29 AM Jul 15, 2010
  */
 package com.codename1.gaming.physics.box2d.callbacks;
@@ -32,7 +32,7 @@ import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
 // updated to rev 100
-/**
+/*
  * Implement this abstract class to allow JBox2d to 
  * automatically draw your physics for debugging purposes.
  * Not intended to replace your own custom rendering
@@ -72,7 +72,7 @@ public abstract class DebugDraw {
 		m_drawFlags &= ~flags;
 	}
 
-	/**
+	/*
 	 * Draw a closed polygon provided in CCW order.  This implementation
 	 * uses {@link #drawSegment(Vec2, Vec2, Color3f)} to draw each side of the
 	 * polygon.
@@ -97,7 +97,7 @@ public abstract class DebugDraw {
 	
 	public abstract void drawPoint(Vec2 argPoint, float argRadiusOnScreen, Color3f argColor);
 
-	/**
+	/*
 	 * Draw a solid closed polygon provided in CCW order.
 	 * @param vertices
 	 * @param vertexCount
@@ -105,7 +105,7 @@ public abstract class DebugDraw {
 	 */
 	public abstract void drawSolidPolygon(Vec2[] vertices, int vertexCount, Color3f color);
 
-	/**
+	/*
 	 * Draw a circle.
 	 * @param center
 	 * @param radius
@@ -113,7 +113,7 @@ public abstract class DebugDraw {
 	 */
 	public abstract void drawCircle(Vec2 center, float radius, Color3f color);
 	
-	/**
+	/*
 	 * Draw a solid circle.
 	 * @param center
 	 * @param radius
@@ -122,7 +122,7 @@ public abstract class DebugDraw {
 	 */
 	public abstract void drawSolidCircle(Vec2 center, float radius, Vec2 axis, Color3f color);
 	
-	/**
+	/*
 	 * Draw a line segment.
 	 * @param p1
 	 * @param p2
@@ -130,13 +130,13 @@ public abstract class DebugDraw {
 	 */
 	public abstract void drawSegment(Vec2 p1, Vec2 p2, Color3f color);
 
-	/**
+	/*
 	 * Draw a transform.  Choose your own length scale
 	 * @param xf
 	 */
 	public abstract void drawTransform(Transform xf);
 
-	/**
+	/*
 	 * Draw a string.
 	 * @param x
 	 * @param y
@@ -153,7 +153,7 @@ public abstract class DebugDraw {
 		return viewportTransform;
 	}
 	
-	/**
+	/*
 	 * @param x
 	 * @param y
 	 * @param scale
@@ -164,7 +164,7 @@ public abstract class DebugDraw {
 	}
 	
 	
-	/**
+	/*
 	 * @param argScreen
 	 * @param argWorld
 	 * @see com.codename1.gaming.physics.box2d.common.IViewportTransform#getScreenToWorld(com.codename1.gaming.physics.box2d.common.Vec2, com.codename1.gaming.physics.box2d.common.Vec2)
@@ -173,7 +173,7 @@ public abstract class DebugDraw {
 		viewportTransform.getScreenToWorld(argScreen, argWorld);
 	}
 
-	/**
+	/*
 	 * @param argWorld
 	 * @param argScreen
 	 * @see com.codename1.gaming.physics.box2d.common.IViewportTransform#getWorldToScreen(com.codename1.gaming.physics.box2d.common.Vec2, com.codename1.gaming.physics.box2d.common.Vec2)
@@ -182,7 +182,7 @@ public abstract class DebugDraw {
 		viewportTransform.getWorldToScreen(argWorld, argScreen);
 	}
 	
-	/**
+	/*
 	 * Takes the world coordinates and puts the corresponding screen
 	 * coordinates in argScreen.
 	 * @param worldX
@@ -194,7 +194,7 @@ public abstract class DebugDraw {
 		viewportTransform.getWorldToScreen(argScreen, argScreen);
 	}
 	
-	/**
+	/*
 	 * takes the world coordinate (argWorld) and returns
 	 * the screen coordinates.
 	 * @param argWorld
@@ -205,7 +205,7 @@ public abstract class DebugDraw {
 		return screen;
 	}
 	
-	/**
+	/*
 	 * Takes the world coordinates and returns the screen
 	 * coordinates.
 	 * @param worldX
@@ -217,7 +217,7 @@ public abstract class DebugDraw {
 		return argScreen;
 	}
 	
-	/**
+	/*
 	 * takes the screen coordinates and puts the corresponding 
 	 * world coordinates in argWorld.
 	 * @param screenX
@@ -229,7 +229,7 @@ public abstract class DebugDraw {
 		viewportTransform.getScreenToWorld(argWorld, argWorld);
 	}
 	
-	/**
+	/*
 	 * takes the screen coordinates (argScreen) and returns
 	 * the world coordinates
 	 * @param argScreen
@@ -240,7 +240,7 @@ public abstract class DebugDraw {
 		return world;
 	}
 	
-	/**
+	/*
 	 * takes the screen coordinates and returns the
 	 * world coordinates.
 	 * @param screenX
