@@ -5113,18 +5113,24 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
           + ":wakeupTimerSet=" + (jvm._wakeupTimer != null ? 1 : 0)
           + ":wakeupAtIn=" + (jvm._wakeupAt != null && jvm._wakeupAt !== Infinity ? Math.round(jvm._wakeupAt - twNow) : "inf")
           + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0));
-        // Recovery backstop: the worker is wedged but has pending timed wakeups,
-        // which means the single wakeup setTimeout was lost/stalled (no green
-        // thread is running to re-arm it). Force-clear and re-arm it, process any
-        // now-expired wakeups, and re-trigger drain. Safe + idempotent: it only
-        // re-creates the timer and fires genuinely-expired sleeps/waits.
-        if (tws.length > 0) {
+        // Recovery backstop -- ONLY when a wakeup is genuinely OVERDUE (wakeAt is
+        // in the past but the timer did not fire), i.e. a true lost/stalled timer.
+        // A "frozen" heartbeat with only FUTURE wakeups is NOT a wedge: the worker
+        // is just waiting on a long legitimate sleep (e.g. NetworkManager's idle
+        // timeout-poll Thread.sleep(timeout/10), 12-30s). Firing the recovery on
+        // those is pure churn (clearTimeout + scheduleDrain every 1.5s) that only
+        // adds main-thread overhead, so gate it strictly on overdue.
+        var anyOverdue = false;
+        for (var ov = 0; ov < tws.length; ov++) {
+          if (!tws[ov].cancelled && (tws[ov].wakeAt | 0) <= twNow + 1) { anyOverdue = true; break; }
+        }
+        if (anyOverdue) {
           try {
             if (jvm._wakeupTimer != null) { clearTimeout(jvm._wakeupTimer); jvm._wakeupTimer = null; jvm._wakeupAt = Infinity; }
             jvm._processExpiredTimedWakeups();
             jvm._refreshTimedWakeupTimer();
             if (typeof jvm.scheduleDrain === "function") jvm.scheduleDrain();
-            vmTrace("DIAG:WORKER_HB_FROZEN:recovery=rearmed-timer");
+            vmTrace("DIAG:WORKER_HB_FROZEN:recovery=rearmed-overdue-timer");
           } catch (_rec) { void _rec; }
         }
       }
