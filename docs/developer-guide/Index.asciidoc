@@ -723,8 +723,9 @@ Codename One includes a portable 3D / GPU graphics API in the `com.codename1.gpu
 package. It's designed for games and other hardware accelerated visuals and runs
 on every supported platform from a single code base: the iOS backend renders with
 Metal, Android and the JavaScript port render with OpenGL ES / WebGL, and the
-simulator renders with a built in software rasterizer so the same scene is
-reproducible during development.
+desktop simulator renders with OpenGL through JOGL (falling back to a built in
+software rasterizer if no GL is available) so you can develop and debug 3D
+without a device.
 
 The API is a hybrid of a low level command surface (vertex/index buffers,
 textures, render state and draw calls) and high level helpers (`Mesh` primitives,

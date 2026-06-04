@@ -23,7 +23,11 @@ import java.awt.image.BufferedImage;
 /// wrapped as a Codename One native peer; each time it is painted it drives one
 /// frame of the application `Renderer` and blits the resulting image. In
 /// continuous mode a Swing timer requests repaints to form an animation loop.
-class JavaSEGLSurface extends JComponent {
+///
+/// This is the fallback backend used only when the JOGL hardware renderer
+/// (`JavaSEJoglSurface`) cannot be initialized; the software rasterizer keeps the
+/// simulator working (for simple scenes) when no OpenGL is available.
+class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
     private final RenderView view;
     private final Renderer renderer;
     private final JavaSESoftwareDevice device = new JavaSESoftwareDevice();
@@ -38,7 +42,11 @@ class JavaSEGLSurface extends JComponent {
         setOpaque(false);
     }
 
-    void setContinuous(boolean continuous) {
+    public JComponent getComponent() {
+        return this;
+    }
+
+    public void setContinuous(boolean continuous) {
         if (continuous) {
             if (timer == null) {
                 timer = new Timer(16, new ActionListener() {
@@ -53,11 +61,11 @@ class JavaSEGLSurface extends JComponent {
         }
     }
 
-    void requestRender() {
+    public void requestRender() {
         view.repaint();
     }
 
-    void disposeSurface() {
+    public void disposeSurface() {
         if (timer != null) {
             timer.stop();
             timer = null;

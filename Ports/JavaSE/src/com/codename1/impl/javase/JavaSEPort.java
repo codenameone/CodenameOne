@@ -15709,15 +15709,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
     }
 
-    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGLSurface> glSurfaces =
-            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGLSurface>();
+    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGpuSurface> glSurfaces =
+            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGpuSurface>();
 
     private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
             new com.codename1.impl.gpu.GpuImplementation() {
         @Override
         public com.codename1.ui.PeerComponent createPeer(com.codename1.gpu.RenderView view) {
-            JavaSEGLSurface surface = new JavaSEGLSurface(view);
-            com.codename1.ui.PeerComponent peer = createNativePeer(surface);
+            // Prefer the real OpenGL (JOGL) backend. Instantiating it touches
+            // JOGL classes and a GL context, so guard against GLException AND
+            // NoClassDefFoundError (jars absent) and fall back to the software
+            // renderer so the simulator never fails to start over 3D.
+            JavaSEGpuSurface surface;
+            try {
+                surface = new JavaSEJoglSurface(view);
+            } catch (Throwable t) {
+                System.out.println("JavaSE 3D: JOGL backend unavailable, using software renderer ("
+                        + t + ")");
+                surface = new JavaSEGLSurface(view);
+            }
+            com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
             if (peer != null) {
                 glSurfaces.put(peer, surface);
             }
@@ -15726,7 +15737,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void setContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
-            JavaSEGLSurface surface = glSurfaces.get(peer);
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
             if (surface != null) {
                 surface.setContinuous(continuous);
             }
@@ -15734,7 +15745,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void requestRender(com.codename1.ui.PeerComponent peer) {
-            JavaSEGLSurface surface = glSurfaces.get(peer);
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
             if (surface != null) {
                 surface.requestRender();
             }

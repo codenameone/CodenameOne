@@ -104,6 +104,21 @@
             <artifactId>filters</artifactId>
             <version>2.0.235-1</version>
         </dependency>
+        <!-- JOGL provides the real OpenGL backend for the simulator's 3D
+             (com.codename1.gpu) API. The "-main" meta artifacts pull in the
+             cross-platform native jars. The 3D backend creates JavaSEJoglSurface
+             inside a try/catch, so a missing or failed JOGL native never breaks
+             simulator startup; it falls back to the software renderer. -->
+        <dependency>
+            <groupId>org.jogamp.jogl</groupId>
+            <artifactId>jogl-all-main</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jogamp.gluegen</groupId>
+            <artifactId>gluegen-rt-main</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
         <dependency>
             <groupId>javax.media</groupId>
             <artifactId>jmf</artifactId>
@@ -126,8 +141,25 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
         <src.dir>../../Ports/JavaSE/src</src.dir>
-
+        <!-- JOGL 2.5.0 ships Apple-Silicon (arm64) macOS natives; it is published
+             on the JogAmp maven repository (see <repositories>) rather than
+             Maven Central, where only the Intel-only 2.3.2 is available. -->
+        <jogl.version>2.5.0</jogl.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>jogamp</id>
+            <name>JogAmp</name>
+            <url>https://jogamp.org/deployment/maven/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>
         <resources>
