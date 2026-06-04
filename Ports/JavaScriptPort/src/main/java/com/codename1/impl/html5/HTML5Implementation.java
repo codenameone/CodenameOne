@@ -5030,35 +5030,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private final java.util.Map<PeerComponent, HTML5GLSurface> glSurfaces =
             new IdentityHashMap<PeerComponent, HTML5GLSurface>();
 
-    @Override
-    public boolean isOpenGLSupported() {
-        return true;
-    }
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            HTML5GLSurface surface = HTML5GLSurface.create(view);
+            if (surface == null) {
+                return null;
+            }
+            glSurfaces.put(surface, surface);
+            return surface;
+        }
+
+        @Override
+        public void setContinuous(PeerComponent peer, boolean continuous) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(PeerComponent peer) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
 
     @Override
-    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
-        HTML5GLSurface surface = HTML5GLSurface.create(view);
-        if (surface == null) {
-            return null;
-        }
-        glSurfaces.put(surface, surface);
-        return surface;
-    }
-
-    @Override
-    public void glSetContinuous(PeerComponent peer, boolean continuous) {
-        HTML5GLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.setContinuous(continuous);
-        }
-    }
-
-    @Override
-    public void glRequestRender(PeerComponent peer) {
-        HTML5GLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.requestRender();
-        }
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
     }
 
     @Override

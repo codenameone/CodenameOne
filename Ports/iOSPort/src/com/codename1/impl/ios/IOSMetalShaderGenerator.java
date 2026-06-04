@@ -15,7 +15,7 @@ import com.codename1.gpu.VertexFormat;
 
 /// Runtime generator of Metal Shading Language (MSL) source for the iOS 3D
 /// backend. This mirrors the logic of the portable GLSL generator
-/// (com.codename1.gpu.GlslShaderGenerator) but emits a single MSL source string
+/// (com.codename1.impl.gpu.GlslShaderGenerator) but emits a single MSL source string
 /// containing both the vertex and fragment functions for a given Material and
 /// VertexFormat. The native side compiles the string once with
 /// newLibraryWithSource and caches the resulting MTLRenderPipelineState by the

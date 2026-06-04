@@ -7,7 +7,11 @@
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
  */
-package com.codename1.gpu;
+package com.codename1.impl.gpu;
+
+import com.codename1.gpu.Material;
+import com.codename1.gpu.VertexAttribute;
+import com.codename1.gpu.VertexFormat;
 
 /// Generates portable GLSL ES 1.00 vertex and fragment shader source for a given
 /// `Material` and `VertexFormat`. This is the "engine-managed shader" code path

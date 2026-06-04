@@ -547,25 +547,32 @@ public final class Display extends CN1Constants {
 
     /// Returns true if the current platform provides a hardware accelerated 3D
     /// GPU backend for `com.codename1.gpu.RenderView`.
-    public boolean isOpenGLSupported() {
-        return impl.isOpenGLSupported();
+    public boolean isGpuSupported() {
+        return impl.getGpuImplementation() != null;
     }
 
     /// Creates the native GPU peer backing a `RenderView`. Intended for use by
     /// `RenderView`; returns null on platforms without a 3D backend.
-    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
-        return impl.createGLPeer(view);
+    public PeerComponent createGpuPeer(com.codename1.gpu.RenderView view) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        return gpu != null ? gpu.createPeer(view) : null;
     }
 
     /// Sets whether a GPU peer renders continuously or only on demand. Intended
     /// for use by `RenderView`.
-    public void glSetContinuous(PeerComponent peer, boolean continuous) {
-        impl.glSetContinuous(peer, continuous);
+    public void gpuSetContinuous(PeerComponent peer, boolean continuous) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        if (gpu != null) {
+            gpu.setContinuous(peer, continuous);
+        }
     }
 
     /// Requests a single frame from a GPU peer. Intended for use by `RenderView`.
-    public void glRequestRender(PeerComponent peer) {
-        impl.glRequestRender(peer);
+    public void gpuRequestRender(PeerComponent peer) {
+        com.codename1.impl.gpu.GpuImplementation gpu = impl.getGpuImplementation();
+        if (gpu != null) {
+            gpu.requestRender(peer);
+        }
     }
 
     /// Indicates the maximum frames the API will try to draw every second
