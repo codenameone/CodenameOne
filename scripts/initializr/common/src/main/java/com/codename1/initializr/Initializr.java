@@ -35,6 +35,10 @@ import com.codename1.util.StringUtil;
 public class Initializr extends Lifecycle {
     private boolean darkMode;
 
+    /** Rebuilds the live preview (and summary) for the current options. Held so a
+     *  later light/dark toggle can re-theme the preview, not just the chrome. */
+    private Runnable uiRefresh;
+
     /** Most recently built form. Exposed only so render/mockup tests can capture
      *  the exact form they triggered (the simulator's app-under-test lifecycle
      *  keeps an earlier form "current", so getCurrent() is not reliable in-test). */
@@ -45,7 +49,8 @@ public class Initializr extends Lifecycle {
     private static final String[] THEMEABLE = {
             "InitializrForm", "InitializrRoot", "InitializrColumn", "InitializrTopbar",
             "InitializrWordmark", "InitializrHero", "InitializrHeroTitle", "InitializrHeroSubtitle",
-            "InitializrPill", "InitializrPanel", "InitializrPanelHeader", "InitializrPanelTitle",
+            "InitializrPill", "InitializrPillDot", "InitializrPillText",
+            "InitializrPanel", "InitializrPanelHeader", "InitializrPanelTitle",
             "InitializrPanelSubtitle", "InitializrPanelChevron", "InitializrPanelBody",
             "InitializrSectionTitle", "InitializrFieldLabel", "InitializrField", "InitializrFieldHint",
             "InitializrChoicesGrid", "InitializrChoice", "InitializrSummary", "InitializrTip",
@@ -178,6 +183,7 @@ public class Initializr extends Lifecycle {
         form.add(BorderLayout.SOUTH, generateBar);
         appNameField.addDataChangedListener((type, index) -> refresh.run());
         packageField.addDataChangedListener((type, index) -> refresh.run());
+        uiRefresh = refresh;
         refresh.run();
         if (darkMode) {
             applyTheme(form, true);
@@ -221,8 +227,17 @@ public class Initializr extends Lifecycle {
 
         Container text = BoxLayout.encloseY(title, subtitle);
 
-        Label pill = new Label("READY");
+        // Clean status dot: a circle glyph on its own transparent-background
+        // label, in a mid-accent that reads on both pill backgrounds (so a
+        // light/dark toggle does not need to recolour it).
+        Label pillDot = new Label("");
+        pillDot.setUIID("InitializrPillDot");
+        FontImage.setMaterialIcon(pillDot, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 1.7f);
+        Label pillText = new Label("READY");
+        pillText.setUIID("InitializrPillText");
+        Container pill = new Container(new com.codename1.ui.layouts.FlowLayout(Component.LEFT, Component.CENTER));
         pill.setUIID("InitializrPill");
+        pill.add(pillDot).add(pillText);
 
         Container pillHolder = new Container(new BorderLayout());
         pillHolder.add(BorderLayout.NORTH, FlowRight(pill));
@@ -476,6 +491,7 @@ public class Initializr extends Lifecycle {
     private void showHelpPopup(Component source, String title, String body) {
         InteractionDialog dlg = new InteractionDialog(title);
         dlg.setUIID(darkMode ? "InitializrHelpPopupDark" : "InitializrHelpPopup");
+        dlg.getTitleComponent().setUIID(darkMode ? "InitializrHelpPopupTitleDark" : "InitializrHelpPopupTitle");
         dlg.setLayout(new BorderLayout());
         SpanLabel content = new SpanLabel(body);
         content.setUIID(darkMode ? "InitializrHelpPopupBodyDark" : "InitializrHelpPopupBody");
@@ -522,6 +538,13 @@ public class Initializr extends Lifecycle {
     private void applyDarkMode(Form form, boolean dark) {
         darkMode = dark;
         Display.getInstance().setDarkMode(dark);
+        // Rebuild the preview for the new theme mode FIRST (it creates a fresh
+        // InterFormContainer), then re-skin the whole tree so the new preview
+        // frame is themed too. Otherwise a light->dark toggle leaves the preview
+        // (and its frame) on the previous theme.
+        if (uiRefresh != null) {
+            uiRefresh.run();
+        }
         applyTheme(form, dark);
         form.refreshTheme();
     }

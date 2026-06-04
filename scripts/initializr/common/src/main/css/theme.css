@@ -230,25 +230,49 @@ InitializrHeroSubtitleDark {
 }
 
 InitializrPill {
-    color: #2F6BFF;
     background-color: #E8F0FF;
-    font-family: "Inter Bold";
-    font-size: 2.2mm;
     border: none;
     border-radius: 2mm;
-    padding: 0.7mm 2.4mm;
-    text-align: center;
+    padding: 0.8mm 2.4mm;
 }
 
 InitializrPillDark {
-    color: #6FA0FF;
     background-color: #15336B;
-    font-family: "Inter Bold";
-    font-size: 2.2mm;
     border: none;
     border-radius: 2mm;
-    padding: 0.7mm 2.4mm;
-    text-align: center;
+    padding: 0.8mm 2.4mm;
+}
+
+InitializrPillDot {
+    background-color: transparent;
+    color: #4D86FF;
+    border: none;
+    padding: 0;
+    margin: 0 0.6mm 0 0;
+}
+
+InitializrPillDotDark {
+    background-color: transparent;
+    color: #4D86FF;
+    border: none;
+    padding: 0;
+    margin: 0 0.6mm 0 0;
+}
+
+InitializrPillText {
+    background-color: transparent;
+    color: #2F6BFF;
+    font-family: "Inter Bold";
+    font-size: 2.2mm;
+    padding: 0;
+}
+
+InitializrPillTextDark {
+    background-color: transparent;
+    color: #6FA0FF;
+    font-family: "Inter Bold";
+    font-size: 2.2mm;
+    padding: 0;
 }
 
 /* ---------- Collapsible panel (card) ---------- */
@@ -547,6 +571,20 @@ InitializrHelpPopupDark {
     border: 2px solid #2F508F;
     border-radius: 1.5mm;
     padding: 0.5mm;
+}
+
+InitializrHelpPopupTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter SemiBold";
+    font-size: 2.9mm;
+}
+
+InitializrHelpPopupTitleDark {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "Inter SemiBold";
+    font-size: 2.9mm;
 }
 
 InitializrHelpPopupBody {
