@@ -115,6 +115,7 @@ CN1Image* cn1WinImageFromArgb(const uint32_t* argb, int width, int height) {
         return NULL;
     }
     img->bitmap = NULL;
+    img->bitmapTarget = NULL;
     img->width = width;
     img->height = height;
     img->mutableGraphics = NULL;
@@ -212,6 +213,7 @@ CN1Image* cn1WinDecodeImage(const BYTE* data, UINT32 len) {
         goto cleanup;
     }
     img->bitmap = NULL;
+    img->bitmapTarget = NULL;
     img->width = (JAVA_INT)w;
     img->height = (JAVA_INT)h;
     img->argb = buffer;
@@ -272,10 +274,22 @@ ID2D1Bitmap* cn1WinEnsureBitmap(CN1Image* img, ID2D1RenderTarget* target) {
         }
         ID2D1RenderTarget_CreateBitmapFromWicBitmap(target,
                 (IWICBitmapSource*) img->mutableGraphics->wicBitmap, NULL, &img->bitmap);
+        img->bitmapTarget = (void*) target;
         return img->bitmap;
     }
     if (img->bitmap != NULL) {
-        return img->bitmap;
+        if (img->bitmapTarget == (void*) target) {
+            return img->bitmap;
+        }
+        /* A D2D bitmap is bound to the device of the target it was created on.
+         * The cached bitmap was made on a different target (e.g. the on-screen
+         * HWND target during a live paint), and drawing it onto this one -- the
+         * mutable-image target a screenshot paints into -- faults the target and
+         * silently drops every later draw in the same BeginDraw/EndDraw batch
+         * (the graphics-draw-image-rect "only the first cell renders" bug). Drop
+         * the stale bitmap and rebuild it on the current target below. */
+        ID2D1Bitmap_Release(img->bitmap);
+        img->bitmap = NULL;
     }
     if (img->argb == NULL || target == NULL || img->width <= 0 || img->height <= 0) {
         return NULL;
@@ -320,6 +334,7 @@ ID2D1Bitmap* cn1WinEnsureBitmap(CN1Image* img, ID2D1RenderTarget* target) {
         }
     }
     free(pbgra);
+    img->bitmapTarget = (void*) target;
     return img->bitmap;
 }
 
@@ -435,6 +450,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
         return 0;
     }
     img->bitmap = NULL;
+    img->bitmapTarget = NULL;
     img->width = width;
     img->height = height;
     img->argb = NULL; /* content lives in the WIC bitmap; getRGB locks it back */

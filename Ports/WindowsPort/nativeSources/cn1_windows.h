@@ -136,7 +136,8 @@ typedef struct CN1Font {
 } CN1Font;
 
 typedef struct CN1Image {
-    ID2D1Bitmap* bitmap;             /* GPU bitmap for the active target     */
+    ID2D1Bitmap* bitmap;             /* GPU bitmap, valid only on bitmapTarget */
+    void* bitmapTarget;              /* render target ->bitmap was created on  */
     JAVA_INT width;
     JAVA_INT height;
     uint32_t* argb;                  /* optional CPU copy for getRGB / scale */
