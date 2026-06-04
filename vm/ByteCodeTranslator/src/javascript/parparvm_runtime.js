@@ -2655,39 +2655,62 @@ const jvm = {
         // ``_Y`` / ``__cn1TickReset`` block at the top of this
         // file for the rationale.
         __cn1TickReset();
-        if (thread.resumeError) {
-          const resumeError = thread.resumeError;
-          thread.resumeError = null;
-          result = thread.generator.throw(resumeError);
-        } else {
-          result = thread.generator.next(thread.resumeValue);
-        }
-        thread.resumeValue = undefined;
-        if (result.done) {
-          thread.done = true;
-          // Always-on lifecycle log: when the MAIN thread completes,
-          // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
-          // lifecycle.start, and runApp() all returned. We post a
-          // ``lifecycle`` VM message back to the main-thread bridge
-          // so it can flip ``window.cn1Started = true`` (the @JSBody-
-          // driven flag set inside ParparVMBootstrap.setStarted lives
-          // on the WORKER's window, not the main thread's, so the
-          // headless-test ``page.evaluate(() => window.cn1Started)``
-          // would never see it without this round trip).
-          if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
-            vmLifecycle("main-thread-completed");
-            emitVmMessage({
-              type: this.protocol.messages.LIFECYCLE || "lifecycle",
-              phase: "started"
-            });
+        try {
+          if (thread.resumeError) {
+            const resumeError = thread.resumeError;
+            thread.resumeError = null;
+            result = thread.generator.throw(resumeError);
+          } else {
+            result = thread.generator.next(thread.resumeValue);
           }
+          thread.resumeValue = undefined;
+          if (result.done) {
+            thread.done = true;
+            // Always-on lifecycle log: when the MAIN thread completes,
+            // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
+            // lifecycle.start, and runApp() all returned. We post a
+            // ``lifecycle`` VM message back to the main-thread bridge
+            // so it can flip ``window.cn1Started = true`` (the @JSBody-
+            // driven flag set inside ParparVMBootstrap.setStarted lives
+            // on the WORKER's window, not the main thread's, so the
+            // headless-test ``page.evaluate(() => window.cn1Started)``
+            // would never see it without this round trip).
+            if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
+              vmLifecycle("main-thread-completed");
+              emitVmMessage({
+                type: this.protocol.messages.LIFECYCLE || "lifecycle",
+                phase: "started"
+              });
+            }
+            if (thread.object) {
+              thread.object[CN1_THREAD_ALIVE] = 0;
+              this.notifyAll(thread.object);
+            }
+            continue;
+          }
+          this.handleYield(thread, result.value);
+        } catch (threadErr) {
+          // An uncaught exception in a green thread TERMINATES THAT THREAD
+          // (Java semantics: Thread.run() unwinds, other threads keep running)
+          // -- it must NOT halt the whole cooperative scheduler. The previous
+          // behaviour let the error propagate out of the drain loop into the
+          // outer catch -> fail(), which stopped dispatch entirely and wedged
+          // the worker (frozen=1/runnable=0): a single __cn1_jso_bridge__
+          // watchdog timeout (main thread briefly blocked by a heavy capture),
+          // resumed into the parked thread as an uncaught RuntimeException, took
+          // down the ENTIRE screenshot suite with no error surfaced to the host.
+          // Terminate just this thread, wake any joiners, record the failure for
+          // diagnostics, and continue draining the rest.
+          thread.done = true;
+          thread.resumeError = null;
+          thread.resumeValue = undefined;
           if (thread.object) {
             thread.object[CN1_THREAD_ALIVE] = 0;
             this.notifyAll(thread.object);
           }
+          this.fail(threadErr);
           continue;
         }
-        this.handleYield(thread, result.value);
       }
     } catch (err) {
       this.fail(err);
