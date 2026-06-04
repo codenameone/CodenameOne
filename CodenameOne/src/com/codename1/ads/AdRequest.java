@@ -43,10 +43,6 @@ public class AdRequest {
     private String contentUrl;
     private boolean nonPersonalized;
 
-    /// Creates an empty request.
-    public AdRequest() {
-    }
-
     /// Adds a keyword used to target the ad.
     ///
     /// #### Parameters
