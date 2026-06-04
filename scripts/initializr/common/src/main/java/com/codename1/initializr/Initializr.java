@@ -51,7 +51,8 @@ public class Initializr extends Lifecycle {
             "InitializrChoicesGrid", "InitializrChoice", "InitializrSummary", "InitializrTip",
             "InitializrValidationError", "InitializrHelpButton", "InitializrGenerateBar",
             "InitializrGenerateInfo", "InitializrPrimaryButton", "InitializrPreviewWrap",
-            "InitializrPreviewTitle", "InitializrLiveDot", "InitializrCard", "InitializrPreviewHolder"
+            "InitializrPreviewTitle", "InitializrLiveDot", "InitializrCard", "InitializrPreviewHolder",
+            "InitializrSummaryText"
     };
 
     @Override
@@ -95,6 +96,7 @@ public class Initializr extends Lifecycle {
         packageError.setHidden(true);
         packageError.setVisible(false);
         summaryLabel.setUIID("InitializrSummary");
+        summaryLabel.setTextUIID("InitializrSummaryText");
 
         final Label bundleInfo = new Label("Bundle: MyAppName.zip");
         bundleInfo.setUIID("InitializrGenerateInfo");
@@ -221,7 +223,8 @@ public class Initializr extends Lifecycle {
 
         Label pill = new Label("READY");
         pill.setUIID("InitializrPill");
-        FontImage.setMaterialIcon(pill, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 2.4f);
+        FontImage.setMaterialIcon(pill, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 1.6f);
+        pill.setGap(convertToPixels(1f));
 
         Container pillHolder = new Container(new BorderLayout());
         pillHolder.add(BorderLayout.NORTH, FlowRight(pill));
@@ -371,7 +374,7 @@ public class Initializr extends Lifecycle {
     private Container createPreviewWrap(TemplatePreviewPanel previewPanel) {
         Label dot = new Label("");
         dot.setUIID("InitializrLiveDot");
-        FontImage.setMaterialIcon(dot, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 3f);
+        FontImage.setMaterialIcon(dot, FontImage.MATERIAL_FIBER_MANUAL_RECORD, 2f);
         Label title = new Label("Live preview");
         title.setUIID("InitializrPreviewTitle");
         Container head = BoxLayout.encloseX(dot, title);

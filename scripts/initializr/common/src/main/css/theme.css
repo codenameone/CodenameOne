@@ -96,11 +96,30 @@ SideCommandDark {
 
 /* ==========================================================================
    Initializr - Codename One design language
-   Light tokens:  bg-app #F3F4F7  panel #FFFFFF  border #D9DEE8  text #112247
+   Font: Inter (bundled under css/fonts). Borders use 2px so they read on the
+   high-DPI simulator skin; radii are deliberately subtle (the design uses 6-8px).
+   Light tokens:  bg-app #F3F4F7  panel #FFFFFF  border #D2D9E6  text #112247
                   muted #7F8AA3   soft  #A0A8BA  accent #2F6BFF  accent-soft #E8F0FF
-   Dark tokens:   bg-app #071B4D  panel #102B66  border #2A4A8A  text #F5F8FF
+   Dark tokens:   bg-app #071B4D  panel #102B66  border #2F508F  text #F5F8FF
                   muted #A8B8DA   soft  #7E93BC  accent #4D86FF  accent-soft #15336B
    ========================================================================== */
+
+@font-face {
+    font-family: "Inter";
+    src: url("fonts/Inter-Regular.ttf");
+}
+@font-face {
+    font-family: "Inter Medium";
+    src: url("fonts/Inter-Medium.ttf");
+}
+@font-face {
+    font-family: "Inter SemiBold";
+    src: url("fonts/Inter-SemiBold.ttf");
+}
+@font-face {
+    font-family: "Inter Bold";
+    src: url("fonts/Inter-Bold.ttf");
+}
 
 /* ---------- App shell ---------- */
 InitializrForm {
@@ -112,12 +131,12 @@ InitializrFormDark {
 }
 
 InitializrRoot {
-    padding: 1.6mm;
+    padding: 1.4mm;
     background-color: #F3F4F7;
 }
 
 InitializrRootDark {
-    padding: 1.6mm;
+    padding: 1.4mm;
     background-color: #071B4D;
 }
 
@@ -134,144 +153,154 @@ InitializrColumnDark {
 /* ---------- Top bar ---------- */
 InitializrTopbar {
     background-color: #FFFFFF;
-    border-bottom: 1px solid #D9DEE8;
-    padding: 2.2mm 3mm;
+    border-bottom: 2px solid #D2D9E6;
+    padding: 2.4mm 3mm;
 }
 
 InitializrTopbarDark {
     background-color: #102B66;
-    border-bottom: 1px solid #24407F;
-    padding: 2.2mm 3mm;
+    border-bottom: 2px solid #2F508F;
+    padding: 2.4mm 3mm;
 }
 
 InitializrWordmark {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 5mm;
+    font-family: "Inter Bold";
+    font-size: 4.8mm;
 }
 
 InitializrWordmarkDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 5mm;
+    font-family: "Inter Bold";
+    font-size: 4.8mm;
 }
 
 /* ---------- Hero ---------- */
 InitializrHero {
     background-color: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    border-radius: 2mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
     padding: 3mm 3.4mm;
-    margin: 1.2mm;
+    margin: 1.1mm;
 }
 
 InitializrHeroDark {
     background-color: #102B66;
-    border: 1px solid #2A4A8A;
-    border-radius: 2mm;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
     padding: 3mm 3.4mm;
-    margin: 1.2mm;
+    margin: 1.1mm;
 }
 
 InitializrHeroTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 4.8mm;
+    font-family: "Inter Bold";
+    font-size: 4.6mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 4.8mm;
+    font-family: "Inter Bold";
+    font-size: 4.6mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroSubtitle {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.8mm;
 }
 
 InitializrHeroSubtitleDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.8mm;
 }
 
 InitializrPill {
     color: #2F6BFF;
     background-color: #E8F0FF;
-    font-family: "native:MainBold";
+    font-family: "Inter Bold";
     font-size: 2.2mm;
-    border-radius: 4mm;
-    padding: 0.8mm 1.8mm;
+    border-radius: 5mm;
+    padding: 1mm 2mm;
 }
 
 InitializrPillDark {
     color: #6FA0FF;
     background-color: #15336B;
-    font-family: "native:MainBold";
+    font-family: "Inter Bold";
     font-size: 2.2mm;
-    border-radius: 4mm;
-    padding: 0.8mm 1.8mm;
+    border-radius: 5mm;
+    padding: 1mm 2mm;
 }
 
 /* ---------- Collapsible panel (card) ---------- */
 InitializrPanel {
     background-color: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    border-radius: 2mm;
-    margin: 1.2mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    margin: 1.1mm;
     padding: 0;
 }
 
 InitializrPanelDark {
     background-color: #102B66;
-    border: 1px solid #2A4A8A;
-    border-radius: 2mm;
-    margin: 1.2mm;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    margin: 1.1mm;
     padding: 0;
 }
 
 InitializrPanelHeader {
     background-color: transparent;
     border: none;
-    padding: 2mm 2.6mm;
+    padding: 2.2mm 2.8mm;
     margin: 0;
 }
 
 InitializrPanelHeaderDark {
     background-color: transparent;
     border: none;
-    padding: 2mm 2.6mm;
+    padding: 2.2mm 2.8mm;
     margin: 0;
 }
 
 InitializrPanelTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0;
 }
 
 InitializrPanelTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0;
 }
 
 InitializrPanelSubtitle {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.6mm;
     padding: 0 0 0 1.6mm;
 }
 
 InitializrPanelSubtitleDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.6mm;
     padding: 0 0 0 1.6mm;
 }
@@ -296,66 +325,70 @@ InitializrPanelChevronDark {
 
 InitializrPanelBody {
     background-color: transparent;
-    border-top: 1px solid #D9DEE8;
-    padding: 1.4mm 2.6mm 2.4mm 2.6mm;
+    border-top: 2px solid #E5EAF2;
+    padding: 1.6mm 2.8mm 2.6mm 2.8mm;
 }
 
 InitializrPanelBodyDark {
     background-color: transparent;
-    border-top: 1px solid #2A4A8A;
-    padding: 1.4mm 2.6mm 2.4mm 2.6mm;
+    border-top: 2px solid #20407D;
+    padding: 1.6mm 2.8mm 2.6mm 2.8mm;
 }
 
 /* ---------- Section title (Essentials, non-collapsible) ---------- */
 InitializrSectionTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrSectionTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0 0 1.2mm 0;
 }
 
 /* ---------- Fields ---------- */
 InitializrFieldLabel {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter Medium";
     font-size: 2.5mm;
-    padding: 0.6mm 0 0.6mm 0.2mm;
+    padding: 0.6mm 0 0.8mm 0.2mm;
 }
 
 InitializrFieldLabelDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter Medium";
     font-size: 2.5mm;
-    padding: 0.6mm 0 0.6mm 0.2mm;
+    padding: 0.6mm 0 0.8mm 0.2mm;
 }
 
 InitializrField, InitializrFieldHint {
     color: #112247;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.9mm;
     background-color: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    border-radius: 1.5mm;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    padding: 1.6mm;
+    margin: 0 0 1.6mm 0;
 }
 
 InitializrFieldDark, InitializrFieldHintDark {
     color: #F5F8FF;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.9mm;
     background-color: #0E2A61;
-    border: 1px solid #3A5694;
-    border-radius: 1.5mm;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    border: 2px solid #3A5694;
+    border-radius: 0.8mm;
+    padding: 1.6mm;
+    margin: 0 0 1.6mm 0;
 }
 
 InitializrChoicesGrid {
@@ -368,90 +401,108 @@ InitializrChoicesGridDark {
 
 /* ---------- Choice toggles ---------- */
 InitializrChoice {
-    color: #7F8AA3;
+    color: #5B6680;
     background-color: #FFFFFF;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    border: 1px solid #D9DEE8;
-    border-radius: 1.5mm;
+    font-family: "Inter SemiBold";
+    font-size: 2.7mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
     margin: 0.6mm;
-    padding: 1.5mm;
+    padding: 1.7mm;
     text-align: center;
 }
 
 InitializrChoice.pressed {
     color: #FFFFFF;
     background-color: #2F6BFF;
-    border: 1px solid #2F6BFF;
+    border: 2px solid #2F6BFF;
     text-align: center;
 }
 
 InitializrChoiceDark {
     color: #A8B8DA;
     background-color: #0E2A61;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    border: 1px solid #3A5694;
-    border-radius: 1.5mm;
+    font-family: "Inter SemiBold";
+    font-size: 2.7mm;
+    border: 2px solid #3A5694;
+    border-radius: 0.8mm;
     margin: 0.6mm;
-    padding: 1.5mm;
+    padding: 1.7mm;
     text-align: center;
 }
 
 InitializrChoiceDark.pressed {
     color: #FFFFFF;
     background-color: #4D86FF;
-    border: 1px solid #4D86FF;
+    border: 2px solid #4D86FF;
     text-align: center;
 }
 
 /* ---------- Summary / current settings ---------- */
 InitializrSummary {
     color: #112247;
-    font-family: "native:MainRegular";
-    font-size: 2.7mm;
+    font-family: "Inter";
+    font-size: 2.6mm;
     background-color: #F3F4F7;
-    border: 1px solid #D9DEE8;
-    border-radius: 1.5mm;
-    padding: 1.6mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    padding: 1.8mm;
     margin: 1mm 0 0 0;
 }
 
 InitializrSummaryDark {
     color: #DCE6FB;
-    font-family: "native:MainRegular";
-    font-size: 2.7mm;
+    font-family: "Inter";
+    font-size: 2.6mm;
     background-color: #0B2459;
-    border: 1px solid #2A4A8A;
-    border-radius: 1.5mm;
-    padding: 1.6mm;
+    border: 2px solid #2F508F;
+    border-radius: 0.8mm;
+    padding: 1.8mm;
     margin: 1mm 0 0 0;
 }
 
+InitializrSummaryText {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter";
+    font-size: 2.6mm;
+}
+
+InitializrSummaryTextDark {
+    background-color: transparent;
+    color: #DCE6FB;
+    font-family: "Inter";
+    font-size: 2.6mm;
+}
+
 InitializrTip {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrTipDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrValidationError {
+    background-color: transparent;
     color: #B42318;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.3mm;
     padding: 0 0 0.8mm 0.2mm;
 }
 
 InitializrValidationErrorDark {
+    background-color: transparent;
     color: #F87171;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.3mm;
     padding: 0 0 0.8mm 0.2mm;
 }
@@ -477,37 +528,39 @@ InitializrHelpButtonDark {
 /* ---------- Generate bar + primary button ---------- */
 InitializrGenerateBar {
     background-color: #F3F4F7;
-    border-top: 1px solid #D9DEE8;
-    padding: 1.6mm 2.4mm;
+    border-top: 2px solid #D2D9E6;
+    padding: 1.8mm 2.4mm;
 }
 
 InitializrGenerateBarDark {
     background-color: #071B4D;
-    border-top: 1px solid #24407F;
-    padding: 1.6mm 2.4mm;
+    border-top: 2px solid #20407D;
+    padding: 1.8mm 2.4mm;
 }
 
 InitializrGenerateInfo {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.5mm;
 }
 
 InitializrGenerateInfoDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.5mm;
 }
 
 InitializrPrimaryButton {
     color: #1A2614;
     background-color: #B8D532;
-    font-family: "native:MainBold";
+    font-family: "Inter SemiBold";
     font-size: 3mm;
-    padding: 2mm 3.4mm;
+    padding: 2.2mm 3.6mm;
     margin: 0;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
@@ -515,7 +568,7 @@ InitializrPrimaryButton.pressed {
     color: #1A2614;
     background-color: #A2BF2C;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
@@ -523,19 +576,19 @@ InitializrPrimaryButton.disabled {
     color: #8A9472;
     background-color: #DDE6BC;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
 InitializrPrimaryButtonDark {
     color: #1A2614;
     background-color: #B8D532;
-    font-family: "native:MainBold";
+    font-family: "Inter SemiBold";
     font-size: 3mm;
-    padding: 2mm 3.4mm;
+    padding: 2.2mm 3.6mm;
     margin: 0;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
@@ -543,7 +596,7 @@ InitializrPrimaryButtonDark.pressed {
     color: #1A2614;
     background-color: #A2BF2C;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
@@ -551,43 +604,45 @@ InitializrPrimaryButtonDark.disabled {
     color: #5E6B49;
     background-color: #5C6B2A;
     border: none;
-    border-radius: 1.5mm;
+    border-radius: 0.8mm;
     text-align: center;
 }
 
 /* ---------- Live preview panel ---------- */
 InitializrPreviewWrap {
     background-color: #FFFFFF;
-    border: 1px solid #D9DEE8;
-    border-radius: 2mm;
-    margin: 1.2mm;
-    padding: 2.4mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 2.6mm;
 }
 
 InitializrPreviewWrapDark {
     background-color: #102B66;
-    border: 1px solid #2A4A8A;
-    border-radius: 2mm;
-    margin: 1.2mm;
-    padding: 2.4mm;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 2.6mm;
 }
 
 InitializrPreviewTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
+    font-family: "Inter SemiBold";
     font-size: 3mm;
     padding: 0 0 0 1.2mm;
 }
 
 InitializrPreviewTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
+    font-family: "Inter SemiBold";
     font-size: 3mm;
     padding: 0 0 0 1.2mm;
 }
 
 InitializrLiveDot {
-    color: #B8D532;
+    color: #8FB81E;
     background-color: transparent;
     padding: 0;
     margin: 0;
@@ -602,16 +657,16 @@ InitializrLiveDotDark {
 
 InitializrCard {
     background-color: #FAFAFC;
-    border: 1px solid #D9DEE8;
-    border-radius: 1.5mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
     padding: 2mm;
     margin: 1.2mm 0 0 0;
 }
 
 InitializrCardDark {
     background-color: #112F70;
-    border: 1px solid #2A4A8A;
-    border-radius: 1.5mm;
+    border: 2px solid #2F508F;
+    border-radius: 0.8mm;
     padding: 2mm;
     margin: 1.2mm 0 0 0;
 }
