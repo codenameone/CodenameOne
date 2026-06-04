@@ -24,7 +24,9 @@ package com.codename1.impl.windows;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.WebSocketImpl;
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
+import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.io.ByteArrayOutputStream;
@@ -1145,6 +1147,25 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public String getPlatformName() {
         return "win";
+    }
+
+    /**
+     * Plays audio (and decodes video) through Media Foundation. The stream is
+     * read into memory and handed to the native engine, which spools it to a
+     * temp file and resolves the source. Returns null only if the engine can't
+     * be created.
+     */
+    @Override
+    public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+        if (stream == null) {
+            return null;
+        }
+        byte[] data = Util.readInputStream(stream);
+        long peer = WindowsNative.mediaCreate(data, data.length, mimeType);
+        if (peer == 0) {
+            return null;
+        }
+        return new WindowsMedia(peer, onCompletion);
     }
 
     /** English long month names; index 0 = January. */

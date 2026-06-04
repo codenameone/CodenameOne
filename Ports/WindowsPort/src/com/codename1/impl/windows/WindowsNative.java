@@ -359,4 +359,32 @@ public final class WindowsNative {
     public static native void clipboardSetText(String text);
 
     public static native String clipboardGetText();
+
+    /* ----------------------------------------------------------- media */
+
+    /** Creates a Media Foundation player from the given bytes (spooled to a temp
+     *  file). {@code length} is the valid byte count; {@code mimeType} hints the
+     *  source resolver. Returns a peer handle, or 0 on failure. */
+    public static native long mediaCreate(byte[] data, int length, String mimeType);
+
+    public static native void mediaPlay(long peer);
+
+    public static native void mediaPause(long peer);
+
+    public static native void mediaSetTime(long peer, int millis);
+
+    public static native int mediaGetTime(long peer);
+
+    public static native int mediaGetDuration(long peer);
+
+    public static native void mediaSetVolume(long peer, int volume);
+
+    public static native boolean mediaIsPlaying(long peer);
+
+    public static native boolean mediaIsEnded(long peer);
+
+    public static native boolean mediaIsVideo(long peer);
+
+    /** Stops playback, frees the engine and deletes the temp file. */
+    public static native void mediaDestroy(long peer);
 }

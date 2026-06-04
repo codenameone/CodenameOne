@@ -611,7 +611,10 @@ public class ByteCodeTranslator {
                 // nativeSources call into; they are exercised on the Windows CI
                 // legs (windows-latest / windows-11-arm).
                 writer.append("if(WIN32)\n");
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 uuid)\n");
+                // d2d1/dwrite/dxgi/windowscodecs: Direct2D + DirectWrite + WIC render layer.
+                // mf*/mfplat/mfuuid: Media Foundation Media Engine (cn1_windows_media.cpp).
+                // oleaut32: SysAllocString for the media source URL BSTR.
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid)\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
