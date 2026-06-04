@@ -194,6 +194,11 @@ public final class WindowsNative {
 
     public static native void clipRect(long graphics, int x, int y, int width, int height);
 
+    /** Sets the clip to an arbitrary screen-space polygon/path (flattened, same
+     *  encoding as {@link #fillShape}). Used for clipRect under a transform and
+     *  setClip(Shape). */
+    public static native void setClipShape(long graphics, float[] coords, int[] types, int typeCount, int windingRule);
+
     /* ---------------------------------------------------------- drawing */
 
     public static native void drawLine(long graphics, int x1, int y1, int x2, int y2);

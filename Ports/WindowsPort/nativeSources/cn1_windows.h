@@ -115,6 +115,8 @@ typedef struct CN1Graphics {
     JAVA_INT alpha;                  /* 0..255                               */
     JAVA_INT clipX, clipY, clipW, clipH;
     JAVA_BOOLEAN clipIsRect;
+    void* clipGeom;                  /* ID2D1PathGeometry* when clip is a shape, else NULL */
+    void* clipLayer;                 /* ID2D1Layer* pushed for a shape clip, else NULL     */
     struct CN1Font* font;            /* current font, not owned              */
     JAVA_BOOLEAN inFrame;            /* between BeginDraw / EndDraw           */
     void* wicBitmap;                 /* IWICBitmap* for offscreen targets, else NULL */

@@ -152,6 +152,18 @@
 #ifndef ID2D1RenderTarget_PushAxisAlignedClip
 #define ID2D1RenderTarget_PushAxisAlignedClip(This, ...) ((This)->PushAxisAlignedClip(__VA_ARGS__))
 #endif
+#ifndef ID2D1RenderTarget_CreateLayer
+#define ID2D1RenderTarget_CreateLayer(This, ...) ((This)->CreateLayer(__VA_ARGS__))
+#endif
+#ifndef ID2D1RenderTarget_PushLayer
+#define ID2D1RenderTarget_PushLayer(This, ...) ((This)->PushLayer(__VA_ARGS__))
+#endif
+#ifndef ID2D1RenderTarget_PopLayer
+#define ID2D1RenderTarget_PopLayer(This, ...) ((This)->PopLayer(__VA_ARGS__))
+#endif
+#ifndef ID2D1Layer_Release
+#define ID2D1Layer_Release(This, ...) ((This)->Release(__VA_ARGS__))
+#endif
 #ifndef ID2D1RenderTarget_Release
 #define ID2D1RenderTarget_Release(This, ...) ((This)->Release(__VA_ARGS__))
 #endif

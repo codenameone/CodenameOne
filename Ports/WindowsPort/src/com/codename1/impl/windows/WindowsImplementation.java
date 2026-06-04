@@ -772,7 +772,37 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
-        WindowsNative.clipRect(peer(graphics), x, y, width, height);
+        com.codename1.ui.Transform t = getTransform(graphics);
+        if (t == null || t.isIdentity()) {
+            WindowsNative.clipRect(peer(graphics), x, y, width, height);
+            return;
+        }
+        /* Under a rotation/scale the clip rect becomes a transformed quad in screen
+         * space (the clip-under-rotation case). Map its 4 corners through the
+         * current transform and set that polygon as the clip. */
+        float[] in = new float[2];
+        float[] out = new float[2];
+        float[] coords = new float[8];
+        int[] types = { 0, 1, 1, 1, 4 };
+        in[0] = x;          in[1] = y;          t.transformPoint(in, out); coords[0] = out[0]; coords[1] = out[1];
+        in[0] = x + width;  in[1] = y;          t.transformPoint(in, out); coords[2] = out[0]; coords[3] = out[1];
+        in[0] = x + width;  in[1] = y + height; t.transformPoint(in, out); coords[4] = out[0]; coords[5] = out[1];
+        in[0] = x;          in[1] = y + height; t.transformPoint(in, out); coords[6] = out[0]; coords[7] = out[1];
+        WindowsNative.setClipShape(peer(graphics), coords, types, 5, 1);
+    }
+
+    @Override
+    public boolean isShapeClipSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public void setClip(Object graphics, Shape shape) {
+        if (shape == null) {
+            return;
+        }
+        FlatPath fp = flattenShape(shape);
+        WindowsNative.setClipShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule);
     }
 
     /* Clip stack. The base pushClip/popClip are unimplemented no-ops, so a

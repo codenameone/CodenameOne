@@ -82,6 +82,8 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
         g->clipH = 0;
     }
     g->clipIsRect = JAVA_TRUE;
+    g->clipGeom = NULL;
+    g->clipLayer = NULL;
     g->font = cn1Win.defaultFont;
     g->inFrame = JAVA_FALSE;
     g->wicBitmap = NULL;
@@ -161,6 +163,26 @@ ID2D1SolidColorBrush* cn1WinBrush(CN1Graphics* g) {
  * axis-aligned clip. Must be paired with cn1WinPopClip after the primitive.
  */
 static void cn1WinPushClip(CN1Graphics* g) {
+    /* Shape clip (clipRect under a rotation/scale, setClip(Shape)): the mask is a
+     * screen-space geometry, so push it as a layer with an identity maskTransform.
+     * The render-target transform still applies to the drawing, not the mask, so a
+     * rotated fill is clipped to the rotated clip polygon. */
+    if (!g->clipIsRect && g->clipGeom != NULL) {
+        ID2D1Layer* layer = NULL;
+        if (SUCCEEDED(ID2D1RenderTarget_CreateLayer(g->target, NULL, &layer)) && layer != NULL) {
+            D2D1_LAYER_PARAMETERS lp;
+            lp.contentBounds = D2D1::InfiniteRect();
+            lp.geometricMask = (ID2D1Geometry*) g->clipGeom;
+            lp.maskAntialiasMode = D2D1_ANTIALIAS_MODE_PER_PRIMITIVE;
+            lp.maskTransform = D2D1::Matrix3x2F::Identity();
+            lp.opacity = 1.0f;
+            lp.opacityBrush = NULL;
+            lp.layerOptions = D2D1_LAYER_OPTIONS_NONE;
+            ID2D1RenderTarget_PushLayer(g->target, &lp, layer);
+            g->clipLayer = layer;
+        }
+        return;
+    }
     D2D1_RECT_F clip;
     clip.left = (FLOAT)g->clipX;
     clip.top = (FLOAT)g->clipY;
@@ -179,6 +201,12 @@ static void cn1WinPushClip(CN1Graphics* g) {
 }
 
 static void cn1WinPopClip(CN1Graphics* g) {
+    if (g->clipLayer != NULL) {
+        ID2D1RenderTarget_PopLayer(g->target);
+        ID2D1Layer_Release((ID2D1Layer*) g->clipLayer);
+        g->clipLayer = NULL;
+        return;
+    }
     ID2D1RenderTarget_PopAxisAlignedClip(g->target);
 }
 
@@ -241,6 +269,17 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_getClipHeight___long_R_int(COD
     return ((CN1Graphics*)__cn1Arg1)->clipH;
 }
 
+static ID2D1PathGeometry* cn1WinBuildPathGeometry(const JAVA_ARRAY_FLOAT* coords, const JAVA_ARRAY_INT* types,
+        JAVA_INT typeCount, JAVA_INT windingRule);
+
+/* Drop any pending shape clip; the next push uses the axis-aligned rect path. */
+static void cn1WinReleaseClipGeom(CN1Graphics* g) {
+    if (g->clipGeom != NULL) {
+        ID2D1PathGeometry_Release((ID2D1PathGeometry*) g->clipGeom);
+        g->clipGeom = NULL;
+    }
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_setClip___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
     CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
     g->clipX = __cn1Arg2;
@@ -248,6 +287,28 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClip___long_int_int_int_in
     g->clipW = __cn1Arg4;
     g->clipH = __cn1Arg5;
     g->clipIsRect = JAVA_TRUE;
+    cn1WinReleaseClipGeom(g);
+}
+
+/* Sets the clip to an arbitrary screen-space shape (flattened path arrays, same
+ * encoding as fillShape). Used for clipRect under a non-identity transform and
+ * setClip(Shape). The geometry is in device/screen space, so the push layer uses
+ * an identity mask transform. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_setClipShape___long_float_1ARRAY_int_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3,
+        JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
+    CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
+    const JAVA_ARRAY_FLOAT* coords;
+    const JAVA_ARRAY_INT* types;
+    if (g == NULL || __cn1Arg2 == NULL || __cn1Arg3 == NULL) {
+        return;
+    }
+    cn1WinReleaseClipGeom(g);
+    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    g->clipGeom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
+    g->clipIsRect = (g->clipGeom == NULL) ? JAVA_TRUE : JAVA_FALSE;
+    /* Keep clipX/Y/W/H as the geometry's bounding box so getClip* stays sane. */
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_clipRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
@@ -268,6 +329,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_clipRect___long_int_int_int_i
     g->clipW = (newRight > newX) ? (newRight - newX) : 0;
     g->clipH = (newBottom > newY) ? (newBottom - newY) : 0;
     g->clipIsRect = JAVA_TRUE;
+    cn1WinReleaseClipGeom(g);
 }
 
 /* ------------------------------------------------------------- primitives */
