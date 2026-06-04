@@ -4138,6 +4138,23 @@ public final class Display extends CN1Constants {
 
     }
 
+    /// Indicates whether this platform provides a native low latency sound pool
+    /// backing `com.codename1.gaming.SoundPool`. When false the gaming layer uses a
+    /// `com.codename1.media.MediaManager` based fallback.
+    public boolean isSoundPoolSupported() {
+        return impl.isSoundPoolSupported();
+    }
+
+    /// Creates a native low latency sound pool peer for `com.codename1.gaming.SoundPool`,
+    /// or returns null when this platform has no native backend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxStreams`: the maximum number of simultaneously playing voices
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        return impl.createSoundPool(maxStreams);
+    }
+
     /// Creates a soft/weak reference to an object that allows it to be collected
     /// yet caches it. This method is in the porting layer since CLDC only includes
     /// weak references while some platforms include nothing at all and some include

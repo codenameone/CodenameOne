@@ -67,6 +67,8 @@ include::graphics.asciidoc[]
 
 include::3D-Graphics.asciidoc[]
 
+include::Game-Development.asciidoc[]
+
 include::Events.asciidoc[]
 
 include::io.asciidoc[]

@@ -1,0 +1,346 @@
+== Game Development
+
+Codename One is a general purpose UI toolkit, but it ships with a package built
+specifically for games: https://www.codenameone.com/javadoc/com/codename1/gaming/package-summary.html[`com.codename1.gaming`].
+It gives you the things games need -- a tight update/render loop, sprite
+primitives, pollable input, low latency sound effects and rigid body physics --
+while building entirely on top of the existing Codename One facilities (the
+animation system, the `Graphics` pipeline and the media APIs) rather than
+replacing them. Everything written here runs unchanged on every Codename One
+target, including iOS.
+
+TIP: This chapter covers the real time game surface. For the "casual game"
+approach -- building game elements out of regular `Component`s and letting the
+layout system render them -- the techniques in the <<Animations>> chapter are
+often a better fit. Reach for `com.codename1.gaming` when you want a framerate
+driven loop and direct rendering.
+
+=== Why a game loop on top of the EDT?
+
+Codename One runs all painting and events on a single thread, the
+<<The-EDT---Event-Dispatch-Thread,Event Dispatch Thread (EDT)>>. The framework's
+animation system already separates "advance one tick" from "draw a frame", which
+is exactly the shape of a game loop. The gaming package wraps that machinery in a
+familiar `update`/`render` facade so you never touch the EDT plumbing directly,
+and exposes input as state you poll rather than events you react to.
+
+The one rule to keep in mind: because your `update` and `render` methods run on
+the EDT, they must never block. Offload asset loading, networking or other long
+work to a background thread and hand the result back with
+https://www.codenameone.com/javadoc/com/codename1/ui/CN.html#callSerially-java.lang.Runnable-[`CN.callSerially`].
+
+=== The game loop: `GameView`
+
+https://www.codenameone.com/javadoc/com/codename1/gaming/GameView.html[`GameView`]
+is a `Component` that drives the loop. Subclass it, implement `update(double
+deltaSeconds)` to advance the game and `render(Graphics g)` to draw a frame, add
+it to a `Form`, then call `start()`:
+
+[source,java]
+----
+public class MyGame extends GameView {
+    private final Sprite player = new Sprite(playerImage);
+
+    @Override
+    protected void update(double dt) {
+        if (getInput().isGameKeyDown(Display.GAME_RIGHT)) {
+            player.setX(player.getX() + 200 * dt);   // 200 px/second
+        }
+    }
+
+    @Override
+    protected void render(Graphics g) {
+        g.setColor(0x101020);
+        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        player.draw(g);
+    }
+}
+
+Form f = new Form("Game", new BorderLayout());
+MyGame game = new MyGame();
+f.add(BorderLayout.CENTER, game);
+f.show();
+game.start();
+----
+
+The `deltaSeconds` passed to `update` is the wall clock time since the previous
+frame. Multiplying movement by it keeps your game running at the same speed
+regardless of the actual framerate ("delta timing").
+
+==== Lifecycle
+
+`start()` registers the view with the form's animation system and raises the
+framerate; `stop()` deregisters it and restores the previous framerate. `pause()`
+and `resume()` suspend updates without tearing the loop down (resuming resets the
+frame clock so the pause gap doesn't produce one huge `dt`). The view also
+releases its framerate hold automatically when it is removed from the form, so a
+backgrounded game does not keep the device awake.
+
+[source,java]
+----
+game.start();   // begin the loop (call after the form is shown)
+game.pause();   // freeze updates, keep the view live
+game.resume();  // continue
+game.stop();    // end the loop, restore the framerate
+----
+
+==== Framerate and battery
+
+`setTargetFramerate(int fps)` (default 60) controls how often the loop runs. The
+framerate is a global Codename One setting; `GameView` saves and restores it
+around the game so the rest of your UI is unaffected.
+
+`setNoSleep(true)` makes the EDT never idle between frames for the highest
+possible framerate -- at a steep battery cost. Leave it off (the default) and
+rely on a capped-but-high target framerate unless you have a specific reason.
+
+==== Fixed timestep and interpolation
+
+Variable timesteps are simple but make physics non deterministic. Call
+`setFixedTimestep(seconds)` to have `update` invoked at a fixed interval instead;
+the loop accumulates real time and may call `update` several times in one frame to
+catch up (capped to avoid a "spiral of death" after a long pause). The leftover
+fraction is available from `getInterpolationAlpha()` (0..1) so you can interpolate
+rendered positions between physics states:
+
+[source,java]
+----
+game.setFixedTimestep(1.0 / 120.0);   // step physics at a steady 120Hz
+// in render(): blend previous and current state by getInterpolationAlpha()
+----
+
+=== Input: `GameInput`
+
+Games usually want to ask "is the left key down right now?" rather than handle a
+stream of events. https://www.codenameone.com/javadoc/com/codename1/gaming/GameInput.html[`GameInput`],
+obtained from `GameView.getInput()`, captures the view's key and pointer events
+and exposes them as state. There are two flavors:
+
+* *Level* state, true for as long as the input is held: `isKeyDown(int)`,
+`isGameKeyDown(int gameAction)`, `isPointerDown()`.
+* *Edge* state, true only during the single frame the transition happened:
+`wasKeyPressed(int)`, `wasKeyReleased(int)`, `wasPointerPressed()`,
+`wasPointerReleased()`. Edges are cleared at the end of each frame, after `update`
+has run.
+
+`isGameKeyDown` works with the device independent game actions `Display.GAME_UP`,
+`GAME_DOWN`, `GAME_LEFT`, `GAME_RIGHT` and `GAME_FIRE`, so directional input works
+the same across keyboards and devices. Pointer coordinates are reported relative
+to the `GameView`'s top left.
+
+[source,java]
+----
+GameInput in = getInput();
+if (in.isGameKeyDown(Display.GAME_FIRE)) { fire(); }
+if (in.wasPointerPressed()) { spawnAt(in.getPointerX(), in.getPointerY()); }
+----
+
+All input state is read and written on the EDT, so no synchronization is needed in
+your game code.
+
+=== Sprites
+
+A https://www.codenameone.com/javadoc/com/codename1/gaming/Sprite.html[`Sprite`]
+is an image with position, rotation, scale, alpha and a normalized anchor. Its
+`getX()`/`getY()` is the location of the anchor point (the image center by
+default), and rotation and scale pivot around that anchor. `draw(Graphics g)`
+renders it through the graphics affine transform, falling back to a plain image
+draw (ignoring rotation/scale) on the rare platform without transform support.
+
+[source,java]
+----
+Sprite ship = new Sprite(shipImage);
+ship.setPosition(160, 240);
+ship.setRotation(45);          // degrees, clockwise
+ship.setScale(2f);
+ship.setAlpha(200);            // 0..255
+// in render():
+ship.draw(g);
+----
+
+`getBounds()` returns the axis aligned bounding box and `intersects(Sprite)` does a
+quick box overlap test, handy for broad phase collision before you involve physics.
+
+==== Sprite sheets and animation
+
+https://www.codenameone.com/javadoc/com/codename1/gaming/SpriteSheet.html[`SpriteSheet`]
+slices one atlas image into a grid of equally sized frames, cutting and caching
+each frame on first use (cutting a sub image copies pixels, so caching matters).
+
+https://www.codenameone.com/javadoc/com/codename1/gaming/AnimatedSprite.html[`AnimatedSprite`]
+is a `Sprite` that cycles through a sequence of frames over time; it advances in
+`onUpdate(double)`, so adding it to a `Scene` (below) drives playback.
+
+[source,java]
+----
+SpriteSheet sheet = new SpriteSheet(explosionImage, 64, 64);
+AnimatedSprite boom = new AnimatedSprite(
+        sheet, new int[]{0, 1, 2, 3, 4, 5}, 0.05); // 50ms per frame
+boom.setLooping(false);
+----
+
+==== Scenes
+
+https://www.codenameone.com/javadoc/com/codename1/gaming/Scene.html[`Scene`] is a
+z-ordered collection of sprites with an optional camera offset. Call its
+`update(double)` from your loop's `update` (it advances every sprite's
+`onUpdate`) and its `render(Graphics)` from your `render` (it draws sprites from
+lowest to highest `zOrder`, re-sorting only when the contents change). The camera
+offset (`setCamera(int, int)`) scrolls the whole scene.
+
+[source,java]
+----
+private final Scene scene = new Scene();
+// ...
+scene.add(player);
+scene.add(boom);
+// in update():
+scene.update(dt);
+// in render():
+scene.render(g);
+----
+
+=== Low latency audio: `SoundPool`
+
+Music and video use the regular `MediaManager`, but rapid overlapping sound
+effects -- gunshots, coins, footsteps -- need a different tool.
+https://www.codenameone.com/javadoc/com/codename1/gaming/SoundPool.html[`SoundPool`]
+loads short clips once and triggers them with minimal latency, mixing several at
+the same time.
+
+[source,java]
+----
+SoundPool sfx = SoundPool.create(12);          // up to 12 simultaneous voices
+SoundEffect coin = sfx.load("/coin.wav");
+// ... in the game loop:
+coin.play();                                   // fire and forget
+int voice = coin.play(0.8f, -0.3f, 1.2f, 0);   // volume, pan, rate/pitch, loop
+sfx.setVolume(voice, 0.5f);                     // adjust a playing voice
+----
+
+`play` returns a voice id (or `-1` if the pool is momentarily exhausted -- it never
+blocks on the hot path). The parameters are: `volume` 0..1, `pan` -1 (left) to 1
+(right), `rate` playback speed/pitch (1.0 is normal), and `loop` (0 once, -1
+forever, n extra repeats). `stop`, `pause`, `resume`, `stopAll`, `autoPause` and
+`autoResume` manage playback; `release()` frees the pool.
+
+On platforms with a purpose built low latency audio engine the pool uses it
+directly with full volume/pan/pitch support. Where none exists it falls back to a
+`MediaManager` based pool that still works everywhere but has higher latency and
+ignores pan and rate. `isNativeAccelerated()` tells you which path is active.
+
+NOTE: Load your sounds once, up front -- ideally on a background thread with
+`SoundPool.loadAsync(...)` -- and keep the `SoundEffect` references for the life of
+the game. Decoding on the fly defeats the purpose.
+
+=== Physics
+
+The https://www.codenameone.com/javadoc/com/codename1/gaming/physics/package-summary.html[`com.codename1.gaming.physics`]
+package adds 2D rigid body physics. It is an idiomatic wrapper around a pure Java
+port of the well known Box2D engine, so it runs on every platform -- including
+iOS, where it is translated to C with no native code.
+
+==== Units: pixels, meters and the y axis
+
+Box2D is tuned for objects a few meters across, so the world works in *meters*
+internally while exposing *pixels* to you. The conversion is governed by
+`setPixelsPerMeter(float)` (default 30). The wrapper also flips the y axis -- Box2D
+points y up, the screen points y down -- so your code stays in screen coordinates.
+The practical consequence: a positive gravity y pulls bodies *down* the screen.
+
+==== Worlds and bodies
+
+Create a https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsWorld.html[`PhysicsWorld`],
+populate it with https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsBody.html[`PhysicsBody`]
+objects, and step it once per frame from your `update`:
+
+[source,java]
+----
+PhysicsWorld world = new PhysicsWorld(0, 900);   // gravity 900 px/s^2 downward
+
+// a STATIC floor that never moves
+world.createBox(160, 460, 320, 40, BodyType.STATIC);
+
+// a DYNAMIC crate affected by gravity and collisions
+PhysicsBody crate = world.createBox(160, 0, 32, 32, BodyType.DYNAMIC);
+crate.setRestitution(0.4f);   // bounciness
+crate.setFriction(0.5f);
+
+// in update(double dt):
+world.step((float) dt);
+----
+
+Bodies come in three kinds, the
+https://www.codenameone.com/javadoc/com/codename1/gaming/physics/BodyType.html[`BodyType`]
+values: `STATIC` (immovable -- ground, walls), `KINEMATIC` (moved by you via
+velocity, unaffected by forces) and `DYNAMIC` (fully simulated). Bodies can be
+boxes, circles or polygons (`createBox`, `createCircle`, `createPolygon`) and
+respond to `setLinearVelocity`, `applyForce`, `applyLinearImpulse`, `applyTorque`,
+`setBullet` (continuous collision for fast objects), `setFixedRotation` and more.
+
+==== Driving sprites from physics
+
+A body can drive a sprite directly. `Sprite` implements
+https://www.codenameone.com/javadoc/com/codename1/gaming/physics/PhysicsLinkable.html[`PhysicsLinkable`],
+so linking the two means `world.step(...)` updates the sprite's position and
+rotation automatically (in pixels, screen space) -- you just draw it:
+
+[source,java]
+----
+Sprite crateSprite = new Sprite(crateImage);
+crate.setLinkedSprite(crateSprite);
+scene.add(crateSprite);
+
+// update():  world.step((float) dt);   // moves crate, which moves crateSprite
+// render():  scene.render(g);          // draws crateSprite at its new spot
+----
+
+==== Collisions
+
+Register a https://www.codenameone.com/javadoc/com/codename1/gaming/physics/ContactListener.html[`ContactListener`]
+to be told when bodies start and stop touching. Callbacks fire from inside
+`step(...)` -- on the game loop thread -- so you can read and update game state
+directly, but you must not create or destroy bodies during the callback; defer
+that until after `step` returns.
+
+[source,java]
+----
+world.addContactListener(new ContactListener() {
+    public void beginContact(PhysicsContact c) {
+        Object a = c.getSpriteA();   // the linked sprites, if any
+        Object b = c.getSpriteB();
+        // e.g. flag the bodies for removal after this step
+    }
+    public void endContact(PhysicsContact c) { }
+});
+----
+
+If you need a feature the wrapper does not expose, `PhysicsWorld.getNativeWorld()`
+and `PhysicsBody.getNativeBody()` give you the underlying engine objects (which
+work in meters, y up).
+
+=== Putting it together
+
+The `GamingDemoSample` in the samples project ties the whole package together in
+under 200 lines: a `GameView` running a `PhysicsWorld` with a floor and walls,
+tap-to-drop balls that bounce, each ball a `Sprite` linked to its body and drawn
+through a `Scene`, and a `SoundPool` blip whose pitch varies per drop. It generates
+its sprite images and its sound at runtime, so it needs no assets -- a compact,
+copyable starting point for your own game.
+
+=== Performance notes
+
+* Keep `update` and `render` non blocking -- they run on the EDT. Load assets off
+the EDT and hand them back with `CN.callSerially`.
+* Prefer a high target framerate over `setNoSleep(true)`; the latter drains the
+battery and can cause thermal throttling on devices.
+* Cache cut sprite frames (use `SpriteSheet`, which does it for you) rather than
+re-slicing every frame.
+* Load every `SoundEffect` up front and reuse it.
+* Tune `setPixelsPerMeter` so your moving bodies are on the order of a meter
+(tens of pixels) in size; very large or very small bodies make the simulation
+unstable.
+
+The physics engine in `com.codename1.gaming.physics.box2d` is a derived work of
+JBox2D (a Java port of Erin Catto's Box2D), used under the BSD 2-Clause license;
+see the project `NOTICE` file for attribution.

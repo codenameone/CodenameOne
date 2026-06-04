@@ -213,9 +213,25 @@ public final class IOSNative {
     native void cleanupAudio(long peer);
 
     native long createAudio(String uri, Runnable onCompletion);
-    
+
     native long createAudio(byte[] data, Runnable onCompletion);
-    
+
+    // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
+    native long nativeCreateSoundPool(int maxStreams);
+    native long nativeLoadSound(long pool, byte[] data, int ringSize);
+    native int nativePlaySound(long pool, long sound, float volume, float pan, float rate, int loop);
+    native void nativeSetSoundVolume(long pool, int voiceId, float volume);
+    native void nativeSetSoundRate(long pool, int voiceId, float rate);
+    native void nativeSetSoundPan(long pool, int voiceId, float pan);
+    native void nativePauseSound(long pool, int voiceId);
+    native void nativeResumeSound(long pool, int voiceId);
+    native void nativeStopSound(long pool, int voiceId);
+    native void nativeStopAllSounds(long pool);
+    native void nativeAutoPauseSoundPool(long pool);
+    native void nativeAutoResumeSoundPool(long pool);
+    native void nativeUnloadSound(long pool, long sound);
+    native void nativeReleaseSoundPool(long pool);
+
     native float getVolume();
 
     native void setVolume(float vol);

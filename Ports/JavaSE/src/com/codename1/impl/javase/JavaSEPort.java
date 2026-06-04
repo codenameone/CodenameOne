@@ -12190,6 +12190,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public boolean isSoundPoolSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
+        try {
+            return new JavaSESoundPool(maxStreams);
+        } catch (Throwable t) {
+            // audio line unavailable (e.g. headless CI) -- fall back to the
+            // MediaManager based pool by reporting no native backend
+            return null;
+        }
+    }
+
     
     
     
