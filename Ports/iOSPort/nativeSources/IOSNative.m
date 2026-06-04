@@ -30,6 +30,7 @@
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
+#import "METALView.h"
 #endif
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -6210,6 +6211,95 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+// Reads the Metal renderer's persistent screenTexture back into a CGImage.
+// screenTexture is exactly the frame presentFramebuffer blits into the
+// CAMetalLayer drawable, so it IS the genuine on-screen pixel content. Unlike
+// -drawViewHierarchyInRect: / -snapshotViewAfterScreenUpdates:, reading it
+// back does not depend on a CADisplayLink present cycle -- which never fires
+// on headless Mac Catalyst CI -- so it always reflects the latest committed
+// frame rather than a stale one. The blit is submitted on the same command
+// queue METALView renders on (CN1MetalCommandQueue), so FIFO ordering
+// guarantees it runs after the frame's render work; waitUntilCompleted then
+// makes the pixels readable. Returns NULL if Metal isn't initialised yet.
+static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
+    if (mv == nil) {
+        return NULL;
+    }
+    id<MTLTexture> src = mv.screenTexture;
+    if (src == nil) {
+        return NULL;
+    }
+    NSUInteger w = src.width;
+    NSUInteger h = src.height;
+    if (w == 0 || h == 0) {
+        return NULL;
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (device == nil || queue == nil) {
+        return NULL;
+    }
+    // screenTexture is MTLStorageModePrivate -- the CPU can't getBytes from it
+    // directly. Blit it into a CPU-visible staging texture and synchronize.
+    // Managed storage is used (not Shared) because it is the one mode valid on
+    // both Apple-silicon and Intel Mac GPUs under Catalyst; synchronizeResource
+    // makes the managed copy CPU-visible (a no-op on unified memory).
+    MTLTextureDescriptor *desc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                           width:w height:h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeManaged;
+    id<MTLTexture> staging = [device newTextureWithDescriptor:desc];
+    if (staging == nil) {
+        return NULL;
+    }
+    id<MTLCommandBuffer> cb = [queue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:src
+              sourceSlice:0 sourceLevel:0
+             sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(w, h, 1)
+                toTexture:staging
+         destinationSlice:0 destinationLevel:0
+        destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit synchronizeResource:staging];
+    [blit endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+
+    NSUInteger bytesPerRow = w * 4;
+    void *bytes = malloc(h * bytesPerRow);
+    if (bytes == NULL) {
+#ifndef CN1_USE_ARC
+        [staging release];
+#endif
+        return NULL;
+    }
+    [staging getBytes:bytes
+          bytesPerRow:bytesPerRow
+           fromRegion:MTLRegionMake2D(0, 0, w, h)
+          mipmapLevel:0];
+#ifndef CN1_USE_ARC
+    [staging release];
+#endif
+
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    // BGRA8Unorm in memory (B,G,R,A) is a 0xAARRGGBB little-endian word, which
+    // Core Graphics consumes as byteOrder32Little | premultipliedFirst (ARGB).
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little;
+    CGContextRef cgctx = CGBitmapContextCreate(bytes, w, h, 8, bytesPerRow, cs, bitmapInfo);
+    CGColorSpaceRelease(cs);
+    CGImageRef img = NULL;
+    if (cgctx != NULL) {
+        img = CGBitmapContextCreateImage(cgctx);
+        CGContextRelease(cgctx);
+    }
+    free(bytes);
+    return img;
+}
+#endif
+
 static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
@@ -6317,6 +6407,28 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
     }
 #endif
+#if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
+    // The Metal screen view: capture from the renderer's screenTexture, the
+    // exact pixels presented to the drawable. On headless Mac Catalyst the
+    // display link never presents, so -drawViewHierarchyInRect: below would
+    // snapshot a stale CALayer frame. The screenTexture readback is always the
+    // latest committed frame, so it is both correct and deterministic.
+    if (!drawn && [renderView isKindOfClass:[METALView class]]) {
+        CGImageRef cg = cn1_copyMetalScreenTextureImage((METALView *)renderView);
+        if (cg != NULL) {
+            // screenTexture row 0 is the top of the screen; Core Graphics draws
+            // bottom-up, so flip vertically to keep it upright in the
+            // (top-left-origin) UIGraphics capture context.
+            CGContextSaveGState(ctx);
+            CGContextTranslateCTM(ctx, 0, localBounds.size.height);
+            CGContextScaleCTM(ctx, 1.0, -1.0);
+            CGContextDrawImage(ctx, CGRectMake(0, 0, localBounds.size.width, localBounds.size.height), cg);
+            CGContextRestoreGState(ctx);
+            CGImageRelease(cg);
+            drawn = YES;
+        }
+    }
+#endif
     if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
         // afterScreenUpdates:NO — YES can stall indefinitely under UIScene on
         // iPhone/iPad waiting for a scene display-link cycle that never fires
@@ -6324,8 +6436,8 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         // different and YES is required: the live screenTexture isn't
         // committed by CADisplayLink between form.show() and the screenshot
         // callback, so afterScreenUpdates:NO captures the previous form's
-        // framebuffer (see Cn1ssDeviceRunnerHelper's repaint-before-capture
-        // dance which alone isn't enough).
+        // framebuffer. (The Metal screen view is handled by the screenTexture
+        // readback above; this fallback only runs for non-Metal peer views.)
 #if TARGET_OS_MACCATALYST
         drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
 #else

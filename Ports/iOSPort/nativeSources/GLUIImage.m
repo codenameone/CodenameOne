@@ -202,6 +202,13 @@ extern int nextPowerOf2(int val);
     mtlMutableTexture = t;
     mtlMutableWidth = w;
     mtlMutableHeight = h;
+    // Track live mutable images so their pixels can be backed up before the
+    // app is suspended (issue #5153). Registering only on a non-nil texture
+    // keeps the registry to images that actually own GPU content; the weak
+    // table drops them automatically on dealloc.
+    if (t != nil) {
+        CN1MetalRegisterMutableImage(self);
+    }
     // Stale cached read-only texture: future getMTLTexture should sample
     // mtlMutableTexture instead of the UIImage-derived one. Release the
     // +1 retain transferred in by getMTLTexture's CN1MetalTextureFromUIImage
@@ -256,6 +263,10 @@ extern int nextPowerOf2(int val);
     // leaks a GPU texture: the animation/transition test suite creates
     // 7 mutable images per test × ~17 tests, and the simulator runs out
     // of Metal device memory mid-suite, hanging the next test.
+    // Drop out of the suspend/resume backup registry (issue #5153). The weak
+    // table would zero this slot on its own, but unregistering explicitly
+    // keeps it tidy and avoids a stale slot lingering until the next compaction.
+    CN1MetalUnregisterMutableImage(self);
     [mtlTexture release];               mtlTexture = nil;
     [mtlMutableTexture release];        mtlMutableTexture = nil;
     // Same +1 retain ownership rule for the cached command buffer (the

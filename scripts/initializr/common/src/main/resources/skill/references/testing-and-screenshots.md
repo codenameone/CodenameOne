@@ -141,6 +141,21 @@ The right loop:
 
 A screenshot test where the baseline was never visually inspected is theatrical. Don't ship it as "validated".
 
+### Self-baseline regression vs. mockup comparison
+
+`screenshotTest` compares a render to a baseline **the system produced itself** — it measures
+*consistency over time* (did this screen change?), not *correctness* (does it match the design?).
+When you have an **independent reference** — a designer's mockup — use the mockup-comparison tools
+instead, which is the actual correctness signal:
+
+| Goal | Use | Reference |
+| --- | --- | --- |
+| "Did this screen change vs. last run?" (regression) | `TestUtils.screenshotTest(name)` | this doc |
+| "How close is this screen to the designer's mockup?" (correctness) | `tools/CompareToMockup.java` (+ `tools/DesignImport.java`) | `references/mockup-comparison.md` |
+
+The comparison tool prints a similarity percentage and supports region masking so device chrome in
+the mockup doesn't sabotage the score. See `references/mockup-comparison.md` for the full loop.
+
 ## Tests that don't need UI
 
 For pure-logic tests (parsers, models, business rules), set `shouldExecuteOnEDT()` to `false` and skip the UI helpers:
