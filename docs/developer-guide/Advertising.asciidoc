@@ -37,7 +37,7 @@ AdMobProvider.install();
 
 That single call binds the provider; the rest of your code uses only the
 framework API in `com.codename1.ads`. If no provider is registered the API
-degrades gracefully: format support reports `false` and loads fail with
+stays safe: format support reports `false` and loads fail with
 `AdError.CODE_UNSUPPORTED` instead of throwing, so a build without an ad library
 still runs.
 
@@ -47,7 +47,7 @@ Collecting privacy consent is mandatory on modern platforms before personalized
 ads can be served: in the EEA/UK the GDPR consent form must be shown (providers
 wrap Google's User Messaging Platform or an equivalent), and on iOS the App
 Tracking Transparency prompt must be presented to access the advertising
-identifier. The recommended flow is initialize, gather consent, then load:
+identifier. The recommended order is to initialize, gather consent, then load:
 
 [source,java]
 ----
@@ -124,7 +124,7 @@ ad.load();
 ----
 
 `RewardedInterstitialAd` has the same API but is shown on a transition rather
-than strictly opt-in.
+than opt-in.
 
 === App open ads
 
@@ -142,7 +142,7 @@ Native ads let you render the advertiser's assets with your own components, so
 the ad matches the look and feel of the surrounding content. This is the format
 to reach for in content driven apps - a news or social feed, a store listing, a
 chat or a search results screen - where a banner feels bolted on but a row
-styled like the others reads naturally. The ad must still be clearly labelled
+styled like the others fits in. The ad must still be clearly labelled
 (for example "Sponsored"):
 
 [source,java]
@@ -156,13 +156,13 @@ if (NativeAdLoader.isSupported()) {
 
 `NativeAd` exposes the headline, body, call-to-action, advertiser and rating
 that you bind to your own components. Native ad support is an optional provider
-capability; when the active provider does not support it, `NativeAdLoader`
+capability; when the active provider doesn't support it, `NativeAdLoader`
 reports the format as unsupported.
 
 === Configuring the AdMob application id
 
 The GMA SDK requires your per-app AdMob application id in the native project.
-Because it differs per app it is not baked into the library; set it with the
+Because it differs per app it's not baked into the library; set it with the
 standard build hints in your project's `codenameone_settings.properties`:
 
 [source,properties]
@@ -172,7 +172,7 @@ codename1.arg.ios.plistInject=<key>GADApplicationIdentifier</key><string>ca-app-
 ----
 
 The SDK dependencies themselves (the GMA pod / Gradle dependency and the
-INTERNET permission) are declared by the `cn1-admob` library, so they are added
+INTERNET permission) are declared by the `cn1-admob` library, so they're added
 automatically when the library is on the classpath.
 
 === Implementing a provider
