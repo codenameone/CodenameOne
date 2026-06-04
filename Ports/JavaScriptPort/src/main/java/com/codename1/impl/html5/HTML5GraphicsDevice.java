@@ -249,6 +249,15 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         if (texture != null && entry.uTexture != null && texture.getHandle() instanceof WebGLTexture) {
             gl.activeTexture(TEXTURE0);
             gl.bindTexture(TEXTURE_2D, (WebGLTexture) texture.getHandle());
+            // Apply the texture's current filter/wrap at bind time so the fluent
+            // setFilter/setWrap setters take effect even when called after the
+            // texture was created.
+            int f = texture.getFilter() == Texture.Filter.LINEAR ? LINEAR : NEAREST;
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, f);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, f);
+            int wrap = texture.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, wrap);
             gl.uniform1i(entry.uTexture, 0);
         }
 

@@ -245,6 +245,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // a textured cube, and a behavioral animation-loop test.
             new Gpu3DCubeScreenshotTest(),
             new Gpu3DTexturedCubeScreenshotTest(),
+            new Gpu3DModelScreenshotTest(),
             new Gpu3DAnimationTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
