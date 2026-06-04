@@ -29,6 +29,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
@@ -382,6 +383,109 @@ public class WindowsImplementation extends CodenameOneImplementation {
         setTransform(graphics, com.codename1.ui.Transform.makeIdentity());
     }
 
+    /*
+     * Software Gaussian blur. Direct2D has a blur effect but it needs the
+     * ID2D1DeviceContext/effects pipeline the port's plain render targets don't
+     * use; a pure-pixel blur (the same approach iOS/Android fall back to) is
+     * simpler and correct. Three box-blur passes approximate a Gaussian; alpha is
+     * premultiplied so transparent edges (drop shadows -- the Switch thumb, etc.)
+     * blur without dark halos.
+     */
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        if (image == null) {
+            return image;
+        }
+        int w = image.getWidth();
+        int h = image.getHeight();
+        int rad = Math.round(radius);
+        if (w <= 0 || h <= 0 || rad <= 0) {
+            return image;
+        }
+        int[] px = image.getRGB();
+        if (px == null || px.length != w * h) {
+            return image;
+        }
+        for (int i = 0; i < px.length; i++) {
+            int p = px[i];
+            int a = p >>> 24;
+            int r = ((p >> 16) & 0xff) * a / 255;
+            int g = ((p >> 8) & 0xff) * a / 255;
+            int b = (p & 0xff) * a / 255;
+            px[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+        int[] tmp = new int[px.length];
+        for (int pass = 0; pass < 3; pass++) {
+            boxBlur(px, tmp, w, h, rad, true);
+            boxBlur(tmp, px, w, h, rad, false);
+        }
+        for (int i = 0; i < px.length; i++) {
+            int p = px[i];
+            int a = p >>> 24;
+            if (a == 0) {
+                px[i] = 0;
+                continue;
+            }
+            int r = Math.min(255, ((p >> 16) & 0xff) * 255 / a);
+            int g = Math.min(255, ((p >> 8) & 0xff) * 255 / a);
+            int b = Math.min(255, (p & 0xff) * 255 / a);
+            px[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+        return Image.createImage(px, w, h);
+    }
+
+    /** One separable box-blur pass over premultiplied ARGB; edges clamp. */
+    private static void boxBlur(int[] src, int[] dst, int w, int h, int rad, boolean horizontal) {
+        int div = 2 * rad + 1;
+        if (horizontal) {
+            for (int y = 0; y < h; y++) {
+                int row = y * w;
+                for (int x = 0; x < w; x++) {
+                    int aSum = 0, rSum = 0, gSum = 0, bSum = 0;
+                    for (int k = -rad; k <= rad; k++) {
+                        int xx = x + k;
+                        if (xx < 0) {
+                            xx = 0;
+                        } else if (xx >= w) {
+                            xx = w - 1;
+                        }
+                        int p = src[row + xx];
+                        aSum += p >>> 24;
+                        rSum += (p >> 16) & 0xff;
+                        gSum += (p >> 8) & 0xff;
+                        bSum += p & 0xff;
+                    }
+                    dst[row + x] = ((aSum / div) << 24) | ((rSum / div) << 16) | ((gSum / div) << 8) | (bSum / div);
+                }
+            }
+        } else {
+            for (int x = 0; x < w; x++) {
+                for (int y = 0; y < h; y++) {
+                    int aSum = 0, rSum = 0, gSum = 0, bSum = 0;
+                    for (int k = -rad; k <= rad; k++) {
+                        int yy = y + k;
+                        if (yy < 0) {
+                            yy = 0;
+                        } else if (yy >= h) {
+                            yy = h - 1;
+                        }
+                        int p = src[yy * w + x];
+                        aSum += p >>> 24;
+                        rSum += (p >> 16) & 0xff;
+                        gSum += (p >> 8) & 0xff;
+                        bSum += p & 0xff;
+                    }
+                    dst[y * w + x] = ((aSum / div) << 24) | ((rSum / div) << 16) | ((gSum / div) << 8) | (bSum / div);
+                }
+            }
+        }
+    }
+
     @Override
     public boolean isPerspectiveTransformSupported() {
         return false;
@@ -669,6 +773,35 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         WindowsNative.clipRect(peer(graphics), x, y, width, height);
+    }
+
+    /* Clip stack. The base pushClip/popClip are unimplemented no-ops, so a
+     * clipRect inside push/pop never restored -- the narrowed clip leaked to
+     * everything drawn afterwards (visible as the clip test's quadrants clipping
+     * each other). Save/restore the rect clip explicitly. */
+    private final java.util.HashMap<Long, java.util.ArrayList<int[]>> clipStacks =
+            new java.util.HashMap<Long, java.util.ArrayList<int[]>>();
+
+    @Override
+    public void pushClip(Object graphics) {
+        Long g = Long.valueOf(peer(graphics));
+        java.util.ArrayList<int[]> stack = clipStacks.get(g);
+        if (stack == null) {
+            stack = new java.util.ArrayList<int[]>();
+            clipStacks.put(g, stack);
+        }
+        stack.add(new int[] {
+                getClipX(graphics), getClipY(graphics), getClipWidth(graphics), getClipHeight(graphics)
+        });
+    }
+
+    @Override
+    public void popClip(Object graphics) {
+        java.util.ArrayList<int[]> stack = clipStacks.get(Long.valueOf(peer(graphics)));
+        if (stack != null && !stack.isEmpty()) {
+            int[] c = stack.remove(stack.size() - 1);
+            setClip(graphics, c[0], c[1], c[2], c[3]);
+        }
     }
 
     /* ------------------------------------------------------------- drawing */

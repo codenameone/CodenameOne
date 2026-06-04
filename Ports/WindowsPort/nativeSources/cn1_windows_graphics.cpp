@@ -166,7 +166,16 @@ static void cn1WinPushClip(CN1Graphics* g) {
     clip.top = (FLOAT)g->clipY;
     clip.right = (FLOAT)(g->clipX + g->clipW);
     clip.bottom = (FLOAT)(g->clipY + g->clipH);
+    /* The Codename One clip is in screen (post-translate) space, independent of
+     * the drawing transform. PushAxisAlignedClip applies the *current* world
+     * transform to the clip rect, so pushing it while g->transform (a rotation/
+     * scale) is active would rotate/scale the clip too -- the clip-under-rotation
+     * bug. Push the clip under identity, then restore the transform for the draw;
+     * the clip stays axis-aligned in screen space while the geometry transforms. */
+    D2D1_MATRIX_3X2_F idm = D2D1::Matrix3x2F::Identity();
+    ID2D1RenderTarget_SetTransform(g->target, &idm);
     ID2D1RenderTarget_PushAxisAlignedClip(g->target, &clip, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+    ID2D1RenderTarget_SetTransform(g->target, &g->transform);
 }
 
 static void cn1WinPopClip(CN1Graphics* g) {
