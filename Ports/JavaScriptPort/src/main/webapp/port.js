@@ -3188,6 +3188,18 @@ const cn1ssRunnerAwaitTestCompletionMethodId = "cn1_com_codenameone_examples_hel
 // finalize at this deadline; with 48 tests and a 150s browser lifetime budget a
 // longer deadline cannot fit.
 const cn1ssTestTimeoutMs = 10000;
+// PER-TEST DISPATCH WATCHDOG deadline. A test whose runTest BLOCKS (parked on a
+// hung host round-trip) never returns, so it never reaches awaitTestCompletion
+// (whose own type-aware deadline tops out ~30s) -- there is no other timeout on
+// the blocking path, and the suite wedges. The watchdog runs as a concurrent
+// green-thread and force-advances if the suite is still on the same index after
+// this deadline. Set well ABOVE the ~30s awaitTestCompletion max so it never
+// preempts a legitimately-slow-but-completing test, and well BELOW the ~40min
+// suite-level harness timeout so it always recovers a true wedge in time.
+// Erring LONG is deliberate: a false-positive (killing a legitimately-slow test)
+// loses that test's screenshot and breaks green, whereas a long deadline only
+// slows wedge recovery (wedges are rare), so 90s = 3x the ~30s legit max.
+const cn1ssDispatchWatchdogMs = 90000;
 const cn1ssRunnerFinalizeTestMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finalizeTest_int_com_codenameone_examples_hellocodenameone_tests_BaseTest_java_lang_String_boolean";
 const cn1ssRunnerFinishSuiteMethodId = "cn1_com_codenameone_examples_hellocodenameone_tests_Cn1ssDeviceRunner_finishSuite";
 // The translator numbers lambdas in their declaration order within the class.
@@ -3291,22 +3303,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // gap. Park until the SVG transform render is fixed so the suite stays green
   // (a delivering test with no golden fails as "Reference screenshot missing").
   "com_codenameone_examples_hellocodenameone_tests_SVGStaticScreenshotTest": "svgTransformBlankRender",
-  // FileSystemStorageOpenInputStreamMissingTest parked: its synchronous runTest
-  // does fs.exists()/openInputStream() on a missing path, which on the JS port
-  // round-trips into LocalForage.getItem on the host. Under load that host call
-  // intermittently BLOCKS (the same host-bridge/response-cross instability that
-  // surfaces elsewhere) and -- unlike a synchronous THROW, which the wedge-guard
-  // in runCn1ssResolvedTest now advances past -- a blocking runTest never reaches
-  // the catch or awaitTestCompletion, so it wedges the whole suite at the tail
-  // (observed: index 121, the last test, after all 103 screenshots delivered;
-  // run c60319b47). The openFileInputStream LOGIC is correct (exists()->false ->
-  // throws IOException), so this is not a missing-file bug; it's flaky host I/O.
-  // No screenshot golden (shouldTakeScreenshot=false) so parking has zero parity
-  // impact. The proper fix is a general per-test dispatch watchdog (force-advance
-  // ANY test whose runTest blocks past a deadline) or a hard timeout on the
-  // LocalForage host call; tracked separately. Park to keep the suite reaching
-  // SUITE:FINISHED reliably.
-  "com_codenameone_examples_hellocodenameone_tests_FileSystemStorageOpenInputStreamMissingTest": "fileSystemStorageLocalForageHang",
+  // FileSystemStorageOpenInputStreamMissingTest UN-PARKED: it was parked because
+  // its synchronous runTest does fs.exists()/openInputStream() on a missing path,
+  // round-tripping into LocalForage.getItem on the host, which under load
+  // intermittently BLOCKS and -- being a blocking runTest, not a synchronous
+  // throw -- wedged the suite tail at index 121. The new per-test dispatch
+  // watchdog (runCn1ssResolvedTest) now force-advances ANY test whose runTest
+  // blocks past cn1ssDispatchWatchdogMs, so this no longer wedges: it either runs
+  // fine or is force-advanced (no screenshot golden -> no missing_actual). Left
+  // un-parked to exercise + prove the watchdog on a known-blocking test.
   // Transform + Rotated kept UN-parked -- never reached on the prior run
   // (CombinedXY hung first); testing whether they render now.
   // Two more late-suite tests that hit the canvas-accumulation
@@ -3710,6 +3715,23 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   if (!jvm.instanceOf(effectiveTestObject, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
     return null;
   }
+  // IDEMPOTENCY GUARD for the per-test dispatch watchdog (below): each test
+  // index runs at most once. If the watchdog force-advanced past a wedged test,
+  // the original (blocked) dispatch will eventually unblock and try to advance
+  // to the same nextIndex -- this makes that a silent no-op so the suite never
+  // double-runs or skips a test. Cooperative scheduling makes this check-and-set
+  // atomic until the first yield, so the watchdog thread and a recovered
+  // original thread can never both pass it. Monotonic in normal flow (index is
+  // always exactly lastStarted+1), so passing runs are completely unaffected.
+  const __cn1LastStarted = (callTarget.__cn1LastStartedIndex == null) ? -1 : (callTarget.__cn1LastStartedIndex | 0);
+  if ((effectiveIndex | 0) <= __cn1LastStarted) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchSuperseded:index=" + String(effectiveIndex)
+      + ":lastStarted=" + __cn1LastStarted
+    );
+    return null;
+  }
+  callTarget.__cn1LastStartedIndex = (effectiveIndex | 0);
   const normalizedTestName = resolveCn1ssTestNameObject(effectiveTestObject, effectiveTestName);
   const nativeTestName = toCn1StringValue(normalizedTestName);
   cn1ssActiveTestName = nativeTestName || "default";
@@ -3757,6 +3779,47 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
       return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeFailed");
     }
     return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeMissing");
+  }
+  // PER-TEST DISPATCH WATCHDOG: a test whose prepare()/runTest() BLOCKS (parked
+  // on a hung host round-trip -- LocalForage.getItem, getContext, etc.) never
+  // returns, so it never reaches the catch (only synchronous THROWS do -- those
+  // are handled by the runErrored guard below) nor awaitTestCompletion, and the
+  // whole suite wedges with no SUITE:FINISHED (observed: FileSystemStorage at
+  // index 121, SwitchTheme-class hangs). The blocked runTest is a SUSPENDED
+  // generator, so the cooperative scheduler is free to run this concurrent
+  // watchdog green-thread. After a deadline well above the ~30s awaitTestCompletion
+  // max, if the suite is STILL on this index (LastStartedIndex unchanged), force
+  // -advance so the suite always reaches comparison. The idempotency guard at the
+  // top makes the original's eventual unblock a no-op. A test that completes
+  // normally advances long before the deadline, so this is a SILENT no-op on
+  // green runs -- it only ever fires on a genuine wedge, converting a whole-suite
+  // hang into at-worst one test's missing screenshot (same tradeoff as the
+  // synchronous-throw wedge-guard). This is the general safety net that removes
+  // the need to park each individual flaky-blocking test.
+  const __cn1WdIndex = (effectiveIndex | 0);
+  const __cn1WdRunner = callTarget;
+  const __cn1WdName = nativeTestName;
+  try {
+    jvm.spawn(null, (function*() {
+      yield { op: "sleep", millis: cn1ssDispatchWatchdogMs };
+      if ((__cn1WdRunner.__cn1LastStartedIndex | 0) === __cn1WdIndex) {
+        emitLambdaBridgeDiag(
+          "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:stall:index=" + __cn1WdIndex
+          + ":name=" + __cn1WdName
+        );
+        if (global.console && typeof global.console.log === "function") {
+          global.console.log("CN1SS:ERR:suite test=" + __cn1WdName
+            + " force-advanced by dispatch watchdog (runTest blocked > "
+            + cn1ssDispatchWatchdogMs + "ms)");
+        }
+        yield* forceAdvanceCn1ssRunner(__cn1WdRunner, __cn1WdIndex, "dispatchWatchdogStall");
+      }
+    })());
+  } catch (__cn1WdErr) {
+    // Best effort: if spawn is unavailable the suite falls back to the prior
+    // behavior (a blocking test can still wedge); never let arming the watchdog
+    // break dispatch.
+    emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdogArmError=1:index=" + __cn1WdIndex);
   }
   let runErrored = false;
   let runPhase = "prepare";
