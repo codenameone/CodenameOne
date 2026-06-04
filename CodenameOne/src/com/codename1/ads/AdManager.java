@@ -23,84 +23,60 @@
 package com.codename1.ads;
 
 import com.codename1.ads.spi.AdProvider;
-import com.codename1.ads.spi.AdProviderInstaller;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
-import com.codename1.system.NativeLookup;
-import com.codename1.ui.Display;
-import com.codename1.util.SuccessCallback;
 
-/// The entry point of the modern Codename One advertising API. It selects the
-/// active [AdProvider], initializes it once, and exposes the deep lifecycle
-/// integrations (interstitial-on-transition and app open ads) that a standalone
-/// cn1lib could not provide on its own.
+/// The entry point of the Codename One advertising API. It holds the active
+/// [AdProvider] and exposes the lifecycle integrations (interstitial-on-transition
+/// and app open ads) that build on the Codename One form and application
+/// lifecycle.
 ///
-/// The provider is supplied by an ad cn1lib (such as the Google AdMob library)
-/// and discovered automatically: when you add the library to your project its
-/// provider registers itself the first time the ads layer needs it, with no
-/// wiring on your part. You may also call [#registerProvider(AdProvider)]
-/// explicitly to choose among multiple installed providers or to plug in a
-/// custom mediation layer.
-///
-/// Typical startup:
+/// A provider is supplied by an ad library and registered once at startup. Each
+/// library exposes a static `install()` method that registers its provider, so
+/// wiring AdMob is a single line:
 ///
 /// ```java
-/// AdManager.initialize(new AdConfig().testMode(true), new SuccessCallback<Boolean>() {
-///     public void onSucess(Boolean ready) {
-///         AdConsent.requestConsent(null);
-///         // ... create and load ads
-///     }
-/// });
+/// public void init(Object context) {
+///     AdMobProvider.install();
+///     AdManager.initialize(new AdConfig(), ready -> AdConsent.requestConsent(null));
+/// }
 /// ```
 ///
-/// When no provider is installed (for example the bare simulator), the API
-/// degrades gracefully: format support reports false and loads fail with
-/// [AdError#CODE_UNSUPPORTED] instead of throwing.
+/// Any object implementing [AdProvider] can be registered with
+/// [#registerProvider(AdProvider)] directly, so third party ad networks and
+/// mediation layers plug in without changing the framework or the build.
 ///
-/// @author Shai Almog
+/// When no provider is registered the API degrades gracefully: format support
+/// reports false and loads fail with [AdError#CODE_UNSUPPORTED] instead of
+/// throwing.
 public final class AdManager {
     private static AdProvider provider;
-    private static boolean discoveryAttempted;
     private static AdConfig config;
     private static boolean initialized;
 
     private AdManager() {
     }
 
-    /// Registers the ad provider to use. Replaces any previously registered
-    /// provider. Normally called by an ad cn1lib's installer; applications only
-    /// call it to override the default or register a custom provider.
+    /// Registers the ad provider to use, replacing any previously registered
+    /// provider. Normally called by a provider's static `install()` method.
     ///
     /// #### Parameters
     ///
     /// - `p`: the provider to use
-    public static synchronized void registerProvider(AdProvider p) {
+    public static void registerProvider(AdProvider p) {
         provider = p;
     }
 
-    /// The active ad provider, lazily discovering one from an installed cn1lib
-    /// on first access. Returns null when no provider is available on this
-    /// platform.
-    public static synchronized AdProvider getProvider() {
-        if (provider == null && !discoveryAttempted) {
-            discoveryAttempted = true;
-            AdProviderInstaller installer = NativeLookup.create(AdProviderInstaller.class);
-            if (installer != null) {
-                try {
-                    installer.install();
-                } catch (Throwable t) {
-                    Log.e(t);
-                }
-            }
-        }
+    /// The active ad provider, or null when none is registered or the registered
+    /// provider is unsupported on this platform.
+    public static AdProvider getProvider() {
         if (provider != null && !provider.isSupported()) {
             return null;
         }
         return provider;
     }
 
-    /// The configuration passed to [#initialize(AdConfig, SuccessCallback)], or
-    /// null if it has not been called.
+    /// The configuration passed to [#initialize(AdConfig, AdCallback)], or null
+    /// if it has not been called.
     public static AdConfig getConfig() {
         return config;
     }
@@ -115,43 +91,41 @@ public final class AdManager {
         return p != null && p.isFormatSupported(format);
     }
 
-    /// Initializes the active provider's SDK. Safe to call more than once; the
-    /// callback fires when initialization completes (immediately with
-    /// `Boolean.FALSE` when no provider is installed).
+    /// Initializes the active provider's SDK. The callback fires when
+    /// initialization completes (immediately with `Boolean.FALSE` when no
+    /// provider is registered).
     ///
     /// #### Parameters
     ///
     /// - `cfg`: the global ad configuration, must not be null
-    /// - `onComplete`: invoked when initialization finishes, may be null
-    public static void initialize(AdConfig cfg, final SuccessCallback<Boolean> onComplete) {
+    /// - `onComplete`: invoked with the readiness flag, may be null
+    public static void initialize(AdConfig cfg, final AdCallback<Boolean> onComplete) {
         config = cfg;
         AdProvider p = getProvider();
         if (p == null) {
             complete(onComplete, Boolean.FALSE);
             return;
         }
-        p.initialize(cfg, new SuccessCallback<Boolean>() {
+        p.initialize(cfg, new AdCallback<Boolean>() {
             @Override
-            public void onSucess(final Boolean value) {
+            public void onResult(Boolean value) {
                 initialized = value != null && value.booleanValue();
                 complete(onComplete, value == null ? Boolean.FALSE : value);
             }
         });
     }
 
-    /// True once [#initialize(AdConfig, SuccessCallback)] has completed successfully.
+    /// True once [#initialize(AdConfig, AdCallback)] has completed successfully.
     public static boolean isInitialized() {
         return initialized;
     }
 
     /// Shows the supplied interstitial automatically on screen transitions, no
-    /// more often than `minIntervalMillis`. This is the modern, event driven
-    /// replacement for the deprecated `com.codename1.impl.FullScreenAdService`.
+    /// more often than `minIntervalMillis`.
     ///
-    /// The manager takes ownership of the ad's lifecycle: it loads the first ad,
-    /// shows it when a transition occurs and the interval has elapsed, and
-    /// preloads the next one when the ad is dismissed. Any [AdListener] you set
-    /// on the ad is still notified.
+    /// The manager loads the first ad, shows it when a transition occurs and the
+    /// interval has elapsed, and preloads the next one when the ad is dismissed.
+    /// Any [AdListener] you set on the ad is still notified.
     ///
     /// #### Parameters
     ///
@@ -226,22 +200,16 @@ public final class AdManager {
         ad.setAutoShowOnForeground(true);
     }
 
-    private static void complete(final SuccessCallback<Boolean> onComplete, final Boolean value) {
+    private static void complete(final AdCallback<Boolean> onComplete, final Boolean value) {
         if (onComplete == null) {
             return;
         }
-        Display d = Display.getInstance();
-        Runnable r = new Runnable() {
+        AbstractFullScreenAd.runOnEdt(new Runnable() {
             @Override
             public void run() {
-                onComplete.onSucess(value);
+                onComplete.onResult(value);
             }
-        };
-        if (d.isEdt()) {
-            r.run();
-        } else {
-            d.callSerially(r);
-        }
+        });
     }
 
     /// Runnable installed as the current-form-change hook; shows the bound

@@ -29,8 +29,6 @@ package com.codename1.ads;
 ///
 /// The `customData` and `userId` are forwarded verbatim to your verification
 /// endpoint, letting you correlate the callback with the user and context.
-///
-/// @author Shai Almog
 public class ServerSideVerificationOptions {
     private final String userId;
     private final String customData;

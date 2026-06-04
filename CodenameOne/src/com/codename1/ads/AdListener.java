@@ -36,8 +36,6 @@ package com.codename1.ads;
 /// Every callback is delivered on the Codename One EDT, so it is safe to touch
 /// the UI directly. The model is fully event driven; there is never a need to
 /// poll [InterstitialAd#isLoaded()] in a loop.
-///
-/// @author Shai Almog
 public class AdListener {
     /// Invoked when the ad finished loading and is ready to be shown.
     public void onLoaded() {

@@ -384,10 +384,6 @@ public class IPhoneBuilder extends Executor {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
         }
 
-        // Deprecated legacy banner-ad injection. Prefer the modern advertising
-        // API (com.codename1.ads.BannerAd via the cn1-admob library + the
-        // admob.appId build hint), which supports adaptive banners, the full set
-        // of ad formats and UMP/ATT consent. This path is kept for compatibility.
         String googleAdUnitId = request.getArg("ios.googleAdUnitId", request.getArg("google.adUnitId", null));
         boolean usePodsForGoogleAds = googleAdUnitId != null && googleAdUnitId.length() > 0;
         if (usePodsForGoogleAds) {
@@ -3415,33 +3411,7 @@ public class IPhoneBuilder extends Executor {
             }
         
         }
-
-        // Google AdMob (modern com.codename1.ads API): wire the per-app
-        // application id into GADApplicationIdentifier and seed SKAdNetworkItems
-        // so installs attribute under iOS 14+ even without IDFA. Both are only
-        // injected when the developer set the "admob.appId" build hint and has
-        // not already declared the keys via ios.plistInject.
-        String adMobAppId = request.getArg("admob.appId", null);
-        if (adMobAppId != null && adMobAppId.length() > 0 && !inject.contains("GADApplicationIdentifier")) {
-            inject += "\n<key>GADApplicationIdentifier</key><string>" + adMobAppId + "</string>";
-            if (!inject.contains("SKAdNetworkItems")) {
-                // Google's network id plus a few common mediation partners. Apps
-                // needing additional networks can extend this via ios.plistInject.
-                String[] skAdNetworkIds = {
-                        "cstr6suwn9.skadnetwork", // Google AdMob
-                        "4fzdc2evr5.skadnetwork",
-                        "2u9pt9hc89.skadnetwork",
-                        "ludvb6z3bs.skadnetwork",
-                        "su67r6k2v3.skadnetwork"
-                };
-                inject += "\n<key>SKAdNetworkItems</key>\n<array>";
-                for (String skId : skAdNetworkIds) {
-                    inject += "\n  <dict><key>SKAdNetworkIdentifier</key><string>" + skId + "</string></dict>";
-                }
-                inject += "\n</array>";
-            }
-        }
-
+        
         boolean multitasking = "true".equals(request.getArg("ios.multitasking", "true"));
         if(request.getArg("ios.generateSplashScreens", "false").equals(
             "true")) {

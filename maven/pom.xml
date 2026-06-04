@@ -88,6 +88,7 @@
         <module>cn1-ai-whisper</module>
         <module>cn1-ai-stablediffusion</module>
         <module>cn1-admob</module>
+        <module>cn1-ads-mock</module>
     </modules>
     <dependencyManagement>
         <dependencies>

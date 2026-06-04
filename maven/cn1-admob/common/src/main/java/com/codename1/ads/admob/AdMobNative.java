@@ -25,16 +25,10 @@ package com.codename1.ads.admob;
 import com.codename1.system.NativeInterface;
 import com.codename1.ui.PeerComponent;
 
-/// The native bridge to the Google Mobile Ads (GMA) SDK. Implemented per
-/// platform (Android Java, iOS Objective-C, JavaSE placeholder) and resolved by
-/// [com.codename1.system.NativeLookup].
-///
-/// Codename One native interfaces may only pass primitives, Strings and
-/// [PeerComponent], so this bridge addresses each ad by an integer handle
-/// allocated by [AdMobProvider]. Events flow back asynchronously through
-/// [AdMobCallback], keyed by the same handle.
-///
-/// @author Shai Almog
+/// The native bridge to the Google Mobile Ads (GMA) SDK, implemented per
+/// platform (Android, iOS, and a JavaSE placeholder). Each ad is addressed by
+/// an integer handle allocated by [AdMobProvider]; lifecycle events flow back
+/// asynchronously through [AdMobCallback] keyed by the same handle.
 public interface AdMobNative extends NativeInterface {
     /// Initializes the GMA SDK. The flags mirror [com.codename1.ads.AdConfig].
     void initialize(String testDeviceIds, boolean testMode, int tagForChildDirected,

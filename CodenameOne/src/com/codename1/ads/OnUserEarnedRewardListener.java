@@ -25,8 +25,6 @@ package com.codename1.ads;
 /// Invoked when the user finished watching a [RewardedAd] or
 /// [RewardedInterstitialAd] and earned the configured reward. Delivered on the
 /// Codename One EDT.
-///
-/// @author Shai Almog
 public interface OnUserEarnedRewardListener {
     /// Invoked once when the reward is earned.
     ///

@@ -22,17 +22,15 @@
  */
 package com.codename1.ads.spi;
 
+import com.codename1.ads.AdCallback;
 import com.codename1.ads.AdError;
 import com.codename1.ads.AdRequest;
 import com.codename1.ads.NativeAd;
-import com.codename1.util.SuccessCallback;
 
 /// Optional capability interface implemented by an [AdProvider] that supports
 /// native ads. The base [AdProvider] does not require native ad support, so a
 /// provider opts in by additionally implementing this interface;
 /// [com.codename1.ads.NativeAdLoader] checks for it at runtime.
-///
-/// @author Shai Almog
 public interface NativeAdProvider {
     /// Loads a native ad. Exactly one of the callbacks is invoked.
     ///
@@ -43,5 +41,5 @@ public interface NativeAdProvider {
     /// - `onSuccess`: invoked with the loaded native ad
     /// - `onError`: invoked when loading fails
     void loadNativeAd(String adUnitId, AdRequest request,
-                      SuccessCallback<NativeAd> onSuccess, SuccessCallback<AdError> onError);
+                      AdCallback<NativeAd> onSuccess, AdCallback<AdError> onError);
 }

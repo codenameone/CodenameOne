@@ -27,8 +27,6 @@ package com.codename1.ads.admob;
 /// minimal: Android calls these methods directly, iOS invokes the generated C
 /// functions. Events are routed to the right session by [AdMobProvider] using
 /// the integer handle.
-///
-/// @author Shai Almog
 public class AdMobCallback {
     /// Event: the ad finished loading.
     public static final int LOADED = 1;

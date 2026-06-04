@@ -31,8 +31,6 @@ import com.codename1.ui.Display;
 /// [RewardedAd], [RewardedInterstitialAd], [AppOpenAd]). Handles lazy session
 /// creation against the registered [AdProvider] and marshals every provider
 /// callback onto the EDT before forwarding it to the public [AdListener].
-///
-/// @author Shai Almog
 abstract class AbstractFullScreenAd {
     private final AdFormat format;
     /// The ad unit identifier from the network console.

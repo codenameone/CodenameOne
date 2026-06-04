@@ -26,8 +26,6 @@ package com.codename1.ads;
 /// [AdListener#onShowFailed(AdError)]. The numeric [#getCode()] and [#getDomain()]
 /// are provider specific (e.g. the underlying SDK error code), while [#getMessage()]
 /// is a human readable description.
-///
-/// @author Shai Almog
 public class AdError {
     /// Error code used when no ad was available to fill the request.
     public static final int CODE_NO_FILL = 3;

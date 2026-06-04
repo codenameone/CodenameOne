@@ -22,7 +22,7 @@
  */
 package com.codename1.ads.spi;
 
-import com.codename1.util.SuccessCallback;
+import com.codename1.ads.AdCallback;
 
 /// A provider's consent and privacy controller, backing the public
 /// [com.codename1.ads.AdConsent] facade. Implementations wrap the GDPR consent
@@ -30,8 +30,6 @@ import com.codename1.util.SuccessCallback;
 /// Transparency prompt.
 ///
 /// This is an internal SPI type.
-///
-/// @author Shai Almog
 public interface AdConsentController {
     /// Gathers consent if required, presenting the consent form when necessary,
     /// and (on iOS) the App Tracking Transparency prompt. The callback receives
@@ -42,7 +40,7 @@ public interface AdConsentController {
     ///
     /// - `underAgeOfConsent`: whether the user is tagged as under the age of consent
     /// - `onComplete`: invoked with the resulting consent status
-    void requestConsent(boolean underAgeOfConsent, SuccessCallback<Integer> onComplete);
+    void requestConsent(boolean underAgeOfConsent, AdCallback<Integer> onComplete);
 
     /// The current consent status without triggering a new request.
     int getConsentStatus();

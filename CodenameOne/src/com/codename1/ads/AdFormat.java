@@ -25,8 +25,6 @@ package com.codename1.ads;
 /// The ad formats supported by the modern advertising API. Not every
 /// [com.codename1.ads.spi.AdProvider] supports every format; query
 /// [AdManager#isSupported(AdFormat)] before requesting one.
-///
-/// @author Shai Almog
 public enum AdFormat {
     /// A small rectangular ad that lives inside the component hierarchy. See [BannerAd].
     BANNER,

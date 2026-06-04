@@ -40,8 +40,6 @@ import java.util.Map;
 /// network here; instead it renders labelled placeholders and drives the full
 /// event lifecycle so the entire advertising flow (load, show, dismiss, reward,
 /// consent) can be exercised in the simulator without a device or AdMob account.
-///
-/// @author Shai Almog
 public class AdMobNativeImpl implements AdMobNative {
     private static final class FullScreen {
         int format;

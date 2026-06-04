@@ -37,8 +37,6 @@ package com.codename1.ads;
 /// All callbacks are delivered on the EDT. You can also let Codename One show an
 /// interstitial automatically on screen transitions with
 /// [AdManager#bindInterstitialOnTransition(InterstitialAd, int)].
-///
-/// @author Shai Almog
 public class InterstitialAd extends AbstractFullScreenAd {
     /// Creates an interstitial for the given ad unit id.
     ///

@@ -24,24 +24,23 @@ package com.codename1.ads;
 
 import com.codename1.ads.spi.AdProvider;
 import com.codename1.ads.spi.NativeAdProvider;
-import com.codename1.util.SuccessCallback;
 
-/// Loads [NativeAd] assets that you render with your own components. Native ads
-/// are an optional provider capability; if the active provider does not support
-/// them the error callback receives an [AdError] with code
+/// Loads [NativeAd] assets that you render with your own components, so the ad
+/// matches the look and feel of the surrounding content. This is the format to
+/// use in content driven apps - a news or social feed, a store listing, a chat
+/// or a search results screen - where a banner would feel bolted on but a list
+/// row styled like the others reads naturally (and must be clearly labelled
+/// "Ad"/"Sponsored").
+///
+/// Native ads are an optional provider capability; if the active provider does
+/// not support them the error callback receives an [AdError] with code
 /// [AdError#CODE_UNSUPPORTED].
 ///
 /// ```java
 /// new NativeAdLoader("ca-app-pub-xxx/yyy").load(null,
-///     new SuccessCallback<NativeAd>() {
-///         public void onSucess(NativeAd ad) { renderMyAd(ad); }
-///     },
-///     new SuccessCallback<AdError>() {
-///         public void onSucess(AdError e) { Log.p(e.toString()); }
-///     });
+///     ad -> feed.addComponent(buildSponsoredRow(ad)),
+///     err -> Log.p(err.toString()));
 /// ```
-///
-/// @author Shai Almog
 public class NativeAdLoader {
     private final String adUnitId;
 
@@ -67,21 +66,21 @@ public class NativeAdLoader {
     /// - `request`: optional targeting metadata, may be null
     /// - `onSuccess`: invoked with the loaded ad
     /// - `onError`: invoked on failure
-    public void load(AdRequest request, final SuccessCallback<NativeAd> onSuccess,
-                     final SuccessCallback<AdError> onError) {
+    public void load(AdRequest request, final AdCallback<NativeAd> onSuccess,
+                     final AdCallback<AdError> onError) {
         loadInternal(adUnitId, request, onSuccess, onError);
     }
 
     private static void loadInternal(String adUnitId, AdRequest request,
-                                     final SuccessCallback<NativeAd> onSuccess,
-                                     final SuccessCallback<AdError> onError) {
+                                     final AdCallback<NativeAd> onSuccess,
+                                     final AdCallback<AdError> onError) {
         AdProvider provider = AdManager.getProvider();
         if (!(provider instanceof NativeAdProvider) || !provider.isFormatSupported(AdFormat.NATIVE)) {
             AbstractFullScreenAd.runOnEdt(new Runnable() {
                 @Override
                 public void run() {
                     if (onError != null) {
-                        onError.onSucess(new AdError(AdError.CODE_UNSUPPORTED, null,
+                        onError.onResult(new AdError(AdError.CODE_UNSUPPORTED, null,
                                 "Native ads are not supported by the active provider"));
                     }
                 }
@@ -89,27 +88,27 @@ public class NativeAdLoader {
             return;
         }
         ((NativeAdProvider) provider).loadNativeAd(adUnitId, request,
-                new SuccessCallback<NativeAd>() {
+                new AdCallback<NativeAd>() {
                     @Override
-                    public void onSucess(final NativeAd value) {
+                    public void onResult(final NativeAd value) {
                         AbstractFullScreenAd.runOnEdt(new Runnable() {
                             @Override
                             public void run() {
                                 if (onSuccess != null) {
-                                    onSuccess.onSucess(value);
+                                    onSuccess.onResult(value);
                                 }
                             }
                         });
                     }
                 },
-                new SuccessCallback<AdError>() {
+                new AdCallback<AdError>() {
                     @Override
-                    public void onSucess(final AdError value) {
+                    public void onResult(final AdError value) {
                         AbstractFullScreenAd.runOnEdt(new Runnable() {
                             @Override
                             public void run() {
                                 if (onError != null) {
-                                    onError.onSucess(value);
+                                    onError.onResult(value);
                                 }
                             }
                         });

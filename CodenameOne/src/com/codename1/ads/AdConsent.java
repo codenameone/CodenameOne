@@ -24,7 +24,6 @@ package com.codename1.ads;
 
 import com.codename1.ads.spi.AdConsentController;
 import com.codename1.ads.spi.AdProvider;
-import com.codename1.util.SuccessCallback;
 
 /// Manages user privacy consent for advertising. On modern platforms collecting
 /// consent is mandatory before personalized ads can be served: in the EEA/UK the
@@ -36,23 +35,16 @@ import com.codename1.util.SuccessCallback;
 /// load ads only once consent has been resolved:
 ///
 /// ```java
-/// AdManager.initialize(new AdConfig(), new SuccessCallback<Boolean>() {
-///     public void onSucess(Boolean ok) {
-///         AdConsent.requestConsent(new SuccessCallback<Integer>() {
-///             public void onSucess(Integer status) {
-///                 if (AdConsent.canRequestAds()) {
-///                     interstitial.load();
-///                 }
-///             }
-///         });
-///     }
-/// });
+/// AdManager.initialize(new AdConfig(), ok ->
+///     AdConsent.requestConsent(status -> {
+///         if (AdConsent.canRequestAds()) {
+///             interstitial.load();
+///         }
+///     }));
 /// ```
 ///
-/// When no provider is installed (e.g. the bare simulator with no ad cn1lib)
-/// consent calls resolve immediately to [#STATUS_NOT_REQUIRED].
-///
-/// @author Shai Almog
+/// When no provider is registered consent calls resolve immediately to
+/// [#STATUS_NOT_REQUIRED].
 public final class AdConsent {
     /// Consent status is unknown (consent has not been requested yet).
     public static final int STATUS_UNKNOWN = 0;
@@ -73,7 +65,7 @@ public final class AdConsent {
     /// #### Parameters
     ///
     /// - `onComplete`: invoked with the resulting consent status, may be null
-    public static void requestConsent(final SuccessCallback<Integer> onComplete) {
+    public static void requestConsent(final AdCallback<Integer> onComplete) {
         AdConsentController controller = controller();
         if (controller == null) {
             complete(onComplete, STATUS_NOT_REQUIRED);
@@ -81,9 +73,9 @@ public final class AdConsent {
         }
         boolean underAge = AdManager.getConfig() != null
                 && AdManager.getConfig().getTagForUnderAgeOfConsent() == AdConfig.TAG_TRUE;
-        controller.requestConsent(underAge, new SuccessCallback<Integer>() {
+        controller.requestConsent(underAge, new AdCallback<Integer>() {
             @Override
-            public void onSucess(final Integer value) {
+            public void onResult(final Integer value) {
                 complete(onComplete, value == null ? STATUS_UNKNOWN : value.intValue());
             }
         });
@@ -115,12 +107,12 @@ public final class AdConsent {
         return provider == null ? null : provider.getConsentController();
     }
 
-    private static void complete(final SuccessCallback<Integer> onComplete, final int status) {
+    private static void complete(final AdCallback<Integer> onComplete, final int status) {
         AbstractFullScreenAd.runOnEdt(new Runnable() {
             @Override
             public void run() {
                 if (onComplete != null) {
-                    onComplete.onSucess(Integer.valueOf(status));
+                    onComplete.onResult(Integer.valueOf(status));
                 }
             }
         });

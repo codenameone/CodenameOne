@@ -31,8 +31,6 @@ import com.codename1.ads.ServerSideVerificationOptions;
 /// driven by the public format classes in [com.codename1.ads].
 ///
 /// This is an internal SPI type.
-///
-/// @author Shai Almog
 public interface FullScreenAdSession {
     /// Registers the callback used to report lifecycle events. Called once
     /// immediately after creation.

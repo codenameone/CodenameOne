@@ -31,8 +31,6 @@ import com.codename1.ads.RewardItem;
 /// [com.codename1.ads.AdListener].
 ///
 /// This is an internal SPI type; applications use [com.codename1.ads.AdListener].
-///
-/// @author Shai Almog
 public interface AdSessionCallback {
     /// The ad finished loading.
     void onLoaded();

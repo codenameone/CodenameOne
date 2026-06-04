@@ -1168,9 +1168,6 @@ public class AndroidGradleBuilder extends Executor {
         String googlePlayAdsMetaData = "";
         String googlePlayAdsActivity = "";
         String googlePlayObfuscation = "";
-        // Deprecated legacy banner-ad injection. Prefer the modern advertising
-        // API (com.codename1.ads.BannerAd via the cn1-admob library + the
-        // admob.appId build hint). This path is kept for compatibility.
         String googleAdUnitId = request.getArg("android.googleAdUnitId", request.getArg("google.adUnitId", null));
         String googlePlayAdViewCode = "";
         String userXapplication = request.getArg("android.xapplication", "");
@@ -1217,18 +1214,6 @@ public class AndroidGradleBuilder extends Executor {
                     + "    public static final ** CREATOR;\n"
                     + "}\n";
 
-        }
-
-        // Google AdMob (modern com.codename1.ads API): the GMA SDK requires the
-        // per-app application id as an <application> meta-data. Wire it from the
-        // "admob.appId" build hint unless the developer already declared it.
-        String adMobAppId = request.getArg("admob.appId", null);
-        if (adMobAppId != null && adMobAppId.length() > 0
-                && !userXapplication.contains("com.google.android.gms.ads.APPLICATION_ID")) {
-            String adMobMeta = "<meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" "
-                    + "android:value=\"" + adMobAppId + "\"/>";
-            userXapplication = userXapplication + "\n        " + adMobMeta;
-            request.putArgument("android.xapplication", userXapplication);
         }
 
 

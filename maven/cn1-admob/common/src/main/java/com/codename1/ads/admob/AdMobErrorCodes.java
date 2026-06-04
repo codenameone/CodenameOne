@@ -24,8 +24,6 @@ package com.codename1.ads.admob;
 
 /// Shared AdMob error codes used by the platform implementations when reporting
 /// failures through [AdMobCallback].
-///
-/// @author Shai Almog
 public final class AdMobErrorCodes {
     /// show() was called but no ad was loaded.
     public static final int NOT_READY = 100;

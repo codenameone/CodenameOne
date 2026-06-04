@@ -43,8 +43,6 @@ package com.codename1.ads;
 /// For valuable rewards, verify server side with
 /// [#setServerSideVerificationOptions(ServerSideVerificationOptions)] rather
 /// than trusting the client callback.
-///
-/// @author Shai Almog
 public class RewardedAd extends AbstractFullScreenAd {
     /// Creates a rewarded ad for the given ad unit id.
     ///

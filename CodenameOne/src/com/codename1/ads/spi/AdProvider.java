@@ -22,26 +22,21 @@
  */
 package com.codename1.ads.spi;
 
+import com.codename1.ads.AdCallback;
 import com.codename1.ads.AdConfig;
 import com.codename1.ads.AdFormat;
-import com.codename1.util.SuccessCallback;
 
-/// The service provider interface implemented by an ad network plugin (such as
-/// the Google AdMob cn1lib). A provider is the seam that lets the
+/// The service provider interface implemented by an ad network library (such
+/// as the Google AdMob library). A provider is the seam that lets the
 /// [com.codename1.ads] API stay network agnostic: AdMob, AppLovin MAX, Unity
 /// LevelPlay or a custom mediation layer can each be plugged in by implementing
 /// this interface and registering with
 /// [com.codename1.ads.AdManager#registerProvider(AdProvider)].
 ///
-/// Most providers are thin bridges that delegate to a
-/// [com.codename1.system.NativeInterface] for the per-platform SDK while
-/// keeping the cross platform plumbing here. Apps never reference this type
-/// directly; they use [com.codename1.ads.AdManager] and the format classes.
-///
-/// A plugin auto-registers its provider by shipping an
-/// [AdProviderInstaller] implementation; see that interface for details.
-///
-/// @author Shai Almog
+/// A library typically exposes a static `install()` method that constructs and
+/// registers its provider, so applications enable it with a single line.
+/// Applications never reference this type directly; they use
+/// [com.codename1.ads.AdManager] and the format classes.
 public interface AdProvider {
     /// A short human readable provider name, e.g. "AdMob".
     String getName();
@@ -60,7 +55,7 @@ public interface AdProvider {
     ///
     /// - `config`: the global ad configuration
     /// - `onComplete`: invoked when initialization finishes
-    void initialize(AdConfig config, SuccessCallback<Boolean> onComplete);
+    void initialize(AdConfig config, AdCallback<Boolean> onComplete);
 
     /// Creates a session for a full screen ad of the given format. Returns null
     /// if the format is unsupported.

@@ -1,0 +1,192 @@
+== Advertising
+
+Codename One provides a pluggable advertising API under `com.codename1.ads`. The
+framework defines the formats, the consent flow and the app/UI lifecycle
+integration; an ad network is supplied by a separate library that implements the
+provider interface. The reference implementation is the Google AdMob library
+(`cn1-admob`), but the design is network agnostic - AdMob, AppLovin MAX, Unity
+LevelPlay or a custom mediation layer all plug in the same way, with no changes
+to the framework or the build.
+
+The supported formats are:
+
+* *Banner* - a small inline ad that lives in the component hierarchy
+  (`com.codename1.ads.BannerAd`).
+* *Interstitial* - a full screen ad shown at a natural break, such as between
+  game levels (`com.codename1.ads.InterstitialAd`).
+* *Rewarded* - an opt-in full screen ad that grants a reward for watching
+  (`com.codename1.ads.RewardedAd`).
+* *Rewarded interstitial* - an incentivized transition ad
+  (`com.codename1.ads.RewardedInterstitialAd`).
+* *App open* - shown when the app is brought to the foreground
+  (`com.codename1.ads.AppOpenAd`).
+* *Native* - assets you render with your own components
+  (`com.codename1.ads.NativeAd`).
+
+=== Enabling a provider
+
+Add an ad library to your project and enable it once at startup. Each library
+exposes a static `install()` method that registers its provider with
+`AdManager`:
+
+[source,java]
+----
+// from the cn1-admob library
+AdMobProvider.install();
+----
+
+That single call binds the provider; the rest of your code uses only the
+framework API in `com.codename1.ads`. If no provider is registered the API
+degrades gracefully: format support reports `false` and loads fail with
+`AdError.CODE_UNSUPPORTED` instead of throwing, so a build without an ad library
+still runs.
+
+=== Initialization and consent
+
+Collecting privacy consent is mandatory on modern platforms before personalized
+ads can be served: in the EEA/UK the GDPR consent form must be shown (providers
+wrap Google's User Messaging Platform or an equivalent), and on iOS the App
+Tracking Transparency prompt must be presented to access the advertising
+identifier. The recommended flow is initialize, gather consent, then load:
+
+[source,java]
+----
+AdMobProvider.install();
+AdManager.initialize(new AdConfig().testMode(true), ready ->
+    AdConsent.requestConsent(status -> {
+        if (AdConsent.canRequestAds()) {
+            // safe to load ads now
+        }
+    }));
+----
+
+`AdConfig` also carries the global compliance flags every network requires:
+test mode, test device ids, child directed treatment, under-age-of-consent
+treatment and a maximum ad content rating.
+
+WARNING: Never ship a release build with `testMode` on, and never click live ads
+during development - both violate ad network program policies. Use the test ad
+unit ids while developing.
+
+=== Banner ads
+
+`BannerAd` is a regular Codename One component. Add it to a form (typically
+anchored at the top or bottom) and call `load()`:
+
+[source,java]
+----
+BannerAd banner = new BannerAd("ca-app-pub-xxx/yyy");
+form.add(BorderLayout.SOUTH, banner);
+banner.load();
+----
+
+The default `SIZE_ADAPTIVE` requests an anchored adaptive banner sized to the
+available width, which is the recommended modern banner type.
+
+=== Interstitial ads
+
+Interstitials are event driven - load, then show when loaded, and preload the
+next one when the current ad is dismissed:
+
+[source,java]
+----
+InterstitialAd ad = new InterstitialAd("ca-app-pub-xxx/yyy");
+ad.setAdListener(new AdListener() {
+    public void onLoaded() { ad.show(); }
+    public void onDismissed() { ad.load(); } // preload the next
+});
+ad.load();
+----
+
+You can also let Codename One show an interstitial automatically on screen
+transitions, no more often than a given interval:
+
+[source,java]
+----
+AdManager.bindInterstitialOnTransition(new InterstitialAd("ca-app-pub-xxx/yyy"), 60000);
+----
+
+=== Rewarded and rewarded interstitial ads
+
+Register a reward listener and grant the reward when it fires. For valuable
+rewards, verify server side rather than trusting the client:
+
+[source,java]
+----
+RewardedAd ad = new RewardedAd("ca-app-pub-xxx/yyy");
+ad.setServerSideVerificationOptions(new ServerSideVerificationOptions(userId, "level=7"));
+ad.setAdListener(new AdListener() {
+    public void onLoaded() {
+        ad.show(reward -> grantCoins(reward.getAmount()));
+    }
+});
+ad.load();
+----
+
+`RewardedInterstitialAd` has the same API but is shown on a transition rather
+than strictly opt-in.
+
+=== App open ads
+
+App open ads are shown while the app is brought to the foreground. Let the
+manager and provider handle the foreground hook and freshness window for you:
+
+[source,java]
+----
+AdManager.enableAppOpenAds(new AppOpenAd("ca-app-pub-xxx/yyy"));
+----
+
+=== Native ads
+
+Native ads let you render the advertiser's assets with your own components, so
+the ad matches the look and feel of the surrounding content. This is the format
+to reach for in content driven apps - a news or social feed, a store listing, a
+chat or a search results screen - where a banner feels bolted on but a row
+styled like the others reads naturally. The ad must still be clearly labelled
+(for example "Sponsored"):
+
+[source,java]
+----
+if (NativeAdLoader.isSupported()) {
+    new NativeAdLoader("ca-app-pub-xxx/yyy").load(null,
+        ad -> feed.addComponent(buildSponsoredRow(ad)),  // your own layout
+        err -> Log.p(err.toString()));
+}
+----
+
+`NativeAd` exposes the headline, body, call-to-action, advertiser and rating
+that you bind to your own components. Native ad support is an optional provider
+capability; when the active provider does not support it, `NativeAdLoader`
+reports the format as unsupported.
+
+=== Configuring the AdMob application id
+
+The GMA SDK requires your per-app AdMob application id in the native project.
+Because it differs per app it is not baked into the library; set it with the
+standard build hints in your project's `codenameone_settings.properties`:
+
+[source,properties]
+----
+codename1.arg.android.xapplication=<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-XXXXXXXX~YYYYYYYY"/>
+codename1.arg.ios.plistInject=<key>GADApplicationIdentifier</key><string>ca-app-pub-XXXXXXXX~YYYYYYYY</string>
+----
+
+The SDK dependencies themselves (the GMA pod / Gradle dependency and the
+INTERNET permission) are declared by the `cn1-admob` library, so they are added
+automatically when the library is on the classpath.
+
+=== Implementing a provider
+
+Third party networks plug in by implementing `com.codename1.ads.spi.AdProvider`
+(and the optional `NativeAdProvider` capability) and calling
+`AdManager.registerProvider(...)` - conventionally from a static `install()`
+method. No framework or build-tool changes are required.
+
+For tests and screenshots the framework ships a deterministic, network-free
+provider, `MockAdProvider` (in `cn1-ads-mock`), that renders fixed, labelled ads
+with stable sizes and colours. Enable it the same way:
+
+[source,java]
+----
+MockAdProvider.install();
+----

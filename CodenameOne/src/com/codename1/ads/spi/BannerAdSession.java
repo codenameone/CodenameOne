@@ -31,8 +31,6 @@ import com.codename1.ui.Component;
 /// simulator it is a lightweight placeholder.
 ///
 /// This is an internal SPI type.
-///
-/// @author Shai Almog
 public interface BannerAdSession {
     /// The component to embed in the UI, never null.
     Component getView();

@@ -20,28 +20,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ads.spi;
+package com.codename1.ads;
 
-import com.codename1.ads.AdManager;
-import com.codename1.ads.admob.AdMobProvider;
-
-/// Auto-registers the [AdMobProvider] with [AdManager]. This class is discovered
-/// by [com.codename1.system.NativeLookup] using the standard `*Impl` naming
-/// convention applied to [AdProviderInstaller], so simply having the cn1-admob
-/// library on the classpath wires up AdMob with no application code.
+/// Single-method callback used throughout the advertising API for asynchronous
+/// results (initialization, consent, native ad loading). It is a functional
+/// interface, so it can be supplied as a lambda:
 ///
-/// Despite the package and `NativeInterface` lineage this is plain cross
-/// platform Java; it carries no native implementation of its own.
+/// ```java
+/// AdManager.initialize(config, ready -> {
+///     if (ready) {
+///         interstitial.load();
+///     }
+/// });
+/// ```
 ///
-/// @author Shai Almog
-public class AdProviderInstallerImpl implements AdProviderInstaller {
-    @Override
-    public void install() {
-        AdManager.registerProvider(new AdMobProvider());
-    }
-
-    @Override
-    public boolean isSupported() {
-        return true;
-    }
+/// The value is always delivered on the Codename One EDT.
+public interface AdCallback<T> {
+    /// Invoked once with the asynchronous result.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the result value
+    void onResult(T value);
 }

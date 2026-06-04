@@ -1,5 +1,6 @@
-/// Google AdMob provider for the modern Codename One advertising API, built on
-/// the Google Mobile Ads (GMA) SDK. Applications do not use these classes
-/// directly; adding this library to the project auto-registers AdMob with
-/// [com.codename1.ads.AdManager], which is the only entry point you need.
+/// Google AdMob provider for the Codename One advertising API, built on the
+/// Google Mobile Ads (GMA) SDK. Call [AdMobProvider#install()] once at startup
+/// to register it; from then on applications use only
+/// [com.codename1.ads.AdManager] and the format classes in
+/// [com.codename1.ads].
 package com.codename1.ads.admob;

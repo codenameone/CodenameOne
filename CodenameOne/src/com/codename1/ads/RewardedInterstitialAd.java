@@ -29,8 +29,6 @@ package com.codename1.ads;
 ///
 /// The API mirrors [RewardedAd]: register an [OnUserEarnedRewardListener] and
 /// optionally [#setServerSideVerificationOptions(ServerSideVerificationOptions)].
-///
-/// @author Shai Almog
 public class RewardedInterstitialAd extends AbstractFullScreenAd {
     /// Creates a rewarded interstitial for the given ad unit id.
     ///

@@ -22,25 +22,23 @@
  */
 package com.codename1.ads.admob;
 
+import com.codename1.ads.AdCallback;
 import com.codename1.ads.spi.AdConsentController;
-import com.codename1.util.SuccessCallback;
 
 /// Wraps Google's User Messaging Platform (UMP) consent flow and, on iOS, the
 /// App Tracking Transparency prompt, exposing them through the Codename One
 /// [AdConsentController] SPI. The native side reports completion through
 /// [AdMobCallback] with handle 0.
-///
-/// @author Shai Almog
 class AdMobConsentController implements AdConsentController {
     private final AdMobNative bridge;
-    private SuccessCallback<Integer> pending;
+    private AdCallback<Integer> pending;
 
     AdMobConsentController(AdMobNative bridge) {
         this.bridge = bridge;
     }
 
     @Override
-    public void requestConsent(boolean underAgeOfConsent, SuccessCallback<Integer> onComplete) {
+    public void requestConsent(boolean underAgeOfConsent, AdCallback<Integer> onComplete) {
         this.pending = onComplete;
         bridge.requestConsent(underAgeOfConsent);
     }
@@ -62,10 +60,10 @@ class AdMobConsentController implements AdConsentController {
 
     /// Invoked by [AdMobProvider#dispatch] when the native consent flow finishes.
     void onConsentComplete(int status) {
-        SuccessCallback<Integer> cb = pending;
+        AdCallback<Integer> cb = pending;
         pending = null;
         if (cb != null) {
-            cb.onSucess(Integer.valueOf(status));
+            cb.onResult(Integer.valueOf(status));
         }
     }
 }

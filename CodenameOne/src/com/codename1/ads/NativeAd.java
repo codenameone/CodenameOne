@@ -30,8 +30,6 @@ package com.codename1.ads;
 /// Native ad support is an optional provider capability. When the active
 /// provider does not support it, [NativeAdLoader] reports the format as
 /// unsupported.
-///
-/// @author Shai Almog
 public class NativeAd {
     private final String headline;
     private final String body;

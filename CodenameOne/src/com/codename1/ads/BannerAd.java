@@ -44,8 +44,6 @@ import com.codename1.ui.layouts.BorderLayout;
 /// be designed and tested without a device. The default [#SIZE_ADAPTIVE] size
 /// asks the network for an anchored adaptive banner sized to the available
 /// width, which is the recommended modern banner type.
-///
-/// @author Shai Almog
 public class BannerAd extends Container {
     /// Anchored adaptive banner sized to the available width (recommended).
     public static final int SIZE_ADAPTIVE = 0;

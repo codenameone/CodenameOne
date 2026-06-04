@@ -39,8 +39,6 @@ import com.codename1.ads.spi.FullScreenAdSession;
 /// Foreground detection is performed natively by the provider (Android process
 /// lifecycle / iOS `applicationDidBecomeActive`), which also honours the ad's
 /// freshness window (an app open ad expires a few hours after loading).
-///
-/// @author Shai Almog
 public class AppOpenAd extends AbstractFullScreenAd {
     /// Creates an app open ad for the given ad unit id.
     ///

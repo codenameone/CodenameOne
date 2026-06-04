@@ -25,12 +25,10 @@ package com.codename1.ads;
 import java.util.ArrayList;
 import java.util.List;
 
-/// Configuration passed once to [AdManager#initialize(AdConfig, com.codename1.util.SuccessCallback)].
+/// Configuration passed once to [AdManager#initialize(AdConfig, AdCallback)].
 /// Controls test mode and the global compliance flags every modern ad network
 /// requires (child directed treatment, under-age-of-consent treatment and a
 /// maximum ad content rating).
-///
-/// @author Shai Almog
 public class AdConfig {
     /// Unspecified child directed treatment (let the network decide).
     public static final int TAG_UNSPECIFIED = 0;

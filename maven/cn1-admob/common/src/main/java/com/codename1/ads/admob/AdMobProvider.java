@@ -22,9 +22,11 @@
  */
 package com.codename1.ads.admob;
 
+import com.codename1.ads.AdCallback;
 import com.codename1.ads.AdConfig;
 import com.codename1.ads.AdError;
 import com.codename1.ads.AdFormat;
+import com.codename1.ads.AdManager;
 import com.codename1.ads.AdRequest;
 import com.codename1.ads.RewardItem;
 import com.codename1.ads.ServerSideVerificationOptions;
@@ -36,20 +38,19 @@ import com.codename1.ads.spi.FullScreenAdSession;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Component;
 import com.codename1.ui.PeerComponent;
-import com.codename1.util.SuccessCallback;
 
 import java.util.HashMap;
 import java.util.Map;
 
-/// The Google AdMob implementation of [AdProvider], built on the modern Google
-/// Mobile Ads (GMA) SDK. It is a thin bridge: all cross platform plumbing lives
-/// here while the per-platform SDK calls go through [AdMobNative].
+/// The Google AdMob implementation of [AdProvider], built on the Google Mobile
+/// Ads (GMA) SDK. Enable it once at startup:
+///
+/// ```java
+/// AdMobProvider.install();
+/// ```
 ///
 /// AdMob's own mediation runs transparently behind this provider, so adding
-/// mediation adapters in the AdMob console requires no code changes. The
-/// provider is registered automatically by [com.codename1.ads.spi.AdProviderInstallerImpl].
-///
-/// @author Shai Almog
+/// mediation adapters in the AdMob console requires no code changes.
 public class AdMobProvider implements AdProvider {
     static final int FORMAT_INTERSTITIAL = 1;
     static final int FORMAT_REWARDED = 2;
@@ -64,6 +65,11 @@ public class AdMobProvider implements AdProvider {
 
     public AdMobProvider() {
         bridge = NativeLookup.create(AdMobNative.class);
+    }
+
+    /// Registers an AdMob provider as the active provider. Call once at startup.
+    public static void install() {
+        AdManager.registerProvider(new AdMobProvider());
     }
 
     @Override
@@ -83,10 +89,10 @@ public class AdMobProvider implements AdProvider {
     }
 
     @Override
-    public void initialize(AdConfig config, SuccessCallback<Boolean> onComplete) {
+    public void initialize(AdConfig config, AdCallback<Boolean> onComplete) {
         if (bridge == null) {
             if (onComplete != null) {
-                onComplete.onSucess(Boolean.FALSE);
+                onComplete.onResult(Boolean.FALSE);
             }
             return;
         }
@@ -95,7 +101,7 @@ public class AdMobProvider implements AdProvider {
                 cfg.getTagForChildDirectedTreatment(), cfg.getTagForUnderAgeOfConsent(),
                 cfg.getMaxAdContentRating());
         if (onComplete != null) {
-            onComplete.onSucess(Boolean.TRUE);
+            onComplete.onResult(Boolean.TRUE);
         }
     }
 

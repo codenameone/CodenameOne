@@ -5,10 +5,11 @@ import com.codename1.ads.spi.AdProvider;
 import com.codename1.ads.spi.AdSessionCallback;
 import com.codename1.ads.spi.BannerAdSession;
 import com.codename1.ads.spi.FullScreenAdSession;
+import com.codename1.ads.spi.NativeAdProvider;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.system.NativeLookup;
-import com.codename1.util.SuccessCallback;
+import com.codename1.ads.AdCallback;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,16 +53,16 @@ class AdManagerTest extends UITestBase {
         void fireDismissed() { loaded = false; cb.onDismissed(); }
     }
 
-    private static final class FakeProvider implements AdProvider {
+    private static class FakeProvider implements AdProvider {
         FakeFullScreen lastFullScreen;
         boolean initialized;
 
         @Override public String getName() { return "Fake"; }
         @Override public boolean isSupported() { return true; }
         @Override public boolean isFormatSupported(AdFormat format) { return format != AdFormat.NATIVE; }
-        @Override public void initialize(AdConfig config, SuccessCallback<Boolean> onComplete) {
+        @Override public void initialize(AdConfig config, AdCallback<Boolean> onComplete) {
             initialized = true;
-            onComplete.onSucess(Boolean.TRUE);
+            onComplete.onResult(Boolean.TRUE);
         }
         @Override public FullScreenAdSession createFullScreenAd(AdFormat format, String adUnitId) {
             lastFullScreen = new FakeFullScreen();
@@ -88,8 +89,8 @@ class AdManagerTest extends UITestBase {
         FakeProvider p = new FakeProvider();
         AdManager.registerProvider(p);
         final boolean[] result = {false};
-        AdManager.initialize(new AdConfig().testMode(true), new SuccessCallback<Boolean>() {
-            @Override public void onSucess(Boolean value) { result[0] = value.booleanValue(); }
+        AdManager.initialize(new AdConfig().testMode(true), new AdCallback<Boolean>() {
+            @Override public void onResult(Boolean value) { result[0] = value.booleanValue(); }
         });
         assertTrue(p.initialized);
         assertTrue(result[0]);
@@ -216,5 +217,41 @@ class AdManagerTest extends UITestBase {
         // provider returns a null banner session -> a graceful failure, no child added
         assertTrue(l.events.contains("failed"));
         assertEquals(0, banner.getComponentCount());
+    }
+
+    /// A provider that additionally supports native ads.
+    private static final class FakeNativeProvider extends FakeProvider implements NativeAdProvider {
+        @Override public boolean isFormatSupported(AdFormat format) { return true; }
+        @Override public void loadNativeAd(String adUnitId, AdRequest request,
+                AdCallback<NativeAd> onSuccess, AdCallback<AdError> onError) {
+            onSuccess.onResult(new NativeAd("Headline", "Body", "Install", "Acme", null, null, 4.5));
+        }
+    }
+
+    @FormTest
+    void testNativeAdLoadDeliversAssets() {
+        FakeNativeProvider p = new FakeNativeProvider();
+        AdManager.registerProvider(p);
+        assertTrue(NativeAdLoader.isSupported());
+        final NativeAd[] loaded = {null};
+        final AdError[] failed = {null};
+        new NativeAdLoader("unit/native").load(null,
+                ad -> loaded[0] = ad,
+                err -> failed[0] = err);
+        assertNull(failed[0]);
+        assertNotNull(loaded[0]);
+        assertEquals("Headline", loaded[0].getHeadline());
+        assertEquals("Install", loaded[0].getCallToAction());
+    }
+
+    @FormTest
+    void testNativeAdUnsupportedReportsError() {
+        FakeProvider p = new FakeProvider(); // not a NativeAdProvider
+        AdManager.registerProvider(p);
+        assertFalse(NativeAdLoader.isSupported());
+        final AdError[] failed = {null};
+        new NativeAdLoader("unit/native").load(null, ad -> {}, err -> failed[0] = err);
+        assertNotNull(failed[0]);
+        assertEquals(AdError.CODE_UNSUPPORTED, failed[0].getCode());
     }
 }

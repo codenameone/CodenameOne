@@ -29,8 +29,6 @@ package com.codename1.ads;
 /// Note: for production apps that grant valuable rewards you should verify the
 /// reward server side rather than trusting the client. See
 /// [ServerSideVerificationOptions].
-///
-/// @author Shai Almog
 public class RewardItem {
     private final String type;
     private final int amount;

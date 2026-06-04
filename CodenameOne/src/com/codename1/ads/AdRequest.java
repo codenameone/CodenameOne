@@ -36,8 +36,6 @@ import java.util.List;
 /// ```
 ///
 /// An `AdRequest` is immutable once a load begins; reuse or discard freely.
-///
-/// @author Shai Almog
 public class AdRequest {
     private final List<String> keywords = new ArrayList<String>();
     private String contentUrl;
