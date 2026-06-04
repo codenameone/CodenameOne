@@ -158,11 +158,11 @@ Map the design's web layout to CN1 by hand - CN1 CSS has **no variables, flex, o
 mode (toggled by re-skinning the tree, since CN1 bakes one theme at a time).
 
 > Capturing the **CN1 render** for the comparison is the same `templates/MockupComparisonTest.java`
-> flow, but note the simulator runs at a phone skin (high DPI): the desktop two-column layout only
-> appears when the display is wide. To capture it, grab the built `Form` directly (not
+> flow, with two gotchas on the high-DPI phone skin. (1) Grab the built `Form` directly (not
 > `Display.getCurrent()`, which the test harness keeps on an earlier form because a second
 > `show()` cannot transition while a test holds the EDT), set its size, `layoutContainer()`, and
-> `paintComponent()` it onto an `Image` of your chosen desktop dimensions.
+> `paintComponent()` it onto an `Image`. (2) To see a tall scrolling screen in one shot, paint at a
+> height larger than the skin (the scrollable column lays out to whatever height you give the form).
 
 ## Common pitfalls
 

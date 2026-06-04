@@ -40,10 +40,6 @@ public class Initializr extends Lifecycle {
      *  keeps an earlier form "current", so getCurrent() is not reliable in-test). */
     static Form lastBuiltForm;
 
-    /** Test-only override for the responsive split, so a mockup test can render
-     *  the wide desktop layout on a phone skin. Null = use the display-width rule. */
-    static Boolean forceWideForTesting;
-
     // UIIDs that have a "...Dark" variant in theme.css. Used to re-skin the whole
     // tree when the host website / system switches between light and dark.
     private static final String[] THEMEABLE = {
@@ -139,13 +135,14 @@ public class Initializr extends Lifecycle {
         Container settingsPanel = makePanel("Current Settings", panelSubtitle("Generated artifacts"), true, true,
                 BoxLayout.encloseY(summaryLabel), form);
 
-        Container leftColumn = BoxLayout.encloseY(hero, essentials, idePanel, localePanel, javaPanel, settingsPanel);
-        leftColumn.setUIID("InitializrColumn");
-        leftColumn.setScrollableY(true);
-        leftColumn.setScrollVisible(false);
+        // ----- live preview (stacked at the end of the single column) -----
+        Container previewWrap = createPreviewWrap(previewPanel);
 
-        // ----- right column (live preview) -----
-        Container rightColumn = createPreviewWrap(previewPanel);
+        Container column = BoxLayout.encloseY(hero, essentials, idePanel, localePanel,
+                javaPanel, settingsPanel, previewWrap);
+        column.setUIID("InitializrColumn");
+        column.setScrollableY(true);
+        column.setScrollVisible(false);
 
         // ----- generate bar -----
         final Button generateButton = new Button("Generate Project");
@@ -169,7 +166,8 @@ public class Initializr extends Lifecycle {
         generateBar.add(BorderLayout.CENTER, bundleInfo);
         generateBar.add(BorderLayout.EAST, generateButton);
 
-        Container body = createResponsiveBody(leftColumn, rightColumn);
+        Container body = new Container(new BorderLayout());
+        body.add(BorderLayout.CENTER, column);
         body.setUIID("InitializrRoot");
         body.setScrollableY(false);
         form.getContentPane().setScrollableY(false);
@@ -436,22 +434,6 @@ public class Initializr extends Lifecycle {
         Label l = new Label("- " + text);
         l.setUIID("InitializrPanelSubtitle");
         return l;
-    }
-
-    private Container createResponsiveBody(Container leftColumn, Container rightColumn) {
-        boolean wide = forceWideForTesting != null
-                ? forceWideForTesting.booleanValue()
-                : getDisplayWidth() >= convertToPixels(110f);
-        if (wide) {
-            Container grid = new Container(new GridLayout(1, 2));
-            grid.add(leftColumn);
-            grid.add(rightColumn);
-            return grid;
-        }
-        Container stacked = new Container(new BorderLayout());
-        stacked.add(BorderLayout.NORTH, leftColumn);
-        stacked.add(BorderLayout.CENTER, rightColumn);
-        return stacked;
     }
 
     private Container FlowRight(Component c) {

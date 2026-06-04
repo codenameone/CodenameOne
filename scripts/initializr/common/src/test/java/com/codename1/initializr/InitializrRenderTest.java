@@ -32,22 +32,17 @@ public class InitializrRenderTest extends AbstractTest {
         boolean dark = "dark".equalsIgnoreCase(System.getProperty("initializr.theme", "light"));
         Display.getInstance().setDarkMode(dark ? Boolean.TRUE : Boolean.FALSE);
 
-        String widthProp = System.getProperty("initializr.width");
+        // Optional taller canvas so a single capture shows the whole stacked column
+        // (panels + the live preview at the end) instead of only the first screen.
         String heightProp = System.getProperty("initializr.height");
-        boolean wide = widthProp != null;
-        if (wide) {
-            // Render the two-column desktop split. The phone skin is high-DPI, so
-            // the canvas is sized so each column is roughly a phone-width wide.
-            Initializr.forceWideForTesting = Boolean.TRUE;
-        }
 
         new Initializr().runApp();
         Form form = Initializr.lastBuiltForm;
         assertNotNull(form, "Initializr should build a form");
 
-        int w = wide ? Integer.parseInt(widthProp) : Display.getInstance().getDisplayWidth();
+        int w = Display.getInstance().getDisplayWidth();
         int h = heightProp != null ? Integer.parseInt(heightProp) : Display.getInstance().getDisplayHeight();
-        String suffix = (wide ? "wide-" : "") + (dark ? "dark" : "light");
+        String suffix = (dark ? "dark" : "light");
         form.setX(0);
         form.setY(0);
         form.setWidth(w);
