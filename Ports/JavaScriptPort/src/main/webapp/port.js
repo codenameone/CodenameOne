@@ -3275,11 +3275,17 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // Chart{CombinedXY,Transform,Rotated} un-parked: they were parked because
-  // ChartCombinedXY's canvasToBlob retry loop HUNG THE SUITE -- a hang that the
-  // scheduler-resilience fix now contains (an uncaught green-thread exception /
-  // watchdog timeout terminates just that thread, the suite keeps running). If
-  // they still hit the capture hang they lose at most their own frame.
+  // ChartCombinedXY hangs the SUITE in canvasToBlob retry loop after
+  // ~88 fallback-path captures (the wipe fix unblocked rendering but
+  // this test hits a separate screenshot-capture hang). Re-park until
+  // canvasToBlob_hang fallback is investigated separately.
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
+  // Transform + Rotated weren't reached on the unpark-all run because
+  // CombinedXY took down the suite first. Leave parked under the same
+  // canvasToBlob-capture suspicion until CombinedXY is sorted; if
+  // that fix unblocks them too, un-park in a follow-up.
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartCombinedXyCapture",
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   // Two more late-suite tests that hit the canvas-accumulation
   // threshold and hang waiting for SCREENSHOT_DONE. On the run that
   // didn't get this far they finish cleanly, but the canary-test
@@ -3382,9 +3388,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // Chart{CombinedXY,Transform,Rotated} un-parked -- see the matching note in
-  // cn1ssForcedTimeoutTestClasses above (suite-hang now contained by scheduler
-  // resilience).
+  "ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
+  "ChartTransformScreenshotTest": "chartCombinedXyCapture",
+  "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
   "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
