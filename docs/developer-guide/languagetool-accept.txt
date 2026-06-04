@@ -561,5 +561,11 @@ espeak
 [Ee]nums
 
 # 3D graphics / shader chapter (com.codename1.gpu). "Phong" is the
-# standard name of the Phong/Blinn-Phong lighting model.
+# standard name of the Phong/Blinn-Phong lighting model. "Khronos" is the
+# standards body behind glTF/OpenGL, "BoomBox" is the Khronos glTF sample
+# model used in the model test, and "JOGL" is the OpenGL binding the desktop
+# simulator renders through.
 [Pp]hong
+Khronos
+BoomBox
+JOGL
