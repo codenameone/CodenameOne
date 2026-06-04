@@ -535,6 +535,32 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
     }
 
+    /*
+     * Legacy affine API (g.scale / g.rotate / g.rotateRadians). The base impl is a
+     * no-op ("Affine unsupported"), so these did nothing -- graphics-rotate and any
+     * g.scale-based drawing rendered untransformed. Compose onto the current
+     * transform exactly as the JavaSE/iOS ports do; getTransform/setTransform
+     * already handle the component cell offset.
+     */
+    @Override
+    public void scale(Object graphics, float x, float y) {
+        com.codename1.ui.Transform t = getTransform(graphics);
+        t.scale(x, y);
+        setTransform(graphics, t);
+    }
+
+    @Override
+    public void rotate(Object graphics, float angle) {
+        rotate(graphics, angle, 0, 0);
+    }
+
+    @Override
+    public void rotate(Object graphics, float angle, int pivotX, int pivotY) {
+        com.codename1.ui.Transform t = getTransform(graphics);
+        t.rotate(angle, pivotX, pivotY);
+        setTransform(graphics, t);
+    }
+
     private static void setAff(double[] a, double m00, double m10, double m01, double m11, double m02, double m12) {
         a[0] = m00; a[1] = m10; a[2] = m01; a[3] = m11; a[4] = m02; a[5] = m12;
     }

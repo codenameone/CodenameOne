@@ -85,6 +85,7 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
     g->font = cn1Win.defaultFont;
     g->inFrame = JAVA_FALSE;
     g->wicBitmap = NULL;
+    g->transform = D2D1::Matrix3x2F::Identity();
     return g;
 }
 
@@ -99,12 +100,13 @@ void cn1WinBeginFrame(CN1Graphics* g) {
     }
     if (!g->inFrame) {
         ID2D1RenderTarget_BeginDraw(g->target);
-        /* Each frame starts with the identity transform; Codename One sets any
-         * affine via setTransform during the frame and resets to identity when
-         * done. Without this reset a transform left over from the previous frame
-         * would leak into the next one. */
-        D2D1_MATRIX_3X2_F idm = D2D1::Matrix3x2F::Identity();
-        ID2D1RenderTarget_SetTransform(g->target, &idm);
+        /* Re-apply the graphics' current transform. For the window this is the
+         * identity at frame start (Codename One sets per-component affines during
+         * the frame and resets to identity after each); for a mutable image the
+         * caller sets the transform via setTransform BEFORE the first primitive,
+         * so forcing identity here used to silently drop it -- the reason
+         * transforms rendered on screen but not into mutable images. */
+        ID2D1RenderTarget_SetTransform(g->target, &g->transform);
         g->inFrame = JAVA_TRUE;
     }
 }
@@ -121,6 +123,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setTransform___long_float_flo
     }
     /* D2D1::Matrix3x2F(_11,_12,_21,_22,_31,_32) maps directly from the CN1 affine. */
     D2D1_MATRIX_3X2_F m = D2D1::Matrix3x2F(m00, m10, m01, m11, m02, m12);
+    /* Remember it so cn1WinBeginFrame re-applies it -- a transform set before the
+     * first primitive (mutable-image path) would otherwise be lost. */
+    g->transform = m;
     ID2D1RenderTarget_SetTransform(g->target, &m);
 }
 
@@ -131,6 +136,9 @@ void cn1WinEndFrame(CN1Graphics* g) {
     if (g->inFrame) {
         ID2D1RenderTarget_EndDraw(g->target, NULL, NULL);
         g->inFrame = JAVA_FALSE;
+        /* Reset so the next frame (the window graphics is reused) starts at
+         * identity unless Codename One sets a transform again. */
+        g->transform = D2D1::Matrix3x2F::Identity();
     }
 }
 

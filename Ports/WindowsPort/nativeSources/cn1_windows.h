@@ -118,6 +118,9 @@ typedef struct CN1Graphics {
     struct CN1Font* font;            /* current font, not owned              */
     JAVA_BOOLEAN inFrame;            /* between BeginDraw / EndDraw           */
     void* wicBitmap;                 /* IWICBitmap* for offscreen targets, else NULL */
+    D2D1_MATRIX_3X2_F transform;     /* current affine; re-applied each BeginDraw so
+                                      * a transform set before the first primitive
+                                      * (the mutable-image path) isn't reset to identity */
 } CN1Graphics;
 
 typedef struct CN1Font {
