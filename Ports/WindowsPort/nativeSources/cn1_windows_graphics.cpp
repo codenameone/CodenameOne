@@ -367,6 +367,31 @@ static ID2D1PathGeometry* cn1WinBuildArcGeometry(CN1Graphics* g, JAVA_INT x, JAV
         return NULL;
     }
 
+    /* Full circle/ellipse: a single D2D arc whose start point equals its end
+     * point is degenerate and draws nothing. fillArc(x,y,w,h,0,360) is exactly
+     * this -- the Switch thumb is a full-circle fillArc, so without this the
+     * thumb (and any 360-degree arc) silently disappears. Emit two 180-degree
+     * arcs through the diametrically opposite point instead. */
+    if (arcAngle >= 360 || arcAngle <= -360) {
+        D2D1_POINT_2F mid = cn1WinArcPoint(cx, cy, rx, ry, (float)(startAngle + 180));
+        D2D1_ARC_SEGMENT half;
+        half.size.width = rx;
+        half.size.height = ry;
+        half.rotationAngle = 0.0f;
+        half.arcSize = D2D1_ARC_SIZE_SMALL;
+        half.sweepDirection = (arcAngle >= 0) ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
+                                              : D2D1_SWEEP_DIRECTION_CLOCKWISE;
+        ID2D1GeometrySink_BeginFigure(sink, start, D2D1_FIGURE_BEGIN_FILLED);
+        half.point = mid;
+        ID2D1GeometrySink_AddArc(sink, &half);
+        half.point = start;
+        ID2D1GeometrySink_AddArc(sink, &half);
+        ID2D1GeometrySink_EndFigure(sink, D2D1_FIGURE_END_CLOSED);
+        ID2D1GeometrySink_Close(sink);
+        ID2D1GeometrySink_Release(sink);
+        return geom;
+    }
+
     if (pie) {
         center.x = cx;
         center.y = cy;
