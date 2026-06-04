@@ -716,3 +716,168 @@ open class MyApplication {
 ----
 
 Once all that's in place Kotlin should work. This should be possible for more JVM languages in the future.
+
+== 3D Graphics
+
+Codename One includes a portable 3D / GPU graphics API in the `com.codename1.gpu`
+package. It is designed for games and other hardware accelerated visuals and runs
+on every supported platform from a single code base: the iOS backend renders with
+Metal, Android and the JavaScript port render with OpenGL ES / WebGL, and the
+simulator renders with a built in software rasterizer so the same scene is
+reproducible during development.
+
+The API is a hybrid of a low level command surface (vertex/index buffers,
+textures, render state and draw calls) and high level helpers (`Mesh` primitives,
+a `Camera`, materials and a model loader). The most important design choice is
+that *you never write shader code*. Instead you describe a `Material` and the
+engine generates the matching GLSL or Metal shader for the current platform. This
+is what keeps the API portable without shipping a shader translation layer in
+your app.
+
+=== Hosting 3D content
+
+3D is rendered into a `RenderView`, a normal Codename One `Component` that you add
+to a `Form` like any other. It wraps a native GPU surface (a peer component) and
+drives a `Renderer` callback you implement. Because it is a regular component it
+participates in layouts, scrolling and transitions.
+
+[source,java,title='A lit, rotating cube']
+----
+public class CubeForm {
+    private float angle;
+
+    public void show() {
+        Form f = new Form("3D Cube", new BorderLayout());
+
+        RenderView view = new RenderView(new Renderer() {
+            private final Camera camera = new Camera();
+            private Mesh cube;
+            private Material material;
+
+            public void onInit(GraphicsDevice device) {                  // <1>
+                cube = Primitives.cube(device, 1.6f);
+                material = new Material(Material.Type.PHONG)             // <2>
+                        .setColor(0xff3366ff)
+                        .setShininess(24f);
+                camera.setPerspective(45f, 0.1f, 100f)                   // <3>
+                        .setPosition(2.6f, 2.1f, 3.4f)
+                        .setTarget(0f, 0f, 0f);
+                device.setLight(new Light().setDirection(-0.4f, -1f, -0.55f));
+            }
+
+            public void onResize(GraphicsDevice device, int w, int h) {
+                camera.setAspect((float) w / Math.max(1, h));
+                device.setViewport(0, 0, w, h);
+            }
+
+            public void onFrame(GraphicsDevice device) {                 // <4>
+                device.clear(0xff101018, true, true);
+                device.setCamera(camera);
+                angle += 0.02f;
+                device.draw(cube, material, Matrix4.rotation(angle, 0.35f, 1f, 0.12f));
+            }
+
+            public void onDispose(GraphicsDevice device) {
+            }
+        });
+
+        if (view.isSupported()) {                                       // <5>
+            view.setContinuous(true);                                   // <6>
+            f.add(BorderLayout.CENTER, view);
+        } else {
+            f.add(BorderLayout.CENTER, new Label("3D not supported"));
+        }
+        f.show();
+    }
+}
+----
+<1> `onInit` runs once when the GPU surface is ready. Allocate meshes, materials
+and textures here using the supplied `GraphicsDevice`.
+<2> A `Material` declares the lighting model (here Phong) plus inputs like color,
+shininess and an optional texture. The engine generates the shader for it; you
+never write GLSL or Metal.
+<3> `Camera` builds the view and projection matrices for you.
+<4> `onFrame` issues the per frame commands: clear, set the camera, then `draw`
+each mesh with its material and a model transform.
+<5> `RenderView.isSupported()` mirrors `CN.isGpuSupported()`. Always provide a
+non 3D fallback for platforms that report no GPU backend.
+<6> By default a `RenderView` renders on demand; call `setContinuous(true)` for an
+animation loop, or call `requestRender()` to draw a single new frame.
+
+image::img/gpu-cube.png[A Phong lit cube rendered by RenderView,scaledwidth=40%]
+
+=== Textures
+
+Textures are created from pixel data or a Codename One `Image` through the
+`GraphicsDevice` and attached to a `Material`. Filtering and wrapping are set with
+the fluent `setFilter` / `setWrap` methods:
+
+[source,java,title='Applying a texture']
+----
+public void onInit(GraphicsDevice device) {
+    Image img = Image.createImage("/wood.png");
+    Texture tex = device.createTexture(img);
+    tex.setFilter(Texture.Filter.LINEAR);
+    tex.setWrap(Texture.Wrap.REPEAT);                  // tile when UVs exceed 0..1
+    material = new Material(Material.Type.PHONG).setTexture(tex);
+    // ... camera, light ...
+}
+----
+
+=== Loading models
+
+Built in primitives (`Primitives.cube`, `Primitives.quad`) are handy for getting
+started, but real scenes use authored geometry. `GltfLoader` loads a `Mesh` from a
+glTF 2.0 model, both the binary `.glb` container and the JSON `.gltf` form with
+embedded buffers:
+
+[source,java,title='Loading a glTF model']
+----
+public void onInit(GraphicsDevice device) {
+    byte[] glb = readBytes("/torus.glb");              // your loading of choice
+    Mesh model = GltfLoader.load(device, glb);          // POSITION + NORMAL + UV
+
+    Texture tex = device.createTexture(checkerImage);
+    tex.setWrap(Texture.Wrap.REPEAT);
+    material = new Material(Material.Type.PHONG)
+            .setTexture(tex)
+            .setShininess(20f);
+    // ... camera, light ...
+}
+----
+
+The loader reads the first triangle primitive of the first mesh, mapping its
+`POSITION`, `NORMAL` (flat normals are computed when the model has none) and
+`TEXCOORD_0` into the engine's standard vertex layout, so the result drops
+straight into any built in `Material`. The torus below is a glTF model loaded this
+way and drawn with a repeating checker texture and Phong lighting:
+
+image::img/gpu-model.png[A textured glTF torus loaded with GltfLoader,scaledwidth=40%]
+
+=== Animation
+
+For animation, drive a value (a rotation angle, a position) over time and redraw.
+A continuous `RenderView` calls `onFrame` every frame; an on demand view redraws
+when you call `requestRender()`. The grid below captures six fixed rotation stages
+of a spinning cube, each rendered into its own viewport in a single frame:
+
+image::img/gpu-animation.png[Six rotation stages of an animated cube,scaledwidth=40%]
+
+=== Capability detection
+
+The 3D API is available on all current Codename One ports, but you should still
+guard for it so the app degrades gracefully on any platform that does not provide
+a GPU backend (it returns `false` instead of crashing):
+
+[source,java]
+----
+if (CN.isGpuSupported()) {
+    // add a RenderView
+} else {
+    // show a 2D fallback
+}
+----
+
+`GraphicsDevice.getCapabilities()` exposes finer grained limits (maximum texture
+size, vertex attribute count and so on) for code that needs to adapt to the
+device.
