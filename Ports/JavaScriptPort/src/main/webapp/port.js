@@ -3284,17 +3284,13 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // ChartCombinedXY hangs the SUITE in canvasToBlob retry loop after
-  // ~88 fallback-path captures (the wipe fix unblocked rendering but
-  // this test hits a separate screenshot-capture hang). Re-park until
-  // canvasToBlob_hang fallback is investigated separately.
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
-  // Transform + Rotated weren't reached on the unpark-all run because
-  // CombinedXY took down the suite first. Leave parked under the same
-  // canvasToBlob-capture suspicion until CombinedXY is sorted; if
-  // that fix unblocks them too, un-park in a follow-up.
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartTransformScreenshotTest": "chartCombinedXyCapture",
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartRotatedScreenshotTest": "chartCombinedXyCapture",
+  // ChartCombinedXY re-parked: exact longs did NOT fix it -- it still hangs the
+  // suite in a non-terminating form-construction/layout loop (runTest never
+  // returns, so the per-test deadline never arms). Distinct from the chart
+  // axis-label bug that exact longs DID fix. Needs its own non-termination fix.
+  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
+  // Transform + Rotated kept UN-parked -- never reached on the prior run
+  // (CombinedXY hung first); testing whether they render now.
   // Two more late-suite tests that hit the canvas-accumulation
   // threshold and hang waiting for SCREENSHOT_DONE. On the run that
   // didn't get this far they finish cleanly, but the canary-test
@@ -3397,9 +3393,9 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
   //"ChartRadarScreenshotTest": "chartDocumentStaleness",
   //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  "ChartCombinedXYScreenshotTest": "chartCombinedXyCapture",
-  "ChartTransformScreenshotTest": "chartCombinedXyCapture",
-  "ChartRotatedScreenshotTest": "chartCombinedXyCapture",
+  // ChartCombinedXY re-parked (non-terminating layout loop); Transform + Rotated
+  // kept un-parked -- see note in cn1ssForcedTimeoutTestClasses above.
+  "ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
   "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
   "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
