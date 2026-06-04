@@ -300,6 +300,33 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
+    /*
+     * Capture the already-rendered window instead of the base behaviour, which
+     * re-paints the current form into a fresh mutable image
+     * (current.paintComponent(img.getGraphics(), true)). Re-painting a *heavy*
+     * form into a mutable-image target drops every grid cell after the first --
+     * the screenshot suite's draw-arc (100 concentric arcs/cell) and
+     * draw-image-rect came out with only the top-left quadrant filled while the
+     * rest stayed form background. The live window target painted the same form
+     * correctly through the normal flush path, so read it back directly. In CI
+     * the window is the headless WIC bitmap, so captureWindowToPngBytes returns
+     * the current frame; if it is not WIC-backed (on-screen HWND target) it
+     * returns null and we fall back to the base mutable-image capture.
+     */
+    @Override
+    public void screenshot(com.codename1.util.SuccessCallback<Image> callback) {
+        byte[] png = WindowsNative.captureWindowToPngBytes();
+        if (png != null && png.length > 0) {
+            try {
+                callback.onSucess(Image.createImage(new java.io.ByteArrayInputStream(png)));
+                return;
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+        super.screenshot(callback);
+    }
+
     @Override
     public void edtIdle(boolean enter) {
         // Intentionally empty: the Win32 message pump and input dispatch run on the

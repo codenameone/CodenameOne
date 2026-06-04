@@ -165,6 +165,13 @@ typedef struct {
 
     volatile LONG initialized;
 
+    /* Bumped on every flushGraphics (i.e. each completed form paint / present).
+     * The headless capture watches this so it snapshots only once painting has
+     * settled, instead of after a fixed sleep that a slow first paint can
+     * outlast -- the draw-arc / draw-image-rect forms paint a heavy first cell
+     * and the flat settle used to grab the frame before the rest had rendered. */
+    volatile LONG flushGen;
+
     /* Headless screenshot mode: when enabled, initDisplay renders into an
      * offscreen WIC bitmap instead of an HWND, and once the form has painted
      * the bitmap is encoded to shotPath and the process exits. Used by CI to

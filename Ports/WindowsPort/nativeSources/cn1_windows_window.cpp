@@ -590,6 +590,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_flushGraphics___long_int_int_
     if (g != NULL) {
         cn1WinEndFrame(g);
     }
+    /* Mark a completed present so the headless capture can tell when the EDT has
+     * stopped painting (see runHeadlessLoop). */
+    InterlockedIncrement(&cn1Win.flushGen);
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_boolean(
@@ -655,11 +658,36 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_runHeadlessLoop__(CODENAME_ON
      * makes it independent of the EDT's scheduling and guarantees termination.
      * The UI is static, so by the settle the EDT is idle and not mid-paint. */
     cn1WindowsLog("runHeadlessLoop: enter");
+    /* Wait for painting to SETTLE rather than for a fixed wall-clock time. A flat
+     * settle that is comfortable for a light form (one fillArc) is too short for a
+     * heavy one (draw-arc fills 100 concentric arcs per cell, draw-image-rect a
+     * dozen scaled blits) on the software-rendered headless target -- the frame
+     * was grabbed mid-paint with only the first grid cell drawn. Instead, snapshot
+     * once flushGraphics (one per completed present) has not advanced for a quiet
+     * window, after at least one present, bounded by a hard ceiling so a wedged
+     * EDT still terminates. When the count is stable the EDT is between frames, so
+     * reading the offscreen target is safe. */
+    const int QUIET_MS = 900;     /* paint considered settled after this idle gap */
+    const int MIN_MS = 1500;      /* always give the first paint at least this long */
+    const int MAX_MS = 30000;     /* hard ceiling: capture regardless after this   */
     int waitedMs = 0;
+    int quietMs = 0;
+    LONG lastGen = -1;
     CN1_YIELD_THREAD;
-    while (waitedMs < 4000) {
+    while (waitedMs < MAX_MS) {
         Sleep(50);
         waitedMs += 50;
+        LONG gen = cn1Win.flushGen;
+        if (gen != lastGen) {
+            lastGen = gen;
+            quietMs = 0;            /* a present landed -- restart the quiet timer */
+        } else {
+            quietMs += 50;
+        }
+        /* Settled: at least one present, then a quiet stretch, past the floor. */
+        if (lastGen > 0 && quietMs >= QUIET_MS && waitedMs >= MIN_MS) {
+            break;
+        }
     }
     CN1_RESUME_THREAD;
     JAVA_BOOLEAN ok = cn1WinEncodeGraphicsToPng(cn1Win.windowGraphics, cn1Win.shotPath);
