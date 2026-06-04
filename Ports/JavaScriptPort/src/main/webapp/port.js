@@ -3801,6 +3801,39 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
       // Best effort only.
     }
   }
+  // SUITE-WEDGE GUARD: if prepare()/runTest() threw synchronously, the form
+  // never finished showing, so onShowCompleted→UITimer→emitCurrentFormScreenshot
+  // →done() will NEVER run and isDone() stays false forever. awaitTestCompletion
+  // would then poll until its (type-aware, up to ~30s) deadline -- and when that
+  // deadline mechanism is itself starved (heavy long-overhead runs, no armed
+  // phase timer because the form never showed), the poll hangs indefinitely and
+  // wedges the WHOLE suite. Observed: SwitchThemeScreenshotTest throwing
+  // "Missing JS member getContext for host receiver" during form.show() stalled
+  // the suite at index 88 with no advance. A test that already errored has
+  // nothing to wait for: finalize + advance immediately so one test's throw can
+  // never wedge the suite. The host-ref getContext flake itself is the separate,
+  // deeper issue; this guarantees forward progress regardless of it.
+  if (runErrored) {
+    emitLambdaBridgeDiag(
+      "PARPAR:DIAG:FALLBACK:lambdaBridge:runErroredSkipAwait=1:phase=" + runPhase
+      + ":test=" + nativeTestName);
+    try {
+      const finalizeAfterErr = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
+      if (typeof finalizeAfterErr === "function") {
+        return yield* cn1_ivAdapt(finalizeAfterErr(
+          callTarget,
+          effectiveIndex,
+          effectiveTestObject,
+          normalizedTestName,
+          0
+        ));
+      }
+    } catch (_finalizeErroredErr) {
+      const finalizeErroredDetail = yield* stringifyThrowable(_finalizeErroredErr);
+      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:finalizeAfterRunErrorFailed=" + finalizeErroredDetail);
+    }
+    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "runErroredAdvance");
+  }
   // Mirror Java's runNextTest lambda: after prepare()+runTest() (or catch),
   // delegate to awaitTestCompletion which polls isDone() and handles the
   // finalize+timeout logic. Skipping this step finalizes the test before
