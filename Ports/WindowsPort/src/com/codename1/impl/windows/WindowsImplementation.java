@@ -29,6 +29,9 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.PathIterator;
+import com.codename1.ui.geom.Shape;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -653,6 +656,91 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public void fillRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
         WindowsNative.fillRoundRect(peer(graphics), x, y, width, height, arcWidth, arcHeight);
+    }
+
+    /*
+     * Direct2D fills/strokes path geometry natively, so the port supports arbitrary
+     * shapes. This is what makes RoundBorder / RoundRectBorder (material pill
+     * buttons, rounded dialogs, chat bubbles) and Graphics.fillShape/drawShape
+     * render -- the base impl returns false and those backgrounds stay blank.
+     */
+    @Override
+    public boolean isShapeSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public void fillShape(Object graphics, Shape shape) {
+        FlatPath fp = flattenShape(shape);
+        WindowsNative.fillShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule);
+    }
+
+    @Override
+    public void drawShape(Object graphics, Shape shape, Stroke stroke) {
+        FlatPath fp = flattenShape(shape);
+        float lineWidth = stroke != null ? stroke.getLineWidth() : 1f;
+        WindowsNative.drawShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule, lineWidth);
+    }
+
+    /** Flattened path data handed to the native geometry builder. */
+    private static final class FlatPath {
+        final float[] coords;
+        final int[] types;
+        final int typeCount;
+        final int windingRule;
+
+        FlatPath(float[] coords, int[] types, int typeCount, int windingRule) {
+            this.coords = coords;
+            this.types = types;
+            this.typeCount = typeCount;
+            this.windingRule = windingRule;
+        }
+    }
+
+    /** Walks a Shape's PathIterator into the (coords, types) arrays the native
+     *  Direct2D path-geometry builder consumes. Segment ops map to
+     *  0=move,1=line,2=quad,3=cubic,4=close. */
+    private FlatPath flattenShape(Shape shape) {
+        PathIterator it = shape.getPathIterator();
+        int windingRule = it.getWindingRule();
+        float[] coords = new float[64];
+        int[] types = new int[32];
+        int ci = 0;
+        int ti = 0;
+        float[] seg = new float[6];
+        while (!it.isDone()) {
+            int type = it.currentSegment(seg);
+            int mapped;
+            int n;
+            switch (type) {
+                case PathIterator.SEG_MOVETO: mapped = 0; n = 2; break;
+                case PathIterator.SEG_LINETO: mapped = 1; n = 2; break;
+                case PathIterator.SEG_QUADTO: mapped = 2; n = 4; break;
+                case PathIterator.SEG_CUBICTO: mapped = 3; n = 6; break;
+                case PathIterator.SEG_CLOSE: mapped = 4; n = 0; break;
+                default: mapped = 1; n = 2; break;
+            }
+            if (ti >= types.length) {
+                int[] nt = new int[types.length * 2];
+                System.arraycopy(types, 0, nt, 0, types.length);
+                types = nt;
+            }
+            types[ti++] = mapped;
+            for (int k = 0; k < n; k++) {
+                if (ci >= coords.length) {
+                    float[] nc = new float[coords.length * 2];
+                    System.arraycopy(coords, 0, nc, 0, coords.length);
+                    coords = nc;
+                }
+                coords[ci++] = seg[k];
+            }
+            it.next();
+        }
+        float[] trimmedCoords = new float[ci];
+        System.arraycopy(coords, 0, trimmedCoords, 0, ci);
+        int[] trimmedTypes = new int[ti];
+        System.arraycopy(types, 0, trimmedTypes, 0, ti);
+        return new FlatPath(trimmedCoords, trimmedTypes, ti, windingRule);
     }
 
     @Override

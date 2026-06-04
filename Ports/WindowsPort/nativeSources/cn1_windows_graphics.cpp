@@ -551,6 +551,149 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawRGB___long_int_1ARRAY_int
     free(bgra);
 }
 
+/*
+ * Builds a Direct2D path geometry from a flattened Codename One path: parallel
+ * arrays of segment types (0=move,1=line,2=quad,3=cubic,4=close) and the packed
+ * coordinate stream they index into (move/line=2 floats, quad=4, cubic=6,
+ * close=0). This is what lets RoundBorder / RoundRectBorder (the material pill
+ * buttons, rounded dialogs, chat bubbles) and Graphics.fillShape/drawShape paint
+ * -- without it isShapeSupported is false and those backgrounds never render.
+ */
+static ID2D1PathGeometry* cn1WinBuildPathGeometry(const JAVA_ARRAY_FLOAT* coords, const JAVA_ARRAY_INT* types,
+        JAVA_INT typeCount, JAVA_INT windingRule) {
+    ID2D1PathGeometry* geom = NULL;
+    ID2D1GeometrySink* sink = NULL;
+    JAVA_INT ci = 0;
+    JAVA_INT i;
+    int figureOpen = 0;
+    if (FAILED(ID2D1Factory_CreatePathGeometry(cn1Win.d2dFactory, &geom)) || geom == NULL) {
+        return NULL;
+    }
+    if (FAILED(ID2D1PathGeometry_Open(geom, &sink)) || sink == NULL) {
+        ID2D1PathGeometry_Release(geom);
+        return NULL;
+    }
+    /* CN1 PathIterator: WIND_EVEN_ODD = 0, WIND_NON_ZERO = 1. */
+    ID2D1GeometrySink_SetFillMode(sink, windingRule == 0 ? D2D1_FILL_MODE_ALTERNATE : D2D1_FILL_MODE_WINDING);
+    for (i = 0; i < typeCount; i++) {
+        switch (types[i]) {
+            case 0: { /* MOVETO */
+                D2D1_POINT_2F p;
+                if (figureOpen) {
+                    ID2D1GeometrySink_EndFigure(sink, D2D1_FIGURE_END_OPEN);
+                }
+                p.x = coords[ci++];
+                p.y = coords[ci++];
+                ID2D1GeometrySink_BeginFigure(sink, p, D2D1_FIGURE_BEGIN_FILLED);
+                figureOpen = 1;
+                break;
+            }
+            case 1: { /* LINETO */
+                D2D1_POINT_2F p;
+                p.x = coords[ci++];
+                p.y = coords[ci++];
+                if (figureOpen) {
+                    ID2D1GeometrySink_AddLine(sink, p);
+                }
+                break;
+            }
+            case 2: { /* QUADTO */
+                D2D1_QUADRATIC_BEZIER_SEGMENT qb;
+                qb.point1.x = coords[ci++];
+                qb.point1.y = coords[ci++];
+                qb.point2.x = coords[ci++];
+                qb.point2.y = coords[ci++];
+                if (figureOpen) {
+                    ID2D1GeometrySink_AddQuadraticBezier(sink, &qb);
+                }
+                break;
+            }
+            case 3: { /* CUBICTO */
+                D2D1_BEZIER_SEGMENT bz;
+                bz.point1.x = coords[ci++];
+                bz.point1.y = coords[ci++];
+                bz.point2.x = coords[ci++];
+                bz.point2.y = coords[ci++];
+                bz.point3.x = coords[ci++];
+                bz.point3.y = coords[ci++];
+                if (figureOpen) {
+                    ID2D1GeometrySink_AddBezier(sink, &bz);
+                }
+                break;
+            }
+            case 4: /* CLOSE */
+                if (figureOpen) {
+                    ID2D1GeometrySink_EndFigure(sink, D2D1_FIGURE_END_CLOSED);
+                    figureOpen = 0;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    if (figureOpen) {
+        ID2D1GeometrySink_EndFigure(sink, D2D1_FIGURE_END_OPEN);
+    }
+    if (FAILED(ID2D1GeometrySink_Close(sink))) {
+        ID2D1GeometrySink_Release(sink);
+        ID2D1PathGeometry_Release(geom);
+        return NULL;
+    }
+    ID2D1GeometrySink_Release(sink);
+    return geom;
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_fillShape___long_float_1ARRAY_int_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3,
+        JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
+    CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
+    ID2D1SolidColorBrush* brush;
+    ID2D1PathGeometry* geom;
+    const JAVA_ARRAY_FLOAT* coords;
+    const JAVA_ARRAY_INT* types;
+    if (g == NULL || __cn1Arg2 == NULL || __cn1Arg3 == NULL) {
+        return;
+    }
+    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    cn1WinBeginFrame(g);
+    brush = cn1WinBrush(g);
+    geom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
+    if (geom == NULL) {
+        return;
+    }
+    cn1WinPushClip(g);
+    ID2D1RenderTarget_FillGeometry(g->target, (ID2D1Geometry*)geom, (ID2D1Brush*)brush, NULL);
+    cn1WinPopClip(g);
+    ID2D1PathGeometry_Release(geom);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_drawShape___long_float_1ARRAY_int_1ARRAY_int_int_float(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3,
+        JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5, JAVA_FLOAT __cn1Arg6) {
+    CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
+    ID2D1SolidColorBrush* brush;
+    ID2D1PathGeometry* geom;
+    const JAVA_ARRAY_FLOAT* coords;
+    const JAVA_ARRAY_INT* types;
+    float lineWidth = __cn1Arg6 > 0.0f ? (float)__cn1Arg6 : 1.0f;
+    if (g == NULL || __cn1Arg2 == NULL || __cn1Arg3 == NULL) {
+        return;
+    }
+    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    cn1WinBeginFrame(g);
+    brush = cn1WinBrush(g);
+    geom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
+    if (geom == NULL) {
+        return;
+    }
+    cn1WinPushClip(g);
+    ID2D1RenderTarget_DrawGeometry(g->target, (ID2D1Geometry*)geom, (ID2D1Brush*)brush, lineWidth, NULL);
+    cn1WinPopClip(g);
+    ID2D1PathGeometry_Release(geom);
+}
+
 } /* extern "C" */
 
 #endif /* _WIN32 */

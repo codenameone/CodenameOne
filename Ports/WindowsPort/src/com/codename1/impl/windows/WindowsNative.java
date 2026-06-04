@@ -204,6 +204,14 @@ public final class WindowsNative {
 
     public static native void drawRoundRect(long graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
+    /** Fills an arbitrary path. {@code types} are segment ops (0=move,1=line,
+     *  2=quad,3=cubic,4=close); {@code coords} is the packed coordinate stream
+     *  they index. windingRule: 0=even-odd, 1=non-zero. */
+    public static native void fillShape(long graphics, float[] coords, int[] types, int typeCount, int windingRule);
+
+    /** Strokes an arbitrary path (see {@link #fillShape}) with the given line width. */
+    public static native void drawShape(long graphics, float[] coords, int[] types, int typeCount, int windingRule, float lineWidth);
+
     public static native void fillRoundRect(long graphics, int x, int y, int width, int height, int arcWidth, int arcHeight);
 
     public static native void fillArc(long graphics, int x, int y, int width, int height, int startAngle, int arcAngle);
