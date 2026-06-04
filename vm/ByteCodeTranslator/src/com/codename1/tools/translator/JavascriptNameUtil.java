@@ -167,10 +167,12 @@ final class JavascriptNameUtil {
         }
         char type = desc.charAt(0);
         switch (type) {
-            // Java long == JS BigInt: a long field/local/array default is 0n, not 0,
-            // so it never enters long arithmetic as a Number (avoids BigInt/Number mix).
+            // Java long == hi/lo Long object: a long field/local/array default is the
+            // shared zero Long (_L0), so reads of an uninitialised long never enter long
+            // arithmetic as a bare Number (the _Lc coercion also tolerates it, but _L0
+            // keeps the representation uniform).
             case 'J':
-                return "0n";
+                return "_L0";
             case 'Z':
             case 'C':
             case 'F':

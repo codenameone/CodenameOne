@@ -758,8 +758,9 @@ final class JavascriptMethodGenerator {
             return ((Boolean) value).booleanValue() ? "1" : "0";
         }
         if (value instanceof Long) {
-            // Java long == JS BigInt: a static final long constant is a BigInt literal.
-            return value.toString() + "n";
+            // Java long == hi/lo Long object: _Llit(lowInt, highInt).
+            long lv = (Long) value;
+            return "_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")";
         }
         if (value instanceof Number) {
             return value.toString();
@@ -2926,10 +2927,10 @@ final class JavascriptMethodGenerator {
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getOpcode() - Opcodes.ICONST_0))).append(";\n");
                 return true;
             case Opcodes.LCONST_0:
-                out.append("  ").append(ctx.push("0n")).append(";\n");
+                out.append("  ").append(ctx.push("_L0")).append(";\n");
                 return true;
             case Opcodes.LCONST_1:
-                out.append("  ").append(ctx.push("1n")).append(";\n");
+                out.append("  ").append(ctx.push("_L1")).append(";\n");
                 return true;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -3269,9 +3270,9 @@ final class JavascriptMethodGenerator {
             return true;
         }
         if (value instanceof Long) {
-            // Java long == JS BigInt: emit a BigInt literal (``123n``). value.toString()
-            // never has a fractional part, so "<digits>n" / "-<digits>n" is always valid.
-            out.append("  ").append(ctx.push(value.toString() + "n")).append(";\n");
+            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
+            long lv = (Long) value;
+            out.append("  ").append(ctx.push("_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")")).append(";\n");
             return true;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
@@ -4199,10 +4200,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_0:
-                out.append("        stack.p(0n); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(_L0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_1:
-                out.append("        stack.p(1n); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(_L1); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -4521,8 +4522,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return;
         }
         if (value instanceof Long) {
-            // Java long == JS BigInt: emit a BigInt literal.
-            out.append("        stack.p(").append(value.toString()).append("n); pc = ").append(index + 1).append("; break;\n");
+            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
+            long lv = (Long) value;
+            out.append("        stack.p(_Llit(").append((int) lv).append(", ").append((int) (lv >>> 32))
+                    .append(")); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
