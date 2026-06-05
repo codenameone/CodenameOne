@@ -27,16 +27,20 @@ Without this configuration present, some functionality in the IDE may be limited
                 <property name="codename1.buildTarget">mac-os-x-desktop</property>
                 <property name="codename1.platform">javase</property>
             </configuration>
+            <configuration id="Mac Native Build" profiles="">
+                <property name="codename1.buildTarget">mac-os-x-native</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+            <configuration id="Mac Native Project" profiles="">
+                <property name="codename1.buildTarget">mac-source</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
             <configuration id="Simulator" profiles="">
                 <property name="codename1.platform">javase</property>
             </configuration>
             <configuration id="Windows Desktop App" profiles="">
                 <property name="codename1.buildTarget">windows-desktop</property>
                 <property name="codename1.platform">javase</property>
-            </configuration>
-            <configuration id="Windows UWP App" profiles="">
-                <property name="codename1.buildTarget">windows-device</property>
-                <property name="codename1.platform">win</property>
             </configuration>
             <configuration id="iOS App (Debug)" profiles="">
                 <property name="codename1.buildTarget">ios-device</property>

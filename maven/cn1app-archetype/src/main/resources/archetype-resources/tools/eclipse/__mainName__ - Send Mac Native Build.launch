@@ -10,8 +10,8 @@
         <listEntry value="jansi.passthrough=false"/>
         <listEntry value="jansi.strip=false"/>
         <listEntry value="jansi.force=false"/>
-        <listEntry value="codename1.platform=win"/>
-        <listEntry value="codename1.buildTarget=windows-device"/>
+        <listEntry value="codename1.platform=ios"/>
+        <listEntry value="codename1.buildTarget=mac-os-x-native"/>
     </listAttribute>
     <stringAttribute key="M2_RUNTIME" value="EMBEDDED"/>
     <booleanAttribute key="M2_SKIP_TESTS" value="true"/>

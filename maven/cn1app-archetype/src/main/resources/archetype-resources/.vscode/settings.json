@@ -16,6 +16,10 @@
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=mac-os-x-desktop\" \"-U\" \"-e\""
   },
   {
+    "alias": "Cloud > Mac Native Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=mac-os-x-native\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Cloud > Android Build",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=android\" \"-Dcodename1.buildTarget=android-device\" \"-U\" \"-e\""
   },
@@ -32,6 +36,10 @@
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=ios-source\" \"-U\" \"-e\""
   },
   {
+    "alias": "Local > Mac Native Project",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=mac-source\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Cloud > Javascript Build",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javascript\" \"-Dcodename1.buildTarget=javascript\" \"-U\" \"-e\""
   },
@@ -42,10 +50,6 @@
   {
     "alias": "Run as Desktop App",
     "command": "\"verify\" \"-Prun-desktop\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
-  },
-  {
-    "alias": "Cloud > Windows Device Build (UWP)",
-    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=win\" \"-Dcodename1.buildTarget=windows-device\" \"-U\" \"-e\""
   },
   {
     "alias": "Local > Gradle Android Project",
