@@ -70,6 +70,13 @@ jobs:
       - name: Commit and push regenerated .res files
         run: |
           set -euo pipefail
+          # This job runs inside the pr-ci-container, where the checked-out
+          # tree is owned by a different UID than this shell step's user.
+          # git's dubious-ownership guard then rejects every command with
+          # "fatal: not in a git directory". actions/checkout writes a
+          # safe.directory entry, but into the action's HOME, which this
+          # bash step doesn't share -- so mark the workspace safe here too.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Themes/ holds the single source of truth. Each downstream consumer
