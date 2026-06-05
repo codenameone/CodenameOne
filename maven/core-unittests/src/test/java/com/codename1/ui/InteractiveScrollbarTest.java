@@ -203,6 +203,38 @@ class InteractiveScrollbarTest extends UITestBase {
     }
 
     @FormTest
+    void interactiveThumbRendersOpaquePixels() {
+        Hashtable props = new Hashtable();
+        props.put("@interactiveScrollBool", "true");
+        // give the track a real gutter width and the thumb a distinctive opaque fill
+        props.put("DesktopScroll.padding", "0,0,8,8");
+        props.put("DesktopScroll.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        props.put("DesktopScrollThumb.bgColor", "ff0000");
+        props.put("DesktopScrollThumb.transparency", "255");
+        UIManager.getInstance().addThemeProps(props);
+
+        Container sc = scrollableContainer(8000);
+        Image img = Image.createImage(sc.getWidth(), sc.getHeight(), 0xffffffff);
+        Graphics g = img.getGraphics();
+        UIManager.getInstance().getLookAndFeel().drawVerticalScroll(g, sc, 0f, 0.3f);
+
+        int w = img.getWidth();
+        int h = img.getHeight();
+        int[] rgb = img.getRGB();
+        int red = 0;
+        for (int yy = 0; yy < h; yy++) {
+            for (int xx = Math.max(0, w - 16); xx < w; xx++) {
+                int p = rgb[yy * w + xx] & 0xffffff;
+                if ((p & 0xff0000) > 0x800000 && (p & 0x00ff00) < 0x008000 && (p & 0xff) < 0x80) {
+                    red++;
+                }
+            }
+        }
+        assertTrue(red > 50, "the interactive scroll thumb must actually paint opaque pixels in the gutter, found red=" + red);
+    }
+
+    @FormTest
     void gutterIsReservedForInteractiveScrollbar() {
         Hashtable props = new Hashtable();
         props.put("@interactiveScrollBool", "true");

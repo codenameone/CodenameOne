@@ -561,7 +561,25 @@ public abstract class LookAndFeel {
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
 
-        scroll.paintComponent(g);
+        if (interactiveScroll) {
+            // Draw the always-visible track directly rather than via the orphan scroll component's
+            // paintComponent: a component that was never attached to a form does not reliably render
+            // its background on every port (notably the iOS/Metal Mac-native pipeline). A direct fill
+            // is renderer-agnostic. Only the interactive (desktop) path is affected, which has no
+            // pre-existing baselines.
+            int trackBgAlpha = scrollStyle.getBgTransparency() & 0xff;
+            if (trackBgAlpha > 0) {
+                int prevColor = g.getColor();
+                int prevAlpha = g.getAlpha();
+                g.setColor(scrollStyle.getBgColor());
+                g.setAlpha(trackBgAlpha);
+                g.fillRect(x, y, width, height);
+                g.setAlpha(prevAlpha);
+                g.setColor(prevColor);
+            }
+        } else {
+            scroll.paintComponent(g);
+        }
 
         marginLeft = scrollThumbStyle.getMarginLeft(c.isRTL());
         marginTop = scrollThumbStyle.getMarginTop();
@@ -644,7 +662,27 @@ public abstract class LookAndFeel {
         }
 
         g.setClip(cx, cy, cw, ch);
-        scrollThumb.paintComponent(g);
+        if (interactiveScroll) {
+            // Direct fill (see the track comment above) so the always-visible thumb renders on every
+            // port. getStyle() resolves the unselected/hover/pressed style via the visual state set
+            // just above; cn1-round-border thumbs become a pill via the arc radius.
+            Style thumbState = scrollThumb.getStyle();
+            int tAlpha = thumbState.getBgTransparency() & 0xff;
+            if (tAlpha > 0) {
+                int prevColor = g.getColor();
+                int prevAlpha = g.getAlpha();
+                int tw = scrollThumb.getWidth();
+                int th = scrollThumb.getHeight();
+                g.setColor(thumbState.getBgColor());
+                g.setAlpha(tAlpha);
+                // fillRect (not fillRoundRect) so it renders identically on every port's Graphics
+                g.fillRect(scrollThumb.getX(), scrollThumb.getY(), tw, th);
+                g.setAlpha(prevAlpha);
+                g.setColor(prevColor);
+            }
+        } else {
+            scrollThumb.paintComponent(g);
+        }
         g.setClip(cx, cy, cw, ch);
         if (fade) {
             scrollStyle.setBgTransparency(alpha, true);
