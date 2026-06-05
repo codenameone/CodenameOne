@@ -5660,14 +5660,52 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // Single chokepoint for every mutable-image backing canvas. Tie the
         // host canvas's lifetime to this Java image: when the image is GC'd the
         // worker finalizer releases the canvas's host id (the ~4MB backing
-        // store). The host never reclaims on its own.
-        registerImageResource(image, graphics.getCanvas());
+        // store). The host never reclaims on its own. For a deferred
+        // (display-list) mutable image there is NO backing canvas yet -- it is
+        // built lazily in rasterizeRecordingSurface(), which registers it then,
+        // so calling getCanvas() here would defeat the laziness and rasterize at
+        // creation. Only register eagerly for the legacy canvas-backed path.
+        if (!graphics.isRecording()) {
+            registerImageResource(image, graphics.getCanvas());
+        }
         image.mutableGraphics.setMutationListener(new Runnable() {
             @Override
             public void run() {
                 JavaScriptNativeImageAdapter.invalidatePatternCache(image.getImageModel());
             }
         });
+    }
+
+    // Materialize a deferred (display-list) mutable image's backing canvas. The
+    // recording HTML5Graphics holds the op list + Java-side dimensions but no
+    // canvas; this builds the canvas lazily on first pixel access and replays
+    // the ops onto it, caching the result and re-replaying only when the op list
+    // changed (rasterDirty). This is the ONLY place a deferred mutable image
+    // touches getContext(), and it happens at draw/getRGB time (serialized with
+    // painting) rather than in the create-time storm that produced the canvas
+    // host-ref staleness.
+    void rasterizeRecordingSurface(HTML5Graphics g) {
+        HTMLCanvasElement rc = g.peekRasterCanvas();
+        CanvasRenderingContext2D ctx;
+        if (rc == null) {
+            rc = renderingBackend.createCanvas(g.getCanvasWidth(), g.getCanvasHeight());
+            // getContext() ONCE per image, here, and cache it -- never per
+            // re-rasterize and never as a standalone read elsewhere. This is the
+            // single deferred getContext() for a display-list mutable image.
+            ctx = renderingBackend.getContext(rc);
+            g.setRasterCanvas(rc);
+            g.setRasterContext(ctx);
+            // Tie the lazily-created canvas's lifetime to the graphics object
+            // (which lives exactly as long as the owning mutable image).
+            registerImageResource(g, rc);
+        } else {
+            ctx = g.peekRasterContext();
+        }
+        if (g.isRasterDirty()) {
+            ctx.clearRect(0, 0, g.getCanvasWidth(), g.getCanvasHeight());
+            g.replayOps(ctx);
+            g.markRasterClean();
+        }
     }
 
     
@@ -5905,45 +5943,31 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createMutableBuffer(width, height, fillColor,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int color, int fillWidth, int fillHeight) {
-                                // Image.createImage(w, h, fillColor) takes an ARGB int. The
-                                // alpha byte must drive the fill's transparency:
-                                // ``setColorWithAlpha`` already sets ``fillStyle`` to an
-                                // ``rgba(...)`` string, but the FillRect op overwrites that
-                                // with ``rgb(...)`` and uses ``state.alpha`` (the graphics-
-                                // wide global alpha, defaulting to 255) as the canvas
-                                // ``globalAlpha`` -- silently dropping the colour's alpha
-                                // byte. Route the alpha through ``setAlpha`` so it lands in
-                                // ``state.alpha`` and the FillRect op picks it up. Reset
-                                // alpha to 255 afterwards so the freshly returned mutable-
-                                // image graphics has the default state the user expects.
-                                int colorAlpha = (color >>> 24) & 0xFF;
-                                graphics.setColor(color & 0xFFFFFF);
-                                if (colorAlpha != 0xFF) {
-                                    graphics.setAlpha(colorAlpha);
-                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
-                                    graphics.setAlpha(255);
-                                } else {
-                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
-                                }
-                            }
-                        });
+        // Deferred (display-list) mutable image: NO backing canvas and no
+        // getContext() round-trip at creation. The returned graphics RECORDS
+        // every draw op; the backing canvas is built lazily only when the image
+        // is actually rasterized (drawn / getRGB / pattern), via
+        // rasterizeRecordingSurface(). This removes the per-mutable-image
+        // getContext() storm during theme install that crossed with concurrent
+        // getWidth()/getHeight() number reads on the worker<->host barrier (the
+        // "Number 667" canvas host-ref staleness that wedged the suite).
+        HTML5Graphics graphics = new HTML5Graphics(this, width, height);
+        // Seed the fill exactly as the canvas path did. Image.createImage(w, h,
+        // fillColor) takes an ARGB int whose alpha byte drives transparency;
+        // route the alpha through setAlpha so the recorded FillRect op picks it
+        // up (it uses state.alpha as globalAlpha), then restore the default 255
+        // so the returned graphics has the state the caller expects.
+        int colorAlpha = (fillColor >>> 24) & 0xFF;
+        graphics.setColor(fillColor & 0xFFFFFF);
+        if (colorAlpha != 0xFF) {
+            graphics.setAlpha(colorAlpha);
+            graphics.fillRect(0, 0, width, height);
+            graphics.setAlpha(255);
+        } else {
+            graphics.fillRect(0, 0, width, height);
+        }
         NativeImage img = new NativeImage();
-        attachMutableImageSurface(img, buffer.getGraphics());
+        attachMutableImageSurface(img, graphics);
         return img;
 
     }
@@ -8532,12 +8556,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public int getMutableSurfaceWidth() {
-                return mutableGraphics.getCanvas().getWidth();
+                // Java-side dimension: never read canvas.getWidth() back across
+                // the barrier (those number reads are exactly what crossed with
+                // getContext() object reads -> "Number 667" staleness). Also
+                // avoids rasterizing a deferred image just to measure it.
+                return mutableGraphics.getCanvasWidth();
             }
 
             @Override
             public int getMutableSurfaceHeight() {
-                return mutableGraphics.getCanvas().getHeight();
+                return mutableGraphics.getCanvasHeight();
             }
 
             @Override
