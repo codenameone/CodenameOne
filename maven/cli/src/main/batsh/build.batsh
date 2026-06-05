@@ -7,6 +7,16 @@ function mac_desktop() {
     call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop");
 }
 
+function mac_native() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=mac-os-x-native");
+}
+
+function mac_native_source() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=mac-source");
+}
+
 function windows_desktop() {
     global MVNW;
     call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop");
@@ -69,6 +79,9 @@ function help() {
     println("  ios_source");
         println("    Generates an Xcode Project that you can open and build using Apple's development tools");
         println("    *Requires a Mac with Xcode installed");
+    println("  mac_native_source");
+        println("    Generates a native Mac Xcode Project that you can open and build using Apple's development tools");
+        println("    *Requires a Mac with Xcode installed");
     println("");
     println("Build Server Commands:");
     println("  The following commands will build the app using the Codename One build server, and require");
@@ -83,6 +96,9 @@ function help() {
     println("  mac_desktop");
     println("    Builds Mac OS desktop app.");
     println("    *Mac OS Desktop builds are a Pro user feature.");
+    println("  mac_native");
+    println("    Builds a native Mac app on the build server.");
+    println("    *Requires an Apple developer account and Mac signing certificate.");
     println("  windows_desktop");
     println("    Builds Windows desktop app.");
     println("    *Windows Desktop builds are a Pro user feature.");
