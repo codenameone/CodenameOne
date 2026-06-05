@@ -96,11 +96,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
-            // Desktop integration: inert on phone/tablet ports (plain Toolbar + hamburger +
-            // faded scrollbar), but on the Mac native build it enables desktop mode so the
-            // Toolbar/hamburger is replaced by the native menu bar and an always-visible
-            // interactive scrollbar thumb appears. Reverts its global toggles after capture.
-            new DesktopModeScreenshotTest(),
             // Advertising API: renders a banner + native-ad feed via the
             // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
             new AdsScreenshotTest(),
@@ -267,7 +262,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
-            new MutableImageReadbackTest()
+            new MutableImageReadbackTest(),
+            // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
+            // and a populated list, which warms the font cache / shifts suite timing, and the
+            // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed
+            // triangle grid) paint text directly during a frame that races the async font load -
+            // running this test before them changes whether those fonts are loaded at capture
+            // time and flips their baselines. Last = the rest of the suite matches master exactly.
+            // Inert on phone/tablet ports (plain Toolbar + hamburger side menu + faded scrollbar);
+            // on the Mac native build it enables desktop mode (commands move to the native menu
+            // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
+            new DesktopModeScreenshotTest()
     };
 
     private static BaseTest prependedTest;
