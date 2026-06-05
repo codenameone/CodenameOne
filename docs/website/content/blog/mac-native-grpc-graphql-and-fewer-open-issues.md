@@ -5,14 +5,14 @@ url: /blog/mac-native-grpc-graphql-and-fewer-open-issues/
 date: '2026-06-05'
 author: Shai Almog
 description: The open issue count dropped below 350 after a push through the oldest reports, and the same week brought native Mac builds, WebSockets in the core, gRPC and GraphQL integration, a new advertising API, and richer background work.
-feed_html: '<img src="https://www.codenameone.com/blog/weekly-post.jpg" alt="Mac Native Builds, Live Protocols, And Open Issues Under 350" /> The open issue count dropped below 350 after a push through the oldest reports, and the same week brought native Mac builds, WebSockets in the core, gRPC and GraphQL integration, a new advertising API, and richer background work.'
+feed_html: '<img src="https://www.codenameone.com/blog/weekly.jpg" alt="Mac Native Builds, Live Protocols, And Open Issues Under 350" /> The open issue count dropped below 350 after a push through the oldest reports, and the same week brought native Mac builds, WebSockets in the core, gRPC and GraphQL integration, a new advertising API, and richer background work.'
 ---
 
-![Mac Native Builds, Live Protocols, And Open Issues Under 350](/blog/weekly-post.jpg)
+![Mac Native Builds, Live Protocols, And Open Issues Under 350](/blog/weekly.jpg)
 
-Our focus was all over the place this week with work that targeted many different directions: desktop, monetization, communication, media and more. This fits with our roadmap of one platform that delivers the promise Java never delivered: WORA for Everything Everywhere. 
+Our focus was all over the place this week with work that targeted many different directions: desktop, monetization, communication, media, and more. This fits with our roadmap of one platform that delivers the promise Java never delivered: WORA for Everything Everywhere. 
 
-But before we dig into the new features, there's one number I'm particularly proud of...
+But before we dig into the new features, there's one number I'm particularly proud of…
 
 ## Open issues are under 350
 
@@ -37,7 +37,7 @@ To everyone who has sent us patches over the years, and especially the people wh
 The bigger items get their own deep-dive tutorials over the coming week. Short version:
 
 - **Native Mac builds.** The `macNative.enabled=true` build hint takes the same project through the iOS pipeline and emits a native Mac app. It pairs with a deeper desktop integration layer (native title bar, native menu bar, interactive scrollbars, desktop notifications), so a desktop target stops feeling like a phone in a window.
-- **WebSockets, gRPC, and GraphQL.** `com.codename1.io.WebSocket` is now in the core with no `cn1lib` required, and `cn1:generate-grpc` and `cn1:generate-graphql` join `cn1:generate-openapi` to turn a proto file or a GraphQL schema into a typed client. GraphQL subscriptions ride the new WebSocket facade, and enum binding landed in the JSON/XML mapper alongside them.
+- **WebSockets, gRPC, and GraphQL.** `com.codename1.io.WebSocket` is now in the core with no `cn1lib` required, and `cn1:generate-grpc` and `cn1:generate-graphql` join `cn1:generate-openapi` to turn a proto file or a GraphQL schema into a typed client. GraphQL subscriptions ride the new core WebSocket support, and enum binding landed in the JSON/XML mapper alongside them.
 - **A new advertising API.** A pluggable, format-complete `com.codename1.ads` subsystem replaces a pile of dead-end legacy mechanisms, with a modern AdMob reference provider.
 - **Background execution and push.** Constraint-based background work, foreground services, push topics, and much richer local notifications, all with full simulator support.
 - **Agent skills and a simpler Initializr.** Covered in this post below, since it is more about the tooling around your project than the framework inside it.
@@ -58,7 +58,7 @@ Agents can now automatically update the skills to the latest versions and also d
 
 Several of these came straight out of the issue-tracker pass:
 
-- **Cubic bezier motion now matches CSS.** [PR #5122](https://github.com/codenameone/CodenameOne/pull/5122) fixes [#1524](https://github.com/codenameone/CodenameOne/issues/1524): `Motion.createCubicBezierMotion` was feeding its control points into a 1D polynomial directly, so the curve did not match the CSS `cubic-bezier()` it was modeled on. It does now so animations might act differently in some cases.
+- **`cubic-bezier()` motion now matches CSS.** [PR #5122](https://github.com/codenameone/CodenameOne/pull/5122) fixes [#1524](https://github.com/codenameone/CodenameOne/issues/1524): `Motion.createCubicBezierMotion` was feeding its control points into a 1D polynomial directly, so the curve did not match the CSS `cubic-bezier()` it was modeled on. It does now so animations might act differently in some cases.
 - **Always-tensile on the X axis.** [PR #5112](https://github.com/codenameone/CodenameOne/pull/5112) closes [#1399](https://github.com/codenameone/CodenameOne/issues/1399), the next-oldest open issue (filed March 2015): `setAlwaysTensile(true)` now applies horizontally as well as vertically. This means you would see the rubber-band effect also on X axis scrolling.
 - **Validation highlights on tap-away.** [PR #5123](https://github.com/codenameone/CodenameOne/pull/5123) closes [#1459](https://github.com/codenameone/CodenameOne/issues/1459): a field with an invalid value is now highlighted when you tap into a different field, not only when you press the virtual keyboard's next/enter.
 - **EncodedImage.dispose() actually frees memory.** [PR #5127](https://github.com/codenameone/CodenameOne/pull/5127) makes `dispose()` release the decoded image and the encoded bytes (it was a no-op before) and adds `isDisposed()`. Closes [#3733](https://github.com/codenameone/CodenameOne/issues/3733).
