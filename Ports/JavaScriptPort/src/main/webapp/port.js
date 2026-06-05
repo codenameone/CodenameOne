@@ -3303,15 +3303,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // gap. Park until the SVG transform render is fixed so the suite stays green
   // (a delivering test with no golden fails as "Reference screenshot missing").
   "com_codenameone_examples_hellocodenameone_tests_SVGStaticScreenshotTest": "svgTransformBlankRender",
-  // FileSystemStorageOpenInputStreamMissingTest UN-PARKED: it was parked because
-  // its synchronous runTest does fs.exists()/openInputStream() on a missing path,
-  // round-tripping into LocalForage.getItem on the host, which under load
-  // intermittently BLOCKS and -- being a blocking runTest, not a synchronous
-  // throw -- wedged the suite tail at index 121. The new per-test dispatch
-  // watchdog (runCn1ssResolvedTest) now force-advances ANY test whose runTest
-  // blocks past cn1ssDispatchWatchdogMs, so this no longer wedges: it either runs
-  // fine or is force-advanced (no screenshot golden -> no missing_actual). Left
-  // un-parked to exercise + prove the watchdog on a known-blocking test.
+  // FileSystemStorageOpenInputStreamMissingTest RE-PARKED: its runTest blocks on
+  // a flaky LocalForage.getItem host call. The per-test dispatch watchdog DOES
+  // fire on it, but force-advancing cannot recover a DEGRADED host channel (the
+  // recovery path runNextTestMethod itself needs the channel), so once the
+  // channel is bad the suite is dead regardless. Parking removes it as a wedge
+  // candidate (no golden -> zero parity impact) and restores the known-green tail
+  // from efabb3e1a. The watchdog stays as a healthy-channel safety net for
+  // genuine isolated blocks; it is NOT a cure for host-channel degradation.
+  "com_codenameone_examples_hellocodenameone_tests_FileSystemStorageOpenInputStreamMissingTest": "fileSystemStorageLocalForageHang",
   // Transform + Rotated kept UN-parked -- never reached on the prior run
   // (CombinedXY hung first); testing whether they render now.
   // Two more late-suite tests that hit the canvas-accumulation
