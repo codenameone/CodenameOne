@@ -125,6 +125,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-02T01:34:44+00:00"
       }
+    },
+    "metal-default-new-build-cloud-and-a-new-format": {
+      "devto": {
+        "id": 3828546,
+        "url": "https://dev.to/codenameone/metal-default-a-new-build-cloud-and-a-new-format-11hg",
+        "syndicated_at": "2026-06-05T13:58:05+00:00"
+      },
+      "foojay": {
+        "id": 124128,
+        "url": "https://foojay.io/wp-admin/post.php?post=124128&action=edit",
+        "preview_url": "https://foojay.io/?p=124128",
+        "featured_media_id": 124127,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-05T13:59:11+00:00"
+      }
     }
   }
 }
