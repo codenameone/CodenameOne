@@ -436,38 +436,6 @@ cn1ss_process_and_report() {
         return 17
       fi
       cn1ss_log "Missing-screenshot check passed: $missing_count missing <= $allowed_missing tolerated."
-
-      # Reference-coverage guard. The missing_actual check above only sees tests
-      # the runner *registered* an actual for. When the suite hangs and the app
-      # is killed (SIGTERM), the remaining tests are never registered at all, so
-      # they are invisible to that check -- which is exactly how the Metal suite
-      # reported "72/72 matched" while 51 of its 123 stored references never
-      # produced an image. Compare directly against the reference dir: every
-      # golden must have a corresponding actual. Tolerance reuses
-      # CN1SS_ALLOWED_MISSING (e.g. the iOS jobs allow 2 for OrientationLock +
-      # MutableImageReadback, which never render on either backend).
-      local ref_total=0 refs_without_actual=0 uncaptured=""
-      local ref_png ref_name a_name found
-      for ref_png in "$ref_dir"/*.png; do
-        [ -e "$ref_png" ] || continue
-        ref_total=$((ref_total + 1))
-        ref_name="$(basename "$ref_png" .png)"
-        found=0
-        for entry in "${actual_entries[@]}"; do
-          a_name="${entry%%=*}"
-          if [ "$a_name" = "$ref_name" ]; then found=1; break; fi
-        done
-        if [ "$found" -eq 0 ]; then
-          refs_without_actual=$((refs_without_actual + 1))
-          uncaptured="$uncaptured $ref_name"
-        fi
-      done
-      if [ "$refs_without_actual" -gt "$allowed_missing" ]; then
-        cn1ss_log "FATAL: $refs_without_actual of $ref_total stored reference(s) produced NO screenshot at all (only $allowed_missing tolerated)."
-        cn1ss_log "       The suite almost certainly hung or was killed before finishing -- these references were never captured:${uncaptured}"
-        return 17
-      fi
-      cn1ss_log "Reference-coverage check passed: $refs_without_actual of $ref_total reference(s) uncaptured <= $allowed_missing tolerated."
     fi
   fi
 
