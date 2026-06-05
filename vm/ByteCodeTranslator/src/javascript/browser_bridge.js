@@ -827,6 +827,7 @@
     FILL_TEXT: 40, STROKE_TEXT: 41, SET_LINE_DASH_OFFSET: 42, SET_LINE_DASH: 43,
     CREATE_LINEAR_GRADIENT: 50, CREATE_RADIAL_GRADIENT: 51, ADD_COLOR_STOP: 52,
     SET_FILL_GRADIENT: 53, SET_STROKE_GRADIENT: 54, CREATE_PATTERN: 55, SET_FILL_PATTERN: 56,
+    CREATE_PATTERN_SURFACE: 57,
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72
   };
@@ -962,6 +963,11 @@
           try { curPattern = ctx.createPattern(pimg, prep); } catch (_ep) { curPattern = null; }
           break;
         }
+        case SURF.CREATE_PATTERN_SURFACE: {
+          var psurf = surfaceTable[nums[ni++]], prep2 = objs[oi++];
+          try { curPattern = (psurf && psurf.canvas) ? ctx.createPattern(psurf.canvas, prep2) : null; } catch (_eps) { curPattern = null; }
+          break;
+        }
         case SURF.SET_FILL_PATTERN: if (curPattern) { ctx.fillStyle = curPattern; } break;
         case SURF.DRAW_IMAGE_XY: {
           var i1 = surfaceImageSource(objs[oi++]);
@@ -1030,6 +1036,17 @@
     var ops = r.ops || [];
     var opCount = r.opCount | 0;
     replaySurfaceCommands(s.ctx, ops, opCount, r.nums || [], r.objs || []);
+    // Surface flushes replay straight onto the canvas context, bypassing the
+    // jso-bridge ``noteDrawTarget`` path that tracks per-canvas paintCount /
+    // lastPaintSeq. The screenshot capture + UI-settle heuristics rely on those
+    // counters to know the display painted; without this nudge they wait forever
+    // for a paint that "never happened" (the display surface renders but reads as
+    // paintCount=0). Mark the display canvas painted and advance the render-queue
+    // sequence so canvas-pick / settle see the frame.
+    if (id === SURF_DISPLAY_ID && opCount > 0) {
+      noteCanvasOperation(s.canvas, 'method', 'fill', true, null);
+      global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+    }
     return null;
   });
 
@@ -1061,6 +1078,31 @@
     return out;
   });
 
+  // Encode a surface's backing canvas to a base64 data URL (PNG/JPEG export +
+  // the animation-grid screenshot path). The image bytes read-back path.
+  hostBridge.register('__cn1_surface_to_dataurl__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.canvas || typeof s.canvas.toDataURL !== 'function') {
+      return ' SURFERR:no-surface:id=' + (r.id | 0)
+        + ':known=' + Object.keys(surfaceTable).join('.');
+    }
+    try {
+      var q = (typeof r.quality === 'number' && r.quality >= 0 && r.quality <= 1) ? r.quality : undefined;
+      var url = s.canvas.toDataURL(r.mime || 'image/png', q);
+      if (!url || url.length < 32) {
+        return ' SURFERR:empty:id=' + (r.id | 0)
+          + ':w=' + (s.canvas.width | 0) + ':h=' + (s.canvas.height | 0)
+          + ':len=' + (url ? url.length : 0);
+      }
+      return url;
+    } catch (e) {
+      return ' SURFERR:throw:id=' + (r.id | 0)
+        + ':w=' + (s.canvas.width | 0) + ':h=' + (s.canvas.height | 0)
+        + ':err=' + (e && e.name ? e.name : String(e)).slice(0, 40);
+    }
+  });
+
   // Release a surface's backing canvas when its owning Java image is GC'd.
   hostBridge.register('__cn1_surface_dispose__', function(request) {
     var r = request || {};
@@ -1068,6 +1110,115 @@
     if (id !== SURF_DISPLAY_ID) {
       delete surfaceTable[id];
     }
+    return null;
+  });
+
+  // Write a raw ARGB pixel rectangle onto a surface (createImage(int[])).
+  hostBridge.register('__cn1_surface_write__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var s = getSurface(r.id | 0, w, h);
+    if (!s || !s.ctx || w <= 0 || h <= 0) {
+      return null;
+    }
+    var argb = r.argb || [];
+    var img = s.ctx.createImageData(w, h);
+    var data = img.data;
+    var n = w * h;
+    for (var i = 0; i < n; i++) {
+      var v = argb[i] | 0;
+      var p = i << 2;
+      data[p] = (v >>> 16) & 0xff;
+      data[p + 1] = (v >>> 8) & 0xff;
+      data[p + 2] = v & 0xff;
+      data[p + 3] = (v >>> 24) & 0xff;
+    }
+    s.ctx.putImageData(img, 0, 0);
+    return null;
+  });
+
+  // Read back an ARGB pixel rectangle from a LOADED image host resource. The
+  // image is drawn onto a scratch canvas (the worker holds no canvas) and its
+  // pixels read + packed ARGB. The one read-back for loaded-image getRGB.
+  hostBridge.register('__cn1_image_read__', function(request) {
+    var r = request || {};
+    var image = resolveHostRef(r.image);
+    var w = r.w | 0, h = r.h | 0;
+    if (!image || w <= 0 || h <= 0) {
+      return null;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.createElement) {
+      return null;
+    }
+    var cv = doc.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    var ctx = cv.getContext('2d');
+    var data;
+    try {
+      ctx.drawImage(image, r.x | 0, r.y | 0, w, h, 0, 0, w, h);
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (_eir) {
+      return null;
+    }
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Gaussian blur from a loaded image (srcSurfaceId < 0) or another surface,
+  // onto a destination surface, in one canvas2d filter:blur op.
+  hostBridge.register('__cn1_surface_blur__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var dst = getSurface(r.dstId | 0, w, h);
+    if (!dst || !dst.ctx) {
+      return null;
+    }
+    var src;
+    if ((r.srcSurfaceId | 0) >= 0) {
+      var ss = surfaceTable[r.srcSurfaceId | 0];
+      src = ss && ss.canvas;
+    } else {
+      src = resolveHostRef(r.srcImage);
+    }
+    if (!src) {
+      return null;
+    }
+    try {
+      dst.ctx.save();
+      dst.ctx.clearRect(0, 0, w, h);
+      dst.ctx.filter = 'blur(' + (+r.radius) + 'px)';
+      dst.ctx.drawImage(src, 0, 0, w, h);
+      dst.ctx.restore();
+    } catch (_eb) {}
+    return null;
+  });
+
+  // Append a surface's backing canvas into a DOM element and style it (native
+  // widgets that embed a CN1-rendered image directly in the page).
+  hostBridge.register('__cn1_attach_surface_to_element__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    var el = resolveHostRef(r.element);
+    if (!s || !s.canvas || !el) {
+      return null;
+    }
+    if (r.cssWidth != null && s.canvas.style) {
+      s.canvas.style.width = r.cssWidth;
+    }
+    if (r.cssHeight != null && s.canvas.style) {
+      s.canvas.style.height = r.cssHeight;
+    }
+    try { el.appendChild(s.canvas); } catch (_ea) {}
     return null;
   });
 

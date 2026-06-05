@@ -97,6 +97,7 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // Patterns: created host-side from an image host-ref into a register.
     public static final int OP_CREATE_PATTERN = 55;  // 1 obj (image ref) + 1 str (repetition)
     public static final int OP_SET_FILL_PATTERN = 56;
+    public static final int OP_CREATE_PATTERN_SURFACE = 57; // 1 num (srcSurfaceId) + 1 str (repetition)
     // Images. The image is referenced by HOST-REF MARKER (loaded images stay
     // host-side resources; never transported back to the worker) carried as an
     // obj arg. drawImage variants by destination/source arity:
@@ -196,6 +197,12 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
         num(srcSurfaceId);
         num(sx); num(sy); num(sw); num(sh);
         num(dx); num(dy); num(dw); num(dh);
+    }
+
+    /** Create a fill pattern from another surface (a mutable image). */
+    public CanvasPattern createPatternFromSurface(int srcSurfaceId, String repetition) {
+        op(OP_CREATE_PATTERN_SURFACE); num(srcSurfaceId); obj(repetition);
+        return patternToken;
     }
 
     // ============ CanvasRenderingContext2D ============

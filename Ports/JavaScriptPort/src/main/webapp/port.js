@@ -1506,17 +1506,44 @@ bindNative([
 // natives. They translate the worker's flat command buffers into a single
 // structured message per surface op and route it to the host bridge
 // (browser_bridge.js __cn1_surface_*). The host keeps the id->{canvas,ctx}
-// lookup table and replays; only readRGB returns pixels. There is at most ONE
-// round-trip per *frame flush* (not per draw call) -- the response is null, so
-// it can never be mistaken for a canvas/number (the "Number 667" staleness the
-// old per-mutable-image getContext storm produced).
+// lookup table and replays; ONLY readRGB returns pixels.
+//
+// Every void surface op is FIRE-AND-FORGET: it posts a host-call the worker
+// never waits on (``__cn1_no_response``), so nothing the renderer issues can
+// park the worker if a response is lost/crossed -- the failure mode that hard-
+// froze the suite when these were round-trips. Posting preserves FIFO order to
+// the host, so create -> flush -> ... -> read stay correctly ordered; the one
+// read (getRGB) is the only round-trip and the only thing that waits.
+function cn1SurfacePost(symbol, arg) {
+  arg.__cn1_no_response = true;
+  self.postMessage({ type: "host-call", symbol: symbol, args: [arg], id: 0 });
+}
+
+// Sanitize a worker-side host-ref (a live JSObject whose interface methods are
+// FUNCTION-valued and thus not structured-cloneable) into a clean transferable
+// marker {__cn1HostRef, __cn1HostClass}. Mirrors what invokeJsoBridge does via
+// toHostTransferArg; without it a drawImage/pattern/attach arg crashes the
+// fire-and-forget postMessage with "function(){} could not be cloned".
+function cn1CleanRef(o) {
+  if (o == null) {
+    return o;
+  }
+  if (jvm && typeof jvm.toHostTransferArg === "function") {
+    return jvm.toHostTransferArg(o);
+  }
+  if (o.__cn1HostRef != null) {
+    return { __cn1HostRef: o.__cn1HostRef, __cn1HostClass: o.__cn1HostClass };
+  }
+  return o;
+}
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int"
 ], function*(id, w, h) {
-  yield jvm.invokeHostNative("__cn1_surface_create__", [{ id: id | 0, w: w | 0, h: h | 0 }]);
+  cn1SurfacePost("__cn1_surface_create__", { id: id | 0, w: w | 0, h: h | 0 });
   return null;
 });
 
@@ -1540,17 +1567,17 @@ bindNative([
     if (o && o.__class === "java_lang_String") {
       outObjs[i] = jvm.toNativeString(o);
     } else {
-      outObjs[i] = o; // host-ref marker {__cn1HostRef} or null
+      outObjs[i] = cn1CleanRef(o); // host image/canvas ref -> clean marker
     }
   }
   // Java primitive arrays are plain JS arrays here; slice to the exact used
   // length so the structured clone doesn't ship the growable buffer's slack.
   const outOps = ops.slice(0, oc);
   const outNums = nums.slice(0, numCount | 0);
-  yield jvm.invokeHostNative("__cn1_surface_flush__", [{
+  cn1SurfacePost("__cn1_surface_flush__", {
     id: id | 0, w: w | 0, h: h | 0,
     ops: outOps, opCount: oc, nums: outNums, objs: outObjs
-  }]);
+  });
   return null;
 });
 
@@ -1573,12 +1600,116 @@ bindNative([
 });
 
 bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl_int_java_lang_String_double_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl___int_java_lang_String_double_R_java_lang_String"
+], function*(id, mime, quality) {
+  const url = yield jvm.invokeHostNative("__cn1_surface_to_dataurl__", [{
+    id: id | 0,
+    mime: mime == null ? "image/png" : jvm.toNativeString(mime),
+    quality: +quality
+  }]);
+  if (url != null && String(url).indexOf(" SURFERR:") === 0) {
+    try { console.log("PARPAR:DIAG:SURF_DATAURL=" + String(url).slice(9)); } catch (_e) {}
+    return null;
+  }
+  return url == null ? null : jvm.createStringLiteral(String(url));
+});
+
+bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int_R_void",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int"
 ], function*(id) {
-  yield jvm.invokeHostNative("__cn1_surface_dispose__", [{ id: id | 0 }]);
+  cn1SurfacePost("__cn1_surface_dispose__", { id: id | 0 });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels_int_int_1ARRAY_int_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceWritePixels___int_int_1ARRAY_int_int"
+], function*(id, argb, w, h) {
+  const n = (w | 0) * (h | 0);
+  cn1SurfacePost("__cn1_surface_write__", {
+    id: id | 0, w: w | 0, h: h | 0, argb: argb.slice(0, n)
+  });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels_com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels___com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels_com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeReadImagePixels___com_codename1_html5_js_JSObject_int_int_int_int_int_1ARRAY"
+], function*(image, x, y, w, h, dest) {
+  const arr = yield jvm.invokeHostNative("__cn1_image_read__", [{
+    image: cn1CleanRef(image), x: x | 0, y: y | 0, w: w | 0, h: h | 0
+  }]);
+  if (arr && dest) {
+    const n = (w | 0) * (h | 0);
+    for (let i = 0; i < n; i++) {
+      dest[i] = arr[i] | 0;
+    }
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur_int_com_codename1_html5_js_JSObject_int_int_int_float",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceBlur___int_com_codename1_html5_js_JSObject_int_int_int_float"
+], function*(dstId, srcImage, srcSurfaceId, w, h, radius) {
+  cn1SurfacePost("__cn1_surface_blur__", {
+    dstId: dstId | 0, srcImage: cn1CleanRef(srcImage), srcSurfaceId: srcSurfaceId | 0,
+    w: w | 0, h: h | 0, radius: +radius
+  });
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement_int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeAttachSurfaceToElement___int_com_codename1_html5_js_JSObject_java_lang_String_java_lang_String"
+], function*(id, element, cssWidth, cssHeight) {
+  cn1SurfacePost("__cn1_attach_surface_to_element__", {
+    id: id | 0, element: cn1CleanRef(element),
+    cssWidth: cssWidth == null ? null : jvm.toNativeString(cssWidth),
+    cssHeight: cssHeight == null ? null : jvm.toNativeString(cssHeight)
+  });
+  return null;
+});
+
+// Surface GC disposal: register the owning Java image in a FinalizationRegistry
+// so the host surface (its backing canvas) is released when the image is
+// collected. Mirrors the host-ref release path but targets the surface table.
+var __cn1SurfaceFinalizers = (typeof FinalizationRegistry === "function")
+  ? new FinalizationRegistry(function(surfaceId) {
+      try {
+        if (typeof self !== "undefined" && typeof self.postMessage === "function") {
+          self.postMessage({
+            type: "host-call",
+            symbol: "__cn1_surface_dispose__",
+            args: [{ id: surfaceId | 0, __cn1_no_response: true }],
+            id: 0
+          });
+        }
+      } catch (_e) {}
+    })
+  : null;
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal_java_lang_Object_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_registerSurfaceDisposal___java_lang_Object_int"
+], function*(owner, surfaceId) {
+  if (__cn1SurfaceFinalizers && owner && typeof owner === "object") {
+    try { __cn1SurfaceFinalizers.register(owner, surfaceId | 0); } catch (_e) {}
+  }
   return null;
 });
 

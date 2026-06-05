@@ -229,11 +229,9 @@ public class PhotoCapture {
     @JSBody(params={"stream"}, script="if (stream==null) {return;} else if (stream.stop !== undefined) { stream.stop();} else {stream.getTracks()[0].stop();}")
     private native static void stopStream(MediaStream stream);
     
-    private static HTMLCanvasElement setStyleSize(HTMLCanvasElement cv, Component cmp) {
-        
-            cv.getStyle().setProperty("width", scaleCoord(cmp.getWidth())+"px");
-            cv.getStyle().setProperty("height", scaleCoord(cmp.getHeight())+"px");
-            return cv;
+    private static void attachButtonSurface(NativeImage img, JSObject el, Component cmp) {
+        HTML5Implementation.attachImageToElement(img, el,
+                scaleCoord(cmp.getWidth())+"px", scaleCoord(cmp.getHeight())+"px");
     }
     
     public HTMLCanvasElement showDialog() {
@@ -282,7 +280,7 @@ public class PhotoCapture {
             nativeCancelButton.setHeight(nativeCancelButton.getPreferredH());
             
             HTMLInputElement cancelButton = createButton("cancel-btn", "");
-            cancelButton.appendChild(setStyleSize(((NativeImage)nativeCancelButton.toImage().getImage()).getMutableGraphics().getCanvas(), nativeCancelButton));
+            attachButtonSurface((NativeImage)nativeCancelButton.toImage().getImage(), cancelButton, nativeCancelButton);
            
             
             nativeUseButton.setMaterialIcon(FontImage.MATERIAL_CHECK_CIRCLE);
@@ -290,21 +288,21 @@ public class PhotoCapture {
             nativeUseButton.setHeight(nativeUseButton.getPreferredH());
             
             HTMLInputElement useButton = createButton("use-btn", "");
-            useButton.appendChild(setStyleSize(((NativeImage)nativeUseButton.toImage().getImage()).getMutableGraphics().getCanvas(), nativeUseButton));
+            attachButtonSurface((NativeImage)nativeUseButton.toImage().getImage(), useButton, nativeUseButton);
             
             
             nativeDontUseButton.setMaterialIcon(FontImage.MATERIAL_DELETE);
             nativeDontUseButton.setWidth(nativeDontUseButton.getPreferredW());
             nativeDontUseButton.setHeight(nativeDontUseButton.getPreferredH());
             HTMLInputElement dontUseButton = createButton("dontuse-btn", "");
-            dontUseButton.appendChild(setStyleSize(((NativeImage)nativeDontUseButton.toImage().getImage()).getMutableGraphics().getCanvas(), nativeDontUseButton));
+            attachButtonSurface((NativeImage)nativeDontUseButton.toImage().getImage(), dontUseButton, nativeDontUseButton);
             
             
             nativeSnapshotButton.setMaterialIcon(FontImage.MATERIAL_CAMERA);
             nativeSnapshotButton.setWidth(nativeSnapshotButton.getPreferredW());
             nativeSnapshotButton.setHeight(nativeSnapshotButton.getPreferredH());
             HTMLInputElement snapshotButton = createButton("capture-btn", "");
-            snapshotButton.appendChild(setStyleSize(((HTML5Implementation.NativeImage)nativeSnapshotButton.toImage().getImage()).getMutableGraphics().getCanvas(), nativeSnapshotButton));
+            attachButtonSurface((NativeImage)nativeSnapshotButton.toImage().getImage(), snapshotButton, nativeSnapshotButton);
             
             
             HTMLElement buttons = doc.createElement("div");

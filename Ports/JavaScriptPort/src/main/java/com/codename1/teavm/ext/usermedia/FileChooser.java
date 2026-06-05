@@ -209,10 +209,9 @@ public class FileChooser {
         btn.getStyle().setProperty("margin", "0");
         //btn.getStyle().setProperty("font-size", "2em");
         btn.getStyle().setProperty("opacity", "0.85");
-        HTMLCanvasElement cv = ((HTML5Implementation.NativeImage)nativeButton.toImage().getImage()).getMutableGraphics().getCanvas();
-        cv.getStyle().setProperty("width", scaleCoord(nativeButton.getWidth())+"px");
-        cv.getStyle().setProperty("height", scaleCoord(nativeButton.getHeight())+"px");
-        btn.appendChild(cv);
+        HTML5Implementation.attachImageToElement(
+                (HTML5Implementation.NativeImage)nativeButton.toImage().getImage(), btn,
+                scaleCoord(nativeButton.getWidth())+"px", scaleCoord(nativeButton.getHeight())+"px");
         
         clickBtn = btn;
         
