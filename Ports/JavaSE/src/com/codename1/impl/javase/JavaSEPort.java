@@ -998,38 +998,100 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
-        if (isSimulator()) {
-            if (localNotificationsTimer == null) {
-                localNotificationsTimer = new java.util.Timer();
-            }
-            TimerTask task = new TimerTask() {
-                public void run() {
+        // honored both in the simulator (rich in-canvas panel) and on a real desktop build
+        // ("Run as desktop app" / executable jar), where it surfaces as a native OS notification
+        // through the system tray
+        if (!isSimulator() && !isDesktop()) {
+            return;
+        }
+        if (localNotificationsTimer == null) {
+            localNotificationsTimer = new java.util.Timer();
+        }
+        final boolean simulator = isSimulator();
+        TimerTask task = new TimerTask() {
+            public void run() {
+                if (simulator) {
                     SimulatorNotifications.show(JavaSEPort.this, notif);
+                } else {
+                    showDesktopNotification(notif);
                 }
-            };
-            if (localNotifications.containsKey(notif.getId())) {
-                TimerTask old = localNotifications.get(notif.getId());
-                old.cancel();
             }
-            localNotifications.put(notif.getId(), task);
-            if (repeat == LocalNotification.REPEAT_NONE) {
-                localNotificationsTimer.schedule(task, new Date(firstTime));
-            } else {
-                localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
-            }
+        };
+        if (localNotifications.containsKey(notif.getId())) {
+            TimerTask old = localNotifications.get(notif.getId());
+            old.cancel();
+        }
+        localNotifications.put(notif.getId(), task);
+        if (repeat == LocalNotification.REPEAT_NONE) {
+            localNotificationsTimer.schedule(task, new Date(firstTime));
+        } else {
+            localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
         }
     }
 
     @Override
     public void cancelLocalNotification(String notificationId) {
+        if (!isSimulator() && !isDesktop()) {
+            return;
+        }
+        if (localNotifications.containsKey(notificationId)) {
+            TimerTask n = localNotifications.get(notificationId);
+            n.cancel();
+            localNotifications.remove(notificationId);
+        }
         if (isSimulator()) {
-            if (localNotifications.containsKey(notificationId)) {
-                TimerTask n = localNotifications.get(notificationId);
-                n.cancel();
-                localNotifications.remove(notificationId);
-            }
             SimulatorNotifications.dismiss(notificationId);
         }
+    }
+
+    private TrayIcon desktopNotificationTray;
+    private String lastDesktopNotificationId;
+
+    /// Surfaces a local notification on a real desktop build as a native OS notification through
+    /// the system tray (Notification Center on macOS, the notification area on Windows/Linux). A
+    /// single persistent tray icon is reused for the lifetime of the process; clicking the
+    /// notification dispatches it to the app's {@code LocalNotificationCallback}, mirroring mobile.
+    private void showDesktopNotification(final LocalNotification notif) {
+        if (!SystemTray.isSupported()) {
+            System.out.println("Local notification not supported on this OS!!!");
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (desktopNotificationTray == null) {
+                        SystemTray sysTray = SystemTray.getSystemTray();
+                        java.awt.Image icon = null;
+                        java.net.URL res = getClass().getResource("/CodenameOne_Small.png");
+                        if (res != null) {
+                            icon = Toolkit.getDefaultToolkit().getImage(res);
+                        }
+                        if (icon == null) {
+                            icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+                        }
+                        String tip = Display.getInstance().getProperty("AppName", "Codename One");
+                        TrayIcon tray = new TrayIcon(icon, tip);
+                        tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                final String id = lastDesktopNotificationId;
+                                if (id != null) {
+                                    dispatchLocalNotification(id, null, null, null);
+                                }
+                            }
+                        });
+                        sysTray.add(tray);
+                        desktopNotificationTray = tray;
+                    }
+                    lastDesktopNotificationId = notif.getId();
+                    desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
+                            TrayIcon.MessageType.INFO);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
     }
 
     /// Returns the channel registered for the given id, or null. Used by the simulator
@@ -1724,6 +1786,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(menu);
             }
             JMenuItem item = new JMenuItem(cmd.getCommandName());
+            KeyStroke accelerator = acceleratorFor(cmd);
+            if (accelerator != null) {
+                item.setAccelerator(accelerator);
+            }
             item.addActionListener(new java.awt.event.ActionListener() {
                 @Override
                 public void actionPerformed(java.awt.event.ActionEvent e) {
@@ -1738,6 +1804,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             menu.add(item);
         }
         return bar;
+    }
+
+    /// Builds a Swing {@link KeyStroke} from a command's desktop-shortcut hint, mapping the
+    /// platform-primary modifier to the OS menu-shortcut mask (Command on macOS, Control
+    /// elsewhere). Returns null when the command has no accelerator.
+    private static KeyStroke acceleratorFor(com.codename1.ui.Command cmd) {
+        int keyChar = cmd.getDesktopShortcutKeyChar();
+        if (keyChar == 0) {
+            return null;
+        }
+        int mods = cmd.getDesktopShortcutModifiers();
+        int awtMods = 0;
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
+            awtMods |= Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT) != 0) {
+            awtMods |= java.awt.event.InputEvent.SHIFT_DOWN_MASK;
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0) {
+            awtMods |= java.awt.event.InputEvent.ALT_DOWN_MASK;
+        }
+        return KeyStroke.getKeyStroke(Character.toUpperCase((char) keyChar), awtMods);
     }
 
     @Override

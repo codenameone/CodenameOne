@@ -19,6 +19,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Deterministic, network-free mock ad provider used by the advertising screenshot test. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-ads-mock</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 

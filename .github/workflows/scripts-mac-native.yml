@@ -82,7 +82,10 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    timeout-minutes: 45
+    # build step (<=45) + screenshot-run step (<=45) <= 90, matching the
+    # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
+    # SIGKILL the screenshot run mid-post-processing on slow runners.
+    timeout-minutes: 90
     concurrency:
       group: mac-ci-${{ github.workflow }}-mac-native-${{ github.ref_name }}
       cancel-in-progress: true
@@ -221,7 +224,12 @@ jobs:
             "${{ steps.build-mac-native-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-mac-native-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # The script's own suite budget is already 1500s (25m); add app
+        # launch + post-processing (compare 122 images, render report, post
+        # comment) and a slow runner tips just over the old 30m step cap and
+        # gets SIGKILLed mid-compare -- a flaky timeout, not a real mismatch.
+        # 45m lets the script's internal timeout govern gracefully instead.
+        timeout-minutes: 45
 
       - name: Publish Mac native screenshot summary
         # Surfaces run-mac-native-ui-tests.sh's comparison result in the

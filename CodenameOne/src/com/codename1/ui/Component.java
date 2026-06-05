@@ -334,6 +334,11 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean draggingScrollThumbY;
     private boolean draggingScrollThumbX;
     private int scrollThumbGrabOffset;
+    // True while the pointer hovers an interactive scrollbar thumb so the look and feel can render
+    // the desktop-conventional hover highlight. Only meaningful on the desktop with interactive
+    // scrollbars enabled.
+    private boolean scrollThumbHoverY;
+    private boolean scrollThumbHoverX;
     private boolean sizeRequestedByUser = false;
     private Dimension preferredSize;
     private boolean scrollSizeRequestedByUser = false;
@@ -6036,6 +6041,101 @@ public class Component implements Animation, StyleListener, Editable {
     /// Package visibility for unit tests in this package; not part of the public API.
     boolean isInteractiveScrollThumbGrabbed() {
         return draggingScrollThumbY || draggingScrollThumbX;
+    }
+
+    /// Indicates whether the vertical interactive scrollbar thumb is currently grabbed/dragged.
+    /// Invoked by the look and feel to render the pressed thumb style; not part of the public API.
+    ///
+    /// #### Returns
+    ///
+    /// true when the vertical thumb is being dragged
+    public boolean isVScrollThumbGrabbed() {
+        return draggingScrollThumbY;
+    }
+
+    /// Indicates whether the horizontal interactive scrollbar thumb is currently grabbed/dragged.
+    /// Invoked by the look and feel to render the pressed thumb style; not part of the public API.
+    ///
+    /// #### Returns
+    ///
+    /// true when the horizontal thumb is being dragged
+    public boolean isHScrollThumbGrabbed() {
+        return draggingScrollThumbX;
+    }
+
+    /// Indicates whether the pointer hovers the vertical interactive scrollbar thumb. Invoked by
+    /// the look and feel to render the hover thumb style; not part of the public API.
+    ///
+    /// #### Returns
+    ///
+    /// true when the vertical thumb is hovered
+    public boolean isVScrollThumbHover() {
+        return scrollThumbHoverY;
+    }
+
+    /// Indicates whether the pointer hovers the horizontal interactive scrollbar thumb. Invoked by
+    /// the look and feel to render the hover thumb style; not part of the public API.
+    ///
+    /// #### Returns
+    ///
+    /// true when the horizontal thumb is hovered
+    public boolean isHScrollThumbHover() {
+        return scrollThumbHoverX;
+    }
+
+    /// Updates the interactive-scrollbar hover state for the given absolute pointer location and
+    /// repaints if it changed. Inert unless the look and feel has interactive scrollbars enabled
+    /// and a scrollbar has been painted at least once. Returns true when the hover state changed.
+    boolean updateInteractiveScrollHover(int x, int y) {
+        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
+            return false;
+        }
+        boolean vHover = false;
+        boolean hHover = false;
+        if (isScrollableY() && isScrollVisible() && scrollThumbW > 0) {
+            int thumbLeft = getAbsoluteX() + scrollThumbX;
+            int thumbTop = getAbsoluteY() + scrollThumbY;
+            vHover = x >= thumbLeft && x < thumbLeft + scrollThumbW && y >= thumbTop && y < thumbTop + scrollThumbH;
+        }
+        if (isScrollableX() && isScrollVisible() && hScrollThumbW > 0) {
+            int thumbLeft = getAbsoluteX() + hScrollThumbX;
+            int thumbTop = getAbsoluteY() + hScrollThumbY;
+            hHover = x >= thumbLeft && x < thumbLeft + hScrollThumbW && y >= thumbTop && y < thumbTop + hScrollThumbH;
+        }
+        if (vHover != scrollThumbHoverY || hHover != scrollThumbHoverX) {
+            scrollThumbHoverY = vHover;
+            scrollThumbHoverX = hHover;
+            repaint();
+            return true;
+        }
+        return false;
+    }
+
+    /// Clears any interactive-scrollbar hover highlight on this component, repainting if needed.
+    void clearInteractiveScrollHover() {
+        if (scrollThumbHoverY || scrollThumbHoverX) {
+            scrollThumbHoverY = false;
+            scrollThumbHoverX = false;
+            repaint();
+        }
+    }
+
+    // Package-private accessors for the last painted vertical interactive-scrollbar geometry,
+    // used only by the in-package unit tests; not part of the public API.
+    int getVScrollThumbYInternal() {
+        return scrollThumbY;
+    }
+
+    int getVScrollThumbHInternal() {
+        return scrollThumbH;
+    }
+
+    int getVScrollTrackYInternal() {
+        return scrollTrackY;
+    }
+
+    int getVScrollTrackHInternal() {
+        return scrollTrackH;
     }
 
     /// Indicates whether tensile drag (dragging beyond the boundry of the component and

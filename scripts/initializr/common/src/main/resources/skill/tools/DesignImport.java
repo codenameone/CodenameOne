@@ -14,12 +14,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/// Parses a designer file (Figma, Sketch, or Adobe XD) into a STARTER Codename One
-/// style so an agent building a screen from a mockup starts near the target instead
-/// of from scratch. It emits three files into the output directory:
+/// Parses a designer file (Figma, Sketch, or Adobe XD) - or an HTML/React design's
+/// CSS design tokens (tokens.css / styles.css, e.g. a Claude-generated mockup) -
+/// into a STARTER Codename One style so an agent building a screen from a mockup
+/// starts near the target instead of from scratch. It emits three files into the
+/// output directory:
 ///
 ///   theme.css   - seeded CN1 CSS (Form/Title/Label/Button + per-named-layer UIIDs)
 ///   tokens.json - the extracted palette, type scale and spacing scale
@@ -38,6 +42,10 @@ import java.util.zip.ZipFile;
 ///   # Local ZIP+JSON formats
 ///   java tools/DesignImport.java path/to/design.sketch [--out DIR] [--px-per-mm N]
 ///   java tools/DesignImport.java path/to/design.xd     [--out DIR] [--px-per-mm N]
+///
+///   # HTML/React design tokens (a tokens.css/styles.css, or a dir containing one)
+///   java tools/DesignImport.java path/to/tokens.css    [--out DIR] [--px-per-mm N]
+///   java tools/DesignImport.java path/to/design-dir/   [--out DIR] [--px-per-mm N]
 ///
 ///   # Figma over its REST API (needs a personal access token + the file key)
 ///   java tools/DesignImport.java figma --token <PAT> --file <FILE_KEY> \
@@ -67,6 +75,7 @@ public class DesignImport {
         String source = args[0];
         String out = "cn1-design-import";
         double pxPerMm = 11.8;
+        boolean pxPerMmSet = false;
         String token = null;
         String fileKey = null;
         String nodeId = null;
@@ -75,7 +84,7 @@ public class DesignImport {
             for (int i = 1; i < args.length; i++) {
                 switch (args[i]) {
                     case "--out":       out = args[++i]; break;
-                    case "--px-per-mm": pxPerMm = Double.parseDouble(args[++i]); break;
+                    case "--px-per-mm": pxPerMm = Double.parseDouble(args[++i]); pxPerMmSet = true; break;
                     case "--token":     token = args[++i]; break;
                     case "--file":      fileKey = args[++i]; break;
                     case "--node":      nodeId = args[++i]; break;
@@ -95,6 +104,35 @@ public class DesignImport {
             Node root;
             String label;
             String lower = source.toLowerCase(Locale.US);
+
+            // CSS design-token mode: a tokens.css / styles.css (or a directory
+            // containing one) produced by an HTML/React design such as the ones
+            // Claude generates. We extract the CSS custom properties instead of a
+            // layer tree, so there is no Node graph - emit straight from here.
+            Path cssTokens = cssTokenSource(source, lower);
+            if (cssTokens != null) {
+                if (!pxPerMmSet) {
+                    pxPerMm = 3.78; // CSS px are 1x logical px (~3.78 px/mm)
+                }
+                Extracted ex = parseCssTokens(cssTokens);
+                if (ex.nodeCount == 0) {
+                    System.err.println("No CSS custom properties (--name: value) found in " + cssTokens + ".");
+                    System.exit(1);
+                }
+                Path outDir = Paths.get(out);
+                Files.createDirectories(outDir);
+                Files.writeString(outDir.resolve("tokens.json"), renderTokens(ex));
+                Files.writeString(outDir.resolve("theme.css"), renderCss(ex, pxPerMm, "CSS tokens " + cssTokens));
+                Files.writeString(outDir.resolve("layout.md"), renderCssLayout(cssTokens));
+                System.out.println("IMPORTED " + ex.colorCounts.size() + " colors, "
+                        + ex.fontSizes.size() + " text sizes, " + ex.spacings.size()
+                        + " spacings -> " + outDir.toAbsolutePath());
+                System.err.println("[DesignImport] next: validate CSS with "
+                        + "`java tools/IsCssValid.java " + outDir.resolve("theme.css") + "`, "
+                        + "then iterate with tools/CompareToMockup.java");
+                return;
+            }
+
             if (source.equals("figma")) {
                 if (token == null || fileKey == null) {
                     System.err.println("figma mode requires --token and --file");
@@ -109,7 +147,8 @@ public class DesignImport {
                 root = parseXd(Paths.get(source));
                 label = "Adobe XD file " + source;
             } else {
-                System.err.println("Unrecognised source. Expected a .sketch / .xd file or the literal 'figma'.");
+                System.err.println("Unrecognised source. Expected a .sketch / .xd / .css file, "
+                        + "a directory with a tokens.css/styles.css, or the literal 'figma'.");
                 usage();
                 System.exit(2);
                 return;
@@ -146,6 +185,149 @@ public class DesignImport {
         System.err.println("  java DesignImport.java design.sketch [--out DIR] [--px-per-mm N]");
         System.err.println("  java DesignImport.java design.xd     [--out DIR] [--px-per-mm N]");
         System.err.println("  java DesignImport.java figma --token PAT --file KEY [--node ID] [--out DIR]");
+        System.err.println("  java DesignImport.java tokens.css    [--out DIR] [--px-per-mm N]   (HTML/React design tokens)");
+        System.err.println("  java DesignImport.java path/to/design-dir/                          (dir containing tokens.css)");
+    }
+
+    // ===================================================================
+    // CSS design-token mode (HTML / React designs, e.g. Claude output)
+    // ===================================================================
+
+    /// Resolves a CSS-token source: a .css file, or a directory that contains a
+    /// tokens.css / styles.css. Returns null when the source is not CSS-based.
+    private static Path cssTokenSource(String source, String lower) {
+        Path p = Paths.get(source);
+        if (lower.endsWith(".css") && Files.isRegularFile(p)) {
+            return p;
+        }
+        if (Files.isDirectory(p)) {
+            for (String candidate : new String[]{"tokens.css", "styles.css", "theme.css"}) {
+                Path c = p.resolve(candidate);
+                if (Files.isRegularFile(c)) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Extracts CSS custom properties (`--name: value;`) from a design's
+    /// tokens/styles CSS into the same Extracted model used by the layer importers.
+    /// Only the FIRST value seen for each name is kept, so the light theme (declared
+    /// first under :root) wins over a later dark-theme override. Colors come from
+    /// --color-* (or any hex/rgb value), sizes from --fs-*/--font-size, spacing from
+    /// --space-*/--gap, radii from --radius-*.
+    private static Extracted parseCssTokens(Path file) throws IOException {
+        String css = Files.readString(file);
+        Map<String, String> vars = new LinkedHashMap<>();
+        Matcher m = Pattern.compile("--([A-Za-z0-9-]+)\\s*:\\s*([^;}]+)").matcher(css);
+        while (m.find()) {
+            String name = m.group(1).trim().toLowerCase(Locale.US);
+            String value = m.group(2).trim();
+            if (!vars.containsKey(name)) {
+                vars.put(name, value);
+            }
+        }
+
+        Extracted ex = new Extracted();
+        for (Map.Entry<String, String> e : vars.entrySet()) {
+            String name = e.getKey();
+            String value = e.getValue();
+            Integer color = parseCssColor(value);
+            boolean isBg = name.contains("bg") || name.contains("background")
+                    || name.contains("surface") || name.contains("panel");
+            boolean isAccent = name.contains("accent") || name.contains("primary");
+            boolean isColor = color != null && (name.startsWith("color") || isBg || isAccent
+                    || name.contains("border") || name.contains("brand") || name.contains("text"));
+            if (isColor) {
+                // Force the dominant background to rank first and the accent second,
+                // so renderCss reads get(0) as the surface and get(1) as the accent.
+                // (Plain frequency fails: white is reused across many surface tokens.)
+                int weight;
+                if (isAccent) {
+                    weight = 10000;
+                } else if (isBg && ex.dominantBackground == null) {
+                    weight = 20000;
+                    ex.dominantBackground = color;
+                } else {
+                    weight = 1;
+                }
+                ex.colorCounts.merge(hex(color), weight, Integer::sum);
+                ex.nodeCount++;
+            } else if (name.startsWith("fs-") || name.contains("font-size") || name.startsWith("text-")) {
+                Double px = parsePx(value);
+                if (px != null && px > 0 && !ex.fontSizes.contains(px)) {
+                    ex.fontSizes.add(px);
+                    ex.nodeCount++;
+                }
+            } else if (name.startsWith("space") || name.equals("gap") || name.startsWith("radius")) {
+                Double px = parsePx(value);
+                if (px != null && px > 0 && !ex.spacings.contains(px)) {
+                    ex.spacings.add(px);
+                    ex.nodeCount++;
+                }
+            }
+        }
+        Collections.sort(ex.fontSizes);
+        Collections.sort(ex.spacings);
+        return ex;
+    }
+
+    /// Parses a CSS color literal (#rgb, #rrggbb, rgb(), rgba()) to 0xRRGGBB, or
+    /// null for non-literal values (var(), color-mix(), named colors, transparent).
+    private static Integer parseCssColor(String raw) {
+        String v = raw.trim().toLowerCase(Locale.US);
+        if (v.startsWith("#")) {
+            String h = v.substring(1);
+            try {
+                if (h.length() == 3) {
+                    int r = Integer.parseInt(h.substring(0, 1), 16);
+                    int g = Integer.parseInt(h.substring(1, 2), 16);
+                    int b = Integer.parseInt(h.substring(2, 3), 16);
+                    return (r * 17 << 16) | (g * 17 << 8) | (b * 17);
+                }
+                if (h.length() == 6 || h.length() == 8) {
+                    return (int) (Long.parseLong(h.substring(0, 6), 16) & 0xFFFFFF);
+                }
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+            return null;
+        }
+        Matcher rgb = Pattern.compile("rgba?\\(\\s*([0-9]+)[,\\s]+([0-9]+)[,\\s]+([0-9]+)").matcher(v);
+        if (rgb.find()) {
+            return (clampByte(Double.parseDouble(rgb.group(1))) << 16)
+                    | (clampByte(Double.parseDouble(rgb.group(2))) << 8)
+                    | clampByte(Double.parseDouble(rgb.group(3)));
+        }
+        return null;
+    }
+
+    /// Parses a leading px length ("14px", "28px") to its numeric value, or null.
+    private static Double parsePx(String raw) {
+        Matcher m = Pattern.compile("(-?[0-9]+(?:\\.[0-9]+)?)\\s*px").matcher(raw.trim());
+        if (m.find()) {
+            return Double.parseDouble(m.group(1));
+        }
+        return null;
+    }
+
+    private static String renderCssLayout(Path file) {
+        return "# Layout map - CSS design tokens\n\n"
+                + "Source: `" + file + "`\n\n"
+                + "This import came from a CSS-token design (an HTML/React mockup), so there is no\n"
+                + "layer tree to map. Use the generated `theme.css` as a *palette + type-scale*\n"
+                + "starting point and build the layout from the design's own HTML/JSX structure:\n\n"
+                + "| Design CSS idiom            | Codename One equivalent                         |\n"
+                + "| --------------------------- | ----------------------------------------------- |\n"
+                + "| `display:flex; flex-direction:row` | `Container` with `BoxLayout.x()` / `FlowLayout` |\n"
+                + "| `display:flex; flex-direction:column` | `Container` with `BoxLayout.y()`           |\n"
+                + "| `display:grid` (N columns)  | `Container` with `GridLayout(rows, N)`          |\n"
+                + "| header / body / footer      | `BorderLayout` NORTH / CENTER / SOUTH           |\n"
+                + "| a `--color-*` variable      | a hardcoded hex per UIID (CN1 CSS has no vars)  |\n"
+                + "| `:root` light / `[data-theme=dark]` | a `Foo` UIID + a parallel `FooDark` UIID |\n\n"
+                + "To capture the design itself as a comparison mockup, render its HTML headlessly\n"
+                + "(e.g. Playwright) to a PNG, then score with `tools/CompareToMockup.java`.\n";
     }
 
     // ===================================================================

@@ -46,7 +46,29 @@ var o = {};
         callback.complete(!!readWebsiteThemePreference());
     };
 
+    function disablePageScroll() {
+        // The Codename One app owns scrolling (it has its own styled scrollbar),
+        // so suppress scrolling on the host page/iframe to avoid a double scroll.
+        try {
+            var styles = "html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none;}";
+            var doc = window.document;
+            if (doc) {
+                if (doc.documentElement) { doc.documentElement.style.overflow = "hidden"; }
+                if (doc.body) { doc.body.style.overflow = "hidden"; doc.body.style.margin = "0"; }
+                if (!doc.getElementById("cn1-initializr-noscroll")) {
+                    var s = doc.createElement("style");
+                    s.id = "cn1-initializr-noscroll";
+                    s.appendChild(doc.createTextNode(styles));
+                    (doc.head || doc.documentElement).appendChild(s);
+                }
+            }
+        } catch (ignored) {
+            // Ignore DOM access failures (e.g. sandboxed contexts).
+        }
+    }
+
     o.notifyUiReady_ = function(callback) {
+        disablePageScroll();
         var sendReady = function() {
             try {
                 if (window.parent && window.parent !== window && window.parent.postMessage) {

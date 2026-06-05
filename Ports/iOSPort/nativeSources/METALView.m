@@ -376,7 +376,38 @@ extern BOOL isRetinaBug();
     clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
     clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
     clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+    // The preserve draw below binds a CN1MetalPipelineCache pipeline, and every
+    // pipeline in that cache declares stencilAttachmentPixelFormat=Stencil8
+    // (polygon-clip #3921). A render pass that binds such a pipeline MUST attach
+    // a Stencil8 texture or Metal aborts in setRenderPipelineState: with a
+    // pixel-format mismatch (#5103): "For stencil attachment, the
+    // renderPipelineState pixelFormat must be MTLPixelFormatInvalid, as no
+    // texture is set." Under MTL_DEBUG_LAYER=assert (the CI Metal screenshot
+    // job) that abort is a SIGABRT on the first resize, which drops every
+    // screenshot after it. Attach a throwaway clear-on-load stencil exactly
+    // like the seed draw in CN1Metalcompat.m -- the preserve draw never engages
+    // the stencil test, so its contents are irrelevant. Only needed when there
+    // is a previous frame to draw (the plain black clear binds no pipeline).
+    id<MTLTexture> clearStencilTex = nil;
+    if (oldScreen != nil) {
+        MTLTextureDescriptor *clearStencilDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+            width:pw height:ph mipmapped:NO];
+        clearStencilDesc.usage = MTLTextureUsageRenderTarget;
+        clearStencilDesc.storageMode = MTLStorageModePrivate;
+        clearStencilTex = [layer.device newTextureWithDescriptor:clearStencilDesc];
+        if (clearStencilTex != nil) {
+            clearPass.stencilAttachment.texture = clearStencilTex;
+            clearPass.stencilAttachment.loadAction = MTLLoadActionClear;
+            clearPass.stencilAttachment.storeAction = MTLStoreActionDontCare;
+            clearPass.stencilAttachment.clearStencil = 0;
+        }
+    }
     id<MTLRenderCommandEncoder> clearEnc = [clearCb renderCommandEncoderWithDescriptor:clearPass];
+#ifndef CN1_USE_ARC
+    // renderCommandEncoderWithDescriptor: retains the attachment for the pass.
+    [clearStencilTex release];
+#endif
     if (oldScreen != nil) {
         [clearEnc setViewport:(MTLViewport){ 0.0, 0.0, (double)pw, (double)ph, 0.0, 1.0 }];
         CN1MetalBeginFrame(clearEnc, projectionMatrix, pw, ph);

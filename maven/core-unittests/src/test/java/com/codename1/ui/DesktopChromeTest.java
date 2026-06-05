@@ -63,6 +63,25 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void desktopShortcutHintRoundTrips() {
+        Command save = new Command("Save");
+        assertEquals(0, save.getDesktopShortcutKeyChar(), "no shortcut by default");
+        assertEquals(0, save.getDesktopShortcutModifiers(), "no modifiers by default");
+
+        // single-arg form uses the platform-primary modifier and upper-cases the key
+        save.setDesktopShortcut('s');
+        assertEquals('S', save.getDesktopShortcutKeyChar());
+        assertEquals(Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY, save.getDesktopShortcutModifiers());
+
+        Command saveAs = new Command("Save As");
+        saveAs.setDesktopShortcut('s',
+                Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY | Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);
+        assertEquals('S', saveAs.getDesktopShortcutKeyChar());
+        assertEquals(Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY | Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT,
+                saveAs.getDesktopShortcutModifiers());
+    }
+
+    @FormTest
     void toolbarModeKeepsToolbarAttached() {
         // default desktop mode is "toolbar": behavior must be unchanged from today
         implementation.setDesktop(true);

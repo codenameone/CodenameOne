@@ -33,7 +33,11 @@ import java.io.InputStream;
 /// This is an Ad service implementation by InnerActive see:
 /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
 ///
+/// @deprecated the InnerActive ad network is defunct. Use the modern pluggable
+/// advertising API in [com.codename1.ads.AdManager] instead.
+///
 /// @author Chen
+@Deprecated
 public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField removed obsolete field
 
     private static final String protocolVersion = "Sm2m-1.5.3";
