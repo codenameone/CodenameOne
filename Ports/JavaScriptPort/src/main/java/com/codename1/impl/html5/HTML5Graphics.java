@@ -63,27 +63,6 @@ public class HTML5Graphics {
     private int canvasWidth;
     private int canvasHeight;
     private CanvasRenderingContext2D context;
-    // DISPLAY-LIST (retained mode) for deferred mutable images. When non-null
-    // this graphics RECORDS every ExecutableOp into the list instead of
-    // executing it against a live canvas context -- there is no backing canvas
-    // and no getContext() round-trip at creation. The op list is later replayed
-    // onto a real context (HTML5Graphics.replayOps) only when the mutable image
-    // is actually rasterized (drawn to a surface or read via getRGB). This is
-    // what removes the per-mutable-image getContext() storm that crosses with
-    // concurrent getWidth()/getHeight() number reads on the worker<->host
-    // barrier (the "Number 667" canvas host-ref staleness). The drawing ops are
-    // self-contained (each carries its color/alpha/font and brackets itself in
-    // save()/restore()), so replaying the list on any fresh context reproduces
-    // identical pixels.
-    private java.util.ArrayList<ExecutableOp> recordedOps;
-    // Lazily-built rasterization of ``recordedOps`` (a deferred mutable image's
-    // "secondary canvas"). Created only when the image is actually drawn or read
-    // (getRGB), and cached across draws; ``rasterDirty`` re-replays it after the
-    // op list changes. The HTML5Implementation owns the backend that builds it
-    // (rasterizeRecordingSurface) -- this class only holds the cache + dirty bit.
-    private HTMLCanvasElement rasterCanvas;
-    private CanvasRenderingContext2D rasterContext;
-    private boolean rasterDirty = true;
     //private Paint paint;
     HTML5Implementation impl;
     private boolean inClip = false;
@@ -102,7 +81,8 @@ public class HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            dispatchOp(operation);
+                            notifyMutation();
+                            operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
@@ -110,7 +90,8 @@ public class HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            dispatchOp(operation);
+                            notifyMutation();
+                            operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
@@ -118,7 +99,8 @@ public class HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
-                            dispatchOp(operation);
+                            notifyMutation();
+                            operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
@@ -150,90 +132,8 @@ public class HTML5Graphics {
         }
         //transform = Transform.makeIdentity();
     }
-
-    // Recording (display-list) constructor for a deferred mutable image: no
-    // backing canvas, no getContext() round-trip. Draw ops are recorded into
-    // ``recordedOps`` and replayed later via replayOps() when the image is
-    // rasterized. ``width``/``height`` are the logical image dimensions, known
-    // Java-side, so callers never read them back across the barrier.
-    HTML5Graphics(HTML5Implementation impl, int width, int height) {
-        this.impl = impl;
-        this.canvasWidth = width;
-        this.canvasHeight = height;
-        this.clipRect.setWidth(width);
-        this.clipRect.setHeight(height);
-        this.recordedOps = new java.util.ArrayList<ExecutableOp>();
-    }
-
-    // Single chokepoint for every drawing op: record it (deferred mutable image)
-    // or execute it immediately against the live canvas context.
-    private void dispatchOp(ExecutableOp operation) {
-        notifyMutation();
-        if (recordedOps != null) {
-            recordedOps.add(operation);
-            rasterDirty = true;
-        } else {
-            operation.execute(context);
-        }
-    }
-
-    boolean isRecording() {
-        return recordedOps != null;
-    }
-
-    // --- Lazy raster cache accessors (used by HTML5Implementation.rasterizeRecordingSurface) ---
-    HTMLCanvasElement peekRasterCanvas() {
-        return rasterCanvas;
-    }
-
-    void setRasterCanvas(HTMLCanvasElement c) {
-        rasterCanvas = c;
-    }
-
-    CanvasRenderingContext2D peekRasterContext() {
-        return rasterContext;
-    }
-
-    void setRasterContext(CanvasRenderingContext2D c) {
-        rasterContext = c;
-    }
-
-    boolean isRasterDirty() {
-        return rasterDirty;
-    }
-
-    void markRasterClean() {
-        rasterDirty = false;
-    }
-
-    int getCanvasWidth() {
-        return canvasWidth;
-    }
-
-    int getCanvasHeight() {
-        return canvasHeight;
-    }
-
-    // Replay the recorded display list onto ``target`` (a fresh rasterization
-    // context). The clip ops are stateful via ClipState, which is only ever
-    // mutated by execute(); recording never toggled it, so reset it to a clean
-    // (no-clip) baseline before each replay so a re-rasterization starts fresh.
-    // ``target`` is a dedicated/throwaway raster canvas, so we do NOT need to
-    // balance the save()/restore() stack the clip ops leave behind -- only the
-    // resulting pixels matter.
-    void replayOps(CanvasRenderingContext2D target) {
-        if (recordedOps == null) {
-            return;
-        }
-        renderState.getClipState().set(false);
-        int size = recordedOps.size();
-        for (int i = 0; i < size; i++) {
-            recordedOps.get(i).execute(target);
-        }
-        renderState.getClipState().set(false);
-    }
-
-
+    
+    
     public ClipState getClipState() {
         return renderState.getClipState();
     }
@@ -243,15 +143,6 @@ public class HTML5Graphics {
     }
 
     public HTMLCanvasElement getCanvas(){
-        if (recordedOps != null) {
-            // Deferred (display-list) mutable image: lazily rasterize the
-            // recorded ops onto a backing canvas the first time real pixels are
-            // needed (drawMutableSurface / getRGB / pattern / native-widget DOM
-            // attach), and re-replay only when the op list changed since. This
-            // is the single chokepoint that materializes the secondary canvas.
-            impl.rasterizeRecordingSurface(this);
-            return rasterCanvas;
-        }
         return canvas;
     }
     
@@ -279,11 +170,9 @@ public class HTML5Graphics {
 
     void setFont(NativeFont font) {
         renderState.setFont(font);
-        // Recorded ops (DrawString) carry their own font, so the live context
-        // push is only needed (and only possible) in immediate mode.
-        if (context != null) {
-            context.setFont(font.getCSS());
-        }
+        context.setFont(font.getCSS());
+        
+        
     }
 
     public static String color(int rgb){
@@ -305,28 +194,21 @@ public class HTML5Graphics {
     void setColor(int color){
     	//System.out.println("Setting color "+color(color));
         renderState.setColor(color);
-        // Drawing ops (FillRect/DrawString/...) carry their own color, so the
-        // live context push is only needed (and only possible) in immediate mode.
-        if (context != null) {
-            this.context.setFillStyle(color(color));
-            this.context.setStrokeStyle(color(color));
-        }
+        this.context.setFillStyle(color(color));
+        this.context.setStrokeStyle(color(color));
+        
     }
-
+    
     void setColorWithAlpha(int color) {
         //System.out.println("Setting color "+color(color));
         renderState.setColor(color);
-        if (context != null) {
-            this.context.setFillStyle(colorWithAlpha(color));
-            this.context.setStrokeStyle(colorWithAlpha(color));
-        }
+        this.context.setFillStyle(colorWithAlpha(color));
+        this.context.setStrokeStyle(colorWithAlpha(color));
     }
-
+    
     void setAlpha(int alpha) {
         renderState.setAlpha(alpha);
-        if (context != null) {
-            this.context.setGlobalAlpha(alpha / 255.0);
-        }
+        this.context.setGlobalAlpha(alpha / 255.0);
     }
     
     int getAlpha() {
@@ -775,13 +657,6 @@ public class HTML5Graphics {
         if (offscreenWidth >= 0) {
             return offscreenWidth + 1;
         }
-        if (context == null) {
-            // Recording (deferred mutable image): no live context to measure
-            // against. The OffscreenCanvas path above is the real measurement
-            // route for this mode and succeeds in every browser we ship; this
-            // is only a defensive estimate if OffscreenCanvas is unavailable.
-            return str.length() * Math.max(1, font.fontHeight() / 2) + 1;
-        }
         return JavaScriptTextMetricsAdapter.stringWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
             @Override
             public String getCurrentFont() {
@@ -871,15 +746,7 @@ public class HTML5Graphics {
 //    }
     
     void clear(){
-        if (recordedOps != null) {
-            // Clearing the whole image == discarding every recorded op (a fresh
-            // raster canvas is already transparent). Cheaper than recording a
-            // ClearRect and replaying it.
-            recordedOps.clear();
-            notifyMutation();
-        } else {
-            context.clearRect(0, 0, canvasWidth, canvasHeight);
-        }
+        context.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
