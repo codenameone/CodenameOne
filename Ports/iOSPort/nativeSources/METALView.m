@@ -417,18 +417,36 @@ extern BOOL isRetinaBug();
     if (oldScreen != nil) {
         id<CAMetalDrawable> dr = [layer nextDrawable];
         if (dr != nil) {
-            id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
-            id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
-            [blit copyFromTexture:self.screenTexture
-                      sourceSlice:0 sourceLevel:0
-                     sourceOrigin:MTLOriginMake(0, 0, 0)
-                       sourceSize:MTLSizeMake(pw, ph, 1)
-                        toTexture:dr.texture
-                 destinationSlice:0 destinationLevel:0
-                destinationOrigin:MTLOriginMake(0, 0, 0)];
-            [blit endEncoding];
-            [presentCb presentDrawable:dr];
-            [presentCb commit];
+            // Clamp the copy region to fit BOTH the source (the new pw x ph
+            // screenTexture) and the drawable's actual texture. Setting
+            // layer.drawableSize above does not reliably take effect before
+            // this very next nextDrawable: the drawable can still come back at
+            // the previous size, so an unconditional pw x ph copy runs off the
+            // end of the (differently sized) destination. With the Metal
+            // validation layer in assert mode -- as the CI screenshot job runs
+            // it -- that "sourceSize exceeds destination" violation aborts the
+            // app on launch (intermittently, depending on whether the layer has
+            // committed the resize); without validation it silently samples out
+            // of bounds. This regressed the iOS Metal screenshot suite (the app
+            // delivered 0 screenshots). Clamping keeps the blit in-bounds for
+            // the transient rotation frame regardless of which size the drawable
+            // currently is.
+            NSUInteger cw = MIN((NSUInteger)pw, MIN(self.screenTexture.width, dr.texture.width));
+            NSUInteger ch = MIN((NSUInteger)ph, MIN(self.screenTexture.height, dr.texture.height));
+            if (cw > 0 && ch > 0) {
+                id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
+                id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
+                [blit copyFromTexture:self.screenTexture
+                          sourceSlice:0 sourceLevel:0
+                         sourceOrigin:MTLOriginMake(0, 0, 0)
+                           sourceSize:MTLSizeMake(cw, ch, 1)
+                            toTexture:dr.texture
+                     destinationSlice:0 destinationLevel:0
+                    destinationOrigin:MTLOriginMake(0, 0, 0)];
+                [blit endEncoding];
+                [presentCb presentDrawable:dr];
+                [presentCb commit];
+            }
         }
     }
 #ifndef CN1_USE_ARC

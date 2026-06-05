@@ -257,10 +257,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    # The Metal sample-app build sits right at the old 30-min build-step cap as
-    # the app grows; give the job and the build step headroom so a slightly slow
-    # runner does not kill the build before the screenshot suite even starts.
-    timeout-minutes: 90
+    timeout-minutes: 60
     concurrency:
       group: mac-ci-${{ github.workflow }}-metal-${{ github.ref_name }}
       cancel-in-progress: true
@@ -413,7 +410,7 @@ jobs:
       - name: Build sample iOS app and compile workspace (Metal)
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
-        timeout-minutes: 45
+        timeout-minutes: 30
 
       - name: Run iOS UI screenshot tests (Metal)
         env:
