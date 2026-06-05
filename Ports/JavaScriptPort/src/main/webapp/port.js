@@ -1516,7 +1516,18 @@ bindNative([
 // read (getRGB) is the only round-trip and the only thing that waits.
 function cn1SurfacePost(symbol, arg) {
   arg.__cn1_no_response = true;
-  self.postMessage({ type: "host-call", symbol: symbol, args: [arg], id: 0 });
+  var msg = { type: "host-call", symbol: symbol, args: [arg], id: 0 };
+  // Route through the runtime's emitVmMessage (same path the scheduler uses for
+  // every other worker->host message) so the payload goes through
+  // sanitizeMessagePayload -- a raw self.postMessage THROWS on any non-cloneable
+  // value (cycle / stray function) and the flush is silently lost, leaving the
+  // surface unpopulated (the intermittent "Failed to encode" / stall). Sanitize
+  // never throws; at worst it drops a bad field.
+  if (typeof self.emitVmMessage === "function") {
+    self.emitVmMessage(msg);
+  } else {
+    self.postMessage(msg);
+  }
 }
 
 // Sanitize a worker-side host-ref (a live JSObject whose interface methods are
@@ -1608,10 +1619,6 @@ bindNative([
     mime: mime == null ? "image/png" : jvm.toNativeString(mime),
     quality: +quality
   }]);
-  if (url != null && String(url).indexOf(" SURFERR:") === 0) {
-    try { console.log("PARPAR:DIAG:SURF_DATAURL=" + String(url).slice(9)); } catch (_e) {}
-    return null;
-  }
   return url == null ? null : jvm.createStringLiteral(String(url));
 });
 

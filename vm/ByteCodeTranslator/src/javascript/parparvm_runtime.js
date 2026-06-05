@@ -231,7 +231,15 @@ const HOST_CALL_WATCHDOG_MS = {
   "__cn1_hide_splash__": 5000,
   "__cn1_load_truetype_font__": 15000,
   "__cn1_wait_for_ui_settle__": 8000,
-  "__cn1_capture_canvas_png__": 10000
+  "__cn1_capture_canvas_png__": 10000,
+  // Surface pixel read-backs (getRGB / image-encode). Like every other read
+  // here, a dropped host response must FAIL FAST (resume the caller with a
+  // transient error) rather than park the worker forever -- these were the only
+  // reads missing a bound. Host-side they are a synchronous getImageData /
+  // toDataURL, so a healthy channel resolves in well under a second.
+  "__cn1_surface_read__": 4000,
+  "__cn1_image_read__": 4000,
+  "__cn1_surface_to_dataurl__": 6000
 };
 // Retryable reads that can NEVER legitimately return null/undefined: for these
 // a null result is itself a degraded read (a lost/crossed response delivered

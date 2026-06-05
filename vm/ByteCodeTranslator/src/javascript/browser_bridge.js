@@ -1084,22 +1084,17 @@
     var r = request || {};
     var s = surfaceTable[r.id | 0];
     if (!s || !s.canvas || typeof s.canvas.toDataURL !== 'function') {
-      return ' SURFERR:no-surface:id=' + (r.id | 0)
-        + ':known=' + Object.keys(surfaceTable).join('.');
+      return null;
     }
     try {
       var q = (typeof r.quality === 'number' && r.quality >= 0 && r.quality <= 1) ? r.quality : undefined;
       var url = s.canvas.toDataURL(r.mime || 'image/png', q);
       if (!url || url.length < 32) {
-        return ' SURFERR:empty:id=' + (r.id | 0)
-          + ':w=' + (s.canvas.width | 0) + ':h=' + (s.canvas.height | 0)
-          + ':len=' + (url ? url.length : 0);
+        return null;
       }
       return url;
     } catch (e) {
-      return ' SURFERR:throw:id=' + (r.id | 0)
-        + ':w=' + (s.canvas.width | 0) + ':h=' + (s.canvas.height | 0)
-        + ':err=' + (e && e.name ? e.name : String(e)).slice(0, 40);
+      return null;
     }
   });
 
