@@ -838,14 +838,56 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (shape == null) {
             return;
         }
-        /* Match the reference (mac-native / iOS) ports: a non-rectangular setClip
-         * narrows to the shape's axis-aligned bounding box rather than the precise
-         * geometry. The golden for graphics-clip fills the whole pane with the blue
-         * triangle's bbox (pixel-verified), and the SVG clip goldens follow the same
-         * convention, so a precise geometric clip would diff against every one of
-         * them. A true rectangle still clips exactly. */
-        com.codename1.ui.geom.Rectangle b = shape.getBounds();
-        WindowsNative.setClip(peer(graphics), b.getX(), b.getY(), b.getWidth(), b.getHeight());
+        FlatPath fp = flattenShape(shape);
+        float[] c = fp.coords;
+        /* The clip geometry is consumed in screen space (cn1WinPushClip pushes it as a
+         * layer mask under an identity maskTransform), but the shape arrives in the
+         * graphics' pre-transform coordinate space -- a GeneratedSVGImage, for one,
+         * paints its paths under the viewBox scale. Map every path point through the
+         * current affine so the clip lands where the (equally transformed) drawing
+         * does; without this the SVG gradient_circle / clipped_badge clip was an
+         * unscaled rect that excluded the whole fill. (clipRect already does this for
+         * its rect; setClip(Shape) used to ignore the transform entirely.) */
+        com.codename1.ui.Transform t = getTransform(graphics);
+        if (t != null && !t.isIdentity()) {
+            float[] in = new float[2];
+            float[] out = new float[2];
+            for (int i = 0; i + 1 < c.length; i += 2) {
+                in[0] = c[i];
+                in[1] = c[i + 1];
+                t.transformPoint(in, out);
+                c[i] = out[0];
+                c[i + 1] = out[1];
+            }
+        }
+        /* The reference renderer clips a straight-edge polygon to its bounding box but
+         * tessellates a curved clip precisely -- pixel-verified against the goldens:
+         * graphics-clip's triangle fills its whole bbox, while the SVG gradient_circle
+         * and clipped_badge clip to the exact curve. Mirror that: MOVE/LINE/CLOSE only
+         * -> bbox; any QUAD/CUBIC -> precise geometry. */
+        boolean curved = false;
+        for (int i = 0; i < fp.typeCount; i++) {
+            if (fp.types[i] == 2 || fp.types[i] == 3) {
+                curved = true;
+                break;
+            }
+        }
+        if (curved) {
+            WindowsNative.setClipShape(peer(graphics), c, fp.types, fp.typeCount, fp.windingRule);
+            return;
+        }
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        for (int i = 0; i + 1 < c.length; i += 2) {
+            minX = Math.min(minX, c[i]);
+            maxX = Math.max(maxX, c[i]);
+            minY = Math.min(minY, c[i + 1]);
+            maxY = Math.max(maxY, c[i + 1]);
+        }
+        if (maxX >= minX) {
+            WindowsNative.setClip(peer(graphics), (int) Math.floor(minX), (int) Math.floor(minY),
+                    (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY));
+        }
     }
 
     /* Clip stack. The base pushClip/popClip are unimplemented no-ops, so a
