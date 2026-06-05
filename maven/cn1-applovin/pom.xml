@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>cn1-applovin</artifactId>
+    <packaging>pom</packaging>
+    <name>Codename One Ads: cn1-applovin</name>
+    <description>AppLovin MAX provider for the Codename One advertising API</description>
+
+    <properties>
+        <cn1lib.name>cn1-applovin</cn1lib.name>
+        <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <modules>
+        <module>common</module>
+        <module>ios</module>
+        <module>android</module>
+        <module>javase</module>
+        <module>lib</module>
+    </modules>
+</project>

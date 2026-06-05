@@ -79,6 +79,8 @@ include::performance.asciidoc[]
 
 include::Testing-with-JUnit.adoc[]
 
+include::Advertising.asciidoc[]
+
 include::Monetization.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]

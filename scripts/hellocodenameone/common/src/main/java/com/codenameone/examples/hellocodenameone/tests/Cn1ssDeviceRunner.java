@@ -96,6 +96,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Advertising API: renders a banner + native-ad feed via the
+            // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
+            new AdsScreenshotTest(),
             // Animation/transition grid tests: each emits a 2x3 frame grid driven
             // by the AnimationTime override so iOS/Android/JavaSE produce identical
             // pixels regardless of wall-clock pacing. Skipped on HTML5 via the
