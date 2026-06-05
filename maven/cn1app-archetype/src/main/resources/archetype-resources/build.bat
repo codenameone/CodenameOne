@@ -17,18 +17,16 @@ goto :EOF
 !MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=mac-os-x-desktop -U -e
 
 goto :EOF
+:mac_native
+!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-os-x-native -U -e
+
+goto :EOF
+:mac_native_source
+!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-source -U -e
+
+goto :EOF
 :windows_desktop
 !MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
-
-goto :EOF
-:windows_device
-!MVNW! package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
-
-goto :EOF
-:uwp
-set /a _0_%~2=^(1 + %~2^)
-call :windows_device _1_%~2 !_0_%~2!
-echo | set /p ^=!_1_%~2!
 
 goto :EOF
 :javascript
@@ -80,6 +78,9 @@ echo     *Requires either GRADLE_HOME environment variable^, or for gradle to be
 echo   ios_source
 echo     Generates an Xcode Project that you can open and build using Apple^'s development tools
 echo     *Requires a Mac with Xcode installed
+echo   mac_native_source
+echo     Generates a native Mac Xcode Project that you can open and build using Apple^'s development tools
+echo     *Requires a Mac with Xcode installed
 echo 
 echo Build Server Commands:
 echo   The following commands will build the app using the Codename One build server^, and require
@@ -94,11 +95,12 @@ echo     Builds android app.
 echo   mac_desktop
 echo     Builds Mac OS desktop app.
 echo     *Mac OS Desktop builds are a Pro user feature.
+echo   mac_native
+echo     Builds a native Mac app on the build server.
+echo     *Requires an Apple developer account and Mac signing certificate.
 echo   windows_desktop
 echo     Builds Windows desktop app.
 echo     *Windows Desktop builds are a Pro user feature.
-echo   windows_device
-echo     Builds UWP Windows app.
 echo   javascript
 echo     Builds as a web app.
 echo     *Javascript builds are an Enterprise user feature
