@@ -1499,6 +1499,89 @@ bindNative([
   return typeof WeakMap === "function" ? 1 : 0;
 });
 
+// ===================================================================
+// SURFACE BRIDGE worker glue (surface-id render model).
+// -------------------------------------------------------------------
+// These bindNative generators back the HTML5Implementation.nativeSurface*
+// natives. They translate the worker's flat command buffers into a single
+// structured message per surface op and route it to the host bridge
+// (browser_bridge.js __cn1_surface_*). The host keeps the id->{canvas,ctx}
+// lookup table and replays; only readRGB returns pixels. There is at most ONE
+// round-trip per *frame flush* (not per draw call) -- the response is null, so
+// it can never be mistaken for a canvas/number (the "Number 667" staleness the
+// old per-mutable-image getContext storm produced).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate_int_int_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceCreate___int_int_int"
+], function*(id, w, h) {
+  yield jvm.invokeHostNative("__cn1_surface_create__", [{ id: id | 0, w: w | 0, h: h | 0 }]);
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush_int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceFlush___int_int_int_int_1ARRAY_int_double_1ARRAY_int_java_lang_Object_1ARRAY_int"
+], function*(id, w, h, ops, opCount, nums, numCount, objs, objCount) {
+  const oc = opCount | 0;
+  if (oc <= 0) {
+    return null;
+  }
+  // ``objs`` carries Java Strings (colors/fonts/text) AND host-ref markers
+  // (loaded images, which stay host-side resources). Convert the strings to
+  // native JS strings; pass markers through verbatim for the host to resolve.
+  const nObj = objCount | 0;
+  const outObjs = new Array(nObj);
+  for (let i = 0; i < nObj; i++) {
+    const o = objs[i];
+    if (o && o.__class === "java_lang_String") {
+      outObjs[i] = jvm.toNativeString(o);
+    } else {
+      outObjs[i] = o; // host-ref marker {__cn1HostRef} or null
+    }
+  }
+  // Java primitive arrays are plain JS arrays here; slice to the exact used
+  // length so the structured clone doesn't ship the growable buffer's slack.
+  const outOps = ops.slice(0, oc);
+  const outNums = nums.slice(0, numCount | 0);
+  yield jvm.invokeHostNative("__cn1_surface_flush__", [{
+    id: id | 0, w: w | 0, h: h | 0,
+    ops: outOps, opCount: oc, nums: outNums, objs: outObjs
+  }]);
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB_int_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB___int_int_int_int_int_int_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB_int_int_int_int_int_int_1ARRAY",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceReadRGB___int_int_int_int_int_int_1ARRAY"
+], function*(id, x, y, w, h, dest) {
+  const arr = yield jvm.invokeHostNative("__cn1_surface_read__", [{
+    id: id | 0, x: x | 0, y: y | 0, w: w | 0, h: h | 0
+  }]);
+  if (arr && dest) {
+    const n = (w | 0) * (h | 0);
+    for (let i = 0; i < n; i++) {
+      dest[i] = arr[i] | 0;
+    }
+  }
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int_R_void",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceDispose___int"
+], function*(id) {
+  yield jvm.invokeHostNative("__cn1_surface_dispose__", [{ id: id | 0 }]);
+  return null;
+});
+
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"

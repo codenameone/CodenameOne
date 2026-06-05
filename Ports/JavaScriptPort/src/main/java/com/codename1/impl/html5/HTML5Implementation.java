@@ -459,6 +459,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={"owner", "resource"}, script="")
     private native static void registerImageResource(Object owner, JSObject resource);
 
+    // ===================================================================
+    // SURFACE BRIDGE natives (surface-id render model).
+    // -------------------------------------------------------------------
+    // The worker holds opaque worker-assigned surface ids; these natives carry
+    // PURE DATA (ids + flat command buffers) to the host, which keeps the
+    // id->{canvas,ctx} table and replays the stream (browser_bridge.js
+    // __cn1_surface_*). Only readRGB returns pixels. Empty @JSBody bodies are
+    // the translate-time linkage; the real implementations are the port.js
+    // bindNative generators that route to the host bridge. See
+    // SurfaceCommandRecorder for the command encoding.
+
+    /** Display surface id; mirrors browser_bridge.js SURF_DISPLAY_ID. */
+    static final int DISPLAY_SURFACE_ID = 1;
+
+    /** Create (or resize+clear) the backing canvas for a surface id. */
+    @JSBody(params={"id", "w", "h"}, script="")
+    static native void nativeSurfaceCreate(int id, int w, int h);
+
+    /**
+     * Replay a recorded command batch onto a surface. ``ops[0..opCount)`` are
+     * opcodes; nums/objs are consumed positionally per opcode (see the
+     * SurfaceCommandRecorder OP_* contract). ``w``/``h`` let the host lazily
+     * create the surface if a flush races ahead of create.
+     */
+    @JSBody(params={"id", "w", "h", "ops", "opCount", "nums", "numCount", "objs", "objCount"}, script="")
+    static native void nativeSurfaceFlush(int id, int w, int h,
+            int[] ops, int opCount, double[] nums, int numCount, Object[] objs, int objCount);
+
+    /** Read back an ARGB pixel rectangle (getRGB) into ``dest``. */
+    @JSBody(params={"id", "x", "y", "w", "h", "dest"}, script="")
+    static native void nativeSurfaceReadRGB(int id, int x, int y, int w, int h, int[] dest);
+
+    /** Release a surface's backing canvas when its owning Java image is GC'd. */
+    @JSBody(params={"id"}, script="")
+    static native void nativeSurfaceDispose(int id);
+
     private int getClientX(MouseEvent evt) {
         int x = evt.getClientX();
         if (x == -1) {

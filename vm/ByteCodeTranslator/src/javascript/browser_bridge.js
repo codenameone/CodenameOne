@@ -806,6 +806,271 @@
     return hostResult(value);
   });
 
+  // ===================================================================
+  // SURFACE BRIDGE  (surface-id render model)
+  // -------------------------------------------------------------------
+  // The worker (Java) side holds opaque, WORKER-ASSIGNED surface ids -- never
+  // canvas / CanvasRenderingContext2D host-refs. It records draw calls into a
+  // flat command stream (see SurfaceCommandRecorder.java) and flushes them
+  // fire-and-forget. This host keeps the id->{canvas,ctx} table and replays the
+  // stream. Only ``__cn1_surface_read__`` (getRGB) ever returns pixels. The
+  // opcodes below MUST mirror SurfaceCommandRecorder.OP_* exactly.
+  var SURF = {
+    SAVE: 1, RESTORE: 2, SCALE: 3, ROTATE: 4, TRANSLATE: 5, TRANSFORM: 6,
+    SET_TRANSFORM: 7, SET_GLOBAL_ALPHA: 8, SET_GCO: 9, SET_FILL_COLOR: 10,
+    SET_STROKE_COLOR: 11, SET_LINE_WIDTH: 12, SET_LINE_CAP: 13, SET_LINE_JOIN: 14,
+    SET_MITER_LIMIT: 15, SET_FONT: 16, SET_TEXT_ALIGN: 17, SET_TEXT_BASELINE: 18,
+    SET_SHADOW_COLOR: 19, SET_SHADOW_BLUR: 20, SET_SHADOW_OFFX: 21, SET_SHADOW_OFFY: 22,
+    SET_FILTER: 23, CLEAR_RECT: 24, FILL_RECT: 25, STROKE_RECT: 26, BEGIN_PATH: 27,
+    CLOSE_PATH: 28, MOVE_TO: 29, LINE_TO: 30, QUAD_TO: 31, BEZIER_TO: 32, ARC: 33,
+    ARC_TO: 34, ELLIPSE: 35, RECT: 36, FILL: 37, STROKE: 38, CLIP: 39,
+    FILL_TEXT: 40, STROKE_TEXT: 41, SET_LINE_DASH_OFFSET: 42, SET_LINE_DASH: 43,
+    CREATE_LINEAR_GRADIENT: 50, CREATE_RADIAL_GRADIENT: 51, ADD_COLOR_STOP: 52,
+    SET_FILL_GRADIENT: 53, SET_STROKE_GRADIENT: 54, CREATE_PATTERN: 55, SET_FILL_PATTERN: 56,
+    DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
+    BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72
+  };
+  // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
+  var SURF_DISPLAY_ID = 1;
+  var surfaceTable = {};
+
+  function surfaceImageSource(marker) {
+    // A drawImage source: either a host-ref marker (a loaded image / canvas
+    // that stays a host-side resource) or already a real element.
+    var resolved = resolveHostRef(marker);
+    if (resolved != null) {
+      return resolved;
+    }
+    return marker;
+  }
+
+  function getSurface(id, createW, createH) {
+    var s = surfaceTable[id];
+    if (s) {
+      return s;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Bind the display surface to the real output canvas lazily.
+      var doc = global.document || (global.window && global.window.document);
+      var out = doc ? doc.getElementById('codenameone-canvas') : null;
+      if (!out) {
+        return null;
+      }
+      s = { canvas: out, ctx: out.getContext('2d') };
+      surfaceTable[id] = s;
+      return s;
+    }
+    if (createW == null) {
+      return null;
+    }
+    var d2 = global.document || (global.window && global.window.document);
+    if (!d2 || !d2.createElement) {
+      return null;
+    }
+    var cv = d2.createElement('canvas');
+    cv.width = createW | 0;
+    cv.height = createH | 0;
+    s = { canvas: cv, ctx: cv.getContext('2d') };
+    surfaceTable[id] = s;
+    return s;
+  }
+
+  // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
+  function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
+    var ni = 0; // num cursor
+    var oi = 0; // obj cursor
+    var curGradient = null;
+    var curPattern = null;
+    for (var k = 0; k < opCount; k++) {
+      var code = ops[k];
+      switch (code) {
+        case SURF.SAVE: ctx.save(); break;
+        case SURF.RESTORE: ctx.restore(); break;
+        case SURF.SCALE: ctx.scale(nums[ni++], nums[ni++]); break;
+        case SURF.ROTATE: ctx.rotate(nums[ni++]); break;
+        case SURF.TRANSLATE: ctx.translate(nums[ni++], nums[ni++]); break;
+        case SURF.TRANSFORM: ctx.transform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_TRANSFORM: ctx.setTransform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_GLOBAL_ALPHA: ctx.globalAlpha = nums[ni++]; break;
+        case SURF.SET_GCO: ctx.globalCompositeOperation = objs[oi++]; break;
+        case SURF.SET_FILL_COLOR: ctx.fillStyle = objs[oi++]; break;
+        case SURF.SET_STROKE_COLOR: ctx.strokeStyle = objs[oi++]; break;
+        case SURF.SET_LINE_WIDTH: ctx.lineWidth = nums[ni++]; break;
+        case SURF.SET_LINE_CAP: ctx.lineCap = objs[oi++]; break;
+        case SURF.SET_LINE_JOIN: ctx.lineJoin = objs[oi++]; break;
+        case SURF.SET_MITER_LIMIT: ctx.miterLimit = nums[ni++]; break;
+        case SURF.SET_FONT: ctx.font = objs[oi++]; break;
+        case SURF.SET_TEXT_ALIGN: ctx.textAlign = objs[oi++]; break;
+        case SURF.SET_TEXT_BASELINE: ctx.textBaseline = objs[oi++]; break;
+        case SURF.SET_SHADOW_COLOR: ctx.shadowColor = objs[oi++]; break;
+        case SURF.SET_SHADOW_BLUR: ctx.shadowBlur = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFX: ctx.shadowOffsetX = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFY: ctx.shadowOffsetY = nums[ni++]; break;
+        case SURF.SET_FILTER: try { ctx.filter = objs[oi++]; } catch (_ef) {} break;
+        case SURF.CLEAR_RECT: ctx.clearRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL_RECT: ctx.fillRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.STROKE_RECT: ctx.strokeRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEGIN_PATH: ctx.beginPath(); break;
+        case SURF.CLOSE_PATH: ctx.closePath(); break;
+        case SURF.MOVE_TO: ctx.moveTo(nums[ni++], nums[ni++]); break;
+        case SURF.LINE_TO: ctx.lineTo(nums[ni++], nums[ni++]); break;
+        case SURF.QUAD_TO: ctx.quadraticCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEZIER_TO: ctx.bezierCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ARC: {
+          var ax = nums[ni++], ay = nums[ni++], ar = nums[ni++], a0 = nums[ni++], a1 = nums[ni++], accw = nums[ni++];
+          ctx.arc(ax, ay, ar, a0, a1, accw !== 0);
+          break;
+        }
+        case SURF.ARC_TO: ctx.arcTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ELLIPSE: ctx.ellipse(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.RECT: ctx.rect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL: ctx.fill(); break;
+        case SURF.STROKE: ctx.stroke(); break;
+        case SURF.CLIP: ctx.clip(); break;
+        case SURF.FILL_TEXT: {
+          var fx = nums[ni++], fy = nums[ni++], fmw = nums[ni++], ftext = objs[oi++];
+          if (fmw >= 0) { ctx.fillText(ftext, fx, fy, fmw); } else { ctx.fillText(ftext, fx, fy); }
+          break;
+        }
+        case SURF.STROKE_TEXT: {
+          var sx0 = nums[ni++], sy0 = nums[ni++], smw = nums[ni++], stext = objs[oi++];
+          if (smw >= 0) { ctx.strokeText(stext, sx0, sy0, smw); } else { ctx.strokeText(stext, sx0, sy0); }
+          break;
+        }
+        case SURF.SET_LINE_DASH_OFFSET: ctx.lineDashOffset = nums[ni++]; break;
+        case SURF.SET_LINE_DASH: {
+          var dn = nums[ni++] | 0, seg = new Array(dn);
+          for (var di = 0; di < dn; di++) { seg[di] = nums[ni++]; }
+          if (ctx.setLineDash) { ctx.setLineDash(seg); }
+          break;
+        }
+        case SURF.CREATE_LINEAR_GRADIENT:
+          curGradient = ctx.createLinearGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.CREATE_RADIAL_GRADIENT:
+          curGradient = ctx.createRadialGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.ADD_COLOR_STOP: {
+          var off = nums[ni++], col = objs[oi++];
+          if (curGradient) { curGradient.addColorStop(off, col); }
+          break;
+        }
+        case SURF.SET_FILL_GRADIENT: if (curGradient) { ctx.fillStyle = curGradient; } break;
+        case SURF.SET_STROKE_GRADIENT: if (curGradient) { ctx.strokeStyle = curGradient; } break;
+        case SURF.CREATE_PATTERN: {
+          var pimg = surfaceImageSource(objs[oi++]), prep = objs[oi++];
+          try { curPattern = ctx.createPattern(pimg, prep); } catch (_ep) { curPattern = null; }
+          break;
+        }
+        case SURF.SET_FILL_PATTERN: if (curPattern) { ctx.fillStyle = curPattern; } break;
+        case SURF.DRAW_IMAGE_XY: {
+          var i1 = surfaceImageSource(objs[oi++]);
+          if (i1) { ctx.drawImage(i1, nums[ni++], nums[ni++]); } else { ni += 2; }
+          break;
+        }
+        case SURF.DRAW_IMAGE_XYWH: {
+          var i2 = surfaceImageSource(objs[oi++]);
+          if (i2) { ctx.drawImage(i2, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          break;
+        }
+        case SURF.DRAW_IMAGE_SRCDST: {
+          var i3 = surfaceImageSource(objs[oi++]);
+          if (i3) { ctx.drawImage(i3, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_XY: {
+          var b1 = surfaceTable[nums[ni++]];
+          if (b1 && b1.canvas) { ctx.drawImage(b1.canvas, nums[ni++], nums[ni++]); } else { ni += 2; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_XYWH: {
+          var b2 = surfaceTable[nums[ni++]];
+          if (b2 && b2.canvas) { ctx.drawImage(b2.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_SRCDST: {
+          var b3 = surfaceTable[nums[ni++]];
+          if (b3 && b3.canvas) { ctx.drawImage(b3.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        default:
+          if (global.console && global.console.warn) {
+            global.console.warn('surface replay: unknown opcode ' + code);
+          }
+          break;
+      }
+    }
+  }
+
+  // Create / resize a surface. Fire-and-forget. Idempotent: an existing surface
+  // of the same id is resized (which also clears it, matching a fresh image).
+  hostBridge.register('__cn1_surface_create__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var w = r.w | 0;
+    var h = r.h | 0;
+    var s = surfaceTable[id];
+    if (!s) {
+      getSurface(id, w, h);
+    } else if (s.canvas && (s.canvas.width !== w || s.canvas.height !== h)) {
+      s.canvas.width = w;
+      s.canvas.height = h;
+    }
+    return null;
+  });
+
+  // Replay a command batch onto a surface. Fire-and-forget.
+  hostBridge.register('__cn1_surface_flush__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var s = getSurface(id, r.w | 0, r.h | 0);
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var ops = r.ops || [];
+    var opCount = r.opCount | 0;
+    replaySurfaceCommands(s.ctx, ops, opCount, r.nums || [], r.objs || []);
+    return null;
+  });
+
+  // Read back pixels as ARGB ints (getRGB). The ONE surface op that returns
+  // data. ``dest`` is filled in place to avoid re-allocating a large array.
+  hostBridge.register('__cn1_surface_read__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var x = r.x | 0, y = r.y | 0, w = r.w | 0, h = r.h | 0;
+    var img;
+    try {
+      img = s.ctx.getImageData(x, y, w, h);
+    } catch (_er) {
+      return null;
+    }
+    var data = img.data;
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Release a surface's backing canvas when its owning Java image is GC'd.
+  hostBridge.register('__cn1_surface_dispose__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    if (id !== SURF_DISPLAY_ID) {
+      delete surfaceTable[id];
+    }
+    return null;
+  });
+
   // Hide the splash element on the main thread. The translated
   // ``HTML5Implementation.hideSplash`` body uses ``jQuery(...)``
   // directly, but the worker context has no jQuery (and no DOM).
