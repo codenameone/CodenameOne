@@ -51,6 +51,11 @@ public class DesktopModeScreenshotTest extends BaseTest {
             Hashtable interactive = new Hashtable();
             interactive.put("@interactiveScrollBool", "true");
             UIManager.getInstance().addThemeProps(interactive);
+            // Diagnostic (shows up in the device-runner log): confirms the interactive scrollbar
+            // actually engaged on the desktop and reports the reserved gutter width.
+            com.codename1.io.Log.p("CN1DESKTOPTEST interactiveScroll="
+                    + UIManager.getInstance().getLookAndFeel().isInteractiveScroll()
+                    + " vScrollWidth=" + UIManager.getInstance().getLookAndFeel().getVerticalScrollWidth());
         }
 
         Form form = createForm("Desktop Mode", new BorderLayout(), "DesktopMode");

@@ -302,24 +302,24 @@ DesktopScroll {
     padding: 0 1mm 0 1mm;
     margin: 0;
 }
+/* Always-visible desktop scrollbar thumb: an opaque macOS-style grey so it reads
+   clearly against content (a translucent thumb is nearly invisible once composited).
+   Hover (.selected) and drag (.pressed) darken it. Properties are re-declared rather
+   than cn1-derive'd from the base UIID, which would be a self-referential cycle. */
 DesktopScrollThumb {
-    background-color: rgba(0,0,0,0.35);
+    background-color: #a8a8ad;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
 }
-/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb,
-   the macOS-conventional interactive-scrollbar highlight. Properties are
-   re-declared (not cn1-derive'd from the base UIID, which would be a
-   self-referential derive cycle). */
 DesktopScrollThumb.selected {
-    background-color: rgba(0,0,0,0.55);
+    background-color: #8e8e93;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
 }
 DesktopScrollThumb.pressed {
-    background-color: rgba(0,0,0,0.7);
+    background-color: #636366;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
@@ -330,19 +330,19 @@ DesktopHorizontalScroll {
     margin: 0;
 }
 DesktopHorizontalScrollThumb {
-    background-color: rgba(0,0,0,0.35);
+    background-color: #a8a8ad;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
 }
 DesktopHorizontalScrollThumb.selected {
-    background-color: rgba(0,0,0,0.55);
+    background-color: #8e8e93;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
 }
 DesktopHorizontalScrollThumb.pressed {
-    background-color: rgba(0,0,0,0.7);
+    background-color: #636366;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
@@ -624,13 +624,13 @@ PopupContent {
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: transparent; }
-    DesktopScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
-    DesktopScrollThumb.selected { background-color: rgba(255,255,255,0.6); cn1-background-type: cn1-round-border; }
-    DesktopScrollThumb.pressed { background-color: rgba(255,255,255,0.78); cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb { background-color: #5a5a5e; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #8e8e93; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: transparent; }
-    DesktopHorizontalScrollThumb { background-color: rgba(255,255,255,0.4); cn1-background-type: cn1-round-border; }
-    DesktopHorizontalScrollThumb.selected { background-color: rgba(255,255,255,0.6); cn1-background-type: cn1-round-border; }
-    DesktopHorizontalScrollThumb.pressed { background-color: rgba(255,255,255,0.78); cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb { background-color: #5a5a5e; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #8e8e93; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: #1c1c1e; }
