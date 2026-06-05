@@ -51,5 +51,9 @@ fi
 # parsing silently misses the app's theme.res. Done as a separate invocation
 # (with -Plocal-dev-javase) because `designer` -> `javase-svg` -> `javase`,
 # and the javase port only resolves its CEF dependency under that profile.
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl designer -am -Plocal-dev-javase -DskipTests -Djava.awt.headless=true install
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Djava.awt.headless=true clean install "$@"
+# Skip javadoc/source jars: they aren't needed to install the iOS port, and the
+# framework is compiled with JDK 8 whose javadoc rejects the JDK 9+ options
+# (--add-stylesheet / --add-script) configured in maven/pom.xml. Mirrors the flags
+# setup-workspace.sh already passes for the main framework install.
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl designer -am -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true install
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"

@@ -936,9 +936,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         ArrayList<com.codename1.ui.Command> filtered = new ArrayList<com.codename1.ui.Command>();
-        // Encode one row per command as "<menuHint>\t<label>", rows separated by '\n'. The native
-        // side groups rows into the matching standard macOS menus (App/File/Edit/View/Window/Help)
-        // or a top-level menu named by the hint; an empty hint means the default commands menu.
+        // Encode one row per command as "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>",
+        // rows separated by '\n'. The native side groups rows into the matching standard macOS menus
+        // (App/File/Edit/View/Window/Help) or a top-level menu named by the hint; an empty hint means
+        // the default commands menu. A non-zero shortcutKeyChar produces a UIKeyCommand so the menu
+        // item shows (and responds to) the keyboard accelerator.
         StringBuilder sb = new StringBuilder();
         if (commands != null) {
             for (int i = 0; i < commands.size(); i++) {
@@ -958,7 +960,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (sb.length() > 0) {
                     sb.append('\n');
                 }
-                sb.append(hint).append('\t').append(name);
+                sb.append(hint).append('\t').append(name).append('\t')
+                        .append(c.getDesktopShortcutKeyChar()).append('\t')
+                        .append(c.getDesktopShortcutModifiers());
                 filtered.add(c);
             }
         }

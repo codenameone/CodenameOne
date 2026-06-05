@@ -8,6 +8,7 @@ import com.codename1.initializr.css.CSSThemeCompiler;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
 import com.codename1.ui.Button;
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -87,9 +88,15 @@ public class TemplatePreviewPanel {
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
-        form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
-                FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
-        applyLivePreviewOptions(form, helloButton, null, options);
+        // Decorative hamburger on the left of the title bar -- it mimics a side
+        // menu in the preview mockup but intentionally does nothing.
+        Command mockMenu = form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, 4, evt -> { });
+        Button menuButton = form.getToolbar().findCommandComponent(mockMenu);
+        // The app's persistent scrollbar (fadeScrollBarBool=false) is a global
+        // constant; the static phone mockup should neither scroll nor show one.
+        form.getContentPane().setScrollableY(false);
+        form.getContentPane().setScrollVisible(false);
+        applyLivePreviewOptions(form, helloButton, menuButton, options);
         applyCustomCssToPreview(form, options.customThemeCss);
         lastLiveForm = form;
         lastLiveHelloButton = helloButton;

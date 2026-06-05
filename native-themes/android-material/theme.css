@@ -349,6 +349,21 @@ DesktopScrollThumb {
     padding: 0;
     margin: 0;
 }
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb.
+   Properties are re-declared rather than cn1-derive'd from the base UIID,
+   which would be a self-referential derive cycle. */
+DesktopScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed {
+    background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
 DesktopHorizontalScroll {
     background-color: #e7e0ec;
     padding: 1.2mm 0 1.2mm 0;
@@ -356,6 +371,18 @@ DesktopHorizontalScroll {
 }
 DesktopHorizontalScrollThumb {
     background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.pressed {
+    background-color: #49454f;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
@@ -576,8 +603,12 @@ PopupContent {
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: #2b2930; }
     DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: #2b2930; }
     DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }

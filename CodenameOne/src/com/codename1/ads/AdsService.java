@@ -36,7 +36,12 @@ import java.io.InputStream;
 /// Each supported Ad network needs to extend this Service and to implement
 /// the initService method
 ///
+/// @deprecated this legacy banner ad service targets ad networks that no longer
+/// exist and predates consent management. Use the modern pluggable advertising
+/// API in [com.codename1.ads.AdManager] instead.
+///
 /// @author Chen Fishbein
+@Deprecated
 public abstract class AdsService extends ConnectionRequest {
 
     private static Class service = InnerActive.class;

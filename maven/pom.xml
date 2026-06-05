@@ -87,6 +87,10 @@
         <module>cn1-ai-tflite</module>
         <module>cn1-ai-whisper</module>
         <module>cn1-ai-stablediffusion</module>
+        <module>cn1-admob</module>
+        <module>cn1-applovin</module>
+        <module>cn1-unity-levelplay</module>
+        <module>cn1-ads-mock</module>
     </modules>
     <dependencyManagement>
         <dependencies>
@@ -377,14 +381,15 @@
 <script src="{@docRoot}/script-files/highlight.min.js"></script>
 <script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
                         ]]></top>
+                        <!-- The syntax-highlight options (add-stylesheet / add-script) are
+                             intentionally NOT here: they only exist in recent javadoc tools (JDK 8
+                             rejects add-stylesheet, JDK 11 rejects add-script), so they break every
+                             JDK 8/11 `mvn install` that builds the per-module javadoc jar. The
+                             published website javadocs apply that highlighting separately via
+                             .github/scripts/build_javadocs.sh, which runs javadoc directly on a JDK
+                             new enough to accept the flags. -->
                         <additionalOptions>
                             <additionalOption>--allow-script-in-comments</additionalOption>
-                            <additionalOption>--add-stylesheet</additionalOption>
-                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
-                            <additionalOption>--add-script</additionalOption>
-                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
-                            <additionalOption>--add-script</additionalOption>
-                            <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
                         </additionalOptions>
                     </configuration>
                 </plugin>
@@ -466,14 +471,10 @@
 <script src="{@docRoot}/script-files/highlight.min.js"></script>
 <script src="{@docRoot}/script-files/javadoc-highlight-init.js"></script>
                     ]]></top>
+                    <!-- add-stylesheet/add-script intentionally omitted; see the note in
+                         pluginManagement above (the website docs apply them via build_javadocs.sh). -->
                     <additionalOptions>
                         <additionalOption>--allow-script-in-comments</additionalOption>
-                        <additionalOption>--add-stylesheet</additionalOption>
-                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.css</additionalOption>
-                        <additionalOption>--add-script</additionalOption>
-                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/highlight.min.js</additionalOption>
-                        <additionalOption>--add-script</additionalOption>
-                        <additionalOption>${maven.multiModuleProjectDirectory}/javadoc-resources/javadoc-highlight-init.js</additionalOption>
                     </additionalOptions>
                 </configuration>
             </plugin>

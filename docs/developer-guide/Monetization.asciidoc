@@ -1,21 +1,8 @@
 == Monetization
 
-Codename One integrates many built-in monetization options such as ad network support and in-app purchases.
+Codename One integrates many built-in monetization options such as in-app purchases and subscriptions. Advertising is covered in its own chapter; see <<_advertising,Advertising>>.
 
 Many monetization options are available as third-party https://www.codenameone.com/cn1libs.html[cn1libs] that you can install through the Codename One website.
-
-=== Google play ads
-
-The simplest banner-ad support is often the easiest network to use. To enable mobile ads, create an ad unit in AdMob's website. You should end up with a key like this:
-
-`ca-app-pub-8610616152754010/3413603324`
-
-To enable this for Android, define `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments. For iOS, use the same value in `ios.googleAdUnitId`. The rest is automatic: the correct ad appears at the bottom of the screen, and the form shrinks to fit the ad. iOS and Android implement that shrinking differently because of platform constraints, but the result should work well with device rotation.
-
-.Google Play ads
-image::img/google-play-ads.png[Google Play ads,scaledwidth=20%]
-
-A special ad unit ID exists for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you get test ads during development. This matters because you aren't allowed to click your own ads. When it's time for a production release, replace it with the real value you generated in AdMob.
 
 === In-app purchase
 

@@ -179,7 +179,10 @@ public abstract class CodenameOneImplementation {
     private BrowserComponent sharedJavascriptContext;
     private Dimension initialWindowSizeHintPercent;
 
-    static void setOnCurrentFormChange(Runnable on) {
+    /// Set a task to be executed every time the current form changes (e.g. on
+    /// navigation). Used by the advertising layer to show interstitials on
+    /// transitions; see [com.codename1.ads.AdManager#bindInterstitialOnTransition].
+    public static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
 

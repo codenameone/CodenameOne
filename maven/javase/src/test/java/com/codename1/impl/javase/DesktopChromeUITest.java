@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
+import java.awt.Toolkit;
 import java.util.Hashtable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +45,7 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -173,6 +175,47 @@ public class DesktopChromeUITest {
         });
         assertNotNull(inFile.get(), "a command hinted DESKTOP_MENU_FILE must appear under a File menu");
         assertNotNull(inCommands.get(), "a command with no hint must appear under the default Commands menu");
+    }
+
+    @Test
+    public void nativeMenuItemCarriesKeyboardAccelerator() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        assumeTrue(Display.getInstance().isDesktop(), "needs the desktop port (no skin)");
+
+        runOnCn1AndWait(new Runnable() {
+            @Override
+            public void run() {
+                JavaSEPort.setDesktopTitleBarMode("native");
+                Toolbar.setGlobalToolbar(true);
+                Form f = new Form("AcceleratorProbe");
+                Command save = new Command("Stash");
+                save.setDesktopShortcut('S');
+                f.addCommand(save);
+                f.show();
+            }
+        });
+        flushAwt();
+
+        final JFrame frame = cn1Frame();
+        assertNotNull(frame);
+        final AtomicReference<KeyStroke> accel = new AtomicReference<KeyStroke>();
+        SwingUtilities.invokeAndWait(new Runnable() {
+            @Override
+            public void run() {
+                JMenuBar mb = frame.getJMenuBar();
+                if (mb != null) {
+                    JMenuItem item = findMenuItem(mb, "Stash");
+                    if (item != null) {
+                        accel.set(item.getAccelerator());
+                    }
+                }
+            }
+        });
+        assertNotNull(accel.get(), "a command with a desktop shortcut must produce a menu accelerator");
+        assertEquals('S', accel.get().getKeyCode(), "the accelerator must use the shortcut key");
+        int menuMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+        assertTrue((accel.get().getModifiers() & menuMask) != 0,
+                "the accelerator must include the platform menu-shortcut (primary) modifier");
     }
 
     @Test

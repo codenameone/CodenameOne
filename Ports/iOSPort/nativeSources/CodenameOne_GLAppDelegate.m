@@ -944,19 +944,38 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
         return;
     }
-    // Group the "<hint>\t<label>" rows by hint, preserving first-seen order. The row index is the
-    // command index passed back to Java, so it must match IOSImplementation's filtered list.
+    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>" rows by hint, preserving
+    // first-seen order. The row index is the command index passed back to Java, so it must match
+    // IOSImplementation's filtered list.
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
     NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
         NSString *row = cn1MacMenuLabels[i];
-        NSRange tab = [row rangeOfString:@"\t"];
-        NSString *hint = (tab.location == NSNotFound) ? @"" : [row substringToIndex:tab.location];
-        NSString *label = (tab.location == NSNotFound) ? row : [row substringFromIndex:tab.location + 1];
-        UICommand *cmd = [UICommand commandWithTitle:label
-                                               image:nil
-                                              action:@selector(cn1MenuAction:)
-                                        propertyList:@(i)];
+        NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
+        NSString *hint = (cols.count > 0) ? cols[0] : @"";
+        NSString *label = (cols.count > 1) ? cols[1] : row;
+        int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
+        int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
+        UICommand *cmd;
+        if (shortcutKeyChar != 0) {
+            // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
+            UIKeyModifierFlags flags = 0;
+            if (shortcutModifiers & 1) { flags |= UIKeyModifierCommand; }
+            if (shortcutModifiers & 2) { flags |= UIKeyModifierShift; }
+            if (shortcutModifiers & 4) { flags |= UIKeyModifierAlternate; }
+            NSString *input = [[NSString stringWithFormat:@"%c", (char)shortcutKeyChar] lowercaseString];
+            cmd = [UIKeyCommand commandWithTitle:label
+                                           image:nil
+                                          action:@selector(cn1MenuAction:)
+                                           input:input
+                                   modifierFlags:flags
+                                    propertyList:@(i)];
+        } else {
+            cmd = [UICommand commandWithTitle:label
+                                        image:nil
+                                       action:@selector(cn1MenuAction:)
+                                 propertyList:@(i)];
+        }
         NSMutableArray<UICommand *> *bucket = groups[hint];
         if (bucket == nil) {
             bucket = [NSMutableArray array];
