@@ -83,6 +83,14 @@
 // Apple's API-usage scan without declaring an NFC privacy manifest.
 //#define CN1_INCLUDE_NFC
 
+// INCLUDE_CN1_CAMERA gates the low-level com.codename1.camera native bridge
+// (CN1Camera.{h,m}: AVFoundation AVCaptureSession preview/frames/photo/video).
+// IPhoneBuilder uncomments this only when the classpath scanner saw
+// com.codename1.camera.*, so apps that use the OLD modal Capture API (which
+// only needs INCLUDE_CAMERA_USAGE) do NOT drag in the new AVFoundation-based
+// natives. Keep this independent of INCLUDE_CAMERA_USAGE on purpose.
+//#define INCLUDE_CN1_CAMERA
+
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
 // (AuthenticationServices.framework import, ASWebAuthenticationSession code
 // in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the

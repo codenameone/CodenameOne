@@ -1612,13 +1612,54 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image) {
     }
 }
 
+// Wait for a Metal command buffer to finish WITHOUT the risk of blocking the
+// calling thread forever. Plain [cb waitUntilCompleted] deadlocks on a buffer
+// that was created but never committed (the readback runs between a mutable
+// image's Begin and End), and it blocks indefinitely on a genuinely stuck GPU
+// command buffer. Both modes intermittently hung the iOS Metal screenshot
+// suite inside the readback path (e.g. ChartRotatedScreenshotTest): the app
+// stalls with no crash and no Metal validation error, the runner eventually
+// SIGTERMs it, and every test after the stall is silently dropped.
+//
+// Returns YES only when the buffer reached Completed. On NO the caller reads
+// back whatever is currently in the texture, so the affected screenshot fails
+// visibly against its golden instead of taking down the whole suite.
+static BOOL cn1MetalWaitCommandBufferBounded(id<MTLCommandBuffer> cb, double timeoutSeconds) {
+    if (cb == nil) return YES;
+    MTLCommandBufferStatus st = cb.status;
+    if (st == MTLCommandBufferStatusCompleted) return YES;
+    if (st == MTLCommandBufferStatusError) return NO;
+    if (st == MTLCommandBufferStatusNotEnqueued || st == MTLCommandBufferStatusEnqueued) {
+        // Never committed -> it will never be submitted to the GPU, so
+        // waitUntilCompleted would block forever. Do not wait.
+        NSLog(@"CN1Metal: readback on an uncommitted command buffer (status=%ld); skipping wait to avoid deadlock", (long)st);
+        return NO;
+    }
+    // Committed/Scheduled: it should complete. Poll the status with a deadline
+    // as a backstop against a stuck buffer rather than calling the unbounded
+    // waitUntilCompleted.
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeoutSeconds];
+    for (;;) {
+        st = cb.status;
+        if (st == MTLCommandBufferStatusCompleted) return YES;
+        if (st == MTLCommandBufferStatusError) return NO;
+        if ([deadline timeIntervalSinceNow] <= 0) {
+            NSLog(@"CN1Metal: command buffer wait timed out after %.1fs (status=%ld); proceeding to avoid suite hang", timeoutSeconds, (long)st);
+            return NO;
+        }
+        [NSThread sleepForTimeInterval:0.004];
+    }
+}
+
 void CN1MetalFlushMutableImageSync(GLUIImage *image) {
     if (image == nil) return;
     id<MTLCommandBuffer> cb = [image mtlMutableCommandBuffer];
     if (cb == nil) return;
-    [cb waitUntilCompleted];
+    // Bounded wait: never block the screenshot/readback path forever on an
+    // uncommitted or stuck command buffer (see cn1MetalWaitCommandBufferBounded).
+    cn1MetalWaitCommandBufferBounded(cb, 8.0);
     // Don't nil the cb -- multiple readbacks of the same already-completed
-    // buffer should be no-op-fast (waitUntilCompleted is idempotent).
+    // buffer should be no-op-fast.
 }
 
 BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
@@ -1658,7 +1699,7 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
          destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
     [blitCb commit];
-    [blitCb waitUntilCompleted];
+    cn1MetalWaitCommandBufferBounded(blitCb, 8.0);
 
     // Read shared texture into a temp BGRA buffer, then convert + scale
     // into outARGB. Texture dims equal imgWidth/imgHeight when the
@@ -1741,7 +1782,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
          destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
     [blitCb commit];
-    [blitCb waitUntilCompleted];
+    cn1MetalWaitCommandBufferBounded(blitCb, 8.0);
 
     NSUInteger rowBytes = (NSUInteger)(texW * 4);
     NSUInteger byteCount = rowBytes * (NSUInteger)texH;
