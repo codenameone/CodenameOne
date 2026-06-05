@@ -36,6 +36,24 @@
                     </execution>
                 </executions>
             </plugin>
+            <!--
+              The javase module has no Java sources of its own (the app lives in
+              common); it only orchestrates desktop packaging, so its default-jar
+              is empty. The build-desktop-macosx / windows-desktop targets fork the
+              package lifecycle, so default-jar runs a second time and
+              maven-jar-plugin 3.4.x refuses to re-attach the main artifact
+              ("You have to use a classifier to attach supplemental artifacts").
+              skipIfEmpty makes the empty jar a no-op so the desktop builds work.
+              The executable-jar profile produces a real (non-empty) runnable jar
+              and is unaffected.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <skipIfEmpty>true</skipIfEmpty>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
