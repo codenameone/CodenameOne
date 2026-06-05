@@ -381,20 +381,20 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 - (void)firePhotoCaptured:(int)cbId bytes:(NSData *)jpeg path:(NSString *)path
                     width:(int)w height:(int)h {
     JAVA_OBJECT b = nsDataToByteArr(jpeg);
-    JAVA_OBJECT p = fromNSString(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG path);
+    JAVA_OBJECT p = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path);
     com_codename1_impl_ios_IOSCameraImpl_onPhotoCaptured___int_byte_1ARRAY_java_lang_String_int_int(
         CN1_THREAD_GET_STATE_PASS_ARG cbId, b, p, w, h);
 }
 
 - (void)firePhotoFailed:(int)cbId withMessage:(NSString *)msg {
-    JAVA_OBJECT m = fromNSString(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG msg);
+    JAVA_OBJECT m = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG msg);
     com_codename1_impl_ios_IOSCameraImpl_onPhotoFailed___int_java_lang_String(
         CN1_THREAD_GET_STATE_PASS_ARG cbId, m);
 }
 
 - (void)fireVideoStopped:(int)cbId path:(NSString *)path {
     if (cbId == 0) return;
-    JAVA_OBJECT p = fromNSString(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG path);
+    JAVA_OBJECT p = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path);
     com_codename1_impl_ios_IOSCameraImpl_onVideoStopped___int_java_lang_String(
         CN1_THREAD_GET_STATE_PASS_ARG cbId, p);
 }
@@ -417,7 +417,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate___R_java_lang_St
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_CAMERA
     NSString *s = [CN1Camera enumerateCameras];
-    return fromNSString(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG s);
+    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG s);
 #else
     return JAVA_NULL;
 #endif
