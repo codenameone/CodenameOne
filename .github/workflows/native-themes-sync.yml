@@ -23,6 +23,11 @@ on:
 
 permissions:
   contents: write
+  # The job runs inside the private ghcr.io/codenameone pr-ci-container
+  # image; pulling it needs the GITHUB_TOKEN to carry packages:read.
+  # Declaring any permissions block resets every unlisted scope to none,
+  # so packages:read must be spelled out or the container pull is denied.
+  packages: read
 
 concurrency:
   group: native-themes-sync
