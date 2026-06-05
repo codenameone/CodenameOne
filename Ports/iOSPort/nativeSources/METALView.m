@@ -315,24 +315,6 @@ extern BOOL isRetinaBug();
         self.renderPassDescriptor = nil;
         self.drawable = nil;
     }
-    // Preserve the previously rendered frame across the resize so a rotation
-    // never shows black. On the Metal backend, changing layer.drawableSize
-    // (below) invalidates the CAMetalLayer's currently displayed drawable, so
-    // the layer falls back to its opaque (black) background until the next
-    // presentDrawable:. With the CADisplayLink disabled in this port, that
-    // next present only arrives once the EDT wakes, re-lays-out and repaints --
-    // a gap that is invisible while the app is actively painting but produces a
-    // visible black flash during the ~0.3s rotation animation when the app has
-    // gone idle (#5162). Capture the old screen texture here; after the new one
-    // is built we scale-blit the last frame into it and present once so the
-    // layer keeps showing the previous frame (stretched, like UIKit's own
-    // rotation snapshot) until the real repaint lands.
-    id<MTLTexture> oldScreen = self.screenTexture;
-#ifndef CN1_USE_ARC
-    // Keep it alive past the self.screenTexture reassignment below: the
-    // synthesized retain setter releases the previously held value.
-    [oldScreen retain];
-#endif
     framebufferWidth = pw;
     framebufferHeight = ph;
     // Match iOS UIKit's Y-down convention: origin at top-left.
@@ -364,32 +346,16 @@ extern BOOL isRetinaBug();
     [newScreen release];
 #endif
 
-    // Initialise the new texture. Private-storage textures come back
+    // Prime the texture to opaque black: private-storage textures come back
     // uninitialised, so the first frame (which uses MTLLoadActionLoad) would
-    // sample garbage for any pixel CN1 hasn't drawn yet. When a previous frame
-    // exists we scale-blit it in (preserving the last visible content across
-    // the resize -- see the oldScreen capture above); otherwise we just clear
-    // to opaque black.
+    // sample garbage for any pixel CN1 hasn't drawn yet.
     id<MTLCommandBuffer> clearCb = [self.commandQueue commandBuffer];
     MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
     clearPass.colorAttachments[0].texture = self.screenTexture;
     clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
     clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
     clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
-    id<MTLRenderCommandEncoder> clearEnc = [clearCb renderCommandEncoderWithDescriptor:clearPass];
-    if (oldScreen != nil) {
-        [clearEnc setViewport:(MTLViewport){ 0.0, 0.0, (double)pw, (double)ph, 0.0, 1.0 }];
-        CN1MetalBeginFrame(clearEnc, projectionMatrix, pw, ph);
-        // Stretch the whole previous frame to fill the new drawable. A pure
-        // scale (no rotation) is imperfect across a portrait<->landscape swap
-        // but is only on screen for the rotation animation and is far less
-        // jarring than a black flash. screenTexture is rendered with the same
-        // y-down projection, so CN1MetalDrawImage's V=0-at-top mapping keeps
-        // the old top at the new top (no vertical flip needed).
-        CN1MetalDrawImage(oldScreen, 255, 0, 0, pw, ph);
-        CN1MetalEndFrame();
-    }
-    [clearEnc endEncoding];
+    [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
     [clearCb commit];
 
     // Build a matching Stencil8 attachment for polygon-shape clipping
@@ -407,50 +373,6 @@ extern BOOL isRetinaBug();
     self.stencilTexture = newStencil;
 #ifndef CN1_USE_ARC
     [newStencil release];
-#endif
-
-    // Present the preserved frame immediately so the CAMetalLayer shows the
-    // last visible content (rather than its invalidated/black surface) for the
-    // duration of the rotation/resize animation, until the EDT repaint presents
-    // the correctly laid-out frame. Skipped on the very first sizing (no
-    // previous frame to show) and if no drawable is currently available.
-    if (oldScreen != nil) {
-        id<CAMetalDrawable> dr = [layer nextDrawable];
-        if (dr != nil) {
-            // Clamp the copy region to fit BOTH the source (the new pw x ph
-            // screenTexture) and the drawable's actual texture. Setting
-            // layer.drawableSize above does not reliably take effect before
-            // this very next nextDrawable: the drawable can still come back at
-            // the previous size, so an unconditional pw x ph copy runs off the
-            // end of the (differently sized) destination. With the Metal
-            // validation layer in assert mode -- as the CI screenshot job runs
-            // it -- that "sourceSize exceeds destination" violation aborts the
-            // app on launch (intermittently, depending on whether the layer has
-            // committed the resize); without validation it silently samples out
-            // of bounds. This regressed the iOS Metal screenshot suite (the app
-            // delivered 0 screenshots). Clamping keeps the blit in-bounds for
-            // the transient rotation frame regardless of which size the drawable
-            // currently is.
-            NSUInteger cw = MIN((NSUInteger)pw, MIN(self.screenTexture.width, dr.texture.width));
-            NSUInteger ch = MIN((NSUInteger)ph, MIN(self.screenTexture.height, dr.texture.height));
-            if (cw > 0 && ch > 0) {
-                id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
-                id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
-                [blit copyFromTexture:self.screenTexture
-                          sourceSlice:0 sourceLevel:0
-                         sourceOrigin:MTLOriginMake(0, 0, 0)
-                           sourceSize:MTLSizeMake(cw, ch, 1)
-                            toTexture:dr.texture
-                     destinationSlice:0 destinationLevel:0
-                    destinationOrigin:MTLOriginMake(0, 0, 0)];
-                [blit endEncoding];
-                [presentCb presentDrawable:dr];
-                [presentCb commit];
-            }
-        }
-    }
-#ifndef CN1_USE_ARC
-    [oldScreen release];
 #endif
 }
 
