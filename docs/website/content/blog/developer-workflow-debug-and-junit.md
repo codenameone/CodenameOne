@@ -65,7 +65,7 @@ A capability difference between the two platforms worth knowing up front: on And
 
 ### Tutorial: IntelliJ + iOS
 
-The Codename One archetype now generates two run configurations under an *On-Device Debug* folder in the IntelliJ run-config dropdown: **CN1 Debug Proxy** and **CN1 Attach iOS**. The tutorial below assumes a project generated from the [Initializr](/initializr/) recently enough to have those. If you have an older project, the [iOS on-device debugging chapter](https://www.codenameone.com/developer-guide/#_on_device_debugging_ios) of the developer guide has the run-configuration XML to drop into `.idea/runConfigurations/`.
+The Codename One archetype now generates two run configurations under an *On-Device Debug* folder in the IntelliJ run-config dropdown: **CN1 Debug Proxy** and **CN1 Attach iOS**. The tutorial below assumes a project generated from the [Initializr](/initializr/) recently enough to have those. If you have an older project, generate a new project with initializr and copy over the `.idea` directory and maven `pom.xml` files.
 
 **1. Enable the build hints.**
 

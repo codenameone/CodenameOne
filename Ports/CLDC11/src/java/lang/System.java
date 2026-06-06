@@ -52,6 +52,13 @@ public final class System{
         return 0l; //TODO codavaj!!
     }
 
+    /// Returns the current value of the running Java Virtual Machine's high-resolution time source, in nanoseconds.
+    /// This method can only be used to measure elapsed time and is not related to any other notion of system or wall-clock time.
+    /// This is a stub signature only; the real value is provided by the native platform implementation at runtime.
+    public static long nanoTime(){
+        return 0l; //TODO codavaj!!
+    }
+
     /// Terminates the currently running Java application. The argument serves as a status code; by convention, a nonzero status code indicates abnormal termination.
     /// This method calls the exit method in class Runtime. This method never returns normally.
     /// The call System.exit(n) is effectively equivalent to the call:

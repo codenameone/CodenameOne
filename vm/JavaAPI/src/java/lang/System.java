@@ -162,8 +162,12 @@ public final class System {
      */
     public static native int identityHashCode(java.lang.Object x);
 
-    public static long nanoTime() {
-        throw new UnsupportedOperationException("System.nanoTime() not supported on this platform");
-    }
+    /**
+     * Returns the current value of the running Java Virtual Machine's high-resolution time source, in nanoseconds.
+     * This method can only be used to measure elapsed time and is not related to any other notion of system or
+     * wall-clock time. The value returned represents nanoseconds since some fixed but arbitrary origin time (perhaps
+     * in the future, so values may be negative). It is backed by a monotonic platform clock.
+     */
+    public native static long nanoTime();
 
 }
