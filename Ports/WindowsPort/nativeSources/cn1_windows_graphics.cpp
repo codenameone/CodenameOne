@@ -84,6 +84,7 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
     g->clipIsRect = JAVA_TRUE;
     g->clipGeom = NULL;
     g->clipLayer = NULL;
+    g->clipMaskTransform = D2D1::Matrix3x2F::Identity();
     g->font = cn1Win.defaultFont;
     g->inFrame = JAVA_FALSE;
     g->wicBitmap = NULL;
@@ -163,10 +164,14 @@ ID2D1SolidColorBrush* cn1WinBrush(CN1Graphics* g) {
  * axis-aligned clip. Must be paired with cn1WinPopClip after the primitive.
  */
 static void cn1WinPushClip(CN1Graphics* g) {
-    /* Shape clip (clipRect under a rotation/scale, setClip(Shape)): the mask is a
-     * screen-space geometry, so push it as a layer with an identity maskTransform.
-     * The render-target transform still applies to the drawing, not the mask, so a
-     * rotated fill is clipped to the rotated clip polygon. */
+    /* Shape clip (clipRect under a rotation/scale, setClip(Shape)): push the clip
+     * geometry as a layer. The geometry is stored in the graphics' own (raw)
+     * coordinate space and clipMaskTransform is the world transform that was active
+     * when the clip was set, so applying it as the maskTransform lands the clip
+     * exactly where drawShape would draw the same path. The render-target transform
+     * (g->transform) still applies to the drawing -- which may differ from the clip
+     * transform (e.g. LinearGradientPaint sets its own matrix between setClip and
+     * the fill) -- so the clip stays fixed while the fill transforms within it. */
     if (!g->clipIsRect && g->clipGeom != NULL) {
         ID2D1Layer* layer = NULL;
         if (SUCCEEDED(ID2D1RenderTarget_CreateLayer(g->target, NULL, &layer)) && layer != NULL) {
@@ -174,7 +179,7 @@ static void cn1WinPushClip(CN1Graphics* g) {
             lp.contentBounds = D2D1::InfiniteRect();
             lp.geometricMask = (ID2D1Geometry*) g->clipGeom;
             lp.maskAntialiasMode = D2D1_ANTIALIAS_MODE_PER_PRIMITIVE;
-            lp.maskTransform = D2D1::Matrix3x2F::Identity();
+            lp.maskTransform = g->clipMaskTransform;
             lp.opacity = 1.0f;
             lp.opacityBrush = NULL;
             lp.layerOptions = D2D1_LAYER_OPTIONS_NONE;
@@ -290,10 +295,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClip___long_int_int_int_in
     cn1WinReleaseClipGeom(g);
 }
 
-/* Sets the clip to an arbitrary screen-space shape (flattened path arrays, same
- * encoding as fillShape). Used for clipRect under a non-identity transform and
- * setClip(Shape). The geometry is in device/screen space, so the push layer uses
- * an identity mask transform. */
+/* Sets the clip to an arbitrary shape (flattened path arrays, same encoding as
+ * fillShape). Used for clipRect under a non-identity transform and setClip(Shape).
+ * The geometry is in the graphics' raw coordinate space (the Java side no longer
+ * pre-transforms it); the world transform active right now is captured into
+ * clipMaskTransform and applied to the mask when the layer is pushed, so the clip
+ * lands exactly where drawShape draws the same path. */
 JAVA_VOID com_codename1_impl_windows_WindowsNative_setClipShape___long_float_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3,
         JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
@@ -307,6 +314,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClipShape___long_float_1AR
     coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
     types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
     g->clipGeom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
+    g->clipMaskTransform = g->transform; /* freeze the world transform at setClip time */
     g->clipIsRect = (g->clipGeom == NULL) ? JAVA_TRUE : JAVA_FALSE;
     /* Keep clipX/Y/W/H as the geometry's bounding box so getClip* stays sane. */
 }

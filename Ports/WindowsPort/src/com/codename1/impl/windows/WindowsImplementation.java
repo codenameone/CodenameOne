@@ -882,17 +882,17 @@ public class WindowsImplementation extends CodenameOneImplementation {
             WindowsNative.clipRect(peer(graphics), x, y, width, height);
             return;
         }
-        /* Under a rotation/scale the clip rect becomes a transformed quad in screen
-         * space (the clip-under-rotation case). Map its 4 corners through the
-         * current transform and set that polygon as the clip. */
-        float[] in = new float[2];
-        float[] out = new float[2];
-        float[] coords = new float[8];
+        /* Under a rotation/scale the clip rect becomes a transformed quad (the
+         * clip-under-rotation case). Pass the RAW rect corners; the native layer
+         * applies the transform captured at setClip time as the mask transform, so
+         * the clip lands exactly where the (equally transformed) drawing does. */
+        float[] coords = {
+            x,         y,
+            x + width, y,
+            x + width, y + height,
+            x,         y + height
+        };
         int[] types = { 0, 1, 1, 1, 4 };
-        in[0] = x;          in[1] = y;          t.transformPoint(in, out); coords[0] = out[0]; coords[1] = out[1];
-        in[0] = x + width;  in[1] = y;          t.transformPoint(in, out); coords[2] = out[0]; coords[3] = out[1];
-        in[0] = x + width;  in[1] = y + height; t.transformPoint(in, out); coords[4] = out[0]; coords[5] = out[1];
-        in[0] = x;          in[1] = y + height; t.transformPoint(in, out); coords[6] = out[0]; coords[7] = out[1];
         WindowsNative.setClipShape(peer(graphics), coords, types, 5, 1);
     }
 
@@ -907,27 +907,6 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return;
         }
         FlatPath fp = flattenShape(shape);
-        float[] c = fp.coords;
-        /* The clip geometry is consumed in screen space (cn1WinPushClip pushes it as a
-         * layer mask under an identity maskTransform), but the shape arrives in the
-         * graphics' pre-transform coordinate space -- a GeneratedSVGImage, for one,
-         * paints its paths under the viewBox scale. Map every path point through the
-         * current affine so the clip lands where the (equally transformed) drawing
-         * does; without this the SVG gradient_circle / clipped_badge clip was an
-         * unscaled rect that excluded the whole fill. (clipRect already does this for
-         * its rect; setClip(Shape) used to ignore the transform entirely.) */
-        com.codename1.ui.Transform t = getTransform(graphics);
-        if (t != null && !t.isIdentity()) {
-            float[] in = new float[2];
-            float[] out = new float[2];
-            for (int i = 0; i + 1 < c.length; i += 2) {
-                in[0] = c[i];
-                in[1] = c[i + 1];
-                t.transformPoint(in, out);
-                c[i] = out[0];
-                c[i + 1] = out[1];
-            }
-        }
         /* The reference renderer clips a straight-edge polygon to its bounding box but
          * tessellates a curved clip precisely -- pixel-verified against the goldens:
          * graphics-clip's triangle fills its whole bbox, while the SVG gradient_circle
@@ -941,8 +920,30 @@ public class WindowsImplementation extends CodenameOneImplementation {
             }
         }
         if (curved) {
-            WindowsNative.setClipShape(peer(graphics), c, fp.types, fp.typeCount, fp.windingRule);
+            /* Pass the RAW path. cn1WinPushClip applies the world transform captured
+             * at setClip time as the layer maskTransform, so a curved clip lands
+             * exactly where drawShape draws the same path -- correct under scale/
+             * rotate. Pre-transforming the points here instead double-counted the cell
+             * offset under a GeneratedSVGImage's viewBox scale and pushed the gradient
+             * fill off its clip disc. */
+            WindowsNative.setClipShape(peer(graphics), fp.coords, fp.types, fp.typeCount, fp.windingRule);
             return;
+        }
+        /* Polygon: clip to the screen-space bounding box (axis-aligned rect clip).
+         * Transform the corners through the current affine for the bbox since the
+         * rect-clip path carries no transform of its own. */
+        float[] c = fp.coords;
+        com.codename1.ui.Transform t = getTransform(graphics);
+        if (t != null && !t.isIdentity()) {
+            float[] in = new float[2];
+            float[] out = new float[2];
+            for (int i = 0; i + 1 < c.length; i += 2) {
+                in[0] = c[i];
+                in[1] = c[i + 1];
+                t.transformPoint(in, out);
+                c[i] = out[0];
+                c[i + 1] = out[1];
+            }
         }
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
