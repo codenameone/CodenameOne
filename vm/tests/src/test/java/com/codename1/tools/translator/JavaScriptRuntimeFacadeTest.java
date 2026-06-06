@@ -196,8 +196,15 @@ class JavaScriptRuntimeFacadeTest {
                         || (html5GraphicsSource.contains("public int charsWidth(")
                                 && html5GraphicsSource.contains("return stringWidth(")),
                 "HTML5Graphics should delegate char measurement to the text metrics adapter");
-        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.stringWidth("),
-                "HTML5Graphics should delegate string measurement to the text metrics adapter");
+        // ``stringWidth`` was refactored to the worker-side OffscreenCanvas fast
+        // path (``stringWidthOffscreen``) to avoid the ~168 main-thread
+        // round-trips per Initializr boot; that IS the measurement route in the
+        // surface render model. Accept either the adapter delegation or the
+        // inline OffscreenCanvas fast path (mirrors the charsWidth clause above).
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.stringWidth(")
+                        || (html5GraphicsSource.contains("public int stringWidth(")
+                                && html5GraphicsSource.contains("stringWidthOffscreen(")),
+                "HTML5Graphics should measure strings via the text metrics adapter or the OffscreenCanvas fast path");
         assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.getFontHeight("),
                 "HTML5Graphics should delegate font height to the text metrics adapter");
         assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.getFontDescent("),
