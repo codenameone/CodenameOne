@@ -791,9 +791,18 @@ JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE)
 
 JAVA_LONG java_lang_System_nanoTime___R_long(CODENAME_ONE_THREAD_STATE) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
+#ifdef _WIN32
+    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl
+       target, so fall back to the microsecond wall clock that already backs
+       currentTimeMillis on Windows (gettimeofday is supplied by cn1_win_compat). */
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return (((JAVA_LONG)time.tv_sec) * 1000000000LL) + (((JAVA_LONG)time.tv_usec) * 1000LL);
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (((JAVA_LONG)ts.tv_sec) * 1000000000LL) + (JAVA_LONG)ts.tv_nsec;
+#endif
 }
 
 JAVA_DOUBLE java_lang_Double_longBitsToDouble___long_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG n1)
