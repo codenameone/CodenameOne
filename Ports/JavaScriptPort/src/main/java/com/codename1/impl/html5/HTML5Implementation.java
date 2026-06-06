@@ -2366,31 +2366,41 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @SuppressSyncErrors
     public void handleAnimationFrame(double time) {
-
-        if (graphicsLocked){
-            // Paint queue is mid-mutation. Re-arm rAF so we retry the
-            // drain once the writer releases the lock; otherwise pending
-            // ops would never paint.
-            scheduleAnimationFrame();
-            return;
-
-        }
-
-        drainPendingDisplayFrame();
-        // Re-arm rAF only if there's still work to flush. The original
-        // unconditional re-arm produced a 60 Hz worker-callback flood
-        // (host->worker postMessage of the rAF firing) even when the UI
-        // was completely idle. During Display.invokeAndBlock that flood
-        // crowded out self.onmessage for incoming pointer events:
-        // the OK button on a Dialog modal stopped reaching the worker.
-        // ``flushGraphics`` paints synchronously and calls
-        // ``scheduleAnimationFrame()`` itself when it leaves work behind,
-        // so dropping the unconditional re-arm here is safe -- the next
-        // user-driven paint or queue write restarts the loop.
-        if (pendingDisplay.hasPendingOps()) {
-            scheduleAnimationFrame();
-        }
-
+        // This rAF callback is dispatched on a SPAWNED, non-EDT green thread
+        // (port.js requestAnimationFrameNative -> spawnVirtualCallback ->
+        // jvm.spawn). ``drainPendingDisplayFrame`` mutates ``pendingDisplay`` --
+        // a single render frame OWNED by the EDT, which produces into it via
+        // ``flushGraphics`` -> queueFlush -> ``JavaScriptRenderQueueState.replace``
+        // (a destructive clear+addAll) and consumes via ``snapshotAndClear``.
+        // Draining from this thread races the EDT: an interleaved replace/snapshot
+        // drops a queued frame before it ships, so the canvas keeps a stale frame
+        // and a run of screenshot tests freeze on it. Marshal the whole
+        // drain+re-arm onto the EDT with callSerially so ALL pendingDisplay
+        // mutation is single-threaded; the per-op ``graphicsLocked`` flag then
+        // only ever guards re-entrancy within the one (EDT) thread.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (graphicsLocked) {
+                    // Paint queue is mid-mutation. Re-arm rAF so we retry the
+                    // drain once the writer releases the lock; otherwise pending
+                    // ops would never paint.
+                    scheduleAnimationFrame();
+                    return;
+                }
+                drainPendingDisplayFrame();
+                // Re-arm rAF only if there's still work to flush. An
+                // unconditional re-arm produced a 60 Hz worker-callback flood
+                // (host->worker postMessage of the rAF firing) even when the UI
+                // was completely idle, which during Display.invokeAndBlock
+                // crowded out self.onmessage for incoming pointer events.
+                // ``flushGraphics`` paints synchronously and re-arms itself when
+                // it leaves work behind, so this conditional re-arm is enough.
+                if (pendingDisplay.hasPendingOps()) {
+                    scheduleAnimationFrame();
+                }
+            }
+        });
     }
 
     private boolean drainPendingDisplayFrame() {
@@ -2456,7 +2466,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         for (ExecutableOp op : frame.getOps()){
-            op.execute(context);
+            try {
+                op.execute(context);
+            } catch (Throwable __opt) {
+                System.out.println("PARPAR:DIAG:OPTHROW:op=" + op.getClass().getName()
+                        + ":cls=" + __opt.getClass().getName() + ":msg=" + __opt.getMessage());
+            }
         }
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();

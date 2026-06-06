@@ -186,6 +186,8 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
             op(OP_BLIT_SURFACE_XY);
             num(srcSurfaceId); num(x); num(y);
         } else {
+            // Cull a zero/negative-area blit -- it copies nothing to the dest.
+            if (w <= 0 || h <= 0) { return; }
             op(OP_BLIT_SURFACE_XYWH);
             num(srcSurfaceId); num(x); num(y); num(w); num(h);
         }
@@ -193,6 +195,8 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
 
     public void blitSurface(int srcSurfaceId, int sx, int sy, int sw, int sh,
             int dx, int dy, int dw, int dh) {
+        // Cull when the source or dest area collapses -- nothing is copied.
+        if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) { return; }
         op(OP_BLIT_SURFACE_SRCDST);
         num(srcSurfaceId);
         num(sx); num(sy); num(sw); num(sh);
@@ -256,12 +260,21 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     @Override public void setFilter(String filter) { op(OP_SET_FILTER); obj(filter); }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {
+        // Cull provable no-ops: a zero/negative-area rect paints nothing, so do
+        // not record (and later ship across the bridge) an op that cannot change
+        // a pixel. NaN is left alone (NaN <= 0 is false) so any genuinely
+        // unexpected value still reaches the host unchanged.
+        if (width <= 0 || height <= 0) { return; }
         op(OP_CLEAR_RECT); num(x); num(y); num(width); num(height);
     }
     @Override public void fillRect(double x, double y, double width, double height) {
+        if (width <= 0 || height <= 0) { return; }
         op(OP_FILL_RECT); num(x); num(y); num(width); num(height);
     }
     @Override public void strokeRect(double x, double y, double width, double height) {
+        // A zero-area stroke rect still draws its outline at width=0 OR height=0
+        // (a line), so only cull when BOTH collapse to a point.
+        if (width <= 0 && height <= 0) { return; }
         op(OP_STROKE_RECT); num(x); num(y); num(width); num(height);
     }
     @Override public void beginPath() { op(OP_BEGIN_PATH); }
@@ -326,21 +339,26 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
         op(OP_DRAW_IMAGE_XY); obj(image); num(dx); num(dy);
     }
     @Override public void drawImage(HTMLImageElement image, double dx, double dy, double dWidth, double dHeight) {
+        if (dWidth <= 0 || dHeight <= 0) { return; }
         op(OP_DRAW_IMAGE_XYWH); obj(image); num(dx); num(dy); num(dWidth); num(dHeight);
     }
     @Override public void drawImage(HTMLImageElement image, double sx, double sy, double sWidth, double sHeight, double dx, double dy, double dWidth, double dHeight) {
+        if (sWidth <= 0 || sHeight <= 0 || dWidth <= 0 || dHeight <= 0) { return; }
         op(OP_DRAW_IMAGE_SRCDST); obj(image); num(sx); num(sy); num(sWidth); num(sHeight); num(dx); num(dy); num(dWidth); num(dHeight);
     }
     @Override public void drawImage(HTMLCanvasElement canvas, double dx, double dy) {
         op(OP_DRAW_IMAGE_XY); obj(canvas); num(dx); num(dy);
     }
     @Override public void drawImage(HTMLCanvasElement canvas, double dx, double dy, double dWidth, double dHeight) {
+        if (dWidth <= 0 || dHeight <= 0) { return; }
         op(OP_DRAW_IMAGE_XYWH); obj(canvas); num(dx); num(dy); num(dWidth); num(dHeight);
     }
     @Override public void drawImage(HTMLCanvasElement canvas, double sx, double sy, double sWidth, double sHeight, double dx, double dy, double dWidth, double dHeight) {
+        if (sWidth <= 0 || sHeight <= 0 || dWidth <= 0 || dHeight <= 0) { return; }
         op(OP_DRAW_IMAGE_SRCDST); obj(canvas); num(sx); num(sy); num(sWidth); num(sHeight); num(dx); num(dy); num(dWidth); num(dHeight);
     }
     @Override public void drawImage(CanvasImageSource image, double dx, double dy, double dWidth, double dHeight) {
+        if (dWidth <= 0 || dHeight <= 0) { return; }
         op(OP_DRAW_IMAGE_XYWH); obj(image); num(dx); num(dy); num(dWidth); num(dHeight);
     }
     @Override public void setImageData(ImageData imageData) {
