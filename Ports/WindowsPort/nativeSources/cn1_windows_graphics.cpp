@@ -183,7 +183,22 @@ static void cn1WinPushClip(CN1Graphics* g) {
             lp.opacity = 1.0f;
             lp.opacityBrush = NULL;
             lp.layerOptions = D2D1_LAYER_OPTIONS_NONE;
+            /* D2D composes the render target's *current* world transform with the
+             * layer maskTransform when positioning the geometric mask. The drawing
+             * transform active here (g->transform) is unrelated to -- and usually
+             * differs from -- the transform the clip was captured under (e.g.
+             * LinearGradientPaint installs its own matrix between setClip and the
+             * fill). Leaving g->transform in effect double-counts it onto the mask:
+             * the clip shrinks when the draw transform equals the clip's, and slides
+             * entirely off the geometry when it differs (the gradient-under-scale
+             * miss). Push the mask under identity so maskTransform alone places it
+             * exactly where drawShape draws the same path, then restore g->transform
+             * for the clipped primitive -- the same identity-then-restore the
+             * axis-aligned rect-clip path below uses. */
+            D2D1_MATRIX_3X2_F idm = D2D1::Matrix3x2F::Identity();
+            ID2D1RenderTarget_SetTransform(g->target, &idm);
             ID2D1RenderTarget_PushLayer(g->target, &lp, layer);
+            ID2D1RenderTarget_SetTransform(g->target, &g->transform);
             g->clipLayer = layer;
         }
         return;
