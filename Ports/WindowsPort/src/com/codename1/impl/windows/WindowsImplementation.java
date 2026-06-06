@@ -546,6 +546,19 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
     }
 
+    /*
+     * Two different questions share this name. The no-arg form (reached via
+     * Transform.isPerspectiveSupported()) asks whether the transform MATH does the
+     * homogeneous w-divide -- it does (Matrix), so graphics-transform-perspective
+     * can project its own corners. The Object form (reached via
+     * Graphics.isPerspectiveTransformSupported()) asks whether the GRAPHICS can
+     * RENDER a primitive under a perspective matrix -- it cannot: the Direct2D
+     * target is 2D-affine and setTransform only keeps the affine sub-matrix. So it
+     * must return false, otherwise FlipTransition / ComponentReplace(flip) draw the
+     * form image under a perspective transform whose perspective term is dropped,
+     * collapsing the mid-flip frames to nothing (black). Returning false makes the
+     * flip use its 2D scaled-drawImage fallback, which renders.
+     */
     @Override
     public boolean isPerspectiveTransformSupported() {
         return true;
@@ -558,7 +571,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isPerspectiveTransformSupported(Object graphics) {
-        return true;
+        return false;
     }
 
     // The transform SPI is backed by Matrix (a pure-Java 4x4, shared with the iOS
@@ -785,6 +798,28 @@ public class WindowsImplementation extends CodenameOneImplementation {
     public void rotate(Object graphics, float angle, int pivotX, int pivotY) {
         com.codename1.ui.Transform t = getTransform(graphics);
         t.rotate(angle, pivotX, pivotY);
+        setTransform(graphics, t);
+    }
+
+    /*
+     * translateMatrix composes the translation directly onto the affine matrix --
+     * the matrix-correct counterpart of the integer translate accumulator -- so it
+     * pairs with scale()/rotate() exactly as on iOS/JavaSE/Android. Without this
+     * the base falls back to translate(int,int): a following g.scale() then
+     * multiplies that integer cell anchor, which threw the inscribed-triangle-grid
+     * cells off-panel (the sy=2 row rendered below the panel and vanished). Since
+     * the port already drives all of scale/rotate/setTransform through one Matrix,
+     * advertise support and compose here too.
+     */
+    @Override
+    public boolean isTranslateMatrixSupported() {
+        return true;
+    }
+
+    @Override
+    public void translateMatrix(Object graphics, float x, float y) {
+        com.codename1.ui.Transform t = getTransform(graphics);
+        t.translate(x, y);
         setTransform(graphics, t);
     }
 
