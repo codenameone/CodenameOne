@@ -158,6 +158,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-05T15:03:31+00:00"
       }
+    },
+    "developer-workflow-debug-and-junit": {
+      "devto": {
+        "id": 3835213,
+        "url": "https://dev.to/codenameone/on-device-debugging-and-junit-5-245",
+        "syndicated_at": "2026-06-06T13:32:21+00:00"
+      },
+      "foojay": {
+        "id": 124137,
+        "url": "https://foojay.io/wp-admin/post.php?post=124137&action=edit",
+        "preview_url": "https://foojay.io/?p=124137",
+        "featured_media_id": 124136,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-06T13:33:29+00:00"
+      }
     }
   }
 }
