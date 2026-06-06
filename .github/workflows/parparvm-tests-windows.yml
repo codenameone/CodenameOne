@@ -523,7 +523,7 @@ jobs:
           CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_COMMENT -->'
           CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port]'
           CN1SS_PREVIEW_SUBDIR: 'windows-native'
-          CN1SS_SUCCESS_MESSAGE: 'Native Windows port: full hellocodenameone screenshot suite, rendered offscreen with Direct2D/DirectWrite (x64). No reference set yet -- every image is posted as "new" for review while the port''s rendering gaps are closed.'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port: full hellocodenameone screenshot suite, rendered offscreen with Direct2D/DirectWrite (x64). Compared against the in-repo baseline in scripts/windows/screenshots; tiles still being worked on (e.g. the SVG gradient fills) have no baseline yet and post as "new".'
         run: |
           set -e
           ART="artifacts/windows-port"
@@ -546,10 +546,16 @@ jobs:
           mkdir -p "$ART/previews"
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
-          # No reference set yet: ProcessScreenshots marks each image "new" and
-          # posts it without a baseline comparison (no failure on mismatch).
+          # Compare against the in-repo baseline (scripts/windows/screenshots).
+          # ProcessScreenshots marks each captured image matched / changed / new
+          # vs that reference and renders the diff into the PR comment. A mismatch
+          # is reported, not fatal (the helper only returns non-zero on its own
+          # tool failures), so a rendering regression shows up for review without
+          # blocking the gate. Tiles with no baseline yet (e.g. SVGStatic, whose
+          # gradient fills are still being fixed) post as "new".
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
           cn1ss_process_and_report \
             "Native Windows port" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
-            "$ART/no-reference" "$ART/previews" "$ART" \
+            "$REF_DIR" "$ART/previews" "$ART" \
             "${entries[@]}"
