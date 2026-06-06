@@ -71,7 +71,18 @@ public abstract class Purchase {
     /// race nor the field assignment need synchronization.
     private static final List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks =
             new ArrayList<SuccessCallback<Boolean>>();
-    private ReceiptStore receiptStore;
+    /// Static (shared across all `Purchase` instances) because
+    /// `Display#getInAppPurchase()` returns a fresh `Purchase` on every
+    /// call on every port (iOS `ZoozPurchase`, Android `ZoozPurchase`,
+    /// the JavaSE anonymous subclass).  A per-instance store would be
+    /// invisible to the native receipt path: StoreKit's
+    /// `paymentQueue:updatedTransactions:` enters via the static
+    /// `#postReceipt(...)` which calls `getInAppPurchase().postReceipt(r)`
+    /// on a brand-new instance whose store would be null, so the app's
+    /// `ReceiptStore` would never be invoked for auto-submitted receipts.
+    /// There is logically one IAP store per app, so a static field is the
+    /// correct scope.  Access is EDT-only by construction.
+    private static ReceiptStore receiptStore;
     private List<Receipt> receipts;
     private Date receiptsRefreshTime;
 

@@ -4750,6 +4750,17 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   return null;
 });
 bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return _LfromNumber(Date.now()); });
+bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function*() {
+  // performance.now() is a high-resolution monotonic clock (sub-millisecond,
+  // in fractional milliseconds) and is available in both window and worker
+  // scopes. Fall back to the wall clock if it is somehow absent. This branch's
+  // exact-64-bit-long migration requires long-returning natives to hand back a
+  // _LfromNumber-wrapped value rather than a raw JS number.
+  if (typeof performance !== "undefined" && performance && typeof performance.now === "function") {
+    return _LfromNumber(Math.floor(performance.now() * 1e6));
+  }
+  return _LfromNumber(Date.now() * 1e6);
+});
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
