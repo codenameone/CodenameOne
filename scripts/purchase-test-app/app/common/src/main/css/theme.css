@@ -1,0 +1,4 @@
+/* Minimal theme for the IAP e2e test app. */
+#Constants {
+    includeNativeBool: true;
+}

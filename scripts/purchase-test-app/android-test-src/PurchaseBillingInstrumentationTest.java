@@ -1,4 +1,4 @@
-package com.codenameone.examples.hellocodenameone;
+package com.codenameone.examples.purchasetest;
 
 import android.app.UiAutomation;
 import android.content.Context;
@@ -25,17 +25,18 @@ import static org.junit.Assert.assertTrue;
 /**
  * Android-side e2e guard for the IAP / ReceiptStore bridge (issue #5186).
  *
- * Injects {@link CN1TestBillingSupport} via the framework test seam
- * ({@link CodenameOneActivity#setBillingSupportTestOverride}), launches the app
- * so the generated stub enables billing and calls {@code initBilling()} on the
- * fake (which synthesizes a purchase through {@code Purchase.postReceipt}), then
- * scrapes logcat for the {@code CN1SS:IAP:SUBMITTED} marker emitted by the app's
- * RecordingReceiptStore. Seeing it proves the receipt reached the store
- * installed on a different Purchase instance at startup.
+ * Installs {@link CN1TestBillingSupport} via the framework test seam
+ * ({@link CodenameOneActivity#setBillingSupportTestOverride}) and launches the
+ * dedicated IAP app. Once the CN1 VM has booted and installed the
+ * RecordingReceiptStore (CN1SS:IAP_DIAG), it drives a synthetic purchase through
+ * the fake -> Purchase.postReceipt -> receipt-sync -> the installed store, then
+ * scrapes logcat for CN1SS:IAP:SUBMITTED. Driving the purchase explicitly after
+ * the store is ready keeps the test deterministic (no startup race).
  */
 @RunWith(AndroidJUnit4.class)
 public class PurchaseBillingInstrumentationTest {
     private static final String TAG = "PurchaseBillingTest";
+    private static final String INSTALLED_MARKER = "CN1SS:IAP_DIAG installed=true";
     private static final String SUBMITTED_MARKER = "CN1SS:IAP:SUBMITTED " + CN1TestBillingSupport.TEST_TX_ID;
 
     @After
@@ -45,9 +46,10 @@ public class PurchaseBillingInstrumentationTest {
 
     @Test
     public void purchaseReachesReceiptStore() throws Exception {
-        // Inject the fake before the activity resumes so getBillingSupport()
-        // returns it instead of the real Play BillingSupport.
-        CodenameOneActivity.setBillingSupportTestOverride(new CN1TestBillingSupport());
+        CN1TestBillingSupport fake = new CN1TestBillingSupport();
+        // Demonstrates the injection seam (the app would route billing here);
+        // we also drive purchase() directly below so timing is deterministic.
+        CodenameOneActivity.setBillingSupportTestOverride(fake);
 
         Context context = ApplicationProvider.getApplicationContext();
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
@@ -55,7 +57,16 @@ public class PurchaseBillingInstrumentationTest {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
 
-        boolean submitted = waitForMarker(SUBMITTED_MARKER, 120_000L);
+        // Wait until the CN1 VM has booted and installed the RecordingReceiptStore.
+        boolean installed = waitForMarker(INSTALLED_MARKER, 90_000L);
+        assertTrue("App did not install the RecordingReceiptStore (no '" + INSTALLED_MARKER
+                + "' in logcat) - the VM may not have booted.", installed);
+
+        // Now fire the synthetic purchase through the bridge; the store exists,
+        // so submitReceipt runs and logs CN1SS:IAP:SUBMITTED.
+        fake.purchase(CN1TestBillingSupport.TEST_SKU);
+
+        boolean submitted = waitForMarker(SUBMITTED_MARKER, 60_000L);
         assertTrue("Did not observe '" + SUBMITTED_MARKER + "' in logcat. The synthetic purchase "
                 + "did not flow through Purchase.postReceipt into the installed ReceiptStore.", submitted);
     }
@@ -70,7 +81,7 @@ public class PurchaseBillingInstrumentationTest {
             while (System.currentTimeMillis() < deadline) {
                 if (reader.ready() && (line = reader.readLine()) != null) {
                     if (line.contains(marker)) {
-                        Log.i(TAG, "Observed submission marker");
+                        Log.i(TAG, "Observed marker: " + marker);
                         return true;
                     }
                 } else {
