@@ -427,9 +427,8 @@ In order for your app to provide you with current data about the user's subscrip
 The following methods can be used for synchronization:
 
 . `synchronizeReceipts()` - Asynchronously synchronizes receipts in the background. You won't be notified when it's complete.
-. `synchronizeReceiptsSync()` - Synchronously synchronizes receipts, and blocks until it's complete. This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
 . `synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback)` - Asynchronously synchronizes receipts, but only if they haven't been synchronized in the specified time. For example, In your start() method you might decide that you only want to synchronize receipts once per day. This also includes a callback that will be called when synchronization is complete.
-. `synchronizeReceiptsSync(long ifOlderThanMs)` - A synchronous version that will only refetch if data is older than given time.
+. `synchronizeReceiptsSync(long ifOlderThanMs)` - Synchronously synchronizes receipts, blocking until it's complete, and will only refetch if data is older than the given time (pass `0` to always refetch). This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
 
 In your hello world app you synchronize the subscriptions in a few places.
 
@@ -578,7 +577,7 @@ public void itemPurchaseError(String sku, String errorMessage) {
 }
 ----
 
-Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync()` but this is just to ensure that your toast message has the new expiry date loaded already.
+Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync(0)` but this is just to ensure that your toast message has the new expiry date loaded already.
 
 ==== Screenshots
 

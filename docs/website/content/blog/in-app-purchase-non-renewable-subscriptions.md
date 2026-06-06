@@ -229,11 +229,9 @@ The following methods can be used for synchronization:
 
   1. `synchronizeReceipts()` – Asynchronously synchronizes receipts in the background. You won’t be notified when it is complete.
 
-  2. `synchronizeReceiptsSync()` – Synchronously synchronizes receipts, and blocks until it is complete. This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
+  2. `synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback)` – Asynchronously synchronizes receipts, but only if they haven’t been synchronized in the specified time period. E.g. In your start() method you might decide that you only want to synchronize receipts once per day. This also includes a callback that will be called when synchronization is complete.
 
-  3. `synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback)` – Asynchronously synchronizes receipts, but only if they haven’t been synchronized in the specified time period. E.g. In your start() method you might decide that you only want to synchronize receipts once per day. This also includes a callback that will be called when synchronization is complete.
-
-  4. `synchronizeReceiptsSync(long ifOlderThanMs)` – A synchronous version that will only refetch if data is older than given time.
+  3. `synchronizeReceiptsSync(long ifOlderThanMs)` – Synchronously synchronizes receipts, blocking until it is complete, and will only refetch if data is older than the given time (pass `0` to always refetch). This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
 
 In our hello world app we synchronize the subscriptions in a few places.
 
@@ -368,7 +366,7 @@ The purchase callbacks are very similar to the ones that we implemented in the r
             ToastBar.showErrorMessage("Failure occurred: "+errorMessage);
         }
 
-Notice that, in `itemPurchased()` we don’t need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. We do make a call to `synchronizeReceiptsSync()` but this is just to ensure that our toast message has the new expiry date loaded already.
+Notice that, in `itemPurchased()` we don’t need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. We do make a call to `synchronizeReceiptsSync(0)` but this is just to ensure that our toast message has the new expiry date loaded already.
 
 ## Full Source
 
