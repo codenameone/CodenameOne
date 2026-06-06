@@ -61,8 +61,6 @@ import java.util.List;
  * clang-cl); it is exercised by the Windows CI legs / build VM. The pure build
  * orchestration (arch resolution, translator invocation, CMake argument
  * assembly) is platform independent and unit tested.</p>
- *
- * @author Codename One
  */
 public class WindowsNativeBuilder extends Executor {
     /** Supported target architectures for {@code windows.arch}. */

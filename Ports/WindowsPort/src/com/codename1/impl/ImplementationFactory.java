@@ -29,8 +29,6 @@ import com.codename1.impl.windows.WindowsImplementation;
  * the core factory on the classpath so {@code Display} instantiates the native
  * Win32 {@link WindowsImplementation}. Third parties can still replace it via
  * {@link #setInstance(ImplementationFactory)}.
- *
- * @author Codename One
  */
 public class ImplementationFactory {
     private static ImplementationFactory instance = new ImplementationFactory();

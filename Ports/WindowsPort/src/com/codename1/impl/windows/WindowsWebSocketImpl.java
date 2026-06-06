@@ -45,8 +45,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * transport talks to a trusted local server, so validating the 101 status and
  * masking client frames is sufficient. Only the {@code ws://} scheme is
  * supported.
- *
- * @author Codename One
  */
 public final class WindowsWebSocketImpl extends WebSocketImpl {
 

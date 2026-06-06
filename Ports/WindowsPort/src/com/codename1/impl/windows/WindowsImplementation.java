@@ -53,8 +53,6 @@ import java.util.Locale;
  * pointers boxed as {@link Long}. A handful of hooks that need richer desktop
  * UX (native text editing / IME, native peer components) are intentionally
  * minimal in this first cut and grow in later phases.</p>
- *
- * @author Codename One
  */
 public class WindowsImplementation extends CodenameOneImplementation {
     private static WindowsImplementation INSTANCE;
@@ -121,7 +119,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* ----------------------------------------------------------- lifecycle */
 
-    /** The port's bundled native (material) theme, shipped next to the exe. */
+    /** The port's bundled native (material) theme, embedded in the executable. */
     private static final String NATIVE_THEME_RES = "windowsNativeTheme.res";
 
     private int screenDpi = 96;
@@ -316,18 +314,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* --------------------------------------------------------------- camera */
 
-    /*
-     * Back the new low-level com.codename1.camera.Camera API with a synthetic
-     * backend (see WindowsCameraImpl) so Camera.isSupported() is true and the API
-     * works end to end on the desktop port. Real Media Foundation webcam capture
-     * is the intended future replacement; until then frames are a fixed synthetic
-     * JPEG. hasCamera() (the legacy Capture API) stays false -- that path has no
-     * native implementation here.
-     */
-    @Override
-    public com.codename1.impl.CameraImpl createCameraImpl() {
-        return new WindowsCameraImpl();
-    }
+    // No camera backend is provided: the port does not yet access the host's
+    // webcam, so createCameraImpl() inherits the base null (Camera.isSupported()
+    // returns false) rather than returning fabricated frames. A real device port
+    // must surface real hardware or report unsupported -- never synthetic data
+    // that could reach a shipping app. Real Media Foundation webcam capture is a
+    // tracked gap (see Ports/WindowsPort/status.md).
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {

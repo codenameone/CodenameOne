@@ -31,8 +31,6 @@ import java.io.OutputStream;
  * handle and exposes both the raw read/write the Codename One socket SPI needs
  * and blocking {@link InputStream}/{@link OutputStream} adapters the port's
  * WebSocket client runs over.
- *
- * @author Codename One
  */
 public final class WindowsSocket {
     private long handle;

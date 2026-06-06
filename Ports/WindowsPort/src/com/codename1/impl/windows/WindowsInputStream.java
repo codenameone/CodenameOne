@@ -30,8 +30,6 @@ import java.io.InputStream;
  * response body of a WinHTTP connection, selected by the {@code http} flag.
  * Reads delegate to {@link WindowsNative}; an HTTP stream does not close its
  * connection (the implementation owns that through {@code cleanup}).
- *
- * @author Codename One
  */
 public final class WindowsInputStream extends InputStream {
     private final long peer;

@@ -308,11 +308,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 finalizeTest(index, testClass, testName, true);
                 return;
             }
-            if (shouldSkipOnNativeWindows(testName)) {
-                log("CN1SS:ERR:suite test=" + testName + " skipped (native Windows 3D Scene gap)");
-                finalizeTest(index, testClass, testName, true);
-                return;
-            }
             try {
                 testClass.prepare();
                 testClass.runTest();
@@ -324,24 +319,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
-    }
-
-    // The lightweight date/time Picker renders its wheel through the 3D Scene
-    // graph (com.codename1.ui.scene), which needs perspective/camera transform
-    // support the native Windows (Direct2D) port does not yet implement. Opening
-    // the wheel throws "Transforms not supported" and drops into an unrecoverable
-    // paint recursion that wedges the EDT (no timeout can free a spinning EDT),
-    // so these must be gated out before the wheel is shown rather than allowed to
-    // hang the whole suite. TODO(windows-port): implement 3D Scene rendering so
-    // these can be un-parked. Keep the lookup inline (see static-init note above).
-    private static boolean shouldSkipOnNativeWindows(String testName) {
-        if (!"win".equals(Display.getInstance().getPlatformName())) {
-            return false;
-        }
-        // The lightweight Picker's 3D Scene now renders on the native Windows
-        // port (the affine transformPoint/transformPoints the wheel projection
-        // needs are implemented), so nothing is parked here anymore.
-        return false;
     }
 
     private boolean shouldForceTimeoutInHtml5(String testName) {

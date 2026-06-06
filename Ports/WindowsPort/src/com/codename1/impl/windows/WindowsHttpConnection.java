@@ -27,8 +27,6 @@ package com.codename1.impl.windows;
  * the native WinHTTP connection peer. The implementation reads the peer to
  * issue header/method/response and stream operations, and releases it in
  * {@code cleanup}.
- *
- * @author Codename One
  */
 public final class WindowsHttpConnection {
     final long peer;

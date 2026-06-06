@@ -32,8 +32,6 @@ package com.codename1.impl.windows;
  *
  * <p>Peers (render targets, fonts, images, files, connections) are opaque
  * native pointers passed across as {@code long}; 0 means none/failure.</p>
- *
- * @author Codename One
  */
 public final class WindowsNative {
     private WindowsNative() {
