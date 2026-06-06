@@ -216,3 +216,77 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+  native-android:
+    name: Android billing-bridge purchase (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-android-purchase-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-android-purchase-
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-purchase-${{ hashFiles('scripts/hellocodenameone/**/build.gradle*', 'Ports/Android/build.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-purchase-
+            ${{ runner.os }}-gradle-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Build Hello Codename One Android app
+        id: build-android-app
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-android-app.sh -q -DskipTests
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Android purchase instrumentation test (targeted)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          # Run ONLY the purchase bridge test; it self-asserts by scraping
+          # logcat for the CN1SS:IAP:SUBMITTED marker. Avoids the full
+          # screenshot DeviceRunner suite.
+          script: |
+            cd "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.class=com.codenameone.examples.hellocodenameone.PurchaseBillingInstrumentationTest
+      - name: Upload Android purchase test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-purchase-tests
+          path: ${{ steps.build-android-app.outputs.gradle_project_dir }}/app/build/reports/androidTests
+          if-no-files-found: warn
+          retention-days: 14
