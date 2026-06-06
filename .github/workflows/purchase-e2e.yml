@@ -1,0 +1,108 @@
+name: Purchase E2E (IAP)
+
+# Focused, path-gated check for the In-App-Purchase / ReceiptStore stack.
+# Triggers only when the purchase surface changes so it pages reviewers fast
+# instead of waiting for the full PR matrix.
+#
+# Layers (see scripts/ios/purchase-tests/README.md and
+# scripts/android/purchase-tests/README.md):
+#   - core-tests  : JavaSE-simulator unit tests of the cross-platform receipt
+#                   sync state machine (Purchase / ReceiptStore), including the
+#                   #5186 regression guard that the store is shared across the
+#                   fresh Purchase instances every port hands out.
+#   - native-ios  : (added with the iOS harness) hosted XCTest + StoreKitTest
+#                   SKTestSession driving a real purchase through the StoreKit
+#                   observer into a recording ReceiptStore.
+#   - native-android : (added with the Android harness) instrumentation test
+#                   injecting a fake IBillingSupport and asserting the bridge
+#                   drives the Java Purchase flow.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/payment/**'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
+      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
+      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
+      - 'scripts/ios/purchase-tests/**'
+      - 'scripts/android/purchase-tests/**'
+      - 'scripts/run-ios-purchase-tests.sh'
+      - '.github/workflows/purchase-e2e.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/payment/**'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
+      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
+      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
+      - 'scripts/ios/purchase-tests/**'
+      - 'scripts/android/purchase-tests/**'
+      - 'scripts/run-ios-purchase-tests.sh'
+      - '.github/workflows/purchase-e2e.yml'
+
+permissions:
+  contents: read
+  # Required to pull the pr-ci-container image from ghcr.io.
+  packages: read
+
+concurrency:
+  group: purchase-e2e-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: Core receipt-sync unit tests (JavaSE)
+    runs-on: ubuntu-latest
+    # Same container the main PR workflow uses; it ships JDK 8/17/21 and
+    # cn1-binaries pre-staged at /opt/cn1-binaries.
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select JDK 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
+          echo "${JAVA_HOME_8}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-purchase-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-purchase-
+            ${{ runner.os }}-m2-
+
+      - name: Run Purchase / ReceiptStore unit tests
+        working-directory: maven
+        run: |
+          set -euo pipefail
+          # PurchaseTest covers the receipt sync state machine and the #5186
+          # regression guard (receiptStore shared across fresh Purchase
+          # instances).  -am builds core + factory first.
+          mvn -B -Dmaven.javadoc.skip=true \
+              -DunitTests=true \
+              -Plocal-dev-javase \
+              -P unittests \
+              -pl core-unittests -am \
+              test \
+              -Dtest='PurchaseTest,ProductTest,ApplePromotionalOfferTest' \
+              -Dsurefire.failIfNoSpecifiedTests=false
