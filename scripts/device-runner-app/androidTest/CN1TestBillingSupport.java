@@ -32,6 +32,7 @@ public class CN1TestBillingSupport implements IBillingSupport {
     }
 
     private void fireSyntheticPurchase() {
+        System.out.println("CN1SS:IAP_FAKE fired postReceipt for " + TEST_TX_ID);
         Purchase.postReceipt(Receipt.STORE_CODE_PLAY, TEST_SKU, TEST_TX_ID,
                 System.currentTimeMillis(), "{\"orderId\":\"GPA.TEST-0001\"}");
     }

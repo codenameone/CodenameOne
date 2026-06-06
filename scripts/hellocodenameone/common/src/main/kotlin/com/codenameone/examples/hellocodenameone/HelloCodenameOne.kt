@@ -48,6 +48,11 @@ open class HelloCodenameOne : Lifecycle() {
         // path is gated out of every CI build and never gets compiled.
         try {
             Purchase.getInAppPurchase().setReceiptStore(RecordingReceiptStore())
+            // Drain any receipts already enqueued before the store was installed
+            // (e.g. the Android instrumentation fake fires a purchase from the
+            // activity's onCreate, which can race ahead of this init). Sensible
+            // for a real app too: submit pending purchases once the store exists.
+            Purchase.getInAppPurchase().synchronizeReceipts()
             System.out.println("CN1SS:IAP_DIAG installed=true")
         } catch (t: Throwable) {
             System.out.println("CN1SS:IAP_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
