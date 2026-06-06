@@ -292,6 +292,7 @@ jobs:
           path: |
             maven/core/target/classes
             maven/windows/target/classes
+            maven/cn1-ads-mock/target/classes
           if-no-files-found: error
           retention-days: 1
 
