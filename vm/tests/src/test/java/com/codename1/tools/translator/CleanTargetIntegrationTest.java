@@ -634,6 +634,12 @@ class CleanTargetIntegrationTest {
         Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
         Path commonClasses = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
                 .normalize().toAbsolutePath();
+        // cn1-ads-mock is a Maven dependency of the app (used by AdsScreenshotTest),
+        // not compiled into common/target/classes, so add its classes as a source
+        // root or the translator can't emit MockAdProvider and the C build fails on
+        // its missing header. Built by the CI install step alongside core + plugin.
+        Path adsMockClasses = Paths.get("..", "..", "maven", "cn1-ads-mock", "target", "classes")
+                .normalize().toAbsolutePath();
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
                 "codenameone-core must be built (maven/core/target/classes)");
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/windows/WindowsImplementation.class")),
@@ -669,7 +675,8 @@ class CleanTargetIntegrationTest {
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         String cp = coreClasses + java.io.File.pathSeparator + portClasses
-                + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir;
+                + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir
+                + java.io.File.pathSeparator + adsMockClasses;
         List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
                 "-source", config.targetVersion, "-target", config.targetVersion,
                 "-classpath", cp, "-d", classesDir.toString(),
@@ -689,7 +696,7 @@ class CleanTargetIntegrationTest {
 
         Path outputDir = Files.createTempDirectory("winhello-out");
         String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
-                + portClasses + ";" + javaApiDir + ";" + nativeStage;
+                + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + adsMockClasses;
         String prevConcrete = System.getProperty("cn1.concreteImplementation");
         System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
         try {
