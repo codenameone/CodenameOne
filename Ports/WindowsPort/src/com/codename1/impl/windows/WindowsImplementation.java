@@ -1298,11 +1298,105 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* ---------------------------------------------------------- input keys */
 
+    private Component currentEditing;
+
+    /**
+     * Native input is supported: while a TextField/TextArea is edited it is
+     * overlaid by a real Win32 EDIT control with a native caret, selection,
+     * keyboard and IME -- so {@code TextArea} routes here instead of the
+     * lightweight (CN1-drawn) editor.
+     */
     @Override
-    public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        // Native text editing / IME is a later-phase enhancement; the lightweight
-        // editing path remains usable in the meantime.
-        WindowsNative.nativeLog("WindowsImplementation.editString: native editing not wired yet");
+    public boolean isNativeInputSupported() {
+        return true;
+    }
+
+    /**
+     * Synchronous edit mode: {@link #editString} blocks (releasing the EDT via
+     * invokeAndBlock) until the native control commits, then returns the value
+     * through {@code onEditingComplete}.
+     */
+    @Override
+    public boolean isAsyncEditMode() {
+        return false;
+    }
+
+    @Override
+    public boolean isEditingText(Component c) {
+        return currentEditing == c;
+    }
+
+    @Override
+    public boolean isEditingText() {
+        return currentEditing != null;
+    }
+
+    /**
+     * Overlays a native Win32 EDIT control at the component's bounds, lets the
+     * user type (native caret / selection / IME / clipboard), and writes the
+     * result back through {@code Display.onEditingComplete} when they commit
+     * (Enter on a single-line field, or focus loss). The EDT is parked in
+     * invokeAndBlock -- so the form stays responsive and repaints -- while the
+     * control, which lives on the window's pump thread, owns the keystrokes.
+     */
+    @Override
+    public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        boolean singleLine = true;
+        if (cmp instanceof com.codename1.ui.TextArea) {
+            singleLine = ((com.codename1.ui.TextArea) cmp).isSingleLineTextArea();
+        }
+        int x = cmp.getAbsoluteX() + cmp.getScrollX();
+        int y = cmp.getAbsoluteY() + cmp.getScrollY();
+        int w = cmp.getWidth();
+        int h = cmp.getHeight();
+        final long peer = WindowsNative.editStringAt(x, y, w, h, text == null ? "" : text,
+                singleLine, maxSize);
+        if (peer == 0) {
+            // No native window (headless) -> nothing to edit; complete with the
+            // existing text so a caller awaiting the callback still proceeds.
+            Display.getInstance().onEditingComplete(cmp, text);
+            return;
+        }
+        currentEditing = cmp;
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                while (!WindowsNative.editIsDone(peer)) {
+                    try {
+                        Thread.sleep(16);
+                    } catch (InterruptedException ignore) {
+                    }
+                }
+            }
+        });
+        String result = WindowsNative.editGetText(peer);
+        WindowsNative.editClose(peer);
+        currentEditing = null;
+        Display.getInstance().onEditingComplete(cmp, result != null ? result : text);
+    }
+
+    /* ----------------------------------------------------------- clipboard */
+
+    /**
+     * Copies text to the real Windows clipboard so it pastes into other apps.
+     * Non-string objects keep the in-memory lightweight clipboard (via super) for
+     * round-tripping within the app. {@code getPasteDataFromClipboard} prefers the
+     * system clipboard and falls back to the lightweight one.
+     */
+    @Override
+    public void copyToClipboard(Object obj) {
+        if (obj instanceof String) {
+            WindowsNative.clipboardSetText((String) obj);
+        }
+        super.copyToClipboard(obj);
+    }
+
+    @Override
+    public Object getPasteDataFromClipboard() {
+        String text = WindowsNative.clipboardGetText();
+        if (text != null) {
+            return text;
+        }
+        return super.getPasteDataFromClipboard();
     }
 
     @Override

@@ -292,6 +292,27 @@ public final class WindowsNative {
      */
     public static native byte[] resourceBytes(String name);
 
+    /* ------------------------------------------------- native text editing */
+
+    /**
+     * Overlays a native Win32 EDIT control at the component's pixel bounds with
+     * the given text, focuses it, and returns an opaque peer (0 when there is no
+     * host window, e.g. headless). {@code singleLine} commits on Enter; a
+     * multi-line control inserts newlines and commits on focus loss. The control
+     * is created on the pump thread; the EDT polls {@link #editIsDone(long)}.
+     */
+    public static native long editStringAt(int x, int y, int w, int h, String text,
+            boolean singleLine, int maxSize);
+
+    /** True once the user has committed the native edit (Enter / focus loss). */
+    public static native boolean editIsDone(long peer);
+
+    /** The native EDIT control's current text. */
+    public static native String editGetText(long peer);
+
+    /** Tears down the native EDIT control. */
+    public static native void editClose(long peer);
+
     public static native long fileOpenRead(String path);
 
     public static native long fileOpenWrite(String path, boolean append);

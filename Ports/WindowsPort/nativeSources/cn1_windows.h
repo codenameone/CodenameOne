@@ -214,6 +214,13 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 #define WM_CN1_BROWSER (WM_APP + 17)
 void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam);
 
+/* Native in-place text editing (cn1_windows_edit.c). The EDIT control must be
+ * created/destroyed on the pump thread that owns the window; the EDT-facing
+ * editStringAt/editClose post WM_CN1_EDIT to cn1Win.hwnd and cn1WinWndProc
+ * forwards it here. */
+#define WM_CN1_EDIT (WM_APP + 18)
+void cn1WinEditHandleMessage(WPARAM wParam, LPARAM lParam);
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);

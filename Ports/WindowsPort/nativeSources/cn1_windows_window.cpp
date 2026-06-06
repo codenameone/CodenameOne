@@ -378,6 +378,10 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* WebView2 operation marshaled from the EDT (cn1_windows_browser.cpp). */
             cn1WinBrowserHandleMessage(wParam, lParam);
             return 0;
+        case WM_CN1_EDIT:
+            /* Native EDIT-control op marshaled from the EDT (cn1_windows_edit.c). */
+            cn1WinEditHandleMessage(wParam, lParam);
+            return 0;
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);
@@ -414,8 +418,11 @@ int cn1WinCreateWindow(const char* utf8Title, int width, int height) {
     WCHAR* wTitle = (WCHAR*) malloc((size_t) titleLen * sizeof(WCHAR));
     MultiByteToWideChar(CP_UTF8, 0, utf8Title, -1, wTitle, titleLen);
 
+    /* WS_CLIPCHILDREN so the Direct2D present does not paint over native child
+     * controls overlaid on the form (the WebView2 browser peer and the EDIT
+     * control used for native text editing). */
     cn1Win.hwnd = CreateWindowExW(0, L"CodenameOneWindow", wTitle,
-            WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT, width, height,
             NULL, NULL, hInstance, NULL);
     free(wTitle);
     return cn1Win.hwnd != NULL ? 1 : 0;
