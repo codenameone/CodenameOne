@@ -239,12 +239,14 @@ public class WindowsCameraImpl extends CameraImpl {
             return;
         }
         running = true;
+        // Note: Thread.setDaemon is absent from the ParparVM clean target's minimal
+        // java.lang.Thread, so the loop must terminate on its own -- close()/pause()
+        // clear `running` and the headless capture force-exits the process anyway.
         frameThread = new Thread(new Runnable() {
             public void run() {
                 frameLoop();
             }
         }, "cn1-win-camera-frames");
-        frameThread.setDaemon(true);
         frameThread.start();
     }
 
