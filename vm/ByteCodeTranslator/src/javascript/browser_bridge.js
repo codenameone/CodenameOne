@@ -1035,6 +1035,23 @@
     }
     var ops = r.ops || [];
     var opCount = r.opCount | 0;
+    if (id === SURF_DISPLAY_ID) {
+      // Give the DISPLAY context a clean baseline before replaying this frame.
+      // A draw op (e.g. a decorated drawString or a gradient) can record an
+      // unbalanced save/clip/transform; the recorded frame's single save/restore
+      // then pops the wrong level and leaks a clip that INTERSECTS into every
+      // later frame -- the drawable region shrinks to nothing and the display
+      // freezes (observed: the whole graphics/chart/theme block captured a stale
+      // frame after DrawStringDecorated). Popping any outstanding saves and
+      // forcing identity here defeats that leak; the recorded ops re-establish
+      // the crop. restore() on an empty stack is a no-op, and this resets context
+      // STATE only -- pixels are untouched so partial-frame updates still
+      // composite correctly.
+      for (var __ri = 0; __ri < 64; __ri++) {
+        s.ctx.restore();
+      }
+      s.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
     replaySurfaceCommands(s.ctx, ops, opCount, r.nums || [], r.objs || []);
     // Surface flushes replay straight onto the canvas context, bypassing the
     // jso-bridge ``noteDrawTarget`` path that tracks per-canvas paintCount /

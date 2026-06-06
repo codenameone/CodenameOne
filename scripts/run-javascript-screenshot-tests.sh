@@ -159,4 +159,19 @@ if [ "$meaningful_decoded_count" -eq 0 ]; then
   comment_rc=12
 fi
 
+# Sanity gate. A capture bug (frozen / wrong surface) makes many DIFFERENT tests
+# deliver the IDENTICAL image -- that is never a legitimate golden change, so fail
+# the job on a duplicate-image cluster. Heavy per-test mismatch is reported (so it
+# is visible in the log) but NOT failed here, because a real rendering change is
+# reviewed and reseeded via the screenshot comment. This guards against reading a
+# capture bug as "green" (e.g. mistaking the constant tolerance threshold in
+# screenshot-compare.json for the measured mismatch_percent).
+SANITY_SCRIPT="$SCRIPT_DIR/lint/jsport-screenshot-sanity.py"
+if [ -f "$SANITY_SCRIPT" ] && [ -f "$COMPARE_JSON" ] && command -v python3 >/dev/null 2>&1; then
+  if ! python3 "$SANITY_SCRIPT" "$COMPARE_JSON" "$SCREENSHOT_RAW_DIR" --max-wrong 9999 --dup-cluster 5; then
+    rj_log "ERROR: screenshot sanity check failed -- a duplicate-image cluster means the capture grabbed the wrong/stale surface, not a per-test render."
+    comment_rc=12
+  fi
+fi
+
 exit $comment_rc
