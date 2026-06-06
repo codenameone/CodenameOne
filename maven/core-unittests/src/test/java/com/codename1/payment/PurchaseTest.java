@@ -5,6 +5,7 @@ import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
@@ -288,6 +289,54 @@ class PurchaseTest extends UITestBase {
                 "Synchronize callback must fire exactly once, not once per drained receipt");
         assertTrue(result[0]);
         assertEquals(3, store.getSubmittedReceipts().size());
+    }
+
+    @FormTest
+    void testReceiptStoreSharedAcrossFreshPurchaseInstances() {
+        // Regression test for #5186: Display.getInAppPurchase() returns a
+        // FRESH Purchase instance on every call on every real port (iOS
+        // ZoozPurchase, Android ZoozPurchase, the JavaSE anonymous subclass).
+        // The native receipt path enters through the static
+        // Purchase.postReceipt(...) which calls getInAppPurchase().postReceipt(r)
+        // on yet another fresh instance.  If receiptStore were a per-instance
+        // field, the store installed by the app would be invisible to that
+        // instance and submitReceipt would never fire.  This test pins the
+        // ports' behaviour with a factory so it fails if receiptStore stops
+        // being shared across instances.
+        implementation.setInAppPurchase(null);
+        implementation.setInAppPurchaseFactory(new TestCodenameOneImplementation.InAppPurchaseFactory() {
+            public Purchase create() {
+                return new TestPurchase();
+            }
+        });
+        try {
+            TestReceiptStore store = new TestReceiptStore();
+
+            // Sanity-check the harness reproduces the ports' behaviour: each
+            // getInAppPurchase() call yields a distinct instance.
+            assertNotSame(Display.getInstance().getInAppPurchase(),
+                    Display.getInstance().getInAppPurchase(),
+                    "Factory must hand out a fresh Purchase per call, like the real ports");
+
+            // Configure the store on ONE freshly-returned instance...
+            ((Purchase) Display.getInstance().getInAppPurchase()).setReceiptStore(store);
+
+            // ...then drive the native entry point, which internally uses a
+            // DIFFERENT freshly-returned instance.
+            Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, "pro", "tx-shared",
+                    System.currentTimeMillis(), "order-shared");
+            flushSerialCalls();
+
+            assertEquals(1, store.getSubmittedReceipts().size(),
+                    "ReceiptStore set on one Purchase instance must be visible to the native "
+                            + "postReceipt path that arrives on a different instance");
+            assertEquals("tx-shared", store.getSubmittedReceipts().get(0).getTransactionId());
+            assertTrue(((Purchase) Display.getInstance().getInAppPurchase()).getPendingPurchases().isEmpty(),
+                    "Successfully submitted receipt should be drained from the pending queue");
+        } finally {
+            ((Purchase) Display.getInstance().getInAppPurchase()).setReceiptStore(null);
+            implementation.setInAppPurchaseFactory(null);
+        }
     }
 
     @FormTest
