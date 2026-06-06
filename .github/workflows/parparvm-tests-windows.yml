@@ -230,76 +230,46 @@ jobs:
         shell: pwsh
         run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
 
-      # Build codenameone-core + the Windows port so the translator can read
-      # their compiled classes (maven/core/target/classes, maven/windows/...).
-      - name: Build core + Windows port (JDK 8)
+      # Install the locally-built artifacts the hellocodenameone Maven build needs:
+      # codename1-core + the Windows port (translator inputs), the codenameone
+      # maven plugin (runs transcode-svg / css / annotation processing during the
+      # app build, '-am' also builds its svg-/lottie-transcoder + css-compiler
+      # deps), and cn1-ads-mock (a common-module dependency). With these in the
+      # local repo the sample resolves the 8.0-SNAPSHOT it pins and builds with the
+      # plugin exactly like a fresh initializr project.
+      - name: Build core + Windows port + CN1 maven plugin (JDK 8)
         working-directory: maven
         shell: pwsh
         # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
         # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
-        run: mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+        run: mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
-      # Build the standalone SVG/Lottie transcoder CLI (jar-with-dependencies).
-      # The common-build step below runs it to emit the GeneratedSVGImage +
-      # SVGRegistry classes that make the SVG / Lottie screenshots render -- the
-      # raw kotlinc/javac app build doesn't run the codenameone-maven-plugin
-      # transcode-svg goal that produces them otherwise.
-      - name: Build the SVG/Lottie transcoder CLI
-        shell: pwsh
-        run: mvn -B -f maven/pom.xml -pl lottie-transcoder -am package -DskipTests '-Dmaven.javadoc.skip=true'
-        continue-on-error: true
-
-      # Build the real hellocodenameone screenshot app (Kotlin + Java + all
-      # *ScreenshotTest classes) into common/target/classes, which the capture test
-      # translates into the native exe. The module's Maven build pulls in the CN1
-      # app plugin (network bootstrap, GUI/CSS codegen, device tmpProject) and needs
-      # a JDK-17 toolchain for the Java sources while Kotlin 1.6.0 must run on a
-      # JDK <= 16 -- too entangled for CI. Instead compile directly, exactly as
-      # scripts/windows/build-hello.bat does: standalone kotlinc (JDK 8, joint with
-      # the Java sources for cross-references) emits the Kotlin classes, then javac
-      # (JDK 17, --release 17) compiles the Java against core + those classes.
-      - name: Build hellocodenameone-common (kotlinc + javac)
+      # Build the hellocodenameone screenshot app into common/target/classes, which
+      # the capture test translates into the native exe. This is a plain Maven build
+      # of the sample on JDK 17 -- exactly what a fresh initializr project does -- so
+      # the codenameone-maven-plugin runs transcode-svg (emitting the
+      # GeneratedSVGImage classes + SVGRegistry), css, and annotation processing
+      # automatically; nothing here is Windows-port specific. Kotlin 1.6.0 compiles
+      # fine on JDK 17 (jvm-target 1.8 is the output bytecode level, not the runtime
+      # JDK). The codename1 install bootstrap profile is gated on a missing
+      # ~/.codenameone/guibuilder.jar -- we built the artifacts locally, so seed an
+      # empty marker to skip that network step.
+      - name: Build hellocodenameone-common (Maven, JDK 17)
         shell: pwsh
         env:
-          JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_17_HOME: ${{ env.JDK_17_HOME }}
         run: |
           $ErrorActionPreference = 'Stop'
-          Invoke-WebRequest -Uri 'https://github.com/JetBrains/kotlin/releases/download/v1.6.0/kotlin-compiler-1.6.0.zip' -OutFile kc.zip
-          Expand-Archive -Force kc.zip -DestinationPath kc
-          $core = "$PWD/maven/core/target/classes"
-          $common = "$PWD/scripts/hellocodenameone/common"
-          $out = "$common/target/classes"
-          New-Item -ItemType Directory -Force $out | Out-Null
-          $env:JAVA_HOME = $env:JDK_8_HOME
-          # AdsScreenshotTest (from the advertising PR) uses com.codename1.ads.mock.
-          # MockAdProvider, which lives in the separate cn1-ads-mock module rather
-          # than core, so compile that one source alongside common (the Maven build
-          # pulls it in as a dependency; this raw kotlinc/javac path must add it).
-          $mockSrc = "$PWD/maven/cn1-ads-mock/src/main/java"
-          & "$PWD/kc/kotlinc/bin/kotlinc.bat" -d $out -classpath $core -jvm-target 1.8 "$common/src/main/kotlin" "$common/src/main/java" $mockSrc
-          if ($LASTEXITCODE -ne 0) { throw "kotlinc failed" }
-          $stdlib = "$PWD/kc/kotlinc/lib/kotlin-stdlib.jar"
-          # Transcode SVG/Lottie assets -> com.codename1.generated.svg.* + SVGRegistry
-          # so SVGRegistry.installGlobal (called by the launcher) registers the real
-          # GeneratedSVGImage instances and the SVG/Lottie screenshots render.
-          # Best-effort: if the CLI jar is absent the suite still runs with the 1x1
-          # placeholders the CSS compiler left.
-          $gen = "$common/target/generated-svg"
-          New-Item -ItemType Directory -Force $gen | Out-Null
-          $cli = Get-ChildItem "$PWD/maven/lottie-transcoder/target" -Filter "*-jar-with-dependencies.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($cli) {
-            & "$env:JDK_17_HOME/bin/java" -jar $cli.FullName "$common/src/main/css" $gen "com.codename1.generated.svg"
-            if ($LASTEXITCODE -ne 0) { Write-Host "transcoder CLI failed (continuing with SVG placeholders)" }
-          } else {
-            Write-Host "transcoder CLI jar not found (continuing with SVG placeholders)"
+          $env:JAVA_HOME = $env:JDK_17_HOME
+          New-Item -ItemType Directory -Force "$env:USERPROFILE/.codenameone" | Out-Null
+          if (!(Test-Path "$env:USERPROFILE/.codenameone/guibuilder.jar")) {
+            New-Item -ItemType File -Force "$env:USERPROFILE/.codenameone/guibuilder.jar" | Out-Null
           }
-          $srcs = @(Get-ChildItem -Recurse "$common/src/main/java" -Filter *.java | ForEach-Object { $_.FullName })
-          $srcs += @(Get-ChildItem -Recurse $mockSrc -Filter *.java | ForEach-Object { $_.FullName })
-          $srcs += @(Get-ChildItem -Recurse $gen -Filter *.java -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-          & "$env:JDK_17_HOME/bin/javac" -nowarn -encoding UTF-8 --release 17 -cp "$core;$stdlib;$out" -d $out $srcs
-          if ($LASTEXITCODE -ne 0) { throw "javac failed" }
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          if ($LASTEXITCODE -ne 0) { throw "hellocodenameone-common Maven build failed" }
+          $out = "scripts/hellocodenameone/common/target/classes"
           if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
+          if (!(Test-Path "$out/com/codename1/generated/svg/SVGRegistry.class")) { throw "transcode-svg did not produce SVGRegistry" }
 
       - name: Upload hellocodenameone-common classes
         uses: actions/upload-artifact@v4

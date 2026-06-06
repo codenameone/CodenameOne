@@ -35,6 +35,7 @@ import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Calendar;
@@ -1367,15 +1368,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * Resolves a classpath-style resource (e.g. {@code /theme.res}) to a file
-     * shipped next to the executable. The ParparVM clean target has no embedded
-     * classpath resources, so app resources travel alongside the exe. Returns
-     * null when the resource is absent.
+     * Resolves a classpath-style resource (e.g. {@code /theme.res}). The ParparVM
+     * windows target embeds the app's classpath resources into the executable's PE
+     * resource section, so they are served straight from the exe -- a single
+     * self-contained binary, the Windows analog of the iOS .app bundle. Falls back
+     * to a file shipped next to the executable (a dev/debug convenience for
+     * resources that were staged rather than embedded). Returns null when absent.
      */
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
         if (resource == null) {
             return null;
+        }
+        byte[] embedded = WindowsNative.resourceBytes(resource);
+        if (embedded != null) {
+            return new ByteArrayInputStream(embedded);
         }
         String dir = WindowsNative.executableDir();
         if (dir == null) {

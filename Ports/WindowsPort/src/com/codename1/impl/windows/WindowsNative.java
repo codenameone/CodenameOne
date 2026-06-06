@@ -278,6 +278,14 @@ public final class WindowsNative {
 
     /* ------------------------------------------------------- filesystem */
 
+    /**
+     * The bytes of a classpath resource embedded in the executable's PE resource
+     * section (e.g. {@code "/theme.res"}), or {@code null} when no such resource
+     * was embedded. Resources are baked in by the ParparVM windows target so the
+     * single .exe is self-contained -- the Windows analog of the iOS .app bundle.
+     */
+    public static native byte[] resourceBytes(String name);
+
     public static native long fileOpenRead(String path);
 
     public static native long fileOpenWrite(String path, boolean append);

@@ -713,7 +713,6 @@ class CleanTargetIntegrationTest {
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
         Path stagedTheme = exe.resolveSibling("windowsNativeTheme.res");
-        Path stagedAppTheme = exe.resolveSibling("theme.res");
 
         // The Windows native theme = the full material theme. The port has no
         // built-in native look, so this is what gives every component its
@@ -721,41 +720,19 @@ class CleanTargetIntegrationTest {
         // buttons, FAB, sheet, ...) and -- crucially -- the $Dark<UIID> variants
         // that make the *_dark screenshot tiles actually render dark. It's the
         // same theme Android ships. installNativeTheme() loads it; the app theme
-        // below layers over it via @includeNativeBool.
+        // layers over it via @includeNativeBool.
         Path materialTheme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
         if (Files.exists(materialTheme)) {
             Files.copy(materialTheme, stagedTheme, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        // The app theme = the project's own theme.css compiled headless with the
-        // no-cef CSS compiler. It holds the CSS-gradient tiles + the SVG/Lottie
-        // url() background UIIDs + the Button font, and is loaded over the native
-        // theme by the launcher (UIManager.initFirstTheme("/theme")). If the
-        // css-compiler jar isn't built or the compile fails the app theme is
-        // simply absent -- the suite still runs on the material native look.
-        try {
-            Path cssDir = Paths.get("..", "..", "maven", "css-compiler", "target").normalize().toAbsolutePath();
-            Path cssJar = null;
-            if (Files.isDirectory(cssDir)) {
-                try (java.util.stream.Stream<Path> s = Files.list(cssDir)) {
-                    cssJar = s.filter(p -> p.getFileName().toString().endsWith("-jar-with-dependencies.jar"))
-                            .findFirst().orElse(null);
-                }
-            }
-            Path themeCss = Paths.get("..", "..", "scripts", "hellocodenameone", "common", "src", "main", "css", "theme.css")
-                    .normalize().toAbsolutePath();
-            if (cssJar != null && Files.exists(themeCss)) {
-                String javaBin = Paths.get(System.getProperty("java.home"), "bin",
-                        CompilerHelper.executableName("java")).toString();
-                ProcessBuilder pb = new ProcessBuilder(javaBin, "-jar", cssJar.toString(),
-                        "-input", themeCss.toString(), "-output", stagedAppTheme.toString());
-                pb.inheritIO();
-                pb.start().waitFor();
-            }
-        } catch (Exception themeCompileFailed) {
-            // Non-fatal: the app theme is an overlay; the material native theme
-            // still drives the component look and dark mode.
-        }
+        // The app theme (the project's compiled theme.css -- CSS-gradient tiles, the
+        // SVG/Lottie url() background UIIDs, the Button font) is not staged here: the
+        // Maven build of hellocodenameone-common compiles it to theme.res (CEF-backed,
+        // so CSS the no-cef compiler rejects -- e.g. bg-type -- works), and the
+        // windows target embeds that theme.res from the app classes into the exe's PE
+        // resource section. The launcher's UIManager.initFirstTheme("/theme") then
+        // loads it straight out of the executable via getResourceAsStream.
 
         // The material icon font. The DirectWrite loader resolves bundled
         // TrueType fonts by reading the ttf from the executable directory
