@@ -49,3 +49,6 @@ bbox
 wordmark
 googlemaps
 foldables?
+
+# WebSocket spec term (Sec-WebSocket-Protocol negotiation).
+[Ss]ubprotocols?
