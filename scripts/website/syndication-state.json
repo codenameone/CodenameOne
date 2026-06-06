@@ -125,6 +125,39 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-02T01:34:44+00:00"
       }
+    },
+    "metal-default-new-build-cloud-and-a-new-format": {
+      "devto": {
+        "id": 3828546,
+        "url": "https://dev.to/codenameone/metal-default-a-new-build-cloud-and-a-new-format-11hg",
+        "syndicated_at": "2026-06-05T13:58:05+00:00"
+      },
+      "foojay": {
+        "id": 124128,
+        "url": "https://foojay.io/wp-admin/post.php?post=124128&action=edit",
+        "preview_url": "https://foojay.io/?p=124128",
+        "featured_media_id": 124127,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-05T13:59:11+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/1945f698dd28/edit",
+        "syndicated_at": "2026-06-05T15:01:09+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3658581/edit.html",
+        "syndicated_at": "2026-06-05T15:02:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq120nmg001h1sq14zpg0q1j",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a22e50abdc172ef8847e8b0",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-05T15:03:31+00:00"
+      }
     }
   }
 }
