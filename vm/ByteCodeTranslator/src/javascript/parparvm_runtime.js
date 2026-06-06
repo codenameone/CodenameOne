@@ -4153,6 +4153,15 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   return null;
 });
 bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return Date.now(); });
+bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function*() {
+  // performance.now() is a high-resolution monotonic clock (sub-millisecond,
+  // in fractional milliseconds) and is available in both window and worker
+  // scopes. Fall back to the wall clock if it is somehow absent.
+  if (typeof performance !== "undefined" && performance && typeof performance.now === "function") {
+    return Math.floor(performance.now() * 1e6);
+  }
+  return Date.now() * 1e6;
+});
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
   for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
