@@ -20,6 +20,9 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The Hugo build embeds JavaDocs produced by this script, so a change
+      # to how the docs are generated must redeploy the website too.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -34,6 +37,9 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The Hugo build embeds JavaDocs produced by this script, so a change
+      # to how the docs are generated must redeploy the website too.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
 
