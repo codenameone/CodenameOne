@@ -52,6 +52,12 @@ void* cn1dwCreateFormat(const wchar_t* family, float sizePx, int bold, int itali
  * Idempotent per family. Returns 0 if the file can't be loaded. */
 int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen);
 
+/* As cn1dwRegisterFontFile, but registers the font from a block of memory (the
+ * embedded PE-resource bytes of a bundled font) via the DirectWrite in-memory
+ * font-file loader -- no file on disk, so the executable stays self-contained.
+ * The loader copies the data, so the buffer need not outlive the call. */
+int cn1dwRegisterFontMemory(const void* data, unsigned int len, wchar_t* outFamily, int outLen);
+
 /* Vertical metrics, in DIPs, for a text format handle. */
 float cn1dwFontHeight(void* format);
 float cn1dwFontAscent(void* format);

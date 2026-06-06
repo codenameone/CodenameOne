@@ -85,18 +85,19 @@ static IDWriteFontCollection1* cn1dwFindCustom(const wchar_t* family) {
     return nullptr;
 }
 
-extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen) {
-    IDWriteFactory* f = dwFactory();
-    if (f == nullptr || path == nullptr) {
-        return 0;
-    }
-    IDWriteFactory3* f3 = nullptr;
-    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory3), reinterpret_cast<void**>(&f3))) || f3 == nullptr) {
-        cn1WindowsLog("cn1dwRegisterFontFile: IDWriteFactory3 unavailable");
-        return 0;
-    }
+/* In-memory font-file loader, created + registered once and reused for every
+ * embedded font. Lets a bundled TTF be registered straight from the executable's
+ * PE resource bytes (no file on disk) -- the single-exe path. */
+static IDWriteInMemoryFontFileLoader* g_inMemoryLoader = nullptr;
+
+/*
+ * Shared tail of font registration: from an IDWriteFontFile (file- or
+ * memory-backed) build a private collection, remember it by its real family
+ * name, and report that name. Releases nothing it does not own (the caller owns
+ * f3 and file). Returns 1 on success.
+ */
+static int cn1dwRegisterFromFontFile(IDWriteFactory3* f3, IDWriteFontFile* file, wchar_t* outFamily, int outLen) {
     int result = 0;
-    IDWriteFontFile* file = nullptr;
     IDWriteFontSetBuilder* builder = nullptr;
     IDWriteFontSetBuilder1* builder1 = nullptr;
     IDWriteFontSet* set = nullptr;
@@ -110,8 +111,7 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
     /* AddFontFile(IDWriteFontFile*) is on IDWriteFontSetBuilder1, not the base
      * IDWriteFontSetBuilder (which only takes a font-face reference), so query
      * for it. CreateFontSet stays on the base interface (same object). */
-    if (SUCCEEDED(f3->CreateFontFileReference(path, nullptr, &file)) && file != nullptr &&
-            SUCCEEDED(file->Analyze(&supported, &fileType, &faceType, &numFaces)) && supported &&
+    if (SUCCEEDED(file->Analyze(&supported, &fileType, &faceType, &numFaces)) && supported &&
             SUCCEEDED(f3->CreateFontSetBuilder(&builder)) && builder != nullptr &&
             SUCCEEDED(builder->QueryInterface(__uuidof(IDWriteFontSetBuilder1),
                     reinterpret_cast<void**>(&builder1))) && builder1 != nullptr &&
@@ -150,10 +150,72 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
     if (set) { set->Release(); }
     if (builder1) { builder1->Release(); }
     if (builder) { builder->Release(); }
+    return result;
+}
+
+extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, int outLen) {
+    IDWriteFactory* f = dwFactory();
+    if (f == nullptr || path == nullptr) {
+        return 0;
+    }
+    IDWriteFactory3* f3 = nullptr;
+    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory3), reinterpret_cast<void**>(&f3))) || f3 == nullptr) {
+        cn1WindowsLog("cn1dwRegisterFontFile: IDWriteFactory3 unavailable");
+        return 0;
+    }
+    int result = 0;
+    IDWriteFontFile* file = nullptr;
+    if (SUCCEEDED(f3->CreateFontFileReference(path, nullptr, &file)) && file != nullptr) {
+        result = cn1dwRegisterFromFontFile(f3, file, outFamily, outLen);
+    }
     if (file) { file->Release(); }
     f3->Release();
     if (result == 0) {
         cn1WindowsLog("cn1dwRegisterFontFile: failed to load bundled font file");
+    }
+    return result;
+}
+
+/*
+ * Registers a TrueType font from a block of memory (the embedded PE-resource
+ * bytes of a bundled font). Uses the IDWriteFactory5 in-memory font-file loader
+ * so there is no temp file; a null owner makes the loader copy the data, so the
+ * caller's buffer need not outlive this call. Returns 1 and the family name on
+ * success.
+ */
+extern "C" int cn1dwRegisterFontMemory(const void* data, unsigned int len, wchar_t* outFamily, int outLen) {
+    IDWriteFactory* f = dwFactory();
+    if (f == nullptr || data == nullptr || len == 0) {
+        return 0;
+    }
+    IDWriteFactory5* f5 = nullptr;
+    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory5), reinterpret_cast<void**>(&f5))) || f5 == nullptr) {
+        cn1WindowsLog("cn1dwRegisterFontMemory: IDWriteFactory5 unavailable");
+        return 0;
+    }
+    IDWriteFactory3* f3 = nullptr;
+    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory3), reinterpret_cast<void**>(&f3))) || f3 == nullptr) {
+        f5->Release();
+        cn1WindowsLog("cn1dwRegisterFontMemory: IDWriteFactory3 unavailable");
+        return 0;
+    }
+    if (g_inMemoryLoader == nullptr) {
+        if (SUCCEEDED(f5->CreateInMemoryFontFileLoader(&g_inMemoryLoader)) && g_inMemoryLoader != nullptr) {
+            f5->RegisterFontFileLoader(g_inMemoryLoader);
+        }
+    }
+    int result = 0;
+    IDWriteFontFile* file = nullptr;
+    if (g_inMemoryLoader != nullptr &&
+            SUCCEEDED(g_inMemoryLoader->CreateInMemoryFontFileReference(f5, data, len, nullptr, &file))
+            && file != nullptr) {
+        result = cn1dwRegisterFromFontFile(f3, file, outFamily, outLen);
+    }
+    if (file) { file->Release(); }
+    f3->Release();
+    f5->Release();
+    if (result == 0) {
+        cn1WindowsLog("cn1dwRegisterFontMemory: failed to load embedded font");
     }
     return result;
 }

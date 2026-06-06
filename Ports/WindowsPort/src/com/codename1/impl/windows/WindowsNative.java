@@ -253,6 +253,14 @@ public final class WindowsNative {
      */
     public static native long loadTrueTypeFont(String fontName, String fileName);
 
+    /**
+     * Loads a bundled TrueType font from its bytes (read out of the exe's embedded
+     * PE resources) via the DirectWrite in-memory font loader -- no file on disk,
+     * keeping the executable self-contained. Falls back to a system family from
+     * {@code fontName} when {@code data} is null/empty or registration fails.
+     */
+    public static native long loadTrueTypeFontFromMemory(String fontName, byte[] data);
+
     /** Derives a new font peer at the given pixel size and CN1 style/weight bits. */
     public static native long deriveTrueTypeFont(long font, float size, int weight);
 

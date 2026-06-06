@@ -1206,11 +1206,49 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        long font = WindowsNative.loadTrueTypeFont(fontName, fileName);
+        long font = 0;
+        // Bundled TTFs (material-design-font.ttf and any app font) ship as
+        // classpath resources embedded in the exe -- load them straight from the
+        // executable via the DirectWrite in-memory loader so there is no file
+        // next to the exe. Falls back to the file-based loader (a font staged
+        // beside the exe) when the resource isn't embedded.
+        if (fileName != null && fileName.toLowerCase().endsWith(".ttf")) {
+            byte[] data = readResourceFully("/" + fileName);
+            if (data != null) {
+                font = WindowsNative.loadTrueTypeFontFromMemory(fontName, data);
+            }
+        }
+        if (font == 0) {
+            font = WindowsNative.loadTrueTypeFont(fontName, fileName);
+        }
         if (font == 0) {
             return null;
         }
         return Long.valueOf(font);
+    }
+
+    /** Reads an embedded classpath resource fully into a byte[], or null. */
+    private byte[] readResourceFully(String resource) {
+        InputStream in = getResourceAsStream(WindowsImplementation.class, resource);
+        if (in == null) {
+            return null;
+        }
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignore) {
+            }
+        }
     }
 
     @Override

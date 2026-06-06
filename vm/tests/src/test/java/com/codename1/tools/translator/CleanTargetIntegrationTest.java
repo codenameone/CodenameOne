@@ -712,38 +712,16 @@ class CleanTargetIntegrationTest {
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
         Path exe = buildDir.resolve(CompilerHelper.executableName("WinHelloMain"));
         assertTrue(Files.exists(exe), "native executable should be produced: " + exe);
-        Path stagedTheme = exe.resolveSibling("windowsNativeTheme.res");
 
-        // The Windows native theme = the full material theme. The port has no
-        // built-in native look, so this is what gives every component its
-        // styling (checkbox, switch, tabs, text field, multi-button, dialog
-        // buttons, FAB, sheet, ...) and -- crucially -- the $Dark<UIID> variants
-        // that make the *_dark screenshot tiles actually render dark. It's the
-        // same theme Android ships. installNativeTheme() loads it; the app theme
-        // layers over it via @includeNativeBool.
-        Path materialTheme = Paths.get("..", "..", "Themes", "AndroidMaterialTheme.res").normalize().toAbsolutePath();
-        if (Files.exists(materialTheme)) {
-            Files.copy(materialTheme, stagedTheme, StandardCopyOption.REPLACE_EXISTING);
-        }
-
-        // The app theme (the project's compiled theme.css -- CSS-gradient tiles, the
-        // SVG/Lottie url() background UIIDs, the Button font) is not staged here: the
-        // Maven build of hellocodenameone-common compiles it to theme.res (CEF-backed,
-        // so CSS the no-cef compiler rejects -- e.g. bg-type -- works), and the
-        // windows target embeds that theme.res from the app classes into the exe's PE
-        // resource section. The launcher's UIManager.initFirstTheme("/theme") then
-        // loads it straight out of the executable via getResourceAsStream.
-
-        // The material icon font. The DirectWrite loader resolves bundled
-        // TrueType fonts by reading the ttf from the executable directory
-        // (cn1_windows_text.c loadTrueTypeFont), so FontImage glyphs -- the
-        // checkbox check, switch thumb, FAB "+", ImageViewer arrows, toast icon
-        // -- only render when this file sits next to the exe.
-        Path materialFont = Paths.get("..", "..", "CodenameOne", "src", "material-design-font.ttf")
-                .normalize().toAbsolutePath();
-        if (Files.exists(materialFont)) {
-            Files.copy(materialFont, exe.resolveSibling("material-design-font.ttf"), StandardCopyOption.REPLACE_EXISTING);
-        }
+        // Nothing is staged next to the exe: the single executable is fully
+        // self-contained. Its classpath resources are embedded in the exe's PE
+        // resource section by the windows translator target and read via
+        // getResourceAsStream -- the app theme (theme.res, compiled by the Maven
+        // build), the port's native material theme (windowsNativeTheme.res, shipped
+        // in the WindowsPort jar), and the material icon font (material-design-font.ttf,
+        // on codename1-core's classpath; the DirectWrite in-memory loader registers it
+        // straight from the embedded bytes). installNativeTheme() and the launcher's
+        // UIManager.initFirstTheme("/theme") load their .res straight out of the exe.
         return exe;
     }
 

@@ -231,6 +231,29 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawString___long_java_lang_S
  * (Segoe UI) with weight/slant from the suffix; any other name is a literal
  * family.
  */
+/*
+ * Fallback when no bundled TTF was registered: resolve a system family. The
+ * "native:" scheme names (native:MainLight, native:ItalicBold, ...) map to the
+ * platform UI family (Segoe UI) with weight/slant from the suffix; any other
+ * non-empty name is a literal family; otherwise plain Segoe UI.
+ */
+static CN1Font* cn1WinSystemFontForName(const WCHAR* name, float dpi) {
+    const wchar_t* family = L"Segoe UI";
+    int style = 0;
+    if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
+        const wchar_t* suffix = name + 7;
+        if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
+            style |= CN1_STYLE_BOLD;
+        }
+        if (wcsstr(suffix, L"Italic") != NULL) {
+            style |= CN1_STYLE_ITALIC;
+        }
+    } else if (name != NULL && name[0] != L'\0') {
+        family = name;
+    }
+    return cn1WinMakeFont(family, 15.0f * dpi, 0, style);
+}
+
 JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_String_java_lang_String_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     WCHAR* name = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, NULL);
@@ -249,23 +272,41 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_
     }
 
     if (font == NULL) {
-        const wchar_t* family = L"Segoe UI";
-        int style = 0;
-        if (name != NULL && wcsncmp(name, L"native:", 7) == 0) {
-            const wchar_t* suffix = name + 7;
-            if (wcsstr(suffix, L"Bold") != NULL || wcsstr(suffix, L"Black") != NULL) {
-                style |= CN1_STYLE_BOLD;
-            }
-            if (wcsstr(suffix, L"Italic") != NULL) {
-                style |= CN1_STYLE_ITALIC;
-            }
-        } else if (name != NULL && name[0] != L'\0') {
-            family = name;
-        }
-        font = cn1WinMakeFont(family, 15.0f * dpi, 0, style);
+        font = cn1WinSystemFontForName(name, dpi);
     }
     free(name);
     free(fileName);
+    return (JAVA_LONG) (intptr_t) font;
+}
+
+/*
+ * Loads a bundled TrueType font directly from its bytes (the font's embedded
+ * PE-resource data, read out of the exe) via the DirectWrite in-memory loader --
+ * the single-exe path, no file on disk. Falls back to a system family resolved
+ * from the font name (so "native:" scheme names still work) when there are no
+ * bytes or registration fails.
+ */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___java_lang_String_byte_1ARRAY_R_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    WCHAR* name = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, NULL);
+    float dpi = cn1Win.dpiScale > 0.0f ? cn1Win.dpiScale : 1.0f;
+    CN1Font* font = NULL;
+
+    if (__cn1Arg2 != JAVA_NULL) {
+        int len = (*(JAVA_ARRAY) __cn1Arg2).length;
+        void* data = (*(JAVA_ARRAY) __cn1Arg2).data;
+        wchar_t registered[128];
+        registered[0] = L'\0';
+        if (len > 0 && data != NULL
+                && cn1dwRegisterFontMemory(data, (unsigned int) len, registered, 128) && registered[0] != L'\0') {
+            font = cn1WinMakeFont(registered, 15.0f * dpi, 0, 0);
+        }
+    }
+
+    if (font == NULL) {
+        font = cn1WinSystemFontForName(name, dpi);
+    }
+    free(name);
     return (JAVA_LONG) (intptr_t) font;
 }
 
