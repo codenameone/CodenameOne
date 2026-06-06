@@ -295,6 +295,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.flushGraphics(windowGraphicsPeer, 0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
+    /* --------------------------------------------------------------- camera */
+
+    /*
+     * Back the new low-level com.codename1.camera.Camera API with a synthetic
+     * backend (see WindowsCameraImpl) so Camera.isSupported() is true and the API
+     * works end to end on the desktop port. Real Media Foundation webcam capture
+     * is the intended future replacement; until then frames are a fixed synthetic
+     * JPEG. hasCamera() (the legacy Capture API) stays false -- that path has no
+     * native implementation here.
+     */
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new WindowsCameraImpl();
+    }
+
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         WindowsNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
