@@ -57,19 +57,35 @@ public class ImplementationFactory {
 }
 EOF
 
-find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" \
-  | /usr/bin/xargs "$JAVADOC_CMD" \
-    --allow-script-in-comments \
-    --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
-    --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
-    --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
-    --release 8 \
-    -exclude com.codename1.impl \
-    -Xdoclint:none \
-    -quiet \
-    -protected \
-    -d "$CN1_DIR/dist/javadoc" \
-    -windowtitle "Codename One API" || true
+# Collect every source file into a javadoc @argfile and run javadoc exactly
+# once. Piping the list through `xargs javadoc -d <dir>` is unsafe: once the
+# command line exceeds the shell/xargs limit (~128 KiB on GNU xargs) the list is
+# split across multiple javadoc invocations, each regenerating the same output
+# directory. The last batch (the Ports/CLDC11 java.* sources) then clobbers the
+# full API docs, leaving only the CLDC packages. An @argfile has no length limit.
+SOURCES_ARGFILE="$CN1_DIR/build/javadoc-sources.txt"
+find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" > "$SOURCES_ARGFILE"
+
+"$JAVADOC_CMD" \
+  --allow-script-in-comments \
+  --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
+  --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
+  --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
+  --release 8 \
+  -exclude com.codename1.impl \
+  -Xdoclint:none \
+  -quiet \
+  -protected \
+  -d "$CN1_DIR/dist/javadoc" \
+  -windowtitle "Codename One API" \
+  "@$SOURCES_ARGFILE" || true
+
+# Fail loudly if the core API failed to generate. Without this guard a partial
+# build (e.g. only the CLDC java.* packages) ships silently to the website.
+if [ ! -f "$CN1_DIR/dist/javadoc/com/codename1/ui/Component.html" ]; then
+  echo "JavaDoc generation produced no core com.codename1.ui output; aborting." >&2
+  exit 1
+fi
 
 (
   cd "$CN1_DIR/dist/javadoc"

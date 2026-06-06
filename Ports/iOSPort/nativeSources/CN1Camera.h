@@ -24,7 +24,7 @@
 #import "CodenameOne_GLViewController.h"
 #import <Foundation/Foundation.h>
 
-#ifdef INCLUDE_CAMERA_USAGE
+#ifdef INCLUDE_CN1_CAMERA
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
 
@@ -33,7 +33,7 @@
 /// `IOSNative` create / mutate / destroy instances and read frames out
 /// through the AVCaptureVideoDataOutputSampleBufferDelegate.
 ///
-/// Compiled in only when `INCLUDE_CAMERA_USAGE` is defined (i.e. the app
+/// Compiled in only when `INCLUDE_CN1_CAMERA` is defined (i.e. the app
 /// has `NSCameraUsageDescription` set; `AiDependencyTable` does this
 /// automatically when any class in `com.codename1.camera.*` is referenced).
 /// Works on iOS, iPadOS and Mac Catalyst -- AVFoundation has the same
@@ -81,4 +81,4 @@
 
 @end
 
-#endif // INCLUDE_CAMERA_USAGE
+#endif // INCLUDE_CN1_CAMERA
