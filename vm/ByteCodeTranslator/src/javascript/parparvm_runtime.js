@@ -389,6 +389,21 @@ function shouldEnableDiag() {
   return false;
 }
 const VM_DIAG_ENABLED = shouldEnableDiag();
+// Opt-in (URL ?cn1DisableSelfHeal=1) kill switch for the worker's stalled-timer
+// SELF-HEAL recovery backstop. Self-heal masks a real wedge non-deterministically
+// (sometimes it re-arms the lost timer before the suite watchdog, sometimes not),
+// which hides the deterministic root cause. With it OFF a lost/stalled timer
+// STAYS stalled, so the failure is reproducible and trackable. Lazy because the
+// URL search is forwarded from the main thread on START (after this file loads).
+function cn1SelfHealDisabled() {
+  try {
+    return typeof self !== "undefined"
+      && typeof self.getParameterByName === "function"
+      && self.getParameterByName("cn1DisableSelfHeal") === "1";
+  } catch (_e) {
+    return false;
+  }
+}
 
 // Event forwarding (worker-side functions becoming real listeners on the
 // main thread) defaults on because production apps need user input to
@@ -2746,6 +2761,21 @@ const jvm = {
       // ops to the host as a single batch postMessage. Saves
       // hundreds of structured-clone roundtrips per paint frame.
       this.flushPendingFireAndForget();
+      // SCHEDULER INVARIANT: drain() must NEVER return with runnable threads
+      // and no drain pending. A stranded runnable thread (observed at boot as
+      // runnable>=1, draining=0, drainScheduled=0 with a live heartbeat -- the
+      // worker freezes mid-boot) means some enqueue path raced the drain-loop
+      // exit: enqueue() calls drain() directly, which no-ops under the
+      // re-entrancy guard, and if that enqueue landed as the loop was tearing
+      // down, nothing re-arms. This is the correct backstop (not a timeout /
+      // self-heal): re-schedule so the thread actually runs. The DIAG line keeps
+      // the strand visible so the racing enqueue path can still be isolated.
+      if (this.runnable.length && !this.captureGateOwner && !this.drainScheduled) {
+        if (VM_DIAG_ENABLED) {
+          vmTrace("DIAG:DRAIN_RESTRAND:runnable=" + this.runnable.length);
+        }
+        this.scheduleDrain();
+      }
     }
   },
   // Cooperative scheduler bookkeeping: see field comments above.
@@ -2813,6 +2843,18 @@ const jvm = {
     expired.reverse();  // restore registration order for FIFO fairness
     for (let i = 0; i < expired.length; i++) {
       const w = expired[i];
+      // RE-CHECK cancelled. Processing an earlier entry below calls enqueue ->
+      // drain, which runs green threads synchronously; one of them can notify a
+      // monitor and cancel a LATER wait/sleep entry already collected in this
+      // same `expired` batch. Without this re-check we would still fire that
+      // cancelled entry's resumeWaiter for a waiter whose thread has ALREADY
+      // resumed and parked elsewhere (typically a host-call round-trip read) --
+      // resuming it with the wrong value (undefined) so the read returns null.
+      // That was the surface-encode/getRGB "lost response", the flaky transition
+      // wedge, and the encode-fail cascade.
+      if (w.cancelled) {
+        continue;
+      }
       if (w.kind === "sleep") {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
@@ -2832,6 +2874,44 @@ const jvm = {
       }
     }
     this._refreshTimedWakeupTimer();
+  },
+  // Snapshot every live green thread and WHAT it is blocked on. Used by the
+  // dispatch watchdog to isolate a stall deterministically (without a JS
+  // debugger attaching to the worker): a deadlock shows up as the EDT parked on
+  // a monitor/capture-gate whose owner is itself parked. Pure read; safe to call
+  // from a stalled state.
+  dumpThreadStates() {
+    var out = [];
+    var ths = this.threads || [];
+    for (var i = 0; i < ths.length; i++) {
+      var t = ths[i];
+      if (t.done) continue;
+      var w = t.waiting;
+      var desc;
+      if (!w) {
+        desc = "RUNNABLE";
+      } else if (w.op === "monitor_enter") {
+        desc = "monitor_enter";
+      } else if (w.op === "sleep") {
+        desc = "sleep:dueIn=" + (w.entry ? Math.round((w.entry.wakeAt | 0) - this.schedulerNow()) : "?");
+      } else if (w.op === "wait") {
+        desc = "obj.wait";
+      } else if (w.id != null) {
+        var pc = this.pendingHostCalls[w.id];
+        desc = "hostcall:" + (pc && pc.symbol ? pc.symbol : "?")
+          + (pc && pc.jso ? ("{" + pc.jso + "}") : "");
+      } else {
+        desc = String(w.op || "?");
+      }
+      var label;
+      try { label = threadDebugLabel(t.object); } catch (e) { void e; label = "?"; }
+      out.push("t" + t.id + "[" + label + "]:" + desc);
+    }
+    return "THREAD_DUMP:live=" + out.length
+      + ":runnable=" + (this.runnable ? this.runnable.length : -1)
+      + ":captureGateOwner=" + (this.captureGateOwner ? ("t" + this.captureGateOwner.id) : "none")
+      + ":draining=" + (this.draining ? 1 : 0)
+      + " " + out.join(" ");
   },
   handleYield(thread, yielded) {
     if (shouldTraceThread(thread)) {
@@ -2873,7 +2953,10 @@ const jvm = {
     }
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
-      this.pendingHostCalls[yielded.id] = { thread: thread, symbol: yielded.symbol };
+      var __jsoReq = (yielded.symbol === "__cn1_jso_bridge__" && yielded.args && yielded.args[0]) ? yielded.args[0] : null;
+      this.pendingHostCalls[yielded.id] = { thread: thread, symbol: yielded.symbol,
+        jso: __jsoReq ? ((__jsoReq.kind || "?") + "." + (__jsoReq.member || "?")
+          + "@" + (__jsoReq.receiverClass || (__jsoReq.receiver && __jsoReq.receiver.__cn1HostClass) || "?")) : null };
       const rawArgs = yielded.args || [];
       const safeArgs = new Array(rawArgs.length);
       for (let i = 0; i < rawArgs.length; i++) {
@@ -5132,7 +5215,11 @@ if (VM_DIAG_ENABLED && typeof setInterval === "function") {
         for (var ov = 0; ov < tws.length; ov++) {
           if (!tws[ov].cancelled && (tws[ov].wakeAt | 0) <= twNow + 1) { anyOverdue = true; break; }
         }
-        if (anyOverdue) {
+        if (anyOverdue && cn1SelfHealDisabled()) {
+          // Self-heal disabled: leave the lost timer stalled so the wedge is
+          // deterministic + trackable instead of silently recovered.
+          vmTrace("DIAG:WORKER_HB_FROZEN:recovery=SKIPPED(selfHealDisabled) " + jvm.dumpThreadStates());
+        } else if (anyOverdue) {
           try {
             if (jvm._wakeupTimer != null) { clearTimeout(jvm._wakeupTimer); jvm._wakeupTimer = null; jvm._wakeupAt = Infinity; }
             jvm._processExpiredTimedWakeups();

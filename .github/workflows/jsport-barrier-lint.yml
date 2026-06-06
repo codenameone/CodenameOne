@@ -1,0 +1,32 @@
+---
+name: JS port barrier-read lint
+
+# Enforce the surface-id render invariant: the JavaScript port's worker must
+# never read dimensions/pixels back off a canvas / 2D-context host-ref across
+# the worker<->host barrier. Such reads can return a degraded value and livelock
+# invokeJsoBridge's retry, wedging the worker (observed: the EDT parked on
+# getter.width@HTMLCanvasElement during a form transition). Dimensions/pixels are
+# kept Java-side; this lint fails the build on any regression.
+
+'on':
+  pull_request:
+    paths:
+      - 'Ports/JavaScriptPort/src/main/java/**/*.java'
+      - 'scripts/lint/jsport-canvas-barrier-reads.py'
+      - '.github/workflows/jsport-barrier-lint.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'Ports/JavaScriptPort/src/main/java/**/*.java'
+      - 'scripts/lint/jsport-canvas-barrier-reads.py'
+      - '.github/workflows/jsport-barrier-lint.yml'
+
+jobs:
+  barrier-lint:
+    name: JS port canvas barrier-read lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run barrier-read linter
+        run: python3 scripts/lint/jsport-canvas-barrier-reads.py

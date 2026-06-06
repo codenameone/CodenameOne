@@ -203,8 +203,8 @@ public class FileChooser {
         btn.getStyle().setProperty("position", "absolute");
         btn.getStyle().setProperty("top", "0");
         btn.getStyle().setProperty("left", "0");
-        btn.getStyle().setProperty("width", ""+scaleCoord(canvas.getWidth())+"px");
-        btn.getStyle().setProperty("height", ""+scaleCoord(canvas.getHeight())+"px");
+        btn.getStyle().setProperty("width", ""+scaleCoord(HTML5Implementation.displayWidthPx())+"px");
+        btn.getStyle().setProperty("height", ""+scaleCoord(HTML5Implementation.displayHeightPx())+"px");
         btn.getStyle().setProperty("padding", "0");
         btn.getStyle().setProperty("margin", "0");
         //btn.getStyle().setProperty("font-size", "2em");

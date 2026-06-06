@@ -292,11 +292,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
-        public CanvasRenderingContext2D getContext(HTMLCanvasElement canvas) {
-            return (CanvasRenderingContext2D)canvas.getContext("2d");
-        }
-
-        @Override
         public void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height) {
             context.drawImage(image, x, y, width, height);
         }
@@ -1344,7 +1339,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                             @Override
                             public void sizeChanged() {
-                                HTML5Implementation.this.sizeChanged(canvas.getWidth(), canvas.getHeight());
+                                // updateCanvasSize() (the sibling callback) already
+                                // recorded the new size Java-side; use it rather than
+                                // reading canvas.getWidth() back across the barrier.
+                                HTML5Implementation.this.sizeChanged(getDisplayWidth(), getDisplayHeight());
                             }
 
                             @Override
@@ -3245,20 +3243,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getDisplayWidth() {
-        // Cached Java-side (updateCanvasSize); only fall back to a single
-        // barrier read if queried before the first layout.
-        if (displayWidth <= 0) {
-            displayWidth = canvas.getWidth();
-        }
-        return displayWidth;
+        // Pure synchronous read of the Java-cached size (set in updateCanvasSize,
+        // which runs at init and on resize). MUST NOT read canvas.getWidth() back
+        // across the barrier (degrades -> wedge) and MUST NOT call updateCanvasSize
+        // here: that yields (barrier reads) and its repaint side effect recurses
+        // back into getDisplayWidth -> synchronous wedge. A pre-layout query just
+        // gets the safe minimum until the first updateCanvasSize lands.
+        return displayWidth > 0 ? displayWidth : 1;
     }
 
     @Override
     public int getDisplayHeight() {
-        if (displayHeight <= 0) {
-            displayHeight = canvas.getHeight();
-        }
-        return displayHeight;
+        return displayHeight > 0 ? displayHeight : 1;
+    }
+
+    /** Cross-package access to the (Java-cached) display size, so callers in
+     *  other packages size native widgets without reading canvas.getWidth()
+     *  back across the barrier. */
+    public static int displayWidthPx() {
+        return instance != null ? instance.getDisplayWidth() : 1;
+    }
+
+    public static int displayHeightPx() {
+        return instance != null ? instance.getDisplayHeight() : 1;
     }
 
     // Cached document accessor. Never re-query doc() across the
@@ -5228,8 +5235,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void flushGraphics() {
-    	flushGraphics(0,0,canvas.getWidth(), canvas.getHeight());
-        
+        flushGraphics(0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
     @Override
@@ -5242,22 +5248,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         flushGraphics();
-        final int width = outputCanvas.getWidth();
-        final int height = outputCanvas.getHeight();
+        final int width = getDisplayWidth();
+        final int height = getDisplayHeight();
         if (width <= 0 || height <= 0) {
             super.screenshot(callback);
             return;
         }
         drainPendingDisplayFrame();
-        final CanvasRenderingContext2D context = (CanvasRenderingContext2D) outputCanvas.getContext("2d");
-        final ImageData imageData = context.getImageData(0, 0, width, height);
-        final Uint8ClampedArray data = imageData.getData();
+        // Read the display SURFACE pixels by id (the one legitimate pixel
+        // read-back) instead of getContext().getImageData() on the canvas
+        // host-ref. nativeSurfaceReadRGB returns ARGB straight into ``rgb``.
         final int[] rgb = new int[width * height];
-        // Bulk RGBA->ARGB conversion in one JS-native loop. The legacy
-        // ``PixelReader`` path made 4 JSO virtual-dispatch calls per
-        // pixel (4.6M for a 1280x900 screenshot); the bulk intrinsic
-        // collapses that to a single ``yield*`` boundary.
-        JavaScriptImageDataAdapter.readRgbaToArgbBulk(data, rgb, 0);
+        nativeSurfaceReadRGB(DISPLAY_SURFACE_ID, 0, 0, width, height, rgb);
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
@@ -9089,15 +9091,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
         public int fontAscent() {
             if (ascent == 0) {
-                HTMLCanvasElement canvas = getCanvasBuffer(100,100);
-                CanvasRenderingContext2D context = (CanvasRenderingContext2D)canvas.getContext("2d");
-                String oldFont = context.getFont();
-                context.setFont(((NativeFont)this).getCSS());
-                //this.canvas.getStyle().setProperty("font", nativeFont+"");
-                //ascent = (int)Math.round(((JSOImplementations.JSFontMetrics)context.measureText(alphabet)).getAscent());
+                // Ascent is derived purely from fontHeight()/fontLeading() and a
+                // family ratio -- the old canvas.getContext()/getFont() probe here
+                // was dead (its result was never used) and a forbidden barrier
+                // read, so it's gone.
                 ascent = (int)((fontHeight()-fontLeading()) * measureAscent(getCSSFontFamily()));
-                //context.setFont(oldFont);
-                
             }
             return ascent;
         }
@@ -9188,8 +9186,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         btn.getStyle().setProperty("position", "absolute");
         btn.getStyle().setProperty("top", "0");
         btn.getStyle().setProperty("left", "0");
-        btn.getStyle().setProperty("width", ""+scaleCoord(HTML5Implementation.instance.canvas.getWidth())+"px");
-        btn.getStyle().setProperty("height", ""+scaleCoord(HTML5Implementation.instance.canvas.getHeight())+"px");
+        btn.getStyle().setProperty("width", ""+scaleCoord(instance.getDisplayWidth())+"px");
+        btn.getStyle().setProperty("height", ""+scaleCoord(instance.getDisplayHeight())+"px");
         btn.getStyle().setProperty("padding", "0");
         btn.getStyle().setProperty("margin", "0");
         btn.getStyle().setProperty("font-size", "2em");
@@ -9489,8 +9487,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         btn.getStyle().setProperty("position", "absolute");
         btn.getStyle().setProperty("top", "0");
         btn.getStyle().setProperty("left", "0");
-        btn.getStyle().setProperty("width", ""+scaleCoord(canvas.getWidth())+"px");
-        btn.getStyle().setProperty("height", ""+scaleCoord(canvas.getHeight())+"px");
+        btn.getStyle().setProperty("width", ""+scaleCoord(getDisplayWidth())+"px");
+        btn.getStyle().setProperty("height", ""+scaleCoord(getDisplayHeight())+"px");
         btn.getStyle().setProperty("padding", "0");
         btn.getStyle().setProperty("margin", "0");
         //btn.getStyle().setProperty("font-size", "2em");

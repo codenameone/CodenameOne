@@ -19,7 +19,6 @@ public interface JavaScriptRenderingBackend {
     HTMLImageElement createImageElement();
     HTMLImageElement createCrossOriginImageElement(String sourceUrl);
     HTMLImageElement createBlobImageElement(Blob blob);
-    CanvasRenderingContext2D getContext(HTMLCanvasElement canvas);
     void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height);
     CanvasPattern createLoadedImagePattern(CanvasRenderingContext2D context, HTMLImageElement image);
     Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException;

@@ -1614,12 +1614,28 @@ bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl_int_java_lang_String_double_R_java_lang_String",
   "cn1_com_codename1_impl_html5_HTML5Implementation_nativeSurfaceToDataUrl___int_java_lang_String_double_R_java_lang_String"
 ], function*(id, mime, quality) {
-  const url = yield jvm.invokeHostNative("__cn1_surface_to_dataurl__", [{
-    id: id | 0,
-    mime: mime == null ? "image/png" : jvm.toNativeString(mime),
-    quality: +quality
-  }]);
-  return url == null ? null : jvm.createStringLiteral(String(url));
+  const mimeStr = mime == null ? "image/png" : jvm.toNativeString(mime);
+  const q = +quality;
+  // Defensive idempotent-read retry. surface_to_dataurl is a round-trip READ:
+  // the host encodes surface `id` and posts the data URL back. The scheduler
+  // race that lost these responses (a stale wait-timeout spuriously resuming a
+  // host-call-parked thread) is fixed in parparvm_runtime.js's
+  // _processExpiredTimedWakeups, so a null is now rare; this small bounded
+  // re-issue (re-encoding the same surface is side-effect free) covers any
+  // residual transient. A genuinely missing/disposed surface falls through to
+  // null after the attempts and the Java caller encodes a placeholder.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      yield { op: "sleep", millis: Math.min(8 * attempt, 32) };
+    }
+    const url = yield jvm.invokeHostNative("__cn1_surface_to_dataurl__", [{
+      id: id | 0, mime: mimeStr, quality: q
+    }]);
+    if (url != null) {
+      return jvm.createStringLiteral(String(url));
+    }
+  }
+  return null;
 });
 
 bindNative([
@@ -2161,13 +2177,15 @@ bindNative([
     fontUrl: toStr(fontFile),
     fontFormat: toStr(fontFormat) || "truetype"
   };
-  try {
-    yield jvm.invokeHostNative("__cn1_load_truetype_font__", [payload]);
-  } catch (err) {
-    if (global.console && typeof global.console.warn === "function") {
-      global.console.warn("PARPAR:DIAG:loadTrueTypeFont:hostBridgeError=" + (err && err.message ? err.message : err));
-    }
-  }
+  // FIRE-AND-FORGET: the worker never uses the load result (it returned null
+  // regardless), and the host resolves 'font-family' at paint time, so there is
+  // no reason to PARK the green thread on the host's FontFace.load() promise.
+  // The old round-trip was a 21s full-worker boot stall (host font-load reply
+  // slow/lost while the worker sat parked) -- a textbook "API that doesn't need
+  // a response". Post it and keep running; text painted before the font lands
+  // re-renders (normal FOUT), and the screenshot settle-wait covers the
+  // transient. Same __cn1_no_response path the surface ops use.
+  cn1SurfacePost("__cn1_load_truetype_font__", payload);
   return null;
 });
 
@@ -3978,6 +3996,12 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   if (global.console && typeof global.console.log === "function") {
     global.console.log("CN1SS:INFO:suite starting test=" + nativeTestName);
   }
+  // Eagerly open the screenshot WebSocket at the first test start so the
+  // transport is established long before any emit. The lazy connect (on first
+  // emitCn1ssChunks) otherwise races a mid-suite wedge: the socket is left in
+  // "connecting" with the PNG queued, and onopen's flush never runs -> 0
+  // delivered even though capture succeeded.
+  cn1ssWsConnect();
   const forcedTimeoutReason = cn1ssForcedTimeoutTestClasses[effectiveTestClassId]
     || cn1ssForcedTimeoutTestNames[nativeTestName]
     || null;
@@ -4021,13 +4045,33 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   const __cn1WdRunner = callTarget;
   const __cn1WdName = nativeTestName;
   try {
+    var __cn1SelfHealOff = (typeof self.getParameterByName === "function"
+      && self.getParameterByName("cn1DisableSelfHeal") === "1");
     jvm.spawn(null, (function*() {
-      yield { op: "sleep", millis: cn1ssDispatchWatchdogMs };
+      // With self-heal OFF, dump + hang FAST (deterministic) instead of masking
+      // the wedge with a 90s force-advance.
+      yield { op: "sleep", millis: __cn1SelfHealOff ? 20000 : cn1ssDispatchWatchdogMs };
       if ((__cn1WdRunner.__cn1LastStartedIndex | 0) === __cn1WdIndex) {
         emitLambdaBridgeDiag(
           "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:stall:index=" + __cn1WdIndex
           + ":name=" + __cn1WdName
         );
+        // TRACK: snapshot what EVERY green thread is blocked on at the stall, so
+        // the wedge (EDT parked on a monitor/capture-gate, a lost host read, a
+        // stalled sleep) is isolated without attaching a JS debugger to the
+        // worker.
+        try {
+          if (typeof jvm.dumpThreadStates === "function") {
+            emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:" + jvm.dumpThreadStates());
+          }
+        } catch (__cn1DumpErr) { void __cn1DumpErr; }
+        if (__cn1SelfHealOff) {
+          // Deterministic mode: do NOT force-advance. Leave the wedge so it is
+          // reproducible; the suite-level timeout ends the run.
+          emitLambdaBridgeDiag(
+            "PARPAR:DIAG:FALLBACK:lambdaBridge:dispatchWatchdog:NOFORCEADVANCE(selfHealDisabled):index=" + __cn1WdIndex);
+          return;
+        }
         if (global.console && typeof global.console.log === "function") {
           global.console.log("CN1SS:ERR:suite test=" + __cn1WdName
             + " force-advanced by dispatch watchdog (runTest blocked > "
@@ -4715,12 +4759,14 @@ function cn1ssWsConnect() {
     emitDiagLine("CN1SS:WSJS:connectError=" + String(e && e.message ? e.message : e));
     return;
   }
+  emitDiagLine("CN1SS:WSJS:connecting url=" + url);
   sock.binaryType = "arraybuffer";
   cn1ssWs.socket = sock;
   sock.onopen = function () {
     cn1ssWs.status = "open";
     const q = cn1ssWs.queue;
     cn1ssWs.queue = [];
+    emitDiagLine("CN1SS:WSJS:open flushQueued=" + q.length);
     for (let i = 0; i < q.length; i++) {
       cn1ssWsSendNow(q[i].test, q[i].bytes);
     }
@@ -4733,6 +4779,7 @@ function cn1ssWsConnect() {
   };
   sock.onerror = function () { /* failures surface via onclose -> status=failed */ };
   sock.onclose = function () {
+    emitDiagLine("CN1SS:WSJS:close priorStatus=" + cn1ssWs.status + " queued=" + cn1ssWs.queue.length);
     if (cn1ssWs.status !== "open") {
       cn1ssWs.status = "failed";
     }
@@ -5134,7 +5181,14 @@ bindCiFallback("BaseTest.registerReadyCallbackImmediate", [
   }
   if (jvm && typeof jvm.invokeHostNative === "function") {
     try {
-      yield jvm.invokeHostNative("__cn1_delay__", [{ millis: delayMillis }]);
+      // A pure time delay is a WORKER scheduler sleep, never a host round-trip.
+      // The old __cn1_delay__ host native was just setTimeout(resolve, millis):
+      // round-tripping to the host to sleep parked the green thread on a host
+      // reply for no reason and added another lost-response wedge surface. The
+      // scheduler's {op:"sleep"} arms a timed wakeup with zero host traffic.
+      // (A/B-confirmed: this is NOT the cause of the SlideHorizontal settle
+      // message loss -- reverting to the host delay did not change it.)
+      yield { op: "sleep", millis: delayMillis };
       const settleResult = yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
         reason: "ready:" + activeTest,
         maxFrames: delayMillis > 1500 ? 120 : 48,

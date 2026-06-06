@@ -214,7 +214,7 @@ public class PhotoCapture {
         findVideoSize(video);
         el.setAttribute("width", String.valueOf(video.getVideoWidth()));
         el.setAttribute("height", String.valueOf(video.getVideoHeight()));
-        CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)el.getContext("2d");
+        CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)el.getContext("2d"); // LINT-ALLOW-CANVAS-BARRIER-READ: one-shot photo frame capture
         ctx.drawImage((CanvasImageSource)video, 0, 0, video.getVideoWidth(), video.getVideoHeight());
         return el;
     }

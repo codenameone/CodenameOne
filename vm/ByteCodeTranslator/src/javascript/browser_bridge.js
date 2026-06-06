@@ -1434,14 +1434,30 @@
         return;
       }
       function step() {
-        raf(function() {
+        // Race rAF against a setTimeout fallback. Headless Chromium throttles
+        // and ultimately STOPS firing requestAnimationFrame when the page idles
+        // (no compositing) -- which happens right after a form transition
+        // completes and the worker's EDT parks on __cn1_wait_for_ui_settle__,
+        // leaving nothing to drive a frame. Without the fallback this runFrame
+        // chain never resolves, the host never replies, and the EDT parks
+        // forever (the SlideHorizontalTransitionTest wall). The fallback
+        // guarantees forward progress; when rAF is healthy it wins the race so
+        // steady-state timing is unchanged.
+        var advanced = false;
+        function tick() {
+          if (advanced) {
+            return;
+          }
+          advanced = true;
           remaining--;
           if (remaining <= 0) {
             resolve();
             return;
           }
           step();
-        });
+        }
+        raf(tick);
+        setTimeout(tick, 32);
       }
       step();
     });
