@@ -1,0 +1,38 @@
+{
+  "identifier" : "CN1E2E0001-0000-0000-0000-000000000001",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "CN1E2E0001-0000-0000-0000-0000000000A1",
+      "localizations" : [
+        {
+          "description" : "Codename One e2e test consumable",
+          "displayName" : "CN1 Test Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.codenameone.hello.pro",
+      "referenceName" : "CN1 Test Pro",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

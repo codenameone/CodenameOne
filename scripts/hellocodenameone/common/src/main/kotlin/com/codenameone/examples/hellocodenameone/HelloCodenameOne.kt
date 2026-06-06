@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone
 
 import com.codename1.camera.Camera
+import com.codename1.payment.Purchase
 import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
@@ -36,6 +37,20 @@ open class HelloCodenameOne : Lifecycle() {
             System.out.println("CN1SS:SWIFT_DIAG:VALIDATION_EXCEPTION " + t.javaClass.name + ": " + t.message)
             t.printStackTrace()
             // Keep running so DeviceRunner can emit CN1SS markers and report swift_diag_status explicitly.
+        }
+        // Reference the In-App-Purchase API (com.codename1.payment.*) so the
+        // build's bytecode scanner flips IPhoneBuilder.usesPurchaseAPI: this
+        // defines CN1_USE_STOREKIT and links StoreKit.framework on iOS so the
+        // SKPaymentQueue observer is compiled in. Installing a recording
+        // ReceiptStore lets the iOS StoreKitTest harness assert, from the
+        // hosted XCTest, that a purchase reached the store -- the iOS-level
+        // guard for issue #5186. Without an app exercising IAP this native
+        // path is gated out of every CI build and never gets compiled.
+        try {
+            Purchase.getInAppPurchase().setReceiptStore(RecordingReceiptStore())
+            System.out.println("CN1SS:IAP_DIAG installed=true")
+        } catch (t: Throwable) {
+            System.out.println("CN1SS:IAP_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
         }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
