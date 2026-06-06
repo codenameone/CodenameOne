@@ -295,6 +295,24 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.flushGraphics(windowGraphicsPeer, 0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
+    /*
+     * Rasterize linear gradients on the fly (direct drawLine strips) rather than
+     * caching them in a mutable Image, matching iOS / Android / JavaScript. The
+     * cached path draws the gradient via impl.drawImage, which -- unlike the core
+     * drawLine primitives -- does NOT pre-add the graphics' xTranslate to the
+     * blit position. LinearGradientPaint.paint sets a rotation matrix that
+     * Graphics.setTransform conjugates with T(xTranslate) (since
+     * isTranslationSupported() is false here), so the un-translated drawImage
+     * lands off-cell: the SVG gradient_circle / clipped_badge fills rendered
+     * outside their clip (an empty disc) while solid fills under the same clip
+     * were fine. Disabling the cache routes the fill through drawLine, which
+     * positions correctly.
+     */
+    @Override
+    protected boolean cacheLinearGradients() {
+        return false;
+    }
+
     /* --------------------------------------------------------------- camera */
 
     /*
