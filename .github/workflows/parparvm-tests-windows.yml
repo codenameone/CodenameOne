@@ -317,14 +317,6 @@ jobs:
             "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
 
-      # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
-      # the app's theme.css into the staged native theme (css-gradients + themed
-      # tiles). Non-fatal: if it fails the build falls back to the material theme.
-      - name: Build the no-cef CSS compiler (compiles the app theme.css)
-        continue-on-error: true
-        shell: pwsh
-        run: mvn -B -f maven/pom.xml -pl css-compiler -am package -DskipTests '-Dmaven.javadoc.skip=true'
-
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm
         shell: pwsh
@@ -418,14 +410,6 @@ jobs:
           if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
             "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
-
-      # Build the headless CSS compiler jar so buildHelloCodenameOneExe can compile
-      # the app's theme.css into the staged native theme (css-gradients + themed
-      # tiles). Non-fatal: if it fails the build falls back to the material theme.
-      - name: Build the no-cef CSS compiler (compiles the app theme.css)
-        continue-on-error: true
-        shell: pwsh
-        run: mvn -B -f maven/pom.xml -pl css-compiler -am package -DskipTests '-Dmaven.javadoc.skip=true'
 
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm
