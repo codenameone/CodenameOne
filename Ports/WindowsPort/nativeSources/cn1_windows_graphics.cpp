@@ -163,7 +163,7 @@ ID2D1SolidColorBrush* cn1WinBrush(CN1Graphics* g) {
  * Build a D2D1_RECT_F covering g's current clip rectangle and push it as an
  * axis-aligned clip. Must be paired with cn1WinPopClip after the primitive.
  */
-static void cn1WinPushClip(CN1Graphics* g) {
+extern "C" void cn1WinPushClip(CN1Graphics* g) {
     /* Shape clip (clipRect under a rotation/scale, setClip(Shape)): push the clip
      * geometry as a layer. The geometry is stored in the graphics' own (raw)
      * coordinate space and clipMaskTransform is the world transform that was active
@@ -220,7 +220,7 @@ static void cn1WinPushClip(CN1Graphics* g) {
     ID2D1RenderTarget_SetTransform(g->target, &g->transform);
 }
 
-static void cn1WinPopClip(CN1Graphics* g) {
+extern "C" void cn1WinPopClip(CN1Graphics* g) {
     if (g->clipLayer != NULL) {
         ID2D1RenderTarget_PopLayer(g->target);
         ID2D1Layer_Release((ID2D1Layer*) g->clipLayer);

@@ -229,6 +229,13 @@ void cn1WinBeginFrame(CN1Graphics* g);
 void cn1WinEndFrame(CN1Graphics* g);
 ID2D1SolidColorBrush* cn1WinBrush(CN1Graphics* g);
 D2D1_COLOR_F cn1WinColorF(JAVA_INT rgb, JAVA_INT alpha);
+/* Push/pop g's current clip (axis-aligned rect, or a layer for a shape clip)
+ * around a single drawing operation. Exposed so the DirectWrite text path
+ * (cn1_windows_text.c) clips glyphs exactly like the graphics primitives do --
+ * without it, text drawn past the dirty region (e.g. overscrolled list rows)
+ * bleeds into the retained surface margins and smears. */
+void cn1WinPushClip(CN1Graphics* g);
+void cn1WinPopClip(CN1Graphics* g);
 
 /* text (cn1_windows_text.c) -- DirectWrite work delegated to the C++ layer */
 CN1Font* cn1WinCreateFont(int face, int style, int size);

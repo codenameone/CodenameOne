@@ -210,8 +210,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawString___long_java_lang_S
     CN1Font* font = g->font ? g->font : cn1WinDefaultFont();
     UINT32 len = 0;
     WCHAR* w = cn1WinJavaStringToWide(threadStateData, __cn1Arg2, &len);
+    /* Clip the glyphs to g's current clip exactly like the graphics primitives do
+     * (cn1WinPushClip/PopClip). DirectWrite's DrawTextLayout otherwise ignores the
+     * clip, so text drawn past the dirty region -- e.g. overscrolled list rows --
+     * bleeds into the retained surface margins and smears. */
+    cn1WinPushClip(g);
     cn1dwDrawText(g->target, font ? font->format : NULL, cn1WinBrush(g), w, (int) len,
             (float) __cn1Arg3, (float) __cn1Arg4);
+    cn1WinPopClip(g);
     free(w);
 }
 
