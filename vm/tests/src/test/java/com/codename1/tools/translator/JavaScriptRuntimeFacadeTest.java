@@ -217,10 +217,25 @@ class JavaScriptRuntimeFacadeTest {
                 "BufferedGraphics should share the shape/gradient render adapter for buffered shape and gradient ops");
         assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.ensureScratchBuffer("),
                 "HTML5Implementation should delegate scratch canvas lifecycle to the buffer lifecycle helper");
-        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createBlankBuffer("),
-                "HTML5Implementation should delegate blank canvas-backed image buffers to the buffer lifecycle helper");
-        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createMutableBuffer("),
-                "HTML5Implementation should delegate mutable canvas-backed image buffers to the buffer lifecycle helper");
+        // The surface-id render flip (commit b824e77b2) replaced the canvas-backed
+        // blank/mutable buffer lifecycle (createBlankBuffer / createMutableBuffer,
+        // which allocated a real HTMLCanvasElement + getContext per image) with the
+        // surface model: a mutable image is now a host-side SURFACE the worker only
+        // references by id, created via createSurfaceGraphics(...) and bound to the
+        // NativeImage via attachMutableImageSurface(...). That removed the per-image
+        // getContext "Number 667" host-ref staleness that wedged the suite. Accept
+        // either the legacy buffer-lifecycle delegation or the surface path (mirrors
+        // the stringWidth / readRgba "accept either chain" clauses above).
+        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(")
+                        || (html5Source.contains("createSurfaceGraphics(")
+                                && html5Source.contains("attachMutableImageSurface(")),
+                "HTML5Implementation should back blank/mutable images with the buffer lifecycle helper "
+                + "or the surface model (createSurfaceGraphics + attachMutableImageSurface)");
+        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createMutableBuffer(")
+                        || (html5Source.contains("createMutableImage(")
+                                && html5Source.contains("attachMutableImageSurface(")),
+                "HTML5Implementation should create mutable images via the buffer lifecycle helper "
+                + "or the surface model (createMutableImage backed by attachMutableImageSurface)");
         String drawShapeSource = new String(Files.readAllBytes(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "DrawShape.java")), StandardCharsets.UTF_8);
         String clipShapeSource = new String(Files.readAllBytes(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "ClipShape.java")), StandardCharsets.UTF_8);
         assertTrue(drawShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
@@ -229,28 +244,44 @@ class JavaScriptRuntimeFacadeTest {
                 "DrawShape should delegate stroke style mapping to the shared shape path adapter");
         assertTrue(clipShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
                 "ClipShape should delegate path traversal to the shared shape path adapter");
-        // Delegation may go through either the per-pixel ``readRgbaToArgb``
-        // helper or the native ``readRgbaToArgbBulk`` intrinsic -- either one
-        // counts as "delegating to the image data adapter". The current
-        // HTML5Implementation calls the bulk variant for the host-side
-        // path (see commit c5080d78b for the rationale).
+        // Image-data readback originally delegated to the per-pixel
+        // ``readRgbaToArgb`` helper or the ``readRgbaToArgbBulk`` intrinsic
+        // (commit c5080d78b). The surface-id flip (b824e77b2) replaced the
+        // canvas getImageData round-trip with a single native surface read,
+        // ``nativeSurfaceReadRGB(surfaceId, x, y, w, h, dest)``, which returns
+        // ARGB straight into the destination -- that IS the readback packing
+        // path in the surface model. Accept either.
         assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb(")
-                        || html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgbBulk("),
-                "HTML5Implementation should delegate image-data readback packing to the image data adapter");
-        assertTrue(html5Source.contains(".writeArgbBuffer("),
-                "HTML5Implementation should delegate image-data writes through ImageData.writeArgbBuffer "
-                + "(host-side prototype extension in browser_bridge.js) — the worker-side "
-                + "JavaScriptImageDataAdapter.writeArgbToRgba round-trip lost every byte to the "
-                + "Uint8ClampedArray clone optimization in hostResult, see commit 6c6c48330 for the "
-                + "rationale and the diagnosis chain");
+                        || html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgbBulk(")
+                        || html5Source.contains("nativeSurfaceReadRGB("),
+                "HTML5Implementation should pack image-data readback via the image data adapter "
+                + "or the surface model (nativeSurfaceReadRGB)");
+        // Image-data writes originally went through ImageData.writeArgbBuffer
+        // (host-side prototype extension in browser_bridge.js) because the
+        // worker-side JavaScriptImageDataAdapter.writeArgbToRgba round-trip lost
+        // every byte to the Uint8ClampedArray clone optimization in hostResult
+        // (commit 6c6c48330). The surface-id flip routes pixel writes through
+        // ``nativeSurfaceWritePixels(surfaceId, argb, w, h)`` instead. Accept either.
+        assertTrue(html5Source.contains(".writeArgbBuffer(")
+                        || html5Source.contains("nativeSurfaceWritePixels("),
+                "HTML5Implementation should write image data via ImageData.writeArgbBuffer "
+                + "or the surface model (nativeSurfaceWritePixels)");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveWidth("),
                 "HTML5Implementation.NativeImage should delegate width resolution to the native image adapter");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveHeight("),
                 "HTML5Implementation.NativeImage should delegate height resolution to the native image adapter");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.draw("),
                 "HTML5Implementation.NativeImage should delegate draw dispatch to the native image adapter");
-        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.tile("),
-                "HTML5Implementation.NativeImage should delegate tile dispatch to the native image adapter");
+        // The black-chrome fix (d944b6bae) reimplemented NativeImage.tile() as
+        // repeated drawImage across the region instead of a CanvasPattern fill (a
+        // pattern set as fillStyle paints opaque black on the display surface), so
+        // tiling now composes the adapter-backed draw() path rather than a dedicated
+        // JavaScriptNativeImageAdapter.tile call. Accept either.
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.tile(")
+                        || (html5Source.contains("public void tile(CanvasRenderingContext2D")
+                                && html5Source.contains("JavaScriptNativeImageAdapter.draw(")),
+                "HTML5Implementation.NativeImage should tile via the native image adapter "
+                + "or by composing the adapter-backed draw() path (repeated drawImage)");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.readPixels("),
                 "HTML5Implementation should delegate native-image pixel readback dispatch to the native image adapter");
         assertTrue(html5Source.contains("private final JavaScriptRenderingBackend renderingBackend = new BrowserDomRenderingBackend()"),
@@ -259,14 +290,30 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation should route cross-origin image creation through the rendering backend");
         assertTrue(html5Source.contains("renderingBackend.createBlobImageElement("),
                 "HTML5Implementation should route blob-backed image creation through the rendering backend");
-        assertTrue(html5Source.contains("renderingBackend.scaleLoadedImageToCanvas("),
-                "HTML5Implementation should route loaded-image scaling through the rendering backend");
-        assertTrue(html5Source.contains("renderingBackend.scaleMutableSurfaceToCanvas("),
-                "HTML5Implementation should route mutable-surface scaling through the rendering backend");
-        assertTrue(html5Source.contains("renderingBackend.toImageBlob("),
-                "HTML5Implementation should route canvas serialization through the rendering backend");
-        assertTrue(html5Source.contains("renderingBackend.writeImageData("),
-                "HTML5Implementation should route image-data writes through the rendering backend");
+        // The surface-id flip (b824e77b2) moved image scaling, serialization and
+        // pixel writes off the canvas-backed rendering backend onto the surface
+        // model: scale(...) creates a target surface (createSurfaceGraphics) and
+        // either drawImage-scales the loaded image into it or blitSurface-scales a
+        // source surface; save() serializes via nativeSurfaceToDataUrl; pixel writes
+        // go through nativeSurfaceWritePixels. Accept either the legacy backend call
+        // or the surface path (mirrors the "accept either chain" clauses above).
+        assertTrue(html5Source.contains("renderingBackend.scaleLoadedImageToCanvas(")
+                        || (html5Source.contains("public Object scale(Object nativeImage")
+                                && html5Source.contains("createSurfaceGraphics(")),
+                "HTML5Implementation should scale loaded images via the rendering backend "
+                + "or the surface model (scale() backed by createSurfaceGraphics + drawImage)");
+        assertTrue(html5Source.contains("renderingBackend.scaleMutableSurfaceToCanvas(")
+                        || html5Source.contains("blitSurface("),
+                "HTML5Implementation should scale mutable surfaces via the rendering backend "
+                + "or the surface model (blitSurface source-to-target scaling)");
+        assertTrue(html5Source.contains("renderingBackend.toImageBlob(")
+                        || html5Source.contains("nativeSurfaceToDataUrl("),
+                "HTML5Implementation should serialize images via the rendering backend "
+                + "or the surface model (nativeSurfaceToDataUrl)");
+        assertTrue(html5Source.contains("renderingBackend.writeImageData(")
+                        || html5Source.contains("nativeSurfaceWritePixels("),
+                "HTML5Implementation should write image data via the rendering backend "
+                + "or the surface model (nativeSurfaceWritePixels)");
         assertTrue(html5Source.contains("JavaScriptAsyncImageLoadCoordinator.handleImmediateCompletion("),
                 "HTML5Implementation.NativeImage should delegate synchronous completion checks to the async image load coordinator");
         assertTrue(html5Source.contains("JavaScriptAsyncImageLoadCoordinator.beginLoading("),
