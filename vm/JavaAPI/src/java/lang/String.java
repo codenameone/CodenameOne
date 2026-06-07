@@ -726,25 +726,6 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return sb.toString();
     }
 
-    // On real device builds the codenameone-maven-plugin rewrites String.replaceAll/
-    // replaceFirst regex calls to the CN1 RE engine, so these methods are bypassed.
-    // The clean target does not run that rewrite, so provide a literal fallback here
-    // (correct for literal patterns; regex metacharacters are treated literally).
-    public java.lang.String replaceAll(java.lang.String regex, java.lang.String replacement) {
-        return replace(regex, replacement);
-    }
-
-    public java.lang.String replaceFirst(java.lang.String regex, java.lang.String replacement) {
-        if (regex == null || replacement == null) {
-            throw new NullPointerException();
-        }
-        int idx = indexOf(regex);
-        if (idx < 0) {
-            return this;
-        }
-        return substring(0, idx) + replacement + substring(idx + regex.length());
-    }
-
     /**
      * Tests if this string starts with the specified prefix.
      */
