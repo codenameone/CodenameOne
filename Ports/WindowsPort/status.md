@@ -58,6 +58,18 @@ most bug-prone areas of any port.
   needs interactive verification on a real Windows desktop, plus new
   device-runner coverage (focus → type → IME → commit → blur → value).
 
+### 1b. Mouse wheel scrolling — not wired
+
+`WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL` are not handled in the native window proc, so
+the scroll wheel does nothing. Touch/drag scrolling works (that path is what the
+overscroll-smear fix exercised). To wire it, push a wheel event from the WndProc
+into the input ring (delta in the spare `eventScratch` slot, like keys) and, in
+`WindowsImplementation.drainInput()`, translate it into a scroll. The JavaSE port
+shows the canonical approach (`JavaSEPort.mouseWheelMoved`): a synthetic
+pointerPressed → pointerDragged → pointerReleased sequence run through Codename
+One's scroll logic, with the component under the cursor temporarily made
+non-focusable so the synthetic press cannot register as a click. Deferred.
+
 ### 2. SIMD acceleration — software fallback only
 
 `com.codename1.util.Simd` (`Simd.java`, `@Concrete` → `IOSSimd`) is the portable
