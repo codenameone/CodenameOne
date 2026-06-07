@@ -129,6 +129,58 @@ debug data dwarfs the binary, which is exactly why it's not in the default. The
 build stays optimized either way; with the `.pdb` present a faulting address can be
 turned back into a function name and source line with `llvm-symbolizer`.
 
+=== Code signing
+
+Unlike iOS and Android, Windows does *not* require a signature to *run* a desktop
+exe -- an unsigned win32 build launches fine. But an unsigned binary that a user
+downloads shows *"Unknown publisher"* in the UAC prompt and trips *SmartScreen*
+("Windows protected your PC"), so anything you actually distribute should be
+*Authenticode-signed*. Signing is therefore optional in the port (the default is
+unsigned) but strongly recommended for release.
+
+The port signs with https://github.com/mtrojnar/osslsigncode[`osslsigncode`], which
+signs Windows PE files on *any* OS -- so signing happens right in the Linux build
+cloud, no Windows machine needed. Provide a code-signing certificate and the build
+hints below, and each produced exe (x64 and arm64) is signed and timestamped.
+
+==== Signing with a PKCS#12 certificate
+
+Put your code-signing certificate and key in a PKCS#12 (`.pfx`/`.p12`) file and
+point the build at it:
+
+[source,properties]
+----
+# codenameone_settings.properties
+codename1.arg.windows.signing.pkcs12=/secure/path/codesign.p12
+codename1.arg.windows.signing.password=your-pkcs12-password
+codename1.arg.windows.signing.name=Acme Corp
+codename1.arg.windows.signing.url=https://acme.example
+# optional -- these are the defaults:
+codename1.arg.windows.signing.timestampUrl=http://timestamp.digicert.com
+codename1.arg.windows.signing.digest=sha256
+----
+
+The signature is *timestamped* (RFC 3161) by default, so it keeps verifying
+after the certificate expires; set `windows.signing.timestampUrl` empty to turn
+that off. Set `windows.signing=false` to force an unsigned build even when a
+certificate is configured. On the build cloud the certificate can instead be
+supplied through the normal build-request certificate channel, exactly like iOS.
+
+==== Hardware-backed and cloud keys
+
+Since June 2023 the CA/Browser Forum requires code-signing private keys to live in
+a hardware module, so a brand-new OV/EV certificate is no longer a plain `.pfx`.
+The usual answer is a managed signing service -- *Azure Trusted Signing*, *DigiCert
+KeyLocker*, *SSL.com eSigner* -- which exposes the key through PKCS#11. `osslsigncode`
+speaks PKCS#11, so the build host points at the service's provider per its docs; the
+rest of the flow (digest, timestamp, the resulting signed exe) is identical. Plain
+`.pfx` signing remains fine for internal/test certificates and for certs issued
+before the cutoff.
+
+NOTE: `osslsigncode` must be on the build host's `PATH` (or set `CN1_OSSLSIGNCODE`
+to its location). If signing is requested but the certificate or tool is missing,
+the build fails with a clear message rather than shipping an unsigned exe by surprise.
+
 === Native Windows vs. the desktop (JVM) app vs. the jar
 
 Codename One can produce three different Windows artifacts from the same project.

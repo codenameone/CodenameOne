@@ -332,8 +332,124 @@ public class WindowsNativeBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to collect the built executable", ex);
         }
+        // Authenticode-sign the exe (osslsigncode) when a code-signing certificate
+        // is supplied; otherwise it ships unsigned (which runs, but trips SmartScreen
+        // / "Unknown publisher").
+        signWindowsExecutable(windowsExecutable, request);
         log("Native Windows executable: " + windowsExecutable.getAbsolutePath() + " (" + arch + ")");
         return true;
+    }
+
+    /**
+     * Authenticode-signs the produced {@code .exe} with {@code osslsigncode} (which
+     * signs Windows PE files on any OS, so it works in the Linux build cloud). No-op
+     * unless a code-signing certificate is provided -- the binary then ships unsigned,
+     * which runs but shows "Unknown publisher" in UAC and trips SmartScreen on
+     * download. Configuration (all optional except a certificate):
+     *
+     * <ul>
+     *   <li>{@code windows.signing.pkcs12} -- path to a PKCS#12 (.pfx/.p12) cert+key;
+     *       falls back to the build request's uploaded certificate.</li>
+     *   <li>{@code windows.signing.password} -- the PKCS#12 password (falls back to
+     *       the request's certificate password).</li>
+     *   <li>{@code windows.signing.timestampUrl} -- RFC&nbsp;3161 timestamp server
+     *       (default {@code http://timestamp.digicert.com}; empty disables it).</li>
+     *   <li>{@code windows.signing.digest} -- digest algorithm (default {@code sha256}).</li>
+     *   <li>{@code windows.signing.name} / {@code windows.signing.url} -- the
+     *       description + URL embedded in the signature (default the app display name).</li>
+     *   <li>{@code windows.signing=false} -- force-skip even if a certificate is present.</li>
+     * </ul>
+     *
+     * <p>Hardware-backed / cloud keys (the post-2023 CA/B requirement -- Azure Trusted
+     * Signing, DigiCert KeyLocker, …) are reached by pointing the above at a
+     * PKCS#11-fronted credential per the signing service's docs; the command shape is
+     * the same.</p>
+     */
+    private void signWindowsExecutable(File exe, BuildRequest request) {
+        if ("false".equalsIgnoreCase(request.getArg("windows.signing", "true"))) {
+            return;
+        }
+        File pkcs12;
+        String pkcs12Hint = request.getArg("windows.signing.pkcs12", null);
+        try {
+            if (pkcs12Hint != null && !pkcs12Hint.isEmpty()) {
+                pkcs12 = new File(pkcs12Hint);
+                if (!pkcs12.isFile()) {
+                    throw new BuildException("windows.signing.pkcs12 file not found: " + pkcs12.getAbsolutePath());
+                }
+            } else if (request.getCertificate() != null && request.getCertificate().length > 0) {
+                pkcs12 = File.createTempFile("cn1-winsign", ".p12", getBuildDirectory());
+                try (FileOutputStream out = new FileOutputStream(pkcs12)) {
+                    out.write(request.getCertificate());
+                }
+            } else {
+                log("Native Windows executable is unsigned (no code-signing certificate provided; set "
+                        + "windows.signing.pkcs12 or supply a certificate to Authenticode-sign it).");
+                return;
+            }
+        } catch (java.io.IOException ex) {
+            throw new BuildException("Failed to stage the Windows code-signing certificate", ex);
+        }
+
+        String password = request.getArg("windows.signing.password", null);
+        if (password == null) {
+            password = request.getCertificatePassword();
+        }
+        if (password == null) {
+            password = "";
+        }
+        String digest = request.getArg("windows.signing.digest", "sha256");
+        String timestampUrl = request.getArg("windows.signing.timestampUrl", "http://timestamp.digicert.com");
+        String name = request.getArg("windows.signing.name", request.getDisplayName());
+        String url = request.getArg("windows.signing.url", null);
+        String tool = System.getenv("CN1_OSSLSIGNCODE");
+        if (tool == null || tool.isEmpty()) {
+            tool = "osslsigncode";
+        }
+
+        File signed = new File(exe.getParentFile(), exe.getName() + ".signed");
+        List<String> cmd = new ArrayList<String>();
+        cmd.add(tool);
+        cmd.add("sign");
+        cmd.add("-pkcs12");
+        cmd.add(pkcs12.getAbsolutePath());
+        cmd.add("-pass");
+        cmd.add(password);
+        cmd.add("-h");
+        cmd.add(digest);
+        if (name != null && !name.isEmpty()) {
+            cmd.add("-n");
+            cmd.add(name);
+        }
+        if (url != null && !url.isEmpty()) {
+            cmd.add("-i");
+            cmd.add(url);
+        }
+        if (timestampUrl != null && !timestampUrl.isEmpty()) {
+            cmd.add("-ts");
+            cmd.add(timestampUrl);
+        }
+        cmd.add("-in");
+        cmd.add(exe.getAbsolutePath());
+        cmd.add("-out");
+        cmd.add(signed.getAbsolutePath());
+
+        try {
+            if (!exec(getBuildDirectory(), 600000, cmd.toArray(new String[0])) || !signed.isFile()) {
+                throw new BuildException("Authenticode signing failed (osslsigncode). Ensure osslsigncode is on PATH "
+                        + "(set CN1_OSSLSIGNCODE to override) and the certificate/password are valid.");
+            }
+            if (!exe.delete() || !signed.renameTo(exe)) {
+                copy(signed, exe);
+                signed.delete();
+            }
+            log("Authenticode-signed " + exe.getName() + (timestampUrl != null && !timestampUrl.isEmpty()
+                    ? " (timestamped)" : " (not timestamped)"));
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Authenticode signing failed (osslsigncode)", ex);
+        }
     }
 
     /**
