@@ -15,7 +15,7 @@ We released an important fix for an issue with daylight saving in north America 
 
 ### Release Schedule
 
-Due to the tight schedule of the bootcamp we’re postponing some of the previously announced to 2017 milestones so we won’t need to split our focus. The bootcamp ends on May 1st and might require some more effort after it completes and we don’t want to draw the attention from the release. Since our set of open issues is ridiculously large there is just no other way.
+Due to the tight schedule of the bootcamp we’re postponing some of the previously announced 2017 milestones so we won’t need to split our focus. The bootcamp ends on May 1st and might require some more effort after it completes and we don’t want to draw the attention from the release. Since our set of open issues is ridiculously large there is just no other way.
 
 The [3.7 milestone](https://github.com/codenameone/CodenameOne/milestone/9) was planned for May 9th. We’ve decided to postpone it to June 27th (a date I just randomly picked with no reason at all).
 
@@ -25,7 +25,7 @@ The [3.8 milestone](https://github.com/codenameone/CodenameOne/milestone/10) was
 
 During the weeks of the bootcamp the blog won’t post updates unless there is something urgent that we need to communicate. We won’t do the standard Friday release either during those dates. Since the bootcamp is split in the middle we will have regular activity during the off week of the bootcamp.
 
-Support which I usually handle will be split between employees with Steve taking most of the public support effort and the pro/enterprise support aliases. Things should function as usual for the most par however if you are one of the people who emails me directly instead of the support alias, or one of the people who doesn’t mention his pro/enterprise account in his email you might not get an answer.
+Support which I usually handle will be split between employees with Steve taking most of the public support effort and the pro/enterprise support aliases. Things should function as usual for the most part however if you are one of the people who emails me directly instead of the support alias, or one of the people who doesn’t mention his pro/enterprise account in his email you might not get an answer.
 
 So please make sure to include that information in support queries (in general not just now).
 ---

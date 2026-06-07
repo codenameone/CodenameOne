@@ -790,6 +790,45 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             });
         }
 
+        private class SavedAsyncClip {
+            Rectangle clip;
+            Path clipP;
+            GeneralPath clipGP;
+            boolean clipIsPath;
+        }
+
+        private final java.util.ArrayDeque<SavedAsyncClip> savedClipStack =
+                new java.util.ArrayDeque<SavedAsyncClip>();
+
+        @Override
+        public void pushClip() {
+            SavedAsyncClip s = new SavedAsyncClip();
+            if (clip != null) {
+                s.clip = new Rectangle(clip);
+            }
+            if (clipP != null) {
+                s.clipP = new Path(clipP);
+            }
+            if (clipGP != null) {
+                s.clipGP = new GeneralPath(clipGP);
+            }
+            s.clipIsPath = clipIsPath;
+            savedClipStack.push(s);
+        }
+
+        @Override
+        public void popClip() {
+            if (savedClipStack.isEmpty()) {
+                return;
+            }
+            SavedAsyncClip s = savedClipStack.pop();
+            clip = s.clip;
+            clipP = s.clipP;
+            clipGP = s.clipGP;
+            clipIsPath = s.clipIsPath;
+            clipFresh = false;
+        }
+
 
         /*
         private Matrix getTransformMatrix(){

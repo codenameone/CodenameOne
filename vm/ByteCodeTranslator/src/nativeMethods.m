@@ -40,9 +40,13 @@
 #import <Foundation/Foundation.h>
 #endif
 
+#ifdef _WIN32
+#include "cn1_win_compat.h"
+#else
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
+#endif
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -785,6 +789,22 @@ JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE)
     return l;
 }
 
+JAVA_LONG java_lang_System_nanoTime___R_long(CODENAME_ONE_THREAD_STATE) {
+    __STATIC_INITIALIZER_java_lang_System(threadStateData);
+#ifdef _WIN32
+    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl
+       target, so fall back to the microsecond wall clock that already backs
+       currentTimeMillis on Windows (gettimeofday is supplied by cn1_win_compat). */
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return (((JAVA_LONG)time.tv_sec) * 1000000000LL) + (((JAVA_LONG)time.tv_usec) * 1000LL);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (((JAVA_LONG)ts.tv_sec) * 1000000000LL) + (JAVA_LONG)ts.tv_nsec;
+#endif
+}
+
 JAVA_DOUBLE java_lang_Double_longBitsToDouble___long_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG n1)
 {
     union {
@@ -1283,7 +1303,14 @@ struct ThreadLocalData* getThreadLocalData() {
         
         i->callStackMethod = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
         memset(i->callStackMethod, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        
+
+#ifdef CN1_ON_DEVICE_DEBUG
+        i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+        memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+        i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+        memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+#endif
+
         i->callStackOffset = 0;
         
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
@@ -1538,6 +1565,10 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     free(head->callStackClass);
     free(head->callStackLine);
     free(head->callStackMethod);
+#ifdef CN1_ON_DEVICE_DEBUG
+    free(head->callStackLocalsAddresses);
+    free(head->callStackFrameInfo);
+#endif
     free(head->pendingHeapAllocations);
     free(head);
     nThreadsToKill--;

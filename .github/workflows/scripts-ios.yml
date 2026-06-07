@@ -76,7 +76,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
-    timeout-minutes: 45         # only sample app build + UI tests now; iOS port build runs in build-port
+    timeout-minutes: 60         # only sample app build + UI tests now; bumped from 45 to accommodate the 45-min test-step cap
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
@@ -86,10 +86,10 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache CocoaPods and user gems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gem
@@ -125,6 +125,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              maven/codenameone-maven-plugin/src/main \
               -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
@@ -141,7 +142,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
@@ -149,7 +150,7 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -157,7 +158,7 @@ jobs:
             ${{ runner.os }}-m2-
 
       - name: Restore cn1-binaries cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ../cn1-binaries
           key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
@@ -165,14 +166,43 @@ jobs:
             cn1-binaries-${{ runner.os }}-
 
       - name: Restore built CN1 + iOS port artifacts
+        # Use the exact key build-port saved against (published as a job
+        # output). Recomputing the src_hash on this runner has been
+        # observed to produce a different value than build-port on the
+        # same SHA -- and even when the algorithm is identical, any new
+        # source path added to the hash here has to land in three
+        # places at once or the keys diverge. The same workaround
+        # protects the build-ios-metal job a few hundred lines below.
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
+
+      - name: Force GL backend for hellocodenameone
+        # IPhoneBuilder defaults ios.metal to true. The GL job exists to
+        # exercise the legacy OpenGL ES 2 path, so pin the hint to false
+        # explicitly. Mirror of the Metal-enabling step in build-ios-metal.
+        run: |
+          set -euo pipefail
+          SETTINGS=scripts/hellocodenameone/common/codenameone_settings.properties
+          if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
+            sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=false|' "$SETTINGS"
+          else
+            awk '
+              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
+                print
+                print "codename1.arg.ios.metal=false"
+                next
+              }
+              { print }
+            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+          fi
+          echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
+          grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
 
       - name: Build sample iOS app and compile workspace
         id: build-ios-app
@@ -182,6 +212,15 @@ jobs:
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests
+          # Strict screenshot gating: fail on any pixel mismatch and on more
+          # missing screenshots than the tolerance below. Enforced centrally
+          # in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # OrientationLock and MutableImageReadback do not render on the iOS
+          # GL backend - the steady-state healthy run reports exactly these
+          # two as missing. Tolerate those two; any further missing
+          # screenshot (a hang/crash dropping the tail of the suite) fails CI.
+          CN1SS_ALLOWED_MISSING: '2'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -193,11 +232,15 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # Bumped from 30 to 45: the Metal screenshot suite has been
+        # bumping up against the prior 30-min cap on master (timing out
+        # at the CN1SS:SUITE:FINISHED wait), and the GL job has the
+        # same envelope so it stays symmetric.
+        timeout-minutes: 45
 
       - name: Upload iOS artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests
           path: artifacts
@@ -214,7 +257,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     concurrency:
       group: mac-ci-${{ github.workflow }}-metal-${{ github.ref_name }}
       cancel-in-progress: true
@@ -224,10 +267,10 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache CocoaPods and user gems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gem
@@ -263,6 +306,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              maven/codenameone-maven-plugin/src/main \
               -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
@@ -279,7 +323,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
@@ -287,7 +331,7 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -295,7 +339,7 @@ jobs:
             ${{ runner.os }}-m2-
 
       - name: Restore cn1-binaries cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ../cn1-binaries
           key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
@@ -385,6 +429,23 @@ jobs:
           CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
           CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
+          # Strict screenshot gating: fail on any pixel mismatch and on any
+          # missing screenshot. The Metal backend must produce the full
+          # baseline set; a test that hangs (e.g. the DialogTheme texture
+          # backdrop) drops every later capture and silently shrinks the
+          # suite from 122 to 107 - that now fails the job. No missing
+          # screenshots are tolerated. Enforced in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # Enable Apple's Metal API Validation in the simulator. Catches
+          # render-pass / pipeline-state mismatches at the moment they
+          # happen (issue #5103: stencil pixel-format mismatch shipped in
+          # four consecutive 7.0.x releases because no test exercised the
+          # validation layer). assert mode crashes the app on the first
+          # validation error -- the missed CN1SS:SUITE:FINISHED marker
+          # then fails this step. run-ios-ui-tests.sh forwards both vars
+          # to the launched app via simctl --setenv.
+          MTL_DEBUG_LAYER: '1'
+          MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -397,7 +458,10 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 30
+        # See the matching note on the GL job: 30-min cap was being
+        # hit on master while the simulator was still draining the
+        # screenshot suite.
+        timeout-minutes: 45
 
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
@@ -436,7 +500,7 @@ jobs:
 
       - name: Upload iOS Metal artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal
           path: artifacts

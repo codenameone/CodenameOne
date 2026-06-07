@@ -84,7 +84,17 @@
                         <id>spotbugs</id>
                         <phase>verify</phase>
                         <goals>
+                            <!--
+                            The `spotbugs` goal generates the XML report but does NOT
+                            break the build on findings. The `check` goal re-uses the
+                            report and fails the build when any bug is reported, which
+                            is what CI relies on to surface regressions like
+                            WMI_WRONG_MAP_ITERATOR. Both goals are bound so the report
+                            artifact is still produced for the quality summary even
+                            when `check` aborts the build.
+                            -->
                             <goal>spotbugs</goal>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>

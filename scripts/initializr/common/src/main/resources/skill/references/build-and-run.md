@@ -11,6 +11,7 @@ A Codename One project can produce four kinds of artifacts. Some build entirely 
 | Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) |
 | Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` |
 | iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) |
+| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) |
 | JavaScript / web bundle | Cloud | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript` |
 
 The two big "local-only" outputs are the **simulator** and **tests** — those are everything you need for ordinary development and CI feedback loops. You only invoke the cloud builds when you want a deployable native artifact.
@@ -40,11 +41,46 @@ mvn -pl common cn1:run
 # Debug from your IDE (attaches to JDWP).
 mvn -pl common cn1:debug
 
+# Hot reload of edited Java code (HotSwap, not full app restart) — see
+# "Hot reload" below. Pick the mode from the simulator's Hot Reload menu.
+
 # Run the CN1 test runner (NOT surefire). Runs inside the simulator JVM.
 mvn -pl common cn1:test
 
 # Compile CSS into theme.res without running the app. Process-resources phase.
 mvn -pl common compile
+
+# Generate stubs for any com.codename1.system.NativeInterface in common/
+# (one per platform under android/, ios/, javase/, javascript/).
+mvn -pl common cn1:generate-native-interfaces
+
+# Generate a typed REST client from an OpenAPI 3.x spec. Writes
+# `@Mapped` records (Java 17+) or classes (Java 8) per schema plus one
+# `@RestClient`-annotated interface per OpenAPI tag into common/src/main/java
+# at <basePackage>. The annotation processors run during the next compile
+# and emit the wire impls into common/target/generated-sources -- the
+# project source stays clean.
+mvn -pl common cn1:generate-openapi \
+  -Dcn1.openapi.spec=petstore.json \
+  -Dcn1.openapi.basePackage=com.example.petstore
+
+# Generate a typed gRPC-Web client from a .proto. Writes @ProtoMessage models
+# (+ @ProtoEnum) and one @GrpcClient interface per service. Same processor
+# pipeline as above. See references/api-clients.md.
+mvn -pl common cn1:generate-grpc \
+  -Dcn1.grpc.proto=catalog.proto \
+  -Dcn1.grpc.basePackage=com.example.catalog
+
+# Generate a typed GraphQL client from a schema (+ optional named operations).
+# Writes @Mapped models, schema enums, and a @GraphQLClient interface with
+# @Query/@Mutation/@Subscription methods. With an operations file the generated
+# methods/response models are precise; without one it falls back to a
+# bounded-depth (cn1.graphql.maxDepth, default 2) selection set per root field.
+mvn -pl common cn1:generate-graphql \
+  -Dcn1.graphql.schema=schema.graphqls \
+  -Dcn1.graphql.operations=operations.graphql \
+  -Dcn1.graphql.basePackage=com.example.catalog \
+  -Dcn1.graphql.clientName=CatalogGraphApi
 
 # --- Cloud builds (need a Codename One account; some need Enterprise tier) ---
 
@@ -53,6 +89,14 @@ mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
 
 # Local Xcode project, no cloud. See Xcode prerequisites below.
 mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
+
+# Native Mac app (AOT-compiled, shares the iOS pipeline so the Mac slice
+# is rendered + compiled the same way as the iOS one). Cloud-built.
+mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
+
+# Local Xcode project for the Mac slice. Open the project in Xcode and
+# select the Mac Catalyst destination to run.
+mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source
 
 # Native Android APK/AAB. Cloud-built by default.
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
@@ -65,6 +109,24 @@ mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-o
 mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=windows-desktop
 mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=linux-desktop
 ```
+
+## Hot reload — Java edits without restarting the simulator
+
+The simulator (`cn1:run` / `cn1:debug`) supports three reload modes, picked from the **Hot Reload** menu in the simulator's window (the setting persists per-project in Java preferences):
+
+| Mode | What it does | When to use |
+| --- | --- | --- |
+| **Disabled** (default) | No reload — restart `cn1:run` to pick up Java edits. CSS still live-reloads regardless. | Production-style runs. |
+| **Reload Simulator** | A file watcher (`SourceChangeWatcher`) recompiles changed `.java` files in `common/src/main/java/` via the IDE's incremental compiler and triggers a simulator restart. The simulator keeps the same JVM but rebuilds the form stack. | The most reliable mode — works on any edit (new class, signature change, new field). |
+| **Reload Current Form** | Requires the **HotswapAgent** JVM agent (set up via `cn1:debug` + an IDE that pushes class file redefinitions through JDWP) **plus** CodeRAD wiring on your forms. When a `.java` file is recompiled, the simulator calls `FormController.tryCloneAndReplaceCurrentForm()` and re-shows the current form on the patched class. | Fastest iteration for UI tweaks inside a single form — preserves global state and the navigation stack, only the visible form re-renders. Method-body edits work; adding fields or methods falls back to a full restart. |
+
+Behind the scenes:
+
+- **CSS reload** is always on. Edits to `common/src/main/css/theme.css` are watched and `theme.res` is regenerated + re-injected into the running simulator without restarting the JVM. This works in every mode.
+- **Java reload (mode 2)** is driven by the standard JVM HotSwap protocol (`-agentlib:jdwp=...,redefinitions=true`) plus [HotswapAgent](https://github.com/HotswapProjects/HotswapAgent) for the deeper redefinitions (added/removed methods, new classes). The IDE compiles the `.java` to a `.class` and JDWP-pushes it; the simulator notices via a system property and re-clones the form.
+- The watcher only sees files written by the IDE — running `mvn compile` from a separate shell doesn't trigger reload because the IDE's incremental compiler is what writes the `.class` to `target/classes/`.
+
+Method-body edits feel instantaneous; structural edits cost a form rebuild but no JVM restart.
 
 ## Tests in CI/CD
 

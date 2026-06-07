@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-send-device-activation-sms-via-twilio/tip.jpg)
 
-A very common question we get from developers is "how do I get the devices phone number". The answer is "you can’t really and you shouldn’t". To clarify, this is possible on Android but would require a scary set of permissions. It’s blocked on iOS completely though so you’d need a different solution anyway…​  
+A very common question we get from developers is "how do I get the device’s phone number". The answer is "you can’t really and you shouldn’t". To clarify, this is possible on Android but would require a scary set of permissions. It’s blocked on iOS completely though so you’d need a different solution anyway…​  
 If you look at apps like Uber, whatsapp etc. they all use SMS activation. They just ask you to type your number and activate your phone via SMS. Usually this SMS is sent from the server side but for simplicity lets discuss how this can be done entirely from your app.
 
 __ |  You should send the SMS from the server for security reasons as the Twillo keys will never appear in the client side   
@@ -56,7 +56,7 @@ Notice that there is currently a bug with the builtin basic authentication in th
             basicAuth(accountSID, authToken)).
             getAsJsonMap();
 
-What we do here is actually pretty trivial, we open a connection the the api messages URL. We add arguments to the body of the post request and define the basic authentication data.
+What we do here is actually pretty trivial, we open a connection to the api messages URL. We add arguments to the body of the post request and define the basic authentication data.
 
 The result is in JSON form we mostly ignore it since it isn’t that important but it might be useful for error handling. This is a sample response (redacted keys):
     

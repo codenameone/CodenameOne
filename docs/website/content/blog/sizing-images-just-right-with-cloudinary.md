@@ -23,7 +23,7 @@ In this article, I would like to share with you another powerful tool to add to 
 
 ## The Motivation
 
-Let’s take a look at a screen mock-up from a a [nice UI kit](http://www.invisionapp.com/now) that I’ve been working with lately:
+Let’s take a look at a screen mock-up from a [nice UI kit](http://www.invisionapp.com/now) that I’ve been working with lately:
 
 ![4a91f952 9295 11e5 953b 850dc84c0fb0](/blog/sizing-images-just-right-with-cloudinary/4a91f952-9295-11e5-953b-850dc84c0fb0.png)
 
@@ -71,7 +71,7 @@ When you sign up for cloudinary, you’ll receive an API key, and associated cre
           "api_secret", "my_api_secret"));
     
     
-        // Disable private CDN URLs as this doesn't seem to work with free accounts
+        // Disable private CDN URLs as this doesn’t seem to work with free accounts
         cloudinary.config.privateCdn = false;
     
         ...
@@ -117,7 +117,7 @@ The result is:
 
 ![251ad556 929d 11e5 8f07 d4d2e2b9ec0e](/blog/sizing-images-just-right-with-cloudinary/251ad556-929d-11e5-8f07-d4d2e2b9ec0e.png)
 
-You’ll notice that if you try to load that image directly from the [URL](http://upload.wikimedia.org/wikipedia/commons/4/46/Jennifer_Lawrence_at_the_83rd_Academy_Awards.jpg), it is massive! The Cloudinary service automatically resizes the image before sending it to the device in the requested size. Performing the resize on the server produces stellar results. Much better than you could achieve with on-device resizing. In addition, you save a lots of bandwidth for your users, which also improves app performance. It’s a win-win all ’round.
+You’ll notice that if you try to load that image directly from the [URL](http://upload.wikimedia.org/wikipedia/commons/4/46/Jennifer_Lawrence_at_the_83rd_Academy_Awards.jpg), it is massive! The Cloudinary service automatically resizes the image before sending it to the device in the requested size. Performing the resize on the server produces stellar results. Much better than you could achieve with on-device resizing. In addition, you save a lot of bandwidth for your users, which also improves app performance. It’s a win-win all ’round.
 
 ## But That’s Not All
 

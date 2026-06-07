@@ -19,6 +19,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Deterministic, network-free mock ad provider used by the advertising screenshot test. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-ads-mock</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
@@ -340,6 +347,13 @@
 
                 <executions>
                     <execution>
+                        <id>transcode-svg</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transcode-svg</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -350,8 +364,9 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>compliance-check</goal>
+                            <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>

@@ -20,7 +20,7 @@ To run the samples you need to checkout the [git cn1 project](https://github.com
     
     ant samples
 
-__ |  `JAVA_HOME` must point at a valid JDK for Codename One and ant must by in the system `PATH` variable. Otherwise this won’t work.   
+__ |  `JAVA_HOME` must point at a valid JDK for Codename One and ant must be in the system `PATH` variable. Otherwise this won’t work.   
 ---|---  
   
 ![The Sample Runner App](/blog/sheets-samples/sample-runner.png)

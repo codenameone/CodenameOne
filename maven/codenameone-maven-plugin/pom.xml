@@ -44,10 +44,46 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- JUnit 4 tests in this module run through Surefire 3.x's JUnit
+             Platform provider, which needs the Vintage engine to discover
+             org.junit.Test classes. Without this engine Surefire silently
+             reports zero tests. See pluginManagement comment on
+             maven-surefire-plugin above. -->
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- RouteAnnotationProcessorTest compiles @Route-annotated fixtures
+             with the in-test JavaSourceCompiler; the fixtures reference the
+             real com.codename1.annotations.Route + com.codename1.ui.Form
+             types from cn1-core. Pull it in directly so the test classpath
+             (and therefore JavaSourceCompiler's resolved classpath) has the
+             package layout. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${project.version}</version>
+            <!-- compile scope (was test) so the OpenAPI codegen mojo can use
+                 com.codename1.io.JSONParser to parse spec documents. The
+                 plugin already ships the codenameone-designer (jar-with-deps)
+                 above so the additional surface area is small. -->
+        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-designer</artifactId>
             <classifier>jar-with-dependencies</classifier>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-svg-transcoder</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-lottie-transcoder</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -240,7 +276,11 @@
                 </plugin>
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.22.1</version>
+                    <!-- Matches the version pinned in the parent reactor pom (3.2.5).
+                         Bumped from 2.22.1 because the older release silently
+                         skipped all JUnit tests in this module under JDK 8, and the
+                         router/annotation-processing tests need to actually run. -->
+                    <version>3.2.5</version>
                 </plugin>
                 <plugin>
                     <artifactId>maven-jar-plugin</artifactId>
@@ -280,8 +320,8 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.1</version>
-
+                <!-- See pluginManagement above for why this is on 3.2.5. -->
+                <version>3.2.5</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -317,6 +357,12 @@
                     <xmlOutput>true</xmlOutput>
                     <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
                     <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <!-- The plugin grew an ASM bytecode-instrumentation pass for
+                         BindingAnnotationProcessor; with effort=Max the
+                         FindOpenStream dataflow detector blew the default 512m
+                         heap on CI ("GC overhead limit exceeded"). Bump the
+                         forked JVM's max heap so SpotBugs has room to finish. -->
+                    <maxHeap>1536</maxHeap>
                 </configuration>
                 <executions>
                     <execution>

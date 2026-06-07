@@ -45,7 +45,7 @@ try {
 === Customizing your theme
 
 You can launch the designer tool by double clicking on the `theme.res` file found in typical Codename One applications.
-In the left side you can see the section picker and within it the Theme section.
+On the left side you can see the section picker and within it the Theme section.
 
 .The theme area in the designer
 image::img/theme-area-in-designer.png[The theme area in the designer]
@@ -55,7 +55,7 @@ When you select the theme you will see the theme default view.
 .Theme default view
 image::img/theme-default-view.png[Theme default view]
 
-many interesting things to notice here the preview section allows you to instantly see the changes you make to the theme data.
+There are many interesting things to notice here: the preview section allows you to instantly see the changes you make to the theme data.
 
 .Theme preview section
 image::img/theme-preview-section.png[Theme preview section,scaledwidth=50%]
@@ -97,7 +97,7 @@ The `Title` is surrounded by a `TitleArea` container that encloses it, above the
 .Title Area UIID's
 image::img/theme-title-area-UIIDs.png[Title Area UIID's,scaledwidth=50%]
 
-TIP: The `StatusBar` UIID is a special case that's there on iOS. In iOS the application needs to render the section under the status bar (which isn't the case for other OS's) and the `StatusBar` UIID was added so developers can ignore that behavior.
+TIP: The `StatusBar` UIID is a special case that's there on iOS. In iOS the application needs to render the section under the status bar (which isn't the case for other OSes) and the `StatusBar` UIID was added so developers can ignore that behavior.
 
 ==== Background priorities and types
 
@@ -118,7 +118,7 @@ The order for UIID settings for background is as follows:
 
 ==== The background behavior and Image
 
-Lets start in the first page of the style entry, you will customize the background behavior for the `Title` UIID and show/explain some behaviors.
+Start in the first page of the style entry, you will customize the background behavior for the `Title` UIID and show/explain some behaviors.
 
 The pictures below show the different types of background image behaviors.
 
@@ -167,29 +167,29 @@ image::img/theme-background-image-aligned-left.png[IMAGE_ALIGNED_LEFT places the
 .IMAGE_ALIGNED_RIGHT places the image centered at the right part of the component
 image::img/theme-background-image-aligned-right.png[IMAGE_ALIGNED_RIGHT places the image centered at the right part of the component]
 
-.IMAGE_ALIGNED_TOP_LEFT places the image at the top left corner
-image::img/theme-background-image-aligned-top-left.png[IMAGE_ALIGNED_TOP_LEFT places the image at the top left corner]
+.IMAGE_ALIGNED_TOP_LEFT places the image in the top left corner
+image::img/theme-background-image-aligned-top-left.png[IMAGE_ALIGNED_TOP_LEFT places the image in the top left corner]
 
-.IMAGE_ALIGNED_TOP_RIGHT places the image at the top right corner
-image::img/theme-background-image-aligned-top-right.png[IMAGE_ALIGNED_TOP_RIGHT places the image at the top right corner]
+.IMAGE_ALIGNED_TOP_RIGHT places the image in the top right corner
+image::img/theme-background-image-aligned-top-right.png[IMAGE_ALIGNED_TOP_RIGHT places the image in the top right corner]
 
-.IMAGE_ALIGNED_BOTTOM_LEFT places the image at the bottom left corner
-image::img/theme-background-image-aligned-bottom-left.png[IMAGE_ALIGNED_BOTTOM_LEFT places the image at the bottom left corner]
+.IMAGE_ALIGNED_BOTTOM_LEFT places the image in the bottom left corner
+image::img/theme-background-image-aligned-bottom-left.png[IMAGE_ALIGNED_BOTTOM_LEFT places the image in the bottom left corner]
 
-.IMAGE_ALIGNED_BOTTOM_RIGHT places the image at the bottom right corner
-image::img/theme-background-image-aligned-bottom-right.png[IMAGE_ALIGNED_BOTTOM_RIGHT places the image at the bottom right corner]
+.IMAGE_ALIGNED_BOTTOM_RIGHT places the image in the bottom right corner
+image::img/theme-background-image-aligned-bottom-right.png[IMAGE_ALIGNED_BOTTOM_RIGHT places the image in the bottom right corner]
 
 .IMAGE_ALIGNED_CENTER places the image in the middle of the component
 image::img/theme-background-image-aligned-center.png[IMAGE_ALIGNED_CENTER places the image in the middle of the component]
 
 ==== The color settings
 
-The color settings are much simpler than the background behavior. As explained <<background-priorities-list,above>> the priority for color is at the bottom so if you've a border, image or gradient defined the background color settings will be ignored.
+The color settings are much simpler than the background behavior. As explained <<background-priorities-list,above>> the priority for color is at the bottom so if you have a border, image or gradient defined the background color settings will be ignored.
 
 .Add theme entry color settings
 image::img/theme-entry-color.png[Add theme entry color settings]
 
-three color settings:
+There are three color settings:
 
 - Foreground color is the RRGGBB color that sets the style foreground color used to draw the text of the component. You can use the color picker button on the side to pick a color
 
@@ -201,7 +201,7 @@ TIP: Setting the background will have no effect unless transparency is higher th
 
 ==== Alignment
 
-Not all component types support alignment and even when they do they don't support it for all elements. For example: a https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] and its subclasses support alignment but will apply it to the text and not the icon.
+Not all component types support alignment and even when they do, they don't support it for all elements. For example: a https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] and its subclasses support alignment but will apply it to the text and not the icon.
 
 Notice that https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] doesn't support alignment. You should use the layout manager to tune component positioning.
 
@@ -210,7 +210,7 @@ image::img/theme-entry-align.png[Alignment of the text within some component typ
 
 WARNING: Aligning text components to anything other than the default alignment might be a problem if they're editable. The native editing capabilities might collide with the alignment behavior.
 
-NOTE: Bidi/RtL layout reverses the alignment value so left becomes right and visa versa
+NOTE: Bidi/RtL layout reverses the alignment value so left becomes right and vice versa
 
 ==== Padding and margin
 
@@ -243,7 +243,7 @@ A 9-piece image border is a common convention in UI theming that divides a borde
 
 TIP: Android uses a common variation on the 9-piece border: 9-patch. The main difference between the 9-piece border and 9-patch is that 9-piece borders tile the sides/center whereas 9-patch scales them
 
-9-piece image borders work better than background images for many use cases where the background needs to "grow/shrink" extensively and might need to change aspect ratio.
+The 9-piece image borders work better than background images for many use cases where the background needs to "grow/shrink" extensively and might need to change aspect ratio.
 
 They don't work well in cases where the image is asymmetric on both axis. For example: a radial gradient image. 9-piece images in general don't work well with complex gradients.
 
@@ -254,14 +254,14 @@ image::img/theme-entry-9-piece-wizard-stage1.png[Stage 1: create or pick an imag
 
 TIP: Use an image that's designed for a high DPI device
 
-For your convenience you can create a rudimentary image with the create image stage but for a professional looking application you would want to use a design by a professional designer.
+For your convenience you can create a rudimentary image with the `create image` stage but for a professional looking application you would want to use a design by a professional designer.
 
 .Stage 2: Cutting the image and adapting it to the DPI's
 image::img/theme-entry-9-piece-wizard-stage2.png[Stage 2: Cutting the image and adapting it to the DPI's]
 
 The second stage is probably the hardest and most important one in this wizard!
 
-You can change the values of the top/bottom/left/right spinners to move the position of the guide lines that show the various 9 pieces. The image shows the correct cut for this image type with special attention to the following:
+You can change the values of the top/bottom/left/right spinners to move the position of the guidelines that show the various 9 pieces. The image shows the correct cut for this image type with special attention to the following:
 
 - The left/right position is high enough to fit in the rounded corners in their entirety. Notice that you didn't leave 1 pixel as that performs badly, you want to leave as much space as possible!
 
@@ -273,7 +273,7 @@ image::img/theme-entry-9-piece-wizard-stage2-bad-border.png[This is why it's imp
 .When the lines are close together the gradient effect grows more effectively
 image::img/theme-entry-9-piece-wizard-stage2-better-border.png[When the lines are close together the gradient effect grows more effectively,scaledwidth=30%]
 
-- The elements on the right hand side include the #Generate Multi Image# options. Here you can show the density of the source image you're using (for example: if its for iPhone 5 class device pick High). You can then select in the checkboxes below the densities that should be generated automatically for you. This allows fine detail on the border to be maintained in the various high/low resolution devices.
+- The elements on the right-hand side include the #Generate Multi Image# options. Here you can show the density of the source image you're using (for example: if its for iPhone 5 class device pick High). You can then select in the checkboxes below the densities that should be generated automatically for you. This allows fine detail on the border to be maintained in the various high/low resolution devices.
 
 TIP: You go into a lot of details about multi images in the advanced theming section.
 
@@ -317,9 +317,9 @@ NOTE: Notice that the other elements in the UI are disabled when the image borde
 // vale-skip: write-good.Weasel — 'rarely used' is the natural phrase here; deleting 'rarely' would lose the meaning.
 The 9-piece border has a (rarely used) special case: 3 image mode. In this mode a developer can specify the top left corner, the top image and the center image to produce a 9 piece border. The corner and top piece are then rotated dynamically to produce a standard 9-piece border on the device.
 
-This is useful for reducing application code size but isn't used often as it requires a more symetric UI.
+This is useful for reducing application code size but isn't used often as it requires a more symmetric UI.
 
-NOTE: don't confuse the 3-image mode for the 9-piece border with the horizontal/vertical image border below
+NOTE: Don't confuse the 3-image mode for the 9-piece border with the horizontal/vertical image border below
 ****
 
 ==== Horizontal/Vertical Image Border
@@ -362,9 +362,9 @@ image::img/round-border-theme.png[Round Border,scaledwidth=50%]
 
 The `RoundRectBorder` was developed based on the `RoundBorder` and has similar features. It produces a rounded rectangle UI.
 
-TIP: don't confuse the Rounded Rectangle border with the deprecated `Rounded` border...
+TIP: Don't confuse the Rounded Rectangle border with the deprecated `Rounded` border...
 
-it's a pretty simple border type akin to the `RoundBorder`.
+It's a pretty simple border type akin to the `RoundBorder`.
 
 .Rounded Rectangle Border
 image::img/rounded-rectangle-border.png[Rounded Rectangle Border,scaledwidth=50%]
@@ -372,7 +372,7 @@ image::img/rounded-rectangle-border.png[Rounded Rectangle Border,scaledwidth=50%
 
 ==== Bevel/Etched borders
 
-You recommend avoiding bevel/etched border types as they aren't as efficient and look a bit dated in todays applications. You cover them here for completeness.
+You recommend avoiding bevel/etched border types as they aren't as efficient and look a bit dated in today's applications. You cover them here for completeness.
 
 .Bevel border
 image::img/theme-entry-border-edit-bevel.png[Bevel border]
@@ -565,7 +565,7 @@ image::img/theme-font-catalog-opo.png[The same demo running on a OnePlus One dev
 You can define an effect to be applied to a specific font, specifically:
 
 - Underline
-- Strike thru
+- Strike through
 - 3d text raised/lowered
 - 3d shadow north
 

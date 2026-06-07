@@ -25,6 +25,8 @@ package com.codename1.impl.javase;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.IOAccessor;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Rectangle;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.net.URLConnection;
@@ -40,7 +42,7 @@ import javax.swing.event.ListSelectionListener;
  *
  * @author Shai Almog
  */
-public class NetworkMonitor extends javax.swing.JPanel {
+public class NetworkMonitor extends javax.swing.JPanel implements Scrollable {
 
     private Map<URLConnection, NetworkRequestObject> requests = new HashMap<URLConnection, NetworkRequestObject>();
     private Map<ConnectionRequest, NetworkRequestObject> queuedRequests = new HashMap<ConnectionRequest, NetworkRequestObject>();
@@ -89,11 +91,50 @@ public class NetworkMonitor extends javax.swing.JPanel {
             });
 
             frame.pack();
+            Dimension packed = frame.getSize();
+            Rectangle screen = frame.getGraphicsConfiguration().getBounds();
+            int defaultW = Math.min(Math.max(packed.width, 1100), screen.width - 80);
+            int defaultH = Math.min(Math.max(packed.height, 700), screen.height - 80);
+            frame.setSize(defaultW, defaultH);
+            if (jSplitPane1 != null) {
+                jSplitPane1.setResizeWeight(0.25);
+                jSplitPane1.setDividerLocation(Math.max(220, defaultW / 4));
+            }
             frame.setLocationByPlatform(true);
             frame.setVisible(true);
 
         }
         return frame;
+    }
+
+    /// Scrollable implementation: when wrapped in a JScrollPane (single-window
+    /// mode via AppPanel.setScrollable), the monitor stretches to fill the
+    /// viewport width so the request list and detail tabs claim the full
+    /// available width as the simulator window resizes.
+
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+        return getPreferredSize();
+    }
+
+    @Override
+    public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+        return 16;
+    }
+
+    @Override
+    public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+        return orientation == SwingConstants.VERTICAL ? visibleRect.height : visibleRect.width;
+    }
+
+    @Override
+    public boolean getScrollableTracksViewportWidth() {
+        return true;
+    }
+
+    @Override
+    public boolean getScrollableTracksViewportHeight() {
+        return false;
     }
 
     public void dispose() {

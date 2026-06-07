@@ -149,10 +149,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private AsyncResource<Media> mediaAsync;
     private final Map<String, AsyncResource<Media>> mediaAsyncByUri = new ConcurrentHashMap<String, AsyncResource<Media>>();
     private Purchase inAppPurchase;
+    private InAppPurchaseFactory inAppPurchaseFactory;
     private int startRemoteControlInvocations;
     private int stopRemoteControlInvocations;
     private boolean mutableImagesFast = true;
     private boolean nativeTitle;
+    private boolean desktop;
+    private String desktopTitleBarMode = "toolbar";
+    private java.util.Vector lastNativeCommands;
     private int softkeyCount = 2;
     private boolean thirdSoftButton = false;
     private boolean nativeFontSchemeSupported = true;
@@ -533,6 +537,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setNativeTitle(boolean nativeTitle) {
         this.nativeTitle = nativeTitle;
+    }
+
+    @Override
+    public boolean isDesktop() {
+        return desktop;
+    }
+
+    public void setDesktop(boolean desktop) {
+        this.desktop = desktop;
+    }
+
+    @Override
+    public String getDesktopTitleBarMode() {
+        return desktopTitleBarMode;
+    }
+
+    public void setDesktopTitleBarMode(String mode) {
+        this.desktopTitleBarMode = mode;
+    }
+
+    @Override
+    public void setNativeCommands(java.util.Vector commands) {
+        this.lastNativeCommands = commands;
+    }
+
+    /** @return the commands last pushed via setNativeCommands, for desktop-chrome assertions. */
+    public java.util.Vector getLastNativeCommands() {
+        return lastNativeCommands;
     }
 
     @Override
@@ -1010,6 +1042,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        desktop = false;
+        nativeTitle = false;
+        desktopTitleBarMode = "toolbar";
+        lastNativeCommands = null;
         clearFileSystem();
         clearSockets();
         clearConnections();
@@ -1060,6 +1096,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         localizationManager = null;
         imageIO = null;
         inAppPurchase = null;
+        inAppPurchaseFactory = null;
         contactIdCounter.set(1);
         accessPointIds = new String[0];
         accessPointTypes.clear();
@@ -3006,8 +3043,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.inAppPurchase = purchase;
     }
 
+    /// Factory that produces a fresh {@link Purchase} on every
+    /// {@link #getInAppPurchase()} call.  The real platform ports
+    /// (iOS {@code ZoozPurchase}, Android {@code ZoozPurchase}, the JavaSE
+    /// anonymous subclass) all construct a new instance per call, so a test
+    /// that needs to reproduce that behaviour (e.g. verifying state shared
+    /// across instances) installs a factory rather than a cached instance.
+    public interface InAppPurchaseFactory {
+        Purchase create();
+    }
+
+    public void setInAppPurchaseFactory(InAppPurchaseFactory factory) {
+        this.inAppPurchaseFactory = factory;
+    }
+
     @Override
     public Purchase getInAppPurchase() {
+        if (inAppPurchaseFactory != null) {
+            return inAppPurchaseFactory.create();
+        }
         if (inAppPurchase != null) {
             return inAppPurchase;
         }

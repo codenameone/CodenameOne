@@ -74,10 +74,10 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache CocoaPods and user gems
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gem
@@ -113,6 +113,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              maven/codenameone-maven-plugin/src/main \
               -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
@@ -129,7 +130,7 @@ jobs:
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
@@ -137,7 +138,7 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -145,7 +146,7 @@ jobs:
             ${{ runner.os }}-m2-
 
       - name: Restore cn1-binaries cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ../cn1-binaries
           key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
@@ -153,13 +154,17 @@ jobs:
             cn1-binaries-${{ runner.os }}-
 
       - name: Restore built CN1 + iOS port artifacts
+        # Use the exact key build-port saved against (published as a job
+        # output). Recomputing src_hash locally drifts whenever new
+        # source paths are added to the build-port hash without
+        # mirroring the change here.
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
-          key: cn1-built-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
           fail-on-cache-miss: true
 
       - name: Build sample iOS app
@@ -180,7 +185,7 @@ jobs:
 
       - name: Upload native iOS artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-native-tests
           path: artifacts

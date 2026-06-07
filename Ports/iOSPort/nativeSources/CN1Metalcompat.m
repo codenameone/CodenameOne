@@ -755,13 +755,81 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
 // the failure rather than papering over it with a different pipeline
 // that would silently mask the bug.
 
+// Returns the effective screen-pixel scale baked into the current
+// transform. The vertex shader applies `projection * modelView *
+// transform * pos`; projection / modelView are stable per frame and
+// expressed in framebuffer units, so any *additional* scaling comes
+// from `currentTransform`. For text rendering we want to know that
+// effective scale up front so the glyph atlas can rasterise at the
+// matching pixel size; otherwise the atlas glyph art (rasterised at
+// font.pointSize) is sampled through a stretched quad and the glyph
+// turns into a smear at every `g.setTransform(scale)` site -- e.g.
+// the SVG transcoder painting `<text>` under a viewBox-to-display
+// scale, which is the most visible offender.
+//
+// Pulls a uniform scale by averaging the magnitudes of the two basis
+// vectors of the upper-left 2x2 (sx along the X column, sy along the
+// Y column). Shear-only or pure-rotation matrices return 1 because
+// both column magnitudes stay at 1; pure scale returns the scale.
+// We do *not* try to handle non-uniform scale separately -- the
+// glyph atlas slot key is one float (pointSize), so even if the
+// SVG draws with sx != sy we have to pick one. Going with the
+// geometric mean keeps the rasterised glyph close to either bound
+// and the residual GPU stretch only kicks in along the dimension
+// that's farther from the mean.
+static inline float currentTransformGlyphScale(void) {
+    float c0x = currentTransform.columns[0].x;
+    float c0y = currentTransform.columns[0].y;
+    float c1x = currentTransform.columns[1].x;
+    float c1y = currentTransform.columns[1].y;
+    float sx = sqrtf(c0x * c0x + c0y * c0y);
+    float sy = sqrtf(c1x * c1x + c1y * c1y);
+    float s = (sx + sy) * 0.5f;
+    // Reject NaN / inf / non-positive values: any of those would
+    // poison `font.pointSize * s` below and produce a UIFont with
+    // bad metrics that hangs the CTLine layout. `isfinite` is true
+    // only for finite numbers; treat anything else as "use unscaled
+    // font" by returning 1.0 (the `useScaledFont` gate at the call
+    // site clears that to the fast path).
+    if (!isfinite(s) || s <= 0.0f) return 1.0f;
+    // Cap at 8x to keep the atlas from rasterising absurdly large
+    // bitmaps for a runaway transform; well past 8x the difference
+    // between "atlas-perfect" and "sampled-and-filtered" is below
+    // what the user can see anyway.
+    if (s < 1.0f) s = 1.0f;     // No down-rasterising; 1px atlas is fine for downscale.
+    if (s > 8.0f) s = 8.0f;
+    return s;
+}
+
 void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
-    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:font];
+    // CoreText shapes glyphs and the atlas rasterises them at font.pointSize
+    // — but the active Graphics transform may be scaling the whole drawing
+    // up before the framebuffer write. If we hand the shader a quad sized to
+    // the unscaled glyph and let the transform stretch it on the GPU, the
+    // result is a smeared/blurry glyph (Codename One's SVG transcoder paints
+    // viewBox-relative text through `g.setTransform(scale*translate)`, so the
+    // screen scale is routinely 2x-4x). Detect the scale baked into
+    // `currentTransform` and rasterise the atlas at the effective pixel size
+    // so the shader transform produces a 1:1 sample. We then divide the
+    // returned glyph metrics back down by the same factor so the vertex
+    // coords stay in unscaled space — the GPU re-applies `currentTransform`
+    // for free and the final on-screen position matches the unscaled path.
+    float glyphScale = currentTransformGlyphScale();
+    BOOL useScaledFont = (glyphScale > 1.01f);
+    UIFont *renderFont = useScaledFont
+        ? [font fontWithSize:font.pointSize * glyphScale]
+        : font;
+    if (renderFont == nil) {
+        renderFont = font;
+        useScaledFont = NO;
+    }
+
+    CN1MetalGlyphAtlas *atlas = [CN1MetalGlyphAtlas atlasForFont:renderFont];
     if (atlas == nil) {
         NSLog(@"CN1MetalDrawString: no atlas available for font %@ pt=%g; string skipped",
-              font.fontName, (double)font.pointSize);
+              renderFont.fontName, (double)renderFont.pointSize);
         return;
     }
 
@@ -774,7 +842,7 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // fresh form, which surfaced as the TL panel of graphics-draw-string-
     // decorated rendering larger/wider glyphs than TR/BL/BR despite
     // identical Java state.
-    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: font };
+    NSDictionary *attrs = @{ (__bridge NSString *)kCTFontAttributeName: renderFont };
     CFAttributedStringRef attrStr = CFAttributedStringCreate(NULL,
                                                              (__bridge CFStringRef)str,
                                                              (__bridge CFDictionaryRef)attrs);
@@ -798,7 +866,14 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // (not CTFontGetAscent) is intentional — UIKit's metric is what
     // drawAtPoint references and the values can disagree slightly across
     // fonts.
+    //
+    // Use the ORIGINAL font's ascender (and the original pointSize) so the
+    // baseline lands where the caller-side framework expects, even when we
+    // upscaled the atlas. The atlas-internal metrics (renderFont) reflect
+    // the rasterised size; we divide them by `glyphScale` below to bring
+    // them back into caller-side coords.
     float baselineY = (float)y + (float)font.ascender;
+    float invScale = useScaledFont ? (1.0f / glyphScale) : 1.0f;
 
     simd_float4 colorV = premultipliedColor(color, alpha);
     int textureW = atlas.textureWidth;
@@ -838,11 +913,24 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
             //   bbox-left-on-screen  = x + posX + bearingX
             //   bbox-top-on-screen   = baselineY - posY - (bearingY + bbox.height)
             // Slot extends 1px above and to the left of the bbox.
-            float gx = (float)x + (float)posPtr[i].x + slot.bearingX - 1.0f;
-            float gy = baselineY - (float)posPtr[i].y
-                       - (slot.bearingY + slot.bboxHeight) - 1.0f;
-            float gw = (float)slot.width;
-            float gh = (float)slot.height;
+            //
+            // When the atlas was rasterised at the upscaled size, the
+            // CoreText positions and slot metrics are in renderFont-pixel
+            // space (which is glyphScale times the caller-side pixel space).
+            // Divide each one back down by glyphScale so the emitted vertex
+            // coords live in caller-side space — the vertex shader will
+            // re-apply currentTransform (the same scale we factored out) and
+            // produce a quad of the correct on-screen size, sampling
+            // 1:1 against the now-matching atlas.
+            float posX = (float)posPtr[i].x * invScale;
+            float posY = (float)posPtr[i].y * invScale;
+            float bearingX = slot.bearingX * invScale;
+            float bearingY = slot.bearingY * invScale;
+            float bboxHeight = slot.bboxHeight * invScale;
+            float gx = (float)x + posX + bearingX - invScale;
+            float gy = baselineY - posY - (bearingY + bboxHeight) - invScale;
+            float gw = (float)slot.width * invScale;
+            float gh = (float)slot.height * invScale;
 
             float vertices[8] = {
                 gx,        gy,
@@ -1343,7 +1431,32 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
                 seedPass.colorAttachments[0].texture = tex;
                 seedPass.colorAttachments[0].loadAction = MTLLoadActionLoad;
                 seedPass.colorAttachments[0].storeAction = MTLStoreActionStore;
+                // Pipelines in CN1MetalPipelineCache declare
+                // stencilAttachmentPixelFormat=Stencil8 (polygon-clip #3921),
+                // so every pass that binds one must attach a Stencil8 texture
+                // or Metal aborts in setRenderPipelineState: with a pixel-
+                // format mismatch (issue #5103). The seed draw never engages
+                // the stencil test, so a throwaway clear-on-load attachment
+                // is sufficient.
+                id<MTLTexture> seedStencilTex = nil;
+                MTLTextureDescriptor *seedStencilDesc = [MTLTextureDescriptor
+                    texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+                    width:(NSUInteger)width height:(NSUInteger)height mipmapped:NO];
+                seedStencilDesc.usage = MTLTextureUsageRenderTarget;
+                seedStencilDesc.storageMode = MTLStorageModePrivate;
+                seedStencilTex = [device newTextureWithDescriptor:seedStencilDesc];
+                if (seedStencilTex != nil) {
+                    seedPass.stencilAttachment.texture = seedStencilTex;
+                    seedPass.stencilAttachment.loadAction = MTLLoadActionClear;
+                    seedPass.stencilAttachment.storeAction = MTLStoreActionDontCare;
+                    seedPass.stencilAttachment.clearStencil = 0;
+                }
                 id<MTLRenderCommandEncoder> seedEnc = [setupCb renderCommandEncoderWithDescriptor:seedPass];
+#ifndef CN1_USE_ARC
+                // renderCommandEncoderWithDescriptor: retains attachments for
+                // the duration of the encoded pass; drop our +1 now.
+                [seedStencilTex release];
+#endif
                 [seedEnc setViewport:(MTLViewport){0.0, 0.0, (double)width, (double)height, 0.0, 1.0}];
                 [seedEnc setRenderPipelineState:seedState];
 
@@ -1499,13 +1612,54 @@ void CN1MetalEndMutableImageDraw(GLUIImage *image) {
     }
 }
 
+// Wait for a Metal command buffer to finish WITHOUT the risk of blocking the
+// calling thread forever. Plain [cb waitUntilCompleted] deadlocks on a buffer
+// that was created but never committed (the readback runs between a mutable
+// image's Begin and End), and it blocks indefinitely on a genuinely stuck GPU
+// command buffer. Both modes intermittently hung the iOS Metal screenshot
+// suite inside the readback path (e.g. ChartRotatedScreenshotTest): the app
+// stalls with no crash and no Metal validation error, the runner eventually
+// SIGTERMs it, and every test after the stall is silently dropped.
+//
+// Returns YES only when the buffer reached Completed. On NO the caller reads
+// back whatever is currently in the texture, so the affected screenshot fails
+// visibly against its golden instead of taking down the whole suite.
+static BOOL cn1MetalWaitCommandBufferBounded(id<MTLCommandBuffer> cb, double timeoutSeconds) {
+    if (cb == nil) return YES;
+    MTLCommandBufferStatus st = cb.status;
+    if (st == MTLCommandBufferStatusCompleted) return YES;
+    if (st == MTLCommandBufferStatusError) return NO;
+    if (st == MTLCommandBufferStatusNotEnqueued || st == MTLCommandBufferStatusEnqueued) {
+        // Never committed -> it will never be submitted to the GPU, so
+        // waitUntilCompleted would block forever. Do not wait.
+        NSLog(@"CN1Metal: readback on an uncommitted command buffer (status=%ld); skipping wait to avoid deadlock", (long)st);
+        return NO;
+    }
+    // Committed/Scheduled: it should complete. Poll the status with a deadline
+    // as a backstop against a stuck buffer rather than calling the unbounded
+    // waitUntilCompleted.
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeoutSeconds];
+    for (;;) {
+        st = cb.status;
+        if (st == MTLCommandBufferStatusCompleted) return YES;
+        if (st == MTLCommandBufferStatusError) return NO;
+        if ([deadline timeIntervalSinceNow] <= 0) {
+            NSLog(@"CN1Metal: command buffer wait timed out after %.1fs (status=%ld); proceeding to avoid suite hang", timeoutSeconds, (long)st);
+            return NO;
+        }
+        [NSThread sleepForTimeInterval:0.004];
+    }
+}
+
 void CN1MetalFlushMutableImageSync(GLUIImage *image) {
     if (image == nil) return;
     id<MTLCommandBuffer> cb = [image mtlMutableCommandBuffer];
     if (cb == nil) return;
-    [cb waitUntilCompleted];
+    // Bounded wait: never block the screenshot/readback path forever on an
+    // uncommitted or stuck command buffer (see cn1MetalWaitCommandBufferBounded).
+    cn1MetalWaitCommandBufferBounded(cb, 8.0);
     // Don't nil the cb -- multiple readbacks of the same already-completed
-    // buffer should be no-op-fast (waitUntilCompleted is idempotent).
+    // buffer should be no-op-fast.
 }
 
 BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
@@ -1545,7 +1699,7 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
          destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
     [blitCb commit];
-    [blitCb waitUntilCompleted];
+    cn1MetalWaitCommandBufferBounded(blitCb, 8.0);
 
     // Read shared texture into a temp BGRA buffer, then convert + scale
     // into outARGB. Texture dims equal imgWidth/imgHeight when the
@@ -1628,7 +1782,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
          destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
     [blitCb commit];
-    [blitCb waitUntilCompleted];
+    cn1MetalWaitCommandBufferBounded(blitCb, 8.0);
 
     NSUInteger rowBytes = (NSUInteger)(texW * 4);
     NSUInteger byteCount = rowBytes * (NSUInteger)texH;
@@ -1660,6 +1814,75 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     UIImage *out = [UIImage imageWithCGImage:cgImg];
     CGImageRelease(cgImg);
     return out;
+}
+
+// --------------- Mutable-image suspend/resume backup (issue #5153) ---------------
+//
+// Private-storage textures backing mutable images can have their contents
+// discarded while the app is suspended, so a cached mutable image (e.g. the
+// RoundBorder drop shadow under a FloatingActionButton) would sample garbage
+// on resume and render as a violet fill. We keep a weak registry of every
+// live mutable image and, on applicationWillResignActive, read each one back
+// into its UIImage backing and drop the volatile texture. The texture is
+// transparently rebuilt from that backing the next time the image is painted
+// or sampled (CN1MetalEnsureMutableTexture / GLUIImage.getMTLTexture both
+// re-seed from getImage), so the pixels survive the round trip.
+
+static NSHashTable *gMutableImageRegistry = nil; // weak refs, no ownership
+static id gMutableImageRegistryToken = nil;      // @synchronized lock token
+
+static void cn1EnsureMutableImageRegistry(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        gMutableImageRegistry = [[NSHashTable weakObjectsHashTable] retain];
+        gMutableImageRegistryToken = [[NSObject alloc] init];
+    });
+}
+
+void CN1MetalRegisterMutableImage(GLUIImage *image) {
+    if (image == nil) return;
+    cn1EnsureMutableImageRegistry();
+    @synchronized (gMutableImageRegistryToken) {
+        [gMutableImageRegistry addObject:image];
+    }
+}
+
+void CN1MetalUnregisterMutableImage(GLUIImage *image) {
+    if (image == nil || gMutableImageRegistry == nil) return;
+    @synchronized (gMutableImageRegistryToken) {
+        [gMutableImageRegistry removeObject:image];
+    }
+}
+
+void CN1MetalBackupMutableImagesForSuspend(void) {
+    if (gMutableImageRegistry == nil) return;
+    NSArray *snapshot;
+    @synchronized (gMutableImageRegistryToken) {
+        // allObjects returns a strong-referencing array, so the images stay
+        // alive for the duration of the loop even though the table is weak.
+        // Iterating the snapshot (not the table) also makes the mutations
+        // below -- which can unregister images -- safe.
+        snapshot = [gMutableImageRegistry allObjects];
+    }
+    for (GLUIImage *image in snapshot) {
+        if ([image mtlMutableTexture] == nil) {
+            continue;
+        }
+        // Read the current GPU pixels back into a UIImage *before* dropping
+        // the texture or its pending command buffer (the readback waits on
+        // that command buffer).
+        UIImage *backup = CN1MetalReadMutableImageAsUIImage(image);
+        if (backup == nil) {
+            // Readback failed -- keep the existing texture rather than lose
+            // the content outright; nothing better we can do here.
+            continue;
+        }
+        [image setMtlMutableCommandBuffer:nil];
+        [image setMtlMutableTexture:nil width:0 height:0];
+        // setImage: becomes the seed source for the lazy rebuild and also
+        // invalidates the read-only mtlTexture cache.
+        [image setImage:backup];
+    }
 }
 
 // --------------- Memory-pressure cache release ---------------

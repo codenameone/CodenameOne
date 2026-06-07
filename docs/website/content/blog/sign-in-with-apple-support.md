@@ -20,7 +20,7 @@ __ |  If your app doesn’t require sign-in or uses custom login logic there’s
   
 ## Getting Started
 
-The hardest part of adding Apple sign-in support house-keeping you need to perform in Apple’s developer portal. If you only intend to support Apple sign-in with your iOS app, and not on other platforms, then the process is pretty simple – you just check a box next to "Sign-in with Apple" in the capabilites section of your App ID details page. Set-up for other platforms is a bit more involved. You need to create a "Services ID" (used for the Oauth2 client ID), and generate a private key so you will be able to generate the Oauth2 client secret on-demand.
+The hardest part of adding Apple sign-in support is the house-keeping you need to perform in Apple’s developer portal. If you only intend to support Apple sign-in with your iOS app, and not on other platforms, then the process is pretty simple – you just check a box next to "Sign-in with Apple" in the capabilities section of your App ID details page. Set-up for other platforms is a bit more involved. You need to create a "Services ID" (used for the Oauth2 client ID), and generate a private key so you will be able to generate the Oauth2 client secret on-demand.
 
 For full instructions see the [setup documentation in the cn1lib’s wiki](https://github.com/shannah/cn1-applesignin/wiki/Getting-Started).
 

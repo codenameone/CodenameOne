@@ -17,7 +17,7 @@ The main problem with this is another pain point for iOS developers. Newer versi
 
 It’s a pain because Catalina (the new Mac OS) isn’t compatible with xcode 9.2. As a result we killed support for xcode 9.2 and if you explicitly request it in your build hints your build will fail starting today. Next week we’ll upgrade the OS’s and install the new version of xcode. At that point you should be able to send a build with xcode set to 11.3 as an option. To do that you can use the build hint: `ios.xcode_version=11.3` or `ios.xcode_version=10.1`. By April we hope to make 11.3 the default value.
 
-__ |  We suggest removing this build hint once your done so you can use the default target recommended by us   
+__ |  We suggest removing this build hint once you’re done so you can use the default target recommended by us   
 ---|---
 ---
 

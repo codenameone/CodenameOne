@@ -53,7 +53,7 @@ _
   
 Most of the functionality used by annotations is useful with dynamic loading, I would be interested to hear use cases though so feel free to submit issues with specific cases you would want to enable.
 
-Lets look at the results and then I’ll try to interpret them. Feel free to give your own spin in the comments below.  
+Let’s look at the results and then I’ll try to interpret them. Feel free to give your own spin in the comments below.  
   
 The first chart represents the primary feature, listed by rank below. 
 

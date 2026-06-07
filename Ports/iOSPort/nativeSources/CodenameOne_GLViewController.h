@@ -76,6 +76,43 @@
 //#define INCLUDE_SPEECHRECOGNITION_USAGE
 //#define INCLUDE_NFCREADER_USAGE
 
+// CN1_INCLUDE_NFC gates the com.codename1.nfc native bridge (CoreNFC.framework
+// import, NFCNDEFReaderSession / NFCTagReaderSession code). IPhoneBuilder
+// uncomments this only when the classpath scanner saw com.codename1.nfc.*,
+// so apps that never touch NFC ship without any CoreNFC symbols and pass
+// Apple's API-usage scan without declaring an NFC privacy manifest.
+//#define CN1_INCLUDE_NFC
+
+// INCLUDE_CN1_CAMERA gates the low-level com.codename1.camera native bridge
+// (CN1Camera.{h,m}: AVFoundation AVCaptureSession preview/frames/photo/video).
+// IPhoneBuilder uncomments this only when the classpath scanner saw
+// com.codename1.camera.*, so apps that use the OLD modal Capture API (which
+// only needs INCLUDE_CAMERA_USAGE) do NOT drag in the new AVFoundation-based
+// natives. Keep this independent of INCLUDE_CAMERA_USAGE on purpose.
+//#define INCLUDE_CN1_CAMERA
+
+// CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
+// (AuthenticationServices.framework import, ASWebAuthenticationSession code
+// in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the
+// classpath scanner saw com.codename1.io.oidc.*, so apps that never use
+// OidcClient ship without the AuthenticationServices link dependency.
+//#define CN1_INCLUDE_OIDC
+
+// CN1_INCLUDE_APPLESIGNIN gates the com.codename1.social.AppleSignIn native
+// bridge (ASAuthorizationAppleIDProvider code in CN1AppleSignIn.m).
+// IPhoneBuilder uncomments this only when the scanner saw AppleSignIn
+// references; without it the .m's body compiles to nothing and apps that
+// never reference AppleSignIn don't need the `com.apple.developer.applesignin`
+// entitlement.
+//#define CN1_INCLUDE_APPLESIGNIN
+
+// CN1_INCLUDE_WEBAUTHN gates the com.codename1.io.webauthn native bridge
+// (ASAuthorizationPlatformPublicKeyCredentialProvider code in CN1WebAuthn.m,
+// iOS 16+). IPhoneBuilder uncomments this only when the scanner saw
+// com.codename1.io.webauthn.*; apps that never use passkeys ship without
+// any passkey symbols.
+//#define CN1_INCLUDE_WEBAUTHN
+
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 //#define USE_FACEBOOK_CONNECT_PODS

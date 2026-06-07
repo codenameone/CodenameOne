@@ -39,7 +39,7 @@ new pipeline mode
 ](http://www.codenameone.com/3/post/2014/02/a-new-pipeline-for-windows-phone.html)  
 for windows  
   
-phone to be the default, its clearly the way to go forward in the long run since we just don’t have any other choice. All feedback on the new pipeline found it to improve performance significantly and generally reduces some of the paint issues that we run into with Windows Phone. However, there are a couple of reports pointing out that font quality has degraded with the new pipeline. We are looking into this but came to the decision that even if this isn’t solvable we will stick with the new pipeline since the old one is just not viable for moving forward.  
+phone to be the default, it’s clearly the way to go forward in the long run since we just don’t have any other choice. All feedback on the new pipeline found it to improve performance significantly and generally reduces some of the paint issues that we run into with Windows Phone. However, there are a couple of reports pointing out that font quality has degraded with the new pipeline. We are looking into this but came to the decision that even if this isn’t solvable we will stick with the new pipeline since the old one is just not viable for moving forward.  
   
   
   
@@ -50,7 +50,7 @@ As part of our ongoing work with the new Android pipeline we added an experiment
 `Display.getInstance().setProperty("blockOverdraw", "true");`  
   
   
-This might improve performance for some cases and might improve performance on platforms other than Android. We’d be interested to hear if this mode break stuff in your application.  
+This might improve performance for some cases and might improve performance on platforms other than Android. We’d be interested to hear if this mode breaks stuff in your application.  
   
   
   

@@ -48,6 +48,7 @@ import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
@@ -2226,6 +2227,18 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// {@inheritDoc}
     @Override
     public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
+        // Modern path: a Material-style circular arc spinner painted
+        // directly by Graphics, with no Label / rotating-icon
+        // machinery. Opt-in via the `pullToRefreshModernBool` theme
+        // constant; the iOS Modern and Android Material themes turn
+        // this on by default so they get the spec-fidelity look. The
+        // legacy path below is the framework default and remains
+        // pixel-identical for apps that don't enable the constant.
+        if (getUIManager().isThemeConstant("pullToRefreshModernBool", false)) {
+            drawModernPullToRefresh(g, cmp, taskExecuted);
+            return;
+        }
+
         final Form parentForm = cmp.getComponentForm();
         final int scrollY = cmp.getScrollY();
         Component cmpToDraw;
@@ -2309,9 +2322,181 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         pull.paintComponent(g);
     }
 
+    /// Material 3 / iOS modern pull-to-refresh: a circular arc spinner
+    /// painted directly with `Graphics`. No Label / rotating-image
+    /// machinery, no `pull` container layout pass per frame -- just an
+    /// arc whose sweep grows from 0&deg; to ~330&deg; as the user pulls
+    /// through the threshold, then spins continuously (advancing the
+    /// start angle each frame) once the task fires.
+    ///
+    /// Geometry:
+    ///
+    /// - Indicator diameter: `pullToRefreshIndicatorDiameterMm` (default 8mm).
+    /// - Stroke thickness: `pullToRefreshIndicatorStrokeMm` (default 0.6mm).
+    /// - Colour: `TabIndicator` UIID's fg colour if set (consistent with
+    ///   the animated tab indicator), otherwise the form's title fg.
+    /// - The arc sits centered horizontally and at `pullToRefreshHeight / 2`
+    ///   from the form's content-pane top.
+    ///
+    /// `taskExecuted == true` -> continuous-spin mode (animation
+    /// registered with the form so it ticks each frame). Pre-threshold
+    /// the sweep mirrors the user's pull fraction; post-threshold (but
+    /// pre-release) the sweep is fixed at the full ring.
+    private long modernSpinStartTime = 0L;
+
+    public void drawModernPullToRefresh(Graphics g, Component cmp, boolean taskExecuted) {
+        final int height = getPullToRefreshHeight();
+        final int scrollY = cmp.getScrollY();
+        final int pullDistance = -scrollY;          // positive when pulling
+        if (pullDistance <= 0 && !taskExecuted) {
+            return;
+        }
+
+        final int diameter = Display.getInstance().convertToPixels(modernIndicatorDiameterMm());
+        final int strokePx = Math.max(1, Display.getInstance().convertToPixels(modernIndicatorStrokeMm()));
+        final int radius = diameter / 2;
+        // Center the indicator horizontally and inside the pull region.
+        int cx = cmp.getAbsoluteX() + cmp.getWidth() / 2;
+        int cy = cmp.getAbsoluteY() - scrollY - height / 2;
+        int boxX = cx - radius;
+        int boxY = cy - radius;
+
+        int sweep;            // degrees -- the visible arc length
+        int startAngle;       // degrees -- where the arc starts (0 = 3 o'clock, CCW positive in CN1 Graphics)
+        if (taskExecuted) {
+            // Continuous spin: rotate the arc by ~360 deg/sec.
+            if (modernSpinStartTime == 0L) {
+                modernSpinStartTime = AnimationTime.now();
+            }
+            long elapsed = AnimationTime.now() - modernSpinStartTime;
+            startAngle = (int) ((elapsed / 2L) % 360L);
+            sweep = 280;
+            // Schedule the next frame -- without this the spinner freezes
+            // after one paint pass.
+            Form f = cmp.getComponentForm();
+            if (f != null) {
+                f.registerAnimated(modernSpinnerRepaintAnimation(cmp));
+            }
+        } else {
+            modernSpinStartTime = 0L;
+            // Pull fraction 0..1 over the threshold height.
+            float pull = pullDistance / (float) Math.max(1, height);
+            float clamped = Math.min(1f, Math.max(0f, pull));
+            sweep = (int) (clamped * 330);   // grow from 0 to ~full ring
+            startAngle = 90;                  // top of the circle
+        }
+
+        // Material 3 spec: the arc sits on a white circular disc with a
+        // soft drop shadow. Without the disc the arc is invisible against
+        // a same-colour backdrop, so paint the disc + shadow first and
+        // then the arc on top.
+        final int discPad = Math.max(2, strokePx + 1);
+        final int discRadius = radius + discPad;
+        final int discDiameter = discRadius * 2;
+        final int shadowOffset = Math.max(1, strokePx);
+
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        try {
+            // Soft drop shadow: three concentric translucent black discs
+            // offset down emulate a small Gaussian blur in pure CN1
+            // Graphics (which doesn't expose a real shadow filter).
+            g.setColor(0x000000);
+            for (int i = 0; i < 3; i++) {
+                int extra = 2 - i;
+                int r = discRadius + extra;
+                g.setAlpha(28);
+                g.fillArc(cx - r, cy - r + shadowOffset, 2 * r, 2 * r, 0, 360);
+            }
+            // White disc backdrop.
+            g.setColor(0xffffff);
+            g.setAlpha(255);
+            g.fillArc(cx - discRadius, cy - discRadius, discDiameter, discDiameter, 0, 360);
+            // Arc itself -- N concentric arcs offset by 1px each emulate a
+            // thick stroke (CN1 Graphics has no stroke-width on drawArc).
+            g.setColor(modernIndicatorColor());
+            for (int i = 0; i < strokePx; i++) {
+                g.drawArc(boxX + i, boxY + i, diameter - 2 * i, diameter - 2 * i, startAngle, sweep);
+            }
+        } finally {
+            g.setColor(oldColor);
+            g.setAlpha(oldAlpha);
+        }
+    }
+
+    private float modernIndicatorDiameterMm() {
+        String s = getUIManager().getThemeConstant("pullToRefreshIndicatorDiameterMm", null);
+        if (s != null) {
+            float f = Util.toFloatValue(s);
+            if (f > 0) {
+                return f;
+            }
+        }
+        return 8f;
+    }
+
+    private float modernIndicatorStrokeMm() {
+        String s = getUIManager().getThemeConstant("pullToRefreshIndicatorStrokeMm", null);
+        if (s != null) {
+            float f = Util.toFloatValue(s);
+            if (f > 0) {
+                return f;
+            }
+        }
+        return 0.6f;
+    }
+
+    private int modernIndicatorColor() {
+        // `getComponentStyle(...)` always returns a non-null Style
+        // (synthesising an empty one when no matching UIID is registered),
+        // so the null check on the result would be redundant.
+        Style indicator = getUIManager().getComponentStyle("TabIndicator");
+        if (indicator.getFgColor() != 0) {
+            return indicator.getFgColor();
+        }
+        // Fall back to the form's title foreground, which already tracks
+        // accent in the modern themes.
+        Style title = getUIManager().getComponentStyle("Title");
+        int titleFg = title.getFgColor();
+        if (titleFg != 0) {
+            return titleFg;
+        }
+        return 0x007aff;     // iOS blue as ultimate fallback
+    }
+
+    /// Animation hook used during the continuous-spin phase to request a
+    /// repaint each EDT cycle without rebuilding state on every frame.
+    /// Holds no reference to a per-spinner instance -- the animation is
+    /// registered once and stops itself when `taskExecuted` flips back to
+    /// false (the pull-to-refresh container repaints from elsewhere when
+    /// the task finishes).
+    private Animation modernSpinnerRepaintAnimation(final Component cmp) {
+        return new Animation() {
+            @Override
+            public boolean animate() {
+                cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(),
+                        cmp.getWidth(), getPullToRefreshHeight());
+                return false;
+            }
+
+            @Override
+            public void paint(Graphics g) {
+                // No-op -- the actual paint happens via cmp.repaint above.
+            }
+        };
+    }
+
     /// {@inheritDoc}
     @Override
     public int getPullToRefreshHeight() {
+        // Modern mode skips the legacy Label/Container stack and uses the
+        // configured indicator diameter plus a small breathing margin as
+        // the gesture threshold.
+        if (getUIManager().isThemeConstant("pullToRefreshModernBool", false)) {
+            int diameter = Display.getInstance().convertToPixels(modernIndicatorDiameterMm());
+            int margin = Display.getInstance().convertToPixels(2f);
+            return diameter + margin * 2;
+        }
         if (pull == null) {
             BorderLayout bl = new BorderLayout();
             bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);

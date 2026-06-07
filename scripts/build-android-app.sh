@@ -73,21 +73,33 @@ fi
 export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
 ba_log "Using Android SDK at $ANDROID_SDK_ROOT"
 
-APP_DIR="scripts/hellocodenameone"
+# CN1_APP_DIR lets this script build any CN1 app (e.g. the dedicated IAP
+# purchase-test app), not just hellocodenameone. Default preserves prior
+# behaviour exactly.
+APP_DIR="${CN1_APP_DIR:-scripts/hellocodenameone}"
 
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
 
 # --- Build Android gradle project ---
-ba_log "Building Android gradle project using Codename One port"
-cd $APP_DIR
-xvfb-run -a ./mvnw package \
-  -DskipTests \
-  -Dcodename1.platform=android \
-  -Dcodename1.buildTarget=android-source \
-  -Dopen=false \
-  -U -e
-cd ../..
+ba_log "Building Android gradle project ($APP_DIR) using Codename One port"
+(
+  cd "$REPO_ROOT/$APP_DIR"
+  # The sample targets Java 17, so both the maven-compiler-plugin
+  # and any forked tooling need a 17 JDK. Mirrors what build-ios-app.sh
+  # does for the iOS pipeline.
+  export JAVA_HOME="$JAVA17_HOME"
+  export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+  xvfb-run -a ./mvnw package \
+    -DskipTests \
+    -Dcodename1.platform=android \
+    -Dcodename1.buildTarget=android-source \
+    -Dmaven.compiler.fork=true \
+    -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
+    -Dopen=false \
+    -U -e
+)
+cd "$REPO_ROOT"
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
@@ -100,9 +112,14 @@ fi
 ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
 
 # --- Install Android instrumentation harness for coverage ---
-ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
+# CN1_ANDROID_TEST_SOURCE_DIR overrides the instrumentation sources (the
+# purchase-test app installs its own); the destination package mirrors the
+# app's codename1.packageName so it works for any app, not just hellocodenameone.
+ANDROID_TEST_SOURCE_DIR="${CN1_ANDROID_TEST_SOURCE_DIR:-$SCRIPT_DIR/device-runner-app/androidTest}"
 ANDROID_TEST_ROOT="$GRADLE_PROJECT_DIR/app/src/androidTest"
-ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/com/codenameone/examples/hellocodenameone"
+APP_PACKAGE="$(sed -n 's/^codename1.packageName=//p' "$REPO_ROOT/$APP_DIR/common/codenameone_settings.properties" | head -n1)"
+APP_PACKAGE="${APP_PACKAGE:-com.codenameone.examples.hellocodenameone}"
+ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/$(printf '%s' "$APP_PACKAGE" | tr . /)"
 if [ -d "$ANDROID_TEST_ROOT" ]; then
   ba_log "Removing template Android instrumentation tests from $ANDROID_TEST_ROOT"
   rm -rf "$ANDROID_TEST_ROOT"

@@ -385,6 +385,135 @@ public class Command implements ActionListener<ActionEvent> {
         }
     }
 
+    /// Client property key carrying the desktop native-menu placement hint for this command.
+    /// When a desktop app bridges its commands to the native menu bar (title-bar mode
+    /// {@code native}/{@code custom}), the value selects which menu the command appears under.
+    /// Recognized values (case-insensitive): `#DESKTOP_MENU_APP`, `#DESKTOP_MENU_ABOUT`,
+    /// `#DESKTOP_MENU_PREFERENCES`, `#DESKTOP_MENU_QUIT`, `#DESKTOP_MENU_FILE`,
+    /// `#DESKTOP_MENU_EDIT`, `#DESKTOP_MENU_VIEW`, `#DESKTOP_MENU_WINDOW`, `#DESKTOP_MENU_HELP`.
+    /// Any other value becomes a top-level menu with that literal title. Commands without the
+    /// hint are grouped under a default application-commands menu.
+    public static final String DESKTOP_MENU = "DesktopMenu";
+
+    /// Standard desktop menu placement: the application menu (macOS app menu / a leading menu).
+    public static final String DESKTOP_MENU_APP = "App";
+    /// Standard desktop menu placement: an "About" item, conventionally in the application menu.
+    public static final String DESKTOP_MENU_ABOUT = "About";
+    /// Standard desktop menu placement: a "Preferences"/"Settings" item in the application menu.
+    public static final String DESKTOP_MENU_PREFERENCES = "Preferences";
+    /// Standard desktop menu placement: a "Quit"/"Exit" item in the application menu.
+    public static final String DESKTOP_MENU_QUIT = "Quit";
+    /// Standard desktop menu placement: the File menu.
+    public static final String DESKTOP_MENU_FILE = "File";
+    /// Standard desktop menu placement: the Edit menu.
+    public static final String DESKTOP_MENU_EDIT = "Edit";
+    /// Standard desktop menu placement: the View menu.
+    public static final String DESKTOP_MENU_VIEW = "View";
+    /// Standard desktop menu placement: the Window menu.
+    public static final String DESKTOP_MENU_WINDOW = "Window";
+    /// Standard desktop menu placement: the Help menu.
+    public static final String DESKTOP_MENU_HELP = "Help";
+
+    /// Sets the desktop native-menu placement hint for this command. See `#DESKTOP_MENU`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: one of the {@code DESKTOP_MENU_*} constants or a custom top-level menu title
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopMenu(String menu) {
+        putClientProperty(DESKTOP_MENU, menu);
+        return this;
+    }
+
+    /// Returns the desktop native-menu placement hint, or null when unset. See `#DESKTOP_MENU`.
+    ///
+    /// #### Returns
+    ///
+    /// the placement hint or null
+    public String getDesktopMenu() {
+        Object o = getClientProperty(DESKTOP_MENU);
+        return o == null ? null : o.toString();
+    }
+
+    /// Client property key carrying the upper-cased character of the desktop keyboard
+    /// accelerator (as an {@code Integer}), see `#setDesktopShortcut(char, int)`.
+    public static final String DESKTOP_SHORTCUT_KEY = "DesktopShortcutKey";
+
+    /// Client property key carrying the modifier bit-mask of the desktop keyboard accelerator
+    /// (as an {@code Integer}), see `#setDesktopShortcut(char, int)`.
+    public static final String DESKTOP_SHORTCUT_MODIFIERS = "DesktopShortcutModifiers";
+
+    /// Accelerator modifier flag for the platform's primary command key: Command on macOS,
+    /// Control on Windows/Linux. This is the modifier used by the vast majority of menu
+    /// shortcuts so it's the default.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_PRIMARY = 1;
+
+    /// Accelerator modifier flag for the Shift key.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_SHIFT = 2;
+
+    /// Accelerator modifier flag for the Alt/Option key.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_ALT = 4;
+
+    /// Assigns a keyboard accelerator to this command for the desktop native menu bar using the
+    /// platform's primary modifier (Command on macOS, Control elsewhere). For example
+    /// {@code setDesktopShortcut('S')} produces Cmd+S / Ctrl+S next to the menu item. The hint is
+    /// inert on platforms without a native menu bar, so it's safe to set unconditionally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyChar`: the accelerator character (case-insensitive)
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopShortcut(char keyChar) {
+        return setDesktopShortcut(keyChar, DESKTOP_SHORTCUT_MODIFIER_PRIMARY);
+    }
+
+    /// Assigns a keyboard accelerator to this command for the desktop native menu bar. See
+    /// `#setDesktopShortcut(char)` for the common case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyChar`: the accelerator character (case-insensitive)
+    ///
+    /// - `modifiers`: a bit-mask of `#DESKTOP_SHORTCUT_MODIFIER_PRIMARY`,
+    /// `#DESKTOP_SHORTCUT_MODIFIER_SHIFT` and `#DESKTOP_SHORTCUT_MODIFIER_ALT`
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopShortcut(char keyChar, int modifiers) {
+        putClientProperty(DESKTOP_SHORTCUT_KEY, Integer.valueOf(Character.toUpperCase(keyChar)));
+        putClientProperty(DESKTOP_SHORTCUT_MODIFIERS, Integer.valueOf(modifiers));
+        return this;
+    }
+
+    /// Returns the upper-cased accelerator character assigned via `#setDesktopShortcut(char, int)`,
+    /// or 0 when no accelerator is set.
+    ///
+    /// #### Returns
+    ///
+    /// the accelerator character or 0
+    public int getDesktopShortcutKeyChar() {
+        Object o = getClientProperty(DESKTOP_SHORTCUT_KEY);
+        return o == null ? 0 : ((Integer) o).intValue();
+    }
+
+    /// Returns the accelerator modifier bit-mask assigned via `#setDesktopShortcut(char, int)`,
+    /// or 0 when no accelerator is set.
+    ///
+    /// #### Returns
+    ///
+    /// the modifier bit-mask
+    public int getDesktopShortcutModifiers() {
+        Object o = getClientProperty(DESKTOP_SHORTCUT_MODIFIERS);
+        return o == null ? 0 : ((Integer) o).intValue();
+    }
+
     /// #### Returns
     ///
     /// the materialIcon

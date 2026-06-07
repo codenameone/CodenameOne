@@ -48,7 +48,7 @@ We’ll install both into our database with the following commands.
     $ mysql -u root -p < sakila-schema.sql
     $ mysql -u root -p < sakila-data.sql
 
-Once these have executed, you should be able to log into mysql and see see the tables listed:
+Once these have executed, you should be able to log into mysql and see the tables listed:
     
     
     $mysql -u root -p
@@ -145,7 +145,7 @@ Next it will ask us which tables to include in the main menu. This is only used 
     ? List the tables that should be included in the main menu in the form: table1=L
     abel1,table2=Label2, etc... customer=Customers
 
-Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow to decide exactly who can access what. This generator will setup the the default table-based authentication and add a "users" table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
+Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow you to decide exactly who can access what. This generator will setup the default table-based authentication and add a "users" table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
 
   1. ADMIN
 
@@ -185,7 +185,7 @@ At this point it will create the "sakila" directory and set up some of the scaff
     Copying .htaccess file
     Copying .htaccess file to templates_c
 
-Now it will ask us about modifications that need to be made to the databse.
+Now it will ask us about modifications that need to be made to the database.
     
     
     ? Create the database sakila now? No
@@ -354,7 +354,7 @@ On the client side, I’m going to use the [CN1Xataface library](https://github.
             contactsDemo.revalidate();
             finishedLoading = true;
     
-            // XFClient won't load the whole set all at once because that would be a waste of
+            // XFClient won’t load the whole set all at once because that would be a waste of
             // network traffic.  Default batch size is 30.  We use InfiniteScrollAdapter
             // to load more of the result set as the user scrolls down the list.
     
@@ -399,10 +399,10 @@ On the client side, I’m going to use the [CN1Xataface library](https://github.
          * Creates a single row for the contact list that encapsulates the provided
          * contact.
          * @param c The contact to represent with this row.
-         * @param parent The parent container to which the row is to be added.  This method doesn't actually add the
+         * @param parent The parent container to which the row is to be added.  This method doesn’t actually add the
          * row to the parent, but it does need to reference it for some of the listeners that are added to the row.  The caller
          * should add the resulting row to the parent after calling this method.
-         * @return A container encapsulating the row, or null if the contact didn't have a name.
+         * @return A container encapsulating the row, or null if the contact didn’t have a name.
          */
         private Container createContactRow(Contact c, Container parent) {
             // redacted... no Database-specific code here.

@@ -25,7 +25,9 @@ package com.codename1.io;
 
 import com.codename1.processing.Result;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -734,6 +736,270 @@ public class JSONParser implements JSONParseCallback {
     /// The JSON string
     public static String mapToJson(Map<String, ?> map) {
         return Result.fromContent(map).toString();
+    }
+
+    /// Convenience: parse a JSON object from a UTF-8 byte array. The
+    /// `parseJSON(Reader)` overload is the canonical entry point but
+    /// callers that already have bytes in hand don't need to wire up
+    /// a `ByteArrayInputStream` + `InputStreamReader` themselves.
+    public static Map<String, Object> parseJSON(byte[] bytes) throws IOException {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+        InputStreamReader r = new InputStreamReader(
+                new ByteArrayInputStream(bytes), "UTF-8");
+        try {
+            return new JSONParser().parseJSON(r);
+        } finally {
+            try {
+                r.close();
+            } catch (IOException ignored) {
+                Log.e(ignored);
+            }
+        }
+    }
+
+    /// Convenience: parse a JSON object from an in-memory String.
+    public static Map<String, Object> parseJSON(String json) throws IOException {
+        if (json == null || json.length() == 0) {
+            return null;
+        }
+        return parseJSON(json.getBytes("UTF-8"));
+    }
+
+    /// Wrapper that lets a caller embed a pre-built JSON fragment into
+    /// a Map/List tree being serialized by [#toJson(Object)]. The
+    /// fragment is inlined verbatim rather than escaped as a string
+    /// literal. Useful when a value (such as a JSON-Schema for a tool
+    /// parameter) is already in canonical JSON form.
+    ///
+    /// ```
+    /// Map<String, Object> root = new HashMap<String, Object>();
+    /// root.put("parameters", JSONParser.rawJson(schema));
+    /// String body = JSONParser.toJson(root);
+    /// ```
+    public static final class RawJson {
+        private final String json;
+
+        private RawJson(String json) {
+            this.json = json;
+        }
+
+        public String getJson() {
+            return json;
+        }
+    }
+
+    /// Creates a [RawJson] marker. See the class javadoc for usage.
+    public static RawJson rawJson(String json) {
+        return new RawJson(json);
+    }
+
+    /// Serializes a `Map`/`List`/`String`/`Number`/`Boolean`/`null` /
+    /// [RawJson] tree to JSON. Differs from [#mapToJson(Map)] in three
+    /// ways: it takes any root type (not just `Map`); it omits
+    /// null-valued `Map` entries (rather than emitting `"key":null`,
+    /// which many REST APIs reject); and it understands the [RawJson]
+    /// sentinel so callers can splice pre-built fragments into the
+    /// tree without re-escaping them.
+    ///
+    /// `Map` keys must be `String`. Floats and doubles serialize
+    /// using `Double.toString` (no scientific notation for typical
+    /// values); integral types (`Integer`, `Long`, etc.) serialize as
+    /// integers.
+    public static String toJson(Object value) {
+        StringBuilder sb = new StringBuilder();
+        writeJsonValue(sb, value);
+        return sb.toString();
+    }
+
+    private static void writeJsonValue(StringBuilder sb, Object o) {
+        if (o == null) {
+            sb.append("null");
+            return;
+        }
+        if (o instanceof RawJson) {
+            String s = ((RawJson) o).getJson();
+            sb.append(s == null || s.length() == 0 ? "null" : s);
+            return;
+        }
+        if (o instanceof String) {
+            writeJsonString(sb, (String) o);
+            return;
+        }
+        if (o instanceof Boolean) {
+            sb.append(((Boolean) o).booleanValue() ? "true" : "false");
+            return;
+        }
+        if (o instanceof Number) {
+            Number n = (Number) o;
+            if (n instanceof Float || n instanceof Double) {
+                double d = n.doubleValue();
+                if (Double.isInfinite(d) || Double.isNaN(d)) {
+                    sb.append("null");
+                } else {
+                    sb.append(d);
+                }
+            } else {
+                sb.append(n.longValue());
+            }
+            return;
+        }
+        if (o instanceof Map) {
+            sb.append('{');
+            boolean first = true;
+            Map m = (Map) o;
+            for (Object entryObj : m.entrySet()) {
+                Map.Entry entry = (Map.Entry) entryObj;
+                Object v = entry.getValue();
+                if (v == null) {
+                    // Null-valued entries are dropped on purpose; if
+                    // a caller really needs `"k":null` on the wire,
+                    // they can serialize with mapToJson(...) instead.
+                    continue;
+                }
+                if (!first) {
+                    sb.append(',');
+                }
+                first = false;
+                writeJsonString(sb, entry.getKey().toString());
+                sb.append(':');
+                writeJsonValue(sb, v);
+            }
+            sb.append('}');
+            return;
+        }
+        if (o instanceof java.util.List) {
+            sb.append('[');
+            java.util.List l = (java.util.List) o;
+            for (int i = 0; i < l.size(); i++) {
+                if (i > 0) {
+                    sb.append(',');
+                }
+                writeJsonValue(sb, l.get(i));
+            }
+            sb.append(']');
+            return;
+        }
+        writeJsonString(sb, o.toString());
+    }
+
+    private static void writeJsonString(StringBuilder sb, String s) {
+        sb.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        sb.append("\\u");
+                        String h = Integer.toHexString(c);
+                        for (int p = h.length(); p < 4; p++) {
+                            sb.append('0');
+                        }
+                        sb.append(h);
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        sb.append('"');
+    }
+
+    /// Cast helper for the `Hashtable`/`Vector`-style return values
+    /// from [#parseJSON(java.io.Reader)]. Returns `null` when the
+    /// input is `null`; callers wishing to walk a JSON object tree
+    /// without sprinkling `(Map)` casts everywhere can pass each
+    /// nested value through this.
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> asMap(Object o) {
+        if (o == null) {
+            return null;
+        }
+        return (Map<String, Object>) o;
+    }
+
+    /// Cast helper for list-typed values pulled out of a parsed JSON
+    /// tree. Same null behavior as [#asMap].
+    @SuppressWarnings("unchecked")
+    public static java.util.List<Object> asList(Object o) {
+        if (o == null) {
+            return null;
+        }
+        return (java.util.List<Object>) o;
+    }
+
+    /// Retrieves a String field from a parsed JSON object. Returns
+    /// `null` if the key is missing or the map is `null`; calls
+    /// `toString()` on non-String values for resilience.
+    public static String getString(Map m, String key) {
+        if (m == null) {
+            return null;
+        }
+        Object v = m.get(key);
+        return v == null ? null : v.toString();
+    }
+
+    /// Retrieves an int field from a parsed JSON object, with a
+    /// fallback when the key is missing, the map is `null`, or the
+    /// value cannot be parsed as an integer.
+    public static int getInt(Map m, String key, int defaultValue) {
+        if (m == null) {
+            return defaultValue;
+        }
+        Object v = m.get(key);
+        if (v == null) {
+            return defaultValue;
+        }
+        if (v instanceof Number) {
+            return ((Number) v).intValue();
+        }
+        try {
+            return Integer.parseInt(v.toString());
+        } catch (NumberFormatException nfe) {
+            return defaultValue;
+        }
+    }
+
+    /// Retrieves a double field from a parsed JSON object, with a
+    /// fallback when the key is missing, the map is `null`, or the
+    /// value cannot be parsed as a number.
+    public static double getDouble(Map m, String key, double defaultValue) {
+        if (m == null) {
+            return defaultValue;
+        }
+        Object v = m.get(key);
+        if (v == null) {
+            return defaultValue;
+        }
+        if (v instanceof Number) {
+            return ((Number) v).doubleValue();
+        }
+        try {
+            return Double.parseDouble(v.toString());
+        } catch (NumberFormatException nfe) {
+            return defaultValue;
+        }
     }
 
     /// Checks to see if this parser generates long objects and not just doubles for numeric values.

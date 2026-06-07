@@ -9,7 +9,7 @@ date: '2020-10-31'
 author: Steve Hannah
 ---
 
-This is the second is a series of blog posts hightlighting some of the components available in the CodeRAD cn1lib. The [first post (or series of posts) introduced the RAD Chatroom component](/blog/rad-chatroom-part-1/), a rich 2nd order UI component that encapsulates the user interface for a fully functional chat room.
+This is the second in a series of blog posts highlighting some of the components available in the CodeRAD cn1lib. The [first post (or series of posts) introduced the RAD Chatroom component](/blog/rad-chatroom-part-1/), a rich 2nd order UI component that encapsulates the user interface for a fully functional chat room.
 
 __ |  A second-order UI component is a complex UI component, usually composed of multiple basic components, which is designed for a specific type of application. Some examples of second-order UI components are login forms, contacts lists, chat room components, news lists, etc..   
 ---|---  
@@ -30,7 +30,7 @@ The following is the snippet that was used to generate the above screen capture:
 
 There really isn’t much to this component, but it is a handy addition to the toolbox nonetheless.
 
-| To use the HelpButton component you’ll need to add the CodeRAD cn1lib to your project, which is available in through Codename One preferences. For instructions on adding cn1libs to your projects, see [this tutorial](https://www.beta.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html).  
+| To use the HelpButton component you’ll need to add the CodeRAD cn1lib to your project, which is available through Codename One preferences. For instructions on adding cn1libs to your projects, see [this tutorial](https://www.beta.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html).  
 ---|---  
   
 For more information about CodeRAD, check out its [github repo](https://github.com/shannah/CodeRAD).

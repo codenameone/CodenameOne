@@ -27,7 +27,7 @@ In terms of features we didn’t implement anything new over the past couple of 
 
 ### Website Server Update
 
-We need to migrate the main server hosting this site to a new location so there might be some service interruption this Sunday around 8AM GMT but it should be pretty quick. If you notice an issue after that just reload as server state might have been impacted.
+We need to migrate the main server hosting this site to a new location so there might be some service interruption this Sunday around 8 AM GMT but it should be pretty quick. If you notice an issue after that just reload as server state might have been impacted.
 
 This is the second server update that’s user noticeable although there were a few others. I’m assuming [Linode](https://www.linode.com/?r=57ffeef90ab49b35f5bdc2a8658a413515d8b3ca) who are our main hosting provider is doing some infrastructure work.
 ---

@@ -59,6 +59,138 @@
         "url": "https://dzone.com/content/3655676/edit.html",
         "syndicated_at": "2026-05-18T13:53:16+00:00"
       }
+    },
+    "skills-java17-and-theme-accents": {
+      "devto": {
+        "id": 3726146,
+        "url": "https://dev.to/codenameone/skills-java-17-and-theme-accents-59dp",
+        "syndicated_at": "2026-05-22T13:46:38+00:00"
+      },
+      "foojay": {
+        "id": 123913,
+        "url": "https://foojay.io/wp-admin/post.php?post=123913&action=edit",
+        "preview_url": "https://foojay.io/?p=123913",
+        "featured_media_id": 123912,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-05-22T13:47:26+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/a92f2e65c4b5/edit",
+        "syndicated_at": "2026-05-22T15:01:26+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3655800/edit.html",
+        "syndicated_at": "2026-05-22T15:02:38+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmpvyqtam00051sjk98woaz8u",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a07e19fea8975272b6efaf2",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-02T01:33:02+00:00"
+      }
+    },
+    "nfc-crypto-biometrics-and-build-cloud": {
+      "devto": {
+        "id": 3778808,
+        "url": "https://dev.to/codenameone/nfc-crypto-biometrics-and-a-new-build-cloud-119j",
+        "syndicated_at": "2026-05-29T14:01:41+00:00"
+      },
+      "foojay": {
+        "id": 124003,
+        "url": "https://foojay.io/wp-admin/post.php?post=124003&action=edit",
+        "preview_url": "https://foojay.io/?p=124003",
+        "featured_media_id": 124002,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-05-29T14:02:56+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/b7dab4277d90/edit",
+        "syndicated_at": "2026-05-29T15:01:20+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3657524/edit.html",
+        "syndicated_at": "2026-05-31T15:01:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmpvyt0pa00061sjkhsqh5xji",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a1e32e181824da877d77d72",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-02T01:34:44+00:00"
+      }
+    },
+    "metal-default-new-build-cloud-and-a-new-format": {
+      "devto": {
+        "id": 3828546,
+        "url": "https://dev.to/codenameone/metal-default-a-new-build-cloud-and-a-new-format-11hg",
+        "syndicated_at": "2026-06-05T13:58:05+00:00"
+      },
+      "foojay": {
+        "id": 124128,
+        "url": "https://foojay.io/wp-admin/post.php?post=124128&action=edit",
+        "preview_url": "https://foojay.io/?p=124128",
+        "featured_media_id": 124127,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-05T13:59:11+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/1945f698dd28/edit",
+        "syndicated_at": "2026-06-05T15:01:09+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3658581/edit.html",
+        "syndicated_at": "2026-06-05T15:02:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq120nmg001h1sq14zpg0q1j",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a22e50abdc172ef8847e8b0",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-05T15:03:31+00:00"
+      }
+    },
+    "developer-workflow-debug-and-junit": {
+      "devto": {
+        "id": 3835213,
+        "url": "https://dev.to/codenameone/on-device-debugging-and-junit-5-245",
+        "syndicated_at": "2026-06-06T13:32:21+00:00"
+      },
+      "foojay": {
+        "id": 124137,
+        "url": "https://foojay.io/wp-admin/post.php?post=124137&action=edit",
+        "preview_url": "https://foojay.io/?p=124137",
+        "featured_media_id": 124136,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-06T13:33:29+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/57036bf1aeaf/edit",
+        "syndicated_at": "2026-06-06T15:01:49+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq2hhs3v00031spqd70cf2w9",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a2436bae769bc0019e10426",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-06T15:04:35+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656694/edit.html",
+        "syndicated_at": "2026-06-06T15:14:17+00:00"
+      }
     }
   }
 }

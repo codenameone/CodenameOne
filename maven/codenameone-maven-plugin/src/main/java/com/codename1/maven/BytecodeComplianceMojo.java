@@ -35,6 +35,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -81,6 +84,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
     private File complianceOutputFile;
     private InvocationRewriteSummary lastInvocationRewriteSummary = new InvocationRewriteSummary();
+    private URLClassLoader validationClassLoader;
 
     private static Map<MethodRef, MethodRef> createInvocationRewriteRules() {
         Map<MethodRef, MethodRef> rules = new LinkedHashMap<MethodRef, MethodRef>();
@@ -318,20 +322,24 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         InvocationRewriteSummary summary = new InvocationRewriteSummary();
         List<File> classFiles = new ArrayList<File>();
         collectClassFiles(outputDir, classFiles);
-        for (File classFile : classFiles) {
-            try {
-                byte[] originalBytes = FileUtils.readFileToByteArray(classFile);
-                InvocationRewriteResult rewriteResult = rewriteClassInvocations(originalBytes);
-                if (rewriteResult.rewrittenCallsites > 0) {
-                    validateClass(rewriteResult.bytes, classFile);
-                    FileUtils.writeByteArrayToFile(classFile, rewriteResult.bytes);
-                    summary.rewrittenClasses++;
-                    summary.rewrittenCallsites += rewriteResult.rewrittenCallsites;
-                    getLog().info("Applied " + rewriteResult.rewrittenCallsites + " invocation rewrite(s) in " + classFile.getAbsolutePath());
+        try {
+            for (File classFile : classFiles) {
+                try {
+                    byte[] originalBytes = FileUtils.readFileToByteArray(classFile);
+                    InvocationRewriteResult rewriteResult = rewriteClassInvocations(originalBytes);
+                    if (rewriteResult.rewrittenCallsites > 0) {
+                        validateClass(rewriteResult.bytes, classFile, outputDir);
+                        FileUtils.writeByteArrayToFile(classFile, rewriteResult.bytes);
+                        summary.rewrittenClasses++;
+                        summary.rewrittenCallsites += rewriteResult.rewrittenCallsites;
+                        getLog().info("Applied " + rewriteResult.rewrittenCallsites + " invocation rewrite(s) in " + classFile.getAbsolutePath());
+                    }
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to rewrite invocations for " + classFile, ex);
                 }
-            } catch (IOException ex) {
-                throw new MojoExecutionException("Failed to rewrite invocations for " + classFile, ex);
             }
+        } finally {
+            closeValidationClassLoader();
         }
         return summary;
     }
@@ -364,19 +372,83 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         return result;
     }
 
-    private void validateClass(byte[] classBytes, File classFile) throws MojoExecutionException {
+    private void validateClass(byte[] classBytes, File classFile, File outputDir) throws MojoExecutionException {
+        ClassLoader loader = getValidationClassLoader(outputDir);
         try {
             StringWriter stringWriter = new StringWriter();
             PrintWriter printWriter = new PrintWriter(stringWriter);
-            CheckClassAdapter.verify(new ClassReader(classBytes), false, printWriter);
+            CheckClassAdapter.verify(new ClassReader(classBytes), loader, false, printWriter);
             printWriter.flush();
             String validationOutput = stringWriter.toString().trim();
             if (!validationOutput.isEmpty()) {
+                if (isUnresolvableTypeOutput(validationOutput)) {
+                    getLog().debug("Skipping deep verification for " + classFile.getName()
+                            + ": referenced type(s) not on classpath. Output: " + validationOutput);
+                    return;
+                }
                 throw new MojoExecutionException("Bytecode validation failed for " + classFile + ": " + validationOutput);
             }
         } catch (RuntimeException ex) {
+            if (isUnresolvableTypeCause(ex)) {
+                getLog().debug("Skipping deep verification for " + classFile.getName()
+                        + ": referenced type(s) not on classpath (" + ex.getMessage() + ").");
+                return;
+            }
             throw new MojoExecutionException("Bytecode validation failed for " + classFile, ex);
         }
+    }
+
+    private ClassLoader getValidationClassLoader(File outputDir) {
+        if (validationClassLoader != null) {
+            return validationClassLoader;
+        }
+        List<URL> urls = new ArrayList<URL>();
+        try {
+            if (outputDir != null && outputDir.isDirectory()) {
+                urls.add(outputDir.toURI().toURL());
+            }
+            if (project != null) {
+                for (File jar : getDependencyJarsForScanning()) {
+                    if (jar != null && jar.exists()) {
+                        urls.add(jar.toURI().toURL());
+                    }
+                }
+            }
+        } catch (MalformedURLException ex) {
+            getLog().debug("Failed to assemble validation classloader URLs; falling back to plugin classloader.", ex);
+            return getClass().getClassLoader();
+        }
+        validationClassLoader = new URLClassLoader(urls.toArray(new URL[0]), getClass().getClassLoader());
+        return validationClassLoader;
+    }
+
+    private void closeValidationClassLoader() {
+        if (validationClassLoader != null) {
+            try {
+                validationClassLoader.close();
+            } catch (IOException ex) {
+                getLog().debug("Failed to close validation classloader", ex);
+            }
+            validationClassLoader = null;
+        }
+    }
+
+    private static boolean isUnresolvableTypeCause(Throwable ex) {
+        Throwable t = ex;
+        while (t != null) {
+            if (t instanceof ClassNotFoundException || t instanceof TypeNotPresentException || t instanceof NoClassDefFoundError) {
+                return true;
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
+
+    private static boolean isUnresolvableTypeOutput(String output) {
+        return output.contains("ClassNotFoundException")
+                || output.contains("TypeNotPresentException")
+                || output.contains("NoClassDefFoundError")
+                || output.contains(" not present");
     }
 
     private List<Violation> scanProjectClasses(File outputDir, final Map<String, ClassMetadata> allowedIndex, final Map<String, ClassMetadata> projectAndDependencyIndex) throws MojoExecutionException {

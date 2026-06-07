@@ -42,9 +42,17 @@ extern float currentScaleY;
 
 -(id)init {
 #ifdef USE_ES2
+#ifdef CN1_USE_METAL
+    // The Mac Catalyst stub GLKit header omits the GLKMatrix4Identity
+    // constant; assemble an identity matrix literal so this path compiles
+    // without GLKit math symbols. Behavior is identical to the GL path.
+    GLKMatrix4 identity = (GLKMatrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
+    [SetTransform currentTransform:identity];
+#else
     [SetTransform currentTransform:GLKMatrix4Identity];
 #endif
-    
+#endif
+
     return self;
 }
 
@@ -52,10 +60,16 @@ extern float currentScaleY;
     //_glMatrixMode(GL_PROJECTION);
     //GLErrorLog;
 #ifdef USE_ES2
+#ifdef CN1_USE_METAL
+    GLKMatrix4 identity = (GLKMatrix4){ { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 } };
+    SetTransform *f = [[SetTransform alloc] initWithArgs:identity originX:0 originY:0];
+#else
     SetTransform *f = [[SetTransform alloc] initWithArgs:GLKMatrix4Identity originX:0 originY:0];
+#endif
     [f execute];
     [f release];
 #endif
+#ifndef CN1_USE_METAL
     _glLoadIdentity();
     GLErrorLog;
     _glOrthof(0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl(), 0, Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), -1, 1);
@@ -68,6 +82,7 @@ extern float currentScaleY;
     GLErrorLog;
     _glTranslatef(0, -Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), 0);
     GLErrorLog;
+#endif // !CN1_USE_METAL
     currentScaleX = 1;
     currentScaleY = 1;
 }

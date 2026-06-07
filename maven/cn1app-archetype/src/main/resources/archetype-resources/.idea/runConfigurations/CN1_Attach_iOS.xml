@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CN1 Attach iOS" type="Remote" folderName="On-Device Debug" singleton="true">
+    <option name="USE_SOCKET_TRANSPORT" value="true" />
+    <option name="SERVER_MODE" value="false" />
+    <option name="SHMEM_ADDRESS" />
+    <option name="HOST" value="localhost" />
+    <option name="PORT" value="8000" />
+    <option name="AUTO_RESTART" value="false" />
+    <module name="${rootArtifactId}-common" />
+    <RunnerSettings RunnerId="Debug">
+      <option name="DEBUG_PORT" value="8000" />
+      <option name="LOCAL" value="false" />
+    </RunnerSettings>
+    <ConfigurationWrapper RunnerId="Debug" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -95,6 +95,17 @@ class EncodedImageTest extends UITestBase {
     }
 
     @FormTest
+    void testDisposeReleasesEncodedBytes() {
+        EncodedImage encoded = EncodedImage.create(new byte[]{1, 2, 3, 4}, 8, 8, true);
+        assertFalse(encoded.isDisposed());
+        encoded.dispose();
+        assertTrue(encoded.isDisposed());
+        assertThrows(IllegalStateException.class, encoded::getImageData);
+        encoded.dispose();
+        assertTrue(encoded.isDisposed());
+    }
+
+    @FormTest
     void testLockAndUnlockPromotesCachedImage() throws Exception {
         EncodedImage encoded = EncodedImage.create(new byte[]{1, 2, 3, 4}, 6, 6, false);
         Image actual = Image.createImage(6, 6);

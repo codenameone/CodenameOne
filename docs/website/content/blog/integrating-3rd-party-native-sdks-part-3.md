@@ -86,7 +86,7 @@ Now that we have implemented our iOS native interface, we need to bundle the Mob
 
   3. The SDK includes `.a` files. In this case, just copy the `.a` file(s) into your `native/ios` directory.
 
-  4. The SDK includes `.framework` files. This is a bit tricker as Codename One doesn’t support simply copying the `.framework` files inside your project. In this case you need to perform the following:
+  4. The SDK includes `.framework` files. This is a bit trickier as Codename One doesn’t support simply copying the `.framework` files inside your project. In this case you need to perform the following:
 
   5. Right click on the `.framework` file (if you are using OS X) and select "Show Package Contents".
 
@@ -96,7 +96,7 @@ Now that we have implemented our iOS native interface, we need to bundle the Mob
 
   8. Update all `#import` statements in the headers from `#import <FrameworkName/FileName.h>` format to simply `#import "FileName.h"`
 
-The FreshDesk SDK doesn’t include any `.framework` files, so we don’t need to worry about that last scenario. We simply [download the iOS SDK](https://s3.amazonaws.com/assets.mobihelp.freshpo.com/sdk/mobihelp_sdk_ios.zip), copy the `libFDMobihelpSDK.a`, `Mobihelp.h`. `MHModel.bundle`, `MHResources.bundle`, and `MHLocalization/en.proj/MHLocalizable.strings` into `native/ios`.
+The FreshDesk SDK doesn’t include any `.framework` files, so we don’t need to worry about that last scenario. We simply [download the iOS SDK](https://s3.amazonaws.com/assets.mobihelp.freshpo.com/sdk/mobihelp_sdk_ios.zip), copy the `libFDMobihelpSDK.a`, `Mobihelp.h`, `MHModel.bundle`, `MHResources.bundle`, and `MHLocalization/en.proj/MHLocalizable.strings` into `native/ios`.
 
 ## Troubleshooting iOS
 
@@ -126,7 +126,7 @@ During the initial development, I generally find it easier to use a regular Code
 
   4. Copy the **relevant** build hints from the original project’s `codenameone_settings.properties` file into the library project’s `codenameone_library_appended.properties` file.
 
-In the case of the FreshDesk .cn1lib, I modified the original project’s build script to generate and build a libary project automatically. But that is beyond the scope of this tutorial.
+In the case of the FreshDesk .cn1lib, I modified the original project’s build script to generate and build a library project automatically. But that is beyond the scope of this tutorial.
 
 ## Summary
 

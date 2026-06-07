@@ -140,7 +140,7 @@ via the PDF file.
 If you have experience with open source toolchains for documentation we’d appreciate some tips here…  
 For videos I don’t see a way of scaling this by much, I’ve improved my video generation process but its still  
 far behind the speed we would need to redo everything and update with new developments. Steve did some  
-great videos but we have a lot of tasks and not enough time. The only solution here is for me to priorities videos  
+great videos but we have a lot of tasks and not enough time. The only solution here is for me to prioritize videos  
 over my other tasks which is something I will try to work on. 
 
 > Dislike: performance on iOS and to some extent on WP
@@ -196,7 +196,7 @@ feasible.
 
 Since Codename One is open source the binding isn’t as bad as it could be. If worse comes to worse you  
 could always build from code. When picking any platform (native or otherwise) you end up depending  
-on the platform, e.g. Apple changed a lot of of things just these past 2 years (64bit, bitcode etc.) all of which  
+on the platform, e.g. Apple changed a lot of things just these past 2 years (64bit, bitcode etc.) all of which  
 were huge disruptions for native developers but not as big for Codename One. 
 
 > To difficult to use some components. For example table use sucks.

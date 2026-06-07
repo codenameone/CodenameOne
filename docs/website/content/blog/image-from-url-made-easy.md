@@ -59,12 +59,12 @@ This image can now be used anywhere a regular image will appear, it will initial
   
 Notice: Since  
   
-ImageIO is used to perform the operations of the adapter interface its required that ImageIO will work. It is currently working in JavaSE, Android, iOS & Windows Phone. It doesn’t work on J2ME/Blackberry devices so if you pass an adapter instance on those platforms it will probably fail to perform its task.  
+ImageIO is used to perform the operations of the adapter interface it’s required that ImageIO will work. It is currently working in JavaSE, Android, iOS & Windows Phone. It doesn’t work on J2ME/Blackberry devices so if you pass an adapter instance on those platforms it will probably fail to perform its task.  
   
   
   
   
-If the file in the URL contains an image that is too bit it will scale it to match the size of the placeholder precisely!  
+If the file in the URL contains an image that is too big it will scale it to match the size of the placeholder precisely!  
   
   
   
@@ -74,7 +74,7 @@ We currently also have an option to fail if the sizes don’t match. Notice that
   
   
   
-The last argument is really quite powerful, its an interface called URLImage.ImageAdapter and you can implement it to adapt the downloaded image in any way you like. E.g. you can use an image mask to automatically create a rounded version of the downloaded image or to scale based on aspect ratio. We will probably add some tools to implement such functionality based on user demand.  
+The last argument is really quite powerful, it’s an interface called URLImage.ImageAdapter and you can implement it to adapt the downloaded image in any way you like. E.g. you can use an image mask to automatically create a rounded version of the downloaded image or to scale based on aspect ratio. We will probably add some tools to implement such functionality based on user demand.  
   
   
   

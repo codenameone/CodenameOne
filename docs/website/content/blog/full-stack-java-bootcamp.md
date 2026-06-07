@@ -48,7 +48,7 @@ When I was a young programmer in my late teens and early 20s I already knew quit
 
 I picked a lot of bad practices from learning on my own and I might have ended up very differently had I not stumbled into amazing mentors who guided me in the right direction. These great mentors transformed the way I code communicate & think. They were pivotal in my career.
 
-When we started the LWUIT project at Sun Microsystems we spent a lot of with customers trying to understand the difficulties they were addressing firsthand. At that point I realized that not only was I mentoring the junior developers I was working with, I was getting a lot in return. I was able to glimpse into LWUIT thru a fresh pair of eyes and see what we got right and what we got wrong. This improved LWUIT immensely.
+When we started the LWUIT project at Sun Microsystems we spent a lot of time with customers trying to understand the difficulties they were addressing firsthand. At that point I realized that not only was I mentoring the junior developers I was working with, I was getting a lot in return. I was able to glimpse into LWUIT thru a fresh pair of eyes and see what we got right and what we got wrong. This improved LWUIT immensely.
 
 That’s why I spend almost all my time doing customer support, it teaches me a lot and allows me to run the company in a way that makes sense for this type of product. But that’s not enough…​
 
@@ -72,7 +72,7 @@ The two additional weeks will cover a lot of things and include personal mentori
 
 ### More Details Coming Soon
 
-There is so much more I would like to cover and I’ll cover some of the nitty gritty details on how this bootcamp will achieve it’s transformative goals in my post early next week. There are many logistic details that we need to sort out mostly with the company as I will find it hard to handle my day to day tasks during the bootcamp.
+There is so much more I would like to cover and I’ll cover some of the nitty gritty details on how this bootcamp will achieve its transformative goals in my post early next week. There are many logistic details that we need to sort out mostly with the company as I will find it hard to handle my day to day tasks during the bootcamp.
 
 In the meantime, if you haven’t answered my email please do so as I’m still interested in hearing more. Also feel free to write and comment in the blog with thoughts/issues/concerns etc.
 

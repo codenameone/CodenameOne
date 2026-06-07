@@ -41,7 +41,7 @@ hide/show a component without deprecated code using something like this:
 
 Notice that in the first/last lines of the event processing I block the button from getting additional events. Since  
 the code is sequential this works rather well and the button won’t get duplicate events during the animation.  
-Codename One currently doesn’t support concurrent animations so its up to you as a developer to serialize  
+Codename One currently doesn’t support concurrent animations so it’s up to you as a developer to serialize  
 your animation requests in the framework. 
 
 #### Accessing Insecure URL’s In iOS 9
@@ -66,7 +66,7 @@ day please join [this group](https://groups.google.com/forum/#!forum/codename-on
 Thru this group we (and you if you have a Codename One relevant project such as an advocacy site, tutorial,  
 library or blog post) can post links and ask for social help: e.g. upvote, like, share, retweet, etc. 
 
-With social networks its pretty hard to get your voice out as people get drowned with messaging from all directions.  
+With social networks it’s pretty hard to get your voice out as people get drowned with messaging from all directions.  
 In this way we can both help you guys to get noticed by the community at large and you can help us to spread  
 our message further thru social clout.
 

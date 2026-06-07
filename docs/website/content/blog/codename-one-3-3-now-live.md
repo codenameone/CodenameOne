@@ -33,10 +33,10 @@ This allowed for a simple rendering logic that is implemented in a single place,
 to deeply optimize some operations in a platform specific way. We moved the rendering into  
 `CodenameOneImplementation.java` which allowed us to override the logic both on Android & iOS  
 to deliver native grade performance on any device.  
-On iOS this has been a strait forward change where most of the low level logic is now written using  
+On iOS this has been a straightforward change where most of the low level logic is now written using  
 very efficient C code. On Android the pipeline complexity is far greater, but thanks to this approach  
 we were able to reuse many system resources and reduce JANK significantly in applications. This  
-work is still ongoing but the bit effort has been implemented.  
+work is still ongoing but the big effort has been implemented.  
 This is probably the biggest piece of multiple changes that went into this release including fast tiling  
 support, better font/string texture caching, Container API optimizations etc.  
 Read more about this work in [this blog post](/blog/code-freeze-for-3.3-performance.html). 
@@ -120,8 +120,8 @@ Read more about this work in [this blog post](/blog/parparvm-spreads-its-wings.h
 
 ____Properties file format support
 
-We didn’t have support for Java venerable Properties file format before  
-3.3. Surprisingly developers didn’t really complain about that ommission as we support XML, CSV & JSON.  
+We didn’t have support for Java’s venerable Properties file format before  
+3.3. Surprisingly developers didn’t really complain about that omission as we support XML, CSV & JSON.  
 Now we can add Properties to that list!  
 Read more about this work in [this blog post](/blog/properties-continued-terseness.html). 
 

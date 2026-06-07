@@ -2541,6 +2541,94 @@ public class Toolbar extends Container {
         }
     }
 
+    /// Aggregates every command exposed by this toolbar - left bar, right bar, overflow
+    /// menu and side menu - into a single de-duplicated `Vector`. Used by the desktop port
+    /// to build the native menu bar when the toolbar is hidden in favor of native window
+    /// chrome. The returned commands must not be mutated.
+    ///
+    /// #### Returns
+    ///
+    /// a de-duplicated vector of all commands hosted by this toolbar
+    public Vector getAllNativeMenuCommands() {
+        Vector all = new Vector();
+        addUniqueCommands(all, getLeftBarCommands());
+        addUniqueCommands(all, getRightBarCommands());
+        addUniqueCommands(all, getOverflowCommands());
+        MenuBar mb = getMenuBar();
+        if (mb != null) {
+            Vector side = mb.getCommands();
+            if (side != null) {
+                for (int i = 0; i < side.size(); i++) {
+                    Object c = side.elementAt(i);
+                    if (c != null && !all.contains(c)) {
+                        all.addElement(c);
+                    }
+                }
+            }
+        }
+        return all;
+    }
+
+    private void addUniqueCommands(Vector all, Iterable<Command> src) {
+        if (src == null) {
+            return;
+        }
+        for (Command c : src) {
+            if (c != null && !all.contains(c)) {
+                all.addElement(c);
+            }
+        }
+    }
+
+    /// Wires the visible Toolbar to act as the draggable title bar of an undecorated desktop window
+    /// (the {@code custom} desktop title-bar mode). The listener is registered at the form level (so
+    /// it fires reliably for every pointer drag) and starts a window move only when the press falls
+    /// within the Toolbar's painted band. Inert on mobile (never invoked there).
+    private void installToolbarWindowDrag(Form parent) {
+        if (parent == null) {
+            return;
+        }
+        ToolbarWindowDrag drag = new ToolbarWindowDrag(this);
+        parent.addPointerPressedListener(drag);
+        parent.addPointerDraggedListener(drag);
+        parent.addPointerReleasedListener(drag);
+    }
+
+    /// @return true when the given form-relative Y coordinate falls within this Toolbar's painted
+    /// band. Used in the desktop {@code custom} mode to start a window drag only from the title bar.
+    boolean isWithinTitleBarBand(int y) {
+        int top = getAbsoluteY();
+        return y >= top && y <= top + getHeight();
+    }
+
+    /// Drives undecorated-window dragging from the Toolbar title region in the desktop {@code custom}
+    /// title-bar mode. A single named (static) class that handles press / drag / release.
+    private static final class ToolbarWindowDrag implements ActionListener {
+        private final Toolbar toolbar;
+        private boolean dragging;
+
+        ToolbarWindowDrag(Toolbar toolbar) {
+            this.toolbar = toolbar;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            ActionEvent.Type t = evt.getEventType();
+            if (t == ActionEvent.Type.PointerPressed) {
+                dragging = toolbar.isWithinTitleBarBand(evt.getY());
+                if (dragging) {
+                    Display.impl.startNativeWindowDrag(evt.getX(), evt.getY());
+                }
+            } else if (t == ActionEvent.Type.PointerDrag) {
+                if (dragging) {
+                    Display.impl.dragNativeWindow(evt.getX(), evt.getY());
+                }
+            } else {
+                dragging = false;
+            }
+        }
+    }
+
     /// Returns the associated SideMenuBar object of this Toolbar.
     ///
     /// #### Returns
@@ -3076,6 +3164,16 @@ public class Toolbar extends Container {
                 parent.removeComponentFromForm(ta);
             }
             super.initMenuBar(parent);
+            if (parent.isDesktopHideToolbar()) {
+                // desktop "native" mode: keep the Toolbar object (so the command API and command
+                // harvesting work) but never attach it to the form, so no title strip is painted.
+                // The title goes to the OS window and commands go to the native menu bar.
+                initialized = true;
+                setTitle(parent.getTitle());
+                parent.revalidate();
+                initTitleBarStatus();
+                return;
+            }
             if (layered) {
                 Container layeredPane = parent.getLayeredPane();
                 Container p = layeredPane.getParent();
@@ -3089,6 +3187,11 @@ public class Toolbar extends Container {
 
             initialized = true;
             setTitle(parent.getTitle());
+            if (parent.isDesktopToolbarTitle()) {
+                // desktop "custom" mode: the visible Toolbar IS the window title bar - dragging it
+                // moves the (undecorated) window. Commands also bridge to the native menu bar.
+                installToolbarWindowDrag(parent);
+            }
             parent.revalidate();
             initTitleBarStatus();
             Display.getInstance().callSerially(new Runnable() {

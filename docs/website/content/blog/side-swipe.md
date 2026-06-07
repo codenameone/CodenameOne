@@ -30,7 +30,7 @@ mailbox
 ](http://www.mailboxapp.com/)  
 like swipes. This effectively allows you to swipe a component to the side in order to reveal capabilities underneath e.g. edit, delete etc.   
   
-Using this capability is really trivial just use something like a a MultiButton and place it in a SwipeableContainer with the bottom Container which includes the various actions as such:  
+Using this capability is really trivial just use something like a MultiButton and place it in a SwipeableContainer with the bottom Container which includes the various actions as such:  
   
   
   

@@ -209,3 +209,105 @@ CssFilterChain {
     background: linear-gradient(45deg, #ff0080, #40e0d0);
     filter: brightness(1.2) contrast(0.9) saturate(1.3);
 }
+
+/* Build-time SVG transcoder: each SVG referenced via url() is picked up by
+ * codenameone-maven-plugin:transcode-svg, transcoded to a GeneratedSVGImage
+ * subclass, and registered with the theme under its source filename. The
+ * cn1-source-dpi hint here is the same one multi-images use: it tells the
+ * transcoder which CN1 density bucket the SVG was authored for so the
+ * runtime size scales to the device. */
+SVGStarStyle {
+    background: url(star.svg);
+    cn1-source-dpi: very-high;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+
+SVGGradientCircleStyle {
+    background: url(gradient_circle.svg);
+    cn1-source-dpi: very-high;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+
+SVGPathArrowStyle {
+    background: url(path_arrow.svg);
+    cn1-source-dpi: very-high;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+
+SVGSpinnerStyle {
+    background: url(spinner_animated.svg);
+    /* Explicit millimeter dimensions carry across DPIs the same way
+     * font-size: 3mm does -- 12mm by 12mm on every device, regardless
+     * of the SVG's declared <svg width=> or device density. */
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+
+SVGPulsingCircleStyle {
+    background: url(pulsing_circle.svg);
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
+    bg-type: image_scaled_fit;
+    padding: 4mm;
+}
+
+/* Exercises <text> rendering with fill colors, anchor, font-weight,
+ * font-style + a rounded-rect frame underneath. */
+SVGLogoTextStyle {
+    background: url(logo_text.svg);
+    cn1-svg-width: 30mm;
+    cn1-svg-height: 12mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Exercises complex path commands -- S/T smooth curves, dashed strokes. */
+SVGWavePathStyle {
+    background: url(wave_path.svg);
+    cn1-svg-width: 30mm;
+    cn1-svg-height: 8mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Multiple parallel animations on one element -- rotate + rx/ry. */
+SVGColorMorphStyle {
+    background: url(color_morph.svg);
+    cn1-svg-width: 18mm;
+    cn1-svg-height: 18mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Exercises <clipPath> + gradient fill + clipped text. */
+SVGClippedBadgeStyle {
+    background: url(clipped_badge.svg);
+    cn1-svg-width: 16mm;
+    cn1-svg-height: 16mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+/* Build-time Lottie transcoder: Bodymovin JSON files are lowered into the
+ * same SVG model the SVG transcoder uses, so the cn1-svg-width / -height
+ * hints sized for SVG apply here too. */
+LottieSpinnerStyle {
+    background: url(lottie_spinner.json);
+    cn1-svg-width: 14mm;
+    cn1-svg-height: 14mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}
+
+LottiePulseStyle {
+    background: url(lottie_pulse.json);
+    cn1-svg-width: 14mm;
+    cn1-svg-height: 14mm;
+    bg-type: image_scaled_fit;
+    padding: 2mm;
+}

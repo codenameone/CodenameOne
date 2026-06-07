@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-iv/qanda-friday.jpg)
 
-I’d like to open this weeks post by covering some things we do and try to avoid on stackoverflow. I try to upvote  
+I’d like to open this week’s post by covering some things we do and try to avoid on stackoverflow. I try to upvote  
 your questions/answers whenever I can and most of us should upvote questions that are decent especially  
 from a person who has low ranking and might not have the stack overflow experience to phrase their question  
 properly.
@@ -64,7 +64,7 @@ Asks a very common question about sharing your app.
 
 ### Why doesn’t my TableLayout center my components?
 
-The defualt behavior of table layout works with preferred/available size and might not take up all available space.
+The default behavior of table layout works with preferred/available size and might not take up all available space.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37019372/why-doesnt-my-tablelayout-center-my-components)
 

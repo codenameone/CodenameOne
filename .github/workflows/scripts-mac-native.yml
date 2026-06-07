@@ -1,0 +1,275 @@
+name: Test Mac native UI build scripts
+
+# Mac native = the macNative.enabled=true variant of the iOS build
+# pipeline. IPhoneBuilder routes the generated project to
+# target/<finalName>-mac-source/ and injects Mac Catalyst settings
+# (SUPPORTS_MACCATALYST, MACOSX_DEPLOYMENT_TARGET, signing/team via
+# [sdk=macosx*] qualifiers, AppStore + Developer ID entitlements,
+# ExportOptions plists, Mac.appiconset). This workflow exercises that
+# path end-to-end: sample app -> Xcode project -> Mac Catalyst .app ->
+# screenshot suite -> golden comparison.
+#
+# Mirrors .github/workflows/scripts-ios.yml's build-ios-metal job
+# closely; the Mac slice shares the iOS port artifact (built by the
+# reusable _build-ios-port.yml workflow) so cache hits across the three
+# Mac/iOS workflows on the same SHA stay fast.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/scripts-mac-native.yml'
+      - '.github/workflows/_build-ios-port.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
+      - 'scripts/build-mac-native-app.sh'
+      - 'scripts/run-mac-native-ui-tests.sh'
+      - 'scripts/hellocodenameone/**'
+      - 'scripts/ios/tests/**'
+      - 'scripts/mac-native/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'scripts/common/java/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
+      - 'native-themes/ios-modern/**'
+      - '!native-themes/ios-modern/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+      - '!docs/**'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/scripts-mac-native.yml'
+      - '.github/workflows/_build-ios-port.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
+      - 'scripts/build-mac-native-app.sh'
+      - 'scripts/run-mac-native-ui-tests.sh'
+      - 'scripts/hellocodenameone/**'
+      - 'scripts/ios/tests/**'
+      - 'scripts/mac-native/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'scripts/common/java/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'CodenameOne/src/**'
+      - 'Ports/iOSPort/**'
+      - 'native-themes/ios-modern/**'
+      - 'vm/**'
+      - 'tests/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+  workflow_dispatch:
+
+jobs:
+  build-port:
+    # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
+    # via the cn1-built cache; first runner to land a fresh SHA populates it
+    # and the others skip the rebuild.
+    uses: ./.github/workflows/_build-ios-port.yml
+
+  build-mac-native:
+    needs: build-port
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    # build step (<=45) + screenshot-run step (<=45) <= 90, matching the
+    # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
+    # SIGKILL the screenshot run mid-post-processing on slow runners.
+    timeout-minutes: 90
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-mac-native-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods / xcodeproj tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          # The macNative path uses xcodeproj unconditionally to inject the
+          # Catalyst build settings (see applyMacNativeXcodeSettings in
+          # IPhoneBuilder.java). cocoapods comes along because the iOS
+          # pipeline shares the same gem cache key and we want one warm
+          # cache across both workflows.
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          else
+            gem list xcodeproj | grep -q xcodeproj || gem install xcodeproj --no-document --user-install
+          fi
+          pod --version
+          ruby -e "require 'xcodeproj'; puts Xcodeproj::VERSION"
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        # The build-port reusable workflow populates this cache; reuse its
+        # exact key (same trick scripts-ios.yml uses) to avoid recomputing
+        # the hash on this runner and producing a spurious miss.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Install Metal Toolchain
+        # Xcode 26+ requires the Metal Toolchain component for .metal
+        # shader compilation. The Mac Catalyst slice always uses Metal
+        # (Mac Catalyst doesn't have OpenGL ES), so this download is
+        # required even though we're not setting ios.metal=true here.
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
+            exit 1
+          fi
+          echo "Using $XCODE_APP"
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+        timeout-minutes: 10
+
+      - name: Build sample Mac native app and compile workspace
+        id: build-mac-native-app
+        run: ./scripts/build-mac-native-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run Mac native UI screenshot tests
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/mac-native-ui-tests
+          # Strict screenshot gating: fail on any pixel mismatch and on more
+          # missing screenshots than the tolerance below. Enforced centrally
+          # in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          # MutableImageReadback and MorphTransitionSnapshot do not yet emit
+          # on the Mac native (Catalyst) backend while the port is maturing -
+          # the steady-state run reports exactly these two as missing.
+          # Tolerate those two; any further missing screenshot fails CI.
+          # Lower this to 0 as the port matures and those tests start
+          # producing output.
+          CN1SS_ALLOWED_MISSING: '2'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-mac-native-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-mac-native-app.outputs.scheme }}'"
+
+          ./scripts/run-mac-native-ui-tests.sh \
+            "${{ steps.build-mac-native-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-mac-native-app.outputs.scheme }}"
+        # The script's own suite budget is already 1500s (25m); add app
+        # launch + post-processing (compare 122 images, render report, post
+        # comment) and a slow runner tips just over the old 30m step cap and
+        # gets SIGKILLed mid-compare -- a flaky timeout, not a real mismatch.
+        # 45m lets the script's internal timeout govern gracefully instead.
+        timeout-minutes: 45
+
+      - name: Publish Mac native screenshot summary
+        # Surfaces run-mac-native-ui-tests.sh's comparison result in the
+        # job's GitHub Actions summary page so the Mac slice status is
+        # visible at a glance without digging into the artifact zip.
+        # Reuses the existing metal-screenshot-summary.py helper because
+        # the JSON schema is identical -- the summary text says "iOS
+        # Metal" so the wrapper here overrides the headline manually.
+        if: always()
+        env:
+          COMPARE_JSON: ${{ github.workspace }}/artifacts/mac-native-ui-tests/screenshot-compare.json
+          COMMENT_MD: ${{ github.workspace }}/artifacts/mac-native-ui-tests/screenshot-comment.md
+        run: |
+          set -eu
+          {
+            echo "## Mac native screenshot comparison"
+            echo
+            echo "Ran against \`scripts/hellocodenameone\` as a Mac Catalyst build (\`macNative.enabled=true\`)."
+            echo "Golden images: \`scripts/mac-native/screenshots/\` (see the README there for the seeding workflow)."
+            echo
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
+            elif [ -s "$COMMENT_MD" ]; then
+              cat "$COMMENT_MD"
+            else
+              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=Mac native screenshot comparison::${NOTICE}"
+            fi
+          fi
+
+      - name: Upload Mac native artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mac-native-ui-tests
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14

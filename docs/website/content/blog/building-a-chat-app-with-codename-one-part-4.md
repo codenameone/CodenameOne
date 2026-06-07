@@ -135,7 +135,7 @@ a new contact object.
 
 ### Getting The Contacts From Facebook
 
-Facebook is pretty similiar, we need to query the Graph API for the users and iterate them. The current code only  
+Facebook is pretty similar, we need to query the Graph API for the users and iterate them. The current code only  
 gets the first page of users hence its a bit flawed but it should be easily adaptable for paging thru the full result list.  
 Notice that Facebook will only return the users that signed in to the app so while the result might list your hundreds of  
 friends you might still get a blank list if none of them signed into the app.
@@ -300,7 +300,7 @@ Notice that if the image is already an encoded image this method does nothing…
 
 We need an encoded image since later in the code we will use `URLImage` which expects `EncodedImage`, the  
 `EncodedImage` is generally a more efficient way of storing images in terms of RAM and it allows us to get the image  
-data more effectively. It means the image PNG/JPEG data is still available…​ All standard/multi images returned form the resource  
+data more effectively. It means the image PNG/JPEG data is still available…​ All standard/multi images returned from the resource  
 file are `EncodedImage’s which helps with memory utilization.
 
 Now that everything is in place we can start with the main method that shows the UI:
@@ -313,7 +313,7 @@ Now that everything is in place we can start with the main method that shows the
         // the toolbar is created into a layer on the content pane. This allows us to render behind it and leave it semi transparent
         Toolbar tb = new Toolbar(true);
     
-        // we want the title area to be transparent so it won't get in the way
+        // we want the title area to be transparent so it won’t get in the way
         contactsForm.getTitleArea().setUIID("Container");
     
         // folds the toolbar automatically as we scroll down, shows it if we scroll back up
@@ -412,7 +412,7 @@ identifier represented by the button. That’s great for decoupling the applicat
             parent.getContentPane().animateUnlayoutAndWait(400, 0);
             parent.getContentPane().removeAll();
     
-            // we can't mutate a form into a component in another form so we need to convert the background to an image and then morph that
+            // we can’t mutate a form into a component in another form so we need to convert the background to an image and then morph that
             // this is especially easy since we already removed all the components
             Label dummy = new Label();
             dummy.setShowEvenIfBlank(true);
@@ -468,7 +468,7 @@ all the standard effects. It also has a cool search feature that we will discuss
         Container titleArea = new Container(new BorderLayout());
     
         // since the Toolbar is now transparent we assign the title area UIID to one of the layers within and the look
-        // is preserved, we make it translucent though so we can see what's underneath
+        // is preserved, we make it translucent though so we can see what’s underneath
         titleArea.setUIID("TitleArea");
         titleArea.getUnselectedStyle().setBgTransparency(128);
     
@@ -525,7 +525,7 @@ All of this functionality is embedded directly into the code that creates the se
         FontImage searchIcon = FontImage.create(" ue806 ", s);
         FontImage cancelIcon = FontImage.create(" ue81e ", s);
     
-        // this is the actual search button, but we don't want it to have a border...
+        // this is the actual search button, but we don’t want it to have a border...
         Button search = new Button(searchIcon);
         search.setUIID("Label");
     
@@ -640,7 +640,7 @@ efficient.
   * We then return to the EDT using `callSerially` to add the components to the UI where we create an entry for  
 every component and revalidate to layout the UI
 
-  * There is some code here for a "recent" entry which should priorities the contacts I’ve contacted recently, its  
+  * There is some code here for a "recent" entry which should prioritize the contacts I’ve contacted recently, its  
 functionality that’s added in the local code base but isn’t fully implemented.
 
 Next time we’ll discuss the chat UI.

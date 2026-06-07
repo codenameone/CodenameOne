@@ -27,7 +27,7 @@ Codename One components share a generic inheritance hierarchy. For example, http
 
 Some components are composites and derive from the https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] class. For example, the https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton] is a composite button that derives from `Container` but behaves like a `Button`. Most of the time this feels seamless, but a few details matter.
 
-- don't use the `Container`-derived methods on such a composite component (for example, `add` and `remove`).
+- Don't use the `Container`-derived methods on such a composite component (for example, `add` and `remove`).
 
 - You can't cast it to the type it relates to. For example, you can't cast `MultiButton` to `Button`.
 
@@ -157,7 +157,7 @@ The second layer is the glass pane which allows you to draw arbitrary things on 
 2. `LayeredPane` is second
 3. `GlassPane` is painted last
 
-NOTE: it's important to notice that a layered pane is on top of the `ContentPane` and doesn't stretch to the title. A `GlassPane` stretches all the way but with a "lightweight" title area, for example, the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar API].
+NOTE: It's important to notice that a layered pane is on top of the `ContentPane` and doesn't stretch to the title. A `GlassPane` stretches all the way but with a "lightweight" title area, for example, the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar API].
 
 The `GlassPane` allows developers to overlay UI on top of existing UI and paint as they see fit. This is useful for things that provide notification but don't want to intrude with application functionality.
 
@@ -167,10 +167,10 @@ NOTE: In earlier versions of Codename One (pre-3.6), `LayeredPane` & `GlassPane`
 
 A https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] is a special kind of `Form` that can occupy a portion of the screen. It also has the more functionality of the modal `show` method.
 
-When showing a dialog you've two basic options: modeless and modal:
+When showing a dialog you have two basic options: modeless and modal:
 
 - Modal dialogs (the default) block the current EDT thread until the dialog is dismissed. To understand how they do it, read about `invokeAndBlock`. +
-Modal dialogs are an useful way to prompt the user since the code can assume the user responded in the next line of execution. This promotes a linear and intuitive way of writing code.
+Modal dialogs are a useful way to prompt the user since the code can assume the user responded in the next line of execution. This promotes a linear and intuitive way of writing code.
 
 - Modeless dialogs return, so a call to show such a dialog can't assume anything in the next line of execution. This is useful for features such as progress indicators where you aren't waiting for user input.
 
@@ -236,10 +236,10 @@ NOTE: `hi` is the name of the parent `Form` in the sample above.
 
 ==== Styling dialogs
 
-it's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle--[getDialogStyle()] or
+It's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle--[getDialogStyle()] or
 https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#setDialogUIID-java.lang.String-[setDialogUIID] methods rather than styling the dialog object directly.
 
-The reason for this is that the `Dialog` is a `Form` that takes up the whole screen. The `Form` that's visible behind the `Dialog` is rendered as a screenshot. customizing the actual `UIID` of the `Dialog` won't produce the desired results.
+The reason for this is that the `Dialog` is a `Form` that takes up the whole screen. The `Form` that's visible behind the `Dialog` is rendered as a screenshot. Customizing the actual `UIID` of the `Dialog` won't produce the desired results.
 
 ==== Tint and blurring
 
@@ -276,9 +276,9 @@ hi.show();
 .Dialog with green tinted background
 image::img/components-dialog-green-tint.png[Dialog with green tinted background,scaledwidth=20%]
 
-You can apply Gaussian blur to the background of a dialog to highlight the foreground further and produce a attractive effect. You can use the `setDefaultBlurBackgroundRadius` to apply this globally, you can use the theme constant `dialogBlurRadiusInt` to do the same or you can do this on a per `Dialog` basis using `setBlurBackgroundRadius`.
+You can apply Gaussian blur to the background of a dialog to highlight the foreground further and produce an attractive effect. You can use the `setDefaultBlurBackgroundRadius` to apply this globally, you can use the theme constant `dialogBlurRadiusInt` to do the same or you can do this on a per `Dialog` basis using `setBlurBackgroundRadius`.
 
-NOTE: Not all device types support blur you can test if your device supports it using `Display.getInstnace().isGaussianBlurSupported()`. If blur isn't supported the blur setting will be ignored.
+NOTE: Not all device types support blur you can test if your device supports it using `Display.getInstnace().isGaussianBlurSupported()`. If blur isn't supported the blur setting will be ignored:
 
 [source,java]
 ----
@@ -306,7 +306,7 @@ image::img/components-dialog-blur-no-tint.png[The blur effect is more pronounced
 
 ==== Popup dialog
 
-A popup dialog is a common mobile paradigm showing a `Dialog` that points at a specific component. it's a standard `Dialog` that's shown in a unique way:
+A popup dialog is a common mobile paradigm showing a `Dialog` that points at a specific component. It's a standard `Dialog` that's shown in a unique way:
 
 [source,java]
 ----
@@ -327,9 +327,9 @@ When Codename One was young you needed a popup arrow implementation but your low
 
 Today Codename One supports pointing an arrow from the `RoundRectBorder` class. This is implicit for the `PopupDialog` UI. This allows for better customization of the border (color etc.) and it looks better on newer displays. It also works on all OSs. Right now the iOS theme has the old image border approach.
 
-NOTE: This will change with a future update where all OS's will align and iOS will use the lightweight popup too
+NOTE: This will change with a future update where all OSes will align and iOS will use the lightweight popup too
 
-TIP: You can make all OS's act the same way by overriding the `PopupDialog` UIID and defining its style to `RoundRectBorder`
+TIP: You can make all OSes act the same way by overriding the `PopupDialog` UIID and defining its style to `RoundRectBorder`
 
 The new `RoundRectBorder` support works by setting the track component property on border. When that’s done the border implicitly points to the right location.
 
@@ -388,11 +388,11 @@ dlg.show(0, 0, Display.getInstance().getDisplayWidth() - (pre.getWidth() + pre.g
 .Interaction Dialog
 image::img/components-interaction-dialog.png[Interaction Dialog,scaledwidth=20%]
 
-This will show the dialog on the right hand side of the screen, which is pretty useful for a floating in place dialog.
+This will show the dialog on the right-hand side of the screen, which is pretty useful for a floating in place dialog.
 
 NOTE: The `InteractionDialog` can be shown at absolute or popup locations. This is inherent to its use case which is "non-blocking." When using this component you need to be aware of its location.
 
-To make popup behaviour feel natural on touch devices you can call `setDisposeWhenPointerOutOfBounds(true)` so the dialog automatically dismisses as soon as the user taps outside the title or content area. Internally the dialog listens for pointer pressed/released events and will call `dispose()` for you when the interaction happens beyond its bounds, so you no longer need to wire that logic manually.
+To make popup behavior feel natural on touch devices you can call `setDisposeWhenPointerOutOfBounds(true)` so the dialog automatically dismisses as soon as the user taps outside the title or content area. Internally the dialog listens for pointer pressed/released events and will call `dispose()` for you when the interaction happens beyond its bounds, so you no longer need to wire that logic manually.
 
 By default the dialog is placed on the form's layered pane, but you can switch between the global layered pane and form-specific layered pane using `setFormMode(boolean)`. Setting form mode to `true` keeps the dialog coupled with the showing form even when the global layered pane is used elsewhere in your app.
 
@@ -421,7 +421,7 @@ hi.add(left).add(right).add(bottom).add(top);
 .Label positions
 image::img/components-label-text-position.png[Label positions,scaledwidth=20%]
 
-`Label` allows a single line of text, line breaking is a expensive operation on mobile devices footnote:[String width is the real expensive part here, the complexity of font kerning and the recursion required to reflow text is a big performance hurdle] and so the `Label` class doesn't support it.
+`Label` allows a single line of text, line breaking is an expensive operation on mobile devices footnote:[String width is the real expensive part here, the complexity of font kerning and the recursion required to reflow text is a big performance hurdle] and so the `Label` class doesn't support it.
 
 TIP: <<SpanLabel,SpanLabel>> supports many lines with a single label, notice that it does carry a performance penalty for this functionality.
 
@@ -437,7 +437,7 @@ You can use the theme constant `labelGap` which is a floating point value you ca
 
 ==== Autosizing labels
 
-One of the common requests you received over the years is a way to let text "fit" into the allocated space so the font will match almost the width available. In some designs this is important but it's also tricky. Measuring the width of a String is a expensive operation on some OS's., there is no other way other than trial & error to find the "best size."
+One of the common requests you received over the years is a way to let text "fit" into the allocated space so the font will match almost the width available. In some designs this is important but it's also tricky. Measuring the width of a String is an expensive operation on some OSes., there is no other way other than trial & error to find the "best size."
 
 Still although something is "slow" you might still want to use it for some cases, this isn't something you should use in a renderer, infinite scroll etc. and recommend minimizing the usage of this feature as much as possible.
 
@@ -488,7 +488,7 @@ NOTE: The semantic difference between `TextField` & `TextArea` dates back to the
 Because it lacks the blinking cursor capability `TextArea` is often used as a multi-line label and is used internally in `SpanLabel`, `SpanButton` etc.
 
 
-TIP: A common use case is to have an important text component in edit mode as you enter a `Form`. Codename One forms support this exact use case thru the https://www.codenameone.com/javadoc/com/codename1/ui/Form.html#setEditOnShow-com.codename1.ui.TextArea-[Form.setEditOnShow(TextArea)] method.
+TIP: A common use case is to have an important text component in edit mode as you enter a `Form`. Codename One forms support this exact use case through the https://www.codenameone.com/javadoc/com/codename1/ui/Form.html#setEditOnShow-com.codename1.ui.TextArea-[Form.setEditOnShow(TextArea)] method.
 
 
 `TextField` & `TextArea` support constraints for various types of input such as `NUMERIC`, `EMAIL`, `URL`, etc. Those usually
@@ -541,7 +541,7 @@ hi.add("First Name").add(firstName).
 .Simple text component sample
 image::img/components-text-component.png[Simple text component sample,scaledwidth=20%]
 
-TIP: The <<Advanced-search-code,Toolbar section>> contains a elaborate `TextField` search sample with `DataChangeListener` and rather unique styling.
+TIP: The <<Advanced-search-code,Toolbar section>> contains an elaborate `TextField` search sample with `DataChangeListener` and rather unique styling.
 
 ==== Masking
 
@@ -601,7 +601,7 @@ This will adapt the icon for the action on the keys.
 
 ===== Next and done on iOS
 
-You try to hide a lot of the platform differences in Codename One, input is **** different between OS's. A common reliance is the ability to send the "Done" event when the user presses the #Done# button. This button doesn't always exist for example: if there is an #Enter# button (due to multiline input) or if there is a #Next# button in that place.
+You try to hide a lot of the platform differences in Codename One, input is **** different between OSes. A common reliance is the ability to send the "Done" event when the user presses the #Done# button. This button doesn't always exist for example: if there is an #Enter# button (due to multiline input) or if there is a #Next# button in that place.
 
 To unify the behavior you slightly customized the iOS keyboard as such:
 
@@ -694,7 +694,7 @@ The code is pretty self-explanatory and more convenient than typical setters/get
 
 The validator class supports text component and it should "work." But the cool thing is that it uses the material design convention for error handling!
 
-if you add to the sample above a `Validator`:
+If you add to the sample above a `Validator`:
 
 [source,java]
 ----
@@ -759,18 +759,18 @@ image::img/pixel-perfect-text-field-picker-ios.png[Picker component taking place
 .And in Android
 image::img/pixel-perfect-text-field-picker-android.png[And in Android,scaledwidth=30%]
 
-The one tiny thing you should notice with the `PickerComponent` is that you don't construct the picker component using `new PickerComponent()`. Instead you use create methods such as `PickerComponent.createDate(new Date())`. The reason for that's that you've many types of pickers and it wouldn't make sense to have one constructor.
+The one tiny thing you should notice with the `PickerComponent` is that you don't construct the picker component using `new PickerComponent()`. Instead you use create methods such as `PickerComponent.createDate(new Date())`. The reason for that's that you have many types of pickers and it wouldn't make sense to have one constructor.
 
 ==== Underlying theme constants and UIID's
 
 These varying looks are implemented through a combination of layouts, theme constants and UIID's. The most important UIID's are: `TextComponent`, `FloatingHint` & `TextHint`.
 
-many theme constants related that can manipulate some pieces of this functionality:
+There are many related theme constants that can manipulate some pieces of this functionality:
 
 - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect. When defined this will change the color of the border and label to the given color to match the material design styling. This implements the red border underline in cases of error and the label text color change
 - `textComponentErrorLineBorderBool` toggles the material-style underline that appears on validation errors. Set it to `false` if you prefer to supply a different border when errors are shown
 
-- `textComponentOnTopBool` toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OS's. This can also be manipulated through the `onTopMode(boolean)` method in `InputComponent`, but the layout will use the theme constant
+- `textComponentOnTopBool` toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OSes. This can also be manipulated through the `onTopMode(boolean)` method in `InputComponent`, but the layout will use the theme constant
 
 - `textComponentAnimBool` toggles the animation mode which again can be manipulated by a method in `InputComponent`. If you want to keep the UI static without the floating hint effect set this to false. Notice this defaults to true on Android
 
@@ -806,7 +806,7 @@ b.addActionListener((e) -> Log.p("Clicked"));
 .Simple button in the iOS styling, notice iOS doesn't have borders on buttons...
 image::img/components-button.png[Simple button in the iOS styling, notice iOS doesn't have borders on buttons...,scaledwidth=40%]
 
-Such a button can be styled to look like a link using code like this or by making these settings in the theme and using code such as `btn.setUIID("Hyperlink")`.
+Such a button can be styled to look like a link using code like this or by making these settings in the theme and using code such as `btn.setUIID("Hyperlink")`:
 
 [source,java]
 ----
@@ -823,7 +823,7 @@ image::img/components-link-button.png[Button styled to look like a link,scaledwi
 
 ==== Uppercase buttons
 
-Buttons on Android's material design UI use upper case styling which isn't the case for iOS. To solve this you've the method `setCapsText(boolean)` in `Button` which has the corresponding `isCapsText`, `isCapsTextDefault` & `setCapsTextDefault(boolean)`. This is pretty core to Codename One so to prevent this from impacting everything unless you explicitly invoke `setCapsText(boolean)` the default value of `true` will apply when the UIID is `Button`, `RaisedButton` or for the built-in `Dialog` buttons.
+Buttons on Android's material design UI use upper case styling which isn't the case for iOS. To solve this you have the method `setCapsText(boolean)` in `Button` which has the corresponding `isCapsText`, `isCapsTextDefault` & `setCapsTextDefault(boolean)`. This is pretty core to Codename One so to prevent this from impacting everything unless you explicitly invoke `setCapsText(boolean)` the default value of `true` will apply when the UIID is `Button`, `RaisedButton` or for the built-in `Dialog` buttons.
 
 You also have a theme constant: `capsButtonTextBool`. This constant controls caps text behavior from the theme and is set to true in the Android native theme.
 
@@ -831,9 +831,9 @@ You also have a theme constant: `capsButtonTextBool`. This constant controls cap
 
 Raised button is a style of button that's available on Android and used to highlight an important action within a form. To confirm with the material design UI guidelines you might want to leverage a raised button UI element on Android but use a regular button everywhere else.
 
-First you need to know whether a raised button exists in the theme. on Android this will return true but on other OS's it will return false. A potential future update might make another platform true based on UI guidelines in other OS's.
+First you need to know whether a raised button exists in the theme. On Android this will return true but on other OSes it will return false. A potential future update might make another platform true based on UI guidelines in other OSes.
 
-For this purpose you've got the theme constant `hasRaisedButtonBool` which will return true on Android but will be false elsewhere. You can use it like this:
+For this purpose you have got the theme constant `hasRaisedButtonBool` which will return true on Android but will be false elsewhere. You can use it like this:
 
 [source,java]
 ----
@@ -842,7 +842,7 @@ if(UIManager.getInstance().isThemeConstant("hasRaisedButtonBool", false)) {
 }
 ----
 
-To enable this you've the `RaisedButton` UIID that derives from `Button` and will act like it except for the places where `hasRaisedButtonBool` is true in which case it will look like this:
+To enable this you have the `RaisedButton` UIID that derives from `Button` and will act like it except for the places where `hasRaisedButtonBool` is true in which case it will look like this:
 
 .Raised and flat button in simulator
 image::img/raised-flat-buttons.png[Raised and flat button in simulator,scaledwidth=40%]
@@ -868,7 +868,7 @@ f.show();
 
 The ripple effect in material design highlights the location of the finger and grows as a circle to occupy the full area of the component as the user presses the button.
 
-you've the ability to perform a ripple effect by darkening the touched area and growing that in a quick animation.
+You can perform a ripple effect by darkening the touched area and growing that in a quick animation.
 
 Ripple effect can be applied to any component but you have it turned on for buttons on Android which also applies to things like title commands, side menu elements etc. This might not apply at this moment to lead components like multi-buttons but that might change in the future.
 
@@ -883,7 +883,7 @@ Both `CheckBox` & `RadioButton` have a selected state that allows you to determi
 
 TIP: `RadioButton` doesn't allow you to "deselect" it, the way to "deselect" a `RadioButton` is by selecting another `RadioButton`.
 
-The `CheckBox` can be added to a `Container` like any other `Component` but the `RadioButton` must be associated with a `ButtonGroup` otherwise if you've more than one set of `RadioButton's` in the form you might have an issue.
+The `CheckBox` can be added to a `Container` like any other `Component` but the `RadioButton` must be associated with a `ButtonGroup` otherwise if you have more than one set of `RadioButton's` in the form you might have an issue.
 
 Notice in the sample below that you associate all the radio buttons with a group but don't do anything with the group as the radio buttons keep the reference internally. You also show the opposite side functionality and icon behavior:
 
@@ -939,9 +939,9 @@ hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
 .Toggle button converted sample
 image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
 
-that's half the story though, to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
+That's half the story though: to get the full effect of some cool toggle button UI's you can use a https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html[ComponentGroup]. This allows you to create a button bar effect with the toggle buttons.
 
-For example: lets enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group. You can do this by changing the last line of the code above as such:
+For example, to enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group, change the last line of the code above as such:
 
 [source,java]
 ----
@@ -1004,7 +1004,7 @@ https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[Mu
 
 NOTE: The `MultiButton` was inspired by the aesthetics of the `UITableView` iOS component.
 
-A common source of confusion in the `MultiButton` is the difference between the icon and the emblem, since both may have an icon image associated with them. The icon is an image representing the entry while the emblem is an optional visual representation of the action that will be undertaken when the element is pressed. Both may be used simultaneously or individually of one another.
+A common source of confusion in the `MultiButton` is the difference between the icon and the emblem, since both may have an icon image associated with them. The icon is an image representing the entry while the emblem is an optional visual representation of the action that will be undertaken when the element is pressed. Both may be used simultaneously or individually of one another:
 
 [source,java]
 ----
@@ -1052,7 +1052,7 @@ Since the `MultiButton` is a composite component setting its `UIID` will impact 
 
 To customize everything you need to customize the UIID's for `MultiLine1`, `MultiLine2`, `MultiLine3`, `MultiLine4` & `Emblem`.
 
-You can customize the individual `UIID's` thru the API directly using the `setIconUIID`, `setUIIDLine1`, `setUIIDLine2`, `setUIIDLine3`, `setUIIDLine4` & `setEmblemUIID`.
+You can customize the individual `UIID's` through the API directly using the `setIconUIID`, `setUIIDLine1`, `setUIIDLine2`, `setUIIDLine3`, `setUIIDLine4` & `setEmblemUIID`.
 
 Recent versions also include a badge overlay that can be rendered in the corner of the main icon. Use `setBadgeText()` to display a value (for example a notification count) and `setBadgeUIID()` if you need a custom UIID instead of the default `Badge` styling. When you need to inspect or adjust the badge style programmatically, `getBadgeStyleComponent()` returns the component whose styles are applied to the badge so you can tweak padding, colors or borders before showing the `MultiButton`.
 
@@ -1061,7 +1061,7 @@ Recent versions also include a badge overlay that can be rendered in the corner 
 
 https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[SpanButton] is a <<lead-component-sidebar,composite component (lead component)>> that looks/acts like a `Button` but can break lines rather than crop them when the text is long.
 
-Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamlessly. The `SpanButton` is far simpler than the `MultiButton` and as a result isn't as configurable.
+Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamlessly. The `SpanButton` is far simpler than the `MultiButton` and as a result isn't as configurable:
 
 [source,java]
 ----
@@ -1082,7 +1082,7 @@ https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[Span
 
 `SpanLabel` uses the `TextArea` internally to break lines seamlessly and so doesn't provide all the elaborate configuration options of `Label`.
 
-One of the features of label that moved into `SpanLabel` to some extent is the ability to position the icon. For example, unlike a `Label` the icon position is determined by the layout manager of the composite so `setIconPosition` accepts a `BorderLayout` constraint.
+One of the features of label that moved into `SpanLabel` to some extent is the ability to position the icon. For example, unlike a `Label` the icon position is determined by the layout manager of the composite so `setIconPosition` accepts a `BorderLayout` constraint:
 
 [source,java]
 ----
@@ -1130,12 +1130,12 @@ TIP: You can force the Android or iOS mode by using the theme constant `onOffIOS
 ==== Validation
 
 Validation is an inherent part of text input, and the https://www.codenameone.com/javadoc/com/codename1/ui/validation/Validator.html[Validator] class allows that. You can enable validation
-thru the `Validator` class to add constraints for a specific component.
-it's also possible to define components that would be enabled/disabled based on validation state and the way in which validation errors are rendered (change the components `UIID`, paint an emblem on top, etc.). A https://www.codenameone.com/javadoc/com/codename1/ui/validation/Constraint.html[Constraint] is an interface
+through the `Validator` class to add constraints for a specific component.
+It's also possible to define components that would be enabled/disabled based on validation state and the way in which validation errors are rendered (change the components `UIID`, paint an emblem on top, etc.). A https://www.codenameone.com/javadoc/com/codename1/ui/validation/Constraint.html[Constraint] is an interface
 that represents validation requirements. You can define a constraint in Java or use some built-in
 constraints such as https://www.codenameone.com/javadoc/com/codename1/ui/validation/LengthConstraint.html[LengthConstraint], https://www.codenameone.com/javadoc/com/codename1/ui/validation/RegexConstraint.html[RegexConstraint], etc.
 
-This sample below continues from the place where the <<text-component-sample-code,TextField sample above>> stopped by adding validation to that code.
+This sample below continues from the place where the <<text-component-sample-code,TextField sample above>> stopped by adding validation to that code:
 
 [source,java]
 ----
@@ -1156,13 +1156,21 @@ v.addSubmitButtons(submit);
 .Validation & Regular Expressions
 image::img/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
 
+When the form components are bound to a model with `@Bindable`, the
+same constraints can be expressed as field annotations -- `@Required`,
+`@Length`, `@Regex`, `@Email`, `@Url`, `@Numeric`, `@ExistIn`,
+`@Validate` -- and the generated binder wires them into a `Validator`
+exposed through `Binding#getValidator()`. See the
+<<annotation-binding-validation,Validation annotations>> section in the
+component binding chapter for the full reference.
+
 === InfiniteProgress
 
 The https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] indicator spins an image infinitely to show that a background process is still working.
 
 TIP: This style of animation is often nicknamed "washing machine" as it spins endlessly.
 
-`InfiniteProgress` can be used in one of two ways either by embedding the component into the UI thru something like this:
+`InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
 
 [source,java]
 ----
@@ -1186,14 +1194,14 @@ image::img/infinite-progress.png[Infinite progress,scaledwidth=10%]
 
 The image used in the `InfiniteProgress` animation is defined by the native theme. You can override that definition either by defining the theme constant `infiniteImage` or by invoking the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html#setAnimation-com.codename1.ui.Image-[setAnimation] method.
 
-NOTE: Despite the name of the method `setAnimation` expects a static image that will be rotated internally. don't use an animated image.
+NOTE: Despite the name of the method `setAnimation` expects a static image that will be rotated internally. Don't use an animated image.
 
 
 === InfiniteScrollAdapter and InfiniteContainer
 
 https://www.codenameone.com/javadoc/com/codename1/components/InfiniteScrollAdapter.html[InfiniteScrollAdapter] & https://www.codenameone.com/javadoc/com/codename1/ui/InfiniteContainer.html[InfiniteContainer] allow you to create a scrolling effect that "never" ends with the typical `Container`/`Component` paradigm.
 
-The motivation behind these classes is simple, say you've a lot of data to fetch from storage or from the internet. You can fetch the data in batches and show progress sign while you do this.
+The motivation behind these classes is simple, say you have a lot of data to fetch from storage or from the internet. You can fetch the data in batches and show progress sign while you do this.
 
 Infinite scroll fetches the next batch of data dynamically as you reach the end of the `Container`. `InfiniteScrollAdapter` & `InfiniteContainer` represent two similar ways to do that task.
 
@@ -1236,7 +1244,7 @@ IMPORTANT: The demo code here doesn't do any error handling! This is a bad pract
 
 The `fetchPropertyData` is a simplistic tool that fetches the next page of listings for the nestoria webservice. Notice that this method is synchronous and will block the calling thread (legally) until the network operation completes.
 
-Now that you've a webservice lets proceed to create the UI. Check out the code annotations below:
+Now that you have a webservice lets proceed to create the UI. Check out the code annotations below:
 
 [source,java]
 ----
@@ -1277,7 +1285,7 @@ InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> { // <2>
 
 <6> You pass true to show that the data isn't "prefilled" so the method should be invoked when the `Form` is first shown
 
-IMPORTANT: don't violate the EDT in the callback. it's invoked on the event dispatch thread and it's crucial
+IMPORTANT: Don't violate the EDT in the callback. It's invoked on the event dispatch thread and it's crucial
 
 ==== The InfiniteContainer
 
@@ -1367,7 +1375,7 @@ This is all generic, but a bit too much for most, doing a list correctly require
 A quick recap of what MVC is:
 
 - #Model# - Represents the data for the component (list), the model can tell you how many items are in it and which item resides at a given offset within the model. This differs from a simple `Vector` (or array), since all access to the model is controlled (the interface is simpler), and unlike a `Vector`/Array, the model can tell you of changes that occur within it.
-- #View# - The view draws the content of the model. it's a "dumb" layer that has no notion of what's displayed and knows how to draw. It tracks changes in the model (the model sends events) and redraws itself when it changes.
+- #View# - The view draws the content of the model. It's a "dumb" layer that has no notion of what's displayed and knows how to draw. It tracks changes in the model (the model sends events) and redraws itself when it changes.
 - #Controller# - The controller accepts user input and performs changes to the model, which in turn cause the view to refresh.
 
 .Typical MVC Diagram footnote:[Image by RegisFrey - Own work, Public Domain, https://commons.wikimedia.org/w/index.php?curid=10298177]
@@ -1388,7 +1396,7 @@ Since the model is a lightweight interface, it can be implemented by you and rep
 
 3. The is no need for state copying. Since renderers allow you to display any object type, the list model interface can be implemented by the application's data structures (for example: persistence/network engine), which would return internal application data structures saving you the need of copying application state into a list specific data structure. Note that this advantage applies with a custom renderer which is pretty difficult to get right.
 
-4. Using the proxy pattern you can layer logic such as filtering, sorting, caching, etc. on top of existing models without changing the model source code.
+4. Using the proxy pattern you can layer logic such as filtering, sorting, caching, etc. On top of existing models without changing the model source code.
 
 5. You can reuse generic models for many views, for example: a model that fetches data from the server can be initialized with different arguments, to fetch different data for different views. View objects in different Forms can display the same model instance in different view instances, thus they would update automatically when you change one global model.
 
@@ -1398,7 +1406,7 @@ Most of these use cases work best for lists that grow to a larger size, or repre
 ==== Important - lists and Layout managers
 When working with lists, you want the list to handle the scrolling (otherwise it will perform badly). This means you should place the list in a non-scrollable container (no parent can be scrollable), notice that the content pane is scrollable by default, so you should disable that.
 
-it's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. for example:
+It's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. For example:
 
 [source,java]
 ----
@@ -1409,7 +1417,7 @@ form.add(BorderLayout.CENTER, myList);
 
 ==== MultiList & DefaultListModel
 
-after this long start lets show the first sample of creating a list using the https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList].
+After this long start, here is the first sample of creating a list using the https://www.codenameone.com/javadoc/com/codename1/ui/list/MultiList.html[MultiList].
 
 The `MultiList` is a preconfigured list that contains a ready made renderer with defaults that make sense for the most common use cases. It still retains most of the power available to the `List` component but reduces the complexity of one of the hardest things to grasp for most developers: rendering.
 
@@ -1471,7 +1479,7 @@ TIP: Since the `MultiList` uses the `GenericListCellRenderer` internally you can
 
 ===== Going further with the ListModel
 
-Lets assume that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
+Suppose that http://www.georgerrmartin.com/[GRRM] was prolific and wrote 1 million books. The default list model won't make much sense in that case but you would still be able to render everything in a list model.
 
 You will fake it a bit but notice that 1M components won't be created even if you somehow scroll all the way down...
 
@@ -1582,7 +1590,7 @@ public Component getListFocusComponent(List list){
 
 This will compile and work, but won't give you much, notice that you won't see the `List` selection move on the List, this is because the renderer returns a https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] with the same style regardless if it's selected or not.
 
-Now make it a bit more useful.
+Now make it a bit more useful:
 
 [source,java]
 ----
@@ -1605,9 +1613,9 @@ In this renderer you set the `Label.setFocus(true)` if it's selected, calling to
 
 Then you invoke `Label.getAllStyles().setBgTransparency(100)` to give the selection semi transparency, and `0` for full transparency if not selected.
 
-that's still not efficient because you create a new `Label` each time the method is invoked.
+That's still not efficient because you create a new `Label` each time the method is invoked.
 
-To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does.
+To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does:
 
 [source,java]
 ----
@@ -1627,7 +1635,7 @@ class MyRenderer extends Label implements ListCellRenderer {
 }
 ----
 
-Now Let you've a look at a more advanced Renderer.
+Now look at a more advanced Renderer:
 
 [source,java]
 ----
@@ -1672,7 +1680,7 @@ In this renderer you want to render a `Contact` object to the Screen, you build 
 
 Notice that in this renderer you return a focus `Label` with semi transparency, as mentioned before, the focus component can be modified within this method.
 
-For example, you can change the focus `Component` to have an icon.
+For example, you can change the focus `Component` to have an icon:
 
 [source,java]
 ----
@@ -1828,7 +1836,7 @@ myMultiList.setRenderingPrototype(map);
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/ComboBox.html[ComboBox] is a specialization of `List` that displays a single selected entry. When clicking that entry a popup is presented allowing the user to pick an entry from the full list of entries.
 
-TIP: The `ComboBox` UI paradigm isn't as common on OS's such as iOS where there is no native equivalent to it. Recommend using either the https://www.codenameone.com/javadoc/com/codename1/ui/spinner/Picker.html[Picker] class or the https://www.codenameone.com/javadoc/com/codename1/ui/AutoCompleteTextField.html[AutoCompleteTextField].
+TIP: The `ComboBox` UI paradigm isn't as common on OSes such as iOS where there is no native equivalent to it. Recommend using either the https://www.codenameone.com/javadoc/com/codename1/ui/spinner/Picker.html[Picker] class or the https://www.codenameone.com/javadoc/com/codename1/ui/AutoCompleteTextField.html[AutoCompleteTextField].
 
 `ComboBox` is notoriously hard to style as it relies on a complex dynamic of popup renderer and instantly visible renderer. The `UIID` for the `ComboBox` is `ComboBox`
 but if you set it to something else all the other `UIID's` will also change their prefix. For example: the `ComboBoxPopup`
@@ -1883,7 +1891,7 @@ image::img/slider.png[Slider,scaledwidth=25%]
 
 The interesting part about the slider is that it has two separate style `UIID’s`, `Slider` & `SliderFull`. The `Slider` `UIID` is always painted and `SliderFull` is rendered on top based on the amount the `Slider` should be filled.
 
-`Slider` is highly customizable for example: a slider can be used to replicate a 5 star rating widget as such. Notice that this slider will work when its given its preferred size otherwise more stars will appear. that's why you place it within a `FlowLayout`:
+`Slider` is highly customizable for example: a slider can be used to replicate a 5-star rating widget as such. Notice that this slider will work when its given its preferred size otherwise more stars will appear. That's why you place it within a `FlowLayout`:
 
 [source,java]
 ----
@@ -1940,9 +1948,9 @@ TIP: This slider goes all the way to 0 stars which is less common. You can use a
 [[table-section]]
 === Table
 
-https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table] is a composite component (but it isn't a <<lead-component-sidebar,lead component>>), this means it's a subclass of https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container]. it's effectively built from many components.
+https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table] is a composite component (but it isn't a <<lead-component-sidebar,lead component>>), this means it's a subclass of https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container]. It's effectively built from many components.
 
-TIP: `Table` is based on the https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html[TableLayout] class. it's important to be familiar with that layout manager when working with `Table`.
+TIP: `Table` is based on the https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html[TableLayout] class. It's important to be familiar with that layout manager when working with `Table`.
 
 Here is a trivial sample of using the standard table component:
 
@@ -2005,7 +2013,7 @@ image::img/components-table-with-spanning.png[Table with spanning and fixed widt
 
 To customize the table cell behavior you can derive the `Table` to create a "renderer like" widget, but unlike the list this component is "kept" and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
 
-lets fix the example above to include far more capabilities:
+The example above can be extended to include far more capabilities:
 [source,java]
 ----
 Table table = new Table(model) {
@@ -2101,7 +2109,7 @@ image::img/components-table-multiline-landscape.png[Multiline table cell in land
 
 ==== Sorting tables
 
-Sorting tables by clicking the titles is something that should work out of the box by using an API like `setSortSupported(true)`.
+Sorting tables by clicking the titles is something that should work out of the box by using an API like `setSortSupported(true)`:
 
 [source,java]
 ----
@@ -2276,13 +2284,125 @@ IMPORTANT: `ShareButton` behaves differently on the device...
 image::img/components-sharebutton-android.png[The share button running on the Android device and screenshot sent into twitter,scaledwidth=50%]
 
 
-IMPORTANT: The `ShareButton` features some share service classes to allow plugging in more share services. For example, this functionality is relevant to devices where native sharing isn't supported. this code isn't used on iOS/Android...
+IMPORTANT: The `ShareButton` features some share service classes to allow plugging in more share services. For example, this functionality is relevant to devices where native sharing isn't supported. This code isn't used on iOS/Android...
+
+==== Share Result Callback
+
+The share API can report what the user did with the share sheet. Register a `ShareResultListener` on either `ShareButton` or directly with `Display.share(...)` and you receive a single `ShareResult` describing the outcome:
+
+* `SHARED_TO(packageName)` -- the user picked a destination. `packageName` is the chosen target's identifier: an Android package name (for example, `com.whatsapp`) or, on iOS, a `UIActivityType` such as `com.apple.UIKit.activity.PostToTwitter`. It may be `null` when the platform doesn't expose the selection (for example, older Android, Web Share API).
+* `DISMISSED` -- the user cancelled without picking a target. iOS reports this reliably; Android's chooser has no public dismissal signal, so on Android the listener simply doesn't fire on cancel.
+* `FAILED` -- the share couldn't be completed. `getError()` may carry a short platform-supplied message.
+
+The listener is always invoked on the EDT, exactly once per share request.
+
+[source,java]
+----
+ShareButton sb = new ShareButton();
+sb.setTextToShare("Check this out!");
+sb.setShareResultListener(result -> {
+    if (result.isSharedTo()) {
+        Log.p("Shared to " + result.getPackageName());
+    } else if (result.isDismissed()) {
+        Log.p("User dismissed the share sheet");
+    } else if (result.isFailed()) {
+        Log.p("Share failed: " + result.getError());
+    }
+});
+form.add(sb);
+----
+
+If you call `Display` directly instead of using `ShareButton`, pass the listener as the final argument to the new overload:
+
+[source,java]
+----
+Display.getInstance().share(
+        "Check this out!", imagePath, "image/png", sourceRect,
+        result -> handleResult(result));
+----
+
+When the share is dispatched through the non-native fallback dialog (platforms without `isNativeShareSupported`), the listener still fires: it reports `DISMISSED` when the user picks the Cancel button, and the underlying `ShareService` implementations report `SHARED_TO` once they call `ShareService.finish()`. Custom `ShareService` subclasses can call `deliverResult(ShareResult.failed("..."))` from inside `share(...)` to publish a failure explicitly; otherwise `finish()` falls back to a default `SHARED_TO(commandName)`.
+
+[[ios-share-extension-section]]
+=== iOS Share Extension Authoring Helper
+
+An iOS *share extension* is a separate app target that the system shows inside `UIActivityViewController` when the user shares from another app (Safari, Photos, etc.). It runs in a sandboxed process and persists payloads to the host app via an *App Group* shared `NSUserDefaults` suite.
+
+Codename One's build pipeline already wires `.ios.appext` zip archives under `src/main/resources` into the generated Xcode project. The `IOSShareExtensionBuilder` helper generates that archive for you so you don't have to create the extension target in Xcode first.
+
+==== What the helper produces
+
+For a single call the helper writes four files at the root of the extension bundle:
+
+* `Info.plist` -- declares the `NSExtension` dictionary, activation rules (`SupportsText` / `SupportsWebURL` / `SupportsImage`), and the principal class (`ShareViewController`).
+* `<ExtensionName>.entitlements` -- declares `com.apple.security.application-groups` with the configured App Group identifier.
+* `ShareViewController.swift` -- a `SLComposeServiceViewController` subclass that extracts text / URL / image attachments from `extensionContext`, packs them into a dictionary, and writes that dictionary to `UserDefaults(suiteName: appGroupId)` under the key `cn1.shareExtension.payload`.
+* `buildSettings.properties` -- Xcode build setting overrides (deployment target, Swift version, entitlements path, plist path) picked up by the iOS build pipeline.
+
+==== Generating the bundle
+
+Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
+
+[source,java]
+----
+import com.codename1.util.IOSShareExtensionBuilder;
+
+new IOSShareExtensionBuilder()
+        .setExtensionName("MyShareExtension")
+        .setDisplayName("Share to MyApp")
+        .setHostBundleId("com.example.myapp")
+        .setAppGroupId("group.com.example.myapp.shared")
+        .acceptText(true)
+        .acceptURLs(true)
+        .acceptImages(true)
+        .writeAppext(new File("src/main/resources/MyShareExtension.ios.appext"));
+----
+
+The next iOS build picks up the `.ios.appext` archive automatically; no Xcode steps are required.
+
+If you prefer a directory layout (for example, to commit the generated sources or to feed a future `ios/app_extensions/` pipeline) use `writeTo(File)` instead of `writeAppext(File)` -- the file contents are identical.
+
+==== Reading the payload from the host app
+
+The host app reads the most recent payload from the same App Group at startup or when it resumes:
+
+[source,objective-c]
+----
+// Inside an iOS native interface
+NSUserDefaults* shared =
+    [[NSUserDefaults alloc] initWithSuiteName:@"group.com.example.myapp.shared"];
+NSDictionary* payload = [shared dictionaryForKey:@"cn1.shareExtension.payload"];
+----
+
+The payload dictionary contains:
+
+* `text` -- the user-composed text (`String`).
+* `items` -- an array of `{ kind, value }` dictionaries where `kind` is `"text"`, `"url"` or `"image"`. For images, `value` is a file URL inside the App Group container.
+* `timestamp` -- a `Double` UNIX time.
+
+Expose this to your CN1 code via a small native interface and clear the key once handled so the next share is unambiguous.
+
+==== Activation rules and validation
+
+The builder validates its inputs before writing anything:
+
+* `extensionName` must be a non-empty identifier (letters, digits, `_`, `-`). It becomes the Xcode target name and the `.appex` bundle name. The extension's bundle id is set to `<hostBundleId>.<extensionName>` by the iOS build pipeline.
+* `appGroupId` must start with `group.` (an Apple requirement). Create the matching App Group in your Apple Developer account and add it to both the host app's and the extension's provisioning profile.
+* At least one of `acceptText`, `acceptURLs`, `acceptImages` must be enabled, otherwise iOS will never present your extension.
+
+The default deployment target is iOS 12.0; override with `setDeploymentTarget("13.0")` if you need newer APIs in your customized controller.
+
+==== Customising the generated controller
+
+The generated Swift controller covers the common case (read attachments, persist to App Group, finish the request). If you need bespoke logic -- custom UI, server upload, image transcoding -- treat the helper's output as a starting point: run it once, copy the directory under `ios/app_extensions/MyShareExtension/`, edit `ShareViewController.swift`, and zip it back into `.ios.appext` (or wait for the directory-based pipeline tracked by issue #3427).
+
+NOTE: Provisioning profiles for the extension target aren't generated by the helper. You still need to provision the extension's bundle id (`<hostBundleId>.<extensionName>`) and add the App Group capability to it on the Apple Developer portal, alongside the host app.
 
 === Tabs
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html[Tabs] `Container` arranges components into groups within "tabbed" containers. `Tabs` is a container type that allows leafing through its children using labeled toggle buttons. The tabs can be placed in many different ways (top, bottom, left or right) with the default being determined by the platform. This class also allows swiping between components to leaf between said tabs (for this purpose the tabs themselves can also be hidden).
 
-Since `Tabs` are a `Container` its a common mistake to try and add a `Tab` using the `add` method. That method won't work since a `Tab` can have both an `Image` and text String associated with it.
+Since `Tabs` are a `Container` its a common mistake to try and add a `Tab` using the `add` method. That method won't work since a `Tab` can have both an `Image` and text String associated with it:
 
 [source,java]
 ----
@@ -2355,6 +2475,52 @@ image::img/components-tabs-swipe2.png[Swipeable Tabs with an iOS carousel effect
 
 NOTE: Notice that you used `setRadioButtonImages` to explicitly set the radio button images to the look you want for the carousel.
 
+==== Animated tab indicator
+
+Modern Material 3 (`NavigationBar`) and iOS 26 tab bars animate a small
+underline between tabs when the user changes selection. `Tabs` ships
+this as an opt-in feature gated by the `tabsAnimatedIndicatorBool`
+theme constant; the iOS Modern and Android Material themes turn it on
+by default, so apps shipping against those themes get the effect for
+free.
+
+To enable in a custom theme:
+
+[source,css]
+----
+#Constants {
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;    /* tween duration in ms */
+    tabsAnimatedIndicatorThicknessMm: 1;      /* underline thickness  */
+}
+
+TabIndicator {
+    /* The indicator picks up its color from this UIID's fg. If the
+       UIID isn't defined or has fgColor == 0, the indicator falls
+       back to the currently-selected tab's fgColor. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+----
+
+To toggle programmatically (e.g. add it to a Tabs instance whose theme
+hasn't enabled it):
+
+[source,java]
+----
+Tabs tabs = new Tabs();
+tabs.setAnimatedIndicator(true);
+----
+
+The indicator animates its `x` / `width` from the previously selected
+tab's bounds to the new selection's bounds using a `Motion.createEaseInOutMotion`
+over the configured duration (200ms default, matching Material 3's
+spec). Rapid double-taps start the animation from the *current
+interpolated position* rather than from a stale baseline, so the
+indicator chains cleanly.
+
 [[mediamanager-section]]
 === MediaManager & MediaPlayer
 
@@ -2372,7 +2538,7 @@ The `MediaManager` is the core class responsible for media interaction in Codena
 
 TIP: You should also check out the https://www.codenameone.com/javadoc/com/codename1/capture/Capture.html[Capture] class for things that aren't covered by the `MediaManager`.
 
-In the demo code below you use the gallery functionality to pick a video from the device's video gallery.
+In the demo code below you use the gallery functionality to pick a video from the device's video gallery:
 
 [source,java]
 ----
@@ -2410,7 +2576,7 @@ IMPORTANT: Video playback in the simulator will work with JavaFX enabled. This i
 === ImageViewer
 
 The https://www.codenameone.com/javadoc/com/codename1/components/ImageViewer.html[ImageViewer] allows you to inspect, zoom and pan into an image. It also allows swiping between images if
-you've a set of images (using an image list model).
+you have a set of images (using an image list model).
 
 IMPORTANT: The `ImageViewer` is a complex rich component designed for user interaction. If you want to display an image use https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] if you want the image to scale seamlessly use https://www.codenameone.com/javadoc/com/codename1/components/ScaleImageLabel.html[ScaleImageLabel].
 
@@ -2453,7 +2619,7 @@ image::img/components-imageviewer-multi.png[An ImageViewer with many elements is
 
 Notice that you use a https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] to allow swiping between images.
 
-From Codename One 9.0, `ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
+`ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
 
 [source,java]
 ----
@@ -2728,7 +2894,7 @@ image::img/toolbar-search-mode.jpg[built-in toolbar search functionality,scaledw
 
 You can customize the appearance of the search bar by using the UIID's: `ToolbarSearch`, `TextFieldSearch` & `TextHintSearch`.
 
-In the sample below you fetch all the contacts from the device and enable search thru them, notice it expects and image called `duke.png` which is the default Codename One icon renamed and placed in the src folder:
+In the sample below you fetch all the contacts from the device and enable search through them, notice it expects and image called `duke.png` which is the default Codename One icon renamed and placed in the src folder:
 
 [source,java]
 ----
@@ -2808,9 +2974,9 @@ This places the component below the side menu bar. Notice that this component co
 [[title-animations-section]]
 ==== Title animations
 
-Modern UI's often animate the title upon scrolling to balance the highly functional smaller title advantage with the gorgeous large image based title. This is pretty easy to do with the Toolbar API thru the Title animation API.
+Modern UI's often animate the title upon scrolling to balance the highly functional smaller title advantage with the gorgeous large image based title. This is pretty easy to do with the Toolbar API through the Title animation API.
 
-The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: http://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out.
+The code below shows off an attractive title based on a book by GRRM on top of text footnote:[The text below is from A Wiki of Ice & Fire: http://awoiaf.westeros.org/index.php/A_Game_of_Thrones] that's scrollable. As the text is scrolled the title fades out:
 
 [source,java]
 ----
@@ -2889,7 +3055,7 @@ NOTE: The scrollbars appear in the simulator, device versions of the browser com
 
 IMPORTANT: A `BrowserComponent` should be in the center of a BorderLayout. Otherwise its preferred size might be zero before the HTML finishes loading/layout in the native layer and layout might be wrong as a result.
 
-You can use `WebBrowser` and `BrowserComponent` interchangeably for most basic usage. For example, if you need access to JavaScript or native browser functionality then there is no use in going thru the `WebBrowser` abstraction.
+You can use `WebBrowser` and `BrowserComponent` interchangeably for most basic usage. For example, if you need access to JavaScript or native browser functionality then there is no use in going through the `WebBrowser` abstraction.
 
 The `BrowserComponent` has full support for executing local web pages from within the jar. The basic support uses the `jar:///` URL as such:
 
@@ -2933,14 +3099,14 @@ NOTE: This issue doesn't affect packaged native applications, only the desktop S
 ==== BrowserComponent hierarchy
 
 When Codename One packages applications into native apps it hides a lot of details to make the process simpler. One of the things hidden is the fact that you aren't dealing with a JAR anymore, so
-`getResource`/`getResourceAsStream` are problematic... Both of these API's support hierarchies and a concept of package
-relativity both of which might not be supported on all OS's.
+`getResource`/`getResourceAsStream` are problematic... Both of these APIs support hierarchies and a concept of package
+relativity both of which might not be supported on all OSes.
 
 Codename One has its own getResourceAsSteam in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class and that works fine, but it requires that all files be in the src root directory.
 
-TIP: that's why recommend that you place files inside res files. A resource file allows you to add arbitrary data files and you can have as many resource files as you need.
+TIP: That's why recommend that you place files inside res files. A resource file allows you to add arbitrary data files and you can have as many resource files as you need.
 
-For web developers this isn't enough since hierarchies are used often to represent the various dependencies, this means that many links & references are relative. To work with such hierarchies place all your resources in a hierarchy under the html package in the project source directory (`src/html`). The build server will `tar` the entire content of that package and add an `html.tar` file into the native package. This `tar` is seamlessly extracted on the device when you actually need the resources and with new application versions (not on every launch). assuming the resources are under the html root package they can be displayed with code like this:
+For web developers this isn't enough since hierarchies are used often to represent the various dependencies, this means that many links & references are relative. To work with such hierarchies place all your resources in a hierarchy under the HTML package in the project source directory (`src/html`). The build server will `tar` the entire content of that package and add an `html.tar` file into the native package. This `tar` is seamlessly extracted on the device when you actually need the resources and with new application versions (not on every launch). Assuming the resources are under the HTML root package they can be displayed with code like this:
 
 [source,java]
 ----
@@ -2951,21 +3117,21 @@ try {
 }
 ----
 
-Notice that the path is relative to the html directory and starts with `/` but inside the HTML files you should use
+Notice that the path is relative to the HTML directory and starts with `/` but inside the HTML files you should use
 relative (not absolute) paths.
 
 Also notice that an `IOException` can be thrown due to the process of untarring. Its unlikely to happen but is entirely possible.
 
 ==== NavigationCallback
 
-At the core of the `BrowserComponent` you've the https://www.codenameone.com/javadoc/com/codename1/ui/events/BrowserNavigationCallback.html[BrowserNavigationCallback]. It might not seem like the most important interface within the browser but it's the "glue" that allows the JavaScript code to communicate back into the Java layer.
+At the core of the `BrowserComponent` you have the https://www.codenameone.com/javadoc/com/codename1/ui/events/BrowserNavigationCallback.html[BrowserNavigationCallback]. It might not seem like the most important interface within the browser but it's the "glue" that allows the JavaScript code to communicate back into the Java layer.
 
 You can bind a `BrowserNavigationCallback` by invoking `setBrowserNavigationCallback` on the `BrowserComponent`. At that point with every navigation within the browser the callback will get invoked.
 
 IMPORTANT: The `shouldNavigate` method from the `BrowserNavigationCallback` is invoked in a native thread and **NOT ON THE EDT**! +
 it's crucial that this method returns and that it won't do any changes on the UI.
 
-The `shouldNavigate` indicates to the native code whether navigation should proceed or not. For example: if a user clicks a specific link you might choose to do something in the Java code so you can return false and block the navigation. You can invoke https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#callSerially java.lang.Runnable-[callSerially] to do the actual task in the Java side.
+The `shouldNavigate` indicates to the native code whether navigation should proceed or not. For example: if a user clicks a specific link you might choose to do something in the Java code so you can return false and block the navigation. You can invoke https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#callSerially java.lang.Runnable-[callSerially] to do the actual task in the Java side:
 
 [source,java]
 ----
@@ -3005,10 +3171,10 @@ NOTE: The JavaScript Bridge is implemented on top of the `BrowserNavigationCallb
 
 ==== JavaScript
 
-TIP: The JavaScript bridge is sometimes confused with the JavaScript Port. The JavaScript bridge allows you to communicate with JavaScript from Java (and visa versa). The JavaScript port allows you to compile the Codename One application into a JavaScript application that runs in a standard web browser without code changes (think GWT without source changes and with thread support).+
+TIP: The JavaScript bridge is sometimes confused with the JavaScript Port. The JavaScript bridge allows you to communicate with JavaScript from Java (and vice versa). The JavaScript port allows you to compile the Codename One application into a JavaScript application that runs in a standard web browser without code changes (think GWT without source changes and with thread support).+
 You discuss the JavaScript port further later in the guide.
 
-Codename One 4.0 introduced a new API for interacting with Javascript in Codename One. This API is part of the `BrowserComponent` class, and effectively replaces the https://www.codenameone.com/javadoc/com/codename1/JavaScript/package-summary.html[com.codename1.JavaScript package], which is now deprecated.
+Codename One 4.0 introduced a new API for interacting with JavaScript in Codename One. This API is part of the `BrowserComponent` class, and effectively replaces the https://www.codenameone.com/javadoc/com/codename1/JavaScript/package-summary.html[com.codename1.JavaScript package], which is now deprecated.
 
 ===== What was wrong with the old API
 
@@ -3021,13 +3187,13 @@ JSObject window = ctx.get("window");
 
 This code looks harmless enough, but this is actually expensive. It issues a command to the `BrowserComponent`, and uses `invokeAndBlock()` to wait for the command to go through and send back a response. `invokeAndBlock()` is a magical tool that allows you to "block" without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` show this in their name. For example: `Component.animateLayoutAndWait()`. This provides you the expectation that this call could take some time, and helps to alert you to the underlying cost.
 
-The problem with the `ctx.get("window")` call is that it looks the same as a call to `Map.get(key)`. There’s no sign that this call is expensive and could take time. One call like this probably isn't a big deal, but it doesn't take long before you've dozens or even hundreds of calls like this littered throughout your codebase, and they can be hard to pick out.
+The problem with the `ctx.get("window")` call is that it looks the same as a call to `Map.get(key)`. There’s no sign that this call is expensive and could take time. One call like this probably isn't a big deal, but it doesn't take long before you have dozens or even hundreds of calls like this littered throughout your codebase, and they can be hard to pick out.
 
 ===== The new API
 
-The new API fully embraces the asynchronous nature of Javascript. It uses callbacks instead of return values, and provides convenience wrappers with the appropriate "AndWait()" naming convention to allow for synchronous usage. Let’s look at a simple example:
+The new API fully embraces the asynchronous nature of JavaScript. It uses callbacks instead of return values, and provides convenience wrappers with the appropriate "AndWait()" naming convention to allow for synchronous usage. Let’s look at a simple example:
 
-NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent].
+NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent]:
 
 [source,java]
 ----
@@ -3037,7 +3203,7 @@ bc.execute(
 );
 ----
 
-This code should output "The result was 7" to the console. it's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-[execute()] method is:
+This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-[execute()] method is:
 
 [source,java]
 ----
@@ -3048,7 +3214,7 @@ The first parameter is a JavaScript expression. This JavaScript *MUST* call eith
 
 The second parameter is your callback that's executed from the JavaScript side, when `callback.onSuccess(res)` is called. The callback takes a single parameter of type https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.JSRef.html[JSRef] which is a generic wrapper around a JavaScript variable. JSRef has accessors to retrieve the value as some primitive types. For example: `getBoolean()`, `getDouble()`, `getInt()`, `toString()`, and it provides some introspection through the `getType()` method.
 
-NOTE: it's worth noting that the callback method can take a single parameter. If you need to pass many parameters, you may consider including them in a single string which you parse in your callback.
+NOTE: It's worth noting that the callback method can take a single parameter. If you need to pass many parameters, you may consider including them in a single string which you parse in your callback.
 
 ===== Synchronous wrappers
 
@@ -3064,11 +3230,11 @@ Log.p("The result was "+res.Int());
 
 Prints `The result was 7`.
 
-IMPORTANT: When using the `andWait()` variant, it's critical that your Javascript calls your callback method at some point - otherwise it will block *indefinitely*. You provide variants of executeAndWait() that include a timeout in case you want to hedge against this possibility.
+IMPORTANT: When using the `andWait()` variant, it's critical that your JavaScript calls your callback method at some point - otherwise it will block *indefinitely*. You provide variants of executeAndWait() that include a timeout in case you want to hedge against this possibility.
 
 ===== Multi-use callbacks
 
-The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the JavaScript side for later use (for example: to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the difference is that the callback will life on after its first use. For example: Consider the following code:
+The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the JavaScript side for later use (for example: to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the difference is that the callback will live on after its first use. For example: Consider the following code:
 
 [source,java]
 ----
@@ -3111,13 +3277,13 @@ bc.execute(
 );
 ----
 
-The gist is that you embed placeholders in the JavaScript expression that are replaced by the corresponding entry in an array of parameters. The `${0}` placeholder is replaced by the first item in the parameters array, the `${1}` placeholder is replaced by the 2nd, etc..
+The gist is that you embed placeholders in the JavaScript expression that are replaced by the corresponding entry in an array of parameters. The `${0}` placeholder is replaced by the first item in the parameters array, the `${1}` placeholder is replaced by the 2nd, etc.
 
 ===== Proxy objects
 
-The new API also includes a https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.JSProxy.html[JSProxy] class that encapsulates a Javascript object simplify the getting and setting of properties on Javascript objects - and the calling of their methods. It provides essentially three core methods, along with many variants of each to allow for async or synchronous usages, parameters, and timeouts.
+The new API also includes a https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.JSProxy.html[JSProxy] class that encapsulates a JavaScript object simplify the getting and setting of properties on JavaScript objects - and the calling of their methods. It provides essentially three core methods, along with many variants of each to allow for async or synchronous usages, parameters, and timeouts.
 
-For example: You might want to create a proxy for the https://developer.mozilla.org/en-You/docs/Web/API/Window/location[window.location] object so that you can access its properties more from Java.
+For example: You might want to create a proxy for the https://developer.mozilla.org/en-You/docs/Web/API/Window/location[window.location] object so that you can access its properties more from Java:
 
 [source,java]
 ----
@@ -3158,7 +3324,7 @@ location.call("replace", new Object[]{"http://www.google.com"},
 
 ===== Legacy JSObject support
 
-This section describes the now deprecated `JSObject` approach. it's here for reference by developers working with older code. You suggest using the new API when starting a new project.
+This section describes the now deprecated `JSObject` approach. It's here for reference by developers working with older code. You suggest using the new API when starting a new project.
 
 `BrowserComponent` can communicate with the HTML code using JavaScript calls. For example: you can create HTML like this:
 
@@ -3198,14 +3364,14 @@ Coupled with `shouldNavigate` you can effectively do everything which is what th
 
 ===== The JavaScript bridge
 
-While it's possible to build everything on top of `execute` and `shouldNavigate`, both of these methods have their limits. that's why Codename One introduced the JavaScript package, it allows you to communicate with JavaScript using intuitive code/syntax.
+While it's possible to build everything on top of `execute` and `shouldNavigate`, both of these methods have their limits. That's why Codename One introduced the JavaScript package, it allows you to communicate with JavaScript using intuitive code/syntax.
 
 The https://www.codenameone.com/javadoc/com/codename1/JavaScript/JavascriptContext.html[JavascriptContext] class lays the foundation by enabling you to call JavaScript code directly from Java. It provides automatic type conversion between Java and JavaScript types as follows:
 
 .Java to JavaScript
 [cols="2*",options="header"]
 |====
-| Java Type | Javascript Type
+| Java Type | JavaScript Type
 | `String` | `String`
 | `Double/Integer/Float/Long` | `Number`
 | `Boolean` | `Boolean`
@@ -3218,7 +3384,7 @@ The https://www.codenameone.com/javadoc/com/codename1/JavaScript/JavascriptConte
 .JavaScript to Java
 [cols="2*",options="header"]
 |====
-| Javascript Type | Java Type
+| JavaScript Type | Java Type
 | `String` | `String`
 | `Number` | `Double`
 | `Boolean` | `Boolean`
@@ -3247,7 +3413,7 @@ bc.setPage( "<html lang=\"en\">\n" +
             "</html>", null);
 hi.add(BorderLayout.CENTER, bc);
 bc.addWebEventListener("onLoad", (e) -> {
-    // Create a Javascript context for this BrowserComponent
+    // Create a JavaScript context for this BrowserComponent
     JavascriptContext ctx = new JavascriptContext(bc);
 
     String pageContent = (String)ctx.get("document.body.innerHTML");
@@ -3257,8 +3423,8 @@ bc.addWebEventListener("onLoad", (e) -> {
 hi.show();
 ----
 
-.The contents was copied from the DOM and placed in the south position of the form
-image::img/components-browsercomponent-context.png[The contents was copied from the DOM and placed in the south position of the form,scaledwidth=20%]
+.The contents were copied from the DOM and placed in the south position of the form
+image::img/components-browsercomponent-context.png[The contents were copied from the DOM and placed in the south position of the form,scaledwidth=20%]
 
 Notice that when you work with numeric values or anything related to the types mentioned above your code must be aware of the typing. For example: in this case the type is `Double` and not `String`:
 
@@ -3283,7 +3449,7 @@ bc.setPage( "<html lang=\"en\">\n" +
             "</html>", null);
 hi.add(BorderLayout.CENTER, bc);
 bc.addWebEventListener("onLoad", (e) -> {
-    // Create a Javascript context for this BrowserComponent
+    // Create a JavaScript context for this BrowserComponent
     JavascriptContext ctx = new JavascriptContext(bc);
 
     JSObject jo = (JSObject)ctx.get("window");
@@ -3297,9 +3463,9 @@ This code effectively navigates to the Codename One home page by fetching the DO
 
 PhoneGap was one of the first web app packager tools in the market: a tool that's effectively a browser component within a native wrapper coupled with native access APIs, and Cordova is the open source extension of this popular project.
 
-Codename One supports embedding PhoneGap/Cordova applications directly into Codename One applications. This is easy to do with the `BrowserComponent` and JavaScript integration. The main aspect that this integration requires is support for Cordova plugins & its JavaScript API's.
+Codename One supports embedding PhoneGap/Cordova applications directly into Codename One applications. This is easy to do with the `BrowserComponent` and JavaScript integration. The main aspect that this integration requires is support for Cordova plugins & its JavaScript APIs.
 
-The effort to integrate Cordova/PhoneGap support into Codename One is handled within an open source github project https://github.com/codenameone/CN1Cordova[here]. The chief benefits of picking Codename One rather than using Cordova directly are:
+The effort to integrate Cordova/PhoneGap support into Codename One is handled within an open-source GitHub project https://github.com/codenameone/CN1Cordova[here]. The chief benefits of picking Codename One rather than using Cordova directly are:
 
 - Build Cloud
 - Better Native Code Support
@@ -3458,7 +3624,7 @@ current.add(ac);
 current.show();
 ----
 
-<1> you've duplicate arrays that are partial for clarity. This is a separate list of data element but you can fetch the more data from anywhere
+<1> you have duplicate arrays that are partial for clarity. This is a separate list of data element but you can fetch the more data from anywhere
 <2> You create the renderer UI instantly in the fields with the helper methods for wrapping elements which is pretty cool & terse
 <3> In a renderer it's important to always set the value if you don't have a value in place
 
@@ -3482,7 +3648,7 @@ At this time there are 4 types of pickers:
 
 If a platform doesn't support native pickers an internal fallback implementation is used. This is the implementation you always use in the simulator so assume different behavior when building for the device.
 
-TIP: While Android supports Date, Time native pickers it doesn't support the Date & Time native picker UX and will fallback in that case.
+TIP: While Android supports Date, Time native pickers it doesn't support the Date & Time native picker UX and will fall back in that case.
 
 The sample below includes al picker types:
 
@@ -3552,7 +3718,7 @@ The text displayed by the picker on selection is generated automatically by the 
 
 A common use case is to format date values based on a specific appearance and `Picker` has built-in support for a custom display formatter. Just use the `setFormatter(SimpleDateFormat)` method and set the appearance for the field.
 
-When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually.
+When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually:
 
 [source,java]
 ----
@@ -3581,7 +3747,7 @@ Button placement options are:
 The https://www.codenameone.com/javadoc/com/codename1/ui/SwipeableContainer.html[SwipeableContainer] allows you to place a component such as a https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton] on top of more "options"
 that can be exposed by swiping the component to the side.
 
-This swipe gesture is commonly used in touch interfaces to expose features such as delete, edit etc. it's trivial to use this component by determining the components placed on top and bottom (the revealed component).
+This swipe gesture is commonly used in touch interfaces to expose features such as delete, edit etc. It's trivial to use this component by determining the components placed on top and bottom (the revealed component):
 
 [source,java]
 ----
@@ -3622,13 +3788,13 @@ The necessity for `EmbeddedContainer` came about due to iPhone inspired designs 
 
 This didn't mesh well with the GUI builder navigation logic and so it needed a rethink. The aim was to reuse GUI as much as possible while still enjoying the advantage of navigation being managed for you.
 
-Android does this with Activities and the iPhone itself has a view controller, both approaches are problematic for Codename One. The problem is that you've what's effectively two incompatible hierarchies to mix and match.
+Android does this with Activities and the iPhone itself has a view controller, both approaches are problematic for Codename One. The problem is that you have what's effectively two incompatible hierarchies to mix and match.
 
-The Component/Container hierarchy is powerful enough to represent such a UI but you needed a "marker" to show to the https://www.codenameone.com/javadoc/com/codename1/ui/util/UIBuilder.html[UIBuilder] where a "root" component exists so navigation occurs within the given "root." Here `EmbeddedContainer` comes into play, its a simple container that can contain another GUI from the GUI builder. Nothing else. you can place it in any form of UI and effectively have the UI change appropriately and navigation would default to "sensible values."
+The Component/Container hierarchy is powerful enough to represent such a UI but you needed a "marker" to show to the https://www.codenameone.com/javadoc/com/codename1/ui/util/UIBuilder.html[UIBuilder] where a "root" component exists so navigation occurs within the given "root." Here `EmbeddedContainer` comes into play, its a simple container that can contain another GUI from the GUI builder. Nothing else. You can place it in any form of UI and effectively have the UI change appropriately and navigation would default to "sensible values."
 
 Navigation replaces the content of the embedded container; it finds the embedded container based on the component that broadcast the event. If you want to navigate manually use the showContainer() method which accepts a component, you can give any component that's under the `EmbeddedContainer` you want to replace and Codename One will be smart enough to replace that component.
 
-The nice part about using the `EmbeddedContainer` is that the resulting UI can be refactored to provide a more traditional form based UI without duplicating effort and can be adapted to a more tablet oriented UI (with a side bar) again without much effort.
+The nice part about using the `EmbeddedContainer` is that the resulting UI can be refactored to provide a more traditional form based UI without duplicating effort and can be adapted to a more tablet oriented UI (with a sidebar) again without much effort.
 
 === MapComponent
 
@@ -3674,7 +3840,7 @@ map.show();
 ----
 
 The example below shows how to integrate the https://www.codenameone.com/javadoc/com/codename1/maps/MapComponent.html[MapComponent] with the Google https://www.codenameone.com/javadoc/com/codename1/location/Location.html[Location] API.
-make sure to get your secret api key from the Google https://www.codenameone.com/javadoc/com/codename1/location/Location.html[Location] data API at:
+Make sure to get your secret API key from the Google https://www.codenameone.com/javadoc/com/codename1/location/Location.html[Location] data API at:
 https://developers.google.com/maps/documentation/places/
 
 .MapComponent with Google Location API
@@ -3789,8 +3955,8 @@ charts, pie charts and more.
 
 ==== Chart types
 
-The `com.codename1.charts` package includes models and renderers for many different types of charts. it's also
-extensible so that you can add your own chart types if required. The following screen shots show a small
+The `com.codename1.charts` package includes models and renderers for many different types of charts. It's also
+extensible so that you can add your own chart types if required. The following screenshots show a small
 sampling of the types of charts that can be created.
 
 .Line Charts
@@ -3848,7 +4014,7 @@ For example: the colors, fonts, styles, to use.
 4. **Create a https://www.codenameone.com/javadoc/com/codename1/charts/ChartComponent.html[ChartComponent]**. To add your chart to the UI, you need to wrap it in a https://www.codenameone.com/javadoc/com/codename1/charts/ChartComponent.html[ChartComponent] object.
 
 You can check out the https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo[ChartsDemo]
-app for specific examples, but here is a high-level view of some code that creates a Pie Chart.
+app for specific examples, but here is a high-level view of some code that creates a Pie Chart:
 
 [source,java]
 ----
@@ -3989,7 +4155,7 @@ Status status = ToastBar.getInstance().createStatus();
 status.setMessage("Hello world");
 status.showDelayed(300); // Wait 300 ms to show the status
 
-// ... Some time later, clear the status... this may be before it shows at all
+// ... Some time later, clear the status... This may be before it shows at all
 status.clear();
 ----
 
@@ -4001,7 +4167,7 @@ image::img/components-statusbar-multiline.png[ToastBar with a multiline message,
 
 Probably the best usage example for actions in toast is in the gmail style undo. If you aren't a gmail user then the gmail app essentially never prompts for confirmation!
 
-It does whatever you ask and pops a "toast message" with an option to undo. if you clicked by mistake you've 3-4 seconds to take that back.
+It does whatever you ask and pops a "toast message" with an option to undo. If you clicked by mistake you have 3-4 seconds to take that back.
 
 This simple example shows you how you can undo any addition to the UI in a similar way to gmail:
 
@@ -4081,7 +4247,7 @@ image::img/components-accordion.png[The Accordion Component,scaledwidth=30%]
 
 === Floating hint
 
-https://www.codenameone.com/javadoc/com/codename1/components/FloatingHint.html[FloatingHint] wraps a text component with a special container that can animate the hint label into a title label when the text component is edited or has content within it.
+https://www.codenameone.com/javadoc/com/codename1/components/FloatingHint.html[FloatingHint] wraps a text component with a special container that can animate the hint label into a title label when the text component is edited or has content within it:
 
 [source,java]
 ----
@@ -4101,7 +4267,7 @@ image::img/components-floatinghint.png[The FloatingHint component with one compo
 
 The material design floating action button is a powerful tool for promoting an action within your application.
 
-https://www.codenameone.com/javadoc/com/codename1/components/FloatingActionButton.html[FloatingActionButton] is a round button that resides on top of the UI typically in the bottom right hand side. +
+https://www.codenameone.com/javadoc/com/codename1/components/FloatingActionButton.html[FloatingActionButton] is a round button that resides on top of the UI typically in the bottom right-hand side. +
 It has a drop shadow to distinguish it from the UI underneath and it can hide two or more actions under the surface. For example: you can create a simple single click button such as this:
 
 [source,java]
@@ -4129,7 +4295,7 @@ Those familiar with this widget know that there are many nuances to this UI that
 
 ==== Using floating Button as a badge
 
-Floating buttons can also be used to badge an arbitrary component in the style popularized by iOS/Mac OS. A badge appears at the top right corner and includes special numeric details such as `unread count.`.
+Floating buttons can also be used to badge an arbitrary component in the style popularized by iOS/macOS. A badge appears in the top right corner and includes special numeric details such as `unread count.`.
 
 The code below adds a simple badge to an icon button:
 
@@ -4187,7 +4353,7 @@ private Container encloseInMaximizableGrid(Component cmp1, Component cmp2) {
 .Split Pane in the Kitchen Sink Demo
 image::img/splitpane.png[Split Pane in the Kitchen Sink Demo,scaledwidth=30%]
 
-This is self-explanatory but "mostly." you've 5 arguments the first 3 make sense:
+This is self-explanatory but "mostly." you have 5 arguments the first 3 make sense:
 
 - Split orientation
 - Components to split

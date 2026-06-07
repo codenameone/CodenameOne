@@ -1,0 +1,147 @@
+=== Generate OpenAPI client (`generate-openapi`)
+
+Generates a typed Codename One client from an OpenAPI 3.x JSON
+specification.  Writes one `@Mapped` record (Java 17+) or class (Java
+8 target) per `components.schemas` entry and one
+`@RestClient`-annotated interface per OpenAPI tag.  The generated
+files land in `common/src/main/java` so the project owns the
+contract; the matching networking implementation is emitted into
+`common/target/generated-sources` by the build-time annotation
+processor so the project source stays clean.
+
+The mojo is paired with the existing `process-annotations` pipeline:
+identical schemas across operations collapse to one record/class, and
+operationIds become interface methods that resolve at runtime via a
+`com.codename1.io.rest.RestClients` registry populated by the generated
+bootstrap class (the same splice pattern as `@Mapped` mappers).
+
+==== Usage example
+
+[source, bash]
+----
+mvn -pl common cn1:generate-openapi \
+    -Dcn1.openapi.spec=petstore.json \
+    -Dcn1.openapi.basePackage=com.example.petstore
+----
+
+Configuration:
+
+[cols="1,3", options="header"]
+|===
+| Property | Description
+
+| `-Dcn1.openapi.spec=PATH`
+| Local file path or URL of the OpenAPI 3.x JSON document, for example
+`petstore.json` or `https://petstore3.swagger.io/api/v3/openapi.json`.
+YAML isn't supported -- convert with `yq` upstream.
+
+| `-Dcn1.openapi.basePackage=PKG`
+| Java package the generated sources are written under.  Records / classes
+go under `<basePackage>.model`; the `@RestClient` interfaces go under
+`<basePackage>`.
+
+| `-Dcn1.openapi.outputDirectory=DIR` (optional)
+| Defaults to `${project.basedir}/src/main/java`.
+
+| `-Dcn1.openapi.overwrite=false` (optional)
+| Defaults to `true`.  Set to `false` to preserve user edits to existing
+files (only missing files are written).
+|===
+
+==== Generated output
+
+For the Swagger Petstore reference spec the goal emits, under
+`common/src/main/java`:
+
+[listing]
+----
+com/example/petstore/
+  PetApi.java          // @RestClient interface, methods addPet, updatePet,
+                       // findPetsByStatus, getPetById, deletePet, ...
+  StoreApi.java        // @RestClient interface, methods getInventory,
+                       // placeOrder, getOrderById, deleteOrder
+  UserApi.java         // @RestClient interface
+com/example/petstore/model/
+  Pet.java             // @Mapped record (Java 17+) or class (Java 8)
+  Order.java
+  User.java
+  Category.java
+  Tag.java
+----
+
+Each `@RestClient` interface method is annotated with the HTTP verb
+and path; parameters are annotated `@Path` / `@Query` / `@Header` /
+`@Body` so the processor knows how to assemble the `Rest` call.  The
+emitted method shape:
+
+[source, java]
+----
+@RestClient
+public interface PetApi {
+
+    @GET("/pet/{petId}")
+    void getPetById(@Path("petId") Long petId,
+                    @Header("Authorization") String bearerToken,
+                    OnComplete<Response<com.example.petstore.model.Pet>> callback);
+
+    @POST("/pet")
+    void addPet(@Body com.example.petstore.model.Pet body,
+                @Header("Authorization") String bearerToken,
+                OnComplete<Response<com.example.petstore.model.Pet>> callback);
+
+    static PetApi of(String baseUrl) {
+        return RestClients.create(PetApi.class, baseUrl);
+    }
+}
+----
+
+Model types are emitted as fully qualified names (the API interface
+lives in `<basePackage>` and models under `<basePackage>.model`) so
+the generator never needs to track imports or worry about
+collisions between an API class name and a same-named model.
+
+Call sites use the static factory:
+
+[source, java]
+----
+PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
+api.getPetById(123L, "MY_TOKEN", response -> {
+    if (response.getResponseCode() == 200) {
+        Pet pet = response.getResponseData();
+        renderPet(pet);
+    }
+});
+----
+
+The `<Tag>ApiImpl` class that actually performs the HTTP call lives
+in `target/generated-sources` -- the project source never references
+it directly.  The build server probes the project zip for the
+generated `cn1app.RestClientBootstrap` and splices the registry
+wiring in, mirroring the existing `cn1app.MapperBootstrap` pattern.
+
+==== Scope
+
+* HTTP verbs: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
+* Parameter locations: `path`, `query`, `header`, `cookie`. Multiple
+`cookie` parameters on the same operation are joined into a single
+`Cookie: a=1; b=2` request header.
+* Request bodies: `application/json` -- serialized via
+`Mappers.toJson(body)` before being attached.
+* Response schemas: `$ref` resolution, primitives (`string` /
+`number` / `integer` / `boolean`), arrays, object schemas.
+`oneOf` / `anyOf` / `allOf` collapse to `Object` -- callers cast.
+* String `enum` schemas are emitted as Java enums and bound by the JSON
+mapper through each constant's `name()`, so a model property typed by an
+enum `$ref` gets the generated enum type.  This requires every enum value
+to be a valid (non-reserved) Java identifier; an enum whose values are
+not -- for example `"two-day"` -- degrades to `String` rather than
+generating an enum that couldn't round-trip.  Integer/number enums keep
+their numeric type.
+* Schema unification: two `components.schemas` entries with identical
+property shapes collapse to a single record/class to avoid an
+explosion of duplicates.
+* Authentication: bearer token is exposed as a `@Header("Authorization")
+String bearerToken` parameter on every operation.  API-key auth
+declared in the spec is emitted as `@Header` or `@Query` like any
+other parameter; basic auth and OAuth bearer tokens travel through
+the same `bearerToken` slot.

@@ -751,7 +751,10 @@ public class ChartComponent extends Component {
         }
     }
 
-    /// Enables or disables pan on x and y axes separately.
+    /// Enables or disables pan on x and y axes separately. Pass a different
+    /// value for each axis to lock panning to a single direction; for example
+    /// `setPanEnabled(true, false)` lets the user pan left/right but pins the
+    /// Y axis (a useful pattern for time-series charts).
     ///
     /// #### Parameters
     ///

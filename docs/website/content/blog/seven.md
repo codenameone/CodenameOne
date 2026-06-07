@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-Its been a long time coming, the main delay in getting iOS 7 support into your hands has been with the need to upgrade all the servers. Apple seems to require OS upgrades as well when it updates xcode so we had to go one by one and update everything.  
+It’s been a long time coming, the main delay in getting iOS 7 support into your hands has been with the need to upgrade all the servers. Apple seems to require OS upgrades as well when it updates xcode so we had to go one by one and update everything.  
   
   
 This is now all in place and you can start building apps that take advantage of iOS 7 functionality and are built using xcode 5.  

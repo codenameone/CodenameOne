@@ -13,9 +13,9 @@ author: Shai Almog
 
 As I [mentioned recently](/blog/xcode-10-1-migration.html), we’re migrating to xcode 10.1. This weekend we entered phase 2 of the migration which allows you to test your builds with xcode 10.1. To do this just set the build hint: `ios.xcode_version=10.1`.
 
-If you run into issues with xcode 10.1 builds let us know ASAP. This is very urgent as phased 3 will kick in this coming Friday. In phase 3 we will flip 10.1 as the default which means that builds sent on Friday will implicitly target xcode 10.1.
+If you run into issues with xcode 10.1 builds let us know ASAP. This is very urgent as phase 3 will kick in this coming Friday. In phase 3 we will flip 10.1 as the default which means that builds sent on Friday will implicitly target xcode 10.1.
 
-If this produces an unforseen regression you can explicitly force xcode 9.2 for compatibility by using the build hint: `ios.xcode_version=9.2`.
+If this produces an unforeseen regression you can explicitly force xcode 9.2 for compatibility by using the build hint: `ios.xcode_version=9.2`.
 
 This means you can use the capabilities of the latest xcode/iOS SDK within your native code starting with this update.
 

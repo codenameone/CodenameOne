@@ -17,7 +17,7 @@ we created a simple tool: [Skin Designer](/demos/SkinDesigner/).
 This tool allows us to create a device skin from two images (landscape & portrait). This skin file can then  
 be used with the Codename One simulator & also contributed so other developers can enjoy it!
 
-The first version of this tool is relatively simple but should allow you to create an contribute skins to our skin  
+The first version of this tool is relatively simple but should allow you to create and contribute skins to our skin  
 database as explained below.
 
 ### Using the Skin Designer

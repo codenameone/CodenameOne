@@ -15,7 +15,7 @@ We are deep within the 3.5 code freeze and this adds up to a remarkably busy wee
 busier week with the release itself. Because of the code freeze there is no need for a Friday release today  
 so we are skipping it this week.
 
-So lets get right down to the questions from stackoverflow…​
+So let’s get right down to the questions from stackoverflow…​
 
 ### CodenameOne ImageViewer blocks scroll
 

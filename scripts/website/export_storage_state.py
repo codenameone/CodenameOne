@@ -12,9 +12,13 @@ Two paths:
     --browser {chrome,...}   launch Playwright with the chosen browser, open
                              the site's signin page, poll for auth cookies
 
-Output is a Playwright storageState JSON written to disk and (unless
---no-base64) a base64 blob ready to paste as the {SITE}_STORAGE_STATE
-repo secret consumed by syndicate_browser_posts.py.
+Output is a Playwright storageState JSON written to a persistent,
+cross-session location (~/.codenameone/syndication/<site>-storage-state.json
+by default; override with --output). syndicate_browser_posts.py discovers
+that file automatically on local runs, so capturing a session once is
+enough — you do NOT need to export a *_STORAGE_STATE env var into your
+shell. The base64 blob (unless --no-base64) is only needed to paste as the
+{SITE}_STORAGE_STATE repo secret for CI.
 
 Examples:
 
@@ -37,8 +41,21 @@ import time
 from pathlib import Path
 
 
-DEFAULT_OUTPUT = Path("medium-storage-state.json")
 DEFAULT_TIMEOUT_SECONDS = 600  # 10 minutes for the user to complete login
+
+# Persistent, cross-session location for saved storage states. Writing here
+# (instead of the current working directory) means a session captured once
+# survives across shell sessions and is discovered automatically by
+# syndicate_browser_posts.py — no need to re-export a *_STORAGE_STATE env var
+# into every shell, which is the fragile step that let Hashnode silently fall
+# out of the syndication rotation.
+STORAGE_STATE_DIR = Path.home() / ".codenameone" / "syndication"
+
+
+def default_storage_path(site: str) -> Path:
+    """Stable on-disk path where a captured session for ``site`` is saved and
+    later auto-discovered by the syndication script."""
+    return STORAGE_STATE_DIR / f"{site}-storage-state.json"
 
 # Per-target site profile. Each entry knows where to land in a launched browser,
 # which cookie domain to filter from a Firefox profile, and how to recognize
@@ -179,7 +196,8 @@ def _normalize_expiry(raw: float | int | None) -> float:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     profile = SITE_PROFILES[args.site]
-    output_path = Path(args.output or f"{args.site}-storage-state.json").resolve()
+    output_path = Path(args.output).resolve() if args.output else default_storage_path(args.site)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     secret_name = f"{args.site.upper()}_STORAGE_STATE"
 
     if args.from_firefox_profile is not None:
@@ -196,11 +214,12 @@ def main(argv: list[str]) -> int:
             return 1
         output_path.write_text(json.dumps(state), encoding="utf-8")
         print(f"Wrote storage state: {output_path}")
+        print("  (local syndication runs discover this file automatically — no env var needed)")
         print(f"  cookies captured: {len(state['cookies'])}")
         if not args.no_base64:
             encoded = base64.b64encode(output_path.read_bytes()).decode("ascii")
             print()
-            print(f"Paste the following as the {secret_name} repository secret:")
+            print(f"For CI only — paste the following as the {secret_name} repository secret:")
             print("-" * 72)
             print(encoded)
             print("-" * 72)
@@ -285,6 +304,7 @@ def main(argv: list[str]) -> int:
 
     print()
     print(f"Wrote storage state: {output_path}")
+    print("  (local syndication runs discover this file automatically — no env var needed)")
     print(f"  cookies captured: {len(state.get('cookies', []))}")
     print(f"  origins with localStorage: {len(state.get('origins', []))}")
 
@@ -293,7 +313,7 @@ def main(argv: list[str]) -> int:
 
     encoded = base64.b64encode(output_path.read_bytes()).decode("ascii")
     print()
-    print(f"Paste the following as the {secret_name} repository secret:")
+    print(f"For CI only — paste the following as the {secret_name} repository secret:")
     print("-" * 72)
     print(encoded)
     print("-" * 72)

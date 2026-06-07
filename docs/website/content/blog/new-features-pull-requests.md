@@ -51,7 +51,7 @@ He also added:
 
 Which are shorthand variants of enclose that allow us to package two or three components together in a horizontal border layout or just enclose with a total below border layout.
 
-__ |  In the total below mode the center component takes up the entire screens and the sides are automatically placed on top of it thus creating a layered effect   
+__ |  In the total below mode the center component takes up the entire screen and the sides are automatically placed on top of it thus creating a layered effect   
 ---|---  
   
 ### Accordion Listener

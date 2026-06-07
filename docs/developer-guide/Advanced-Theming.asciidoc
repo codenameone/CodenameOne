@@ -115,7 +115,7 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |`true` to activate the material design ripple effect on the buttons. This effect draws a growing circle from the point of touch onwards. This is `false` by default except for Android where it defaults to `true`. This is equivalent to `setButtonRippleEffectDefault(bool)` in the `Button` class
 
 |capsButtonTextBool
-|`true` to activate the caps text mode in the buttons. When activated `setText` on `Button` and all the constructors will invoke `upcase()` on all the strings effectively making the application buttons use uppercase exclusively. This is `false` by default except for Android where it defaults to `true`. it's equivalent to `Button.setCapsTextDefault(boolean)` and can be tuned to an individual `Component` via `Component.setRippleEffect(boolean)`
+|`true` to activate the caps text mode in the buttons. When activated `setText` on `Button` and all the constructors will invoke `upcase()` on all the strings effectively making the application buttons use uppercase exclusively. This is `false` by default except for Android where it defaults to `true`. It's equivalent to `Button.setCapsTextDefault(boolean)` and can be tuned to an individual `Component` via `Component.setRippleEffect(boolean)`
 
 |capsButtonUiids
 |A list of the UIID's that should be capitalized by default (in supported platforms) other than the `Button` and `RaisedButton` which are already capitalized. This list can be separated by spaces or commas for example, `capsButtonUiids=UpcaseButton,OtherCustomButton`
@@ -161,7 +161,7 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 SoftKey, Touch, Bar, Title, Right, Native
 
 |ComponentGroupBool
-|Enables component group, which allows components to be logically grouped together, so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. it's disabled by default, thus leaving its usage up to the designer
+|Enables component group, which allows components to be logically grouped together, so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. It's disabled by default, thus leaving its usage up to the designer
 
 |dialogTransitionIn
 |Default transition for dialog
@@ -565,7 +565,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |Snap to grid toggle
 
 |statusBarScrollsUpBool
-|Indicates that a tap on the status bar should scroll up the UI, only relevant in OS's where paintsTitleBarBool is true
+|Indicates that a tap on the status bar should scroll up the UI, only relevant in OSes where paintsTitleBarBool is true
 
 |switchButtonPadInt
 |Indicates the padding in the on/off switch, defaults to 16
@@ -610,7 +610,7 @@ SoftKey, Touch, Bar, Title, Right, Native
 |A hex RGB color which defaults to null in which case this has no effect. When defined this will change the color of the border and label to the given color to match the material design styling. This implements the red border underline in cases of error and the label text color change
 
 |textComponentOnTopBool
-|Toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OS's. This can also be manipulated via the `onTopMode(boolean)` method in `InputComponent`, but the layout will only use the theme constant
+|Toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OSes. This can also be manipulated via the `onTopMode(boolean)` method in `InputComponent`, but the layout will only use the theme constant
 
 |textComponentAnimBool
 |toggles the animation mode which again can be manipulated by a method in `InputComponent`. If you want to keep the UI static without the floating hint effect set this to false. Notice this defaults to true only on Android
@@ -640,10 +640,10 @@ SoftKey, Touch, Bar, Title, Right, Native
 |The size of the side menu when expanded and attached to the top in a phone in landscape mode
 
 |touchCommandFillBool
-|Indicates how the touch menu should layout the commands within
+|Indicates how the touch menu should lay out the commands within
 
 |touchCommandFlowBool
-|Indicates how the touch menu should layout the commands within
+|Indicates how the touch menu should lay out the commands within
 
 |transitionSpeedInt
 |Indicates the default speed for transitions
@@ -723,27 +723,27 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 
 Will set the foreground color of the https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] UIID to white.
 
-When a Codename One https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] is instantiated it requests a https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] object from the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager] class. The `Style` object is based on the settings within the theme and can be modified thru code or by using the theme.
+When a Codename One https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] is instantiated it requests a https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] object from the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager] class. The `Style` object is based on the settings within the theme and can be modified through code or by using the theme.
 
 You can replace the theme dynamically in runtime and refresh the styles assigned to the various components using the https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#refreshTheme--[refreshTheme()] method.
 
-NOTE: it's a common mistake to invoke `refreshTheme()` without actually changing the theme. You see developers doing it when all they need is a `repaint()` or `revalidate()`. Since `refreshTheme()` is **** expensive recommend that you don't use it unless you need to...
+NOTE: It's a common mistake to invoke `refreshTheme()` without actually changing the theme. You see developers doing it when all they need is a `repaint()` or `revalidate()`. Since `refreshTheme()` is **** expensive recommend that you don't use it unless you need to...
 
-A theme `Hashtable` key is comprised of:
+A theme `Hashtable` key comprises:
 
 `[UIID.][type#]attribute`
 
-The _UIID_, corresponds to the component’s UIID for example: `Button`, https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html[CheckBox] etc. it's optional and may be omitted to address the global default style.
+The _UIID_, corresponds to the component’s UIID for example: `Button`, https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html[CheckBox] etc. It's optional and may be omitted to address the global default style.
 
 The type is omitted for the default unselected type, and may be one of _sel_ (selected type), _dis_ (disabled type) or _press_ (pressed type). The attribute should be one of:
 
 *	`derive` - the value for this attribute should be a string representing the base component.
 *	`bgColor` - represents the background color for the component, if applicable, in a web hex string format RRGGBB for example: ff0000 for red.
 *	`fgColor` - represents the foreground color, if applicable.
-*	border - an instance of the border class, used to display the border for the component.
+*	`border` - an instance of the border class, used to display the border for the component.
 *	`bgImage` - an https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] object used in the background of a component.
-*	transparency - a `String` containing a number between 0-255 representing the alpha value for the background. This applies to the bgColor.
-*	`margin` - the margin of the component as a `String` containing 4 comma separated numbers for top,bottom,left,right.
+*	`transparency` - a `String` containing a number between 0-255 representing the alpha value for the background. This applies to the bgColor.
+*	`margin` - the margin of the component as a `String` containing 4 comma separated numbers for top, bottom, left, right.
 *	`padding` - the padding of the component, it has an identical format to the margin attribute.
 *	`font` - A https://www.codenameone.com/javadoc/com/codename1/ui/Font.html[Font] object instance.
 *	`alignment` - an `Integer` object containing the LEFT/RIGHT/CENTER constant values defined in Component.
@@ -751,7 +751,7 @@ The type is omitted for the default unselected type, and may be one of _sel_ (se
 *	`backgroundType` - a `Byte` object containing one of the constants for the background type defined in https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] under BACKGROUND_*.
 *	`backgroundGradient` - contains an `Object` array containing 2 integers for the colors of the gradient. If the gradient is radial it contains 3 floating points defining the x, y & size of the gradient.
 
-to set the foreground color of a selected button to red, a theme will define a property like:
+To set the foreground color of a selected button to red, a theme will define a property like:
 
 `Button.sel#fgColor=ff0000`
 
@@ -788,7 +788,7 @@ From the programming perspective this is seamless, a developer accesses one imag
 
 You can use two basic methods to add a multi-image: quick add and standard add.
 
-Both methods rely on understanding the source resolution of the image, for example: if you've an icon that you expect to be
+Both methods rely on understanding the source resolution of the image, for example: if you have an icon that you expect to be
 128×128 pixels on iPhone 4, 102×102 on nexus one and 64×64 on iPhone 3gs. You can provide the source image
 as the 128 pixel image and perform a quick add option while picking the # High# density option.
 
@@ -862,7 +862,7 @@ image::img/styled-sidemenu-result.png[Side Menu final result,scaledwidth=50%]
 
 A side menu is a crucial piece of an elegant application. You will explain how one creates a simple side menu that's elegant, portable and easy to build. This is a good "starting point" side menu from which you can build more elaborate designs.
 
-To get this result you will start from a native theme and a bare bones application to keep things simple.
+To get this result you will start from a native theme and a bare-bones application to keep things simple.
 
 The code for the side menu is this:
 
@@ -896,7 +896,7 @@ You will set padding to 3 millimeters which provides everything a good feel and 
 .Padding is 3mm so it will feel spacious and touch friendly
 image::img/styled-sidemenu-4.png[Padding is 3mm so it will feel spacious and touch friendly,scaledwidth=40%]
 
-You will set margin to 0 except for the bottom one pixel which will leave a nice white line by showing off the background. This means the commands will have a space between them and the white style you gave to the #SideNavigationPanel# will appear thru that space.
+You will set margin to 0 except for the bottom one pixel which will leave a nice white line by showing off the background. This means the commands will have a space between them and the white style you gave to the #SideNavigationPanel# will appear through that space.
 
 .Margin is 0 except for a thin line below each command
 image::img/styled-sidemenu-5.png[Margin is 0 except for a thin line below each command,scaledwidth=40%]
@@ -936,11 +936,11 @@ The last change for the theme is for the #StatusBarSideMenu# UIID which is a spa
 .StatusBarSideMenu padding for the top of the side menu
 image::img/styled-sidemenu-11.png[StatusBarSideMenu padding for the top of the side menu,scaledwidth=40%]
 
-Finally, you will add the icon image (or a logo if you've it) into the theme as a multi image so you can use it within the side menu as a good looking logo. A large icon image works as a 2HD multi-image but you can use many strategies to get a fitting image for this spot.
+Finally, you will add the icon image (or a logo if you have it) into the theme as a multi image so you can use it within the side menu as a good looking logo. A large icon image works as a 2HD multi-image but you can use many strategies to get a fitting image for this spot.
 
 TIP: Rounded images work well here, you can round images dynamically using masking
 
-These steps produce the UI above as a side menu, they might seem like a long set of steps but each step is pretty simple as you walk thru each one. This does show off the versatility and power of Codename One as a change to one step can create a radically different UI design.
+These steps produce the UI above as a side menu, they might seem like a long set of steps but each step is pretty simple as you walk through each one. This does show off the versatility and power of Codename One as a change to one step can create a radically different UI design.
 
 === Converting a PSD to a theme
 
@@ -996,14 +996,14 @@ Scroll up the hierarchy a bit and uncheck/recheck the eye icon on the left until
 .Selecting a layer from the region you're interested in
 image::img/psd2app-image5.png[Find the right element layer you're interested in,scaledwidth=30%]
 
-Right click the layer and select #Convert To Smart Object#.
+Right-click the layer and select #Convert To Smart Object#.
 
 IMPORTANT: The right click menu will present different options when you click different areas of the layer, clicking on the left area of the layer works
 
 .In the right click menu option select "Convert To Smart Object"
 image::img/psd2app-image6.png[In the right click menu option select "Convert To Smart Object",scaledwidth=40%]
 
-Once the layer hierarchy is a smart object you can double click it which will open the sub hierarchy in a new tab and you now have the pieces of the image you care about.
+Once the layer hierarchy is a smart object you can double-click it which will open the sub hierarchy in a new tab and you now have the pieces of the image you care about.
 
 .Double clicking the smart object allows you to edit the form you need
 image::img/psd2app-image7.png[Double clicking the smart object allows you to edit the form you need,scaledwidth=40%]
@@ -1021,7 +1021,7 @@ To discover that, click them to select the layer then switch to the text tool:
 .The text tool allows you to inspect the font used
 image::img/psd2app-image8.png[The text tool allows you to inspect the font used,scaledwidth=5%]
 
-Then double click the text area layer to find out the font in the top of the UI like this:
+Then double-click the text area layer to find out the font in the top of the UI like this:
 
 .The Done toolbar entry uses SourceSansPro Regular
 image::img/psd2app-image9.png[The Done toolbar entry uses SourceSansPro Regular]
@@ -1039,13 +1039,13 @@ You can now hide both text layers so they won't pose a problem later.
 
 The camera button includes an icon and the button background itself. You can use that as a single image and be done with it, but for this tutorial you will take the harder route of separating this into a button background and a foreground image.
 
-When you click on the camera icon you will notice that the camera icon is comprised of two separate layers: the camera and the "x" symbol above it. You can select both layers using #ctrl-click# (command click on the Mac) and convert both to a smart object together using the same method as before:
+When you click on the camera icon you will notice that the camera icon comprises two separate layers: the camera and the "x" symbol above it. You can select both layers using #ctrl-click# (command click on the Mac) and convert both to a smart object together using the same method as before:
 
 .The camera smart object
 image::img/psd2app-image11.png[The camera smart object]
 
 Since the image is used as an icon you want it to be square which isn't the situation here! +
-This is important as a non-square image can trigger misalignment when dealing with icons and the background. you need to use the #Image# -> #Canvas Size# menu and set the values to be the same (the higher value of the two).
+This is important as a non-square image can trigger misalignment when dealing with icons and the background. You need to use the #Image# -> #Canvas Size# menu and set the values to be the same (the higher value of the two).
 
 .The canvas size dialog for the camera.png file
 image::img/psd-image-size.png[The canvas size dialog for the camera.png file,scaledwidth=40%]
@@ -1097,10 +1097,10 @@ While that was verbose it was simple. You will create a simple barebones manual 
 
 NOTE: The reason for this is to avoid "noise," if you use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow
 
-.Simple bare bones app settings
-image::img/psd2app-image14.png[Simple bare bones app settings]
+.Simple bare-bones app settings
+image::img/psd2app-image14.png[Simple bare-bones app settings]
 
-Once the project is created double click the `theme.res` file and within the designer select #Images# -> #Quick Add Multi Images#. Select the 3 images you created above: `background.jpg`, `camera.png` & `camera-button.png`. Leave the default setting on # High# and press #OK#.
+Once the project is created double-click the `theme.res` file and within the designer select #Images# -> #Quick Add Multi Images#. Select the 3 images you created above: `background.jpg`, `camera.png` & `camera-button.png`. Leave the default setting on # High# and press #OK#.
 
 Then save the resource file so you can use these images from code.
 
@@ -1118,7 +1118,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 
 ==== Styling the UI
 
-the code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
+The code above is most of the work but you still need to put everything together using the theme. This is what you've so far:
 
 .Before applying the changes to the theme this is what you've
 image::img/psd2app-image15.png[Before applying the changes to the theme this is what you've,scaledwidth=20%]
@@ -1132,10 +1132,10 @@ Open the designer and select the theme. Press the #Add# button and type in #Titl
 
 Define the padding as:
 
-- Left - 3 millimeter
-- Right - 3 millimeter
-- Top - 8 millimeter
-- Bottom - 2 millimeter
+- Left - 3 millimeters
+- Right - 3 millimeters
+- Top - 8 millimeters
+- Bottom - 2 millimeters
 
 This will allow enough space for the title. Define margin as 0 on all sides. Then press #OK#.
 
@@ -1155,7 +1155,7 @@ Add the "TitleArea" UIID. In the #Color# tab define transparency as `0` (fully t
 In the #Border# tab press the #...# button and select #[Empty]#.
 Press #OK# to save the changes.
 
-Add the "TextField" UIID. In the #Color# tab define transparency as `255` (fully opaque) and the background as `ffffff` (white). Define padding as 2 millimeter on all sides and margin as 0 on all sides. +
+Add the "TextField" UIID. In the #Color# tab define transparency as `255` (fully opaque) and the background as `ffffff` (white). Define padding as 2 millimeters on all sides and margin as 0 on all sides. +
 In the #Border# tab press the #...# button and select #[Empty]#.
 In the #Font# tab set the #True Type# to #native:MainLight# and set the size to 2. Press #OK# to save the changes.
 

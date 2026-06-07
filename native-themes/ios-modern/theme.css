@@ -66,6 +66,22 @@
        Themes painting a flush full-width tab strip leave this true (the
        framework default) so the tab strip itself reserves the inset. */
     tabsSafeAreaBool: false;
+    /* iOS 26 NavigationBar-style sliding indicator: a thin coloured
+       underline that tweens between tabs when the user changes
+       selection. Off by default in the framework (so existing apps
+       don't suddenly animate); on by default in the modern native
+       theme. Duration 200ms matches Material 3's reference. */
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;
+    tabsAnimatedIndicatorThicknessMm: 1;
+    /* Modern arc-spinner pull-to-refresh. Replaces the legacy
+       rotating-arrow + text stack with a thin circular arc whose sweep
+       grows as the user pulls, then spins continuously while the
+       refresh task is running. Color is pulled from the TabIndicator
+       UIID's fg (already accent-tinted in this theme). */
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;
+    pullToRefreshIndicatorStrokeMm: "0.6";
     /* Route the Tab icon's styling through a separate UIID. FontImage
        copies the Button's bgColor/transparency into the rendered glyph
        image; over the cn1-pill-border selected pill that paints a
@@ -275,6 +291,63 @@ MainTitle { cn1-derive: Title; }
 BackCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 
+/* ---- Desktop chrome (macOS conventions) ----
+   Only used when the desktop port enables interactiveScrollBool /
+   desktop window chrome; inert on real iOS devices. The horizontal
+   padding of DesktopScroll defines the scrollbar gutter width
+   (LookAndFeel.getVerticalScrollWidth sums its horizontal margin +
+   padding), giving a thin macOS-style overlay scrollbar. */
+DesktopScroll {
+    background-color: transparent;
+    padding: 0 1mm 0 1mm;
+    margin: 0;
+}
+/* Always-visible desktop scrollbar thumb: an opaque macOS-style grey so it reads
+   clearly against content (a translucent thumb is nearly invisible once composited).
+   Hover (.selected) and drag (.pressed) darken it. Properties are re-declared rather
+   than cn1-derive'd from the base UIID, which would be a self-referential cycle. */
+DesktopScrollThumb {
+    background-color: #a8a8ad;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.selected {
+    background-color: #8e8e93;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed {
+    background-color: #636366;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScroll {
+    background-color: transparent;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb {
+    background-color: #a8a8ad;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    background-color: #8e8e93;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.pressed {
+    background-color: #636366;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+
 /* iOS 26 tab-bar look: the TabsContainer is the visible pill group
    hugging the bottom edge, with individual tabs rendered as
    transparent hits inside it. cn1-pill-border draws a true pill;
@@ -322,6 +395,11 @@ UnselectedTab { cn1-derive: Tab; color: #000000; }
    square inside the pill. Color (light/dark) inherits from the parent
    Tab via Style.fgColor at icon-render time. */
 TabIcon { background-color: transparent; padding: 0; margin: 0; }
+
+/* TabIndicator: color reference read by Tabs.paintAnimatedIndicator()
+   for the sliding underline. The actual drawing is done in Java; this
+   UIID only contributes the foreground colour. */
+TabIndicator { color: var(--accent-color, #007aff); background-color: transparent; padding: 0; margin: 0; }
 TabIcon.selected { background-color: transparent; }
 TabIcon.pressed { background-color: transparent; }
 
@@ -433,6 +511,59 @@ FloatingActionButton {
 }
 FloatingActionButton.pressed { background-color: var(--accent-pressed-color, #0064d1); }
 
+/* ChatView (com.codename1.components.ChatView) -- AI / messaging UI.
+   USER bubbles right-align with the accent fill (iMessage-style),
+   ASSISTANT bubbles left-align with a neutral surface fill, SYSTEM
+   bubbles centre with the muted secondary text colour. The TextArea
+   inside each bubble (ChatBubbleText) inherits via cn1-derive so the
+   text colour matches the bubble's foreground. */
+ChatView { background-color: #f2f2f7; padding: 0; margin: 0; }
+ChatViewMessages { background-color: #f2f2f7; padding: 1mm; margin: 0; }
+ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleUser {
+    background-color: var(--accent-color, #007aff);
+    color: var(--accent-on-color, #ffffff);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleAssistant {
+    background-color: #e5e5ea;
+    color: #000000;
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleSystem {
+    background-color: transparent;
+    color: #8e8e93;
+    padding: 1mm 2mm;
+    margin: 0.5mm 0;
+}
+ChatBubbleText { cn1-derive: Label; background-color: transparent; padding: 0; margin: 0; }
+ChatTypingIndicator {
+    background-color: transparent;
+    color: #8e8e93;
+    padding: 1mm 3mm;
+    margin: 0;
+}
+ChatInput { background-color: #ffffff; padding: 1mm 2mm; margin: 0; }
+ChatInputField {
+    cn1-derive: TextField;
+    background-color: #f2f2f7;
+    padding: 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: 3mm;
+}
+ChatSendButton {
+    cn1-derive: RaisedButton;
+    padding: 1.5mm 3mm;
+    margin: 0.5mm;
+    border-radius: 3mm;
+}
+ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+
 Separator { background-color: #c6c6c8; padding: 0; margin: 0; }
 PopupContent {
     background-color: #ffffff;
@@ -490,6 +621,17 @@ PopupContent {
     BackCommand { color: var(--accent-color-dark, #0a84ff); }
     TitleCommand { color: var(--accent-color-dark, #0a84ff); }
 
+    /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
+       re-declared so the round primitive carries into dark mode. */
+    DesktopScroll { background-color: transparent; }
+    DesktopScrollThumb { background-color: #5a5a5e; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #8e8e93; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScroll { background-color: transparent; }
+    DesktopHorizontalScrollThumb { background-color: #5a5a5e; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #8e8e93; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-round-border; }
+
     Tabs { background-color: transparent; }
     TabbedPane { background-color: #1c1c1e; }
     TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
@@ -509,6 +651,9 @@ PopupContent {
     TabIcon { color: #ffffff; background-color: transparent; }
     TabIcon.selected { color: #ffffff; background-color: transparent; }
     TabIcon.pressed { color: #ffffff; background-color: transparent; }
+
+    /* Animated indicator inherits the dark-mode accent. */
+    TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
 
     SideNavigationPanel { background-color: #000000; }
     SideCommand { color: #ffffff; }
@@ -537,6 +682,16 @@ PopupContent {
 
     FloatingActionButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
     FloatingActionButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }
+
+    ChatView { background-color: #1c1c1e; }
+    ChatViewMessages { background-color: #1c1c1e; }
+    ChatBubbleUser { background-color: var(--accent-color-dark, #0a84ff); color: #ffffff; }
+    ChatBubbleAssistant { background-color: #2c2c2e; color: #ffffff; }
+    ChatBubbleSystem { color: #8e8e93; }
+    ChatBubbleText { color: #ffffff; background-color: transparent; }
+    ChatTypingIndicator { color: #8e8e93; }
+    ChatInput { background-color: #1c1c1e; }
+    ChatInputField { background-color: #2c2c2e; color: #ffffff; border-radius: 3mm; }
 
     Separator { background-color: #38383a; }
 }

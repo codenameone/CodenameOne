@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/migrating-from-parse-back4app/parse.com-post-header.jpg)
 
-A couple of years ago I wrote an app for my spouses yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
+A couple of years ago I wrote an app for my spouse’s yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
 
 As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](/blog/how-i-chose-my-replacement-for-parse-com/) detailing the various [options](/blog/how-i-chose-my-replacement-for-parse-com-part-2/) I thought it might be possible to take the "lazy approach".
 
@@ -21,7 +21,7 @@ Looking at the options available I chose to go with [back4app](https://www.back4
 
 The migration didn’t require anything on the parse side, I just signed up for back4app and then selected the migration option. They offered two options for the migration supposedly an easy and a more custom migration. I clicked easy and it worked but I wish there was a description there detailing what I’m choosing (e.g. if I click easy and it doesn’t work can I have a do over? And if so why not do easy by default and offer the advanced option when something doesn’t work?).
 
-After clicking the easy option I got some emails from parse and the UI showed my app from Parse being migrated at 0%. Since I don’t have much of a database I assumed this would be instant and it wasn’t. It took a bit under 10 minutes so your millage may vary, during those 10 minutes I tried to reload the site and something didn’t work but afterwards things started working and seemed in order so it might have been a small hiccup.
+After clicking the easy option I got some emails from parse and the UI showed my app from Parse being migrated at 0%. Since I don’t have much of a database I assumed this would be instant and it wasn’t. It took a bit under 10 minutes so your mileage may vary, during those 10 minutes I tried to reload the site and something didn’t work but afterwards things started working and seemed in order so it might have been a small hiccup.
 
 The end result looks great and the only thing I had to change in the app to get it to work was this:
     

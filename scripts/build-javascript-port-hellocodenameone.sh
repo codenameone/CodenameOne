@@ -64,6 +64,22 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_PARPARVM_BUILD:-0}" != "1" ]
   mvn -B -f "$REPO_ROOT/maven/pom.xml" -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 fi
 
+# Mirror the modern native themes (iOSModernTheme.res /
+# AndroidMaterialTheme.res) into Ports/JavaScriptPort/src/main/webapp/
+# assets so the bundle picks them up when JavascriptBundleWriter copies
+# webapp/assets/* into the served output. The mirror files are
+# gitignored build artefacts, so without this step a fresh checkout
+# would silently fall back to iOS7Theme.res / android_holo_light.res
+# at runtime.
+if [ "${SKIP_NATIVE_THEMES_BUILD:-0}" != "1" ]; then
+  if [ -x "$REPO_ROOT/scripts/build-native-themes.sh" ]; then
+    bj_log "Compiling native themes (iOS Modern / Android Material) for JS bundle"
+    "$REPO_ROOT/scripts/build-native-themes.sh"
+  else
+    bj_log "WARNING: scripts/build-native-themes.sh missing - modern themes won't be in bundle"
+  fi
+fi
+
 if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; then
   bj_log "Building HelloCodenameOne common module and compile-scope dependencies"
   mkdir -p "$HOME/.codenameone"
@@ -271,6 +287,64 @@ if [ -d "$DIST_DIR" ]; then
     fi
   done
 fi
+
+# --- Post-translation minimisation pass -------------------------------------
+# See build-javascript-port-initializr.sh for the rationale. Applying the
+# same mangle + esbuild pass here keeps the JS port's per-bundle output
+# under Cloudflare Pages' 25 MiB per-file limit and matches the competitive
+# TeaVM-like sizes we publish from the website.
+if [ "${SKIP_JS_MINIFICATION:-0}" != "1" ]; then
+  # Identifier mangling is opt-in; see the matching block in
+  # build-javascript-port-initializr.sh for the rationale. port.js's
+  # runtime reflection (key.indexOf("cn1_") scans + "cn1_" + owner +
+  # suffix string concat) breaks if we rename those identifiers.
+  if [ "${ENABLE_JS_IDENT_MANGLING:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
+    bj_log "Mangling cn1_* / class-name identifiers across worker-side JS"
+    map_path="$(dirname "$OUTPUT_ZIP")/$(basename "$OUTPUT_ZIP" .zip).mangle-map.json"
+    mkdir -p "$(dirname "$map_path")"
+    python3 "$SCRIPT_DIR/mangle-javascript-port-identifiers.py" \
+      --map-output "$map_path" "$DIST_DIR" || \
+      bj_log "WARNING: identifier mangling failed; continuing with unmangled output" >&2
+  fi
+  if command -v npx >/dev/null 2>&1; then
+    bj_log "Minifying translated JS chunks with esbuild"
+    minified_count=0
+    for js in "$DIST_DIR"/*.js; do
+      name="$(basename "$js")"
+      case "$name" in
+        browser_bridge.js|port.js|worker.js|sw.js) continue ;;
+        *_native_handlers.js) continue ;;
+      esac
+      # esbuild's ``--minify`` flag bundles ``--minify-identifiers`` —
+      # which renames top-level bindings on a per-file basis. Worker-side
+      # files share global scope via ``importScripts``, so renaming a
+      # top-level function in (say) ``parparvm_runtime.js`` orphans
+      # every cross-file reference. Stick to ``--minify-syntax``
+      # + ``--minify-whitespace`` — those collapse the bytes
+      # without touching identifier names.
+      if npx --yes esbuild --minify-syntax --minify-whitespace --log-level=error --allow-overwrite \
+          --target=es2020 "$js" --outfile="$js" >/dev/null 2>&1; then
+        minified_count=$((minified_count + 1))
+      else
+        bj_log "WARNING: esbuild minify failed for $name; leaving it as-is" >&2
+      fi
+    done
+    bj_log "Minified $minified_count JS file(s) via esbuild"
+  else
+    bj_log "npx not found; skipping esbuild minification"
+  fi
+  # Final post-esbuild dead-code strip. esbuild's --minify-syntax merges
+  # adjacent statements inside switch cases but does NOT eliminate dead
+  # ``{pc=N;break}`` blocks that end up following a return / throw after
+  # the merge. The translator's own ``stripDeadCodeAfterTerminator`` pass
+  # cleaned these up pre-esbuild; this pass cleans up what esbuild
+  # reintroduces.
+  if command -v python3 >/dev/null 2>&1; then
+    python3 "$SCRIPT_DIR/strip-dead-code-after-return.py" "$DIST_DIR" || \
+      bj_log "WARNING: dead-code-after-return strip failed; continuing" >&2
+  fi
+fi
+# ---------------------------------------------------------------------------
 
 FINAL_DIST_DIR="$TRANSLATOR_OUT/dist/$DIST_APP_NAME-js"
 if [ "$DIST_DIR" != "$FINAL_DIST_DIR" ]; then

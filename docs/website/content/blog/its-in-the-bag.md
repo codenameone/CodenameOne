@@ -48,7 +48,7 @@ AWT layout managers also synchronize a lot on the AWT thread. This is no longer 
   3.   
 Components are positioned relatively to container so the layout code can start at 0, 0 (otherwise it will be slightly offset).  
 
-Other than those things its mostly just fixing method signatures and import statements which are slightly different. Pretty trivial stuff and GridBagLayout from project Harmony is now working on Codename One.
+Other than those things it’s mostly just fixing method signatures and import statements which are slightly different. Pretty trivial stuff and GridBagLayout from project Harmony is now working on Codename One.
 
   
   
@@ -66,7 +66,7 @@ The code is almost the same although I did need to make some adaptations e.g. JB
   
   
   
-Now this stuff probably won’t make it into the GUI builder in the forseeable future, but if you are hellbent on GridBag or porting some Swing code this should be pretty convenient. Its also a great case study if you want to port some of your other favorite layout managers such as MiG or FormLayout.  
+Now this stuff probably won’t make it into the GUI builder in the foreseeable future, but if you are hellbent on GridBag or porting some Swing code this should be pretty convenient. It’s also a great case study if you want to port some of your other favorite layout managers such as MiG or FormLayout.  
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 ---

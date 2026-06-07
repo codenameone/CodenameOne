@@ -77,6 +77,7 @@ import org.xeustechnologies.jtar.TarOutputStream;
 public abstract class Executor {
     public static final String BUILD_TARGET_XCODE_PROJECT = "ios-source";
     public static final String BUILD_TARGET_ANDROID_PROJECT = "android-source";
+    public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = "mac-source";
     private String buildTarget;
 
     private static boolean disableDelete;
@@ -1983,5 +1984,95 @@ public abstract class Executor {
 
         return localBuilderProperties;
 
+    }
+
+    /// Returns true when the project's `jar-with-dependencies` (the
+    /// `sourceZip` passed to `build(...)`) contains the build-time
+    /// generated `com.codename1.router.generated.Routes` class.
+    protected static boolean projectHasRouteDispatcher(File sourceZip) {
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
+            return zf.getEntry("com/codename1/router/generated/Routes.class") != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /// Stub-source fragment to splice into a generated application stub
+    /// right before `Display.init(...)` to install the build-time
+    /// generated `@Route` dispatcher. Empty when the project ships no
+    /// Routes class, so legacy apps without the annotation Mojo still
+    /// produce a clean stub. The dispatcher's no-arg constructor self-
+    /// registers via `Navigation#setDispatcher` -- direct symbol
+    /// reference, not `Class.forName`, so ParparVM / R8 obfuscation
+    /// rewrites the call site and the generated class together and the
+    /// binding survives in shipped builds. `indent` is the leading
+    /// whitespace that matches the surrounding stub source.
+    protected static String routeDispatcherInstallSource(File sourceZip, String indent) {
+        if (!projectHasRouteDispatcher(sourceZip)) {
+            return "";
+        }
+        return indent + "new com.codename1.router.generated.Routes();\n";
+    }
+
+    /// Stub-source fragment to splice into a generated application stub
+    /// right before `Display.init(...)` to install the build-time-generated
+    /// JSON / XML mapper index, the component binder index, and the SQLite
+    /// dao index -- but only when the project actually uses each feature.
+    ///
+    /// The annotation processor emits `cn1app.MapperBootstrap` /
+    /// `BinderBootstrap` / `DaoBootstrap` only when there are `@Mapped` /
+    /// `@Bindable` / `@Entity` classes to register. Each bootstrap's
+    /// constructor references every generated per-class mapper / binder /
+    /// dao by direct symbol (`new com.example.UserCn1Mapper();` etc.), so
+    /// ParparVM iOS / R8 Android rename the call sites and the generated
+    /// classes together.
+    ///
+    /// We probe the project zip for each bootstrap and emit the
+    /// instantiation only when the class is present, so a project that
+    /// uses only `@Mapped` (no `@Bindable`, no `@Entity`) gets just the
+    /// mapper bootstrap line and nothing else. cn1-core does not ship a
+    /// stub: an absent feature leaves the registries empty.
+    protected static String annotationFrameworksInstallSource(File sourceZip, String indent) {
+        StringBuilder sb = new StringBuilder();
+        if (projectHasBootstrap(sourceZip, "cn1app/MapperBootstrap.class")) {
+            sb.append(indent).append("new cn1app.MapperBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/BinderBootstrap.class")) {
+            sb.append(indent).append("new cn1app.BinderBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/DaoBootstrap.class")) {
+            sb.append(indent).append("new cn1app.DaoBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/RestClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.RestClientBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/ProtoBootstrap.class")) {
+            sb.append(indent).append("new cn1app.ProtoBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/GrpcClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.GrpcClientBootstrap();\n");
+        }
+        if (projectHasBootstrap(sourceZip, "cn1app/GraphQLClientBootstrap.class")) {
+            sb.append(indent).append("new cn1app.GraphQLClientBootstrap();\n");
+        }
+        return sb.toString();
+    }
+
+    /// Returns true when `sourceZip` (the project's
+    /// `jar-with-dependencies`) contains `entryPath`. Used to gate the
+    /// per-feature bootstrap install lines so projects that don't use
+    /// every annotation framework still produce a clean stub.
+    protected static boolean projectHasBootstrap(File sourceZip, String entryPath) {
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(sourceZip)) {
+            return zf.getEntry(entryPath) != null;
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

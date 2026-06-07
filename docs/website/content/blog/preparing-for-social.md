@@ -17,7 +17,7 @@ Normally we don’t bother with a release candidate this close to an actual rele
 
 We will enter the release code freeze for social on September 12th after which only reviewed commits can be cherry picked. Only critical bugs will be fixed at that point.
 
-Currently version 6.0 (AKA Chat) is scheduled for release in February 19th 2019.
+Currently version 6.0 (AKA Chat) is scheduled for release on February 19th 2019.
 
 ### Social
 

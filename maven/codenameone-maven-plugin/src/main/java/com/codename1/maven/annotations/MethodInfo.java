@@ -1,0 +1,113 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven.annotations;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.objectweb.asm.Opcodes;
+
+/// Lightweight description of a method discovered during the class-scanning
+/// pass. Mirrors ASM's `MethodVisitor` signature without retaining the visitor
+/// itself.
+///
+/// `descriptor` is the JVM signature (e.g., `(Ljava/lang/String;)V`).
+/// `annotations` are keyed by their JVM descriptor.
+public final class MethodInfo {
+
+    private final String name;
+    private final String descriptor;
+    private final String signature;
+    private final int access;
+    private final Map<String, AnnotationValues> annotations;
+    private final List<Map<String, AnnotationValues>> parameterAnnotations;
+
+    MethodInfo(String name, String descriptor, String signature, int access,
+               Map<String, AnnotationValues> annotations,
+               List<Map<String, AnnotationValues>> parameterAnnotations) {
+        this.name = name;
+        this.descriptor = descriptor;
+        this.signature = signature;
+        this.access = access;
+        this.annotations = (annotations == null)
+                ? Collections.<String, AnnotationValues>emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotationValues>(annotations));
+        if (parameterAnnotations == null) {
+            this.parameterAnnotations = Collections.emptyList();
+        } else {
+            List<Map<String, AnnotationValues>> copy =
+                    new ArrayList<Map<String, AnnotationValues>>(parameterAnnotations.size());
+            for (Map<String, AnnotationValues> m : parameterAnnotations) {
+                copy.add(m == null
+                        ? Collections.<String, AnnotationValues>emptyMap()
+                        : Collections.unmodifiableMap(
+                                new LinkedHashMap<String, AnnotationValues>(m)));
+            }
+            this.parameterAnnotations = Collections.unmodifiableList(copy);
+        }
+    }
+
+    public String getName() { return name; }
+    public String getDescriptor() { return descriptor; }
+
+    /// The JVM generic-type signature (e.g.
+    /// `(Ljava/lang/Long;Lcom/codename1/util/OnComplete<...>;)V`). Null when
+    /// the class file does not carry a signature attribute for this method
+    /// (no generics, no type parameters). Processors that need to inspect
+    /// type arguments on parameters parse this string.
+    public String getSignature() { return signature; }
+
+    public int getAccess() { return access; }
+
+    public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
+    public boolean isStatic() { return (access & Opcodes.ACC_STATIC) != 0; }
+    public boolean isAbstract() { return (access & Opcodes.ACC_ABSTRACT) != 0; }
+    public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }
+
+    /// Returns true when this is a `<init>` method (constructor).
+    public boolean isConstructor() { return "<init>".equals(name); }
+
+    /// All annotations on this method, keyed by JVM descriptor (e.g.
+    /// `Lcom/codename1/annotations/Async$Schedule;`).
+    public Map<String, AnnotationValues> getAnnotations() { return annotations; }
+
+    /// Convenience: look up an annotation by descriptor, returning null if absent.
+    public AnnotationValues getAnnotation(String descriptor) { return annotations.get(descriptor); }
+
+    /// Annotations attached to each parameter, indexed by parameter position
+    /// (0-based). Each entry is keyed by annotation descriptor. The list size
+    /// equals the parameter count when the class file records any parameter
+    /// annotations, and is empty otherwise -- callers should treat an empty
+    /// list as "no parameter carries any annotation".
+    public List<Map<String, AnnotationValues>> getParameterAnnotations() {
+        return parameterAnnotations;
+    }
+
+    @Override
+    public String toString() {
+        return name + descriptor;
+    }
+}

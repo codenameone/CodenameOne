@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/tip-cross-platform-update-available-strategy/just-the-tip.jpg)
 
 One of the nice things in mobile development vs. desktop is the fact that updates are seamless. We supposedly  
-don’t need to worry about them and most newer OS’s turn them on by default. This keeps are users with the latest  
+don’t need to worry about them and most newer OS’s turn them on by default. This keeps our users with the latest  
 version which is important, e.g. if we fixed a crucial bug or added a new monetization option…​
 
 However, the reality rarely fits into this nice image. In practice an update can be delayed because of permission  
@@ -29,7 +29,7 @@ Over the years we developed a policy of update management that handles all poten
   * Update required – if you don’t update now we’d rather the app stops working
 
   * Switch App recommended – This app was discontinued, we **suggest** you switch to a new app. This can  
-happen when a product line changes or even if you lose your certificate an can no longer update the app
+happen when a product line changes or even if you lose your certificate and can no longer update the app
 
   * Switch App required – This app was discontinued but we have this alternative app you can migrate to, the  
 app will stop working and activating it will launch that URL after an error message
@@ -38,7 +38,7 @@ app will stop working and activating it will launch that URL after an error mess
 
   * App was discontinued and will no longer work
 
-Those are all potential outcomes that we can forsee but there are a lot of things we can’t forsee so we need  
+Those are all potential outcomes that we can foresee but there are a lot of things we can’t foresee so we need  
 to make this process as generic as possible.
 
 ### The Solution

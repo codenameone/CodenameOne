@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" width="200" height="80">
+  <rect x="2" y="2" width="196" height="76" rx="10" ry="10"
+        fill="#1976D2" stroke="#0D47A1" stroke-width="2"/>
+  <text x="100" y="40" font-size="22" font-weight="bold"
+        text-anchor="middle" fill="white">Codename One</text>
+  <text x="100" y="62" font-size="11" text-anchor="middle"
+        fill="#BBDEFB" font-style="italic">build-time SVG</text>
+</svg>

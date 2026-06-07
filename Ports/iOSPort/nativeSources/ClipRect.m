@@ -258,13 +258,14 @@ static CGRect drawingRect;
     if ( clipIsTexture ){
         return;
     }
+#ifndef CN1_USE_METAL
     int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     if(currentScaleX == 1 && currentScaleY == 1) {
         //_glEnable(GL_SCISSOR_TEST);
         //CN1Log(@"Updating clip to scale");
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
     }
-
+#endif // !CN1_USE_METAL
 }
 
 #ifndef CN1_USE_ARC

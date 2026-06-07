@@ -39,10 +39,17 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
 import com.codename1.payment.Purchase;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
@@ -496,6 +503,34 @@ public final class Display extends CN1Constants {
 
     CodenameOneImplementation getImplementation() {
         return impl;
+    }
+
+    /// Returns the platform's WiFi implementation. Used by
+    /// `com.codename1.io.wifi.WiFi`; applications normally talk to that
+    /// static facade rather than calling this directly.
+    public com.codename1.io.wifi.WifiPlatform getWifiPlatform() {
+        return impl.getWifiPlatform();
+    }
+
+    /// Returns the platform's WiFi-Direct implementation.
+    public com.codename1.io.wifi.WifiDirectPlatform getWifiDirectPlatform() {
+        return impl.getWifiDirectPlatform();
+    }
+
+    /// Returns the platform's Bonjour / mDNS implementation.
+    public com.codename1.io.bonjour.BonjourPlatform getBonjourPlatform() {
+        return impl.getBonjourPlatform();
+    }
+
+    /// Returns the platform's USB host implementation.
+    public com.codename1.io.usb.UsbPlatform getUsbPlatform() {
+        return impl.getUsbPlatform();
+    }
+
+    /// Returns the platform's network-type tracker used by
+    /// `NetworkManager.addNetworkTypeListener(...)`.
+    public com.codename1.io.NetworkTypePlatform getNetworkTypePlatform() {
+        return impl.getNetworkTypePlatform();
     }
 
     /// Returns the SIMD API instance bound to the current implementation.
@@ -3625,6 +3660,30 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Heuristic test for URL-shaped strings. Accepts anything containing
+    /// `://` or a `scheme:` prefix; falls through for `AppArg` payloads that
+    /// happen to be non-URL data.
+    private static boolean looksLikeUrl(String v) {
+        if (v == null) {
+            return false;
+        }
+        if (v.indexOf("://") >= 0) {
+            return true;
+        }
+        int colon = v.indexOf(':');
+        if (colon <= 0) {
+            return false;
+        }
+        for (int i = 0; i < colon; i++) {
+            char c = v.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Returns the property from the underlying platform deployment or the default
     /// value if no deployment values are supported. This is equivalent to the
     /// getAppProperty from the jad file.
@@ -3682,6 +3741,14 @@ public final class Display extends CN1Constants {
     public void setProperty(String key, String value) {
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);
+            // Every CN1 port (iOS cn1OpenURL / cn1ContinueUserActivity, Android
+            // onNewIntent, JS URL navigation) already pipes deep links through
+            // setProperty("AppArg", url). Treat URL-shaped values as deep links
+            // and route them through the build-time-generated dispatcher; other
+            // AppArg payloads (free-form launch data) are untouched.
+            if (value != null && value.length() > 0 && looksLikeUrl(value)) {
+                com.codename1.router.Navigation.dispatchExternalUrl(value);
+            }
             return;
         }
         if ("blockOverdraw".equals(key)) {
@@ -4309,6 +4376,14 @@ public final class Display extends CN1Constants {
     /// application code.
     public SecureStorage getSecureStorage() {
         return impl.getSecureStorage();
+    }
+
+    /// Returns the platform NFC entry point. Prefer
+    /// {@link com.codename1.nfc.Nfc#getInstance()} in application code ---
+    /// it handles the fallback to a no-op stub when the current port does
+    /// not implement NFC.
+    public com.codename1.nfc.Nfc getNfc() {
+        return impl.getNfc();
     }
 
     /// This method tries to invoke the device native camera to capture images.
@@ -5118,7 +5193,46 @@ public final class Display extends CN1Constants {
     /// some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
     /// on the iPad with iOS 8 and higher.
     public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect) {
-        impl.share(textOrPath, image, mimeType, sourceRect);
+        share(textOrPath, image, mimeType, sourceRect, null);
+    }
+
+    /// Like [#share(String,String,String,Rectangle)] but reports the
+    /// outcome through `listener` on the EDT.
+    ///
+    /// `listener` may be `null`. If the underlying platform cannot report
+    /// the outcome (older Android, Web Share API), the listener is still
+    /// invoked with [ShareResult#sharedTo] passing a `null` package name
+    /// so the app can resume its flow.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textOrPath`: String to share, or path to file to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or file. null if just sharing text
+    ///
+    /// - `sourceRect`: source rectangle hint for the share popover. May be null.
+    ///
+    /// - `listener`: callback for the share outcome. May be null.
+    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        if (listener == null) {
+            impl.share(textOrPath, image, mimeType, sourceRect);
+            return;
+        }
+        final ShareResultListener finalListener = listener;
+        impl.share(textOrPath, image, mimeType, sourceRect, new ShareResultListener() {
+            @Override
+            public void onResult(final ShareResult result) {
+                final ShareResult r = result != null ? result : ShareResult.sharedTo(null);
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        finalListener.onResult(r);
+                    }
+                });
+            }
+        });
     }
 
     /// The localization manager allows adapting values for display in different locales thru parsing and formatting
@@ -5258,6 +5372,44 @@ public final class Display extends CN1Constants {
     /// getAvailableRecordingMimeTypes()
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return impl.createMediaRecorder(path, mimeType);
+    }
+
+    /// Whether [com.codename1.media.SpeechRecognizer] is implemented
+    /// on the current platform. The user may still deny mic / speech
+    /// permission at call time even when this returns true.
+    public boolean isSpeechRecognitionSupported() {
+        return impl.speechRecognitionIsSupported();
+    }
+
+    /// Begins a speech-recognition session. See
+    /// [com.codename1.media.SpeechRecognizer#recognize] for the
+    /// callable surface; this hook is the direct delegation point
+    /// that platform ports override.
+    public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
+                                       com.codename1.media.RecognitionCallback callback) {
+        impl.startSpeechRecognition(options, callback);
+    }
+
+    public void stopSpeechRecognition() {
+        impl.stopSpeechRecognition();
+    }
+
+    /// Whether [com.codename1.media.TextToSpeech] is implemented on
+    /// the current platform.
+    public boolean isTextToSpeechSupported() {
+        return impl.textToSpeechIsSupported();
+    }
+
+    public void textToSpeechSpeak(String text, com.codename1.media.TtsOptions options) {
+        impl.textToSpeechSpeak(text, options);
+    }
+
+    public void textToSpeechStop() {
+        impl.textToSpeechStop();
+    }
+
+    public String[] textToSpeechAvailableVoices() {
+        return impl.textToSpeechAvailableVoices();
     }
 
     /// Returns the image IO instance that allows scaling image files.
@@ -5527,6 +5679,16 @@ public final class Display extends CN1Constants {
         return impl.hasCamera();
     }
 
+    /// Creates a fresh per-session backend for the low-level
+    /// `com.codename1.camera.Camera` API. Returns `null` on platforms that do
+    /// not implement the new API. Application code should use `Camera.open(...)`
+    /// rather than calling this directly.
+    ///
+    /// @hidden
+    public com.codename1.impl.CameraImpl getCameraBackend() {
+        return impl.createCameraImpl();
+    }
+
     /// Indicates whether the native picker dialog is supported for the given type
     /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
     ///
@@ -5668,6 +5830,206 @@ public final class Display extends CN1Constants {
     /// - com.codename1.notifications.LocalNotification
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
+    }
+
+    /// Requests permission to post notifications using a default request (alert, sound and
+    /// badge). The result is delivered to the callback on the EDT. On platforms without a
+    /// notification permission model the callback reports the permission as granted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: the callback to receive the result
+    public void requestNotificationPermission(NotificationPermissionCallback callback) {
+        requestNotificationPermission(new NotificationPermissionRequest(), callback);
+    }
+
+    /// Requests permission to post notifications with the capabilities described by the
+    /// given request. The result is delivered to the callback on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: describes which notification capabilities to request
+    ///
+    /// - `callback`: the callback to receive the result
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        impl.requestNotificationPermission(request, callback);
+    }
+
+    /// Registers a notification channel (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `builder`: the channel definition
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+        impl.registerNotificationChannel(builder);
+    }
+
+    /// Deletes a notification channel (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the channel id to delete
+    public void deleteNotificationChannel(String channelId) {
+        impl.deleteNotificationChannel(channelId);
+    }
+
+    /// Creates a notification channel group (Android). No-op on platforms without channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `groupId`: the group id
+    ///
+    /// - `groupName`: the user-visible group name
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+        impl.createNotificationChannelGroup(groupId, groupName);
+    }
+
+    /// Schedules constraint-aware background work. Used internally by
+    /// `com.codename1.background.BackgroundWork`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the work request
+    public void scheduleBackgroundWork(WorkRequest request) {
+        impl.scheduleBackgroundWork(request);
+    }
+
+    /// Cancels scheduled background work by id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `workId`: the work id
+    public void cancelBackgroundWork(String workId) {
+        impl.cancelBackgroundWork(workId);
+    }
+
+    /// Returns true if constraint-aware background work is supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isBackgroundWorkSupported() {
+        return impl.isBackgroundWorkSupported();
+    }
+
+    /// Schedules a deferrable background processing task. Used internally by
+    /// `com.codename1.background.BackgroundTask`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the task id
+    ///
+    /// - `earliestBeginEpochMs`: the earliest begin time in milliseconds since the epoch, or 0
+    ///
+    /// - `requiresNetwork`: true if network is required
+    ///
+    /// - `requiresPower`: true if charging is required
+    ///
+    /// - `task`: the work to run
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        impl.scheduleBackgroundProcessing(id, earliestBeginEpochMs, requiresNetwork, requiresPower, task);
+    }
+
+    /// Cancels a scheduled background processing task.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the task id
+    public void cancelBackgroundProcessing(String id) {
+        impl.cancelBackgroundProcessing(id);
+    }
+
+    /// Returns true if deferrable background processing is supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isBackgroundProcessingSupported() {
+        return impl.isBackgroundProcessingSupported();
+    }
+
+    /// Starts a foreground service. Used internally by
+    /// `com.codename1.background.ForegroundService`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the notification channel id
+    ///
+    /// - `title`: the notification title
+    ///
+    /// - `body`: the notification body
+    ///
+    /// - `iconName`: the small icon resource name, or null
+    ///
+    /// - `task`: the task to run
+    ///
+    /// - `handle`: the service handle passed to the task
+    ///
+    /// #### Returns
+    ///
+    /// an opaque native handle
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
+        return impl.startForegroundService(channelId, title, body, iconName, task, handle);
+    }
+
+    /// Updates a foreground service notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeHandle`: the handle returned by `#startForegroundService`
+    ///
+    /// - `title`: the new title
+    ///
+    /// - `body`: the new body
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        impl.updateForegroundServiceNotification(nativeHandle, title, body);
+    }
+
+    /// Stops a foreground service.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeHandle`: the handle returned by `#startForegroundService`
+    public void stopForegroundService(Object nativeHandle) {
+        impl.stopForegroundService(nativeHandle);
+    }
+
+    /// Returns true if foreground services are supported.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isForegroundServiceSupported() {
+        return impl.isForegroundServiceSupported();
+    }
+
+    /// Returns true if the platform can receive shared content from other apps.
+    ///
+    /// #### Returns
+    ///
+    /// true if supported
+    public boolean isReceiveSharedContentSupported() {
+        return impl.isReceiveSharedContentSupported();
+    }
+
+    /// Subscribes the device to a push topic. Used internally by
+    /// `com.codename1.push.Push`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public void subscribeToPushTopic(String topic) {
+        impl.subscribeToPushTopic(topic);
+    }
+
+    /// Unsubscribes the device from a push topic. Used internally by
+    /// `com.codename1.push.Push`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    public void unsubscribeFromPushTopic(String topic) {
+        impl.unsubscribeFromPushTopic(topic);
     }
 
     /// Sets the preferred time interval between background fetches.  This is only a

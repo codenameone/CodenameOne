@@ -1,0 +1,314 @@
+name: Identity stack
+
+# Focused, fast PR check for the OidcClient / SystemBrowser / AppleSignIn /
+# *Connect identity stack. Triggers only when files in the identity surface
+# change, so it pages reviewers within a couple of minutes instead of waiting
+# for the full PR matrix.
+#
+# Coverage:
+#   - linux-tests    : compiles core, runs OidcCoreTest + the existing
+#                      Oauth2/Login/*Connect unit tests, builds the Maven
+#                      plugin (so IPhoneBuilder + AndroidGradleBuilder scanner
+#                      changes can't bit-rot), packages the Android port
+#                      (verifies new Java native impls bundle correctly), and
+#                      javac-compiles the UniversalSignInDemo sample against
+#                      the freshly built core jar to catch API drift.
+#   - sample-secrets : trivial grep scan that fails if real-looking credentials
+#                      appear in the demo sample.
+#   - macos-clang    : runs `clang -fsyntax-only` on both new iOS native
+#                      sources under the host Xcode SDK -- catches Obj-C
+#                      typos and API misuse before the change ever reaches
+#                      the build cloud.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/webauthn/**'
+      - 'CodenameOne/src/com/codename1/io/Oauth2.java'
+      - 'CodenameOne/src/com/codename1/io/AccessToken.java'
+      - 'CodenameOne/src/com/codename1/social/**'
+      - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
+      - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
+      - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
+      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
+      - 'Ports/Android/src/com/codename1/io/oidc/**'
+      - 'Ports/Android/src/com/codename1/io/webauthn/**'
+      - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/Oauth2*'
+      - 'maven/core-unittests/src/test/java/com/codename1/social/**'
+      - 'Samples/samples/UniversalSignInDemo/**'
+      - 'docs/developer-guide/Authentication-And-Identity.asciidoc'
+      - '.github/workflows/identity-stack.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/io/oidc/**'
+      - 'CodenameOne/src/com/codename1/io/webauthn/**'
+      - 'CodenameOne/src/com/codename1/io/Oauth2.java'
+      - 'CodenameOne/src/com/codename1/social/**'
+      - 'Ports/iOSPort/nativeSources/CN1OidcBrowser.*'
+      - 'Ports/iOSPort/nativeSources/CN1AppleSignIn.*'
+      - 'Ports/iOSPort/nativeSources/CN1WebAuthn.*'
+      - 'Ports/iOSPort/src/com/codename1/io/oidc/**'
+      - 'Ports/iOSPort/src/com/codename1/io/webauthn/**'
+      - 'Ports/iOSPort/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java'
+      - 'Ports/Android/src/com/codename1/io/oidc/**'
+      - 'Ports/Android/src/com/codename1/io/webauthn/**'
+      - 'Ports/Android/src/com/codename1/social/AppleSignInNativeImpl.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/oidc/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/io/webauthn/**'
+      - 'Samples/samples/UniversalSignInDemo/**'
+      - '.github/workflows/identity-stack.yml'
+
+permissions:
+  contents: read
+  # Required to pull the pr-ci-container image from ghcr.io.
+  packages: read
+
+concurrency:
+  group: identity-stack-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  linux-tests:
+    name: Core tests, plugin & Android compile, sample javac
+    runs-on: ubuntu-latest
+    # Same container the main PR workflow uses; it ships JDK 8/17/21 and
+    # cn1-binaries pre-staged at /opt/cn1-binaries.
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select JDK 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
+          echo "${JAVA_HOME_8}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-identity-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-identity-
+            ${{ runner.os }}-m2-
+
+      - name: Stage cn1-binaries (required by maven-plugin tests)
+        run: |
+          set -euo pipefail
+          rm -rf maven/target/cn1-binaries
+          mkdir -p maven/target
+          cp -r /opt/cn1-binaries maven/target/cn1-binaries
+
+      - name: Run identity-stack unit tests
+        working-directory: maven
+        run: |
+          set -euo pipefail
+          # Targeted run: OidcCoreTest is the new suite; the *Connect / Login /
+          # Oauth2 tests cover backward-compat for the changes in Login.java
+          # and friends.
+          mvn -B -Dmaven.javadoc.skip=true \
+              -DunitTests=true \
+              -Plocal-dev-javase \
+              -P unittests \
+              -pl core-unittests -am \
+              test \
+              -Dtest='OidcCoreTest,WebAuthnCoreTest,Oauth2Test,Oauth2RefreshTokenRequestTest,GoogleConnectTest,FacebookConnectTest,LoginTest,Login1Test,LoginExtrasTest' \
+              -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Compile Maven plugin (verifies IPhoneBuilder + AndroidGradleBuilder scanner edits)
+        working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          set -euo pipefail
+          # `-am` (also-make) pulls in the plugin's intra-repo deps
+          # (designer, parparvm, ios bundle, javase, android, java-runtime).
+          # Without it the build can't resolve those SNAPSHOT artifacts
+          # because only core / factory / core-unittests landed in the
+          # local repo from the previous step.
+          mvn -B -Dmaven.javadoc.skip=true \
+              -pl codenameone-maven-plugin -am \
+              -Plocal-dev-javase \
+              -Dcn1.binaries="${CN1_BINARIES}" \
+              -DskipTests \
+              install
+
+      - name: Package Android port (verifies new Java sources bundle correctly)
+        run: |
+          set -euo pipefail
+          (cd maven && mvn -B -Dmaven.javadoc.skip=true \
+              -pl android -am \
+              -Plocal-dev-javase \
+              -DskipTests \
+              package)
+          BUNDLE="maven/android/target/classes/com/codename1/android/android_port_sources.jar"
+          if [ ! -f "${BUNDLE}" ]; then
+            echo "::error::android_port_sources.jar not produced at ${BUNDLE}"
+            exit 1
+          fi
+          # Capture the listing once into a variable rather than re-piping
+          # `unzip -l | grep -q` per file. With pipefail set, `grep -q` exits
+          # as soon as it finds a match and SIGPIPEs unzip (status 141);
+          # the resulting non-zero pipeline status was being misread as
+          # "no match" even though the bundle actually contained the file.
+          LISTING="$(unzip -l "${BUNDLE}")"
+          for required in \
+              com/codename1/io/oidc/OidcBrowserNativeImpl.java \
+              com/codename1/io/webauthn/WebAuthnNativeImpl.java \
+              com/codename1/social/AppleSignInNativeImpl.java; do
+            if ! grep -qF "${required}" <<<"${LISTING}"; then
+              echo "::error::${required} missing from android_port_sources.jar"
+              echo "Bundle listing (oidc / webauthn / social entries):"
+              grep -E "oidc|webauthn|social" <<<"${LISTING}" || true
+              exit 1
+            fi
+          done
+
+      - name: Compile UniversalSignInDemo against built core
+        run: |
+          set -euo pipefail
+          CORE_CLASSES="maven/core/target/classes"
+          if [ ! -d "${CORE_CLASSES}" ]; then
+            echo "::error::core not built yet at ${CORE_CLASSES}"
+            exit 1
+          fi
+          mkdir -p target/sample-check
+          # JDK 8 is fine for the sample -- it deliberately avoids Java 8+
+          # syntax to match the broader Codename One source level.
+          "${JAVA_HOME}/bin/javac" \
+              -source 1.8 -target 1.8 \
+              -Xlint:-options \
+              -cp "${CORE_CLASSES}" \
+              -d target/sample-check \
+              Samples/samples/UniversalSignInDemo/UniversalSignInDemo.java
+          test -f target/sample-check/com/codename1/samples/UniversalSignInDemo.class
+
+  sample-secrets:
+    name: Scan demo sample for accidental credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+      - name: Reject real-looking secrets in identity sources & demo
+        run: |
+          set -euo pipefail
+          # Patterns: JWTs, Firebase web API keys (AIza...), Google client IDs
+          # (numeric-prefixed apps.googleusercontent.com), hex blobs >=32 chars,
+          # private-key headers, GitHub PATs, AWS keys.
+          PATTERN='eyJ[A-Za-z0-9_-]{20,}|[0-9]{6,}\.apps\.googleusercontent\.com|AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9]{20,}|[0-9a-f]{32,}|BEGIN (RSA|EC|PRIVATE) KEY|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}'
+          TARGETS=(
+            Samples/samples/UniversalSignInDemo
+            CodenameOne/src/com/codename1/io/oidc
+            CodenameOne/src/com/codename1/social/AppleSignIn.java
+            CodenameOne/src/com/codename1/social/AppleSignInCallback.java
+            CodenameOne/src/com/codename1/social/AppleSignInNative.java
+            CodenameOne/src/com/codename1/social/AppleSignInResult.java
+            CodenameOne/src/com/codename1/social/Auth0Connect.java
+            CodenameOne/src/com/codename1/social/FirebaseAuth.java
+            CodenameOne/src/com/codename1/social/MicrosoftConnect.java
+            CodenameOne/src/com/codename1/io/webauthn
+          )
+          # `|| true` is intentional: grep -E exits 1 when there are zero
+          # matches, which is the success case.
+          HITS=$(grep -rEn "$PATTERN" "${TARGETS[@]}" 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Real-looking credentials found in identity-stack files:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "No credential leaks detected."
+
+  macos-clang:
+    name: Clang syntax check for iOS native sources
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun --show-sdk-path --sdk iphoneos
+
+      - name: Clang -fsyntax-only on new iOS native impls
+        run: |
+          set -euo pipefail
+          cd Ports/iOSPort/nativeSources
+          SDK="$(xcrun --show-sdk-path --sdk iphoneos)"
+          if [ ! -d "$SDK" ]; then
+            echo "::error::No iPhoneOS SDK available on this runner"
+            exit 1
+          fi
+          # The .m files include "xmlvm.h" and use ParparVM's CN1_THREAD_*
+          # macros. Those live in the ParparVM build pipeline, not in this
+          # checkout, so we stage a minimal shim header that defines the
+          # types and macros the .m files reference. The real header on the
+          # build cloud supplies richer definitions; this shim is enough to
+          # exercise everything clang cares about for -fsyntax-only.
+          STUB="$(mktemp -d)"
+          cat > "$STUB/xmlvm.h" <<'EOF'
+          typedef void* JAVA_OBJECT;
+          typedef int   JAVA_BOOLEAN;
+          typedef int   JAVA_INT;
+          typedef long  JAVA_LONG;
+          typedef void  JAVA_VOID;
+          #define JAVA_TRUE  1
+          #define JAVA_FALSE 0
+          #define JAVA_NULL  0
+          #define POOL_BEGIN()
+          #define POOL_END()
+          typedef void* CODENAME_ONE_THREAD_STATE;
+          // _SINGLE_ARG short-circuits the override block in the real
+          // CodenameOne_GLViewController.h so our threadStateData-bearing
+          // expansions survive the include.
+          #define CN1_THREAD_STATE_SINGLE_ARG
+          #define CN1_THREAD_STATE_MULTI_ARG void* threadStateData,
+          #define CN1_THREAD_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_STATE_PASS_SINGLE_ARG threadStateData
+          #define CN1_THREAD_GET_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG threadStateData
+          EOF
+          # Exercise BOTH configurations -- the "stubs" path (apps that
+          # don't reference com.codename1.io.oidc / AppleSignIn) and the
+          # "full" path (apps that do). IPhoneBuilder flips the macros on
+          # via the classpath scanner; we want either to keep building.
+          for label in stubs full; do
+            extra=""
+            if [ "$label" = full ]; then
+              extra="-DCN1_INCLUDE_OIDC -DCN1_INCLUDE_APPLESIGNIN -DCN1_INCLUDE_WEBAUTHN"
+            fi
+            echo "::group::clang $label"
+            xcrun --sdk iphoneos clang \
+                -fsyntax-only \
+                -arch arm64 \
+                -fobjc-arc \
+                -Werror=incompatible-pointer-types \
+                -Werror=objc-method-access \
+                -Wno-unused-parameter \
+                -I"$STUB" \
+                -DNEW_CODENAME_ONE_VM=1 \
+                $extra \
+                CN1OidcBrowser.m \
+                CN1AppleSignIn.m \
+                CN1WebAuthn.m
+            echo "::endgroup::"
+          done

@@ -1,6 +1,20 @@
 # Testing and Screenshots Reference
 
-Codename One runs tests through its own runner (`cn1:test`), not Surefire. Tests can mutate the UI on the EDT, drive components programmatically, and capture screenshots for regression. This document covers the API and the screenshot comparison algorithm, plus how to use screenshots to evaluate UI you just generated.
+This document covers Codename One's `AbstractTest` framework, which runs through `cn1:test`. Standard JUnit 5 tests against the simulator are covered in `references/junit-testing.md` — both frameworks coexist in the same project and you pick per test class.
+
+When to use `AbstractTest` (this doc):
+
+- The test must also run on a device via `mvn cn1:test -Dtarget=ios`. JUnit Jupiter is not available on ParparVM, so on-device tests must use `AbstractTest`.
+- The test compiles under the strict device subset (no reflection, no `java.nio.file.*`, no `java.net.http.*`).
+- You already have a body of `AbstractTest` tests and want to keep adding peers in the same style.
+
+When to use JUnit instead (`references/junit-testing.md`):
+
+- Simulator-only tests that want reflection, Mockito, AssertJ, `assertThrows`, parameterized tests, `-Dtest=Foo#bar` filtering, IDE-native test discovery.
+
+Either way, the `TestUtils` helpers below (`waitForFormTitle`, `clickButtonByLabel`, `screenshotTest`, etc.) are framework-independent — they work the same from both.
+
+`AbstractTest` tests mutate the UI on the EDT, drive components programmatically, and capture screenshots for regression. This document covers the API and the screenshot comparison algorithm, plus how to use screenshots to evaluate UI you just generated.
 
 ## Where tests live
 
@@ -126,6 +140,21 @@ The right loop:
 4. On the next CI run, the screen rendering must continue to match — that's where the test earns its keep.
 
 A screenshot test where the baseline was never visually inspected is theatrical. Don't ship it as "validated".
+
+### Self-baseline regression vs. mockup comparison
+
+`screenshotTest` compares a render to a baseline **the system produced itself** — it measures
+*consistency over time* (did this screen change?), not *correctness* (does it match the design?).
+When you have an **independent reference** — a designer's mockup — use the mockup-comparison tools
+instead, which is the actual correctness signal:
+
+| Goal | Use | Reference |
+| --- | --- | --- |
+| "Did this screen change vs. last run?" (regression) | `TestUtils.screenshotTest(name)` | this doc |
+| "How close is this screen to the designer's mockup?" (correctness) | `tools/CompareToMockup.java` (+ `tools/DesignImport.java`) | `references/mockup-comparison.md` |
+
+The comparison tool prints a similarity percentage and supports region masking so device chrome in
+the mockup doesn't sabotage the score. See `references/mockup-comparison.md` for the full loop.
 
 ## Tests that don't need UI
 

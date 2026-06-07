@@ -72,6 +72,23 @@
           <artifactId>codenameone-javase</artifactId>
           <scope>provided</scope>
       </dependency>
+      <!--
+        JUnit Jupiter so Surefire (which is bound to this module's test
+        phase by default) actually runs any @Test methods under
+        common/src/test/java. The codenameone-javase artifact above
+        declares junit-jupiter as a "provided" dep, which is why the
+        compile-time @CodenameOneTest, @RunOnEdt, @Theme, and similar
+        annotations resolve. The JUnit Jupiter engine itself has to be
+        on the test classpath here for Surefire to discover and run
+        them. Apps that only use the legacy AbstractTest / cn1:test
+        flow can delete this block without affecting anything.
+      -->
+      <dependency>
+          <groupId>org.junit.jupiter</groupId>
+          <artifactId>junit-jupiter</artifactId>
+          <version>5.9.3</version>
+          <scope>test</scope>
+      </dependency>
 
   </dependencies>
   

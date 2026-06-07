@@ -11,7 +11,7 @@ description: This blog post contain tips for working with the Javascript port of
   One apps.
 ---
 
-This blog post contain tips for working with the Javascript port of Codename One apps.
+This blog post contains tips for working with the Javascript port of Codename One apps.
 
 ### Sending Messages to Outside Webpage
 
@@ -270,7 +270,7 @@ complete(true) indicates that the user decided to play the audio. complete(false
 2. Important: You must call `evt.consume()` to let Codename One know that you are going to handle this prompt. Otherwise, the default permission prompt will still be shown.
   
   
-3. Because we are using a modal dialog which will block the event dispatch, we wrap the dialog in callSerially() so this event dispatch won’t be blocked. This is not absolutely necessary, but it will make it easier to follow the app’s logic, as these prompts are designed to by asynchronous.
+3. Because we are using a modal dialog which will block the event dispatch, we wrap the dialog in callSerially() so this event dispatch won’t be blocked. This is not absolutely necessary, but it will make it easier to follow the app’s logic, as these prompts are designed to be asynchronous.
   
   
 4. Obtain the PromptPromise from the event which we will use to convey the user’s response back to the app. YOU MUST call the complete() on this promise no matter what, or the app will lock up.

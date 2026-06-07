@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
@@ -216,6 +217,7 @@ public class ImageViewer extends Component {
     private float thumbnailBarHeightMM = 6f;
     private int pointerPressedAction;
     private int pointerPressedThumbnailIndex = -1;
+    private boolean delegatingDragToParent;
 
     /// Default constructor
     public ImageViewer() {
@@ -445,7 +447,19 @@ public class ImageViewer extends Component {
         pointerPressedAction = getPointerActionAt(x, y);
         pointerPressedThumbnailIndex = getThumbnailIndexAt(x, y);
         currentZoom = zoom;
+        delegatingDragToParent = false;
         getComponentForm().addComponentAwaitingRelease(this);
+    }
+
+    private Container findScrollableYAncestor() {
+        Container p = getParent();
+        while (p != null) {
+            if (p.isScrollableY()) {
+                return p;
+            }
+            p = p.getParent();
+        }
+        return null;
     }
 
     @Override
@@ -476,6 +490,15 @@ public class ImageViewer extends Component {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        if (delegatingDragToParent) {
+            Container p = findScrollableYAncestor();
+            delegatingDragToParent = false;
+            if (p != null) {
+                p.pointerReleased(x, y);
+            }
+            pointerPressedAction = ACTION_NONE;
+            return;
+        }
         super.pointerReleased(x, y);
         isPinchZooming = false;
         int releaseAction = getPointerActionAt(x, y);
@@ -532,6 +555,24 @@ public class ImageViewer extends Component {
     public void pointerDragged(int x, int y) {
         if (pointerPressedAction != ACTION_NONE) {
             return;
+        }
+        if (delegatingDragToParent) {
+            Container p = findScrollableYAncestor();
+            if (p != null) {
+                p.pointerDragged(x, y);
+            }
+            return;
+        }
+        int dxAbs = Math.abs(x - pressX);
+        int dyAbs = Math.abs(y - pressY);
+        if (getZoom() <= 1 && dyAbs > dxAbs) {
+            Container p = findScrollableYAncestor();
+            if (p != null) {
+                delegatingDragToParent = true;
+                p.pointerPressed(pressX, pressY);
+                p.pointerDragged(x, y);
+                return;
+            }
         }
         // could be a pan
         float distanceX = ((float) pressX - x) / getZoom();

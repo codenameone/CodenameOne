@@ -38,7 +38,7 @@ The intention is that the user presses the "Show Details" button, and they are s
     nameField.setText(model.getName());
     ...
 
-That `loadDetailsFromTheServer()` is a synchronous call to the server, so it uses `invokeAndBlock()` to be able to "block" control flow without actually blocking the EDT. It’s great that it doesn’t block the EDT, but it still blocks our ability to deliver the details form that the user is expecting. The form won’t be built until after the network request complete, then the user will experience a short delay before transitioning to the new form.
+That `loadDetailsFromTheServer()` is a synchronous call to the server, so it uses `invokeAndBlock()` to be able to "block" control flow without actually blocking the EDT. It’s great that it doesn’t block the EDT, but it still blocks our ability to deliver the details form that the user is expecting. The form won’t be built until after the network request completes, then the user will experience a short delay before transitioning to the new form.
 
 A better way is to build and show the `DetailsForm`, perform an asynchronous network request, and then update the details form with the data received when the network request completes. E.g.
     
@@ -91,7 +91,7 @@ This can be run directly on the EDT without blocking it because events will cont
 
 However, there is a cost to using `invokeAndBlock()`. It still blocks the current dispatch, which can be problematic in certain contexts. E.g. What if we block the pointer-press dispatch. This might cause components to receive the corresponding pointer-release before the pointer-press – which is counter-intuitive.
 
-I generally try to avoid using `invokeAndBlock()` directly inside event handlers like action events or pointer events, because you could be getting in the way of other event handlers that are relying on the order events. E.g., Instead of:
+I generally try to avoid using `invokeAndBlock()` directly inside event handlers like action events or pointer events, because you could be getting in the way of other event handlers that are relying on the order of events. E.g., Instead of:
     
     
     button.addActionListener(evt->{
@@ -131,7 +131,7 @@ E.g.
 
 ### Conclusion
 
-`invokeAndBlock()` is a great tool for simplifying control flow, but in some circumstances, using it can negatively impact the user experience. Two places where `invokeAndBlock()` should be avoided is during the construction of UI forms to display to the user, and directly inside an event handler. In some cases you can mitigate the cost of `invokeAndBlock()` by simply wrapping it in a `callSerially()` (e.g. inside an event handler) so that it doesn’t block the current event. When constructing a UI component like a form, you can use `invokeWithoutBlocking()` to provide guarantees that your code doesn’t block, and be sure that the user will be shown your form without delay.
+`invokeAndBlock()` is a great tool for simplifying control flow, but in some circumstances, using it can negatively impact the user experience. Two places where `invokeAndBlock()` should be avoided are during the construction of UI forms to display to the user, and directly inside an event handler. In some cases you can mitigate the cost of `invokeAndBlock()` by simply wrapping it in a `callSerially()` (e.g. inside an event handler) so that it doesn’t block the current event. When constructing a UI component like a form, you can use `invokeWithoutBlocking()` to provide guarantees that your code doesn’t block, and be sure that the user will be shown your form without delay.
 ---
 
 ## Archived Comments

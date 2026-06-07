@@ -284,6 +284,53 @@ Use multi-images for everything that ships with the app (icons, decorative graph
 
 See `references/java-api-subset.md` *Multi-images* for the full density table.
 
+### SVG icons — build-time transcoder
+
+Drop an `.svg` file into `common/src/main/css/` and reference it from CSS the same way you would a PNG:
+
+```css
+HomeIcon {
+    background: url(home.svg);
+    cn1-svg-width: 6mm;        /* recommended: pin physical size */
+    cn1-svg-height: 6mm;
+    bg-type: image_scaled_fit;
+}
+```
+
+The build-time SVG transcoder parses each referenced `.svg` and emits a Java `com.codename1.ui.GeneratedSVGImage` subclass that renders the vector through the standard `Graphics` shape API. A generated `SVGRegistry` is installed automatically into every `Resources` opened in the VM — no glue code in app land. Fetching is identical to multi-images:
+
+```java
+Image home = Resources.getGlobalResources().getImage("home.svg");
+```
+
+**Sizing keys** (mirror the multi-image conventions):
+
+- `cn1-svg-width` / `cn1-svg-height` in **mm** — recommended; the value is routed through `Display.convertToPixels()` so the icon comes out at the same physical size on every device. Use this for any SVG with non-standard intrinsic dimensions (most third-party SVGs).
+- `cn1-source-dpi: <bucket>` — declares which density bucket the SVG was authored for; runtime scales by `deviceDensity / sourceDensity`. Use the same keywords multi-images do (`medium`, `high`, `very-high`, `hd`, `2hd`, `4k`, etc.).
+- No hint — the SVG's declared pixel dimensions are treated as `DENSITY_MEDIUM` design pixels and scaled to the device.
+
+**SVG coverage**: rect / circle / ellipse / line / polyline / polygon / path (full mini-language including arcs), affine transforms (translate / rotate / scale / skew / matrix), linear gradients (shape-clipped), opacity / fill-opacity / stroke-opacity (animatable), `<text>` with anchor / font-size / font-weight / font-style, SMIL animations (`<animate>` of numeric attrs, `<animateTransform>` translate / scale / rotate, `<set>`). Not (yet) supported: `<filter>` primitives, alpha `<mask>`. Radial gradients fall back to first-stop color.
+
+For the full feature matrix and troubleshooting, point users to `docs/developer-guide/SVG-Transcoder.asciidoc`.
+
+### Lottie — same pipeline, same URL syntax
+
+The `transcode-svg` goal also picks up Lottie / Bodymovin JSON (`.json`, `.lottie`). The file is lowered into the same SVG model and registered in the same `SVGRegistry`, so the developer-facing API is identical to the SVG path:
+
+```css
+SpinnerStyle { background: url(spinner.json); cn1-svg-width: 12mm; cn1-svg-height: 12mm; bg-type: image_scaled_fit; }
+```
+
+```java
+Image spin = Resources.getGlobalResources().getImage("spinner.json");
+```
+
+Source directories: `common/src/main/lottie/` for Lottie, or drop next to `theme.css` like SVGs.
+
+**Lottie coverage**: shape layers (rect / ellipse / bezier path) with solid fills and strokes, layer transform (anchor / position / scale / rotation / opacity), animated rotation / position / scale collapsed to a first-to-last linear loop over the comp duration. Color / opacity animations, bezier easing, multi-keyframe paths (3+ keys), trim-path, gradients, text layers, image layers, expressions, and `.lottie` ZIP archives are **not** rendered — the parser drops them silently so a partially-supported file still produces a renderable class.
+
+For the full Lottie feature matrix and troubleshooting, point users to `docs/developer-guide/SVG-Transcoder.asciidoc`.
+
 ### Custom TTF fonts
 
 Drop a `.ttf` (or `.otf`) under `common/src/main/css/fonts/`, then reference its **font name (not file name)** in `font-family`:

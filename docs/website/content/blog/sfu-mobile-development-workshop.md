@@ -17,12 +17,12 @@ Since the workshop was being held in the [SIAT](http://www.sfu.ca/siat.html) (In
 
 ## The Format and Content
 
-The workshop followed a strict tutorial format. Once the students were ready, and introductions had been made, we commenced development of a mobile application using Netbeans and Codename One. The source for the app are available on [GitHub](https://github.com/shannah/sfu-mobile-workshop/wiki/SFU-Tour-Guide-App). It is a simple "tour guide" app for SFU, that allows users to find useful services at SFU.
+The workshop followed a strict tutorial format. Once the students were ready, and introductions had been made, we commenced development of a mobile application using Netbeans and Codename One. The source for the app is available on [GitHub](https://github.com/shannah/sfu-mobile-workshop/wiki/SFU-Tour-Guide-App). It is a simple "tour guide" app for SFU, that allows users to find useful services at SFU.
 
 ![SFU Tourguide App Main screen](/blog/sfu-mobile-development-workshop/sfu-workshop-tourguide-app.png)
     
     
-    While the app, in this form, isn't all that useful since the content is hard-coded in Java and not connected to a database, it is a good starting point for developers who want to build this type of app.
+    While the app, in this form, isn’t all that useful since the content is hard-coded in Java and not connected to a database, it is a good starting point for developers who want to build this type of app.
 
 ## What I Learned
 
@@ -38,7 +38,7 @@ As this was the first time doing this type of workshop, I didn’t really know w
 
 ## Future Workshops
 
-Much of the feedback from the first workshop was positive, and we plan to hold more in the future. Once piece of feedback that was common was that the content was "too easy". I definitely underestimated the audience. Future workshops will therefore be more challenging.
+Much of the feedback from the first workshop was positive, and we plan to hold more in the future. One piece of feedback that was common was that the content was "too easy". I definitely underestimated the audience. Future workshops will therefore be more challenging.
 
 I’m located in the Vancouver, Canada area – which is why I did the workshop at SFU (I’m also an SFU grad, so that is another reason). If you would like me to hold a similar workshop in your school, and you are in the Vancouver area, please drop me a line.
 

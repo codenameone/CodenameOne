@@ -121,23 +121,29 @@ extern BOOL isRetinaBug();
     }
 }
 
-//The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
-- (id)initWithCoder:(NSCoder*)coder
-{
-    self = [super initWithCoder:coder];
-    if (self) {
-        self.clearsContextBeforeDrawing = NO;
-        if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
-            if(isRetinaBug()) {
-                self.contentScaleFactor = 1.0;
-            } else {
-                self.contentScaleFactor = [[UIScreen mainScreen] scale];
-            }
+// Shared Metal device + command-queue setup invoked by both the NIB-
+// instantiated path (initWithCoder:) and the programmatic-instantiation
+// path (initWithFrame:). The Mac Catalyst slice goes through
+// initWithFrame: because IBAgent-macOS-UIKit can't compile the iOS
+// view-controller XIB and CodenameOne_GLAppDelegate falls back to
+// passing nil to initWithNibName:. Without this shared setup the
+// CAMetalLayer's device stays nil, CN1MetalSetDeviceAndCommandQueue
+// is never published, and CN1MetalGlyphAtlas+atlasForFont: returns nil
+// for every font -- which is exactly the "no atlas available" failure
+// the Mac CI surfaced.
+- (void)cn1SetupMetal {
+    self.clearsContextBeforeDrawing = NO;
+    if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
+        if(isRetinaBug()) {
+            self.contentScaleFactor = 1.0;
+        } else {
+            self.contentScaleFactor = [[UIScreen mainScreen] scale];
         }
-        CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
-        metalLayer.device = MTLCreateSystemDefaultDevice();
-        metalLayer.opaque = TRUE;
-        metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    }
+    CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
+    metalLayer.device = MTLCreateSystemDefaultDevice();
+    metalLayer.opaque = TRUE;
+    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         // framebufferOnly must be NO: presentFramebuffer blits screenTexture
         // into the drawable via copyFromTexture:toTexture:, and Metal's blit
         // validation aborts ("destinationTexture must not be a framebufferOnly
@@ -204,17 +210,41 @@ extern BOOL isRetinaBug();
         CGFloat s = self.contentScaleFactor;
         [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
 
-        // Drop the glyph atlas + text cache + gradient cache on memory
-        // pressure. Pipeline state cache stays — those are precious to
-        // rebuild and small. The screen texture also stays; updateFrame-
-        // BufferSize: handles its replacement on resize.
-        [[NSNotificationCenter defaultCenter]
-            addObserver:self
-               selector:@selector(memoryWarning)
-                   name:UIApplicationDidReceiveMemoryWarningNotification
-                 object:nil];
-    }
+    // Drop the glyph atlas + text cache + gradient cache on memory
+    // pressure. Pipeline state cache stays — those are precious to
+    // rebuild and small. The screen texture also stays; updateFrame-
+    // BufferSize: handles its replacement on resize.
+    [[NSNotificationCenter defaultCenter]
+        addObserver:self
+           selector:@selector(memoryWarning)
+               name:UIApplicationDidReceiveMemoryWarningNotification
+             object:nil];
+}
 
+//The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
+- (id)initWithCoder:(NSCoder*)coder
+{
+    self = [super initWithCoder:coder];
+    if (self) {
+        [self cn1SetupMetal];
+    }
+    return self;
+}
+
+// Programmatic instantiation. Used on Mac Catalyst (and any future
+// platform where the iOS XIB is unavailable): CodenameOne_GLView-
+// Controller's loadView allocates a METALView via initWithFrame:
+// instead of loading from the NIB. Without this override the
+// UIView default initWithFrame: runs, which skips cn1SetupMetal and
+// leaves CN1MetalDevice() returning nil for the lifetime of the
+// process -- the runtime failure mode that surfaced in CI as "no
+// atlas available for font" on every CN1MetalDrawString call.
+- (id)initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        [self cn1SetupMetal];
+    }
     return self;
 }
 
@@ -285,6 +315,24 @@ extern BOOL isRetinaBug();
         self.renderPassDescriptor = nil;
         self.drawable = nil;
     }
+    // Preserve the previously rendered frame across the resize so a rotation
+    // never shows black. On the Metal backend, changing layer.drawableSize
+    // (below) invalidates the CAMetalLayer's currently displayed drawable, so
+    // the layer falls back to its opaque (black) background until the next
+    // presentDrawable:. With the CADisplayLink disabled in this port, that
+    // next present only arrives once the EDT wakes, re-lays-out and repaints --
+    // a gap that is invisible while the app is actively painting but produces a
+    // visible black flash during the ~0.3s rotation animation when the app has
+    // gone idle (#5162). Capture the old screen texture here; after the new one
+    // is built we scale-blit the last frame into it and present once so the
+    // layer keeps showing the previous frame (stretched, like UIKit's own
+    // rotation snapshot) until the real repaint lands.
+    id<MTLTexture> oldScreen = self.screenTexture;
+#ifndef CN1_USE_ARC
+    // Keep it alive past the self.screenTexture reassignment below: the
+    // synthesized retain setter releases the previously held value.
+    [oldScreen retain];
+#endif
     framebufferWidth = pw;
     framebufferHeight = ph;
     // Match iOS UIKit's Y-down convention: origin at top-left.
@@ -316,16 +364,63 @@ extern BOOL isRetinaBug();
     [newScreen release];
 #endif
 
-    // Prime the texture to opaque black: private-storage textures come back
+    // Initialise the new texture. Private-storage textures come back
     // uninitialised, so the first frame (which uses MTLLoadActionLoad) would
-    // sample garbage for any pixel CN1 hasn't drawn yet.
+    // sample garbage for any pixel CN1 hasn't drawn yet. When a previous frame
+    // exists we scale-blit it in (preserving the last visible content across
+    // the resize -- see the oldScreen capture above); otherwise we just clear
+    // to opaque black.
     id<MTLCommandBuffer> clearCb = [self.commandQueue commandBuffer];
     MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
     clearPass.colorAttachments[0].texture = self.screenTexture;
     clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
     clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
     clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
-    [[clearCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
+    // The preserve draw below binds a CN1MetalPipelineCache pipeline, and every
+    // pipeline in that cache declares stencilAttachmentPixelFormat=Stencil8
+    // (polygon-clip #3921). A render pass that binds such a pipeline MUST attach
+    // a Stencil8 texture or Metal aborts in setRenderPipelineState: with a
+    // pixel-format mismatch (#5103): "For stencil attachment, the
+    // renderPipelineState pixelFormat must be MTLPixelFormatInvalid, as no
+    // texture is set." Under MTL_DEBUG_LAYER=assert (the CI Metal screenshot
+    // job) that abort is a SIGABRT on the first resize, which drops every
+    // screenshot after it. Attach a throwaway clear-on-load stencil exactly
+    // like the seed draw in CN1Metalcompat.m -- the preserve draw never engages
+    // the stencil test, so its contents are irrelevant. Only needed when there
+    // is a previous frame to draw (the plain black clear binds no pipeline).
+    id<MTLTexture> clearStencilTex = nil;
+    if (oldScreen != nil) {
+        MTLTextureDescriptor *clearStencilDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+            width:pw height:ph mipmapped:NO];
+        clearStencilDesc.usage = MTLTextureUsageRenderTarget;
+        clearStencilDesc.storageMode = MTLStorageModePrivate;
+        clearStencilTex = [layer.device newTextureWithDescriptor:clearStencilDesc];
+        if (clearStencilTex != nil) {
+            clearPass.stencilAttachment.texture = clearStencilTex;
+            clearPass.stencilAttachment.loadAction = MTLLoadActionClear;
+            clearPass.stencilAttachment.storeAction = MTLStoreActionDontCare;
+            clearPass.stencilAttachment.clearStencil = 0;
+        }
+    }
+    id<MTLRenderCommandEncoder> clearEnc = [clearCb renderCommandEncoderWithDescriptor:clearPass];
+#ifndef CN1_USE_ARC
+    // renderCommandEncoderWithDescriptor: retains the attachment for the pass.
+    [clearStencilTex release];
+#endif
+    if (oldScreen != nil) {
+        [clearEnc setViewport:(MTLViewport){ 0.0, 0.0, (double)pw, (double)ph, 0.0, 1.0 }];
+        CN1MetalBeginFrame(clearEnc, projectionMatrix, pw, ph);
+        // Stretch the whole previous frame to fill the new drawable. A pure
+        // scale (no rotation) is imperfect across a portrait<->landscape swap
+        // but is only on screen for the rotation animation and is far less
+        // jarring than a black flash. screenTexture is rendered with the same
+        // y-down projection, so CN1MetalDrawImage's V=0-at-top mapping keeps
+        // the old top at the new top (no vertical flip needed).
+        CN1MetalDrawImage(oldScreen, 255, 0, 0, pw, ph);
+        CN1MetalEndFrame();
+    }
+    [clearEnc endEncoding];
     [clearCb commit];
 
     // Build a matching Stencil8 attachment for polygon-shape clipping
@@ -343,6 +438,32 @@ extern BOOL isRetinaBug();
     self.stencilTexture = newStencil;
 #ifndef CN1_USE_ARC
     [newStencil release];
+#endif
+
+    // Present the preserved frame immediately so the CAMetalLayer shows the
+    // last visible content (rather than its invalidated/black surface) for the
+    // duration of the rotation/resize animation, until the EDT repaint presents
+    // the correctly laid-out frame. Skipped on the very first sizing (no
+    // previous frame to show) and if no drawable is currently available.
+    if (oldScreen != nil) {
+        id<CAMetalDrawable> dr = [layer nextDrawable];
+        if (dr != nil) {
+            id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
+            id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
+            [blit copyFromTexture:self.screenTexture
+                      sourceSlice:0 sourceLevel:0
+                     sourceOrigin:MTLOriginMake(0, 0, 0)
+                       sourceSize:MTLSizeMake(pw, ph, 1)
+                        toTexture:dr.texture
+                 destinationSlice:0 destinationLevel:0
+                destinationOrigin:MTLOriginMake(0, 0, 0)];
+            [blit endEncoding];
+            [presentCb presentDrawable:dr];
+            [presentCb commit];
+        }
+    }
+#ifndef CN1_USE_ARC
+    [oldScreen release];
 #endif
 }
 

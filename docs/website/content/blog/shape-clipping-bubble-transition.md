@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/shape-clipping-bubble-transition/shaped-clipping.png)
 
-Clipping is one of the core tenants of graphics programming, you define the boundaries for drawing and when  
+Clipping is one of the core tenets of graphics programming, you define the boundaries for drawing and when  
 you exceed said boundaries things aren’t drawn. Shape clipping allows us to clip based on any arbitrary `Shape`  
 and not just a rectangle, this allows some unique effects generated in runtime.
 

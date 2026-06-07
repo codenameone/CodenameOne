@@ -71,6 +71,15 @@
   }
 
   function log(line) {
+    // Gate browser-bridge PARPAR:* log entries behind the same diagEnabled
+    // toggle (``?parparDiag=1``) that already gates diag(). Without this,
+    // every production page load emitted PARPAR:worker-mode /
+    // PARPAR:startParparVmApp / PARPAR:appStarter-present regardless of
+    // context. Tests that *want* these — the Playwright harness passes
+    // parparDiag=1 — still get them.
+    if (!diagEnabled) {
+      return;
+    }
     if (global.console && typeof global.console.log === 'function') {
       global.console.log('PARPAR:' + line);
     }
@@ -122,17 +131,34 @@
     },
     invoke: function(symbol, args, target, id) {
       var handler = this.handlers[symbol];
+      // Fire-and-forget request: the worker passed ``__cn1_no_response``
+      // because the Java caller is a void method whose green thread
+      // shouldn't block on a HOST_CALLBACK round-trip. Run the handler
+      // and don't post a callback. (For JSO bridge requests the flag
+      // lives on ``args[0].__cn1_no_response``; ``__cn1_jso_bridge__``
+      // is the only handler that uses it, and the per-canvas-op flood
+      // it eliminates was what starved ``self.onmessage`` for incoming
+      // pointer events during a Dialog modal.)
+      var noResponse = !!(args && args[0] && args[0].__cn1_no_response);
       if (!handler) {
         diag('FIRST_FAILURE', 'category', 'host_call_unhandled');
         diag('FIRST_FAILURE', 'symbol', symbol);
-        postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
+        if (!noResponse) {
+          postHostCallback(target, id, null, 'Unhandled host call ' + symbol);
+        }
         return;
       }
       try {
         normalizeHostResult(handler.apply(null, args || []), function(value, err) {
+          if (noResponse && err == null) {
+            return;
+          }
           postHostCallback(target, id, value, err);
         });
       } catch (err) {
+        // Errors must surface even for fire-and-forget, otherwise a bad
+        // op silently corrupts the canvas state with no signal to the
+        // worker that the chain went off the rails.
         postHostCallback(target, id, null, err);
       }
     }
@@ -349,11 +375,174 @@
     return null;
   }
 
+  // Singletons that must never be released even if the worker reports them
+  // dead: their wrappers are cached for the life of the page. Defensive -- the
+  // display canvas is held by a long-lived Java field so its wrapper never
+  // dies, but guard it anyway.
+  function isProtectedHostRef(value) {
+    // Callers (releaseHostRefs) already screen out null before reaching here.
+    if (value === global || value === global.window) {
+      return true;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (doc && (value === doc || value === doc.body
+        || value === doc.documentElement || value === doc.head)) {
+      return true;
+    }
+    if (value.id === 'codenameone-canvas') {
+      return true;
+    }
+    return false;
+  }
+
+  // Drop host refs the worker reported as dead -- every worker-side wrapper for
+  // them was garbage-collected, so they are unreachable from the worker and
+  // safe to evict, letting the browser reclaim the element AND its multi-MB
+  // backing store. This is the host half of the host-ref leak fix (see
+  // parparvm_runtime.js); without it ``hostRefById`` grew unbounded and the
+  // late-suite canvas-accumulation thrash starved the worker<->host bridge.
+  //
+  // We release CANVASES ONLY. The GC signal already guarantees a reused canvas
+  // (still referenced by a live Java image) is never reported dead. Non-canvas
+  // refs (DOM nodes, events, the WebSocket) are left intact because some
+  // @JSBody natives stash a raw ``__jsValue`` host-ref marker that can outlive
+  // its wrapper -- dropping those produced "Missing host receiver for JSO
+  // bridge" errors and stalled the screenshot WebSocket send.
+  function releaseHostRefs(ids) {
+    if (!ids || !ids.length || !hostRefById) {
+      return;
+    }
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var value = hostRefById[id];
+      if (value == null || isProtectedHostRef(value) || !isCanvasLike(value)) {
+        continue;
+      }
+      delete hostRefById[id];
+      if (hostRefByObject && typeof hostRefByObject.delete === 'function') {
+        try {
+          hostRefByObject.delete(value);
+        } catch (weakErr) {
+          void weakErr;
+        }
+      }
+    }
+  }
+
+  // Cache of worker-callback proxy functions keyed by the callback ID the
+  // worker minted. addEventListener/removeEventListener parity needs the
+  // *same* real function on both sides of the call, so we memoise here.
+  var workerCallbackProxies = Object.create(null);
+
+  // Serialise the fields of a DOM Event the worker-side EventListener
+  // wrappers in port.js actually read. Everything here is either a
+  // primitive or a host-ref marker so it round-trips through postMessage
+  // without losing information. We extend this as more event types show
+  // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
+  // covered below.
+  function serializeEventForWorker(evt) {
+    if (evt == null || typeof evt !== 'object') {
+      return evt;
+    }
+    var out = {
+      type: evt.type || '',
+      bubbles: !!evt.bubbles,
+      cancelable: !!evt.cancelable,
+      defaultPrevented: !!evt.defaultPrevented,
+      eventPhase: evt.eventPhase | 0,
+      timeStamp: +evt.timeStamp || 0
+    };
+    if ('clientX' in evt) out.clientX = +evt.clientX || 0;
+    if ('clientY' in evt) out.clientY = +evt.clientY || 0;
+    if ('pageX'   in evt) out.pageX   = +evt.pageX   || 0;
+    if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
+    if ('screenX' in evt) out.screenX = +evt.screenX || 0;
+    if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('button'  in evt) out.button  = evt.button  | 0;
+    if ('buttons' in evt) out.buttons = evt.buttons | 0;
+    if ('detail'  in evt) out.detail  = evt.detail  | 0;
+    if ('deltaX'  in evt) out.deltaX  = +evt.deltaX || 0;
+    if ('deltaY'  in evt) out.deltaY  = +evt.deltaY || 0;
+    if ('deltaZ'  in evt) out.deltaZ  = +evt.deltaZ || 0;
+    if ('deltaMode' in evt) out.deltaMode = evt.deltaMode | 0;
+    if ('key'     in evt) out.key     = evt.key == null ? '' : String(evt.key);
+    if ('code'    in evt) out.code    = evt.code == null ? '' : String(evt.code);
+    if ('keyCode' in evt) out.keyCode = evt.keyCode | 0;
+    if ('which'   in evt) out.which   = evt.which   | 0;
+    if ('charCode' in evt) out.charCode = evt.charCode | 0;
+    if ('shiftKey' in evt) out.shiftKey = !!evt.shiftKey;
+    if ('ctrlKey'  in evt) out.ctrlKey  = !!evt.ctrlKey;
+    if ('altKey'   in evt) out.altKey   = !!evt.altKey;
+    if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
+    if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    // preventDefault / stopPropagation are fire-and-forget from the worker
+    // side (we eagerly call them on the main-thread event just in case).
+    // touches arrays are serialised shallow — most user code reads the
+    // first touch's clientX/Y which is the same as the top-level fields
+    // except on real multi-touch, but the port.js shims use the flat
+    // fields already.
+    if (evt.target && typeof storeHostRef === 'function') {
+      out.target = storeHostRef(evt.target);
+    }
+    if (evt.currentTarget && typeof storeHostRef === 'function') {
+      out.currentTarget = storeHostRef(evt.currentTarget);
+    }
+    // preventDefault / stopPropagation stubs are re-attached on the
+    // worker side (structured-clone postMessage cannot clone functions),
+    // see parparvm_runtime.js `worker-callback` message handling.
+    return out;
+  }
+
+  // Main-thread proxy for a worker-side callback. When the browser fires
+  // a DOM event, we postMessage { type: 'worker-callback', callbackId,
+  // args: [<serialised event>] } back to the worker, which runs the
+  // function that originally produced this ID. We preventDefault/stop
+  // propagation side effects happen on the main-thread event before the
+  // message round-trip, because the worker may not reply synchronously
+  // and a deferred preventDefault would miss the browser's dispatch
+  // window. Apps that depend on conditional preventDefault need to set
+  // it from the native host-bridge path instead.
+  function makeWorkerCallback(callbackId) {
+    if (workerCallbackProxies[callbackId]) {
+      return workerCallbackProxies[callbackId];
+    }
+    var fn = function(event) {
+      var target = global.__parparWorker;
+      if (!target || typeof target.postMessage !== 'function') {
+        return;
+      }
+      var payload;
+      try {
+        payload = serializeEventForWorker(event);
+      } catch (err) {
+        payload = null;
+      }
+      try {
+        target.postMessage({
+          type: 'worker-callback',
+          callbackId: callbackId,
+          args: [payload]
+        });
+      } catch (err) {
+        diag('FIRST_FAILURE', 'category', 'worker_callback_post_failed');
+        diag('FIRST_FAILURE', 'message', err && err.message ? err.message : String(err));
+      }
+    };
+    fn.__cn1WorkerCallbackId = callbackId;
+    workerCallbackProxies[callbackId] = fn;
+    return fn;
+  }
+
   function mapHostArgs(args) {
     var out = [];
     var list = args || [];
     for (var i = 0; i < list.length; i++) {
-      out.push(resolveHostRef(list[i]));
+      var arg = list[i];
+      if (arg && typeof arg === 'object' && typeof arg.__cn1WorkerCallback === 'number') {
+        out.push(makeWorkerCallback(arg.__cn1WorkerCallback));
+      } else {
+        out.push(resolveHostRef(arg));
+      }
     }
     return out;
   }
@@ -449,6 +638,49 @@
     return null;
   });
 
+  // Install a `writeBuffer(arr)` method on `ImageData.prototype` so the
+  // worker can copy bytes into the live host-side `imageData.data` buffer in
+  // one shot. The worker can't write to `imageData.data` from its side
+  // because `hostResult` clones any returned `Uint8ClampedArray` to a fresh
+  // worker-local view (read perf optimization, see line ~485) — so a worker
+  // call like `((Uint8ClampedArraySetter)d.getData()).set(arr)` writes into
+  // the clone, not the original. `putImageData(d)` then sees zeros. This
+  // helper sidesteps the clone: the bridge call lands on `ImageData` itself
+  // (resolved via host-ref), and `this.data.set(host_arr)` runs entirely on
+  // the host where `this.data` is the live buffer.
+  if (typeof ImageData !== 'undefined' && ImageData.prototype && !ImageData.prototype.writeArgbBuffer) {
+    var __waFn = function(argb, offset, width, height) {
+      // ``argb`` is a Java int[] cloned via postMessage. It survives as an
+      // array-like with ``.length`` and integer-indexed entries. Unpack each
+      // 32-bit ARGB word into RGBA bytes directly into ``this.data`` — that
+      // buffer is live on host, so ``putImageData`` will see what we wrote.
+      var data = this.data;
+      var off = offset | 0;
+      var w = width | 0;
+      var h = height | 0;
+      var pixelCount = w * h;
+      var dstLen = data.length;
+      var maxPixels = (dstLen / 4) | 0;
+      if (pixelCount > maxPixels) pixelCount = maxPixels;
+      for (var i = 0; i < pixelCount; i++) {
+        var argbWord = argb[off + i] | 0;
+        var di = i * 4;
+        data[di] = (argbWord >>> 16) & 0xFF;
+        data[di + 1] = (argbWord >>> 8) & 0xFF;
+        data[di + 2] = argbWord & 0xFF;
+        data[di + 3] = (argbWord >>> 24) & 0xFF;
+      }
+    };
+    try {
+      Object.defineProperty(ImageData.prototype, 'writeArgbBuffer', {
+        value: __waFn,
+        writable: true, configurable: true, enumerable: false
+      });
+    } catch (_e) {
+      try { ImageData.prototype.writeArgbBuffer = __waFn; } catch (_e2) {}
+    }
+  }
+
   hostBridge.register('__cn1_jso_bridge__', function(request) {
     var payload = request || {};
     var receiver = resolveHostRef(payload.receiver);
@@ -509,6 +741,16 @@
           value = fn.apply(receiver, args);
         } else if (!args.length && Object.prototype.hasOwnProperty.call(receiver, member)) {
           value = receiver[member];
+        } else if (typeof receiver === 'function') {
+          // Functional-interface (SAM) receivers — see parparvm_runtime.js
+          // ``invokeJsoBridge`` for the full rationale. Plain JS function
+          // wrapped as e.g. an EventListener / Runnable / SuccessCallback
+          // gets dispatched by calling the function itself; ``handleEvent``
+          // / ``run`` / ``onSuccess`` aren't properties of a function
+          // value. Without this fallback, every ``addEventListener(type,
+          // fn)`` whose listener round-trips back into the worker as a
+          // SAM call fails with ``Missing JS member handleEvent``.
+          value = receiver.apply(null, args);
         } else {
           throw new Error('Missing JS member ' + member + ' for host receiver');
         }
@@ -525,7 +767,216 @@
       global.__cn1LastDrawCanvas = receiver;
       global.__cn1LastDrawMember = 'getContext';
     }
+    // SMOKING GUN DIAG: when a getter returns a number for document/getContext
+    // (the canvasContextWipe leak path), log the receiver shape so we can
+    // identify whether the receiver is the actual Window/Canvas or has been
+    // corrupted/wrong.
+    if (typeof value === 'number'
+        && (member === 'document' || member === 'getContext')) {
+      if (!global.__cn1NumberLeakLogged) global.__cn1NumberLeakLogged = 0;
+      if (global.__cn1NumberLeakLogged < 5) {
+        global.__cn1NumberLeakLogged++;
+        try {
+          var protoName = '<none>';
+          try {
+            var proto = Object.getPrototypeOf(receiver);
+            protoName = proto && proto.constructor && proto.constructor.name || '<unknown>';
+          } catch (_e1) {}
+          // receiver is guaranteed non-null here -- the earlier null-check
+          // at the top of the bridge handler throws "Missing host receiver
+          // for JSO bridge" before we ever reach this diag block.
+          var receiverDesc = 'unknown';
+          try {
+            if (receiver === global.window) receiverDesc = 'global.window';
+            else if (global.window && receiver === global.window.document) receiverDesc = 'global.window.document';
+            else if (typeof receiver === 'object' && typeof receiver.tagName === 'string') receiverDesc = 'element:' + receiver.tagName;
+            else receiverDesc = String(receiver).slice(0, 60);
+          } catch (_e2) {}
+          diag('NUMBER_LEAK', 'member', String(member));
+          diag('NUMBER_LEAK', 'kind', String(kind));
+          diag('NUMBER_LEAK', 'value', String(value));
+          diag('NUMBER_LEAK', 'receiverTypeof', typeof receiver);
+          diag('NUMBER_LEAK', 'receiverProto', protoName);
+          diag('NUMBER_LEAK', 'receiverDesc', receiverDesc);
+          diag('NUMBER_LEAK', 'receiverHasDocument', String(typeof receiver.document));
+          diag('NUMBER_LEAK', 'receiverHasGetContext', String(typeof receiver.getContext));
+        } catch (_e) {}
+      }
+    }
     return hostResult(value);
+  });
+
+  // Hide the splash element on the main thread. The translated
+  // ``HTML5Implementation.hideSplash`` body uses ``jQuery(...)``
+  // directly, but the worker context has no jQuery (and no DOM).
+  // The corresponding worker-side ``bindCiFallback`` in port.js
+  // detects the missing jQuery and routes to this host handler so
+  // the actual splash removal happens on the main thread where
+  // jQuery / the DOM are available. Falls back to a manual remove
+  // when jQuery isn't loaded on the main thread either (e.g. when
+  // the bundle is served standalone without the website wrapper).
+  hostBridge.register('__cn1_hide_splash__', function() {
+    var doc = (global.window || global).document || global.document;
+    if (!doc) {
+      return null;
+    }
+    var splash = doc.getElementById('cn1-splash');
+    if (!splash) {
+      return null;
+    }
+    var jq = (global.window || global).jQuery || global.jQuery;
+    if (typeof jq === 'function') {
+      try {
+        jq(splash).fadeOut(100, function() { jq(this).remove(); });
+        return null;
+      } catch (_e) {
+        // Fall through to manual remove on jQuery error.
+      }
+    }
+    if (splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+    return null;
+  });
+
+  // Save-blob handler (used by HTML5Implementation.execute for downloads).
+  // The worker can't touch ``document`` so all the link-creation +
+  // .click() driving the actual file save has to live on the main thread.
+  // We stash the pending handler here and the cn1NativeBacksideHooks
+  // user-gesture poll fires ``__cn1_fire_save_blob__`` which invokes it
+  // -- preserving the "download must be inside a user-gesture event"
+  // browser contract.
+  var __cn1PendingSaveBlobHandler = null;
+
+  function __cn1MakeBlobDownloader(blob, fileName) {
+    return function() {
+      var doc = (global.window || global).document || global.document;
+      var win = global.window || global;
+      if (!doc) {
+        return;
+      }
+      if (win.navigator && win.navigator.msSaveOrOpenBlob) {
+        win.navigator.msSaveOrOpenBlob(blob, fileName);
+        return;
+      }
+      var a = doc.createElement('a');
+      a.href = (win.URL || URL).createObjectURL(blob);
+      a.download = fileName;
+      doc.body.appendChild(a);
+      a.click();
+      doc.body.removeChild(a);
+    };
+  }
+
+  hostBridge.register('__cn1_register_save_blob__', function(request) {
+    var payload = request || {};
+    var blob = resolveHostRef(payload.blob);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:register fileName=' + fileName + ' blob=' + (blob ? 'ok' : 'missing')); } catch (_le) {}
+    }
+    if (!blob) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    // Fire the download immediately. The Generate flow is a clear user-
+    // intent path so most browsers allow the programmatic ``a.click()``
+    // even though the original ``mousedown`` was ~10s ago (cooperative
+    // scheduler had to walk the zip template). Backside-hook timing
+    // becomes irrelevant.
+    var handler = __cn1MakeBlobDownloader(blob, fileName);
+    try { handler(); } catch (e) {
+      if (global.console && typeof global.console.warn === 'function') {
+        try { global.console.warn('PARPAR:save-blob-immediate-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+      }
+    }
+    // Also stash for the existing backside-hook fire path in case the
+    // immediate click was blocked by user-gesture policy.
+    __cn1PendingSaveBlobHandler = __cn1MakeBlobDownloader(blob, fileName);
+    return null;
+  });
+
+  hostBridge.register('__cn1_register_save_blob_dataurl__', function(request) {
+    var payload = request || {};
+    var dataUrl = String(payload.dataUrl == null ? '' : payload.dataUrl);
+    var fileName = String(payload.fileName == null ? 'download' : payload.fileName);
+    if (!dataUrl) {
+      __cn1PendingSaveBlobHandler = null;
+      return null;
+    }
+    __cn1PendingSaveBlobHandler = function() {
+      var doc = (global.window || global).document || global.document;
+      if (!doc) {
+        return;
+      }
+      var a = doc.createElement('a');
+      a.href = dataUrl;
+      a.download = fileName;
+      doc.body.appendChild(a);
+      a.click();
+      doc.body.removeChild(a);
+    };
+    return null;
+  });
+
+  hostBridge.register('__cn1_deregister_save_blob__', function() {
+    __cn1PendingSaveBlobHandler = null;
+    return null;
+  });
+
+  hostBridge.register('__cn1_fire_save_blob__', function() {
+    var handler = __cn1PendingSaveBlobHandler;
+    __cn1PendingSaveBlobHandler = null;
+    if (global.console && typeof global.console.log === 'function') {
+      try { global.console.log('CN1INIT:save-blob:fire handler=' + (typeof handler === 'function' ? 'present' : 'absent')); } catch (_le) {}
+    }
+    if (typeof handler === 'function') {
+      try { handler(); } catch (e) {
+        if (global.console && typeof global.console.warn === 'function') {
+          try { global.console.warn('PARPAR:save-blob-failed:' + (e && e.message ? e.message : String(e))); } catch (_le) {}
+        }
+      }
+    }
+    return null;
+  });
+
+  // Apply a CSS canvas2d ``filter: blur(<radius>px)`` to ``dst`` from
+  // ``src`` in a single host-side call. The worker invokes this once per
+  // ``gaussianBlurImage`` so the cooperative scheduler doesn't have to
+  // round-trip six separate ctx.save/setFilter/drawImage/setFilter/restore
+  // ops -- the earlier per-op Java-typed dispatch path was correct but
+  // slow enough to hang Sheet/Dialog backdrop renders against the screenshot
+  // test budget (see fa18f0301..153d971dc). Returns null; callers don't
+  // need the result, just the side effect on ``dst``.
+  hostBridge.register('__cn1_apply_canvas_blur__', function(request) {
+    var payload = request || {};
+    var dst = resolveHostRef(payload.dst);
+    var src = resolveHostRef(payload.src);
+    if (!dst || !src || typeof dst.getContext !== 'function') {
+      return null;
+    }
+    var w = (payload.w | 0);
+    var h = (payload.h | 0);
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    var radius = +payload.radius;
+    if (!(radius >= 0)) {
+      radius = 0;
+    }
+    var ctx = dst.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    ctx.save();
+    try {
+      ctx.filter = 'blur(' + radius + 'px)';
+      ctx.drawImage(src, 0, 0, w, h);
+    } finally {
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+    return null;
   });
 
   hostBridge.register('__cn1_create_custom_event__', function(request) {
@@ -1509,8 +1960,30 @@
     if (!data) {
       return;
     }
+    if (data.type === 'releaseHostRef') {
+      releaseHostRefs(data.ids);
+      return;
+    }
     if (data.type === 'host-call') {
       hostBridge.invoke(data.symbol, data.args || [], target || global.__parparWorker, data.id);
+      return;
+    }
+    if (data.type === 'host-call-batch') {
+      // Batched fire-and-forget JSO bridge ops. The worker emits these
+      // at end-of-drain to amortise structured-clone postMessage cost
+      // across all canvas/DOM setters or void method calls in a paint
+      // burst. Each op carries its own ``__cn1_no_response`` flag, so
+      // hostBridge.invoke skips the postHostCallback path naturally.
+      var ops = data.ops || [];
+      for (var oi = 0; oi < ops.length; oi++) {
+        try {
+          hostBridge.invoke('__cn1_jso_bridge__', [ops[oi]], target || global.__parparWorker, 0);
+        } catch (e) {
+          if (global.console && typeof global.console.error === 'function') {
+            global.console.error('host-call-batch op[' + oi + '] failed: ' + (e && e.message || e));
+          }
+        }
+      }
       return;
     }
     if (data.type === 'result') {
@@ -1518,8 +1991,39 @@
       global.cn1Started = true;
       return;
     }
+    if (data.type === 'lifecycle' && data.phase === 'started') {
+      // Worker emits this once when the main bytecode generator
+      // completes — Lifecycle.init and Lifecycle.start both
+      // returned. The pre-existing fallbacks (CN1JS:.runApp log
+      // probe + ``type: result`` System.exit hook) only fire for
+      // the screenshot test fixtures (which run an explicit suite)
+      // and the unit-test System.exit pattern. A regular app that
+      // reaches its first form and waits for input never produced
+      // either signal — manifested as ``cn1Started`` staying false
+      // forever in the lifecycle test harness.
+      global.cn1Started = true;
+      return;
+    }
     if (data.type === 'error') {
       global.__parparError = data;
+      // ALWAYS surface runtime errors to the main-thread console — this is
+      // unrelated to the diagEnabled diagnostics toggle. Without this, an
+      // app crash inside the worker vanishes silently because diag() is
+      // gated, and users only see the "Loading..." splash hang forever.
+      if (global.console && typeof global.console.error === 'function') {
+        var errorText = 'PARPAR:ERROR: ' + (data.message || 'unknown');
+        if (data.stack) {
+          errorText += '\n' + data.stack;
+        }
+        if (data.virtualFailure) {
+          try {
+            errorText += '\n  virtualFailure=' + JSON.stringify(data.virtualFailure);
+          } catch (_jse) {
+            errorText += '\n  virtualFailure=[unserialisable]';
+          }
+        }
+        global.console.error(errorText);
+      }
       var failure = data.virtualFailure || null;
       if (failure) {
         diag('FIRST_FAILURE', 'category', failure.category || 'runtime_error');
@@ -1532,8 +2036,29 @@
       return;
     }
     if (data.type === 'log' && data.message) {
-      if (global.console && typeof global.console.log === 'function') {
+      // Forwarded log messages from the worker. We still have to inspect
+      // the message body below (CN1SS:INFO:suite starting drives the
+      // screenshot harness state, and CN1JS:RenderQueue.* updates the
+      // paint-seq counter) so the *detection* path is unconditional; we
+      // only suppress the main-thread console echo unless diagnostics
+      // are enabled. That echo was the source of the doubled
+      // PARPAR:DIAG:* lines in the production browser console.
+      if (diagEnabled && global.console && typeof global.console.log === 'function') {
         global.console.log(String(data.message));
+      } else if (global.console && typeof global.console.log === 'function') {
+        // Allowlist a small set of high-value diagnostic prefixes so they
+        // surface on the main-thread console even without ?parparDiag=1.
+        // System.out.println from user / framework code uses these tags
+        // exactly because the diag-gated echo above swallows everything;
+        // app-level breadcrumbs and the raw-JS-error catch warning need
+        // to be visible in production deployments to be useful.
+        var rawMsg = String(data.message);
+        if (rawMsg.indexOf('CN1INIT:') === 0
+                || rawMsg.indexOf('PARPAR:CAUGHT_RAW_JS_ERROR') === 0
+                || rawMsg.indexOf('PARPAR:ERROR') === 0
+                || rawMsg.indexOf('CN1SS:ERR:') === 0) {
+          global.console.log(rawMsg);
+        }
       }
       if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
         diag('SCREENSHOT_START', 'source', 'vm_log');

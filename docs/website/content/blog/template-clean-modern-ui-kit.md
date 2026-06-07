@@ -28,7 +28,7 @@ in the design so I’ll go over them below.
 
 ### Disabled Global Toolbar
 
-I used the `Toolbar` in the demo but disabled it’s global default. I did this so I can create my own `Toolbar` instances  
+I used the `Toolbar` in the demo but disabled its global default. I did this so I can create my own `Toolbar` instances  
 using the layered mode which we create using `new Toolbar(true)`.
 
 This allows the `Toolbar` to hover on top of the UI and is very useful for a transparent `Toolbar` effect where the UI  

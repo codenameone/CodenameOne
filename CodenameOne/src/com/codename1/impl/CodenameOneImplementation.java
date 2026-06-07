@@ -37,9 +37,14 @@ import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.NetworkTypePlatform;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.io.bonjour.BonjourPlatform;
+import com.codename1.io.usb.UsbPlatform;
+import com.codename1.io.wifi.WifiDirectPlatform;
+import com.codename1.io.wifi.WifiPlatform;
 import com.codename1.io.tar.TarEntry;
 import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
@@ -48,6 +53,15 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
+import com.codename1.share.ShareResult;
+import com.codename1.share.ShareResultListener;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
@@ -165,13 +179,39 @@ public abstract class CodenameOneImplementation {
     private BrowserComponent sharedJavascriptContext;
     private Dimension initialWindowSizeHintPercent;
 
-    static void setOnCurrentFormChange(Runnable on) {
+    /// Set a task to be executed every time the current form changes (e.g. on
+    /// navigation). Used by the advertising layer to show interstitials on
+    /// transitions; see [com.codename1.ads.AdManager#bindInterstitialOnTransition].
+    public static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
 
     /// Set a task to be executed once the implementation is being destroyed
     public static void setOnExit(Runnable on) {
         onExit = on;
+    }
+
+    private static Object currentApplicationInstance;
+
+    /// Stores the running application's main class instance so the implementation can
+    /// dispatch lifecycle style callbacks (such as shared content delivery) to it. Set by
+    /// the platform port when it bootstraps the application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `app`: the application main class instance
+    public static void setCurrentApplicationInstance(Object app) {
+        currentApplicationInstance = app;
+    }
+
+    /// Returns the running application's main class instance, or null if it has not been
+    /// captured.
+    ///
+    /// #### Returns
+    ///
+    /// the application main class instance, or null
+    public static Object getCurrentApplicationInstance() {
+        return currentApplicationInstance;
     }
 
     /// Allows the system to register to receive push callbacks
@@ -1518,6 +1558,63 @@ public abstract class CodenameOneImplementation {
     /// and handling them.
     public boolean isTranslationSupported() {
         return false;
+    }
+
+    // -----------------------------------------------------------------
+    // Speech recognition + Text-to-speech hooks
+    //
+    // Default to no-op so existing platform ports compile unchanged.
+    // iOS / Android / JavaSE override these in their own impl classes.
+    // -----------------------------------------------------------------
+
+    public boolean speechRecognitionIsSupported() {
+        return false;
+    }
+
+    public void startSpeechRecognition(com.codename1.media.RecognitionOptions options,
+                                       com.codename1.media.RecognitionCallback callback) {
+        if (callback != null) {
+            Display.getInstance().callSerially(
+                    new UnsupportedSpeechFallback(callback));
+        }
+    }
+
+    /// Static helper that fires the no-op fallback error on the EDT.
+    /// Named so SpotBugs' SIC_INNER_SHOULD_BE_STATIC_ANON doesn't
+    /// flag the equivalent anonymous Runnable.
+    private static final class UnsupportedSpeechFallback implements Runnable {
+        private final com.codename1.media.RecognitionCallback callback;
+
+        UnsupportedSpeechFallback(com.codename1.media.RecognitionCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void run() {
+            callback.onError(new UnsupportedOperationException(
+                    "Speech recognition is not supported on this platform"));
+        }
+    }
+
+    public void stopSpeechRecognition() {
+        // No-op: platforms with no recognizer have nothing to stop.
+    }
+
+    public boolean textToSpeechIsSupported() {
+        return false;
+    }
+
+    public void textToSpeechSpeak(String text, com.codename1.media.TtsOptions options) {
+        // No-op fallback: apps can probe textToSpeechIsSupported()
+        // first; calling speak() on an unsupported platform is silent
+        // by design so simulator/test code paths keep flowing.
+    }
+
+    public void textToSpeechStop() {
+    }
+
+    public String[] textToSpeechAvailableVoices() {
+        return new String[0];
     }
 
 /// Translates the X/Y location for drawing on the underlying surface. Translation
@@ -4280,6 +4377,57 @@ public abstract class CodenameOneImplementation {
     public void setNativeCommands(Vector commands) {
     }
 
+    /// Returns the desktop title-bar mode for this platform: one of {@code "native"} (OS title
+    /// bar + native menu bar), {@code "custom"} (undecorated window where the CN1 Toolbar acts as
+    /// the title bar) or {@code "toolbar"} (legacy in-app CN1 Toolbar). Returns {@code "toolbar"}
+    /// by default; desktop ports override this when running on the desktop. This is the
+    /// authoritative source consulted by `Form.isDesktopNativeChrome()` - more robust than a theme
+    /// constant, which not all ports propagate identically.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop title-bar mode, never null
+    public String getDesktopTitleBarMode() {
+        return "toolbar";
+    }
+
+    /// Minimizes the native desktop window when the application draws its own (custom mode)
+    /// window chrome on an undecorated window. No-op on platforms without a native window.
+    public void minimizeNativeWindow() {
+    }
+
+    /// Toggles the maximized state of the native desktop window when the application draws
+    /// its own (custom mode) window chrome. No-op on platforms without a native window.
+    public void toggleMaximizeNativeWindow() {
+    }
+
+    /// Closes the native desktop window when the application draws its own (custom mode)
+    /// window chrome. No-op on platforms without a native window.
+    public void closeNativeWindow() {
+    }
+
+    /// Begins dragging the native desktop window (custom mode title bar). The arguments are
+    /// absolute pointer coordinates at the start of the drag. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void startNativeWindowDrag(int x, int y) {
+    }
+
+    /// Continues dragging the native desktop window (custom mode title bar). The arguments
+    /// are the current absolute pointer coordinates. No-op without a native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: absolute pointer x
+    ///
+    /// - `y`: absolute pointer y
+    public void dragNativeWindow(int x, int y) {
+    }
+
     /// Exits the application...
     public void exitApplication() {
     }
@@ -6376,6 +6524,104 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    // ---------------------------------------------------------------------
+    // Deeper-network connectivity platform accessors.
+    //
+    // Each create*Platform() factory returns a narrow abstract class that
+    // the public-facing APIs in com.codename1.io.{wifi,bonjour,usb} ask for
+    // via Display.getInstance().getXxxPlatform(). Platform ports override
+    // the factory they care about; everything else falls through to the
+    // default no-op implementations. Keeping these as small factories
+    // (instead of dozens of methods on this class) lets each port ship its
+    // platform-specific code in a dedicated class and keeps this base
+    // implementation modular.
+    // ---------------------------------------------------------------------
+
+    private WifiPlatform wifiPlatform;
+    private WifiDirectPlatform wifiDirectPlatform;
+    private BonjourPlatform bonjourPlatform;
+    private UsbPlatform usbPlatform;
+    private NetworkTypePlatform networkTypePlatform;
+
+    public final WifiPlatform getWifiPlatform() {
+        if (wifiPlatform == null) {
+            WifiPlatform p = createWifiPlatform();
+            wifiPlatform = p != null ? p : new WifiPlatform();
+        }
+        return wifiPlatform;
+    }
+
+    /// Platform ports override to return their WiFi implementation. The
+    /// default returns `null`, which the caller turns into the
+    /// unsupported stub built into `WifiPlatform`.
+    protected WifiPlatform createWifiPlatform() {
+        return null;
+    }
+
+    public final WifiDirectPlatform getWifiDirectPlatform() {
+        if (wifiDirectPlatform == null) {
+            WifiDirectPlatform p = createWifiDirectPlatform();
+            wifiDirectPlatform = p != null ? p : new WifiDirectPlatform();
+        }
+        return wifiDirectPlatform;
+    }
+
+    protected WifiDirectPlatform createWifiDirectPlatform() {
+        return null;
+    }
+
+    public final BonjourPlatform getBonjourPlatform() {
+        if (bonjourPlatform == null) {
+            BonjourPlatform p = createBonjourPlatform();
+            bonjourPlatform = p != null ? p : new BonjourPlatform();
+        }
+        return bonjourPlatform;
+    }
+
+    protected BonjourPlatform createBonjourPlatform() {
+        return null;
+    }
+
+    public final UsbPlatform getUsbPlatform() {
+        if (usbPlatform == null) {
+            UsbPlatform p = createUsbPlatform();
+            usbPlatform = p != null ? p : new UsbPlatform();
+        }
+        return usbPlatform;
+    }
+
+    protected UsbPlatform createUsbPlatform() {
+        return null;
+    }
+
+    public final NetworkTypePlatform getNetworkTypePlatform() {
+        if (networkTypePlatform == null) {
+            NetworkTypePlatform p = createNetworkTypePlatform();
+            networkTypePlatform = p != null ? p : new LegacyAccessPointNetworkType(this);
+        }
+        return networkTypePlatform;
+    }
+
+    protected NetworkTypePlatform createNetworkTypePlatform() {
+        return null;
+    }
+
+    /// Fallback `NetworkTypePlatform` for ports that haven't been updated
+    /// to provide their own. Bridges to the legacy access-point API so
+    /// `NetworkManager.getCurrentNetworkType()` still distinguishes
+    /// "online" from "offline" when an AP is configured.
+    private static final class LegacyAccessPointNetworkType extends NetworkTypePlatform {
+        private final CodenameOneImplementation impl;
+        LegacyAccessPointNetworkType(CodenameOneImplementation impl) {
+            this.impl = impl;
+        }
+        @Override public int getCurrentNetworkType() {
+            return impl.isAPSupported() && impl.getCurrentAccessPoint() != null
+                    ? NetworkManager.NETWORK_TYPE_OTHER
+                    : NetworkManager.NETWORK_TYPE_NONE;
+        }
+    }
+
     /// For some reason the standard code for writing UTF8 output in a server request
     /// doesn't work as expected on SE/CDC stacks.
     ///
@@ -6570,6 +6816,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific NFC entry point. Default implementation
+    /// returns {@code null}; ports that implement
+    /// {@link com.codename1.nfc.Nfc} override this to return a cached
+    /// singleton. Application code should use
+    /// {@link com.codename1.nfc.Nfc#getInstance()} instead of calling this
+    /// directly --- it transparently substitutes a no-op fallback when the
+    /// port returns {@code null}.
+    public com.codename1.nfc.Nfc getNfc() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters
@@ -6584,6 +6841,15 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `response`: callback for the resulting image
     public void capturePhoto(ActionListener response) {
+    }
+
+    /// Factory for the low-level `com.codename1.camera.Camera` API. Each call
+    /// returns a fresh per-session backend, or `null` on platforms that do not
+    /// implement the new API. Subclasses override to wire in their port.
+    ///
+    /// @hidden
+    public CameraImpl createCameraImpl() {
+        return null;
     }
 
     /// Captures a screenshot of the screen.
@@ -7125,6 +7391,22 @@ public abstract class CodenameOneImplementation {
     /// higher) to dictate where the popover dialog should be placed.
     public void share(String text, String image, String mimeType, Rectangle sourceRect) {
 
+    }
+
+    /// Share variant that delivers an outcome through `listener`.
+    ///
+    /// The default implementation delegates to the legacy
+    /// [#share(String,String,String,Rectangle)] entry point and reports
+    /// `SHARED_TO(null)` once it returns, since this base class has no
+    /// way to observe the platform sheet. Ports that can observe the
+    /// result (iOS, Android API 22+) override this method.
+    ///
+    /// `listener` is guaranteed non-null by [com.codename1.ui.Display#share].
+    public void share(String text, String image, String mimeType, Rectangle sourceRect, ShareResultListener listener) {
+        share(text, image, mimeType, sourceRect);
+        if (listener != null) {
+            listener.onResult(ShareResult.sharedTo(null));
+        }
     }
 
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
@@ -9077,6 +9359,47 @@ public abstract class CodenameOneImplementation {
     public void writeToSocketStream(Object socket, byte[] data) {
     }
 
+    /// Indicates whether the underlying implementation supports the
+    /// [com.codename1.io.WebSocket] API. Ports that do not implement
+    /// WebSocket return false; the public `WebSocket.isSupported()` calls
+    /// through here.
+    public boolean isWebSocketSupported() {
+        return false;
+    }
+
+    /// Create a platform-specific `WebSocketImpl` bound to the given URL.
+    /// The returned impl is not yet connected; the public `WebSocket` facade
+    /// wires its event sink and calls `connect(int)`.
+    ///
+    /// @throws RuntimeException if the port does not support WebSocket.
+    public WebSocketImpl createWebSocketImpl(String url) {
+        throw new RuntimeException("WebSocket not supported on this platform");
+    }
+
+    /// Write a range of the given byte array to the socket. The default implementation
+    /// copies the requested range into a fresh array and delegates to
+    /// {@link #writeToSocketStream(Object, byte[])}; platform ports that can write a
+    /// sub-range natively should override this to avoid the intermediate allocation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `socket`: the socket instance
+    ///
+    /// - `data`: the buffer containing the data to write
+    ///
+    /// - `offset`: the offset within the buffer at which to start writing
+    ///
+    /// - `len`: the number of bytes to write
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        if (offset == 0 && len == data.length) {
+            writeToSocketStream(socket, data);
+            return;
+        }
+        byte[] arr = new byte[len];
+        System.arraycopy(data, offset, arr, 0, len);
+        writeToSocketStream(socket, arr);
+    }
+
     private void mkdirs(FileSystemStorage fs, String path) {
         int lastPos = path.lastIndexOf('/');
         if (lastPos >= 0) {
@@ -9867,6 +10190,134 @@ public abstract class CodenameOneImplementation {
     }
 
     public void cancelLocalNotification(String notificationId) {
+    }
+
+    /// Requests permission to post notifications. The default implementation assumes the
+    /// platform has no permission model and immediately reports the permission as granted.
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        if (callback != null) {
+            callback.notificationPermissionResult(new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED));
+        }
+    }
+
+    /// Registers a notification channel. No-op on platforms without channels.
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+    }
+
+    /// Deletes a notification channel. No-op on platforms without channels.
+    public void deleteNotificationChannel(String channelId) {
+    }
+
+    /// Creates a notification channel group. No-op on platforms without channels.
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+    }
+
+    /// Returns true if the platform can receive shared content from other apps.
+    public boolean isReceiveSharedContentSupported() {
+        return false;
+    }
+
+    /// Delivers shared content to the running application instance. onReceivedSharedContent
+    /// is defined on com.codename1.system.Lifecycle, so apps that handle shared content
+    /// extend Lifecycle; non-Lifecycle apps cannot override it and are skipped. The
+    /// dispatch is performed on the EDT.
+    public void fireSharedContentReceived(final SharedContent content) {
+        Object app = currentApplicationInstance;
+        if (content == null || !(app instanceof com.codename1.system.Lifecycle)) {
+            return;
+        }
+        Runnable r = new SharedContentDispatch((com.codename1.system.Lifecycle) app, content);
+        if (Display.getInstance().isEdt()) {
+            r.run();
+        } else {
+            Display.getInstance().callSerially(r);
+        }
+    }
+
+    private static final class SharedContentDispatch implements Runnable {
+        private final com.codename1.system.Lifecycle lifecycle;
+        private final SharedContent content;
+
+        SharedContentDispatch(com.codename1.system.Lifecycle lifecycle, SharedContent content) {
+            this.lifecycle = lifecycle;
+            this.content = content;
+        }
+
+        @Override
+        public void run() {
+            lifecycle.onReceivedSharedContent(content);
+        }
+    }
+
+    /// Returns true if the platform supports constraint-aware background work.
+    public boolean isBackgroundWorkSupported() {
+        return false;
+    }
+
+    /// Schedules constraint-aware background work. No-op when unsupported.
+    public void scheduleBackgroundWork(WorkRequest request) {
+    }
+
+    /// Cancels previously scheduled background work. No-op when unsupported.
+    public void cancelBackgroundWork(String workId) {
+    }
+
+    /// Returns true if the platform supports foreground services.
+    public boolean isForegroundServiceSupported() {
+        return false;
+    }
+
+    /// Starts a foreground service. The default implementation runs the task on a thread
+    /// without a system notification and returns null.
+    public Object startForegroundService(String channelId, String title, String body, String iconName, ForegroundService.Task task, ForegroundService handle) {
+        if (task != null) {
+            new Thread(new ForegroundServiceRunner(task, handle)).start();
+        }
+        return null;
+    }
+
+    private static final class ForegroundServiceRunner implements Runnable {
+        private final ForegroundService.Task task;
+        private final ForegroundService handle;
+
+        ForegroundServiceRunner(ForegroundService.Task task, ForegroundService handle) {
+            this.task = task;
+            this.handle = handle;
+        }
+
+        @Override
+        public void run() {
+            task.run(handle);
+        }
+    }
+
+    /// Updates the notification of a running foreground service. No-op by default.
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+    }
+
+    /// Stops a running foreground service. No-op by default.
+    public void stopForegroundService(Object nativeHandle) {
+    }
+
+    /// Returns true if the platform supports deferrable background processing tasks.
+    public boolean isBackgroundProcessingSupported() {
+        return false;
+    }
+
+    /// Schedules a deferrable background processing task. No-op when unsupported.
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+    }
+
+    /// Cancels a scheduled background processing task. No-op when unsupported.
+    public void cancelBackgroundProcessing(String id) {
+    }
+
+    /// Subscribes the device to a push topic. No-op when unsupported.
+    public void subscribeToPushTopic(String topic) {
+    }
+
+    /// Unsubscribes the device from a push topic. No-op when unsupported.
+    public void unsubscribeFromPushTopic(String topic) {
     }
 
     /// Gets the preferred time (in seconds) between background fetches.

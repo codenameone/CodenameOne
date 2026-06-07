@@ -135,16 +135,20 @@ static NSMutableArray* pendingDeleteStrings = nil;
     [str release];
     [font release];
     [lastAccess release];
+#ifndef CN1_USE_METAL
     if (textureName != 0) {
         glDeleteTextures(1, &textureName);
         GLErrorLog;
     }
+#endif
     [super dealloc];
 }
 #else
 -(void)dealloc {
+#ifndef CN1_USE_METAL
     glDeleteTextures(1, &textureName);
     GLErrorLog;
+#endif
 }
 #endif
 @end

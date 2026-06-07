@@ -7,6 +7,8 @@ on:
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -25,6 +27,8 @@ on:
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -48,19 +52,42 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/javascript-ui-tests
-      CN1_JS_TIMEOUT_SECONDS: "180"
-      CN1_JS_BROWSER_LIFETIME_SECONDS: "150"
+      # CN1_JS_TIMEOUT_SECONDS guards the per-suite SUITE:FINISHED wait.
+      # Bumped from 720s to 1200s after merging master's #4875 chunk-emit
+      # fix and removing the ``jsChunkDrop`` skip block in port.js: with
+      # the previously-silent graphics / chart / kotlin / mainscreen /
+      # transition tests now actually rendering and emitting full PNG
+      # streams instead of being dropped, the 73-test suite walks at
+      # ~10 s/test on shared GHA runners and lands 12-17 min wall-clock
+      # depending on canvas-accumulation pressure later in the run. The
+      # 720s budget was too tight: comparison-step runs succeed at 12-14
+      # min but SUITE:FINISHED-wait runs that race the bottom of the
+      # suite were timing out before any tests could be diff'd. 1200s
+      # absorbs the variance without re-introducing the
+      # silently-dropped-test workaround.
+      CN1_JS_TIMEOUT_SECONDS: "1800"
+      CN1_JS_BROWSER_LIFETIME_SECONDS: "1740"
       CN1SS_SKIP_COVERAGE: "1"
       CN1SS_FAIL_ON_MISMATCH: "1"
+      # Strict, matching the native ports. The "variable tail of dropped
+      # screenshots" that previously forced a tolerance of 20 was the
+      # canvas-accumulation root cause: browser_bridge.js retained every host
+      # canvas forever, so by ~test 66 the main thread thrashed, capture
+      # stalled and the suite re-dispatched. That leak is fixed (dead canvas
+      # host-refs are now released on the worker GC signal), so the suite
+      # delivers every screenshot deterministically -- a missing capture is a
+      # real regression again. Keep at 0 like Android/JavaSE (iOS uses 2 for
+      # OrientationLock + MutableImageReadback, which don't apply here).
+      CN1SS_ALLOWED_MISSING: "0"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
       - name: Cache codenameone-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/codenameone-tools
           key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
@@ -68,9 +95,9 @@ jobs:
             ${{ runner.os }}-cn1-tools-
 
       - name: Set up Java 8 for ParparVM
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
 
@@ -83,19 +110,19 @@ jobs:
         run: mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
       - name: Cache npm modules for scripts/
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: scripts/node_modules
           key: ${{ runner.os }}-scripts-npm-playwright-v1
@@ -104,7 +131,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-v2
@@ -159,6 +186,62 @@ jobs:
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
+      - name: Run JavaScript lifecycle test
+        # Validates that the bundled app reaches both ``cn1Initialized``
+        # and ``cn1Started`` lifecycle flags within a per-bundle timeout
+        # — i.e. ``Lifecycle.init`` and ``Lifecycle.start`` both
+        # complete without throwing or hanging. Captures every
+        # ``PARPAR-LIFECYCLE`` marker and the most recent
+        # ``PARPAR:DIAG:FIRST_FAILURE`` so a stuck boot is visible
+        # without having to download the full screenshot-test
+        # browser log. Runs BEFORE the screenshot suite because if
+        # the lifecycle test fails the screenshots are doomed to
+        # time out anyway, and we want fast feedback for boot
+        # regressions.
+        #
+        # ``continue-on-error: true`` because the boot path is
+        # currently flaky on shared GHA runners (same bundle, same
+        # workflow: one runner finishes ``cn1Started`` in ~4s, the
+        # next stalls at host-callback id=11 even with a 480s
+        # budget). Until that variance is understood, treat the
+        # lifecycle marker as advisory and keep going so the
+        # screenshot suite — which has its own per-suite timeout
+        # and would always fail-fast in the same circumstances —
+        # still gets a chance to run and surface its own results.
+        # The lifecycle artifact upload below preserves the
+        # ``report.json`` either way.
+        continue-on-error: true
+        env:
+          # CI runners process bytecode-translator output noticeably
+          # slower than local, and shared GitHub Actions runners can
+          # vary by 5-10× in cooperative-scheduler throughput. The
+          # passing runs converge around 90-100 host callbacks in
+          # 240s; on a slow runner the same boot stalls below 20
+          # callbacks in the same window, far short of
+          # ``main-thread-completed``. 480s eats the worst case
+          # without hiding regressions (the passing path returns
+          # within ~30s either way).
+          CN1_LIFECYCLE_TIMEOUT_SECONDS: "480"
+          CN1_LIFECYCLE_REPORT_DIR: ${{ github.workspace }}/artifacts/javascript-lifecycle-tests
+        run: |
+          mkdir -p "${CN1_LIFECYCLE_REPORT_DIR}"
+          # Only the HelloCodenameOne bundle is built locally in this
+          # workflow; the Initializr bundle goes through the cloud
+          # build and isn't available on the runner. Pass the local
+          # bundle explicitly so the test doesn't try to rebuild
+          # missing artifacts.
+          node scripts/run-javascript-lifecycle-tests.mjs \
+            "${{ steps.locate_bundle.outputs.bundle }}"
+
+      - name: Upload JavaScript lifecycle artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: javascript-lifecycle-tests
+          path: artifacts/javascript-lifecycle-tests
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Run JavaScript screenshot browser tests
         run: |
           mkdir -p "${ARTIFACTS_DIR}"
@@ -166,7 +249,7 @@ jobs:
 
       - name: Upload JavaScript screenshot artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: javascript-ui-tests
           path: artifacts/javascript-ui-tests

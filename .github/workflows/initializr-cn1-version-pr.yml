@@ -20,7 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          # The Create-pull-request step below authenticates with a PAT
+          # (CN1SS_GH_TOKEN) that differs from the GITHUB_TOKEN checkout
+          # would otherwise persist as an http.extraheader. Two different
+          # credentials on the same remote make git emit two Authorization
+          # headers, which GitHub rejects with "Duplicate header:
+          # Authorization" / HTTP 400. Not persisting the checkout
+          # credential leaves only the PAT, so the push succeeds.
+          persist-credentials: false
 
       - name: Wait for developer-guide.pdf on the release
         env:
@@ -79,7 +88,7 @@ jobs:
         run: ./scripts/cn1playground/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           # PRs created with the default GITHUB_TOKEN do not trigger pull_request
           # workflows (GitHub's anti-recursion rule), so the bump PR ships with no

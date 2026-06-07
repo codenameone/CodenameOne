@@ -20,11 +20,7 @@ mobile gaming article
 , since quite a few Codename One developers use it to write games we decided to accept the offer and I wrote an article titled: "Writing casual games In Java for mobile devices". In this article we create a simple poker game mockup that is fully functional (although it doesn’t include betting, AI or networking), but you can drag the cards to have them replaced and click the deck to deal new cards. 
 
   
-The game took 270 lines of code (including imports,  
-  
-its a bit larger now since I commented the code quite a bit  
-  
-), it took me roughly 2 hours to write that code.  
+The game took 270 lines of code (including imports, it’s a bit larger now since I commented the code quite a bit), it took me roughly 2 hours to write that code.  
   
 The issue will be published in the 19th of August but you can  
 [  

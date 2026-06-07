@@ -80,7 +80,7 @@ On iOS, `isInCall()` is inferred from app interruption lifecycle events, which m
 
 Because iOS toggles this flag during app lifecycle transitions, polling it with a `UITimer` can miss the interruption window entirely (timers are paused while the app is inactive, and the flag is reset when the app becomes active again). If you need to react, check it from lifecycle callbacks such as your app's `stop()`/`start()` flow instead of periodic polling.
 
-On Android, call detection is unsupported because robust detection would require invasive telephony permissions that are intentionally avoided.
+On Android, call detection is unsupported because robust detection would require invasive telephony permissions that are intentionally avoided:
 
 [source,java]
 ----
@@ -114,7 +114,7 @@ m.getAttachments().put(imageAttachmentUri, "image/png");
 Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject of message", m);
 ----
 
-NOTE: Some features such as attachments etc. don't work in the simulator but should work on iOS/Android
+NOTE: Some features such as attachments etc. Don't work in the simulator but should work on iOS/Android
 
 === Larger text accessibility
 
@@ -162,7 +162,7 @@ The contacts API provides you with the means to query the phone’s address book
 
 Notice that on some platforms this will prompt the user for permissions and the user might choose not to grant that permission. To detect whether this is the case you can invoke `isContactsPermissionGranted()` after invoking `getAllContacts()`. This can help you adapt your error message to the user.
 
-Once you've a https://www.codenameone.com/javadoc/com/codename1/contacts/Contact.html[Contact] you can use the `getContactById` method, but the default method is a bit slow if you want to pull a large batch of contacts. The solution for this is to extract the data that you need through
+Once you have a https://www.codenameone.com/javadoc/com/codename1/contacts/Contact.html[Contact] you can use the `getContactById` method, but the default method is a bit slow if you want to pull a large batch of contacts. The solution for this is to extract the data that you need through
 
 [source,java]
 ----
@@ -175,7 +175,7 @@ Here you can specify true for the attributes that actually matter to you.
 
 Another capability of the contacts API is the ability to extract all the contacts. This isn't supported on all platforms but platforms such as Android can get a boost from this API as extracting the contacts one by one is slow on Android.
 
-You can check if a platform supports the extraction of all the contacts thru `ContactsManager.isAllContactsFast()`.
+You can check if a platform supports the extraction of all the contacts through `ContactsManager.isAllContactsFast()`.
 
 IMPORTANT: When retrieving all the contacts, notice that you should probably not retrieve all the data and should set some fields to false to perform a more efficient query
 
@@ -268,7 +268,7 @@ You can install the bundle using code like this:
 UIManager.getInstance().setBundle(res.getL10N("l10n", local));
 ----
 
-The device language (as an ISO 639 two letter code) could be retrieved with this:
+The device language (as an ISO 639 two-letter code) could be retrieved with this:
 
 [source,java]
 ----
@@ -313,7 +313,7 @@ image::img/l10n-basic.png[Localized label,scaledwidth=30%]
 
 The https://www.codenameone.com/javadoc/com/codename1/l10n/L10NManager.html[L10NManager] class includes a multitude of features useful for common localization tasks.
 
-It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle.
+It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
 
 [source,java]
 ----
@@ -355,15 +355,15 @@ Resource bundles can also include special case constant @rtl, which indicates if
 
 When in `RTL` mode the UI will be the exact mirror so `WEST` will become `EAST`, `RIGHT` will become `LEFT` and this would be true for paddings/margins as well.
 
-If you've a special case where you don’t want this behavior you will need to wrap it with an `isRTL` check. You can also use `setRTL` on a per `Component` basis to disable RTL behavior for a specific `Component`.
+If you have a special case where you don’t want this behavior you will need to wrap it with an `isRTL` check. You can also use `setRTL` on a per `Component` basis to disable RTL behavior for a specific `Component`.
 
-NOTE: Most UI API's have special cases for BiDi instead of applying it globally for example: AWT introduced constants such as `LEADING` instead of making `WEST` mean the opposite direction. You think that was a mistake since the cases where you wouldn't want the behavior of automatic reversal are rare.
+NOTE: Most UI APIs have special cases for BiDi instead of applying it globally for example: AWT introduced constants such as `LEADING` instead of making `WEST` mean the opposite direction. You think that was a mistake since the cases where you wouldn't want the behavior of automatic reversal are rare.
 
 Codename One's support for bidi includes the following components:
 
 * *Bidi algorithm* - allows converting between logical to visual representation for rendering
 * *Global RTL flag* - default flag for the entire application indicating the UI should flow from right to left
-* *Individual RTL flag* - flag indicating that the specific component/container should be presented as an RTL/LTR component (for example: for displaying English elements within a RTL UI).
+* *Individual RTL flag* - flag indicating that the specific component/container should be presented as an RTL/LTR component (for example: for displaying English elements within an RTL UI).
 * *RTL text field input*
 
 Most of Codename One's RTL support is under the hood, the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/LookAndFeel.html[LookAndFeel] global RTL flag can be enabled using:
@@ -425,9 +425,9 @@ iOS requires you to supply usage descriptions for many features that will be dis
 ios.NSCameraUsageDescription=This app needs to use your camera to scan bar codes
 ----
 
-These descriptions are embedded in your app's Info.plist file, so they can be localized the same way you localize other Info.plist values - in the localized _InfoPlist.strings_ file.
+These descriptions are embedded in your app's Info.plist file, so they can be localized the same way you localize other Info.plist values - in the localized `InfoPlist.strings` file.
 
-See <<_example_localizing_the_app_name, the above example>> for instructions on localizing values in the Info.plist file. Then add translations to the _InfoPlist.strings_ file for your usage descriptions.
+See <<_example_localizing_the_app_name, the above example>> for instructions on localizing values in the Info.plist file. Then add translations to the `InfoPlist.strings` file for your usage descriptions.
 
 .ios/src/main/strings/en.lproj/InfoPlist.strings
 [source,strings]
@@ -460,7 +460,7 @@ cn1_icon_<lang>[_<country>].png
 
 Supply a square source image at least 432×432 pixels (the largest size emitted for Android adaptive icons); the build resizes it to every target density. The default app icon continues to be controlled by your `codenameone_settings.properties` file and is used whenever the device locale doesn't match any of the localized variants. At runtime the builders look for a `<lang>_<COUNTRY>` match first, then fall back to a bare `<lang>` match. Providing both (for example `cn1_icon_en.png` plus `cn1_icon_en_GB.png`) lets you give British users a country-specific icon while every other English locale still receives the generic English icon.
 
-===== Android behaviour
+===== Android behavior
 
 On Android the build generates locale-qualified drawable resources at every density so the platform picks the right icon automatically based on the device's current locale:
 
@@ -471,7 +471,7 @@ No code changes are required—Android's resource framework switches icons when 
 
 When you supply a region-qualified icon (such as `cn1_icon_ar_AE.png`) without a matching language-only variant, the build also emits the *default* (non-localized) icon into `drawable-<lang>/` and the matching `mipmap-*-<lang>/` directories. This barrier is required because Android's resource resolver (API 24+) walks every child of the parent locale when it can't find an exact or parent-language match, and would otherwise pick `ar-rAE` for, say, an `ar-PK` device. The barrier short-circuits that lookup so only devices whose region matches the supplied variant receive the localized icon. If you also ship a language-only file (for example `cn1_icon_ar.png`) it's used as the barrier instead, so you keep full control of the fallback icon for Arabic speakers outside AE.
 
-===== iOS behaviour
+===== iOS behavior
 
 iOS doesn't localize launcher icons natively, so Codename One wires up https://developer.apple.com/documentation/uikit/uiapplication/2806818-setalternateiconname[alternate app icons] for you:
 
@@ -480,7 +480,7 @@ iOS doesn't localize launcher icons natively, so Codename One wires up https://d
 * The `CodenameOne_GLAppDelegate` is patched to call `-[UIApplication setAlternateIconName:completionHandler:]` at launch. The delegate reads `[NSLocale preferredLanguages]`, tries the full `<lang>_<COUNTRY>` key first, then falls back to the language-only key, and clears the alternate icon (reverting to the default) if no variant matches.
 * The injection is idempotent and runs before the `ios.afterFinishLaunching` hook, so any custom code you supply via that build hint is unaffected.
 
-NOTE: iOS displays a system alert the first time an app switches to an alternate icon. This is platform-standard behaviour—Codename One can't suppress it.
+NOTE: IOS displays a system alert the first time an app switches to an alternate icon. This is platform-standard behavior—Codename One can't suppress it.
 
 ===== Tips and troubleshooting
 
@@ -507,7 +507,7 @@ IMPORTANT: In order for location to work on iOS you *MUST* define the build hint
 // vale-skip: Microsoft.Adverbs: "repeatedly" is the precise frequency contrast with "once" here, not authorial padding.
 The `getCurrentLocationSync()` method is good for cases where you need to fetch a current location once and not repeatedly query location. It activates the GPS then turns it off to avoid excessive battery usage. For example, if an application needs to track motion or position over time it should use the location listener API to track location as such:
 
-TIP: Notice that there is a method called `getCurrentLocation()` which will return the current state and might not be right for some cases.
+TIP: Notice that there is a method called `getCurrentLocation()` which will return the current state and might not be right for some cases:
 
 [source,java]
 ----
@@ -523,7 +523,7 @@ public MyListener implements LocationListener {
 LocationManager.getLocationManager().setLocationListener(new MyListener());
 ----
 
-IMPORTANT: On Android location maps to low-level API's if you disable the usage of Google Play Services. By default location should perform well if you leave the Google Play Services on
+IMPORTANT: On Android location maps to low-level APIs if you disable the usage of Google Play Services. By default location should perform well if you leave the Google Play Services on
 
 ==== Location in the background - geofencing
 
@@ -541,7 +541,7 @@ When implementing this make sure that:
 
 - The class passed to the API is a public class in the global scope. Not an inner class or anything like that!
 - The class has a public no-argument constructor
-- You need to pass it as a class literal for example: `MyClassName.class`. don't use `Class.forName("my.package.MyClassName")`! +
+- You need to pass it as a class literal for example: `MyClassName.class`. Don't use `Class.forName("my.package.MyClassName")`! +
 Class names are problematic since device builds are obfuscated, you should use literals which the obfuscator detects and handles.
 
 The following code demonstrates usage of the GeoFence API:
@@ -559,7 +559,7 @@ LocationManager.getLocationManager()
 
 On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select `Allow all the time`. Codename One handles this flow automatically when you use `LocationManager`.
 
-For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`.
+For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
 
 [source,java]
 ----
@@ -1027,7 +1027,7 @@ If your application isn't a GUI builder application or you would like to send mo
 
 In 2013 Google introduced an improved application level analytics API that's specifically built for mobile apps. For example, it requires a slightly different API usage. You can activate this specific mode by invoking `setAppsMode(true)`.
 
-When using this mode you can also report errors and crashes to the Google analytics server using the `sendCrashReport(Throwable, String message, boolean fatal)` method.
+When using this mode you can also report errors and crashes to the Google Analytics server using the `sendCrashReport(Throwable, String message, boolean fatal)` method.
 
 You recommend using this mode and setting up an apps analytics account as the results are more refined.
 
@@ -1044,408 +1044,9 @@ AnalyticsService.init(new MyAnalyticsServiceSubclass());
 
 Notice that this removes the need to invoke the other `init` method or `setAppsMode(boolean)`.
 
-=== Native Facebook support
+=== Social sign-in (Facebook, Google, ...)
 
-// HTML_ONLY_START
-TIP: Check out the https://www.codenameone.com/manual/components.html#sharebutton-section[ShareButton section] it might be enough for most of your needs.
-// HTML_ONLY_END
-////
-//PDF_ONLY
-TIP: Check out the <<sharebutton-section,ShareButton section>> it might be enough for most of your needs.
-////
-
-Codename One supports Facebooks https://www.codenameone.com/javadoc/com/codename1/io/Oauth2.html[Oauth2] login and Facebooks single sign on for iOS and Android.
-
-==== Getting started - web setup
-
-To get started first you will need to create a facebook app on the Facebook developer portal
-at https://developers.facebook.com/apps/
-
-.Create New App
-image::img/chat-app-tutorial-facebook-login-1.png[Create New App,scaledwidth=50%]
-
-You need to repeat the process for web, Android & iOS (web is used by the simulator):
-
-.Pick Platform
-image::img/chat-app-tutorial-facebook-login-2.png[Pick Platform,scaledwidth=50%]
-
-For the first platform you need to enter the app name:
-
-.Pick app name
-image::img/chat-app-tutorial-facebook-login-3.png[Pick Name,scaledwidth=50%]
-
-And provide some basic details:
-
-.Basic details for the app
-image::img/chat-app-tutorial-facebook-login-4.png[Details,scaledwidth=35%]
-
-For iOS you need the bundle ID which is the exact same thing you used in the Google+ login to identify the iOS app
-its effectively your package name:
-
-.iOS specific basic details
-image::img/chat-app-tutorial-facebook-login-5.png[Details,scaledwidth=50%]
-
-You should end up with something that looks like this:
-
-.Finished Facebook app
-image::img/chat-app-tutorial-facebook-login-6.png[Details,scaledwidth=50%]
-
-The Android process is pretty similar but in this case you need the activity name too.
-
-IMPORTANT: The activity name should match the main class name followed by the word `Stub` (uppercase s). For example: for the main class `SociallChat` you would use `SocialChatStub` as the activity name
-
-.Android Activity definition
-image::img/chat-app-tutorial-facebook-login-7.png[Details,scaledwidth=50%]
-
-To build the native Android app you must make sure that you setup the keystore for your application. If you don't have
-an Android certificate you can use the visual wizard (in the Android section in the project preferences the button labeled #Generate#) or use the command line:
-
-[source,bash]
-----
-keytool -genkey -keystore Keystore.ks -alias [alias_name] -keyalg RSA -keysize 2048 -validity 15000 -dname "CN=[full name], OU=[ou], O=[comp], L=[City], S=[State], C=[Country Code]" -storepass [password] -keypass [password]
-----
-
-IMPORTANT: You can reuse the certificate in all your apps, some developers like having a different certificate for every app. This is like having one master key for all your doors, or a huge keyring filled with keys.
-
-With the certificate you need an SHA1 key to further authenticate you to Facebook and you do this using the keytool command line on Linux/Mac:
-
-[source,bash]
-----
-keytool -exportcert -alias (your_keystore_alias) -keystore (path_to_your_keystore) | openssl sha1 -binary | openssl base64
-----
-
-And on Windows:
-
-----
-keytool -exportcert -alias androiddebugkey -keystore %HOMEPATH%\.android\debug.keystore | openssl sha1 -binary | openssl base64
-----
-
-You can read more about it on the https://developers.facebook.com/docs/android/getting-started[Facebook guide here].
-
-.Hash generation process, notice the command lines are listed as part of the web wizard
-image::img/chat-app-tutorial-facebook-login-8.png[Hash,scaledwidth=50%]
-
-Lastly you need to publish the Facebook app by flipping the switch in the apps "Status & Review" page as such:
-
-.Without flipping the switch the app won't "appear"
-image::img/chat-app-tutorial-facebook-login-9.png[Enable The App,scaledwidth=50%]
-
-==== IDE setup
-
-You now need to set some important build hints in the project so it will work. To set the build hints right click the project select project properties and in the Codename One section pick the second tab. Add this entry into the table:
-
-[source,bash]
-----
-facebook.appId=...
-----
-
-The app ID will be visible in your Facebook app page in the top left position.
-
-==== The Code
-
-To bind your mobile app into the Facebook app you can use the following code:
-
-[source,java]
-----
-Login fb = FacebookConnect.getInstance();
-
-fb.setClientId("9999999");
-fb.setRedirectURI("http://www.youruri.com/");
-fb.setClientSecret("-------");
-
-// Sets a LoginCallback listener
-fb.setCallback(new LoginCallback() {
-    public void loginSuccessful() {
-        // we can now start fetching stuff from Facebook!
-    }
-
-    public void loginFailed(String errorMessage) {}
-});
-
-// trigger the login if not already logged in
-if(!fb.isUserLoggedIn()){
-    fb.doLogin();
-} else {
-    // get the token and now you can query the Facebook API
-    String token = fb.getAccessToken().getToken();
-    // ...
-}
-----
-
-IMPORTANT: All these values are from the web version of the app! +
-They're used in the simulator and on "unsupported"
-platforms as a fallback. Android and iOS will use the
-native login
-
-==== Facebook publish permissions
-
-To post something to Facebook you need to request a write permission, you can do write operations
-within the callback which is invoked when the user approves the permission.
-
-You can prompt the user for publish permissions by using this code on a logged in https://www.codenameone.com/javadoc/com/codename1/social/FacebookConnect.html[FacebookConnect]:
-
-[source,java]
-----
-FacebookConnect.getInstance()askPublishPermissions(new LoginCallback() {
-    public void loginSuccessful() {
-         // do something...
-    }
-    public void loginFailed(String errorMessage) {
-        // show error or just ignore
-    }
-});
-----
-
-TIP: Notice that this won't always prompt the user, but its required to verify that your token is valid for writing.
-
-[[google-login-section]]
-=== Google Sign-In
-
-Google Login is a bit of a moving target, as they're creating new APIs and deprecating old ones. Codename One 3.7 and earlier used the Google+ API for sign-in, which is now deprecated. While this API still works, it's no longer useful on iOS as it redirects to Safari to perform login, and Apple no longer allows this practice.
-
-The new, approved API is called Google Sign-In. Rather than using Safari to handle login (on iOS), it uses an embedded web view, which *is* permitted by Apple.
-
-The process involves four parts:
-
-. <<ios-setup>>
-. <<android-setup>>
-. <<oauth-setup>>
-. <<the-code>>
-
-*OAuth Setup* is required for using Google Sign-In in the simulator, and for accessing other Google APIs in Android.
-
-
-[[ios-setup]]
-==== iOS setup instructions
-
-**Short Version**
-
-Go to https://developers.google.com/mobile/add[the Google Developer Portal], follow the steps to create an App, and enable Google Sign-In, and download the GoogleService-Info.plist file. Then copy this file into your project's native/ios directory.
-
-**Long Version**
-
-Point your browser to https://developers.google.com/mobile/add[this page].
-
-.Set up mobile app form on Google
-image::img/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=50%]
-
-Click on the "Getting Started" button.
-
-.Getting started button
-image::img/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
-
-Then click "iOS App"
-
-.Pick a platform
-image::img/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=50%]
-
-Now enter an app name and the bundle ID for your app on the form below. The app name doesn't necessary need to match your app's name, but the bundle ID should match the package name of your app.
-
-.Create or Choose App
-image::img/google-signin-ios-create-or-choose-app.png[Create or Choose App,scaledwidth=50%]
-
-Select your country, and then click the "Choose and Configure Services" button.
-
-.Choose and Configure Services
-image::img/google-signin-ios-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=20%]
-
-You'll be presented with the following screen
-
-.Choose and Configure Services form
-image::img/google-signin-ios-choose-and-configure-services-form.png[Choose and Configure Services form,scaledwidth=50%]
-
-Click on `Google Sign-In`.
-
-Then press the "Enable Google Sign-In" button that appears.
-
-.Enable Google Sign-In
-image::img/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=50%]
-
-You should then be presented with another button to "Generate Configuration Files" as shown below
-
-.Generate Configuration Files
-image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
-
-You will be presented with a button to `Download GoogleServices-Info.plist`.
-
-.Download GoogleService-Info.plist file
-image::img/google-signin-ios-download-googleservice-infoplist-btn.png[Download GoogleService-Info plist file,scaledwidth=20%]
-
-Press this button to download the GoogleService-Info.plist file. Then copy this into the "native/ios" directory of your Codename One project.
-
-.Project file structure after placing the GoogleService-Info.plist into the native/ios directory
-image::img/google-signin-ios-google-service-info-plist-file-structure.png[Project structure,scaledwidth=15%]
-
-At this point, your app should be able to use Google Sign-In. Notice that you don't require any build hints. Only that the GoogleService-Info.plist file is added to the project's native/ios directory.
-
-[[android-setup]]
-==== Android setup instructions
-
-**Short Version**
-
-Go to https://developers.google.com/mobile/add[the Google Developer Portal], follow the steps to create an App, and enable Google Sign-In, and download the google-services.json file. Then copy this file into your project's native/android directory.
-
-**Long Version**
-
-Point your browser to https://developers.google.com/mobile/add[this page].
-
-.Set up mobile app form on Google
-image::img/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=30%]
-
-Click on the "Getting Started" button.
-
-image::img/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
-
-Then click "Android App"
-
-image::img/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=30%]
-
-Now enter an app name and the platform for your app on the form below. The app name doesn't necessary need to match your app's name, but the package name should match the package name of your app.
-
-.Create or Choose App
-image::img/google-signin-android-create-or-choose-app.png[Create or Choose App,scaledwidth=40%]
-
-Select your country, and then click the "Choose and Configure Services" button.
-
-.Choose and Configure Services
-image::img/google-signin-android-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=40%]
-
-Click on "Google Sign-In"
-
-Then you'll be presented with a field to enter the Android Signing Certificate SHA-1.
-
-.Android Signing Certifiate SHA-1
-image::img/google-signin-android-signing-sha1.png[Android Signing Certifiate SHA-1,scaledwidth=40%]
-
-The value that you enter here should be obtained from the certificate that you're using to build your app. You an use the *keytool* app that's distributed with the JDK to extract this value
-
-[source,bash]
-----
-$ keytool -exportcert -alias myAlias -keystore /path/to/my-keystore.keystore -list -v
-----
-
-The snippet above assumes that your keystore is located at `/path/to/my-keystore.keystore`, and the certificate alias is "myAlias." You'll be prompted to enter the password for your keystore, then the output will look something like:
-
-----
-Alias name: myAlias
-Creation date: 22-Jan-2014
-Entry type: PrivateKeyEntry
-Certificate chain length: 1
-Certificate[1]:
-Owner: CN=My Own Company Corp., OU=, O=, L=Vancouver, ST=British Columbia, C=CA
-Issuer: CN=My Own Company Corp., OU=, O=, L=Vancouver, ST=British Columbia, C=CA
-Serial number: 56b2fd42
-Valid from: Wed Jan 22 12:23:50 PST 2014 until: Tue Feb 16 12:23:50 PST 2055
-Certificate fingerprints:
-	 MD5:  98:F9:34:5B:B5:1A:14:2D:3C:5D:F4:92:D2:73:30:6B
-	 SHA1: 76:BA:AA:11:A9:22:42:24:93:82:6D:33:7E:48:BC:AF:45:4D:79:B0
-	 SHA256: 3D:04:33:67:6A:13:FF:4F:EE:E8:C9:7D:D2:CC:DF:70:33:E1:90:44:BF:22:B6:96:11:C7:00:67:8D:CD:53:BC
-	 Signature algorithm name: SHA256withRSA
-	 Version: 3
-
-Extensions:
-
-#1: ObjectId: 2.5.29.14 Criticality=false
-SubjectKeyIdentifier [
-KeyIdentifier [
-0000: C2 A0 48 AA 60 BA DD E3   0C 3F 00 B4 2C D5 92 A5  ..H.`.......D...
-0010: 31 16 EF A2                                        1...
-]
-]
-----
-
-You will be interested in SHA1 fingerprint. In the snippet above, the SHA1 fingerprint is:
-
-----
-76:BA:AA:11:A9:22:42:24:93:82:6D:33:7E:48:BC:AF:45:4D:79:B0
-----
-
-You would paste this value into the "Android Signing Certificate SHA-1" field in the web form.
-
-After pasting that in, you'll see a new button with label "Enable Google Sign-in"
-
-.Enable Google Sign-In
-image::img/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=40%]
-
-Press this button and you'll be presented with another button to "Generate Configuration Files" as shown below
-
-.Generate Configuration Files
-image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
-
-You will be presented with a button to `Download google-services.json`.
-
-.Download google-services.json file
-image::img/google-signin-android-download-googleservices-json-btn.png[Download google-services json file,scaledwidth=20%]
-
-Press this button to download the google-services.json file. Then copy this into the "native/android" directory of your Codename One project.
-
-.Project file structure after placing the GoogleService-Info.plist into the native/android directory
-image::img/google-signin-android-google-services-json-file-structure.png[Project structure,scaledwidth=15%]
-
-At this point, your app should be able to use Google Sign-In. Notice that you don't require any build hints. Only that the google-services.json file is added to the project's native/android directory.
-
-IMPORTANT: If you want to access more information about the logged in user using Google's REST APIs, you will require an OAuth2.0 client ID of type Web Application for this project as well. See <<oauth-setup>> for details.
-
-[[oauth-setup]]
-==== OAuth setup (simulator and REST API access)
-
-Getting Google Sign-In to work in the Codename One simulator requires an extra step after you've set up iOS and/or Android apps. The Simulator can't use the native Google Sign-In APIs, so it uses the standard Web Application OAuth2.0 API. Also, the Android App requires a Web Application OAuth2.0 client ID to access more Google REST APIs.
-
-If you've set up the Google Sign-In API for either Android or iOS, then Google will have already automatically generated a Web Application OAuth2.0 client ID for you. You need to provide the ClientID and ClientSecret to the `GoogleConnect` instance (in your Java code).
-
-===== Client ID, client secret and redirect URL
-
-. Log into https://console.cloud.google.com/apis[the Google Cloud Platform API console].
-. Select your app from the drop-down-menu in the top bar
-. Click on "Credentials" in the left menu. You'll see a screen like this
-+
-image::img/google-sign-in-google-cloud-platform-credentials.png[Credentials,scaledwidth=20%]
-. Under the "OAuth2.0 Client IDs", find the row with "Web application" listed in the type column
-. Click the "Edit icon for that row.
-. Make note of the "Client ID" and "Client Secret" on this page, as you'll need to add them to your Java source in the next step.
-. In the "Authorized redirect URIs" section, you will need to enter the URL to the page that the user will be sent to after a successful login. This page will appear in the simulator for a split second, as Codename One's BrowserComponent will intercept this request to get the access token upon successful login. You can use any URL you like here, but it must match the value you give to `GoogleConnect.setRedirectURL()` in <<the-code>>.
-+
-image::img/google-sign-in-oauth-setup-redirect-url.png[Redirect URL,scaledwidth=30%]
-
-[[javascript-setup]]
-==== Javascript setup instructions
-
-The Javascript port can use the same OAuth2.0 credentials as the simulator does. It doesn't require your Client Secret or redirect URL. It requires your Client ID, which you can specify using the `GoogleConnect.setClientID()` method.
-
-[[the-code]]
-==== The Code
-
-[source,java]
-----
-Login gc = GoogleConnect.getInstance();
-gc.setClientId("*****************.apps.googleusercontent.com");
-gc.setRedirectURI("https://yourURL.com/");
-gc.setClientSecret("-------------------");
-
-// Sets a LoginCallback listener
-gc.setCallback(new LoginCallback() {
-    public void loginSuccessful() {
-        // we can now start fetching stuff from Google+!
-    }
-
-    public void loginFailed(String errorMessage) {}
-});
-
-// trigger the login if not already logged in
-if(!gc.isUserLoggedIn()){
-    gc.doLogin();
-} else {
-    // get the token and now you can query the Google API
-    String token = gc.getAccessToken().getToken();
-      // NOTE: On Android, this token will be null unless you provide valid
-      // client ID and secrets.
-}
-----
-
-NOTE: The client ID and client secret values here are the ones from your <<oauth-setup, OAuth2.0 Web Application>>.
-
-IMPORTANT: The *Client ID* and *Client Secret* values are used on both the Simulator and on Android. On simulator these values are required for login to work at all. On Android these values are required to get an access token to query the Google API further using its various REST APIs. If you don't include these values on Android, login will still work, but `gc.getAccessToken().getToken()` will return `null`.
-
+The legacy Facebook and Google OAuth2 sign-in flows that used to live here drove an embedded `WebBrowser`, which the providers no longer permit. The full sign-in stack -- system-browser-based OpenID Connect for any provider, plus Facebook / Google / Microsoft / Apple / Auth0 / Firebase helpers -- now lives in the <<authentication-and-identity, Authentication and Identity>> chapter.
 
 [[lead-component-section]]
 === Lead Component
@@ -1462,9 +1063,9 @@ For example,
 components like https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton], https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[SpanButton] & https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[SpanLabel] don't necessarily seem like the right candidate for compositing but they're all `Container` subclasses.
 
 Using a `Container` provides you a lot of flexibility in layout & functionality for a specific component. `MultiButton`
-is a great example of that. it's a `Container` internally that's composed of 5 labels and a `Button`.
+is a great example of that. It's a `Container` internally that's composed of 5 labels and a `Button`.
 
-Codename One makes the `MultiButton` "feel" like a single button thru the use of `setLeadComponent(Component)` which
+Codename One makes the `MultiButton` "feel" like a single button through the use of `setLeadComponent(Component)` which
 turns the button into the "leader" of the component.
 
 When a `Container` hierarchy is placed under a leader all events within the hierarchy are sent to the leader, so if a label within the lead component receives a pointer pressed event this event will be sent to the leader.
@@ -1544,11 +1145,11 @@ public class SpanButton extends Container {
 
 The `Component` class has two methods that allow you to exclude a component from lead behavior: `setBlockLead(boolean)` & `isBlockLead()`.
 
-Effectively when you've a `Component` within the lead hierarchy that you would like to treat differently from the rest you can use this method to exclude it from the lead component behavior while keeping the rest in line...
+Effectively when you have a `Component` within the lead hierarchy that you would like to treat differently from the rest you can use this method to exclude it from the lead component behavior while keeping the rest in line...
 
 This should have no effect if the component isn't a part of a lead component.
 
-The sample below is based on the `Accordion` component which uses a lead component internally.
+The sample below is based on the `Accordion` component which uses a lead component internally:
 
 [source,java]
 ----
@@ -1600,17 +1201,63 @@ hi.getContentPane().addPullToRefresh(() -> {
 hi.show();
 ----
 
+`setPullToRefresh(Runnable)` is provided as a more discoverable alias for the
+same single-task slot -- both names route to the same field, and a second
+call replaces whatever runnable was previously registered.
+
 .Pull to refresh demo
 image::img/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
+
+==== Modern arc-spinner pull-to-refresh
+
+The legacy pull-to-refresh visual is the classic "rotating arrow + text"
+stack. Modern Material 3 / iOS apps instead show a thin circular arc
+that grows as the user pulls and spins once the task fires. This is
+shipped as an opt-in path via the `pullToRefreshModernBool` theme
+constant; the iOS Modern and Android Material themes enable it by
+default so apps shipping against those themes get the spec-accurate
+look without any extra wiring.
+
+To enable in a custom theme:
+
+[source,css]
+----
+#Constants {
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;       /* 8mm circle           */
+    pullToRefreshIndicatorStrokeMm: "0.6";     /* 0.6mm stroke thickness */
+}
+
+TabIndicator {
+    /* The pull-to-refresh arc shares its color with the animated tab
+       indicator -- both follow the brand's accent. */
+    color: #007aff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+----
+
+Behavior:
+
+* During the pull gesture the arc sweep grows from 0° to ~330°
+ proportional to how far the user has pulled past the threshold.
+* When the refresh task fires the arc rotates continuously at ~360°/sec
+ until the task completes.
+* All sizing is in millimetres so the indicator stays physical-size-accurate
+ across device densities; no rasterized images involved.
+
+The legacy `addPullToRefresh` API is unchanged -- the same `Runnable` is
+invoked at the same moment; only the visual rendering differs.
 
 === Running 3rd party apps using display's execute
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class's `execute` method allows you to invoke a URL which is bound to a particular application.
 
 This works rather well assuming the application is installed. For example: link:http://wiki.akosma.com/IPhone_URL_Schemes[this list]
-contains a set of valid URL's that can be used on iOS to run common applications and use built-in functionality.
+contains a set of valid URLs that can be used on iOS to run common applications and use built-in functionality.
 
-Some URL's might not be supported if an app isn't installed, on Android there isn't much that can be done but iOS has a `canOpenURL` method for Objective-C.
+Some URLs might not be supported if an app isn't installed, on Android there isn't much that can be done but iOS has a `canOpenURL` method for Objective-C.
 
 On iOS you can use the `Display.canExecute()` method which returns a `Boolean` instead of a `boolean` which
 allows you to support 3 result states:
@@ -1635,24 +1282,24 @@ if(can != null && can) {
 
 === Automatic build hint configuration
 
-You try to make Codename One "seamless," this expresses itself in small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. However, it isn't enough, build hints are often confusing and obscure. it's hard to abstract the mess that's native mobile OS's and the odd policies from Apple/Google...
+You try to make Codename One "seamless," this expresses itself in small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. However, it isn't enough, build hints are often confusing and obscure. It's hard to abstract the mess that's native mobile OSes and the odd policies from Apple/Google...
 
 A good example for a common problem developers face is location code that doesn't work in iOS. This is due to the `ios.locationUsageDescription` build hint that's required. The reason that build hint was added is a need by Apple to provide a description for every app that uses the location service.
 
-To solve this sort of used case you've two API's in `Display`:
+To solve this sort of used case you have two APIs in `Display`:
 
 [source,java]
 ----
 /**
  * Returns the build hints for the simulator, this will only work in the debug environment and it's
- * designed to allow extensions/API's to verify user settings/build hints exist
+ * designed to allow extensions/APIs to verify user settings/build hints exist
  * @return map of the build hints that isn't modified without the codename1.arg. prefix
  */
 public Map<String, String> getProjectBuildHints() {}
 
 /**
  * Sets a build hint into the settings while overwriting any previous value. This will only work in the
- * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+ * debug environment and it's designed to allow extensions/APIs to verify user settings/build hints exist.
  * Important: this will throw an exception outside of the simulator!
  * @param key the build hint without the codename1.arg. prefix
  * @param value the value for the hint
@@ -1662,7 +1309,7 @@ public void setProjectBuildHint(String key, String value) {}
 
 Both of these allow you to detect if a build hint is set and if not (or if it's set incorrectly) set its value...
 
-if you will use the location API from the simulator and you didn't define `ios.locationUsageDescription` Codename One will implicitly define a string there. The cool thing is that you will now see that string in your settings and you would be able to customize it.
+If you use the location API from the simulator and you didn't define `ios.locationUsageDescription` Codename One will implicitly define a string there. The cool thing is that you will now see that string in your settings and you would be able to customize it.
 
 For example, this gets way better than that trivial example!
 
@@ -1698,7 +1345,7 @@ However, it gets better, say you want to return a value:
 e.run((success) -> success.onSuccess(doThisOnTheThread()), (myResult) -> onEDTGotResult(myRsult));
 ----
 
-Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. this code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
+Lets break that down... You ran the thread with the success callback on the new thread then the callback got invoked on the EDT as a result. This code `(success) -> success.onSuccess(doThisOnTheThread())` ran off the EDT in the thread and when you invoked the `onSuccess` callback it sent it asynchronously to the EDT here: `(myResult) -> onEDTGotResult(myRsult)`.
 
 These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
 
@@ -1711,7 +1358,7 @@ int result = e.run(() -> {
 });
 ----
 
-a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
+There are a few other variants like `runAndWait` and there is a `kill()` method which stops a thread and releases its resources.
 
 === Mouse cursor
 
@@ -1763,22 +1410,22 @@ lib/impl/
 native/internal_tmp/
 ----
 
-The important lines are `lib/impl/` and `native/internal_tmp/`. Technically cn1libs are zips. When you do a refresh libs they unzip into the right directories under `lib/impl` and `native/internal_tmp`. By excluding these directories you can remove duplicates that can result in conflicts.
+The important lines are `lib/impl/` and `native/internal_tmp/`. Technically cn1libs are zips. When you run a refresh-libs operation they unzip into the right directories under `lib/impl` and `native/internal_tmp`. By excluding these directories you can remove duplicates that can result in conflicts.
 
 ==== Resource files
 
-Committing the res file is a matter of personal choice. it's committed in the git ignore files above but you can remove it. The res file is at risk of corruption and in that case having a history you can refer to, matters a lot.
+Committing the res file is a matter of personal choice. It's committed in the git ignore files above but you can remove it. The res file is at risk of corruption and in that case having a history you can refer to, matters a lot.
 
-However, the resource file is a bit of a problematic file. As a binary file if you've a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
+However, the resource file is a bit of a problematic file. As a binary file if you have a team working with it the conflicts can be a major blocker. This was far worse with the old GUI builder, that was one of the big motivations of moving into the new GUI builder which works better for teams.
 
-Still, if you want to keep an eye of every change in the resource file you can switch on the #File# -> #XML Team Mode# which should be on by default. This mode creates a file hierarchy under the `res` directory to match the res file you opened. For example: if you've a file named `src/theme.res` it will create a matching `res/theme.xml` and also nest all the images and resources you use in the res directory.
+Still, if you want to keep an eye of every change in the resource file you can switch on the #File# -> #XML Team Mode# which should be on by default. This mode creates a file hierarchy under the `res` directory to match the res file you opened. For example: if you have a file named `src/theme.res` it will create a matching `res/theme.xml` and also nest all the images and resources you use in the res directory.
 
-that's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
+That's useful as you can edit the files directly and keep track of every file in git. For example, this has two big drawbacks:
 
 - it's flaky - while this mode works it never reached the stability of the regular res file mode
-- It conflicts - the simulator/device are oblivious to this mode. if you fetch an update you also need to update the res file and you might still have conflicts related to that file
+- It conflicts - the simulator/device are oblivious to this mode. If you fetch an update you also need to update the res file and you might still have conflicts related to that file
 
-Both of these issues shouldn't be a deal breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal breaker.
+Both of these issues shouldn't be a deal-breaker. Even though this mode is a bit flaky it's better than the alternative as you can "see" the content of the resource file. You can revert and reapply your changes to the res file when merging from git, it's tedious but again not a deal-breaker.
 
 ==== Eclipse version
 

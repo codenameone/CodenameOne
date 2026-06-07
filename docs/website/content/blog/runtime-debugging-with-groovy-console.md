@@ -69,11 +69,11 @@ directly in the console.
 ### Using the  
 ComponentSelector
 
-My most frequent uses of the console  
+My most frequent use of the console  
 is to find out the properties on some component in the UI.  
 For this sort of thing, the ComponentSelector class is an  
 invaluable tool. It makes it easy to find the components that  
-you’re interested in, and to inspect its state.
+you’re interested in, and to inspect their state.
 
 For example, we might want to look  
 at the font height of all instances of the Label class on the  
@@ -95,7 +95,7 @@ returns `true` are included. Notice the convenient
 notation for a closure in Groovy: `{ .. }`. And it  
 provides you with the implicit variable "it" which refers to the  
 parameter in a single-parameter method closure.
-  3. `.each{…}` – Allow you to execute  
+  3. `.each{…}` – Allows you to execute  
 code on "each" element in the set. Again, we use the  
 convenient closure notation and implicit "it" object provided by  
 Groovy.
@@ -120,7 +120,7 @@ Debugging in the IDE
 It is worth noting that you could  
 already inspect the runtime state of your app using your IDE  
 debugger. You can pause the app, then evaluate arbitrary Java  
-expressions to see their output. You can Add break-points,  
+expressions to see their output. You can add break-points,  
 and even make source code changes that are applied seamlessly at  
 runtime. The console is not meant to replace this  
 functionality. It is meant to provide a slightly  

@@ -51,7 +51,7 @@ and the long time RFE for the old GUI builder:
 
 ### Using Custom Components
 
-The new GUI Builder allows us to custom components into the GUI. Just pick the custom component from the  
+The new GUI Builder allows us to add custom components into the GUI. Just pick the custom component from the  
 palette and drag it into place.
 
 Once you do that you will need to create a method with the signature:

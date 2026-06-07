@@ -102,6 +102,7 @@ public class MutableResource extends Resources {
         }
     }
 
+    @Override
     public void setImage(String name, Image value) {
         if (value instanceof Timeline) {
             throw new UnsupportedOperationException("Timeline resources are not supported in MutableResource");

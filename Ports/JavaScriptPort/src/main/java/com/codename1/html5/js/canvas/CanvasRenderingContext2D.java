@@ -54,6 +54,8 @@ public interface CanvasRenderingContext2D extends JSObject {
     double getShadowOffsetX();
     void setShadowOffsetY(double offset);
     double getShadowOffsetY();
+    void setFilter(String filter);
+    String getFilter();
     void clearRect(double x, double y, double width, double height);
     void fillRect(double x, double y, double width, double height);
     void strokeRect(double x, double y, double width, double height);

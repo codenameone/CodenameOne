@@ -26,10 +26,15 @@
 #endif
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
+#import <objc/message.h>
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
 #import "CN1TapGestureRecognizer.h"
+#ifdef CN1_USE_METAL
+#import "CN1Metalcompat.h"
+#endif
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_impl_ios_IOSNative.h"
 #include "com_codename1_push_PushContent.h"
 #include "com_codename1_ui_Display.h"
 #ifdef NEW_CODENAME_ONE_VM
@@ -119,10 +124,22 @@ static void installSignalHandlers() {
 - (CodenameOne_GLViewController *)cn1EnsureViewController
 {
     if (self.viewController == nil) {
-#ifdef CN1_USE_ARC
-        self.viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+        // The iOS XIB-based instantiation breaks under Mac Catalyst on
+        // Xcode 26: IBAgent-macOS-UIKit crashes compiling the GL/Metal
+        // view-controller XIBs, so the file is excluded from the Mac
+        // slice via EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]. Pass nil as
+        // the NIB name on Mac so UIViewController synthesises a plain
+        // UIView; the Metal layer is attached programmatically further
+        // down the init chain, so the XIB's IBOutlet wiring isn't needed.
+#if TARGET_OS_MACCATALYST
+        NSString *cn1NibName = nil;
 #else
-        CodenameOne_GLViewController *viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+        NSString *cn1NibName = @"CodenameOne_GLViewController";
+#endif
+#ifdef CN1_USE_ARC
+        self.viewController = [[CodenameOne_GLViewController alloc] initWithNibName:cn1NibName bundle:nil];
+#else
+        CodenameOne_GLViewController *viewController = [[CodenameOne_GLViewController alloc] initWithNibName:cn1NibName bundle:nil];
         self.viewController = viewController;
         [viewController release];
 #endif
@@ -210,13 +227,27 @@ static void installSignalHandlers() {
 
 - (void)cn1ApplicationWillResignActive
 {
+#ifdef CN1_USE_METAL
+    // Back up the pixels of every mutable image into CPU memory while the app
+    // is still active (GPU use is legal here, unlike didEnterBackground). The
+    // private-storage textures backing them can otherwise be discarded during
+    // suspension and sampled as garbage on resume -- the FloatingActionButton
+    // "violet background" artifact (issue #5153). The textures are rebuilt
+    // lazily from the backup the next time each image is painted.
+    CN1MetalBackupMutableImagesForSuspend();
+#endif
     com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)cn1ApplicationDidEnterBackground
 {
  #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
-    [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
+    // Hide the view controller's root view rather than just the EAGL/Metal
+    // surface. Once a peer component is added with paintPeersBehindEnabled,
+    // the controller's view is a newRoot containing both eaglView and the
+    // peerComponentsLayer (BrowserComponent's WKWebView lives in the latter)
+    // -- hiding only eaglView leaves peers visible in the app-switcher snapshot.
+    [CodenameOne_GLViewController instance].view.hidden = YES;
     cn1IsHiddenInBackground = YES;
 #endif
     if(editingComponent != nil) {
@@ -239,7 +270,7 @@ static void installSignalHandlers() {
 - (void)cn1ApplicationWillEnterForeground
 {
     if (cn1IsHiddenInBackground) {
-        [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
+        [CodenameOne_GLViewController instance].view.hidden = NO;
     }
     // Clear before updateCanvas: viewWillTransitionToSize: and
     // didRotateFromInterfaceOrientation: use this to skip propagation during
@@ -322,9 +353,17 @@ static void installSignalHandlers() {
     
     // Override point for customization after application launch.
     
-    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the 
+    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the
     // app will throw an NPE.
     installSignalHandlers();
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Spawn the on-device-debug listener thread. Non-blocking: if
+    // CN1ProxyWaitForAttach=YES the function also installs a translucent
+    // overlay UIWindow so the user sees a "Waiting for debugger..." message
+    // instead of the launch splash while the wait is in progress.
+    extern void cn1_debugger_start(void);
+    cn1_debugger_start();
+#endif
     [self cn1EnsureViewController];
 #ifndef CN1_USE_UI_SCENE
     [self cn1InstallRootViewControllerIntoWindow:self.window];
@@ -341,12 +380,26 @@ static void installSignalHandlers() {
             }
         }
     }
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Defer the VM callback until the on-device-debug proxy reports an IDE
+    // has attached (if CN1ProxyWaitForAttach=YES). Otherwise this fires
+    // synchronously and behaves identically to the non-debug build.
+    extern void cn1_debugger_run_when_ready(void (^onReady)(void));
+    id locationValueDeferred = [launchOptions objectForKey:UIApplicationLaunchOptionsLocationKey];
+    cn1_debugger_run_when_ready(^{
+        com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        if (locationValueDeferred) {
+            com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        }
+    });
+#else
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    
+
     id locationValue = [launchOptions objectForKey:UIApplicationLaunchOptionsLocationKey];
     if (locationValue) {
         com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+#endif
     
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH
     [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
@@ -405,7 +458,20 @@ static void installSignalHandlers() {
 #endif
 
     //afterDidFinishLaunchingWithOptionsMarkerEntry
-    
+
+    // Register BGTaskScheduler processing identifiers declared in the Info.plist
+    // BGTaskSchedulerPermittedIdentifiers array. This must run before this method returns.
+    if (@available(iOS 13.0, *)) {
+        NSArray *permitted = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"BGTaskSchedulerPermittedIdentifiers"];
+        if ([permitted isKindOfClass:[NSArray class]]) {
+            for (id idObj in permitted) {
+                if ([idObj isKindOfClass:[NSString class]]) {
+                    com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (NSString*)idObj));
+                }
+            }
+        }
+    }
+
 #ifdef INCLUDE_FACEBOOK_CONNECT
     return [[FBSDKApplicationDelegate sharedInstance] application:application
                                     didFinishLaunchingWithOptions:launchOptions];
@@ -501,6 +567,16 @@ static void installSignalHandlers() {
      */
     //[self.viewController startAnimation];
     [self cn1ApplicationDidBecomeActive];
+
+    // Deliver any content shared into the app via the share extension. The shared App
+    // Group name is written into the Info.plist by the build (CN1ShareAppGroup).
+    NSString *shareGroup = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1ShareAppGroup"];
+    if ([shareGroup isKindOfClass:[NSString class]] && [shareGroup length] > 0) {
+        JAVA_OBJECT json = com_codename1_impl_ios_IOSNative_getPendingSharedContent___java_lang_String_R_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG shareGroup));
+        if (json != JAVA_NULL) {
+            com_codename1_impl_ios_IOSImplementation_fireSharedContentFromNative___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG json);
+        }
+    }
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application
@@ -738,4 +814,215 @@ extern void repaintUI();
 #endif
 
 //GL_APP_DELEGATE_BODY
+
+#if TARGET_OS_MACCATALYST
+// Mac Catalyst native window-chrome bridge. The current form title and command labels are stored
+// here and applied to the host NSWindow title / the application menu bar. Both are first set very
+// early (before the window scene and menu system exist), so they are re-applied whenever a scene
+// activates. Selecting a menu item dispatches back into Java (IOSImplementation.fireMacMenuCommand)
+// which runs the command on the Codename One EDT.
+static NSArray<NSString *> *cn1MacMenuLabels = nil;
+static NSString *cn1MacPendingTitle = nil;
+static BOOL cn1MacObserverRegistered = NO;
+static BOOL cn1MacUndecorated = NO;
+static BOOL cn1MacUndecoratedSet = NO;
+
+// Applies the "custom" desktop title-bar mode to the host NSWindow: hide the AppKit title bar so the
+// CN1 Toolbar (drawn at the top of the content) becomes the window's title bar, while keeping the
+// window resizable and draggable. Passing the un-decorated flag back to NO restores a titled window.
+// All AppKit access goes through the Obj-C runtime so the Catalyst build needs no AppKit link.
+static void cn1ApplyMacWindowChrome(void) API_AVAILABLE(ios(13.0)) {
+    if (!cn1MacUndecoratedSet) { return; }
+    // NSWindowStyleMaskFullSizeContentView == 1 << 15; NSWindowTitleHidden == 1, NSWindowTitleVisible == 0.
+    const NSUInteger CN1_FULL_SIZE_CONTENT = (1UL << 15);
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { continue; }
+            if ([nsWindow respondsToSelector:@selector(styleMask)] && [nsWindow respondsToSelector:@selector(setStyleMask:)]) {
+                NSUInteger mask = ((NSUInteger (*)(id, SEL))objc_msgSend)(nsWindow, @selector(styleMask));
+                if (cn1MacUndecorated) { mask |= CN1_FULL_SIZE_CONTENT; } else { mask &= ~CN1_FULL_SIZE_CONTENT; }
+                ((void (*)(id, SEL, NSUInteger))objc_msgSend)(nsWindow, @selector(setStyleMask:), mask);
+            }
+            if ([nsWindow respondsToSelector:@selector(setTitlebarAppearsTransparent:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setTitlebarAppearsTransparent:), cn1MacUndecorated ? YES : NO);
+            }
+            if ([nsWindow respondsToSelector:@selector(setTitleVisibility:)]) {
+                ((void (*)(id, SEL, NSInteger))objc_msgSend)(nsWindow, @selector(setTitleVisibility:), cn1MacUndecorated ? (NSInteger)1 : (NSInteger)0);
+            }
+            if ([nsWindow respondsToSelector:@selector(setMovableByWindowBackground:)]) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(nsWindow, @selector(setMovableByWindowBackground:), cn1MacUndecorated ? YES : NO);
+            }
+        }
+    }
+}
+
+static void cn1ApplyMacWindowTitle(void) API_AVAILABLE(ios(13.0)) {
+    if (cn1MacPendingTitle == nil) { return; }
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        // UIWindowScene.title alone does not always replace the AppKit window title (which Catalyst
+        // seeds from the bundle name); reach the host NSWindow and set its title directly too.
+        ws.title = cn1MacPendingTitle;
+        for (UIWindow *w in ws.windows) {
+            id nsWindow = nil;
+            @try { nsWindow = [w valueForKey:@"_nsWindow"]; } @catch (id e) { nsWindow = nil; }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"nsWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow == nil) { @try { nsWindow = [w valueForKey:@"hostNSWindow"]; } @catch (id e) { nsWindow = nil; } }
+            if (nsWindow != nil && [nsWindow respondsToSelector:@selector(setTitle:)]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(nsWindow, @selector(setTitle:), cn1MacPendingTitle);
+            }
+        }
+    }
+}
+
+static void cn1RegisterMacObserver(void) API_AVAILABLE(ios(13.0)) {
+    if (cn1MacObserverRegistered) { return; }
+    cn1MacObserverRegistered = YES;
+    [[NSNotificationCenter defaultCenter] addObserverForName:UISceneDidActivateNotification
+                                                      object:nil
+                                                       queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification *note) {
+        cn1ApplyMacWindowTitle();
+        cn1ApplyMacWindowChrome();
+        [[UIMenuSystem mainSystem] setNeedsRebuild];
+    }];
+}
+
+void CN1SetMacWindowTitle(NSString *title) {
+    if (@available(iOS 13.0, *)) {
+        cn1MacPendingTitle = [title copy];
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowTitle(); });
+    }
+}
+
+void CN1SetMacWindowUndecorated(BOOL undecorated) {
+    if (@available(iOS 13.0, *)) {
+        cn1MacUndecorated = undecorated;
+        cn1MacUndecoratedSet = YES;
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ cn1ApplyMacWindowChrome(); });
+    }
+}
+
+void CN1SetMacMenuLabels(NSArray *labels) {
+    cn1MacMenuLabels = labels;
+    if (@available(iOS 13.0, *)) {
+        cn1RegisterMacObserver();
+        dispatch_async(dispatch_get_main_queue(), ^{ [[UIMenuSystem mainSystem] setNeedsRebuild]; });
+    }
+}
+
+// Maps a Codename One desktop-menu hint (case-insensitive) to a standard UIKit menu identifier.
+// Returns nil for an empty/custom hint (the caller then makes a top-level menu titled by the hint
+// or a default "Commands" menu). placeAtStart is set for the application-menu slots.
+static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) API_AVAILABLE(ios(13.0)) {
+    *placeAtStart = NO;
+    NSString *h = [hint lowercaseString];
+    if ([h isEqualToString:@"app"] || [h isEqualToString:@"about"]
+            || [h isEqualToString:@"preferences"] || [h isEqualToString:@"quit"]) {
+        *placeAtStart = YES;
+        return UIMenuApplication;
+    }
+    if ([h isEqualToString:@"file"]) { return UIMenuFile; }
+    if ([h isEqualToString:@"edit"]) { return UIMenuEdit; }
+    if ([h isEqualToString:@"view"]) { return UIMenuView; }
+    if ([h isEqualToString:@"window"]) { return UIMenuWindow; }
+    if ([h isEqualToString:@"help"]) { return UIMenuHelp; }
+    return nil;
+}
+
+- (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder API_AVAILABLE(ios(13.0)) {
+    [super buildMenuWithBuilder:builder];
+    if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
+        return;
+    }
+    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>" rows by hint, preserving
+    // first-seen order. The row index is the command index passed back to Java, so it must match
+    // IOSImplementation's filtered list.
+    NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
+    NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
+    for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
+        NSString *row = cn1MacMenuLabels[i];
+        NSArray<NSString *> *cols = [row componentsSeparatedByString:@"\t"];
+        NSString *hint = (cols.count > 0) ? cols[0] : @"";
+        NSString *label = (cols.count > 1) ? cols[1] : row;
+        int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
+        int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
+        UICommand *cmd;
+        if (shortcutKeyChar != 0) {
+            // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
+            UIKeyModifierFlags flags = 0;
+            if (shortcutModifiers & 1) { flags |= UIKeyModifierCommand; }
+            if (shortcutModifiers & 2) { flags |= UIKeyModifierShift; }
+            if (shortcutModifiers & 4) { flags |= UIKeyModifierAlternate; }
+            NSString *input = [[NSString stringWithFormat:@"%c", (char)shortcutKeyChar] lowercaseString];
+            cmd = [UIKeyCommand commandWithTitle:label
+                                           image:nil
+                                          action:@selector(cn1MenuAction:)
+                                           input:input
+                                   modifierFlags:flags
+                                    propertyList:@(i)];
+        } else {
+            cmd = [UICommand commandWithTitle:label
+                                        image:nil
+                                       action:@selector(cn1MenuAction:)
+                                 propertyList:@(i)];
+        }
+        NSMutableArray<UICommand *> *bucket = groups[hint];
+        if (bucket == nil) {
+            bucket = [NSMutableArray array];
+            groups[hint] = bucket;
+            [groupOrder addObject:hint];
+        }
+        [bucket addObject:cmd];
+    }
+    NSUInteger customMenuCounter = 0;
+    for (NSString *hint in groupOrder) {
+        NSArray<UICommand *> *bucket = groups[hint];
+        BOOL placeAtStart = NO;
+        NSString *targetIdentifier = cn1MenuIdentifierForHint(hint, &placeAtStart);
+        if (targetIdentifier != nil) {
+            // insert the commands as an inline (anonymous) group into the standard menu
+            UIMenu *inlineMenu = [UIMenu menuWithTitle:@""
+                                                 image:nil
+                                            identifier:nil
+                                               options:UIMenuOptionsDisplayInline
+                                              children:bucket];
+            if (placeAtStart) {
+                [builder insertChildMenu:inlineMenu atStartOfMenuForIdentifier:targetIdentifier];
+            } else {
+                [builder insertChildMenu:inlineMenu atEndOfMenuForIdentifier:targetIdentifier];
+            }
+        } else {
+            // empty hint -> default "Commands" menu; custom hint -> a top-level menu by that title
+            NSString *title = (hint.length == 0) ? @"Commands" : hint;
+            NSString *identifier = [NSString stringWithFormat:@"com.codename1.menu.%lu", (unsigned long)customMenuCounter++];
+            UIMenu *menu = [UIMenu menuWithTitle:title
+                                           image:nil
+                                      identifier:identifier
+                                         options:0
+                                        children:bucket];
+            [builder insertSiblingMenu:menu afterMenuForIdentifier:UIMenuView];
+        }
+    }
+}
+
+- (void)cn1MenuAction:(UICommand *)sender API_AVAILABLE(ios(13.0)) {
+    NSNumber *idx = (NSNumber *)sender.propertyList;
+    if (idx == nil) {
+        return;
+    }
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_fireMacMenuCommand___int(threadStateData, (JAVA_INT)[idx intValue]);
+}
+#endif
+
 @end

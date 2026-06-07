@@ -23,7 +23,7 @@ You can also customize the appearance of the search bar by using the UIID’s: `
 `TextHintSearch`.
 
 In the sample below we fetch all the contacts from the device and enable search thru them, notice it expects  
-and image called `duke.png` which is really just the default Codename One icon renamed and placed in the src  
+an image called `duke.png` which is really just the default Codename One icon renamed and placed in the src  
 folder:
     
     

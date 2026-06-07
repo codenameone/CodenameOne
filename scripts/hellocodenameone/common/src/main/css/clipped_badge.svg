@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Exercises <clipPath> + rounded-rect clip -->
+  <defs>
+    <clipPath id="rounded">
+      <rect x="10" y="10" width="80" height="80" rx="20" ry="20"/>
+    </clipPath>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF5722"/>
+      <stop offset="1" stop-color="#FFC107"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="100" height="100" fill="url(#bgGrad)" clip-path="url(#rounded)"/>
+  <text x="50" y="58" font-size="22" font-weight="bold"
+        text-anchor="middle" fill="white" clip-path="url(#rounded)">PRO</text>
+</svg>

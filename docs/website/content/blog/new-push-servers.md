@@ -14,7 +14,7 @@ author: Shai Almog
 We are starting the complete overhaul of our push implementation that will allow us to deliver improved push  
 related fixes/features and provide more reliability to the push service. When we designed our push offering  
 initially it was focused around the limitations of Google App Engine which we are finally phasing out. The new  
-servers are no longer constrained by this can scale far more easily and efficiently for all requirements. 
+servers are no longer constrained by this and can scale far more easily and efficiently for all requirements. 
 
 However, as part of this we decided to separate the push functionality into two very different capabilities:  
 push & device registration.  
@@ -40,7 +40,7 @@ The response to that will be something like this:
     
     {"key":"cn1-ios-nativedevicecode"}
 
-The response to that will be something or this: 
+The response to that will be something like this: 
     
     
     {"error":"Unsupported device type"}

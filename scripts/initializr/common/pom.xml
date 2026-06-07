@@ -22,6 +22,12 @@
             <artifactId>codenameone-javase</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
           <artifactId>initializr-ZipSupport</artifactId>
@@ -356,6 +362,19 @@
 
                 <executions>
                     <execution>
+                        <!-- Build-time SVG transcoder: any SVG dropped into
+                             src/main/css/ or src/main/svg/ is compiled into
+                             a GeneratedSVGImage subclass plus an SVGRegistry,
+                             so theme.css `url(*.svg)` references resolve at
+                             runtime to vector-rendered Image objects on every
+                             port. See docs/developer-guide/svg.md. -->
+                        <id>transcode-svg</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transcode-svg</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>
@@ -366,8 +385,14 @@
                         <id>cn1-process-classes</id>
                         <phase>process-classes</phase>
                         <goals>
-                            <goal>compliance-check</goal>
+                            <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <!-- Scans the project's compiled bytecode for
+                                 @Route declarations and generates the
+                                 dispatcher class consumed by the per-platform
+                                 application stub. No-op for projects with no
+                                 @Route. -->
+                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>
@@ -384,6 +409,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <!--
+                  Surefire is intentionally skipped in the common module.
+                  Legacy AbstractTest classes run through `cn1:test` (wired
+                  in the javase module's "test" profile). New JUnit 5
+                  tests under src/test/java run from the javase module as
+                  well, which mounts these same sources via
+                  testSourceDirectory. Enabling Surefire here too would
+                  execute every JUnit test twice.
+                  -->
                 <configuration>
                     <skipTests>true</skipTests>
                 </configuration>

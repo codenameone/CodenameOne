@@ -43,7 +43,7 @@ This can be a problem, while most translators are familiar with Java properties 
   
   
   
-The CSV is also very convenient since it can be opened by any spreadsheet and edited freely. We went to great pains to make it excel compatible although there are some bug in Excel for Mac OS X.  
+The CSV is also very convenient since it can be opened by any spreadsheet and edited freely. We went to great pains to make it excel compatible although there are some bugs in Excel for Mac OS X.  
   
 Importing for both formats and exporting Android XML’s will be available in the next plugin update.
 

@@ -60,7 +60,7 @@ This pull request adds a mode to the `JSONParser` where null attributes will sti
 
 Now why would you need that?
 
-Lets say you display the set of attributes for a user to edit:
+Let’s say you display the set of attributes for a user to edit:
     
     
     Given Name: Shai

@@ -58,7 +58,7 @@ doOperationB();
   
 doOperationC();
 
-Unfortunately, this means that operation C will happen in parallel to operation C which might be a problem… E.g. instead of using operation names lets use a more "real world" example:  
+Unfortunately, this means that operation C will happen in parallel to operation B which might be a problem… E.g. instead of using operation names lets use a more "real world" example:  
   
 updateUIToLoadingStatus();  
   
@@ -130,11 +130,11 @@ However, it does make some sense and we can explain that using an example. E.g. 
   
 2\. A framework the user installed added some logging to the button.  
   
-3\. The button repaints a release animation as its being released.
+3\. The button repaints a release animation as it’s being released.
 
 However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the following events. E.g. a dialog will block the EDT (using invokeAndBlock), events will keep happening but since the event we are in "already happened" the button repaint and the framework logging won’t occur. This might also happen if we show a form which might trigger logic that relies on the current form still being present.
 
-One of the solutions to this problem is to just wrap the action listeners body with a callSerially. In this case the callSerially will postpone the event to the next cycle (loop) of the EDT and let the other events in the chain complete. Notice that you shouldn’t use this normally since it includes an overhead and complicates application flow, however when you run into issues in event processing I suggest trying this to see if its the cause.  
+One of the solutions to this problem is to just wrap the action listeners body with a callSerially. In this case the callSerially will postpone the event to the next cycle (loop) of the EDT and let the other events in the chain complete. Notice that you shouldn’t use this normally since it includes an overhead and complicates application flow, however when you run into issues in event processing I suggest trying this to see if it’s the cause.  
   
 
   

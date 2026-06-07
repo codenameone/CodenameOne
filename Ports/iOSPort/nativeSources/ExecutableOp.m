@@ -28,6 +28,14 @@
 
 
 extern void logGlErrorAt(const char *f, int l) {
+#ifdef CN1_USE_METAL
+    // No GL context on the Metal backend (and no GL symbols at all on
+    // the Mac Catalyst slice). Callers still expand GLErrorLog macros
+    // unconditionally; honour them with a no-op so the rendering ops
+    // don't need to be touched for this single log helper.
+    (void)f;
+    (void)l;
+#else
     GLenum err = glGetError();
     if(err != GL_NO_ERROR) {
         switch(err) {
@@ -45,6 +53,7 @@ extern void logGlErrorAt(const char *f, int l) {
                 break;
         }
     }
+#endif
 }
 
 @implementation ExecutableOp

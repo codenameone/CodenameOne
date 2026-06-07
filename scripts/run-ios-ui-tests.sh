@@ -68,8 +68,8 @@ cd "$REPO_ROOT"
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
-  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" ]; then
+  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/Cn1ssScreenshotServer.java" >&2
   exit 3
 fi
 cn1ss_log() { ri_log "$1"; }
@@ -186,6 +186,19 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
+
+# Start the host-side WebSocket screenshot server on the fixed standard port.
+# The iOS simulator shares the host loopback, so the device-runner defaults to
+# ws://127.0.0.1:8765 with no per-launch URL injection. PNGs the app sends land
+# directly in $WS_RAW_DIR; if WS delivers nothing the legacy base64/syslog
+# decode below is used instead, so this is purely additive.
+WS_RAW_DIR="$SCREENSHOT_TMP_DIR/ws"
+mkdir -p "$WS_RAW_DIR"
+if cn1ss_start_ws_server "$WS_RAW_DIR"; then
+  ri_log "WebSocket screenshot server listening on port ${CN1SS_WS_PORT} (out=$WS_RAW_DIR)"
+else
+  ri_log "WebSocket screenshot server did not start; relying on base64 fallback"
+fi
 
 # Patch scheme env vars to point to our runtime dirs
 SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
@@ -625,6 +638,24 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"
 
+  # Thread Metal validation env vars (if set in the caller's environment)
+  # through to the launched app. simctl on Xcode 26 does NOT take a
+  # --setenv flag (`xcrun simctl help launch` confirms); the documented
+  # mechanism is exporting SIMCTL_CHILD_<NAME>=<value> in the shell that
+  # invokes simctl, which the launch helper unwraps into <NAME>=<value>
+  # for the child. CI's Metal job sets MTL_DEBUG_LAYER /
+  # MTL_DEBUG_LAYER_ERROR_MODE at the step level so iOS render-pass /
+  # pipeline-state mismatches (issue #5103) abort the app immediately
+  # instead of producing undefined behaviour off-CI.
+  if [ -n "${MTL_DEBUG_LAYER:-}" ]; then
+    export SIMCTL_CHILD_MTL_DEBUG_LAYER="${MTL_DEBUG_LAYER}"
+    ri_log "Forwarding MTL_DEBUG_LAYER=${MTL_DEBUG_LAYER} to simulator app (via SIMCTL_CHILD_)"
+  fi
+  if [ -n "${MTL_DEBUG_LAYER_ERROR_MODE:-}" ]; then
+    export SIMCTL_CHILD_MTL_DEBUG_LAYER_ERROR_MODE="${MTL_DEBUG_LAYER_ERROR_MODE}"
+    ri_log "Forwarding MTL_DEBUG_LAYER_ERROR_MODE=${MTL_DEBUG_LAYER_ERROR_MODE} to simulator app (via SIMCTL_CHILD_)"
+  fi
+
   launch_simulator_app() {
     local target="$1"
     local attempt=1
@@ -756,104 +787,36 @@ if [ -n "$SIM_DEVICE_ID" ]; then
   xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 fi
 
-declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
+# The app has exited; stop the WS server and adopt whatever it received. One
+# <test>.png per delivered screenshot is in $WS_RAW_DIR. When WS delivered at
+# least one image we use that set directly and skip the legacy syslog/base64
+# decode entirely.
+cn1ss_stop_ws_server
+declare -a COMPARE_ENTRIES=()
+WS_DELIVERED=0
+if [ -d "${WS_RAW_DIR:-}" ]; then
+  for ws_png in "$WS_RAW_DIR"/*.png; do
+    [ -s "$ws_png" ] || continue
+    ws_test="$(basename "$ws_png" .png)"
+    ws_dest="$SCREENSHOT_TMP_DIR/${ws_test}.png"
+    cp -f "$ws_png" "$ws_dest" 2>/dev/null || continue
+    COMPARE_ENTRIES+=("${ws_test}=${ws_dest}")
+    WS_DELIVERED=$(( WS_DELIVERED + 1 ))
+  done
+fi
+if [ "$WS_DELIVERED" -gt 0 ]; then
+  ri_log "WebSocket transport delivered ${WS_DELIVERED} screenshot(s); using WS path (legacy decode skipped)"
+fi
 
-LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
-ri_log "Chunk counts -> simulator log: ${LOG_CHUNKS}"
-
-if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
-  ri_log "---- CN1SS lines (if any) ----"
-  (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
+# WebSocket is the only transport now. If it delivered nothing the on-device
+# suite either never ran or produced no screenshots -- fail loudly; there is
+# no syslog/base64/file fallback any more.
+if [ "$WS_DELIVERED" -eq 0 ]; then
+  ri_log "STAGE:MARKERS_NOT_FOUND -> no screenshots delivered over WebSocket"
+  ri_log "---- CN1SS lines from log ----"
+  (grep "CN1SS:" "$TEST_LOG" 2>/dev/null || true) | sed 's/^/[CN1SS] /'
   exit 12
 fi
-
-TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
-declare -a TEST_NAMES=()
-if [ -n "$TEST_NAMES_RAW" ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAMES+=("$name")
-  done <<< "$TEST_NAMES_RAW"
-else
-  TEST_NAMES+=("default")
-fi
-ri_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
-
-PAIR_SEP=$'\037'
-declare -a TEST_OUTPUT_ENTRIES=()
-
-ensure_dir "$SCREENSHOT_PREVIEW_DIR"
-
-for test in "${TEST_NAMES[@]}"; do
-  dest="$SCREENSHOT_TMP_DIR/${test}.png"
-  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
-    TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-    ri_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
-    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
-      ri_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-    else
-      rm -f "$preview_dest" 2>/dev/null || true
-    fi
-  else
-    ri_log "Primary decode failed for '$test'; trying fallback log"
-    if [ -s "$FALLBACK_LOG" ] && source_label="$(cn1ss_decode_test_png "$test" "$dest" "SIMLOG:$FALLBACK_LOG")"; then
-      # Without these two lines, tests that needed the fallback log were
-      # decoded but not added to TEST_OUTPUT_ENTRIES, so the comparator
-      # silently skipped them -- iOS Metal compared 84 screenshots vs the
-      # 89 it had streams for, with 5 large transition tests
-      # (SlideHorizontal*, SlideVertical, SlideFadeTitle, CoverHorizontal)
-      # missing from the report because their ~288-chunk streams hit
-      # logcat-style line drops in device-runner.log but survived in the
-      # syslog fallback.
-      TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
-      preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-      if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "SIMLOG:$FALLBACK_LOG")"; then
-        ri_log "Decoded preview for '$test' from fallback (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
-      else
-        rm -f "$preview_dest" 2>/dev/null || true
-      fi
-      ri_log "Decoded screenshot for '$test' from fallback (size: $(cn1ss_file_size "$dest") bytes)"
-    else
-      ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
-      RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-      {
-        for entry in "${CN1SS_SOURCES[@]}" "SIMLOG:$FALLBACK_LOG"; do
-          path="${entry#*:}"
-          [ -s "$path" ] || continue
-          count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-          if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
-        done
-      } > "$RAW_B64_OUT" 2>/dev/null || true
-      if [ -s "$RAW_B64_OUT" ]; then
-        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-        ri_log "Partial base64 saved at: $RAW_B64_OUT"
-      fi
-      exit 12
-    fi
-  fi
-done
-
-lookup_test_output() {
-  local key="$1" entry prefix
-  for entry in "${TEST_OUTPUT_ENTRIES[@]}"; do
-    prefix="${entry%%$PAIR_SEP*}"
-    if [ "$prefix" = "$key" ]; then
-      echo "${entry#*$PAIR_SEP}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-COMPARE_ENTRIES=()
-for test in "${TEST_NAMES[@]}"; do
-  if dest="$(lookup_test_output "$test")"; then
-    [ -n "$dest" ] || continue
-    COMPARE_ENTRIES+=("${test}=${dest}")
-  fi
-done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
@@ -897,29 +860,19 @@ if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   exit 16
 fi
 
-# Guard: the suite must produce at least this many screenshots. A bug in
-# the rendering pipeline (e.g. a hang during one test) used to surface as
-# "Compared 1 screenshot" -- the suite would silently exit early after
-# SIGTERM and we'd accept the run as green. The threshold is intentionally
-# below the current suite size (~37 graphics tests) to allow legitimate
-# additions/removals; raise it deliberately when adding tests.
-MIN_SCREENSHOTS="${CN1SS_MIN_SCREENSHOTS:-30}"
-if [ -s "$COMPARE_JSON" ]; then
-  ACTUAL_COUNT="$(python3 -c "import json,sys
-try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    print(len(d.get('results', [])))
-except Exception as e:
-    print(0)" "$COMPARE_JSON" 2>/dev/null || echo 0)"
-else
-  ACTUAL_COUNT=0
+# Screenshot mismatch / count-regression guards are centralised in
+# cn1ss_process_and_report (scripts/lib/cn1ss.sh), which returns these
+# codes only when CN1SS_FAIL_ON_MISMATCH=1:
+#   15 - a screenshot differs from / errored against its stored baseline
+#   17 - fewer screenshots were produced than there are stored references
+#        (a test failed to emit; the suite most likely hung or crashed
+#        partway, dropping every screenshot after the failure - the exact
+#        symptom behind the Metal suite silently reporting 107/122).
+# The count floor is the size of $SCREENSHOT_REF_DIR, optionally raised via
+# CN1SS_MIN_SCREENSHOTS. comment_rc already carries those codes, so simply
+# surface it (after the benchmark guard above) as this script's exit status.
+if [ "${comment_rc:-0}" -eq 15 ] || [ "${comment_rc:-0}" -eq 17 ]; then
+  ri_log "STAGE:SCREENSHOT_REGRESSION -> failing with exit ${comment_rc} (see cn1ss FATAL message above)."
 fi
-if [ "$ACTUAL_COUNT" -lt "$MIN_SCREENSHOTS" ]; then
-  ri_log "STAGE:SCREENSHOT_COUNT_REGRESSION -> got $ACTUAL_COUNT, expected >= $MIN_SCREENSHOTS"
-  ri_log "Suite likely hung or crashed early; check device-runner.log for SIGTERM and the last CN1SS:METAL_DIAG / CN1SS:INFO:suite entries."
-  exit 17
-fi
-ri_log "Screenshot count check passed: $ACTUAL_COUNT >= $MIN_SCREENSHOTS"
 
 exit $comment_rc

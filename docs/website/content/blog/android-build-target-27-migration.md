@@ -54,7 +54,7 @@ This will implicitly set a lot of other values including the target level and it
 
 #### Other Benefits.
 
-By flipping this switch the build should now work on Android Studio 3.x out of the box without the changes listed in [this tip](/blog/tip-include-source-android-studio-3.html). We also plan to enable other things in the resulting project such as using Googles builtin Java 8 support instead of ours (this isn’t enabled yet).
+By flipping this switch the build should now work on Android Studio 3.x out of the box without the changes listed in [this tip](/blog/tip-include-source-android-studio-3.html). We also plan to enable other things in the resulting project such as using Google’s builtin Java 8 support instead of ours (this isn’t enabled yet).
 
 This will mean that native Android code would be able to use Java 8 features. Notice that this currently applies to the native interfaces only and not to the code in the Codename One implementation.
 

@@ -14,12 +14,12 @@ author: Chen Fishbein
 When StartApp first launched a few years ago, they were a unique innovative new monetization channel to make money on Android.  
 The Android developer bundled their SDK and once the app was installed a new search shortcut would appear on the user’s device,   
 this allowed them to monetize on the search functionality.  
-We had a smart integration with StartApp, were the developer checked a CheckBox on the plugin and the SDK got bundled on the cloud build. 
+We had a smart integration with StartApp, where the developer checked a CheckBox on the plugin and the SDK got bundled on the cloud build. 
 
 This unique new monetization channel was a hit.  
 [StartApp on VentureBeat 2 years ago](http://venturebeat.com/2013/03/12/startapps-growth-explodes-500-million-downloads-more-searches-on-android-than-anyone-but-google/)  
 But it was a matter of time until Google will prohibit this from their platform, taking money from Google on Android with a different Search engine utility…  
-Well, Google did changed their terms eventually and started banning apps from their play store with this integration. 
+Well, Google did change their terms eventually and started banning apps from their play store with this integration. 
 
 Nowadays, StartApp has managed to recover and become a strong new innovative Ads network for iOS and Android.  
 We are now introducing a new cn1lib to allow you to monetize your apps using their channel. 

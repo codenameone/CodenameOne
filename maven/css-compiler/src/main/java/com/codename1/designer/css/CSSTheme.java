@@ -2904,6 +2904,35 @@ public class CSSTheme {
     public Image getBorderImage(Map<String,LexicalUnit> styles) {
         return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
     }
+
+    /// 1x1 transparent PNG (43 bytes) -- used to satisfy the EditableResources
+    /// image slot when a CSS rule references an SVG by URL. The runtime
+    /// {@code com.codename1.generated.svg.SVGRegistry} (emitted by the SVG
+    /// transcoder mojo when the project contains any SVGs) replaces the
+    /// placeholder with the transcoded image when its {@code installGlobal()}
+    /// runs at startup.
+    private static final byte[] SVG_PLACEHOLDER_PNG = new byte[] {
+            (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, (byte)0xC4,
+            (byte)0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
+            0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, (byte)0xB4, 0x00,
+            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, (byte)0xAE,
+            0x42, 0x60, (byte)0x82
+    };
+
+    private Image registerSVGPlaceholder(String imageIdStr) {
+        Image existing = res.getImage(imageIdStr);
+        if (existing != null) {
+            return existing;
+        }
+        com.codename1.ui.EncodedImage placeholder =
+                com.codename1.ui.EncodedImage.create(SVG_PLACEHOLDER_PNG);
+        res.setImage(imageIdStr, placeholder);
+        return placeholder;
+    }
     
     
     
@@ -2918,11 +2947,27 @@ public class CSSTheme {
             if (fileName.indexOf("/") != -1) {
                 fileName = fileName.substring(fileName.lastIndexOf("/")+1);
             }
-            
+
+            // SVG references handled by the build-time transcoder land here too.
+            // We don't rasterize them at CSS compile time: the SVG XML can't go
+            // through ImageIO and the actual image instance is a Java class
+            // emitted by codenameone-svg-transcoder. Drop a 1x1 transparent
+            // EncodedImage placeholder into the resource under the SVG filename
+            // so the theme references it by name; the runtime
+            // com.codename1.generated.svg.SVGRegistry (when present) then
+            // overrides the entry with the transcoded image during init().
+            if (fileName.toLowerCase().endsWith(".svg")) {
+                Image placeholder = registerSVGPlaceholder(fileName);
+                if (placeholder != null) {
+                    loadedImages.put(url, placeholder);
+                    return placeholder;
+                }
+            }
+
             if (loadedImages.containsKey(url)) {
                 return loadedImages.get(url);
             }
-            
+
             LexicalUnit imageId = styles.get("cn1-image-id");
             String imageIdStr = fileName;
             
@@ -6173,6 +6218,23 @@ public class CSSTheme {
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
                 return createRoundBorder(styles);
             }
+            // Prefer RoundRectBorder for the simple border-radius case
+            // (no border-image, no compound per-side borders). The JS
+            // port's CSSBorder.paintBorderBackground calls
+            // g.fillShape(p) directly against the main canvas, which
+            // doesn't actually render on the cooperative-scheduler
+            // worker-side bridge (visible symptom: Dialog / TextField /
+            // ChatBubble UIIDs show no rounded background, only their
+            // children render). RoundRectBorder.paintBorderBackground
+            // routes through createTargetImage + drawImage on the same
+            // path that already works for cn1-pill-border (Button), so
+            // switching dispatch fixes Dialog without changing iOS /
+            // Android pixels (RoundRectBorder produces a visually-
+            // equivalent rounded rect there).
+            if (b.canBeAchievedWithRoundRectBorder(styles) && b.hasBorderRadius()
+                    && !b.hasBorderImage() && !b.hasUnequalBorders()) {
+                return createRoundRectBorder(styles);
+            }
             if (b.canBeAchievedWithCSSBorder(styles) && (b.hasBorderImage() || b.hasUnequalBorders() || b.hasBorderRadius()) ) {
                 return createCSSBorder(styles);
             }
@@ -6398,6 +6460,16 @@ public class CSSTheme {
         
             case "cn1-source-dpi" : {
                 style.put("cn1-source-dpi", value);
+                break;
+            }
+
+            // cn1-svg-* attributes are consumed by the build-time SVG
+            // transcoder mojo (see TranscodeSVGMojo), not the CSS compiler.
+            // Acknowledge them here so the parser doesn't log
+            // "Unsupported CSS property" warnings -- the values themselves
+            // are irrelevant to the compiled theme.res.
+            case "cn1-svg-width" :
+            case "cn1-svg-height" : {
                 break;
             }
             

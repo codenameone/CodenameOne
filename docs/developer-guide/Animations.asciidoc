@@ -19,7 +19,7 @@ For example, imagine adding 100 components to a form. If the form was laid out a
 
 NOTE: Smart layout reflow logic can alleviate some pains of the automatic layout reflows but since the process is implicit it's almost impossible to optimize complex usages across browsers/devices. A major JavaScript performance tip is to use absolute positioning which is akin to not using layouts at all!
 
-that's why, when you add components to a form that's already showing, you should invoke `revalidate()` or animate the layout appropriately. This also enables the layout animation behavior explained below.
+That's why, when you add components to a form that's already showing, you should invoke `revalidate()` or animate the layout appropriately. This also enables the layout animation behavior explained below.
 
 [[layout-animations]]
 === Layout animations
@@ -31,7 +31,7 @@ If you add components to a form that's showing, it's your responsibility to invo
 
 `animateLayout()` method is a fancy form of revalidate that animates the components into their laid out position. After changing the layout & invoking this method the components move to their new sizes/positions seamlessly. `Form` exposes convenience wrappers such as `animateLayout*()` that forward to the underlying content pane, so you can call the methods directly on the form unless you specifically need to animate a nested container.
 
-This sort of behavior creates a special case where setting the size/position makes sense. When you set the size/position in the demo code here you're positioning the components at the animation start position above the frame.
+This sort of behavior creates a special case where setting the size/position makes sense. When you set the size/position in the demo code here you're positioning the components at the animation start position above the frame:
 
 [source,java]
 ----
@@ -114,7 +114,7 @@ The `AndWait` variant blocks the calling thread until the animation completes. T
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationSynchronicityDemo.java[tag=animationSequence,indent=0]
 ----
 
-First the UI goes thru an "unlayout" animation, once that completes the layout itself is performed.
+First the UI goes through an "unlayout" animation, once that completes the layout itself is performed.
 
 // HTML_ONLY_START
 IMPORTANT: The `AndWait` calls needs to be invoked on the Event Dispatch Thread despite being "blocking." This is a common convention in Codename One powered by a unique capability of Codename One: `invokeAndBlock`. +
@@ -137,11 +137,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 ===== Animation fade and hierarchy
 
-several more variations on the standard animate methods. Several methods accept a numeric `fade` argument. This is useful to fade out an element in an "unlayout" operation or fade in a regular animation.
+There are several more variations on the standard animate methods. Several methods accept a numeric `fade` argument. This is useful to fade out an element in an "unlayout" operation or fade in a regular animation.
 
 The value for the fade argument is a number between 0 and 255 where 0 represents full transparency and 255 represents full opacity.
 
-Some animate layout methods are hierarchy based. They work like the regular `animateLayout` methods but recurse into the entire https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] hierarchy. These methods work well when you've components in a nested hierarchy that need to animate into place. This is demonstrated in the opening sequence of the kitchen sink demo:
+Some animate layout methods are hierarchy based. They work like the regular `animateLayout` methods but recurse into the entire https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] hierarchy. These methods work well when you have components in a nested hierarchy that need to animate into place. This is demonstrated in the opening sequence of the kitchen sink demo:
 
 [source,java]
 ----
@@ -154,7 +154,7 @@ WARNING: Avoid the hierarchy version where possible. Its slower but more importa
 
 ==== Sequencing animations via AnimationManager
 
-All the animations go thru a per-form queue: the https://www.codenameone.com/javadoc/com/codename1/ui/AnimationManager.html[AnimationManager].
+All the animations go through a per-form queue: the https://www.codenameone.com/javadoc/com/codename1/ui/AnimationManager.html[AnimationManager].
 This effectively prevents two animations from mutating the UI in parallel so you won't have collisions between two conflicting sides. Things get more interesting when you try to do something like this:
 
 [source,java]
@@ -171,7 +171,7 @@ The simple *yet problematic* fix would be:
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerWait,indent=0]
 ----
 
-why that might still fail?
+Why might that still fail?
 
 Events come in constantly during the run of the EDT footnote:[Event Dispatch Thread], so an event might come in that might trigger an animation in your code. Even if you're on the EDT keep in mind that you don't actually block it and an event might come in.
 
@@ -198,7 +198,7 @@ Every component in Codename One contains an `animate()` method that returns a bo
 
 If the `animate` method returns true then the animation will be painted (the `paint` method of the `Animation` interface would be invoked).
 
-TIP: it's important to deregister animations when they aren’t needed to conserve battery life.
+TIP: It's important to deregister animations when they aren’t needed to conserve battery life.
 
 If you derive from a component, which has its own animation logic you might damage its animation behavior by deregistering it, so use care with the low-level API’s.
 
@@ -216,7 +216,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 ==== Why not just write code in paint
 
-Animations are comprised of two parts, the logic (deciding the position etc) and the painting. The paint method should be dedicated to painting, not to the actual moving of the components.
+Animations comprise two parts, the logic (deciding the position, etc.) and the painting. The paint method should be dedicated to painting, not to the actual moving of the components.
 
 The separation of concerns allows you to avoid redundant painting for example, if animate didn't trigger a change return `false` to avoid the overhead related to animations.
 
@@ -241,23 +241,23 @@ https://www.codenameone.com/javadoc/com/codename1/ui/plaf/LookAndFeel.html[LookA
 ****
 When defining a transition you define the entering transition and the exiting transition. For most cases only one of those is necessary and you default to the exiting (out transition) as a convention.
 
-for most cases the method `setFormTransitonIn` should go unused. That API exists for some elaborate custom transitions that might need to have a special effect both when transitioning in and out of a specific form. But, most of these effects are easier to achieve with layout animations (for example, components dropping into place etc.).
+For most cases the method `setFormTransitonIn` should go unused. That API exists for some elaborate custom transitions that might need to have a special effect both when transitioning in and out of a specific form. But, most of these effects are easier to achieve with layout animations (for example, components dropping into place etc.).
 
-For `Dialog` the transition in shows its appearance and the transition out shows its disposal. in that case both transitions make a lot of sense.
+For `Dialog` the transition in shows its appearance and the transition out shows its disposal. In that case both transitions make a lot of sense.
 ****
 
 .Back/Forward Transitions
 ****
 Transitions have a direction and can all be played either in incoming or outgoing direction. A transition can be flipped (played in reverse) when use an RTL language footnote:[Right to left/bidi language such as Hebrew or Arabic] or when you traverse backwards in the form navigation hierarchy.
 
-Normally `Form.show()` displays the next `Form` with an incoming transition based on the current RTL mode. If use `Form.showBack()` it will play the transition in reverse.
+Normally `Form.show()` displays the next `Form` with an incoming transition based on the current RTL mode. If you use `Form.showBack()` it will play the transition in reverse.
 ****
 
 TIP: When working with high-level animations you can select #Slow Motion# option in the simulator to slow down animations and inspect their details
 
 Themes define the default transitions used when showing a form, these differ based on the OS. In most platforms the default is `Slide` whereas in iOS the default is `SlideFade` which slides the content pane and title while fading in/out the content of the title area.
 
-TIP: `SlideFade` is problematic without a title area. If you've a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
+TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
 
 // HTML_ONLY_START
 Check out the full set of theme constants in the https://www.codenameone.com/manual/advanced-theming.html#theme-constants-section[Theme Constants Section].
@@ -276,7 +276,7 @@ To apply a transition to a component you can use the `Container.replace()` metho
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/ReplaceTransitionDemo.java[tag=replaceTransition,indent=0]
 ----
 
-TIP: Replace even works when you've a layout constraint in place for example, replacing a component in a border layout will do the "right thing." But, some layouts such as `TableLayout` might be tricky in such cases so recommend wrapping a replaceable `Component` in a border layout and replacing the content.
+TIP: Replace even works when you have a layout constraint in place for example, replacing a component in a border layout will do the "right thing." But, some layouts such as `TableLayout` might be tricky in such cases so recommend wrapping a replaceable `Component` in a border layout and replacing the content.
 
 `Container.replace()` can also be used with a null transition at which point it replaces instantly with no transition.
 
@@ -285,7 +285,7 @@ TIP: Replace even works when you've a layout constraint in place for example, re
 The slide transitions are used to move the `Form/Component` in a sliding motion to the side or up/down. Four basic types of slide transitions exist:
 
 . Slide - the most commonly used transition
-. Fast Slide - historically this provided better performance for old device types. it's no longer recommended for newer devices
+. Fast Slide - historically this provided better performance for old device types. It's no longer recommended for newer devices
 . Slide Fade - the iOS default where the title area features a fade transition
 . Cover/Uncover - a kind of slide transition where the source or destination form slides while the other remains static in place
 
@@ -306,7 +306,7 @@ image::img/transition-slide-vertical.jpg[The slide transition can be applied ver
 .Slide fade fades in the destination title while sliding the content pane it's the default on iOS
 image::img/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
 
-TIP: `SlideFade` is problematic without a title area. If you've a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
+TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
 
 .With cover transitions the source form stays in place as it's covered by the destination. This transition can be played both horizontally and vertically
 image::img/transition-cover.jpg[With cover transitions the source form stays in place as it's covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
@@ -361,22 +361,61 @@ once.
 .Morph Transition
 image::img/mighty-morphing-components-1.png[Morph Transition,scaledwidth=15%]
 
-To support this behavior you've the https://www.codenameone.com/javadoc/com/codename1/ui/animations/MorphTransition.html[MorphTransition] class that provides this same effect coupled with a fade to
+To support this behavior you have the https://www.codenameone.com/javadoc/com/codename1/ui/animations/MorphTransition.html[MorphTransition] class that provides this same effect coupled with a fade to
 the rest of the UI (see <<mighty-morphing-components-1>>).
 
 Since the transition is created before the form exists you can't reference explicit components within the form
 when creating the morph transition (to show which component becomes which) so you need to refer
 to them by name. This means you need to use `setName(String)` on the components in the source/destination
-forms so the transition will be able to find them.
+forms so the transition will be able to find them:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/animations/MorphTransitionDemo.java[tag=morphTransition,indent=0]
 ----
 
+===== Snapshot mode
+
+By default `MorphTransition` paints both endpoints by re-rendering the live
+source / destination components every frame at the interpolated bounds.
+That works well when the source is fully visible -- a card in the body
+of one form morphing to a card in the next.
+
+It runs into edge cases when the source lives inside a scrolling
+container that has children extending past the source's bounds, or
+when the source has dynamic content (a video frame, a `BrowserComponent`,
+a custom-painted background) that should be visually frozen for the
+duration of the animation. The legacy live-paint path can leak
+off-viewport pixels into the morph because the layered pane that holds
+the source during the animation doesn't carry the original parent's clip.
+
+To opt into the image-snapshot path call `snapshotMode(true)` on the
+builder:
+
+[source,java]
+----
+MorphTransition morph = MorphTransition.create(300)
+        .snapshotMode(true)
+        .morph("card");
+nextForm.setTransitionInAnimator(morph);
+nextForm.show();
+----
+
+`snapshotMode(true)` captures each `(source, dest)` pair as a clipped
+`Image` at `initTransition()`, then the tween draws those images at the
+interpolated bounds rather than re-painting the live components.
+Off-viewport children of the source are clipped at capture time (the
+image's own bounds are the clip), so they can't leak into the morph.
+
+The default `MorphTransition` behavior (live paint, no snapshots) is
+unchanged for back-compat. Use snapshot mode opportunistically when
+the live-paint output exhibits the off-viewport leak, or when the
+source's children produce frame-by-frame visual change you want to
+freeze.
+
 ==== SwipeBackSupport
 
-iOS7+ allows swiping back one form to the previous form, Codenmae One has an API to enable back swipe transition:
+iOS7+ allows swiping back one form to the previous form, Codename One has an API to enable back swipe transition:
 
 [source,java]
 ----
@@ -389,7 +428,7 @@ That one command will enable swiping back from `currentForm`. https://www.codena
 [source,java]
 ----
 /**
- * Useful when passing a value that might not exist to a function, e.g. when we
+ * Useful when passing a value that might not exist to a function, e.g. When we
  * pass a form that we might need to construct dynamically later on.
  */
 public interface LazyValue<T> {

@@ -98,7 +98,7 @@ Figure 2. Purple raised button
 
 To enable this I added a new round rect border type similar to the round border type. This will supersede the existing round rect border functionality and there is quite a bit to say about that which I will cover next week.
 
-For now the cool thing is you can use use the system colors and things will work pretty much as you would expect…​
+For now the cool thing is you can use the system colors and things will work pretty much as you would expect…​
 
 #### Pressed Effect for Flat Buttons
 

@@ -33,7 +33,7 @@ And the resulting configuration would look like the following:
 
 If you prefer to break out a panel into a separate window, you can do that also. When you close the window, it will automatically be returned to its original region inside the main simulator window.
 
-For example, if we wanted to move the simulator itself to a separate window, we could select the panel menu in the uper right of the **Simulator** panel, and select `"Move To" > "New Window"`
+For example, if we wanted to move the simulator itself to a separate window, we could select the panel menu in the upper right of the **Simulator** panel, and select `"Move To" > "New Window"`
 
 ![](/blog/codename-one-simulator-facelift/move-to-separate-window.png)
 
@@ -41,7 +41,7 @@ The result would be the simulator in its own window as shown below:
 
 ![](/blog/codename-one-simulator-facelift/simulator-in-separate-window.png)
 
-Your configuration will be remembered for your next run, so you wan’t have to repeat yourself.
+Your configuration will be remembered for your next run, so you won’t have to repeat yourself.
 
 ### Menu Changes
 

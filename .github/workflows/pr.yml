@@ -53,7 +53,7 @@ jobs:
         java-version: [8, 17, 21]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate Java 25 markdown docs style (CodenameOne + CLDC11)
         run: ./.github/scripts/validate-java25-markdown-docs.sh
       - name: Set up Java
@@ -69,7 +69,7 @@ jobs:
              echo "${JAVA_HOME_21}/bin" >> $GITHUB_PATH
           fi
       - name: Cache Maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -77,7 +77,7 @@ jobs:
             ${{ runner.os }}-m2
       - name: Set up Node
         if: ${{ matrix.java-version == 8 }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
       - name: Run Unit Tests
@@ -133,6 +133,42 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
+      - name: Build AI and ad cn1libs (mlkit + tflite + whisper + stable diffusion + admob + mediation + mock)
+        # Exercises every cn1-ai-* and ad-provider multi-module project:
+        # compiles the common module, runs its JUnit 5 tests, and packages
+        # the .cn1lib archive (including native iOS Obj-C / Android Java
+        # sources). Also re-runs the AI generator and verifies the working
+        # tree matches what's checked in.
+        working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          set -eu
+          python3 ../scripts/gen-ai-cn1libs.py > /tmp/gen-ai.log
+          # Capture a list of changed files instead of using --exit-code/--quiet,
+          # which interacted poorly with the surrounding `set -e -o pipefail`.
+          drift=$(git -C .. status --porcelain -- 'maven/cn1-ai-*' || true)
+          if [ -n "$drift" ]; then
+            echo "::error::Checked-in cn1-ai-* tree is out of sync with scripts/gen-ai-cn1libs.py"
+            echo "$drift"
+            git -C .. --no-pager diff -- 'maven/cn1-ai-*' || true
+            exit 1
+          fi
+          # The cn1lib mojo is part of codenameone-maven-plugin and isn't
+          # in m2 from prior CI steps (those run the plugin's tests but
+          # don't install it, and -am pulls in transitive deps not yet
+          # built here -- designer, java-runtime, ports). Install the
+          # plugin + everything it transitively needs, then run package
+          # on each cn1lib's common module.
+          mvn -B -Dmaven.javadoc.skip=true \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -Plocal-dev-javase \
+            -pl codenameone-maven-plugin -am -DskipTests install
+          mvn -B -Dmaven.javadoc.skip=true \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -Plocal-dev-javase \
+            -pl 'cn1-ai-mlkit-text/common,cn1-ai-mlkit-barcode/common,cn1-ai-mlkit-face/common,cn1-ai-mlkit-labeling/common,cn1-ai-mlkit-translate/common,cn1-ai-mlkit-smartreply/common,cn1-ai-mlkit-langid/common,cn1-ai-mlkit-pose/common,cn1-ai-mlkit-segmentation/common,cn1-ai-mlkit-docscan/common,cn1-ai-tflite/common,cn1-ai-whisper/common,cn1-ai-stablediffusion/common,cn1-admob/common,cn1-applovin/common,cn1-unity-levelplay/common,cn1-ads-mock' \
+            package
       - name: Run SpotBugs for ports and Maven plugin
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
@@ -200,7 +236,7 @@ jobs:
       - name: Upload quality artifacts
         if: ${{ always() && matrix.java-version == 8 }}
         id: upload-quality-artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quality-artifacts
           path: quality-artifacts
@@ -288,13 +324,13 @@ jobs:
         run: python3 .github/scripts/generate-quality-report.py
       - name: Upload quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: quality-report
           path: quality-report.md
       - name: Publish quality report comment
         if: ${{ github.event_name == 'pull_request' && matrix.java-version == 8 }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
@@ -324,7 +360,7 @@ jobs:
 
       - name: Set up Java 25 for JavaDocs
         if: matrix.java-version == 8
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
@@ -341,7 +377,7 @@ jobs:
 
       - name: Upload JavaDocs artifact
         if: matrix.java-version == 8
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CodenameOne-javadocs
           path: CodenameOne/javadocs.zip
@@ -359,7 +395,7 @@ jobs:
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaAPI.jar
           path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
@@ -369,14 +405,14 @@ jobs:
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ByteCodeTranslator.jar
           path: vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CLDC11.jar
           path: Ports/CLDC11/dist/CLDC11.jar
@@ -404,7 +440,7 @@ jobs:
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: JavaSE.jar
           path: Ports/JavaSE/dist/JavaSE.jar

@@ -13,7 +13,7 @@ author: Shai Almog
 
 One of the problems with native maps is that they work very differently between the device and the simulator. This is because we use `MapComponent` on the simulator and as a fallback on the devices where Google Maps isn’t available. We just committed a new mode for maps that allows you to use the Google HTML maps as the fallback instead of the `MapComponent`.
 
-This is faster, has better support from Google and is more similar to the way maps work on the physical device because the browser component is also a peer component so similar restrictions will apply. This is off by default since the HTML maps require a key and right now we didn’t finish mapping all the components. This also needs some server functionality so I’m not sure when this will land in the actual extension but it’s already there is you build from source. We’ll post more about this when we do an official refresh of the extension.
+This is faster, has better support from Google and is more similar to the way maps work on the physical device because the browser component is also a peer component so similar restrictions will apply. This is off by default since the HTML maps require a key and right now we didn’t finish mapping all the components. This also needs some server functionality so I’m not sure when this will land in the actual extension but it’s already there if you build from source. We’ll post more about this when we do an official refresh of the extension.
 
 ### Z-Ordering in Peer Components
 

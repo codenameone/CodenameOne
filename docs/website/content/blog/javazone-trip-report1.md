@@ -104,7 +104,7 @@ Amazingly I’m sure I’m missing quite a lot as I’m writing all this from me
   
   
 
-The guys and gals running the show are all pretty cool people as is evidence by all of the above, unfortunately this year there was no new JavaZone t-shirt (although they gave a great waterbottle which my spouse immediately confiscated for her own use) so I stopped by their booth and they gave me this t-shirt.  
+The guys and gals running the show are all pretty cool people as is evidenced by all of the above, unfortunately this year there was no new JavaZone t-shirt (although they gave a great waterbottle which my spouse immediately confiscated for her own use) so I stopped by their booth and they gave me this t-shirt.  
   
   
   
@@ -349,7 +349,7 @@ I-Tier: Breaking Up the Monolith
 .  
   
   
-I did check it online in Vimeo later (great thing about JavaZone) and its really interesting. We’re coming from the opposite side of a cloud architecture that is trying to normalize whereis Groupon has a far different approach. I’m not a fan of the node.js  
+I did check it online in Vimeo later (great thing about JavaZone) and its really interesting. We’re coming from the opposite side of a cloud architecture that is trying to normalize whereas Groupon has a far different approach. I’m not a fan of the node.js  
   
 architecture but its interesting hearing real world experiences with modularity which is something we all need.  
 |    

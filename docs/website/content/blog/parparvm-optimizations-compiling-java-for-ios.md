@@ -61,14 +61,14 @@ There remained much low-hanging fruit for optimizing the actual generated C-code
 
 ParparVM remained largely unchanged and stable through Codename One 3.5 and 3.6, but recently we ran into an issue where clang was having difficulty compiling very large C methods. This gave us some motivation to optimize some of the generated C-code again. This time, the impetus was a desire to reduce the size of the generated code.
 
-The use case that we were provided with included hundreds method invocations to construct a GeneralPath. Each java instruction looked like:
+The use case that we were provided with included hundreds of method invocations to construct a GeneralPath. Each java instruction looked like:
     
     
     ((GeneralPath) shape).curveTo(105.305275, 167.71288, 105.24711, 168.68971, 105.457146, 169.88364);
 
 The resulting C-code for each of these would be over 20 lines of code. It would add the shape and each of the numbers to the stack, then call the function which would unwind the stack.
 
-I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang "hanging" problem, and improved performance.
+I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang’s "hanging" problem, and improved performance.
 
 ### Let’s do ALL the Optimizations!
 
@@ -126,17 +126,17 @@ Now, to test out performance of static variable access, I modified the benchmark
             return staticLargest;
         }
 
-Running this benchmark on Codename One 3.6 (before optimizations) resulted in an average time of **380ms**. On that latest Codename One (i.e. after optimizations) it ran in **135ms**. That is an speed increase of over **2.8x**.
+Running this benchmark on Codename One 3.6 (before optimizations) resulted in an average time of **380ms**. On the latest Codename One (i.e. after optimizations) it ran in **135ms**. That is a speed increase of over **2.8x**.
 
 ![Benchmarking large prime number calculation with ParparVM](/blog/parparvm-optimizations-compiling-java-for-ios/parparvm-primenumber-benchmarks.png)
 
-There are obviously many more benchmarks that can be written that would cover more cases, but things are looking good so far. Does this mean that your app will perform 2.8x better? Probably not. As I mentioned above, most of the user experience is dictated by graphics performance and responsiveness (scrolling, rendering, etc..), and this is already done mostly in native code. However, for processor intensive tasks like number crunching, or data parsing, you are likely to see real performance gains. Code that is heavy on 2D graphics, shapes, and transforms may also see noticeably improvement.
+There are obviously many more benchmarks that can be written that would cover more cases, but things are looking good so far. Does this mean that your app will perform 2.8x better? Probably not. As I mentioned above, most of the user experience is dictated by graphics performance and responsiveness (scrolling, rendering, etc..), and this is already done mostly in native code. However, for processor intensive tasks like number crunching, or data parsing, you are likely to see real performance gains. Code that is heavy on 2D graphics, shapes, and transforms may also see noticeable improvement.
 
 Even if these gains aren’t readily noticeable in your app, it is nice to know that if you crank out some extra performance for something in your app, you can do it without having to delve into native interfaces.
 
 ## Code Size and App Size
 
-These optimizations also yielded smaller apps. I built the Kitchen Sink app using Codename One 3.6 and with the latest to see if there was any difference in the size of code. It produced 15% to 20% improvements on both of these fronts. With 3.6, Kitchen Sink resulted in 930276 lines of C code (in .m files), and an App store IPA file size of 7.3MB. Buliding it with the latest Codename One resulted in 802457 lines of code, and an IPA file size of 6.3MB. That is 16% fewer lines of code and a final app size that is also 16% smaller. Not dramatic, but substantial.
+These optimizations also yielded smaller apps. I built the Kitchen Sink app using Codename One 3.6 and with the latest to see if there was any difference in the size of code. It produced 15% to 20% improvements on both of these fronts. With 3.6, Kitchen Sink resulted in 930276 lines of C code (in .m files), and an App store IPA file size of 7.3MB. Building it with the latest Codename One resulted in 802457 lines of code, and an IPA file size of 6.3MB. That is 16% fewer lines of code and a final app size that is also 16% smaller. Not dramatic, but substantial.
 
 ![Comparing lines of code in Kitchen Sink between ParparVM 3.6 and latest](/blog/parparvm-optimizations-compiling-java-for-ios/parparvm-lines-of-code-kitchensink.png)
 

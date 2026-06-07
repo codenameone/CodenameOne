@@ -150,6 +150,26 @@ public final class IOSNative {
 
     native boolean isTablet();
     native boolean isIOS7();
+    native boolean isRunningOnMac();
+
+    // Mac native (Catalyst): set the host window title bar text from the current form title.
+    native void setWindowTitle(String title);
+
+    // Mac native (Catalyst): replace the application menu's CN1 command items. namesNewlineJoined
+    // holds the visible command labels separated by '\n'; selecting item i calls back into
+    // IOSImplementation.fireMacMenuCommand(i).
+    native void setNativeMenuCommands(String namesNewlineJoined);
+
+    // Mac native: propagate the current form's brightness to the host
+    // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
+    // CN1) matches the app's dark/light theme. A no-op on iOS/iPadOS.
+    native void setMacWindowDarkAppearance(boolean dark);
+
+    // Mac native (Catalyst): undecorate the host window for the "custom" desktop title-bar mode -
+    // hide the AppKit title bar (transparent + hidden title + full-size content view) so the CN1
+    // Toolbar acts as the window title bar, and make the window movable by its background so the
+    // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
+    native void setMacWindowUndecorated(boolean undecorated);
     
     native void setImageName(long nativeImage, String name);
     
@@ -310,6 +330,39 @@ public final class IOSNative {
     native boolean isDarkModeDetectionSupported();
     native boolean isVPNActive();
 
+    // Active-network type queries used by NetworkManager.getCurrentNetworkType
+    // and addNetworkTypeListener. Returns one of
+    // NetworkManager.NETWORK_TYPE_* constants. Implementation uses
+    // SCNetworkReachability (always available) and an interface-name probe to
+    // distinguish WiFi from cellular.
+    native int wifiNetworkType();
+    native void wifiInstallTypeListener(Object instance);
+    native void wifiUninstallTypeListener();
+
+    // WiFi info; SSID/BSSID require the wifi-info entitlement and (since iOS
+    // 13) a granted CoreLocation authorization. The build pipeline injects
+    // both automatically when WiFi.getCurrentSSID/getBSSID is on the
+    // classpath. Returns null when permission denied or not on WiFi.
+    native String wifiCurrentSSID();
+    native String wifiCurrentBSSID();
+    native String wifiGateway();
+    native String wifiIpAddress();
+
+    // NEHotspotConfiguration-backed join. Requires the
+    // com.apple.developer.networking.HotspotConfiguration entitlement
+    // (injected by IPhoneBuilder when com.codename1.io.wifi.WiFi.connect is
+    // referenced). The result is delivered via
+    // com.codename1.impl.ios.IOSConnectivity.wifiConnectResult.
+    native void wifiConnect(String ssid, String password, int security);
+    native void wifiDisconnect(String ssid);
+
+    // NSNetServiceBrowser-backed Bonjour discovery. Callbacks land in
+    // com.codename1.impl.ios.IOSConnectivity.bonjour* static dispatchers.
+    native long bonjourBrowseStart(String type);
+    native void bonjourBrowseStop(long handle);
+    native long bonjourPublishStart(String name, String type, int port, String[] txtKeys, String[] txtVals);
+    native void bonjourPublishStop(long handle);
+
     native int fileCountInDir(String dir);
     native void listFilesInDir(String dir, String[] files);
     native void createDirectory(String dir);
@@ -377,6 +430,24 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
+
+    // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
+    // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side
+    // routes static callbacks delivered from the capture queue.
+    native String cn1CameraEnumerate();
+    native long cn1CameraOpen(String cameraId, int previewW, int previewH, boolean captureAudio);
+    native long cn1CameraCreatePreviewView(long sessionPeer);
+    native void cn1CameraTakePhoto(long sessionPeer, int width, int height, int jpegQuality, String filePath, int callbackId);
+    native boolean cn1CameraStartVideo(long sessionPeer, String filePath, boolean captureAudio);
+    native void cn1CameraStopVideo(long sessionPeer, int callbackId);
+    native void cn1CameraSetFrameDelivery(long sessionPeer, boolean enabled, int maxFps);
+    native void cn1CameraSetFlash(long sessionPeer, int mode);
+    native void cn1CameraSetZoom(long sessionPeer, float ratio);
+    native void cn1CameraFocus(long sessionPeer, float xNorm, float yNorm);
+    native void cn1CameraPause(long sessionPeer);
+    native void cn1CameraResume(long sessionPeer);
+    native void cn1CameraClose(long sessionPeer);
+
     native void destroyAudioUnit(long peer);
 
     native long createAudioUnit(String path, int audioChannels, float sampleRate, float[] f);
@@ -488,15 +559,40 @@ public final class IOSNative {
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
     
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
+
+    // Same as socialShare but reports the outcome via
+    // IOSImplementation.socialShareCallback(int, String, String) using
+    // the supplied callbackId. Status: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
+    native void socialShareWithCallback(String text, long imagePeer, Rectangle sourceRect, int callbackId);
     
     // facebook connect
     public native void facebookLogin(Object callback);
     public native boolean isFacebookLoggedIn();
     public native String getFacebookToken();
     public native void facebookLogout();
-    public native boolean askPublishPermissions(LoginCallback lc);    
+    public native boolean askPublishPermissions(LoginCallback lc);
     public native boolean hasPublishPermissions();
-        
+
+    // OidcClient / SystemBrowser -- ASWebAuthenticationSession (iOS 12+).
+    // See nativeSources/CN1OidcBrowser.m for the Obj-C side.
+    public native boolean oidcSystemBrowserSupported();
+    public native String oidcStartAuthorization(String authUrl, String redirectScheme);
+
+    // AppleSignIn -- ASAuthorizationAppleIDProvider (iOS 13+).
+    // See nativeSources/CN1AppleSignIn.m for the Obj-C side.
+    public native boolean appleSignInSupported();
+    public native String appleSignIn(String scopes, String nonce);
+    public native boolean appleSignInIsLoggedIn();
+    public native void appleSignInSignOut();
+
+    // WebAuthn / passkeys --
+    // ASAuthorizationPlatformPublicKeyCredentialProvider (iOS 16+).
+    // See nativeSources/CN1WebAuthn.m for the Obj-C side.
+    public native boolean webauthnSupported();
+    public native String webauthnCreate(String optionsJson);
+    public native String webauthnGet(String optionsJson);
+
+
     
     public native boolean isAsyncEditMode();
     public native void setAsyncEditMode(boolean b);
@@ -505,7 +601,7 @@ public final class IOSNative {
     public native int getVKBHeight();
     public native int getVKBWidth();
 
-    public native long connectSocket(String host, int port, int connectTimeout);    
+    public native long connectSocket(String host, int port, int connectTimeout);
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
@@ -514,6 +610,14 @@ public final class IOSNative {
     public native int getSocketAvailableInput(long socket);
     public native byte[] readFromSocketStream(long socket);
     public native void writeToSocketStream(long socket, byte[] data);
+    public native void writeToSocketStream(long socket, byte[] data, int offset, int len);
+
+    public native long createWebSocketNative(int connectionId, String url);
+    public native void connectWebSocketNative(long handle, int connectTimeoutMs, String subprotocolsCsv);
+    public native void closeWebSocketNative(long handle);
+    public native void sendWebSocketTextNative(long handle, String text);
+    public native void sendWebSocketBinaryNative(long handle, byte[] data);
+    public native void releaseWebSocketNative(long handle);
 
     
     // Paths
@@ -626,7 +730,33 @@ public final class IOSNative {
     
     native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground);
 
+    /// Enriched local notification scheduling carrying actions, grouping, time-sensitive
+    /// flag and an image attachment. actionsEncoded packs the actions as
+    /// idtitleplaceholderbutton records separated by .
+    native void sendLocalNotification2(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground, String categoryId, String threadId, boolean timeSensitive, String imageAttachmentPath, String actionsEncoded);
+
     native void cancelLocalNotification(String id);
+
+    /// Requests notification authorization with the given UNAuthorizationOptions mask. The
+    /// result is delivered asynchronously to IOSImplementation.notificationPermissionResult.
+    native void requestNotificationPermission(int optionsMask);
+
+    /// Registers a BGTaskScheduler processing task identifier. Must be called before
+    /// application:didFinishLaunchingWithOptions: returns.
+    native void registerBackgroundProcessingTask(String identifier);
+
+    /// Submits a BGProcessingTaskRequest for the given identifier.
+    native void submitBackgroundProcessingTask(String identifier, double earliestBeginEpochSeconds, boolean requiresNetwork, boolean requiresPower);
+
+    /// Cancels a pending BGTaskScheduler request by identifier.
+    native void cancelBackgroundTask(String identifier);
+
+    /// True if BGTaskScheduler (iOS 13+) is available.
+    native boolean isBackgroundProcessingSupported();
+
+    /// Reads and clears any shared content payload written by the share extension into the
+    /// shared App Group user defaults. Returns a JSON string or null if there is none.
+    native String getPendingSharedContent(String appGroupId);
 
     // --- Biometrics (LocalAuthentication.framework) -------------------------
 
@@ -663,6 +793,63 @@ public final class IOSNative {
 
     /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
     native void secureStorageRemove(int requestId, String reason, String account);
+
+    // --- NFC (Core NFC) -----------------------------------------------------
+
+    /** True when NFCNDEFReaderSession is available (iOS 11+) and the device has NFC hardware. */
+    native boolean isNfcSupported();
+
+    /** True when Core NFC reader sessions can be started right now. */
+    native boolean canReadNfc();
+
+    /** True when Core NFC tag sessions (ISO-DEP / FeliCa / MIFARE) are available (iOS 13+). */
+    native boolean canReadNfcTags();
+
+    /** True when CardSession (HCE) is available; iOS 17.4+ EU-only with entitlement. */
+    native boolean canHostEmulateNfc();
+
+    /**
+     * Starts an NDEF-only NFCNDEFReaderSession. Result is delivered via
+     * IOSNfc.nativeNdefResult(int, byte[]) or
+     * IOSNfc.nativeNfcError(int, int, String).
+     */
+    native void startNdefRead(int requestId, String alertMessage, long timeoutMs);
+
+    /**
+     * Starts an NFCTagReaderSession that accepts ISO-DEP / FeliCa / MIFARE.
+     * `polling` is a bitmask: 1 = NFC-A, 2 = NFC-B, 4 = NFC-F, 8 = NFC-V (Core
+     * NFC does not actually expose B/V; the request is silently downgraded
+     * by the OS). `aidsArr`, when non-null, lists ISO 7816 AIDs to auto-SELECT.
+     * `felicaSystemCodes` is a list of 2-byte hex strings.
+     * Result via IOSNfc.nativeTagDiscovered(int, byte[], int) and
+     * IOSNfc.nativeNfcError(int, int, String).
+     */
+    native void startTagRead(int requestId, String alertMessage,
+            int polling, String[] felicaSystemCodes, byte[][] aidsArr,
+            long timeoutMs);
+
+    /** Cancels the active reader session. */
+    native void stopNfcRead(int requestId);
+
+    /** Sends an APDU on the currently-connected ISO 7816 tag.
+     * Result via IOSNfc.nativeTransceiveResult(int, byte[]) or
+     * IOSNfc.nativeNfcError(int, int, String). */
+    native void nfcTransceive(int requestId, long tagHandle, byte[] payload);
+
+    /** Reads the NDEF message on the currently-connected tag (after tag session). */
+    native void nfcReadNdefFromTag(int requestId, long tagHandle);
+
+    /** Writes an NDEF message to the currently-connected tag. */
+    native void nfcWriteNdefToTag(int requestId, long tagHandle, byte[] ndef);
+
+    /** Permanently locks the NDEF area on the currently-connected tag. */
+    native void nfcLockTag(int requestId, long tagHandle);
+
+    /** Registers / clears HCE AID list. Called by IOSNfc.registerHostCardEmulationService. */
+    native void registerHceAids(String[] aids);
+
+    /** Sends the HCE response for the APDU currently outstanding on CardSession. */
+    native void hceSendResponse(byte[] response);
 
     native long gausianBlurImage(long peer, float radius);
     

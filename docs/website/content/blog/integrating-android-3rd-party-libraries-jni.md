@@ -13,7 +13,7 @@ author: Chen Fishbein
 
 ![](/blog/integrating-android-3rd-party-libraries-jni/binary.png)
 
-While its pretty easy to use [native interfaces](http://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html)  
+While it’s pretty easy to use [native interfaces](http://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html)  
 to write Android native code some things aren’t necessarily as obvious. E.g. if you want to integrate a 3rd party library, specifically one that includes native C JNI code this process is somewhat undocumented.  
 If you need to integrate such a library into your native calls you have the following 3 options: 
 
@@ -24,14 +24,14 @@ You can workaround this by adding a build hint to the proguard obfuscation code 
          
          android.proguardKeep=-keep class com.mypackage.ProblemClass { *; }
 
-  2. The second option is to add an Android Library Project. Not all 3rd parties can be packaged as a simple jar, some 3rd parties needs to declare  
+  2. The second option is to add an Android Library Project. Not all 3rd parties can be packaged as a simple jar, some 3rd parties need to declare  
 Activities add permissions, resources, assets, and/or even add native code (.so files). To link a Library project to your CN1 project open the Library  
 project in Eclipse or Android Studio and make sure the project builds, after the project was built successfully remove the bin directory from the  
 project and zip the whole project.  
 Rename the extension of the zip file to .andlib and place the andlib file under native/android directory. The build server will pick it up and will link it to the project.
-  3. We recently added a 3rd option :aar files. The aar file is a binary format from Google that represents an Android Library project. One of the problem with  
+  3. We recently added a 3rd option :aar files. The aar file is a binary format from Google that represents an Android Library project. One of the problems with  
 the Android Library projects was the fact that it required the project sources which made it difficult for 3rd party vendors to publish libraries, so android  
-introduced the aar file which is a binary format that represents a Library project. To learn more about arr you can read  
+introduced the aar file which is a binary format that represents a Library project. To learn more about aar you can read  
 [this](http://tools.android.com/tech-docs/new-build-system/aar-format).
 
 You can link an aar file by placing it under the native/android and the build server will link it to the project.

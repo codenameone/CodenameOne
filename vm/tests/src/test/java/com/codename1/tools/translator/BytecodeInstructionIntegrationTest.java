@@ -916,7 +916,8 @@ class BytecodeInstructionIntegrationTest {
         compileDummyMainClass(sourceDir, "com.example", "MyAppDefault", config);
 
         String[] args = new String[] {
-                "csharp",
+                // Unrecognized output type routes to the plain copy-through default handler
+                "unknown",
                 sourceDir.toAbsolutePath().toString(),
                 outputDir.toAbsolutePath().toString(),
                 "MyAppDefault", "com.example", "My App", "1.0", "ios", "none"
@@ -1214,6 +1215,52 @@ class BytecodeInstructionIntegrationTest {
                 "Object PUTFIELD must read both operands with PEEK:\n" + objC);
         assertFalse(objC.contains("POP_OBJ(), POP_OBJ()"),
                 "Object PUTFIELD must not rely on C argument evaluation order:\n" + objC);
+    }
+
+    /**
+     * Regression test for issue #3108 (second cause).
+     *
+     * The widening / narrowing conversion opcodes (I2D, I2L, F2D, F2L, L2D and
+     * their inverses) used to write the new value into SP[-1].data but leave
+     * the runtime type tag untouched. BC_DUP2_X1 / BC_DUP2_X2 / BC_DUP_X2
+     * dispatch via IS_DOUBLE_WORD(...) on that tag, so e.g. PUSH_INT (tag=INT)
+     * followed by I2D (data updated, tag still INT) followed by DUP2_X1 sent
+     * the dup through the cat-1 branch and shifted SP by +2 instead of +1.
+     * The chained assignment "a.x = b.x = (double) someInt" then read garbage
+     * for the second putfield's operands and crashed with NPE on iOS.
+     *
+     * Each cat-changing conversion must rewrite SP[-1].type to the new
+     * CN1_TYPE_*. Pure-arithmetic conversions (I2B/I2C/I2S, I2F/F2I) are not
+     * involved in dup-dispatch but are checked for symmetry.
+     */
+    @Test
+    void conversionOpcodesUpdateRuntimeTypeTag() {
+        Object[][] cases = {
+                {Opcodes.I2L, "I2L", "CN1_TYPE_LONG"},
+                {Opcodes.I2D, "I2D", "CN1_TYPE_DOUBLE"},
+                {Opcodes.I2F, "I2F", "CN1_TYPE_FLOAT"},
+                {Opcodes.L2I, "L2I", "CN1_TYPE_INT"},
+                {Opcodes.L2F, "L2F", "CN1_TYPE_FLOAT"},
+                {Opcodes.L2D, "L2D", "CN1_TYPE_DOUBLE"},
+                {Opcodes.F2I, "F2I", "CN1_TYPE_INT"},
+                {Opcodes.F2L, "F2L", "CN1_TYPE_LONG"},
+                {Opcodes.F2D, "F2D", "CN1_TYPE_DOUBLE"},
+                {Opcodes.D2I, "D2I", "CN1_TYPE_INT"},
+                {Opcodes.D2L, "D2L", "CN1_TYPE_LONG"},
+                {Opcodes.D2F, "D2F", "CN1_TYPE_FLOAT"},
+        };
+        for (Object[] c : cases) {
+            int opcode = (Integer) c[0];
+            String name = (String) c[1];
+            String expectedTypeTag = (String) c[2];
+            BasicInstruction instr = new BasicInstruction(opcode, 0);
+            StringBuilder out = new StringBuilder();
+            instr.appendInstruction(out, new ArrayList<Instruction>());
+            String emitted = out.toString();
+            assertTrue(emitted.contains("SP[-1].type = " + expectedTypeTag),
+                    name + " must rewrite SP[-1].type to " + expectedTypeTag
+                            + " so BC_DUP2_X1 / BC_DUP2_X2 / BC_DUP_X2 dispatch correctly. Emitted:\n" + emitted);
+        }
     }
 
     @Test

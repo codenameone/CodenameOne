@@ -13,7 +13,7 @@ author: Shai Almog
 
   
 
-Chen has been busy adding one of the more addictive features yet to Codename One: pull to refresh. If you are unfamiliar with the Twitter app, this feature essentially means that you pull the UI downwards from the top and an arrow appears indicating that the UI will refresh once you lift your finger. This is now baked into Codename One allowing you instantly add this sort of UI pattern! 
+Chen has been busy adding one of the more addictive features yet to Codename One: pull to refresh. If you are unfamiliar with the Twitter app, this feature essentially means that you pull the UI downwards from the top and an arrow appears indicating that the UI will refresh once you lift your finger. This is now baked into Codename One allowing you to instantly add this sort of UI pattern! 
 
   
 Cool and painfully addictive.  

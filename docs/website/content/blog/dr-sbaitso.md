@@ -28,9 +28,9 @@ dev day at Riga
 ](http://rigadevday.lv/)  
 , I was quite ill before the trip so it was pretty difficult and that’s the main reason I didn’t make a trip report like I normally do. However, the conference and the people running it did seem like a whole lot of fun that unfortunately I was in no shape to enjoy.  
   
-I did prepare a demo/presentation for the trip though and since I gave my talk under the influence of medication I think its wise to post a tutorial to the demo I did here both for those who were in attendance and for the rest of the Codename One community. 
+I did prepare a demo/presentation for the trip though and since I gave my talk under the influence of medication I think it’s wise to post a tutorial to the demo I did here both for those who were in attendance and for the rest of the Codename One community. 
 
-The demo I made is a homage to an old Soundblaster demo, its generally a chat app between you and an AI that I designed to look like iMessage. It uses text to speech (with native interfaces) to vocalize the responses of the "AI". Notice the AI is really trivial and I don’t cover it in the video tutorials below.  
+The demo I made is a homage to an old Soundblaster demo, it’s generally a chat app between you and an AI that I designed to look like iMessage. It uses text to speech (with native interfaces) to vocalize the responses of the "AI". Notice the AI is really trivial and I don’t cover it in the video tutorials below.  
   
 You can see the full source code of the demo in our  
 [  

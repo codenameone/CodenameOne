@@ -25,6 +25,9 @@ Here is the current list of supported arguments. Build hints change over time, s
 |android.release
 |true/false defaults to true - indicates whether to include the release version in the build
 
+|android.onDeviceDebug
+|Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable="true"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it — release builds are unaffected. See the link:#_ondevice_debugging_android[On-Device Debugging (Android) chapter] for the full flow.
+
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
 
@@ -32,7 +35,7 @@ Here is the current list of supported arguments. Build hints change over time, s
 |defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.
 
 |android.permission.PERMISSION_NAME
-|true/false Whether to include a particular permission. Use of these build hints is preferred to `android.xpermissions` since they avoid possible conflicts with libraries. See https://developer.android.com/reference/android/Manifest.permission.html[Android's Manifest.permission docs] for a full list of permissions.
+|true/false Whether to include a particular permission. Use of these build hints is preferred to `android.xpermissions` since they avoid possible conflicts with libraries. See https://developer.android.com/reference/android/Manifest.permission.html[Android's `Manifest.permission` docs] for a full list of permissions.
 
 |android.permission.PERMISSION_NAME.maxSdkVersion
 |Will be translated to the `maxSdkVersion` attribute of the `<uses-permission>` tag for the corresponding `android.permission.PERMISSION_NAME` build hint.  (Optional)
@@ -82,7 +85,7 @@ Here is the current list of supported arguments. Build hints change over time, s
 |Device key used to mark a specific Android device as a test device for Google Play ads defaults to C6783E2486F0931D9D09FABC65094FDF
 
 |android.includeGPlayServices
-|*Deprecated, please android.playService.+++*+++!* Indicates whether Goolge Play Services should be included into the build, defaults to false but that might change based on the functionality of the application and other build hints. Adding Google Play Services support allows you to use a more refined location implementation and invoke some Google specific functionality from native code.
+|*Deprecated, please android.playService.+++*+++!* Indicates whether Google Play Services should be included into the build, defaults to false but that might change based on the functionality of the application and other build hints. Adding Google Play Services support allows you to use a more refined location implementation and invoke some Google specific functionality from native code.
 
 |android.playService.plus, android.playService.auth, android.playService.base, android.playService.identity, android.playService.indexing, android.playService.appInvite, android.playService.analytics, android.playService.cast, android.playService.gcm, android.playService.drive, android.playService.fitness, android.playService.location, android.playService.maps, android.playService.ads, android.playService.vision, android.playService.nearby, android.playService.panorama, android.playService.games, android.playService.safetynet, android.playService.wallet, android.playService.wearable
 |Allows including only a specific play services library portion. Notice that this setting conflicts with the deprecated `android.includeGPlayServices` and only works with the Gradle-based Android build pipeline. +
@@ -93,10 +96,10 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 | The version number of play services to build against. Experimental.  **Use with caution** as building against versions other than the server default may introduce incompatibilities with some Codename One APIs.
 
 |xxx.minPlayServicesVersion
-|This is a special case build hint. You can use any prefix to the build hint and the convention is to use your cn1lib name. it's identical to `android.minPlayServicesVersion` with the exception that the "highest version wins." That way if your cn1lib requires play services 9+ and uses: `myLib.minPlayServicesVersion=9.0.0` and another library has `otherLib.minPlayServicesVersion=10.0.0` then play services will be 10.0.0
+|This is a special case build hint. You can use any prefix to the build hint and the convention is to use your cn1lib name. It's identical to `android.minPlayServicesVersion` with the exception that the "highest version wins." That way if your cn1lib requires play services 9+ and uses: `myLib.minPlayServicesVersion=9.0.0` and another library has `otherLib.minPlayServicesVersion=10.0.0` then play services will be 10.0.0
 
 |android.multidex
-|Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you've it off by default but if you get a build error mentioning this limit you should turn this on.
+|Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on.
 
 |android.headphoneCallback
 |Boolean true/false defaults to false. When set to true it assumes the main class has two methods: `headphonesConnected` & `headphonesDisconnected` which it invokes appropriately as needed
@@ -126,13 +129,13 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |Optional path (relative to the root of the native Android project) to an image file to use as the adaptive icon background when `android.enableAdaptiveIcons=true`. If this property is set, it overrides `android.adaptiveIconBackground`.
 
 |android.cusom_layout1
-|Applies to any number of layouts as long as they're in sequence (for example, android.cusom_layout2, android.cusom_layout3 etc.). Will write the content of the argument as a layout xml file and give it the name `cusom_layout1.xml` onwards. This can be used by native code to work with XML files
+|Applies to any number of layouts as long as they're in sequence (for example, android.cusom_layout2, android.cusom_layout3 etc.). Will write the content of the argument as a layout XML file and give it the name `cusom_layout1.xml` onwards. This can be used by native code to work with XML files
 
 |android.keyboardOpen
 |Boolean true/false defaults to true. Toggles the new async keyboard mode that leaves the keyboard open while you move between text components
 
 |android.versionCode
-|Allows overriding the auto generated version number with a custom internal version number specifically used for the xml attribute `android:versionCode`
+|Allows overriding the auto generated version number with a custom internal version number specifically used for the XML attribute `android:versionCode`
 
 |android.captureRecord
 |Indicates whether the `RECORD_AUDIO` permission should be requested. Can be `enabled` or any other value to disable this option
@@ -227,12 +230,12 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 | desktop.mac.plist.PLISTKEY
 | Set the key `PLISTKEY` in the Info.plist file for desktop mac build. For example, `desktop.mac.plist.LSApplicationCategoryType=public.app-category.business`.  See https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Introduction/Introduction.html[Apple Documentation of Info.plist keys and values for a full list of supported keys].
 +
-Only supported for App Store builds. See https://www.codenameone.com/developer-guide.html#_mac_os_desktop_build_options[Mac OS Desktop Build Options] for more information.
+Only supported for App Store builds. See https://www.codenameone.com/developer-guide.html#_mac_os_desktop_build_options[macOS Desktop Build Options] for more information.
 
 | desktop.mac.plistInject
 | Injects raw XML into the Info.plist file for desktop builds. For example, `desktop.mac.plistInject=<key>LSApplicationCategoryType</key><string>public.app-category.business</string>`
 +
-Only supported for App Store builds. See https://www.codenameone.com/developer-guide.html#_mac_os_desktop_build_options[Mac OS Desktop Build Options] for more information.
+Only supported for App Store builds. See https://www.codenameone.com/developer-guide.html#_mac_os_desktop_build_options[macOS Desktop Build Options] for more information.
 
 |ios.associatedDomains
 |Comma-delimited list of domains associated with this app. Since 6.0.  Note that each domain should be prefixed by a supported prefix. For example, "applinks:" or "webcredentials:." See https://developer.apple.com/documentation/security/password_autofill/setting_up_an_app_s_associated_domains?language=objc[Apple's documentation on Associated domains] for more information.
@@ -353,7 +356,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |true/false (defaults to `false`). Setting this flag to `true` will cause available java source files to be included in the resulting .zip and .war files. These may be used by Chrome during debugging.
 
 |javascript.stopOnErrors
-|true/false (defaults to `true`). Cause JavaScript build to fail if there are warnings during the build. Sometimes build warnings won't affect the running of the app. For example, if the Javascript port is missing a method that the app depends on, but it isn't used in most of the app. Or if there is multithreaded code detected in static initializers, but that code-path isn't used by the app. Setting this to `false` may allow you to get past some build errors, but it might just result in runtime errors later on, which are much more difficult to debug.  *This build hint is only available in Codename One 3.4 and later.
+|true/false (defaults to `true`). Cause JavaScript build to fail if there are warnings during the build. Sometimes build warnings won't affect the running of the app. For example, if the JavaScript port is missing a method that the app depends on, but it isn't used in most of the app. Or if there is multithreaded code detected in static initializers, but that code-path isn't used by the app. Setting this to `false` may allow you to get past some build errors, but it might just result in runtime errors later on, which are much more difficult to debug.  *This build hint is only available in Codename One 3.4 and later.
 
 |javascript.teavm.version
 | (Optional)  The version of TeaVM to use for the build.  *Use caution*, only use this property if you know what you're doing!
@@ -393,7 +396,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Objective-C code that can be injected into the iOS callback method (message) `viewDidLoad`
 
 |ios.googleAdUnitIdPadding
-|Indicates the amount of padding to pass to the Google ads placed at the bottom of the screen with `google.adUnitId`
+|Indicates the amount of padding to pass to the Google Ads placed at the bottom of the screen with `google.adUnitId`
 
 |ios.enableBadgeClear
 |Boolean true/false defaults to true. Clears the badge value with every load of the app, this is useful if the app doesn't manually keep track of number values for the badge
@@ -439,8 +442,101 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |ios.testFlight
 |Boolean true/false defaults to false and works only for pro accounts. Enables the testflight support in the release binaries for easy beta testing. Notice that the IDE plugin has a "Test Flight" check box you *should* use under the iOS section.
 
+|ios.metal
+|Boolean true/false defaults to true. Selects the Metal rendering backend (`CAMetalLayer`) over the legacy OpenGL ES 2 path (`CAEAGLLayer`). Metal is the supported iOS graphics API; OpenGL ES is deprecated. Set to `false` to opt out if you hit a Metal-only rendering regression. See link:#_metal_renderer[Working with iOS / Metal renderer] for details.
+
+|ios.metal.colorSpace
+|Selects the `CAMetalLayer.colorspace` for the Metal renderer. Accepts `sRGB` (default), `displayP3`, `deviceRGB`, `linearSRGB`, `extendedSRGB`, `extendedLinearSRGB`, or `none`. Has no effect when `ios.metal=false`. See link:#_choosing_a_color_space_for_the_metal_renderer[Working with iOS / Choosing a color space] for the full table.
+
 |ios.generateSplashScreens
 |Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
+
+|ios.onDeviceDebug
+|Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the link:#_ondevice_debugging_ios[On-Device Debugging chapter] for the full flow.
+
+|ios.onDeviceDebug.proxyHost
+|Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.
+
+|ios.onDeviceDebug.proxyPort
+|TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.
+
+|ios.onDeviceDebug.waitForAttach
+|Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.
+
+|codename1.mac.appid
+|Mac Native cloud builds only. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
+
+|codename1.mac.certificate
+|Mac Native cloud builds only. Path to the `.p12` file containing the Mac signing certificate(s) — _Mac App Distribution_ (3rd Party Mac Developer Application) for App Store builds, _Developer ID Application_ for Developer ID builds, or both bundled into the same P12 when `macNative.distribution=both`. Not interchangeable with the iOS distribution certificate. Required for cloud Mac builds.
+
+|codename1.mac.certificatePassword
+|Mac Native cloud builds only. Password to unlock the P12 referenced by `codename1.mac.certificate`. Required for cloud Mac builds.
+
+|codename1.mac.provision
+|Mac Native cloud builds only. Path to the Mac provisioning profile (`.provisionprofile`). Apple issues distinct provisioning profiles for Mac App Store and Developer ID distribution — pass the one that matches the chosen channel.
+
+|macNative.distribution
+|Mac Native builds only. `appStore` (default), `developerID`, or `both`. Selects which entitlements + ExportOptions plist + signing certificate to emit. `both` emits parallel `*-AppStore.entitlements` / `*-DeveloperID.entitlements` and matching `ExportOptions-*-Mac.plist` files so a single project can be archived to either channel.
+
+|macNative.teamId
+|Mac Native builds only. Apple Developer Team ID (alphanumeric). Falls back to `ios.release.teamId` → `ios.teamId` → `ios.debug.teamId` since most apps share a single Apple Developer Team for iOS and Mac.
+
+|macNative.bundleId
+|Mac Native builds only. Used only when `macNative.deriveBundleId=false`. Default: `<packageName>.mac`.
+
+|macNative.deriveBundleId
+|Mac Native builds only. `true` (default) maps to Xcode's `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER=YES` (Xcode appends `.maccatalyst` to the iOS bundle ID). Set to `false` to take the bundle ID verbatim from `macNative.bundleId`.
+
+|macNative.minDeploymentTarget
+|Mac Native builds only. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default `10.15` — earlier versions don't support Mac Catalyst.
+
+|macNative.iosMinDeploymentTarget
+|Mac Native builds only. iOS deployment-target floor for the Catalyst slice (`IPHONEOS_DEPLOYMENT_TARGET`). Default `13.1`. The plugin coerces the iOS slice's minimum upward when set.
+
+|macNative.appCategory
+|Mac Native builds only. `LSApplicationCategoryType` in the generated Info.plist. Default `public.app-category.utilities`. See https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype[Apple's category list].
+
+|macNative.copyright
+|Mac Native builds only. `NSHumanReadableCopyright` in the Info.plist. Defaults to `Copyright (c) <year> <vendor>`.
+
+|macNative.signing.style
+|Mac Native builds only. `automatic` (default) lets Xcode pick the signing certificate; `manual` forces the certificate identity hints below to be respected verbatim.
+
+|macNative.signingIdentity.appStore
+|Mac Native builds only. Signing certificate identity for the App Store channel. Default `Apple Distribution`.
+
+|macNative.signingIdentity.developerID
+|Mac Native builds only. Signing certificate identity for the Developer ID channel. Default `Developer ID Application`.
+
+|macNative.provisioningProfile.appStore
+|Mac Native builds only. Provisioning profile name for App Store distribution — used only when `macNative.signing.style=manual`.
+
+|macNative.provisioningProfile.developerID
+|Mac Native builds only. Provisioning profile name for Developer ID distribution — used only when `macNative.signing.style=manual`.
+
+|macNative.entitlements.appSandbox
+|Mac Native builds only. `true` enables `com.apple.security.app-sandbox`. Default is `true` for the `appStore` channel (Mac App Store requires the sandbox), `false` for `developerID`.
+
+|macNative.entitlements.network.client
+|Mac Native builds only. Toggles `com.apple.security.network.client`. Default `true`.
+
+|macNative.entitlements.network.server
+|Mac Native builds only. Toggles `com.apple.security.network.server`. Default `false`.
+
+|macNative.entitlements.files.userSelected
+|Mac Native builds only. `readwrite` (default), `readonly`, or `none`. Sets the matching `com.apple.security.files.user-selected.*` entitlement.
+
+|macNative.entitlements.hardenedRuntime
+|Mac Native builds only. `true` enables hardened runtime restrictions. Default is `true` for `developerID` (notarization requires it), `false` for `appStore`.
+
+|macNative.entitlements.allowJit
+|Mac Native builds only. `true` enables `com.apple.security.cs.allow-jit` for hardened runtime. ParparVM is AOT-compiled so this is `false` by default; flip when bundling a JIT-using cn1lib.
+
+|macNative.entitlements.extra
+|Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>…</dict>` of the generated entitlements plist. Use for entitlements Codename One doesn't expose individually.
+
+|macNative.fixedWindowSize
+|Mac Native builds only. Opt-in. Format `<width>x<height>` — for example `1024x685`. When set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
 
 |desktop.width
 |Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.
@@ -449,7 +545,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Height in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 600.
 
 |desktop.adaptToRetina
-|Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. will use higher DPI's
+|Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. Will use higher DPI's
 
 |desktop.resizable
 |Boolean true/false defaults to true. Indicates whether the UI in the desktop build is resizable
@@ -461,7 +557,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Name of the theme res file (without the ".res" extension) to use as the "native" theme. By default this is native indicating iOS theme on Mac and Windows Metro on Windows. If its something else then the app will try to load the file /themeName.res (placed in native/Java SE directory).
 
 |desktop.themeMac
-|Same as `desktop.theme` but specific to Mac OS
+|Same as `desktop.theme` but specific to macOS
 
 |desktop.themeWin
 |Same as `desktop.theme` but specific to Windows
@@ -482,13 +578,13 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |The JVM that should be bundled in the Windows desktop build. Windows desktop builds only. Supported values: zulu8, zuluFx8, zulu8-32bit, zuluFx8-32bit, zulu11, zuluFx11, zulu11-32bit, zuluFx11-32bit
 
 |windows.extensions
-|Historical build hint for the discontinued UWP target. it's retained here only for legacy reference and isn't used by current supported build targets.
+|Historical build hint for the discontinued UWP target. It's retained here only for legacy reference and isn't used by current supported build targets.
 
 |win.vm32bit
 |true/false (defaults to false). Forces windows desktop builds to use the Win32 JVM instead of the 64 bit VM making them compatible with older Windows Machines. This is off by default at the moment because of a bug in JDK 8 update 112 that might cause this to fail for some cases
 
 |win.installDirName
-|Windows desktop builds only. Overrides the default installation folder name suggested by the installer (under `Program Files`). Defaults to the application's main class name for backward compatibility. Use this build hint to set a user-friendly installation folder name (for example, `win.installDirName=My Application`). The application id used by Windows for upgrade detection is unaffected, so existing installs continue to upgrade.
+|Windows desktop builds only. Overrides the default installation folder name suggested by the installer (under `Program Files`). Defaults to the application's main class name for backward compatibility. Use this build hint to set a user-friendly installation folder name (for example, `win.installDirName=My Application`). The application ID used by Windows for upgrade detection is unaffected, so existing installations continue to upgrade.
 
 |win.shortcutName
 |Windows desktop builds only. Overrides the name used for the Start Menu shortcut, the Desktop shortcut and (when `win.launchOnStart=true`) the autostart shortcut. Defaults to the application's main class name for backward compatibility. Use this build hint to set a user-friendly shortcut label (for example, `win.shortcutName=My Application`).
@@ -551,7 +647,7 @@ If you explicitly lower the target SDK (for example: `android.targetSDKVersion=2
 .Install UI when using the old permissions system
 image::img/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
 
-When you keep the default target (API 33+) the installer defers to the runtime permission flow and the install UI looks like this instead:
+When you keep the default target (API 33+) the installer defers to the runtime permission flow and the installation UI looks like this instead:
 
 .Install UI when using the new permissions system
 image::img/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
@@ -578,7 +674,7 @@ Notice that denying this second request won't trigger another Codename One promp
 
 ===== Code changes
 
-no explicit code changes needed for this functionality to "work." The respective API's will work like they always worked and will prompt the user seamlessly for permissions.
+No explicit code changes needed for this functionality to "work." The respective APIs will work like they always worked and will prompt the user seamlessly for permissions.
 
 TIP: Some behaviors that never occurred on Android but were legal in the past might start occurring with the switch to the new API. For example: the location manager might be null and your app must always be ready to deal with such a situation
 
@@ -682,7 +778,7 @@ Here are steps that should work for everyone:
 
 NOTE: You might need to copy more Gradle file meta-data such as multi-dexing etc.
 
-You might not need to repeat the whole thing with every build. For example: it might be practical to copy the `userSources.jar` from the libs directory to get the latest version of your code. You can copy the `src/main` directory to get the latest up to date Android port.
+You might not need to repeat the whole thing with every build. For example: it might be practical to copy the `userSources.jar` from the libs directory to get the latest version of your code. You can copy the `src/main` directory to get the latest up-to-date Android port.
 
 
 === Native interfaces
@@ -691,7 +787,7 @@ Sometimes you may wish to use an API that's unsupported by Codename One or integ
 
 ==== Introduction
 
-Notice that when you say "native" you don't mean C/C++ always but rather the platforms "native" environment. for Android, Java or Kotlin code can be invoked with full access to the Android API. In case of iOS, Objective-C or Swift code can be invoked and so forth.
+Notice that when you say "native" you don't mean C/C++ always but rather the platforms "native" environment. For Android, Java or Kotlin code can be invoked with full access to the Android API. In case of iOS, Objective-C or Swift code can be invoked and so forth.
 
 TIP: You can still access C code under Android either by using JNI from the Android native code or by using a library
 
@@ -701,7 +797,7 @@ NOTE: The reason for the limits is the disparity between the platforms. Mapping 
 
 Furthermore, native methods should avoid features such as overloading, varargs (or any Java 5+ feature for that matter) to allow portability for languages that don't support such features.
 
-IMPORTANT: don't rely on pass by reference/value behavior since they vary between platforms
+IMPORTANT: Don't rely on pass by reference/value behavior since they vary between platforms
 
 Implementing a native layer effectively means:
 
@@ -716,7 +812,7 @@ For example: to create a simple hello world interface do something like:
 include::../demos/common/src/main/java/com/mycompany/myapp/MyNative.java[tag=myNativeInterface,indent=0]
 ----
 
-You now need to right click the class in the IDE and select the #Generate Native Access# menu item:
+You now need to right-click the class in the IDE and select the #Generate Native Access# menu item:
 
 .Generating the native code
 image::img/native-interfaces-generate-menu.png[Generating the native code,scaledwidth=20%]
@@ -766,12 +862,12 @@ include::../demos/android/src/main/java/com/mycompany/myapp/MyNativeImpl.java[ta
 <2> The impl class doesn't physically implement the `MyNative` interface! +
 This is intentional and due to the `PeerComponent` functionality mentioned below. You don't need to add an implements clause.
 
-<3> Notice that there is no constructor and the class is public. it's crucial that the system will be able to assign the class without obstruction. You can use a constructor but it can't have any arguments and you shouldn't rely on semantics of construction.
+<3> Notice that there is no constructor and the class is public. It's crucial that the system will be able to assign the class without obstruction. You can use a constructor but it can't have any arguments and you shouldn't rely on semantics of construction.
 
 <4> You implemented the native method and that you set `isSupported` to true.
 
 IMPORTANT: The IDE won't provide completion suggestions and will claim that there are errors in the code! +
-Codename One doesn't include the native platforms in its bundle for example: the full Android SDK or the full Xcode Objective-C runtime. For example, since the native code is compiled on the servers (where these runteims are present) this shouldn't be a problem
+Codename One doesn't include the native platforms in its bundle for example: the full Android SDK or the full Xcode Objective-C runtime. For example, since the native code is compiled on the servers (where these runtimes are present) this shouldn't be a problem
 
 TIP: When implementing a non-trivial native interface, send a server build with the "Include Source" option checked. Implement the native interface in the native IDE then copy and paste the native code back into Codename One
 
@@ -799,9 +895,9 @@ For Android native interfaces you can implement the generated `...Impl` class in
 
 ===== Use the Android main thread (native EDT)
 
-iOS, Android & pretty much any modern OS has an EDT like thread that handles events etc. The problem is that they differ in their nuanced behavior. For example: Android will respect calls off of the EDT and iOS will often crash. Some OS's enforce EDT access and will throw an exception when you violate that...
+iOS, Android & pretty much any modern OS has an EDT like thread that handles events etc. The problem is that they differ in their nuanced behavior. For example: Android will respect calls off of the EDT and iOS will often crash. Some OSes enforce EDT access and will throw an exception when you violate that...
 
-You don't need to know about these things, hidden functionality within your implementation bridges between your EDT and the native EDT to provide consistent cross platform behavior. However, when you write native code you need awareness.
+You don't need to know about these things, hidden functionality within your implementation bridges between your EDT and the native EDT to provide consistent cross-platform behavior. However, when you write native code you need awareness.
 
 .Why not Implicitly call Native Interfaces on the Native EDT?
 ****
@@ -817,7 +913,7 @@ Within your native code in Android do something like:
 include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/AndroidThreadSnippets.java[tag=androidRunOnUiThread,indent=0]
 ----
 
-This will execute the block within `run()` asynchronously on the native Android UI thread. If you need synchronous execution you've a special method for Codename One:
+This will execute the block within `run()` asynchronously on the native Android UI thread. If you need synchronous execution you have a special method for Codename One:
 
 [source,java]
 ----
@@ -851,7 +947,7 @@ android.gradleDep=compile 'io.intercom.android:intercom-sdk:3.+'
 
 This would "work" but there is a catch...
 
-You might need to define the specific version of the Android SDK used and specific version of Google play services version used. Intercom is pretty sensitive about those and demanded that you also add:
+You might need to define the specific version of the Android SDK used and specific version of Google Play Services version used. Intercom is pretty sensitive about those and demanded that you also add:
 
 ----
 android.playServices=9.8.0
@@ -911,19 +1007,19 @@ You can use this for synchronous invocation, notice the lack of the `a` in the d
 include::../demos/ios/src/main/objectivec/DispatchExamples.m[tag=dispatchSync,indent=0]
 ----
 
-The problem with the synchronous call is that it will block the caller thread, if the caller thread is the EDT this can cause performance issues and even a deadlock. it's important to be cautious with this call!
+The problem with the synchronous call is that it will block the caller thread, if the caller thread is the EDT this can cause performance issues and even a deadlock. It's important to be cautious with this call!
 
 ===== Use Cocoapods for dependencies
 
 Cocoapods are the iOS equivalent of Gradle dependencies.
 
-CocoaPods allow you to add a native library dependency to iOS far more than Gradle. By default you target iOS 7.0 or newer which is supported by Intercom for older versions of the library. Annoyingly CocoaPods might seem to work but some specific API's won't work since it fell back to an older version... To solve this you've to explicitly define the build hint `ios.pods.platform=8.0` to force iOS 8 or newer. You might need to force it to even newer versions as some libraries force an iOS 9 least etc.
+CocoaPods allow you to add a native library dependency to iOS far more than Gradle. By default you target iOS 7.0 or newer which is supported by Intercom for older versions of the library. Annoyingly CocoaPods might seem to work but some specific APIs won't work since it fell back to an older version... To solve this you've to explicitly define the build hint `ios.pods.platform=8.0` to force iOS 8 or newer. You might need to force it to even newer versions as some libraries force an iOS 9 least etc.
 
 Including intercom itself required a single build hint: `ios.pods=Intercom` which you can obviously extend by using commas to include many libraries. You can search the https://cocoapods.org/[CocoaPods website] for supported 3rd party libraries which includes everything you would expect. One important advantage when working with CocoaPods is the faster build time as the upload to the Codename One website is smaller and the bandwidth you've to CocoaPods is faster. Another advantage is the ability to keep up with the latest developments from the library providers.
 
-==== Javascript
+==== JavaScript
 
-Native interfaces in Javascript look a little different than the other platforms since Javascript doesn't natively support threads or classes. The native implementation should be placed in a file with name matching the name of the package and the class name combined where the "." elements are replaced by underscores.
+Native interfaces in JavaScript look a little different than the other platforms since JavaScript doesn't natively support threads or classes. The native implementation should be placed in a file with name matching the name of the package and the class name combined where the "." elements are replaced by underscores.
 
 The default generated stubs for the JavaScript build look like this `com_mycompany_myapp_MyNative`:
 
@@ -947,7 +1043,7 @@ exports.com_mycompany_myapp_MyNative= o;
 })(cn1_get_native_interfaces());
 ----
 
-A simple implementation looks like this.
+A simple implementation looks like this:
 
 [source,JavaScript]
 ----
@@ -968,7 +1064,7 @@ exports.com_my_code_MyNative = o;
 })(cn1_get_native_interfaces());
 ----
 
-Notice that you use the `complete()` method of the provided callback to pass the return value rather than using the `return` statement. This is to work around the fact that Javascript doesn't natively support threads. The *Java* thread that's calling your native interface will block until your method calls `callback.complete()`. This allows you to use asynchronous APIs inside your native method while still allowing Codename One to work use your native interface through a synchronous API.
+Notice that you use the `complete()` method of the provided callback to pass the return value rather than using the `return` statement. This is to work around the fact that JavaScript doesn't natively support threads. The *Java* thread that's calling your native interface will block until your method calls `callback.complete()`. This allows you to use asynchronous APIs inside your native method while still allowing Codename One to work use your native interface through a synchronous API.
 
 WARNING: Make sure you call either `callback.complete()` or `callback.error()` in your method at some point, or you will cause a deadlock in your app (code calling your native method will sit and "wait" forever for your method to return a value).
 
@@ -979,7 +1075,7 @@ The naming conventions for the methods themselves are modeled after the naming c
 
 Where `<method-name>` is the name of the method in Java, and the `<param-X-type>`s are a string representing the parameter type. The general rule for these strings are:
 
-1. Primitive types are mapped to their type name. (For example: `int` to "int," `double` to "double," etc...).
+1. Primitive types are mapped to their type name. (For example: `int` to "int," `double` to "double," etc.).
 2. Reference types are mapped to their fully qualified class name with '.' replaced with underscores. For example: `java.lang.String` would be `java_lang_String`.
 3. Array parameters are marked by their scalar type name followed by an underscore and `1ARRAY`. For example: `int[]` would be "int_1ARRAY" and `String[]` would be `java_lang_String_1ARRAY`.
 
@@ -1062,7 +1158,7 @@ include::../demos/ios/src/main/objectivec/PeerComponentExamples.m[tag=createPeer
 TIP: Not all platforms support native peers. Specifically Java SE doesn't support them due to the way the Java SE native interfaces are mapped to their implementation. +
 Note that this won't limit the code from running on an unsupported platform. Only that specific method won't work.
 
-Javascript would expect a DOM Element (for example: a `<div>` tag to be returned.). For example:
+JavaScript would expect a DOM Element (for example: a `<div>` tag to be returned.). For example:
 
 [source,JavaScript]
 ----
@@ -1171,8 +1267,8 @@ Permissions in Codename One are seamless. Codename One traverses the bytecode an
 
 For example, when accessing native functionality this won’t work since native code might require specialized permissions and you don’t/can’t run any serious analysis on it (it can be about anything).
 
-if you require more permissions in your Android native code you need to define them in the build arguments using
-`android.permission.<PERMISSION_NAME>=true` for each permission you want to include. A full list of permissions are listed in Android's https://developer.android.com/reference/android/Manifest.permission.html[Manifest.permission documentation].
+If you require more permissions in your Android native code you need to define them in the build arguments using
+`android.permission.<PERMISSION_NAME>=true` for each permission you want to include. A full list of permissions are listed in Android's https://developer.android.com/reference/android/Manifest.permission.html[`Manifest.permission` documentation].
 
 For example:
 
@@ -1207,7 +1303,7 @@ NOTE: You need to include the full XML snippet. You can unify many lines into a 
 
 ==== Native AndroidNativeUtil
 
-If you do any native interfaces programming in Android you should be familiar with the `AndroidNativeUtil` class which allows you to access native device functionality more from the native code. For example: many Android API's need access to the `Activity` which you can get by calling `AndroidNativeUtil.getActivity()`.
+If you do any native interfaces programming in Android you should be familiar with the `AndroidNativeUtil` class which allows you to access native device functionality more from the native code. For example: many Android APIs need access to the `Activity` which you can get by calling `AndroidNativeUtil.getActivity()`.
 
 The native util class includes a few other features such as:
 
@@ -1218,7 +1314,7 @@ The native util class includes a few other features such as:
  `onCreate` etc. which can be pretty useful for some cases.
 
 * `registerViewRenderer` - https://www.codenameone.com/javadoc/com/codename1/ui/PeerComponent.html[PeerComponent]'s are shown on top of the UI since they're rendered within
- their own thread outside of the EDT cycle. when you need to show a https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] on top of the peer you grab a
+ their own thread outside of the EDT cycle. When you need to show a https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] on top of the peer you grab a
  screenshot of the peer, hide it and then show the dialog with the image as the background (the same applies for
  transitions). Some components (specifically the MapView) might not render and require
  custom code to implement the transferal to a native Bitmap, this API allows you to do that.
@@ -1234,7 +1330,7 @@ include::../demos/android/src/main/java/com/codenameone/developerguide/advancedt
 
 A common way to implement features in Android is the `BroadcastReceiver` API. This allows intercepting operating system events for common use cases.
 
-A good example is intercepting incoming SMS which is specific to Android so you'd need a broardcast receiver to implement that. This is often confusing to developers who sometimes derive the impl class from broadcast receiver. that's a mistake...
+A good example is intercepting incoming SMS which is specific to Android so you'd need a broadcast receiver to implement that. This is often confusing to developers who sometimes derive the impl class from broadcast receiver. That's a mistake...
 
 The solution is to place any native Android class into the `native/android` directory. It will get compiled with the rest of the native code and "works." You can therefore place this class under `native/android/com/codename1/sms/intercept`:
 
@@ -1322,9 +1418,9 @@ The native sample in stack overflow bound the listener in the activity but here 
 include::../demos/common/src/main/java/com/codename1/sms/intercept/NativeSMSInterceptor.java[tag=nativeSmsInterceptor,indent=0]
 ----
 
-that's easy!
+That's easy!
 
-Notice that `isSupported()` returns false for all other OS's so you won't need to ask whether this is "Android" you can use `isSupported()`.
+Notice that `isSupported()` returns false for all other OSes so you won't need to ask whether this is "Android" you can use `isSupported()`.
 
 The implementation is pretty easy too:
 
@@ -1335,7 +1431,7 @@ include::../demos/android/src/main/java/com/codename1/sms/intercept/NativeSMSInt
 
 <1> This will trigger the permission prompt on Android 6 and newer. Even though the permission is declared in XML this isn't enough for 6+. Notice that even when you run on Android 6 you still need to declare permissions in XML!
 
-<2> Here you actually bind the listener, this allows you to grab one SMS and not listen in on every SMS coming thru
+<2> Here you actually bind the listener, this allows you to grab one SMS and not listen in on every SMS coming through
 
 
 ==== Native code callbacks
@@ -1345,8 +1441,8 @@ Native interfaces standardize the invocation of native code from Codename One, b
 A common "trick" for calling back is to define a static method and then trigger it from native code. This works
 for Android & Java SE since those platforms use Java for their "native code." Mapping this to iOS requires some basic understanding of how the iOS VM works.
 
-For this explanation lets pretend you've a class called NativeCallback in the src hierarchy under
-the package `com.mycompany` that has the method: `public static void callback()`.
+For this explanation lets pretend you have a class called NativeCallback in the src hierarchy under
+the package `com.mycompany` that has the method: `public static void callback()`:
 
 [source,java]
 ----
@@ -1354,7 +1450,7 @@ include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nat
 ----
 
 
-if you want to call it from Android or all the Java based platforms you can write this in the "native" code:
+If you want to call it from Android or all the Java based platforms you can write this in the "native" code:
 
 [source,java]
 ----
@@ -1449,11 +1545,11 @@ include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCal
 
 The upper case R allows you to differentiate between void `callback(int,int)` and `int callback(int)`.
 
-TIP: Covariant return types are a little known Java 5 feature. For example: the method `Object getX()` can be overriden by `MyObject getX()`. For example, in the VM level they can both exist side by side.
+TIP: Covariant return types are a little known Java 5 feature. For example: the method `Object getX()` can be overridden by `MyObject getX()`. For example, in the VM level they can both exist side by side.
 
 ===== Accessing callbacks from JavaScript
 
-The mechanism for invoking static callback methods from Javascript (for the Javascript port ) is like Objective-C's. The `this` object in your native interface method contains a property named `$GLOBAL$` that provides access to static Java methods. This object will contain Javascript mirror objects for each Java class (though the property name is mangled by replacing "." with underscores). Each mirror object contains a wrapper method for its underlying class's static methods where the method name follows the same naming convention as is used for the Javascript native methods themselves (and like the naming conventions used in Objective-C).
+The mechanism for invoking static callback methods from JavaScript (for the JavaScript port ) is like Objective-C's. The `this` object in your native interface method contains a property named `$GLOBAL$` that provides access to static Java methods. This object will contain JavaScript mirror objects for each Java class (though the property name is mangled by replacing "." with underscores). Each mirror object contains a wrapper method for its underlying class's static methods where the method name follows the same naming convention as is used for the JavaScript native methods themselves (and like the naming conventions used in Objective-C).
 
 For example, the Google Maps project includes the static callback method:
 
@@ -1462,9 +1558,9 @@ For example, the Google Maps project includes the static callback method:
 include::../demos/common/src/main/java/com/codename1/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
 ----
 
-defined in the `com.codename1.googlemaps.MapContainer` class.
+It's defined in the `com.codename1.googlemaps.MapContainer` class.
 
-This method is called from Javascript inside a native interface using the following code:
+This method is called from JavaScript inside a native interface using the following code:
 
 [source,JavaScript]
 ----
@@ -1476,7 +1572,7 @@ google.maps.event.addListener(this.map, 'bounds_changed', function() {
 
 In this example you first get a reference to the `fireMapChangeEvent` method, and then call it later. For example, you could have called it directly also.
 
-WARNING: Your code *MUST* contain the full string path `this.$GLOBAL$.your_class_name.your_method_name` or the build server won't be able to recognize that your code requires this method. The `$GLOBAL$` object is populated by the build server with those classes and methods that are used inside your native methods. If the build server doesn't recognize that the methods are being used (through this pattern) it won't generate the necessary wrappers for your Javascript code to access the Java methods.
+WARNING: Your code *MUST* contain the full string path `this.$GLOBAL$.your_class_name.your_method_name` or the build server won't be able to recognize that your code requires this method. The `$GLOBAL$` object is populated by the build server with those classes and methods that are used inside your native methods. If the build server doesn't recognize that the methods are being used (through this pattern) it won't generate the necessary wrappers for your JavaScript code to access the Java methods.
 
 ===== Callbacks of the SMS receiver
 
@@ -1495,7 +1591,7 @@ include::../demos/common/src/main/java/com/codename1/sms/intercept/SMSCallback.j
 
 ===== Asynchronous callbacks & threading
 
-One of the problematic aspects of calling back into Java from Javascript is that Javascript has no notion of multi-threading. If the method you're calling uses Java's threads at all (for example: It includes a `wait()`, `notify()`, `sleep()`, `callSerially()`, etc...) you need to call it asynchronously from Javascript. You can call a method asynchronously by appending `$async` to the method name. For example: With the Google Maps example above, you would change :
+One of the problematic aspects of calling back into Java from JavaScript is that JavaScript has no notion of multi-threading. If the method you're calling uses Java's threads at all (for example: It includes a `wait()`, `notify()`, `sleep()`, `callSerially()`, etc.) you need to call it asynchronously from JavaScript. You can call a method asynchronously by appending `$async` to the method name. For example: With the Google Maps example above, you would change :
 
 [source,JavaScript]
 ----
@@ -1518,12 +1614,12 @@ TIP: Usually you should use the *async* version of a method when calling it from
 
 Support for JAR files in Codename One has been a source of confusion so its probably a good idea to revisit this subject again and clarify all the details.
 
-The first source of confusion is changing the classpath. You should NEVER change the classpath or add an external JAR through the IDE classpath UI. The reasoning here is simple, these IDE's don't package the JAR's into the final executable and even if they did these JAR's would probably use features unavailable or inappropriate for the device (for example: `java.io.File` etc.).
+The first source of confusion is changing the classpath. You should NEVER change the classpath or add an external JAR through the IDE classpath UI. The reasoning here is simple, these IDEs don't package the JARs into the final executable and even if they did these JARs would probably use features unavailable or inappropriate for the device (for example: `java.io.File` etc.).
 
-.don't change the classpath, this is how it should look for a typical Java 8 Codename One application
-image::img/cn1libs-dont-change-classpath.png[don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
+.Don't change the classpath, this is how it should look for a typical Java 8 Codename One application
+image::img/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
 
-Cn1libs are Codename One's file format for 3rd party extensions. it's physicially a zip file containing other zip files and some meta-data.
+Cn1libs are Codename One's file format for 3rd party extensions. It's physically a zip file containing other zip files and some meta-data.
 
 ==== Why not use JAR
 
@@ -1533,7 +1629,7 @@ Jars don't include support for writing native code; you could use JNI in jars bu
 
 Jars don't support "proper" code completion, a common developer trick is to stick source code into the jar but that prevents usage with proprietary code. Cn1libs provide full IDE code completion (with JavaDoc hints) without exposing the sources.
 
-two use cases for wanting JAR's and they both have different solutions:
+There are two use cases for wanting JARs and they both have different solutions:
 
 . Modularity
 . Working with an existing JARs
@@ -1597,7 +1693,7 @@ The best way to discover the right syntax for such build hints is to set them th
 
 The obvious question is why do you need two files?
 
-two types of build hints: required and appended.
+There are two types of build hints: required and appended.
 
 Required build hints can be something like `ios.objC=true`
 which you want to always work. For example: if a cn1lib defines `ios.objC=true` and another cn1lib defines `ios.objC=false`
@@ -1619,7 +1715,7 @@ for the developer to investigate issues in this process.
 `codenameone_settings.properties` file. If you need to change a flag later on you might need to alert users to make changes to their properties essentially negating the value of this feature... +
 be careful when adding properties here.
 
-it's your responsibility as a library developer to decide which build hint goes into which file! +
+It's your responsibility as a library developer to decide which build hint goes into which file! +
 Codename One can't automate this process as the whole process of build hints is by definition an ad hoc process.
 
 The rule of thumb is that a build hint with a numeric or boolean value is always a required property. If an entry has a string that you can append with another string then its probably an appended entry.
@@ -1677,6 +1773,7 @@ ios.locationUsageDescription
 ios.bundleVersion
 ios.objC
 ios.testFlight
+ios.metal
 desktop.width
 desktop.height
 desktop.adaptToRetina
@@ -1755,13 +1852,13 @@ While its pretty easy to use native interfaces to write Android native code some
 obvious. For example: if you want to integrate a 3rd party library, specifically one that includes native C JNI code this
 process isn't as straightforward.
 
-If you need to integrate such a library into your native calls you've the following options:
+If you need to integrate such a library into your native calls you have the following options:
 
 . The first option (and the easiest one) is to place a Jar file in the native/android directory. This will link
 your binary with the jar file. Just place the jar under the native/android and the build server will pick it up and will
 add it to the classpath. +
 Notice that Android release apps are obfuscated by default which might cause issues with such libraries if they
-reference API's that are unavailable on Android. You can workaround this by adding a build hint to the proguard
+reference APIs that are unavailable on Android. You can work around this by adding a build hint to the proguard
 obfuscation code that blocs the obfuscation of the problematic classes using the build hint: +
 `android.proguardKeep=-keep class com.mypackage.ProblemClass { *; }``
 
@@ -1778,13 +1875,13 @@ Rename the extension from `.zip` to `.andlib` and place the andlib file under th
 
 === Drag & drop
 
-Unlike other platforms that tried to create overly generic catch all API's Codename One tried to make things as simple as possible.
+Unlike other platforms that tried to create overly generic catch all APIs Codename One tried to make things as simple as possible.
 
 In Codename One components can be dragged and drop targets are always components. The logic of actually performing the operation indicated by the drop is the responsibility of the person implementing the drop.
 
 NOTE: Some platforms for example: AWT allow dragging abstract concepts such as mime type elements. This allows dragging things like a text file into the app, but that use case isn't realistic in mobile
 
-The code below allows you to rearrange the items based on a sensible order. Notice it relies on the default `Container` drop behavior.
+The code below allows you to rearrange the items based on a sensible order. Notice it relies on the default `Container` drop behavior:
 
 [source,java]
 ----
@@ -1849,7 +1946,7 @@ of your project. It should look like this:
 </resources>
 ----
 
-=== Intercepting URL's on iOS & Android
+=== Intercepting URLs on iOS & Android
 
 A common trick in mobile application development, is communication between two unrelated applications.
 
@@ -1942,11 +2039,11 @@ Use this checklist when the integration can activate payment credentials or acco
   _Where_: native Android code (bridge activity/native interface), because this requires Android `PackageManager` APIs.
 . **Check payload freshness** (nonce/timestamp/challenge) before approving. +
   _Where_: back end/API service as the source of truth.
-. **Bind response to request** (request id / correlation id) and reject mismatched or replayed responses. +
+. **Bind response to request** (request ID / correlation ID) and reject mismatched or replayed responses. +
   _Where_: back end first, then enforce in CN1/native completion flow.
 . **Time-box bridge activity state** and fail closed on timeout, process death, or missing bridge instance. +
   _Where_: native Android bridge + CN1 timeout handling.
-. **Audit log** caller package, request id, decision, and failure reason (without storing full PAN/token data). +
+. **Audit log** caller package, request ID, decision, and failure reason (without storing full PAN/token data). +
   _Where_: back end and security telemetry pipeline.
 ****
 
@@ -2084,14 +2181,14 @@ iOS is practically identical to Android with some small caveats, iOS's equivalen
 
 You can inject more data into the plist by using the `ios.plistInject` build hint.
 
-the equivalent in the iOS side would be
+The equivalent on the iOS side would be:
 
 [source,xml]
 ----
 ios.plistInject=<key>CFBundleURLTypes</key>     <array>         <dict>             <key>CFBundleURLName</key>             <string>com.yourcompany.myapp</string>         </dict>         <dict>             <key>CFBundleURLSchemes</key>             <array>                 <string>myapp</string>             </array>         </dict>     </array>
 ----
 
-For example, that can conflict with the Facebook integration if you use `FacebookConnect` which needs access to the schemes. To workaround it you can use the build hint `ios.urlScheme` for example:
+For example, that can conflict with the Facebook integration if you use `FacebookConnect` which needs access to the schemes. To work around this you can use the build hint `ios.urlScheme` for example:
 
 [source,xml]
 ----
@@ -2118,10 +2215,10 @@ of Codename One's code is in Java hence its portable and pretty easy to maintain
 
 ==== Why does Codename One need native widgets at all
 
-You need the native device to do input, html rendering etc. these are too big and too complex tasks for Codename One to
+You need the native device to do input, html rendering etc. These are too big and too complex tasks for Codename One to
 do from scratch.
 
-They're sometimes impossible to perform without the native platform. For example: the virtual keyboard input on the devices is tied directly to the native text input. it's impractical to implement everything from scratch for all languages, dictionaries etc. The result would be sub-par.
+They're sometimes impossible to perform without the native platform. For example: the virtual keyboard input on the devices is tied directly to the native text input. It's impractical to implement everything from scratch for all languages, dictionaries etc. The result would be sub-par.
 
 A web browser can't be implemented in this age without a JavaScript JIT and including a JIT within an iOS app is prohibited by Apple.
 
@@ -2147,13 +2244,13 @@ Codename One grabs a screenshot of the peer, hide it and then you can show the s
 
 ==== Why can't you combine peer component scrolling and Codename One scrolling
 
-Since the form title/footer etc. are drawn by Codename One the peer component might paint itself on top of them.
+Since the form title/footer etc. Are drawn by Codename One the peer component might paint itself on top of them.
 Clipping a peer component is often pretty difficult. Furthermore, if the user drags his finger within the peer
 component he might trigger the native scroll within the might collide with your scrolling?
 
 ==== Native components in the first Form
 
-Another problem might be counter intuitive. iOS has screenshot images representing the first form. If your first page is an HTML or a native map (or other peer widget) the screenshot process on the build server will show fallback code instead of the real thing thus providing sub-par behavior.
+Another problem might be counterintuitive. iOS has screenshot images representing the first form. If your first page is an HTML or a native map (or other peer widget) the screenshot process on the build server will show fallback code instead of the real thing thus providing sub-par behavior.
 
 Its impractical to support something like HTML for the screenshot process since it would also look different from the web component running on the device.
 
@@ -2214,7 +2311,7 @@ Strings, as are return values.
 are written in the native language of the platform (for example: Java for Android, and Objective-C for iOS).
 4. *Native dependencies*. Any 3rd party libraries required for the native code to work, need to be included for
 each platform. On android, this may mean bundling.jar files,.aar files, or.andlib files. On iOS, this may mean
-bundling.h files,.a files,.framework, and.bundle files.
+bundling `.h` files, `.a` files, `.framework`, and `.bundle` files.
 5. *Build hints*. Some libraries will require you to add some extra build hints to your project. For example: On Android you
 may need to add permissions to the manifest, or define services in the `<Application>` section of the manifest.
 On iOS, this may mean specifying more core frameworks for inclusion, or adding build flags for compilation.
@@ -2239,7 +2336,7 @@ image::img/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,sc
 
 ==== Step 4: Implement the public API and native interface
 
-you've already looked at the final product of the public API in the previous step. Back up and walk through the process step-by-step.
+You've already looked at the final product of the public API in the previous step. Back up and walk through the process step-by-step.
 
 The goal is to model your API around the Android API. The central class that includes all the functionality of the SDK is the http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html[com.freshdesk.mobihelp.Mobihelp class], so you begin there.
 
@@ -2275,7 +2372,7 @@ In any case, you don't have to come up with the specifics right now, as you're s
 
 ===== Callbacks
 
-it's often the case that native code needs to call back into Codename One code when an event occurs. This may be connected directly to an API method call (for example: as the result of an asynchronous method invocation), or due to something initiated by the operating system or the native SDK on its own (for example: a push notification, a location event, etc..).
+It's often the case that native code needs to call back into Codename One code when an event occurs. This may be connected directly to an API method call (for example: as the result of an asynchronous method invocation), or due to something initiated by the operating system or the native SDK on its own (for example: a push notification, a location event, etc.).
 
 Native code will have access to both the Codename One API and any native APIs in your app, but on some platforms, accessing the Codename One API may be a little tricky. For example: on iOS you'll be calling from Objective-C back into Java which requires knowledge of Codename One's java-to-goal C conversion process. In general, the easiest way to ease callbacks is to provide abstractions that involve static Java methods (in Codename One space) that accept and return primitive types.
 
@@ -2292,16 +2389,16 @@ The interface definition for `UnreadUpdatesCallback` is:
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
 ----
 
-that's: If you were to implement this method (planned for a later section), you need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
+In other words: if you were to implement this method (planned for a later section), you need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
 
-you've two issues that will need to be solved here:
+You've two issues that will need to be solved here:
 
 1. How to pass the `callback` object through the native interface.
 2. How to *call* the `callback.onResult()` method from native code at the right time.
 
 For the first issue, you will use strategy #2 that you mentioned earlier: (Store the parameter on the Codename One side and pass some ID or token that can be used on the native side to retrieve the value).
 
-For the second issue, you will create a static method that can take the token generated to solve the first issue, and call the stored `callback` object's `onResult()` method. You abstract both sides of this process using the https://github.com/shannah/cn1-freshdesk/blob/master/cn1-freshdesk-demo/src/com/codename1/freshdesk/MobihelpNativeCallback.java[`MobihelpNativeCallback` class].
+For the second issue, you will create a static method that can take the token generated to solve the first issue, and call the stored `callback` object's `onResult()` method. You abstract both sides of this process using the https://github.com/shannah/cn1-freshdesk/blob/master/cn1-freshdesk-demo/src/com/codename1/freshdesk/MobihelpNativeCallback.java[`MobihelpNativeCallback` class]:
 
 [source,java]
 ----
@@ -2323,7 +2420,7 @@ Note, but, that FreshDesk (and most other service provides that have native SDKs
 
 Your public API therefore needs to enable you to provide many credentials in the same app, and your API needs to know to use the correct credentials depending on the device that the app is running on.
 
-many solutions to this problem exist, but the chosen approach provides two different `init()` methods:
+Many solutions to this problem exist, but the chosen approach provides two different `init()` methods:
 
 [source,java]
 ----
@@ -2353,7 +2450,7 @@ include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp
 
 ===== The native interface
 
-The final native interface is identical to your public API, except in cases where the public API included non-primitive parameters.
+The final native interface is identical to your public API, except in cases where the public API included non-primitive parameters:
 
 [source,java]
 ----
@@ -2364,7 +2461,7 @@ Notice also, that the native interface includes a set of methods with names pref
 
 ===== Connecting the public API to the native interface
 
-you've a public API, and you've a native interface. The idea is that the public API should be a thin wrapper around the native interface to smooth out rough edges that are likely to exist due to the strict set of rules involved in native interfaces. You will, so, use delegation inside the `Mobihelp` class to provide it a reference to an instance of `MobihelpNative`:
+You've a public API, and you have a native interface. The idea is that the public API should be a thin wrapper around the native interface to smooth out rough edges that are likely to exist due to the strict set of rules involved in native interfaces. You will, so, use delegation inside the `Mobihelp` class to provide it a reference to an instance of `MobihelpNative`:
 
 [source,java]
 ----
@@ -2394,7 +2491,8 @@ include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp
 
 For some other methods, the public API needs to break apart the parameters into a form that the native interface can accept. For example: the `init()` method, shown above, takes a `MobihelpConfig` object as a parameter, but it passed the properties of the `config` object individually into the native interface.
 
-Another example, is the `showSupport(ArrayList<String> tags)` method. The corresponding native interface method that's wraps is `showSupport(String tags, `String` separator)` - i.e it needs to merge all tags into a single delimited string, and pass then to the native interface along with the delimiter used. The implementation is:
+// vale-skip: Microsoft.Foreign: "i.e.," is the precise abbreviation here; "that is" would read awkwardly inside the parenthetical clause. LanguageTool requires the comma after "i.e.".
+Another example, is the `showSupport(ArrayList<String> tags)` method. The corresponding native interface method that's wraps is `showSupport(String tags, `String` separator)` - i.e., it needs to merge all tags into a single delimited string, and pass then to the native interface along with the delimiter used. The implementation is:
 
 [source,java]
 ----
@@ -2490,9 +2588,9 @@ appcompat-v7-19.1.0.aar.md5	appcompat-v7-19.1.0.pom.md5
 appcompat-v7-19.1.0.aar.sha1	appcompat-v7-19.1.0.pom.sha1
 ----
 
-two files of interest here:
+There are two files of interest here:
 
-. appcompat-v7-19.1.0.aar - This is the actual library that you need to include in your project to meet the Mobisdk dependency.
+. appcompat-v7-19.1.0.aar - This is the actual library that you need to include in your project to meet the MobiSDK dependency.
 . appcompat-v7-19.1.0.pom - This is the Maven XML file for the library. It will show you any dependencies that the appcompat library has. You will also need to include these dependencies:
 +
 ----
@@ -2506,7 +2604,7 @@ two files of interest here:
   </dependencies>
 ----
 +
-that's: You need to include the `support-v4` library version 19.1.0 in your project. This is also part of the Android Support library. If you back up a couple of directories to: `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support`, you will see it listed there:
+In other words: you need to include the `support-v4` library version 19.1.0 in your project. This is also part of the Android Support library. If you back up a couple of directories to: `ANDROID_HOME/sdk/extras/android/m2repository/com/android/support`, you will see it listed there:
 +
 ----
 appcompat-v7			palette-v7
@@ -2530,7 +2628,7 @@ support-v4-19.1.0-sources.jar.sha1	support-v4-19.1.0.pom.sha1
 +
 Looks like this library is pure Java classes, so you need to include the `support-v4-19.1.0.jar` file into your project. Checking the `.pom` file you see that there are no more dependencies you need to add.
 
-to summarize your findings, you need to include the following files in your `native/android` directory:
+To summarize your findings, you need to include the following files in your `native/android` directory:
 
 . appcompat-v7-19.1.0.aar
 . support-v4-19.1.0.jar
@@ -2652,7 +2750,7 @@ You will need to add the `<uses-permission>` tags and all the contents of the `<
 For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
 
 
-> If you use Proguard, please make sure you've the following included in your project's proguard-project.txt
+> If you use Proguard, please make sure you have the following included in your project's proguard-project.txt
 >
 > ----
 > -keep class android.support.v4.** { *; }
@@ -2742,12 +2840,12 @@ include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNative
 
 ==== Bundling native iOS SDK
 
-Now that you've implemented your iOS native interface, you need to bundle the Mobihelp iOS SDK into your project. a few different scenarios you may face when looking to include a native SDK:
+Now that you've implemented your iOS native interface, you need to bundle the Mobihelp iOS SDK into your project. A few different scenarios you may face when looking to include a native SDK:
 
 . The SDK includes `.bundle` resource files. In this case, copy the `.bundle` file(s) into your `native/ios` directory.
 . The SDK includes `.h` header files. In this case, copy the `.h` file(s) into your `native/ios` directory.
 . The SDK includes `.a` files. In this case, copy the `.a` file(s) into your `native/ios` directory.
-. The SDK includes `.framework` files. In this case, you'll need to zip up the framework, and copy it into your `native/ios` directory. For example: If the framework is named, MyFramework.framework, then the zip file should be named MyFramework.framework.zip, and should be located at `native/ios/MyFramework.framework.zip`.
+. The SDK includes `.framework` files. In this case, you'll need to zip up the framework, and copy it into your `native/ios` directory. For example: If the framework is named, `MyFramework.framework`, then the zip file should be named MyFramework.framework.zip, and should be located at `native/ios/MyFramework.framework.zip`.
 
 The FreshDesk SDK doesn't include any `.framework` files, so you don't need to worry about that last scenario. You https://s3.amazonaws.com/assets.mobihelp.freshpo.com/sdk/mobihelp_sdk_ios.zip[download the iOS SDK], copy the `libFDMobihelpSDK.a`, `Mobihelp.h`. `MHModel.bundle`, `MHResources.bundle`, and `MHLocalization/en.proj/MHLocalizable.strings` into `native/ios`.
 
@@ -2769,7 +2867,7 @@ You can add these dependencies to your project using the `ios.add_libs` build hi
 .iOS's "add libs" build hint
 image::img/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
 
-that's: you list the framework names separated by semicolons. Notice that your list in the above image doesn't include all the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by building the project with "include sources" checked, then looked at the frameworks that were included).
+In short: you list the framework names separated by semicolons. Notice that your list in the above image doesn't include all the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by building the project with "include sources" checked, then looked at the frameworks that were included).
 
 === Part 3 : Packaging as a cn1lib
 
@@ -2839,7 +2937,7 @@ The difficulty of porting a particular language to Codename One will vary depend
 
 The more similar a language, and its build outputs are to Java, the easier it will be to port (probably). Most JVM languages have two parts:
 
-1. A compiler, which compiles source files to JVM byte-code (usually as.class files).
+1. A compiler, which compiles source files to JVM byte-code (usually as `.class` files).
 2. A runtime library.
 
 One language (other than Java) doesn't require a runtime library: http://www.mirah.org/[Mirah].
@@ -3031,7 +3129,7 @@ Constant pool:
 
 ----
 
-that's a big mess of stuff, but it's pretty easy to pick through it when you know what you're looking for. The layout of this output is pretty straight forward. The beginning shows that this is a class definition:
+That's a big mess of stuff, but it's pretty easy to pick through it when you know what you're looking for. The layout of this output is pretty straight forward. The beginning shows that this is a class definition:
 
 [source,java]
 ----
@@ -3064,13 +3162,13 @@ Constant pool:
    #7 = Utf8               Hello Kotlin
    #8 = String             #7             //  Hello Kotlin
    #9 = Utf8               com/codename1/ui/layouts/BoxLayout
-   ... etc...
+   ... etc.
 ----
 
 
 The constant pool will consist of class names, and strings. You'll want to peruse this list to see if the compiler has added any classes that aren't in the source code. In the example above, it looks like Kotlin is pretty faithful to the original source's dependencies. It didn't inject any classes that aren't in the original source.
 
-Even if the compiler does inject other dependencies into the bytecode, it might not be a problem. it's a problem if those classes aren't supported by Codename One. Watch for anything in the `java.lang.reflect` package or unsolicited use of `java.net`, `java.nio`, or any other package that aren't part of the Codename One standard library. If you're not sure if a class or package is available in the Codename One standard library, check https://www.codenameone.com/javadoc/[the javadocs].
+Even if the compiler does inject other dependencies into the bytecode, it might not be a problem. It's a problem if those classes aren't supported by Codename One. Watch for anything in the `java.lang.reflect` package or unsolicited use of `java.net`, `java.nio`, or any other package that aren't part of the Codename One standard library. If you're not sure if a class or package is available in the Codename One standard library, check https://www.codenameone.com/javadoc/[the javadocs].
 
 **The ByteCode Instructions**:
 
@@ -3091,7 +3189,7 @@ public com.codename1.hellokotlin2.KotlinForm();
       12: new           #21                 // class com/codename1/ui/Label
       15: dup
       16: ldc           #8                  // String Hello Kotlin
-      etc...
+      etc.
 ----
 
 In the above snippet, the first instruction is `aload_0` (which adds `this` to the stack). The 2nd instruction is `ldc`, (which loads constant #8 -- the string "Hello Kotlin" to the stack). The 3rd instruction is `invokestatic` which calls the static method define by Constant #14 from the constant pool, with the two parameters that had been added to the stack.
@@ -3102,13 +3200,13 @@ The instruction that *might* be problematic is "invokedynamic." All other instru
 
 **Summary of Byte-code Assessment**
 
-to summarize, the byte-code assessment phase, you're basically looking to make sure that the compiler doesn't tend to add dependencies to parts of the JDK that Codename One doesn't support. And you want to make sure that it doesn't use invokedynamic.
+To summarize, the byte-code assessment phase, you're basically looking to make sure that the compiler doesn't tend to add dependencies to parts of the JDK that Codename One doesn't support. And you want to make sure that it doesn't use invokedynamic.
 
 If you find that the compiler does use invokedynamic or add references to classes that Codename One doesn't support, don't give up yet. You might be able to create your own "porting" runtime library that will provide these dependencies at runtime.
 
 ====== Assessing the runtime library
 
-The process for assessing the runtime library is pretty like the process for the bytecodes. You'll want to get your hands on the language's runtime library, and use `javap` to inspect the.class files. You're looking for the same things as you were looking for in the compiler's output: "invokedynamic" and classes that aren't supported in Codename One.
+The process for assessing the runtime library is pretty like the process for the bytecodes. You'll want to get your hands on the language's runtime library, and use `javap` to inspect the `.class` files. You're looking for the same things as you were looking for in the compiler's output: "invokedynamic" and classes that aren't supported in Codename One.
 
 ===== Step 2: Convert the runtime library into a CN1Lib
 
@@ -3116,13 +3214,13 @@ Once you've assessed the language and are optimistic that it's a good candidate 
 
 If you can't find the sources of the runtime library or they don't seem to be "buildable," then the next best thing is to get the binary distribution's jar file and convert it to a cn1lib. This is what you did for the https://github.com/shannah/codenameone-kotlin[Kotlin runtime library].
 
-This procedure exploits the fact that a cn1lib file is a zip file with a specific file structure inside it. The cross-platform Java.class files are all contained inside a file named `main.zip`, inside the zip file. This is the *mandatory* file that must be inside a cn1lib.
+This procedure exploits the fact that a cn1lib file is a zip file with a specific file structure inside it. The cross-platform Java `.class` files are all contained inside a file named `main.zip`, inside the zip file. This is the *mandatory* file that must be inside a cn1lib.
 
-To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Maven cn1lib project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named `kotlin-runtime-sources.jar`, so you used this as the "stubs." It contains full sources, which isn't necessary, but it also doesn't hurt.
+To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Maven cn1lib project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The Kotlin distribution includes a separate jar file with the runtime sources, named `kotlin-runtime-sources.jar`, so you used this as the "stubs." It contains full sources, which isn't necessary, but it also doesn't hurt.
 
-now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, create a new empty directory and copy them inside. Rename the jars "main.zip" and "stubs.zip" respectively. Then zip up the directory and rename the zip file `kotlin-runtime.cn1lib`.
+Now that you had your two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, create a new empty directory and copy them inside. Rename the jars "main.zip" and "stubs.zip" respectively. Then zip up the directory and rename the zip file `kotlin-runtime.cn1lib`.
 
-IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypasses the API verification step that occurs when building a library project. it's possible, even likely, that the jar files that you convert depend on classes that aren't in the Codename One library, so your library will fail at runtime in unexpected ways. The reason you could do this with kotlin's runtime (with some confidence) is because the bytecodes were already analyzed to ensure that they didn't include anything problematic.
+IMPORTANT: Building cn1libs manually in this way is a ** bad habit, as it bypasses the API verification step that occurs when building a library project. It's possible, even likely, that the jar files that you convert depend on classes that aren't in the Codename One library, so your library will fail at runtime in unexpected ways. The reason you could do this with kotlin's runtime (with some confidence) is because the bytecodes were already analyzed to ensure that they didn't include anything problematic.
 
 ===== Step 3: Hello world
 
@@ -3161,7 +3259,7 @@ If you run this in the Simulator, it should print "Hello from Kotlin" in the out
 
 ===== Step 4: A more complex hello world
 
-For Kotlin, the hello world example app would actually run without the runtime library because it was so simple. it was necessary to add a more complex example to prove the need for the runtime library. It doesn't matter what you do with your more complex example, as long as it doesn't require classes that aren't in Codename One.
+For Kotlin, the hello world example app would actually run without the runtime library because it was so simple. It was necessary to add a more complex example to prove the need for the runtime library. It doesn't matter what you do with your more complex example, as long as it doesn't require classes that aren't in Codename One.
 
 If you want to use the Codename One inside your project, you should add the CodenameOne.jar (found inside any Codename One project) to your classpath so that it will compile.
 
@@ -3170,14 +3268,14 @@ If you want to use the Codename One inside your project, you should add the Code
 At this point you already have a manual process for incorporating files built with your alternate language into a Codename One project. The process looks like:
 
 1. Use standard tools for your JVM language to write your code.
-2. Use the JVM language's standard build tools (for example: command-line compiler, etc..) to compile your code so that you've.class files (and optionally a.jar file).
-3. Wrap your.class files in a cn1lib by dropping them into a Maven cn1lib project generated from the `cn1lib-archetype` (see <<creating-cn1libs>>).
+2. Use the JVM language's standard build tools (for example: command-line compiler, etc.) to compile your code so that you've`.class` files (and optionally a `.jar` file).
+3. Wrap your `.class` files in a cn1lib by dropping them into a Maven cn1lib project generated from the `cn1lib-archetype` (see <<creating-cn1libs>>).
 4. Install the cn1lib locally with `mvn install` and add it as a `pom`-typed dependency to your Codename One application's `common/pom.xml`.
 5. Use your library from the Codename One project.
 
-When Steve first developed Mirah support he automated this process using an https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml[ANT script]. He also automatically generated some bootstrap code so that he could develop the whole app in Mirah and he woudn't have to write any Java. For example, this level of integration has limitations.
+When Steve first developed Mirah support he automated this process using an https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml[ANT script]. He also automatically generated some bootstrap code so that he could develop the whole app in Mirah and he wouldn't have to write any Java. For example, this level of integration has limitations.
 
-For example, with this approach alone, you couldn't have two-way dependencies between Java source and Mirah source. Yes, Mirah code could use Java libraries (and it did depend on CodenameOne.jar), and your Java code could use your Mirah code. For example, Mirah *source* code couldn't depend on the Java *source* code in your project. This has to do with the order in which code is compiled. it's a bit of a chicken and egg issue. If you're building a project that has Java source code and Mirah source code, you're using two different compilers: mirahc to compile the Mirah files, and javac to compile the Java files. If you're starting from a clean build, and you run mirahc first, then the.Java files haven't yet been compiled to.class files - and thus mirahc can't *reference* them - and any mirah code that depends on those uncompiled Java classes will fail. If you compile the.Java files first, then you've the opposite problem.
+For example, with this approach alone, you couldn't have two-way dependencies between Java source and Mirah source. Yes, Mirah code could use Java libraries (and it did depend on CodenameOne.jar), and your Java code could use your Mirah code. For example, Mirah *source* code couldn't depend on the Java *source* code in your project. This has to do with the order in which code is compiled. It's a bit of a chicken-and-egg issue. If you're building a project that has Java source code and Mirah source code, you're using two different compilers: mirahc to compile the Mirah files, and javac to compile the Java files. If you're starting from a clean build, and you run mirahc first, then the `.java` files haven't yet been compiled to `.class` files - and thus mirahc can't *reference* them - and any mirah code that depends on those uncompiled Java classes will fail. If you compile the `.java` files first, then you have the opposite problem.
 
 Steve worked around this problem in Mirah by writing https://github.com/shannah/mirah-ant/blob/master/src/ca/weblite/asm/JavaExtendedStubCompiler.java[your own pseudo-compiler] that produced stub class files for the java source that would be referenced by mirahc when compiling the Mirah files. In this way he was able to have two-way dependencies between Java and Mirah in the same project.
 
@@ -3192,7 +3290,7 @@ For both the Kotlin and Mirah support, you wanted integration to be seamless. Yo
 <withKotlin/>
 ----
 
-And it would automatically handle Kotlin and Java files together: Seamlessly. a few places in a Codename One's build.xml file where you call "javac" so you needed to inject these tags in those places. This injection is performed automatically by the Codename One IntelliJ plugin.
+And it would automatically handle Kotlin and Java files together: Seamlessly. A few places in a Codename One's build.xml file where you call "javac" so you needed to inject these tags in those places. This injection is performed automatically by the Codename One IntelliJ plugin.
 
 For Mirah, Steve developed his own https://github.com/shannah/mirah-ant[ANT plugins] and https://github.com/shannah/mirah-nbm[Netbeans module] that do something similar in Netbeans.
 
@@ -3202,7 +3300,7 @@ When Codename One launched in 2012 there was a need to ship updates and fixes fa
 
 The https://github.com/codenameone/UpdateCodenameOne[Update Framework] solves many problems in the old systems:
 
-- Download once - if you've many projects the library will download once to the `.codenameone` directory. All the projects will update from local storage
+- Download once - if you have many projects the library will download once to the `.codenameone` directory. All the projects will update from local storage
 
 - Skins update automatically - this is hugely important. When you change a theme you need to update it in the skins and if you don't update the skin you might see a difference between the simulator and the device
 
@@ -3214,7 +3312,8 @@ You can also use the usual method of #Codename One Settings# -> #Basic# -> #Upda
 
 ==== How does it work
 
-You can see the full code https://github.com/codenameone/UpdateCodenameOne[here] the gist of it's simple. You create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
+// vale-skip: Microsoft.Contractions: "of it is simple" parses as the prepositional phrase "of it" plus the predicate "is simple"; collapsing it to "of it's" would read as a possessive ("of its simple") and lose the meaning.
+You can see the full code https://github.com/codenameone/UpdateCodenameOne[here] the gist of it is simple. You create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
 
 An update happens by running this tool with a path to a Codename One project for example:
 
@@ -3241,7 +3340,7 @@ Updating the file: /Users/shai/dev/AccordionDemo/lib/CodenameOne.jar
 Updated project files
 ----
 
-Notice that no download happened since the files were up to date. You can also force a check against the server by adding the force argument as such:
+Notice that no download happened since the files were up-to-date. You can also force a check against the server by adding the force argument as such:
 
 [source,bash]
 ----
@@ -3252,7 +3351,7 @@ The way this works under the hood is thought a `Versions.properties` within your
 
 TIP: Exclude `Versions.properties` from Git
 
-Under the `~/.codenameone` directory you've a more detailed `UpdateStatus.properties` file that includes versions of the locally downloaded files. Notice you can delete this file and it will be recreated as all the jars get downloaded over again.
+Under the `~/.codenameone` directory you have a more detailed `UpdateStatus.properties` file that includes versions of the locally downloaded files. Notice you can delete this file and it will be recreated as all the jars get downloaded over again.
 
 ==== What isn't covered
 

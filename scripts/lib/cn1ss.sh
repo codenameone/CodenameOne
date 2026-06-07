@@ -2,7 +2,6 @@
 # Shared helpers for Codename One screenshot (CN1SS) chunk processing
 
 # Default class names used by the Java source helpers
-: "${CN1SS_MAIN_CLASS:=Cn1ssChunkTools}"
 : "${CN1SS_PROCESS_CLASS:=ProcessScreenshots}"
 : "${CN1SS_RENDER_CLASS:=RenderScreenshotReport}"
 : "${CN1SS_POST_COMMENT_CLASS:=PostPrComment}"
@@ -127,150 +126,81 @@ cn1ss_java_run() {
   "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" "$class_name" "$@"
 }
 
-cn1ss_count_chunks() {
-  local file="$1"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
-    echo 0
-    return
-  fi
-  local args=("count" "$file")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
-}
-
-cn1ss_extract_base64() {
-  local file="$1"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
+# WebSocket screenshot server bootstrap. Starts Cn1ssScreenshotServer on
+# an ephemeral port; captures the bound port from its first stdout line so
+# the runner can hand it to the device via -Dcn1ss.websocket.url=...
+# Sets CN1SS_WS_PORT and CN1SS_WS_PID on success.
+cn1ss_start_ws_server() {
+  local out_dir="$1"
+  if [ -z "$out_dir" ]; then
+    cn1ss_log "cn1ss_start_ws_server: missing output dir"
     return 1
   fi
-  local args=("extract" "$file")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
-}
-
-cn1ss_decode_binary() {
-  local file="$1"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
+  mkdir -p "$out_dir" 2>/dev/null || true
+  if [ -z "${CN1SS_JAVA_BIN:-}" ] || [ -z "${CN1SS_JAVA_CLASSPATH:-}" ]; then
+    cn1ss_log "cn1ss_start_ws_server: cn1ss_setup must be called first"
     return 1
   fi
-  local args=("extract" "$file" "--decode")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
-}
-
-cn1ss_list_tests() {
-  local file="$1"
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
-    return 1
-  fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" tests "$file"
-}
-
-cn1ss_print_log() {
-  local file="$1"
-  if [ -z "$file" ] || [ ! -r "$file" ]; then
-    return 1
-  fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" check "$file"
-}
-
-cn1ss_verify_png() {
-  local file="$1"
-  [ -s "$file" ] || return 1
-  # Leading PNG signature: 89 50 4E 47 0D 0A 1A 0A
-  head -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$' || return 1
-  # Trailing IEND chunk: ascii "IEND" (49 45 4E 44) + CRC of "IEND" (AE 42 60 82).
-  # A truncated PNG (e.g. caused by a dropped chunk in the reassembly pipeline)
-  # would still match the leading signature, so the trailer check is what
-  # catches "PNG chunk truncated before CRC" before the file reaches the
-  # comparator.
-  tail -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^49454e44ae426082$'
-}
-
-cn1ss_verify_jpeg() {
-  local file="$1"
-  [ -s "$file" ] || return 1
-  local header trailer
-  header="$(head -c 2 "$file" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
-  trailer="$(tail -c 2 "$file" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
-  [ "$header" = "FFD8" ] && [ "$trailer" = "FFD9" ]
-}
-
-cn1ss_decode_test_asset() {
-  local test="$1"; shift
-  local dest="$1"; shift
-  local channel="$1"; shift
-  local verifier="$1"; shift
-  local entry source_type source_path count err_log
-
-  rm -f "$dest" 2>/dev/null || true
-  for entry in "$@"; do
-    source_type="${entry%%:*}"
-    source_path="${entry#*:}"
-    [ -s "$source_path" ] || continue
-    count="$(cn1ss_count_chunks "$source_path" "$test" "$channel")"
-    count="${count//[^0-9]/}"; : "${count:=0}"
-    [ "$count" -gt 0 ] || continue
-    cn1ss_log "Reassembling test '$test' from ${source_type} source: $source_path (chunks=$count)"
-    err_log="$(mktemp -t cn1ss-decode-err.XXXXXX 2>/dev/null || mktemp 2>/dev/null || echo "")"
-    if [ -n "$err_log" ]; then
-      cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>"$err_log"
-    else
-      cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>/dev/null
-    fi
-    local rc=$?
-    if [ "$rc" -eq 0 ] && { [ -z "$verifier" ] || "$verifier" "$dest"; }; then
-      [ -n "$err_log" ] && rm -f "$err_log" 2>/dev/null || true
-      echo "${source_type}:$(basename "$source_path")"
+  local port_file
+  port_file="$(mktemp)"
+  # Bind the fixed standard port (override with CN1SS_WS_BIND_PORT). The device
+  # runner defaults to ws://HOST:8765 with no per-run injection, so this must
+  # match CN1SS_WS_DEFAULT_PORT in Cn1ssDeviceRunnerHelper.java. CN1SS_WS_PORT
+  # (set below from the server's reported port) stays the captured bound port.
+  local bind_port="${CN1SS_WS_BIND_PORT:-8765}"
+  "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" \
+    Cn1ssScreenshotServer --port "$bind_port" --out "$out_dir" \
+    >"$port_file" 2>&1 &
+  CN1SS_WS_PID=$!
+  # Wait for the server to print "CN1SS_SERVER_PORT=<n>" on the first line.
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if grep -q "^CN1SS_SERVER_PORT=" "$port_file" 2>/dev/null; then
+      CN1SS_WS_PORT="$(grep -m1 "^CN1SS_SERVER_PORT=" "$port_file" | cut -d'=' -f2)"
+      CN1SS_WS_LOG="$port_file"
+      cn1ss_log "Cn1ssScreenshotServer listening on port $CN1SS_WS_PORT (pid $CN1SS_WS_PID, log $port_file)"
       return 0
     fi
-    if [ "$rc" -ne 0 ]; then
-      cn1ss_log "Reassembly failed for test '$test' from ${source_type} source: $source_path (exit=$rc)"
-    else
-      cn1ss_log "Reassembled file for test '$test' failed verification (${source_type} source: $source_path)"
+    if ! kill -0 "$CN1SS_WS_PID" 2>/dev/null; then
+      cn1ss_log "Cn1ssScreenshotServer died before reporting a port:"
+      cat "$port_file" >&2
+      return 1
     fi
-    if [ -n "$err_log" ] && [ -s "$err_log" ]; then
-      while IFS= read -r line; do
-        cn1ss_log "  $line"
-      done < "$err_log"
-    fi
-    [ -n "$err_log" ] && rm -f "$err_log" 2>/dev/null || true
+    sleep 0.2
   done
-  rm -f "$dest" 2>/dev/null || true
+  cn1ss_log "Timed out waiting for Cn1ssScreenshotServer to bind a port"
+  kill "$CN1SS_WS_PID" 2>/dev/null || true
   return 1
 }
 
-cn1ss_decode_test_png() {
-  local test="$1"; shift
-  local dest="$1"; shift
-  cn1ss_decode_test_asset "$test" "$dest" "" cn1ss_verify_png "$@"
-}
-
-cn1ss_decode_test_preview() {
-  local test="$1"; shift
-  local dest="$1"; shift
-  cn1ss_decode_test_asset "$test" "$dest" "PREVIEW" cn1ss_verify_jpeg "$@"
+cn1ss_stop_ws_server() {
+  if [ -n "${CN1SS_WS_PID:-}" ]; then
+    kill "$CN1SS_WS_PID" 2>/dev/null || true
+    wait "$CN1SS_WS_PID" 2>/dev/null || true
+    cn1ss_log "Cn1ssScreenshotServer (pid $CN1SS_WS_PID) stopped"
+    unset CN1SS_WS_PID CN1SS_WS_PORT
+  fi
+  # Persist the server log so the WebSocket transport is debuggable from CI
+  # artifacts. The server prints one CN1SS:INFO:test=... line per delivered
+  # screenshot plus any "binary frame without META" / hash_mismatch warnings;
+  # without this the only copy lived in a mktemp file that never reached the
+  # uploaded artifacts (the WS pipeline was effectively a black box on
+  # failure). Also surface a one-line summary + tail in the job log directly.
+  if [ -n "${CN1SS_WS_LOG:-}" ] && [ -s "${CN1SS_WS_LOG:-}" ]; then
+    local delivered dropped
+    delivered="$(grep -c "^CN1SS:INFO:test=" "$CN1SS_WS_LOG" 2>/dev/null || echo 0)"
+    dropped="$(grep -c "binary frame without META" "$CN1SS_WS_LOG" 2>/dev/null || echo 0)"
+    cn1ss_log "WebSocket server summary: ${delivered} screenshot(s) written, ${dropped} unpaired binary frame(s) dropped"
+    if [ -n "${ARTIFACTS_DIR:-}" ]; then
+      mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+      cp -f "$CN1SS_WS_LOG" "$ARTIFACTS_DIR/cn1ss-ws-server.log" 2>/dev/null \
+        && cn1ss_log "WebSocket server log saved to $ARTIFACTS_DIR/cn1ss-ws-server.log"
+    fi
+    cn1ss_log "----- last 40 lines of Cn1ssScreenshotServer log -----"
+    tail -n 40 "$CN1SS_WS_LOG" 2>/dev/null | sed 's/^/[cn1ss-ws-server] /'
+    cn1ss_log "----- end of Cn1ssScreenshotServer log -----"
+  fi
+  unset CN1SS_WS_LOG
 }
 
 cn1ss_file_size() {
@@ -335,6 +265,36 @@ cn1ss_post_pr_comment() {
     fi
   fi
   return $rc
+}
+
+# Count the "missing" screenshots in a comparison JSON, i.e. expected tests
+# that produced no image (status == "missing_actual"). This is the signal for
+# the screenshot-count regression this guard targets: when a test hangs or the
+# rendering pipeline crashes partway (e.g. the Metal DialogTheme hang), every
+# test from that point on is recorded as missing_actual instead of equal, so
+# the suite silently drops from 122 captures to 107. Counting *entries* would
+# miss this - the iOS harness still records all 122 names, just with 15 of them
+# flagged missing_actual - which is why a len(results) guard never caught it.
+# We count the missing ones directly instead.
+cn1ss_count_missing() {
+  local json="$1"
+  if [ -z "$json" ] || [ ! -s "$json" ]; then
+    # No comparison JSON at all means the suite produced nothing usable.
+    # Report a sentinel large enough to trip any tolerance so the caller
+    # fails loudly rather than treating "no data" as "nothing missing".
+    echo 999999
+    return
+  fi
+  python3 - "$json" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    results = data.get("results", []) if isinstance(data, dict) else []
+except Exception:
+    print(999999)
+    sys.exit(0)
+print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "missing_actual"))
+PY
 }
 
 # Shared function to generate report, compare screenshots, and post PR comment
@@ -449,6 +409,33 @@ cn1ss_process_and_report() {
     if [ -f "$summary_out" ] && (grep -q "^different|" "$summary_out" || grep -q "^error|" "$summary_out"); then
       cn1ss_log "FATAL: Screenshot mismatches or errors detected (CN1SS_FAIL_ON_MISMATCH=1)"
       return 15
+    fi
+
+    # Missing-screenshot regression guard. Every expected test must produce its
+    # screenshot; a test that runs but emits nothing is recorded as status
+    # "missing_actual". When a test hangs or the rendering pipeline crashes
+    # partway (the Metal DialogTheme hang), every test from that point on
+    # becomes missing_actual and the suite silently drops from 122 captures to
+    # 107 - all still listed, just unproduced. We fail when the number of
+    # missing screenshots exceeds CN1SS_ALLOWED_MISSING (default 0: no missing
+    # screenshots tolerated). A pipeline with a known, steady-state gap raises
+    # its own tolerance (e.g. the iOS jobs set CN1SS_ALLOWED_MISSING=2 for
+    # OrientationLock + MutableImageReadback, which do not render on either iOS
+    # backend). Set CN1SS_SKIP_COUNT_CHECK=1 to bypass while intentionally
+    # seeding a brand new reference set. Enforced on every pipeline that opts
+    # into strict mode (CN1SS_FAIL_ON_MISMATCH=1).
+    if [ "${CN1SS_SKIP_COUNT_CHECK:-0}" != "1" ]; then
+      local missing_count allowed_missing
+      missing_count=$(cn1ss_count_missing "$compare_json_out")
+      missing_count="${missing_count//[^0-9]/}"; : "${missing_count:=999999}"
+      allowed_missing="${CN1SS_ALLOWED_MISSING:-0}"
+      allowed_missing="${allowed_missing//[^0-9]/}"; : "${allowed_missing:=0}"
+      if [ "$missing_count" -gt "$allowed_missing" ]; then
+        cn1ss_log "FATAL: $missing_count screenshot(s) missing (no image produced) but only $allowed_missing tolerated (CN1SS_ALLOWED_MISSING)."
+        cn1ss_log "       A test failed to emit its screenshot - the suite likely hung or crashed before finishing. See the 'missing actual' entries above."
+        return 17
+      fi
+      cn1ss_log "Missing-screenshot check passed: $missing_count missing <= $allowed_missing tolerated."
     fi
   fi
 

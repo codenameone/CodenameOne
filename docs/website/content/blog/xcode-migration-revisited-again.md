@@ -72,7 +72,7 @@ iOS applications are physically Mac OS app bundles. The natively compiled binary
 
 When we look into more esoteric devices like the Apple Watch or TV the story becomes more complicated and would become worse as a result.
 
-This is the problem bitcode aims to solve. Since Apple already uses LLVM which has an intermediate representation after compilation they might as well use that instead of the native OS executables. This would allow Apples servers to natively compile the app to any future processor platform without you changing your code…​ Effectively this is like a form of bytecode for Apples benefit.
+This is the problem bitcode aims to solve. Since Apple already uses LLVM which has an intermediate representation after compilation they might as well use that instead of the native OS executables. This would allow Apple’s servers to natively compile the app to any future processor platform without you changing your code…​ Effectively this is like a form of bytecode for Apple’s benefit.
 
 Apple requires bitcode for Apple Watch apps and might require it for all apps in the future so it’s a good idea to turn it on. You can turn it on by setting the `ios.bitcode=true` build hint.
 

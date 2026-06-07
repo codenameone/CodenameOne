@@ -20,9 +20,9 @@ This is builtin to enterprise servers but I won’t go into that here, there is 
 
 To understand 2PC you need to understand what’s a transaction. I hope you do but just in case you don’t here’s an oversimplified definition: A transaction contains more than one operation where we want all the operations to succeed or we want all of them to fail.
 
-This is explained with a simple example of a transfer between two bank accounts: If I transfer $5 from my account to my friends account I want the deduction of $5 to be in the same transaction as adding the $5. Otherwise if there is a failure money can evaporate and vanish!
+This is explained with a simple example of a transfer between two bank accounts: If I transfer $5 from my account to my friend’s account I want the deduction of $5 to be in the same transaction as adding the $5. Otherwise if there is a failure money can evaporate and vanish!
 
-Here’s where 2PC comes in, say my account is in one bank and my friends is in another bank in a different server (obviously this is more complicated, again over simplifying). How would that work?
+Here’s where 2PC comes in, say my account is in one bank and my friend’s is in another bank in a different server (obviously this is more complicated, again over simplifying). How would that work?
 
 The two phase commit splits every transaction into two phases:
 

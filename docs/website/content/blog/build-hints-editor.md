@@ -12,7 +12,7 @@ description: In the latest plugin update, we’ve added a Build-Hints Editor tha
   may need to configure.
 ---
 
-In the latest plugin update, we’ve added a Build-Hints Editor that accessible from a menu item inside the Codename One simulator. This is intended to make it easier to edit your app’s build hints, and also inform you of build hints that you may need to configure. 
+In the latest plugin update, we’ve added a Build-Hints Editor that is accessible from a menu item inside the Codename One simulator. This is intended to make it easier to edit your app’s build hints, and also inform you of build hints that you may need to configure. 
 
 ![codename one - build hint editor](/blog/build-hints-editor/cn1-build-hint-editor-1024x536.jpg)
 
@@ -44,7 +44,7 @@ It includes a text field for entering the build hint, some help text to let you 
 
 In this case it also includes a "Get Key" button that will open the webpage for creating an API key.
 
-The old way to set up Google maps was to follow the [README](https://github.com/codenameone/codenameone-google-maps#readme), and look manually walk through the required steps.
+The old way to set up Google maps was to follow the [README](https://github.com/codenameone/codenameone-google-maps#readme), and manually walk through the required steps.
 
 ## IMPORTANT
 
@@ -148,7 +148,7 @@ Some property names that you can define include:
 
 ## label
 
-The label for this build hint as it will be rendered in the built-hints editor.
+The label for this build hint as it will be rendered in the build-hints editor.
 
 ## description
 
@@ -168,7 +168,7 @@ The widget type to use for editing this build hint. Supported values include "te
 
 ## values
 
-A list of options to use when the  _type_ property is "select". Values should be delimited by a character, and the delimiter is defined by the trailing character. E.g. `red, green, blue,` or `red; green; blue;`. The import part is that the delimiter is included at the  _end_ as the build-hints editor will check the last character to find out what the delimiter is.
+A list of options to use when the  _type_ property is "select". Values should be delimited by a character, and the delimiter is defined by the trailing character. E.g. `red, green, blue,` or `red; green; blue;`. The important part is that the delimiter is included at the  _end_ as the build-hints editor will check the last character to find out what the delimiter is.
 
 With this in mind, let’s take a look at the `ios.afterFinishLaunching` field settings:
     
@@ -195,7 +195,7 @@ With this in mind, let’s take a look at the `ios.afterFinishLaunching` field s
 
 ## NOTE
 
-> The `googlemaps prefix to the build hint causes the field to be rendered inside its own "Google Maps" tab of the build-hints editor. 
+> The `googlemaps` prefix to the build hint causes the field to be rendered inside its own "Google Maps" tab of the build-hints editor. 
 
 ![](/blog/build-hints-editor/build-hint-properties.png)
 

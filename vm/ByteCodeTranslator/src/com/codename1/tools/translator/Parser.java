@@ -91,8 +91,179 @@ public class Parser extends ClassVisitor {
             if(bc.getClsName().equals(name)) {
                 return bc;
             }
-        }        
+        }
         return null;
+    }
+
+    /**
+     * Resolves a class by name and returns its post-{@link #writeOutput}
+     * classOffset, or -1 if no class with that name exists. Used by the
+     * on-device-debug side-table emitter to wire stable IDs into the
+     * generated frame_info structs.
+     */
+    public static int getClassOffset(String name) {
+        ByteCodeClass bc = getClassByName(name);
+        return bc == null ? -1 : bc.getClassOffset();
+    }
+
+    /**
+     * On-device-debug field-id allocator. Maps a (declaring-class, field-name)
+     * pair to a stable int the device and proxy both use to address an
+     * instance field. Field ids start at 1 — 0 is reserved as a "no-field"
+     * sentinel so JDWP code can use 0 to mean "skip".
+     *
+     * IDs are persistent only within a single translator invocation; the
+     * sidecar carries them so the proxy doesn't need to recompute the same
+     * mapping.
+     */
+    private static final java.util.LinkedHashMap<String, Integer> fieldIdByKey = new java.util.LinkedHashMap<>();
+    private static int nextFieldId = 1;
+
+    public static int getOrAssignFieldId(String declClassMangled, String fieldName) {
+        String key = declClassMangled + "." + fieldName;
+        Integer id = fieldIdByKey.get(key);
+        if (id != null) return id;
+        id = nextFieldId++;
+        fieldIdByKey.put(key, id);
+        return id;
+    }
+
+    /**
+     * Returns the JVM-style descriptor for a ByteCodeField — "I" for int,
+     * "Lcom/example/Foo;" for object, "[I" for int[], etc. The translator
+     * normally exposes underscore-mangled type names; this helper converts
+     * to JVM form for JDWP wire compatibility.
+     */
+    public static String jvmDescriptorOf(ByteCodeField bf) {
+        StringBuilder sb = new StringBuilder();
+        String rd = bf.getRuntimeDescriptor();
+        // getRuntimeDescriptor returns either a JVM single-char (I/J/...)
+        // or an underscore-mangled object type, possibly followed by "[]"
+        // repeats for array dimensions.
+        int arrayDims = 0;
+        while (rd != null && rd.endsWith("[]")) {
+            arrayDims++;
+            rd = rd.substring(0, rd.length() - 2);
+        }
+        for (int i = 0; i < arrayDims; i++) sb.append('[');
+        if (rd != null && rd.length() == 1 && "ZBSCIJFD".indexOf(rd.charAt(0)) >= 0) {
+            sb.append(rd);
+        } else if (rd != null && !rd.isEmpty()) {
+            sb.append('L').append(rd.replace('_', '/')).append(';');
+        } else {
+            sb.append("Ljava/lang/Object;");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns a JDWP-style modifier bitmask (PUBLIC=1, PRIVATE=2, STATIC=8,
+     * FINAL=16, VOLATILE=64, TRANSIENT=128). We don't track protected/transient
+     * — fields are reported as public unless flagged private.
+     */
+    public static int jdwpAccessFlagsOf(ByteCodeField bf) {
+        int f = 0;
+        if (bf.isPrivate()) f |= 0x0002; else f |= 0x0001;
+        if (bf.isStaticField()) f |= 0x0008;
+        if (bf.isFinal()) f |= 0x0010;
+        if (bf.isVolatile()) f |= 0x0040;
+        return f;
+    }
+
+    /**
+     * Writes the on-device-debug symbol sidecar (cn1-symbols.txt) to the
+     * output directory. Format is line-based ASCII for trivial parsing
+     * by the desktop proxy:
+     *   version &lt;n&gt;
+     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt;
+     *   method  &lt;methodId&gt; &lt;classId&gt; &lt;methodName&gt; &lt;desc&gt;
+     *   line    &lt;methodId&gt; &lt;sourceLine&gt;
+     * The proxy uses this to map JDWP class signatures and source-line
+     * breakpoints back onto the (classId, methodId, line) tuples the
+     * device wire protocol speaks.
+     */
+    private static void writeSymbolSidecar(File outputDirectory) throws IOException {
+        File f = new File(outputDirectory, "cn1-symbols.txt");
+        try (Writer w = new OutputStreamWriter(Files.newOutputStream(f.toPath()), StandardCharsets.UTF_8)) {
+            w.write("version\t1\n");
+            for (ByteCodeClass bc : classes) {
+                String src = bc.getSourceFile();
+                if (src == null) {
+                    src = "";
+                }
+                // Extended class row: id, name, sourceFile, superId.
+                // Older proxies (4-column form) ignore the trailing
+                // column since the parser tolerates extras.
+                int superId = -1;
+                if (bc.getBaseClassObject() != null) {
+                    superId = bc.getBaseClassObject().getClassOffset();
+                }
+                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
+                        + "\t" + src + "\t" + superId + "\n");
+            }
+            // Emit instance-field metadata so the proxy can answer JDWP
+            // ClassType.Fields / FieldsWithGeneric without a device round-trip,
+            // and so ObjectReference.GetValues knows what (type, declaring class)
+            // each fieldId resolves to. We list inherited fields under each
+            // class that physically stores them — JDWP expects a class's
+            // Fields response to include only its own declarations, but
+            // listing inherited fields too keeps single-table lookup cheap on
+            // the proxy side; the proxy filters to "declared here" itself.
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (ByteCodeField bf : bc.getFields()) {
+                    if (bf.isStaticField()) continue;
+                    int fid = getOrAssignFieldId(bc.getClsName(), bf.getFieldName());
+                    String desc = jvmDescriptorOf(bf);
+                    int access = jdwpAccessFlagsOf(bf);
+                    w.write("field\t" + classId + "\t" + fid
+                            + "\t" + bf.getFieldName()
+                            + "\t" + desc
+                            + "\t" + access + "\n");
+                }
+            }
+            for (ByteCodeClass bc : classes) {
+                int classId = bc.getClassOffset();
+                for (BytecodeMethod m : bc.getMethods()) {
+                    if (m.isEliminated()) {
+                        continue;
+                    }
+                    String desc = m.getDesc();
+                    if (desc == null) {
+                        desc = "";
+                    }
+                    // Extended method row: classId, name, desc, isStatic.
+                    // Older proxies that only know 4 columns ignore the 5th
+                    // because the parser slices with `split("\t", -1)` and
+                    // size-checks before reading.
+                    w.write("method\t" + m.getMethodOffset() + "\t" + classId
+                            + "\t" + m.getMethodName()
+                            + "\t" + desc
+                            + "\t" + (m.isStatic() ? "1" : "0") + "\n");
+                    Set<Integer> lines = new TreeSet<>();
+                    for (com.codename1.tools.translator.bytecodes.Instruction ins : m.getInstructions()) {
+                        if (ins instanceof com.codename1.tools.translator.bytecodes.LineNumber) {
+                            lines.add(((com.codename1.tools.translator.bytecodes.LineNumber)ins).getLine());
+                        }
+                    }
+                    for (Integer line : lines) {
+                        w.write("line\t" + m.getMethodOffset() + "\t" + line + "\n");
+                    }
+                    // Local variables: emitted as "always-live" scope until a
+                    // follow-up resolves ASM labels to source lines properly.
+                    // jdb tolerates this — uninitialised slots just show 0.
+                    for (com.codename1.tools.translator.bytecodes.LocalVariable lv : m.getLocalVariables()) {
+                        w.write("var\t" + m.getMethodOffset()
+                                + "\t" + lv.getIndex()
+                                + "\t" + lv.getOrigName()
+                                + "\t" + lv.getDesc() + "\n");
+                    }
+                }
+            }
+        }
+        if (ByteCodeTranslator.verbose) {
+            System.out.println("Wrote on-device-debug symbol sidecar: " + f.getAbsolutePath());
+        }
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {
@@ -445,6 +616,45 @@ public class Parser extends ClassVisitor {
                 }
             }
 
+            // JavaScript-target-only Rapid Type Analysis pass. Runs AFTER
+            // the existing desc.name-keyed culler so we start from an
+            // already-pruned class list. RTA only eliminates additional
+            // methods the conservative graph considered "used" because
+            // some OTHER class with the same name+desc was invoked; it
+            // never resurrects methods the earlier pass removed. Gated
+            // on OUTPUT_TYPE_JAVASCRIPT because the iOS runtime relies on
+            // different dispatch mechanics and may break under stricter
+            // reachability.
+            if (BytecodeMethod.optimizerOn
+                    && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                    && System.getProperty("parparvm.js.rta.off") == null) {
+                Date rtaStart = new Date();
+                int rtaEliminated = JavascriptReachability.run(classes, nativeSources);
+                Date rtaEnd = new Date();
+                long rtaDif = rtaEnd.getTime() - rtaStart.getTime();
+                if (ByteCodeTranslator.verbose) {
+                    System.out.println("JS RTA pass removed " + rtaEliminated + " additional methods in "
+                            + (rtaDif / 1000) + " seconds");
+                }
+                neliminated += rtaEliminated;
+            }
+
+            // JavaScript-target-only suspension analysis: decide which
+            // surviving methods can be emitted as plain ``function``
+            // (no generator allocation / no yield*) vs which must stay
+            // as ``function*``. Must run after RTA so eliminated
+            // methods don't pollute the analysis.
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                Date suspStart = new Date();
+                int syncCount = JavascriptSuspensionAnalysis.run(classes);
+                Date suspEnd = new Date();
+                if (ByteCodeTranslator.verbose) {
+                    System.out.println("JS suspension analysis: " + syncCount
+                            + " methods classified synchronous in "
+                            + ((suspEnd.getTime() - suspStart.getTime()) / 1000) + " seconds");
+                }
+            }
+
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 JavascriptBundleWriter.write(outputDirectory, classes);
             } else {
@@ -458,6 +668,10 @@ public class Parser extends ClassVisitor {
                     writeFile(bc, outputDirectory, cos);
                 }
                 if (cos != null) cos.realClose();
+
+                if (BytecodeMethod.isOnDeviceDebug()) {
+                    writeSymbolSidecar(outputDirectory);
+                }
             }
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
@@ -520,6 +734,16 @@ public class Parser extends ClassVisitor {
                             System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
                         }
                     }
+                    continue;
+                }
+                // Preserve virtual-root methods of java.lang.Object when
+                // on-device-debug is on. jdb's `print` formats objects by
+                // calling Object.toString, and a debugger user can ask to
+                // invoke equals/hashCode/etc. without a static call site
+                // to keep their body alive on its own.
+                if (BytecodeMethod.isOnDeviceDebug()
+                        && "java_lang_Object".equals(bc.getClsName())
+                        && !mtd.isStatic()) {
                     continue;
                 }
 
@@ -639,10 +863,7 @@ public class Parser extends ClassVisitor {
         if (outMain instanceof ConcatenatingFileOutputStream) {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
         }
-        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
-            outMain.write(cls.generateCSharpCode().getBytes(StandardCharsets.UTF_8));
-            outMain.close();
-        } else if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+        if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
             outMain.write(cls.generateJavascriptCode(classes).getBytes(StandardCharsets.UTF_8));
             outMain.close();
         } else {
@@ -1016,30 +1237,12 @@ public class Parser extends ClassVisitor {
                 // Invoke implMethod
                 // Return result
 
-                // Handle Constructor Reference (special case)
+                // Determine how the implementation method is invoked up front:
+                // we need to know whether it has an implicit receiver (an
+                // instance call consumes the first captured arg as `this`)
+                // before we can line captured/SAM args up against the target
+                // parameter types for adaptation.
                 boolean isCtorRef = (implMethod.getTag() == Opcodes.H_NEWINVOKESPECIAL);
-                if (isCtorRef) {
-                    interfaceMethod.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
-                    interfaceMethod.addInstruction(Opcodes.DUP);
-                }
-
-                // Load captured args
-                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
-                for (int i = 0; i < capturedArgs.length; i++) {
-                    interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
-                    String fieldName = "arg$" + (i + 1);
-                    interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
-                }
-
-                // Load method args
-                Type[] samArgs = samMethodType.getArgumentTypes();
-                int localIndex = 1;
-                for (Type t : samArgs) {
-                    interfaceMethod.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
-                    localIndex += t.getSize();
-                }
-
-                // Invoke implMethod
                 int invokeOpcode;
                 switch (implMethod.getTag()) {
                     case Opcodes.H_INVOKESTATIC: invokeOpcode = Opcodes.INVOKESTATIC; break;
@@ -1052,15 +1255,79 @@ public class Parser extends ClassVisitor {
                         invokeOpcode = Opcodes.INVOKESTATIC;
                         break;// Fallback
                 }
+                boolean instanceCall = !isCtorRef &&
+                        (invokeOpcode == Opcodes.INVOKEVIRTUAL ||
+                         invokeOpcode == Opcodes.INVOKEINTERFACE ||
+                         invokeOpcode == Opcodes.INVOKESPECIAL);
 
+                // The values the implementation invocation consumes, in order:
+                // the receiver (for instance calls) followed by the declared
+                // parameter types. LambdaMetafactory adapts each captured/SAM
+                // argument to the matching target type (box, unbox, widen or
+                // cast) -- e.g. a SAM that hands us a Double bound to a method
+                // taking a primitive double must unbox via doubleValue(). We
+                // must replicate that here; loading the SAM args verbatim and
+                // invoking the impl method directly emits a C call that passes a
+                // JAVA_OBJECT where a primitive (or vice versa) is expected and
+                // fails to compile in the generated Xcode project.
+                Type[] implArgTypes = Type.getArgumentTypes(implMethod.getDesc());
+                Type[] targetTypes = new Type[(instanceCall ? 1 : 0) + implArgTypes.length];
+                int tIdx = 0;
+                if (instanceCall) {
+                    targetTypes[tIdx++] = Type.getObjectType(implMethod.getOwner());
+                }
+                for (Type t : implArgTypes) {
+                    targetTypes[tIdx++] = t;
+                }
+                Type[] samArgs = samMethodType.getArgumentTypes();
+                // Defensive: only adapt when our model of the consumed values
+                // matches the values we push (captured + SAM args). If it does
+                // not we fall back to the verbatim load/invoke below.
+                boolean adapt = targetTypes.length == capturedArgs.length + samArgs.length;
+
+                // Handle Constructor Reference (special case)
+                if (isCtorRef) {
+                    interfaceMethod.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
+                    interfaceMethod.addInstruction(Opcodes.DUP);
+                }
+
+                // Load captured args
+                // Same caveat as the constructor: do not also emit addInstruction(Opcodes.ALOAD).
+                int targetIndex = 0;
+                for (int i = 0; i < capturedArgs.length; i++) {
+                    interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
+                    String fieldName = "arg$" + (i + 1);
+                    interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
+                    if (adapt) {
+                        adaptLambdaType(interfaceMethod, capturedArgs[i], targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+
+                // Load method args
+                int localIndex = 1;
+                for (Type t : samArgs) {
+                    interfaceMethod.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                    localIndex += t.getSize();
+                    if (adapt) {
+                        adaptLambdaType(interfaceMethod, t, targetTypes[targetIndex]);
+                    }
+                    targetIndex++;
+                }
+
+                // Invoke implMethod
                 if (isCtorRef) {
                     interfaceMethod.addInvoke(Opcodes.INVOKESPECIAL, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), false);
                 } else {
                     interfaceMethod.addInvoke(invokeOpcode, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), implMethod.isInterface());
                 }
 
-                // Return
+                // Adapt the value left on the stack by the implementation method
+                // to the SAM's return type (unbox/box/widen/cast, or pop for a
+                // void SAM), then return per the SAM descriptor.
                 Type returnType = samMethodType.getReturnType();
+                Type implReturnType = isCtorRef ? Type.getObjectType(implMethod.getOwner()) : Type.getReturnType(implMethod.getDesc());
+                adaptLambdaType(interfaceMethod, implReturnType, returnType);
                 interfaceMethod.addInstruction(returnType.getOpcode(Opcodes.IRETURN));
                 interfaceMethod.setMaxes(20, 20); // Approximation
 
@@ -1106,6 +1373,130 @@ public class Parser extends ClassVisitor {
             }
 
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs); 
+        }
+
+        /**
+         * Emits the box / unbox / widen / cast instructions LambdaMetafactory
+         * inserts when adapting a value of type {@code from} to type {@code to}
+         * (e.g. when a method reference's parameter or return type differs from
+         * the functional interface's). A no-op when the types already match.
+         */
+        private void adaptLambdaType(BytecodeMethod m, Type from, Type to) {
+            if (from.equals(to)) {
+                return;
+            }
+            int toSort = to.getSort();
+            int fromSort = from.getSort();
+            if (toSort == Type.VOID) {
+                if (fromSort != Type.VOID) {
+                    m.addInstruction(from.getSize() == 2 ? Opcodes.POP2 : Opcodes.POP);
+                }
+                return;
+            }
+            if (fromSort == Type.VOID) {
+                return; // nothing on the stack to adapt
+            }
+            boolean toRef = toSort == Type.OBJECT || toSort == Type.ARRAY;
+            boolean fromRef = fromSort == Type.OBJECT || fromSort == Type.ARRAY;
+
+            if (!toRef && fromRef) {
+                // unbox: cast to the wrapper (when the source is Object/Number
+                // rather than the exact wrapper) then invoke its xxxValue()
+                String wrapper = wrapperType(toSort);
+                if (wrapper == null) {
+                    return;
+                }
+                if (!wrapper.equals(from.getInternalName())) {
+                    m.addTypeInstruction(Opcodes.CHECKCAST, wrapper);
+                }
+                m.addInvoke(Opcodes.INVOKEVIRTUAL, wrapper, unboxMethod(toSort), "()" + to.getDescriptor(), false);
+                return;
+            }
+            if (toRef && !fromRef) {
+                // box via Wrapper.valueOf(primitive); the boxed wrapper is
+                // assignment compatible with the reference target by contract
+                String wrapper = wrapperType(fromSort);
+                if (wrapper == null) {
+                    return;
+                }
+                m.addInvoke(Opcodes.INVOKESTATIC, wrapper, "valueOf", "(" + from.getDescriptor() + ")L" + wrapper + ";", false);
+                return;
+            }
+            if (!toRef && !fromRef) {
+                emitPrimitiveConversion(m, from, to);
+                return;
+            }
+            // both references: narrow with a checkcast (generic erasure)
+            if (!"java/lang/Object".equals(to.getInternalName())) {
+                m.addTypeInstruction(Opcodes.CHECKCAST, to.getInternalName());
+            }
+        }
+
+        private void emitPrimitiveConversion(BytecodeMethod m, Type from, Type to) {
+            int t = to.getSort();
+            int f = from.getSort();
+            // byte/short/char/boolean live as int on the operand stack
+            int fc = (f == Type.BOOLEAN || f == Type.BYTE || f == Type.SHORT || f == Type.CHAR) ? Type.INT : f;
+            switch (t) {
+                case Type.LONG:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2L);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2L);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2L);
+                    return;
+                case Type.FLOAT:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2F);
+                    else if (fc == Type.LONG) m.addInstruction(Opcodes.L2F);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2F);
+                    return;
+                case Type.DOUBLE:
+                    if (fc == Type.INT) m.addInstruction(Opcodes.I2D);
+                    else if (fc == Type.LONG) m.addInstruction(Opcodes.L2D);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2D);
+                    return;
+                case Type.INT:
+                case Type.BYTE:
+                case Type.SHORT:
+                case Type.CHAR:
+                case Type.BOOLEAN:
+                    // bring the source down to int first, then narrow if needed
+                    if (fc == Type.LONG) m.addInstruction(Opcodes.L2I);
+                    else if (fc == Type.FLOAT) m.addInstruction(Opcodes.F2I);
+                    else if (fc == Type.DOUBLE) m.addInstruction(Opcodes.D2I);
+                    if (t == Type.BYTE) m.addInstruction(Opcodes.I2B);
+                    else if (t == Type.SHORT) m.addInstruction(Opcodes.I2S);
+                    else if (t == Type.CHAR) m.addInstruction(Opcodes.I2C);
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        private String wrapperType(int sort) {
+            switch (sort) {
+                case Type.BOOLEAN: return "java/lang/Boolean";
+                case Type.BYTE: return "java/lang/Byte";
+                case Type.CHAR: return "java/lang/Character";
+                case Type.SHORT: return "java/lang/Short";
+                case Type.INT: return "java/lang/Integer";
+                case Type.LONG: return "java/lang/Long";
+                case Type.FLOAT: return "java/lang/Float";
+                case Type.DOUBLE: return "java/lang/Double";
+                default: return null;
+            }
+        }
+
+        private String unboxMethod(int sort) {
+            switch (sort) {
+                case Type.BOOLEAN: return "booleanValue";
+                case Type.BYTE: return "byteValue";
+                case Type.CHAR: return "charValue";
+                case Type.SHORT: return "shortValue";
+                case Type.INT: return "intValue";
+                case Type.LONG: return "longValue";
+                case Type.FLOAT: return "floatValue";
+                case Type.DOUBLE: return "doubleValue";
+                default: return null;
+            }
         }
 
         private void appendConcatLiteral(BytecodeMethod targetMethod, CharSequence literal) {

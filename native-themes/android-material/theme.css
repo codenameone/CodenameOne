@@ -71,6 +71,19 @@
     tabsSafeAreaBool: true;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* Material 3 NavigationBar-style sliding indicator: a thin coloured
+       underline that tweens between tabs when the user changes
+       selection. Off by default in the framework so existing apps
+       don't suddenly animate; on by default in the modern Material
+       theme to match the spec. Duration 200ms matches Material 3. */
+    tabsAnimatedIndicatorBool: true;
+    tabsAnimatedIndicatorDurationInt: 200;
+    tabsAnimatedIndicatorThicknessMm: 1;
+    /* Modern arc-spinner pull-to-refresh, Material 3 style. Color
+       comes from the TabIndicator UIID's fg (accent-tinted). */
+    pullToRefreshModernBool: true;
+    pullToRefreshIndicatorDiameterMm: 8;
+    pullToRefreshIndicatorStrokeMm: "0.6";
     switchThumbPaddingInt: 2;
     switchThumbScaleY: "1.5";
     switchTrackScaleY: "0.9";
@@ -320,6 +333,61 @@ MainTitle { cn1-derive: Title; }
 BackCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 
+/* ---- Desktop chrome (Material Design conventions) ----
+   Used when the desktop port enables interactiveScrollBool / desktop
+   window chrome; inert on real Android devices. Material desktop
+   scrollbars are slightly wider and flatter than macOS overlay bars;
+   the DesktopScroll horizontal padding sets the gutter width. */
+DesktopScroll {
+    background-color: #e7e0ec;
+    padding: 0 1.2mm 0 1.2mm;
+    margin: 0;
+}
+DesktopScrollThumb {
+    background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb.
+   Properties are re-declared rather than cn1-derive'd from the base UIID,
+   which would be a self-referential derive cycle. */
+DesktopScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed {
+    background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScroll {
+    background-color: #e7e0ec;
+    padding: 1.2mm 0 1.2mm 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb {
+    background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.pressed {
+    background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+
 /* Material 3 top tabs: flat surface with selected tab underlined by
    color rather than a pill fill. No border-radius here -
    combining it with a visible border would drop into the 9-piece
@@ -341,6 +409,11 @@ Tab.pressed { color: var(--accent-on-container-color, #21005d); background-color
 
 SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }
+
+/* TabIndicator: color reference read by Tabs.paintAnimatedIndicator()
+   for the sliding underline. The actual drawing is done in Java; this
+   UIID only contributes the foreground colour. */
+TabIndicator { color: var(--accent-color, #6750a4); background-color: transparent; padding: 0; margin: 0; }
 
 SideNavigationPanel { background-color: #fef7ff; padding: 0; margin: 0; }
 
@@ -421,6 +494,48 @@ FloatingActionButton {
 }
 FloatingActionButton.pressed { background-color: var(--accent-pressed-color, #d0bcff); }
 
+/* ChatView (com.codename1.components.ChatView) -- mirrors the iOS modern
+   layout but uses Material 3 surfaces. USER bubble = primary container,
+   ASSISTANT = surface variant, SYSTEM = transparent + muted. Rounded
+   bubble corners use plain border-radius (no border) so the CSS
+   compiler doesn't need the CEF-backed rasterizer. */
+ChatView { background-color: #fffbfe; padding: 0; margin: 0; }
+ChatViewMessages { background-color: #fffbfe; padding: 1mm; margin: 0; }
+ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+ChatBubbleUser {
+    background-color: var(--accent-container-color, #eaddff);
+    color: var(--accent-on-container-color, #21005d);
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleAssistant {
+    background-color: #e6e0e9;
+    color: #1d1b20;
+    padding: 2mm 3mm;
+    margin: 0.5mm 0;
+    border-radius: 4mm;
+}
+ChatBubbleSystem {
+    background-color: transparent;
+    color: #79747e;
+    padding: 1mm 2mm;
+    margin: 0.5mm 0;
+}
+ChatBubbleText { cn1-derive: Label; background-color: transparent; padding: 0; margin: 0; }
+ChatTypingIndicator { background-color: transparent; color: #79747e; padding: 1mm 3mm; margin: 0; }
+ChatInput { background-color: #fffbfe; padding: 1mm 2mm; margin: 0; }
+ChatInputField {
+    cn1-derive: TextField;
+    background-color: #f3edf7;
+    padding: 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: 3mm;
+}
+ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; border-radius: 3mm; }
+ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
+
 Separator { background-color: #cac4d0; padding: 0; margin: 0; }
 PopupContent {
     background-color: #e6e0e9;
@@ -484,6 +599,17 @@ PopupContent {
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 
+    /* Desktop scrollbar (Material) dark overrides. cn1-background-type is
+       re-declared so the round primitive carries into dark mode. */
+    DesktopScroll { background-color: #2b2930; }
+    DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScroll { background-color: #2b2930; }
+    DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
+
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }
     Tab { color: #cac4d0; background-color: #141218; }
@@ -491,6 +617,9 @@ PopupContent {
     Tab.pressed { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-pressed-color-dark, #4f378b); }
     SelectedTab { color: var(--accent-color-dark, #d0bcff); }
     UnselectedTab { color: #cac4d0; }
+
+    /* Animated indicator inherits the dark-mode accent. */
+    TabIndicator { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 
     SideNavigationPanel { background-color: #141218; }
     SideCommand { color: #e6e0e9; background-color: transparent; }
@@ -514,6 +643,16 @@ PopupContent {
 
     FloatingActionButton { color: var(--accent-on-container-color-dark, #eaddff); background-color: var(--accent-container-color-dark, #4f378b); }
     FloatingActionButton.pressed { background-color: var(--accent-color-dark, #d0bcff); }
+
+    ChatView { background-color: #141218; }
+    ChatViewMessages { background-color: #141218; }
+    ChatBubbleUser { background-color: var(--accent-container-color-dark, #4f378b); color: var(--accent-on-container-color-dark, #eaddff); }
+    ChatBubbleAssistant { background-color: #2b2930; color: #e6e0e9; }
+    ChatBubbleSystem { color: #938f99; }
+    ChatBubbleText { color: #e6e0e9; background-color: transparent; }
+    ChatTypingIndicator { color: #938f99; }
+    ChatInput { background-color: #141218; }
+    ChatInputField { background-color: #1d1b20; color: #e6e0e9; border-radius: 3mm; }
 
     Separator { background-color: #49454f; }
 }

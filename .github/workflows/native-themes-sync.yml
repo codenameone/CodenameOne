@@ -23,6 +23,11 @@ on:
 
 permissions:
   contents: write
+  # The job runs inside the private ghcr.io/codenameone pr-ci-container
+  # image; pulling it needs the GITHUB_TOKEN to carry packages:read.
+  # Declaring any permissions block resets every unlisted scope to none,
+  # so packages:read must be spelled out or the container pull is denied.
+  packages: read
 
 concurrency:
   group: native-themes-sync
@@ -36,7 +41,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -47,7 +52,7 @@ jobs:
           echo "${JAVA_HOME_8}/bin" >> $GITHUB_PATH
 
       - name: Cache Maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -65,6 +70,13 @@ jobs:
       - name: Commit and push regenerated .res files
         run: |
           set -euo pipefail
+          # This job runs inside the pr-ci-container, where the checked-out
+          # tree is owned by a different UID than this shell step's user.
+          # git's dubious-ownership guard then rejects every command with
+          # "fatal: not in a git directory". actions/checkout writes a
+          # safe.directory entry, but into the action's HOME, which this
+          # bash step doesn't share -- so mark the workspace safe here too.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Themes/ holds the single source of truth. Each downstream consumer

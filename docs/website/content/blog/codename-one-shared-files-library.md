@@ -93,11 +93,11 @@ try (OutputStream output = sharedFile.openOutputStream(sharedFile.getMimetype())
 
 ### Bookmarking For Later Use
 
-By default, the files you obtain will no be accessible the next time you load the app. You need to create a bookmarked file which will provide you with a persistent path that you can use to access the file.
+By default, the files you obtain will not be accessible the next time you load the app. You need to create a bookmarked file which will provide you with a persistent path that you can use to access the file.
 
 1. Use `SharedFile.createBookmark()` to create a bookmark.
 
-2. Use `SharedFile.deleteBookmark()` do remove a bookmark.
+2. Use `SharedFile.deleteBookmark()` to remove a bookmark.
 
 3. Use `SharedFile.isBookmark()` to check if the file is a bookmarked file.
 

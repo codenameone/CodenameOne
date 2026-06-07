@@ -17,6 +17,8 @@
 
 package java.util;
 
+import java.util.function.UnaryOperator;
+
 
 /// A `List` is a collection which maintains an ordering for its elements. Every
 /// element in the `List` has an index. Each element can thus be accessed by its
@@ -431,4 +433,17 @@ public interface List<E> extends Collection<E> {
     /// if the type of an element in this `List` cannot be stored
     /// in the type of the specified array.
     public <T> T[] toArray(T[] array);
+
+    /// Replaces each element of this list with the result of applying
+    /// the operator to that element. Stubbed in the CLDC11 subset;
+    /// the actual implementation comes from the platform's JDK at
+    /// runtime.
+    default void replaceAll(UnaryOperator<E> operator) {
+    }
+
+    /// Sorts this list according to the order induced by the specified
+    /// `Comparator`. Stubbed in the CLDC11 subset; the actual
+    /// implementation comes from the platform's JDK at runtime.
+    default void sort(Comparator<? super E> c) {
+    }
 }

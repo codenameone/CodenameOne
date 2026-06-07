@@ -44,7 +44,7 @@ However, for most cases you might want to use the new `revalidateWithAnimationSa
 
 ### Component Ownership
 
-`Component.setOwner()`, `Component.isOwnedBy()` and `Component.containsOrOwns(x,y)` allow components to denote an ownership hierarchy. This allows you to more easily track relationships hierarchical relationships between components that don’t happen to descendents of each other – e.g. for popup dialogs that are actually contained in a layered pane but are logically owned by components in the content pane. This is used by `Dialog` and `InteractionDialog` to better test for pointer events that occur outside their bounds. Now `Dialog.setDisposeWhenPointerOutOfBounds()` regards an event to be **in** bounds if it occurs on a component that is owned by the `Dialog` (or by a component in the dialog). The `Picker`, `AutocompleteTextField` and `ComboBox` popup dialogs have been updated to track their owner so that they behave appropriately. If you develop your own popups that are placed in the layered pane, it is up to you to set their owner appropriately using `Component.setOwner()` so that dialogs can deal with their pointer events properly.
+`Component.setOwner()`, `Component.isOwnedBy()` and `Component.containsOrOwns(x,y)` allow components to denote an ownership hierarchy. This allows you to more easily track hierarchical relationships between components that don’t happen to be descendents of each other – e.g. for popup dialogs that are actually contained in a layered pane but are logically owned by components in the content pane. This is used by `Dialog` and `InteractionDialog` to better test for pointer events that occur outside their bounds. Now `Dialog.setDisposeWhenPointerOutOfBounds()` regards an event to be **in** bounds if it occurs on a component that is owned by the `Dialog` (or by a component in the dialog). The `Picker`, `AutocompleteTextField` and `ComboBox` popup dialogs have been updated to track their owner so that they behave appropriately. If you develop your own popups that are placed in the layered pane, it is up to you to set their owner appropriately using `Component.setOwner()` so that dialogs can deal with their pointer events properly.
 
 There is no special house-keeping for the owner hierarchy. E.g. If you remove an owner from the form, it doesn’t do anything like remove its owned components also. It is up to you (the developer) to manage these relationships.
 
@@ -54,11 +54,11 @@ We added limited support for badges in the Android port. Now Push type 101 is su
 
 ### rotateRadian
 
-Rotate works with absolute coordinates which in retrospect might have been a poor choice. We can’t change that as due to backward compatibility. So we added a new method `rotateRadian()` that rotate graphics context about the context’s current origin, taking into account translation.
+Rotate works with absolute coordinates which in retrospect might have been a poor choice. We can’t change that as due to backward compatibility. So we added a new method `rotateRadian()` that rotates graphics context about the context’s current origin, taking into account translation.
 
 ### Zoom Enhancements on ImageViewer
 
-[Carlos Verdier](https://github.com/carlosverdier) submitted a [a pull request](https://github.com/codenameone/CodenameOne/pull/2592) that adds a method to zoom to a specific location panning the image. As part of that change zoom is now animated by default.
+[Carlos Verdier](https://github.com/carlosverdier) submitted [a pull request](https://github.com/codenameone/CodenameOne/pull/2592) that adds a method to zoom to a specific location panning the image. As part of that change zoom is now animated by default.
 
 You can disable zoom animations on `ImageViewer` using `setAnimateZoom(false)`.
 

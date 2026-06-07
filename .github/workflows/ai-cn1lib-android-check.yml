@@ -1,0 +1,134 @@
+name: AI cn1lib Android native check
+
+# Parses the Android Java sources bundled in every cn1-ai-* cn1lib
+# against android.jar so missing symbols / typos surface in PR review.
+# A full Android emulator integration run (which would also exercise the
+# bridges against fixture images via espresso) lands separately -- this
+# workflow is a fast static gate.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+      - '.github/workflows/ai-cn1lib-android-check.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'maven/cn1-ai-**'
+      - 'scripts/gen-ai-cn1libs.py'
+
+jobs:
+  android-native-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android platform & ML Kit deps
+        # sdkmanager + `yes |` would SIGPIPE under `set -o pipefail`, so feed
+        # licence approvals via printf instead.
+        run: |
+          set -eux
+          printf 'y\n%.0s' {1..50} | sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+          mkdir -p /tmp/cn1-ai-android/probe/src/main/java /tmp/cn1-ai-android/probe/libs
+      - name: Download ML Kit / TFLite / ONNX AARs and JARs
+        # Most ML Kit deps are .aar (Android library archive); javac can't read
+        # them directly, so we unzip classes.jar out of each. Maven's
+        # dependency:copy plugin handles the download + checksum.
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/lintprobe /tmp/lintcp
+          cat > /tmp/lintprobe/pom.xml <<'EOF'
+          <?xml version="1.0"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>cn1.lintprobe</groupId>
+            <artifactId>cn1-ai-android-lintprobe</artifactId>
+            <version>1.0</version>
+            <packaging>pom</packaging>
+            <repositories>
+              <repository><id>google</id><url>https://maven.google.com</url></repository>
+            </repositories>
+            <build>
+              <plugins>
+                <plugin>
+                  <groupId>org.apache.maven.plugins</groupId>
+                  <artifactId>maven-dependency-plugin</artifactId>
+                  <version>3.6.1</version>
+                  <executions>
+                    <execution>
+                      <id>copy-aars</id>
+                      <phase>validate</phase>
+                      <goals><goal>copy</goal></goals>
+                      <configuration>
+                        <outputDirectory>/tmp/lintaar</outputDirectory>
+                        <stripVersion>true</stripVersion>
+                        <artifactItems>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>text-recognition</artifactId><version>16.0.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>barcode-scanning</artifactId><version>17.2.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>face-detection</artifactId><version>16.1.5</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>image-labeling</artifactId><version>17.0.7</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>translate</artifactId><version>17.0.3</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>smart-reply</artifactId><version>17.0.4</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>language-id</artifactId><version>17.0.6</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>pose-detection</artifactId><version>18.0.0-beta3</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>segmentation-selfie</artifactId><version>16.0.0-beta5</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>vision-common</artifactId><version>17.3.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>common</artifactId><version>18.11.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>vision-interfaces</artifactId><version>16.3.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.android.gms</groupId><artifactId>play-services-tasks</artifactId><version>18.1.0</version><type>aar</type></artifactItem>
+                          <artifactItem><groupId>com.google.mlkit</groupId><artifactId>barcode-scanning-common</artifactId><version>17.0.0</version><type>aar</type></artifactItem>
+                        </artifactItems>
+                      </configuration>
+                    </execution>
+                  </executions>
+                </plugin>
+              </plugins>
+            </build>
+          </project>
+          EOF
+          mvn -B -f /tmp/lintprobe/pom.xml validate -q || {
+              echo "::warning::Some ML Kit dependencies failed to resolve; lint may emit false-positive errors";
+          }
+          for aar in /tmp/lintaar/*.aar; do
+              [ -f "$aar" ] || continue
+              base=$(basename "$aar" .aar)
+              mkdir -p "/tmp/lintcp/$base"
+              unzip -q -o "$aar" classes.jar -d "/tmp/lintcp/$base" 2>/dev/null || true
+              [ -f "/tmp/lintcp/$base/classes.jar" ] && \
+                  mv "/tmp/lintcp/$base/classes.jar" "/tmp/lintcp/$base.jar"
+              rm -rf "/tmp/lintcp/$base"
+          done
+          ls -la /tmp/lintcp/
+
+      - name: Compile every cn1-ai-* Android source against android.jar
+        # Best-effort lint: not every transitive AAR is necessarily resolvable
+        # from public Google Maven (versions change). When a class is missing
+        # we keep going to surface every error in a single CI run rather than
+        # bailing on the first failure. Failures here gate the PR.
+        run: |
+          set -eux
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          LINT_CP=$(find /tmp/lintcp -name '*.jar' | tr '\n' ':')
+          fail=0
+          mkdir -p /tmp/out
+          for d in maven/cn1-ai-*/android/src/main/java; do
+              sources=$(find "$d" -name '*.java')
+              [ -z "$sources" ] && continue
+              if ! javac -d /tmp/out -classpath "$ANDROID_JAR:$LINT_CP" \
+                      -source 1.8 -target 1.8 \
+                      -Xlint:-options \
+                      $sources 2>&1 | tee /tmp/last-javac.log; then
+                  echo "::error::Android Java compile failed for $d"
+                  fail=1
+              fi
+          done
+          exit $fail

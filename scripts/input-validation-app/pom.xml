@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone.examples.inputvalidation</groupId>
+    <artifactId>cn1-input-validation</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>cn1-input-validation</name>
+    <description>
+        Minimal CN1 app whose only job is to validate that input events
+        (tap, drag, long-press) reach Component listeners end-to-end on each
+        port. Driven by per-platform OS-level automation (XCUITest, Playwright).
+    </description>
+
+    <modules>
+        <module>common</module>
+    </modules>
+
+    <properties>
+        <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
+        <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>17</java.version>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <cn1app.name>cn1-input-validation</cn1app.name>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>java-runtime</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-buildclient</artifactId>
+                <version>${cn1.version}</version>
+                <scope>system</scope>
+                <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-maven-plugin</artifactId>
+                    <version>${cn1.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>ios</id>
+            <activation>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>ios</value>
+                </property>
+            </activation>
+            <modules>
+                <module>ios</module>
+            </modules>
+        </profile>
+    </profiles>
+</project>

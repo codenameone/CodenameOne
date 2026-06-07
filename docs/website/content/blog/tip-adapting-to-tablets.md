@@ -41,7 +41,7 @@ But why is the title a variable?
 
 Where are the rest of the methods we expect in `Form`?
 
-Simple, we create every method thats missing and make it work in such a way that makes sense for our applications tablet design. E.g. this is `show()` which is one of the bigger methods here:
+Simple, we create every method that’s missing and make it work in such a way that makes sense for our application’s tablet design. E.g. this is `show()` which is one of the bigger methods here:
     
     
     public void show() {

@@ -311,8 +311,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return null;
     }
 
+    public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
+
     private boolean isLocalBuildTarget(String buildTarget) {
-        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget));
+        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget));
     }
 
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
@@ -387,10 +391,17 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // Jars that should be stripped out and not sent to the server
             List<String> blackListJars = new ArrayList<String>();
             getLog().info("Project artifacts: "+project.getArtifacts());
+            // For local JavaScript builds we need codenameone-core and java-runtime classes
+            // in the staged jar — the build server normally re-supplies those, but ParparVM's
+            // ByteCodeTranslator runs locally here and resolves everything from the staged class
+            // directory.
+            boolean localJsBuild = buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
             for (Artifact artifact : project.getArtifacts()) {
                 boolean addToBlacklist = false;
                 if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
-                    addToBlacklist = true;
+                    if (!localJsBuild) {
+                        addToBlacklist = true;
+                    }
                 }
                 if (!addToBlacklist && !isLocalBuildTarget(buildTarget)) {
                     // When sending to the build server, we'll strip the kotlin-stdlib and the server will provide it
@@ -402,7 +413,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     }
                 }
                 if (!addToBlacklist && !"compile".equals(artifact.getScope())) {
-                    addToBlacklist = true;
+                    // Local JS builds need codenameone-core / java-runtime even though they are
+                    // marked `provided` in the user's POM — the build server normally re-supplies
+                    // them, but locally we have to bundle them so ParparVM's translator can see
+                    // every referenced class.
+                    boolean keepForLocalJs = localJsBuild
+                            && "com.codenameone".equals(artifact.getGroupId())
+                            && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST);
+                    if (!keepForLocalJs) {
+                        addToBlacklist = true;
+                    }
                 }
                 if (addToBlacklist) {
                     File jar = getJar(artifact);
@@ -441,6 +461,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
                 getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
                 jarsToMerge.add(new File(element));
+            }
+            if (localJsBuild) {
+                // `provided`-scope deps are not transitive, so a child module that only
+                // depends on a `common` library never sees the project's codenameone-core /
+                // java-runtime jars on its compile classpath. Pull them in explicitly here
+                // so ParparVM has every class available when it translates to JavaScript.
+                for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                    File jar = getJar("com.codenameone", bundled);
+                    if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
+                        getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
+                        jarsToMerge.add(jar);
+                    }
+                }
             }
             mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
 
@@ -567,12 +600,26 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 automated = false;
                 if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    // mac-source rides the iOS pipeline with the macNative.enabled
+                    // build hint forced on. The IPhoneBuilder delegates Mac-specific
+                    // emission to MacNativeBuilder when that hint is set.
+                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (buildTarget.contains("javascript")) {
+                    doJavaScriptLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
             } else {
+                // Cloud-builds route through a remote build server; for the Mac
+                // native target we set the same macNative.enabled hint here so
+                // the server-side IPhoneBuilder takes the Mac branch.
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                }
                 if (automated) {
                     getLog().debug("Attempting to start hyper beam stream the build log to the console");
                     hyperBeamThread.start();
@@ -709,6 +756,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private File getGeneratedIOSProjectSourceDirectory() {
         return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-ios-source");
+    }
+
+    private File getGeneratedMacProjectSourceDirectory() {
+        return new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-mac-source");
+    }
+
+    private boolean isMacNativeBuild(Properties props) {
+        return "true".equalsIgnoreCase(props.getProperty("codename1.arg.macNative.enabled", "false"));
     }
 
     private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
@@ -943,9 +998,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
 
-        if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
+        boolean macNativeBuild = isMacNativeBuild(props);
 
-            File generatedProject = getGeneratedIOSProjectSourceDirectory();
+        if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+
+            File generatedProject = macNativeBuild
+                    ? getGeneratedMacProjectSourceDirectory()
+                    : getGeneratedIOSProjectSourceDirectory();
             getLog().info("Generating Xcode Project to "+generatedProject+"...");
             try {
                 if (generatedProject.exists()) {
@@ -971,7 +1030,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         IPhoneBuilder e = new IPhoneBuilder();
         e.setLogger(getLog());
-        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "ios-build");
+        File buildDirectory = new File(tmpProjectDir,
+                "dist" + File.separator + (macNativeBuild ? "mac-build" : "ios-build"));
         e.setBuildDirectory(buildDirectory);
 
         e.setCodenameOneJar(codenameOneJar);
@@ -1033,9 +1093,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 throw new MojoExecutionException("iOS build failed");
             }
 
-            if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) && e.getXcodeProjectDir() != null) {
+            if ((BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) && e.getXcodeProjectDir() != null) {
                 File xcodeProject = e.getXcodeProjectDir();
-                File output = getGeneratedIOSProjectSourceDirectory();
+                File output = macNativeBuild
+                        ? getGeneratedMacProjectSourceDirectory()
+                        : getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
                     getLog().info("Copying Xcode Project to "+output);
@@ -1064,6 +1126,87 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             e.cleanup();
         }
 
+    }
+
+    // Local ParparVM-backed JavaScript build target. Enterprise-gated; see
+    // JavaScriptBuilder#checkUserLevel. Intentionally undocumented in the
+    // archetype build scripts — discoverable via `mvn cn1:build
+    // -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript`.
+    private void doJavaScriptLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+
+        JavaScriptBuilder e = new JavaScriptBuilder();
+        e.setLogger(getLog());
+        e.setBuildTarget(buildTarget);
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "javascript-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        r.setVersion(props.getProperty("codename1.version"));
+        String iconPath = props.getProperty("codename1.icon");
+        if (iconPath != null) {
+            File iconFile = new File(iconPath);
+            if (!iconFile.isAbsolute()) {
+                iconFile = new File(getCN1ProjectDir(), iconPath);
+            }
+            if (iconFile.isFile()) {
+                try {
+                    r.setIcon(iconFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to read icon " + iconFile, ex);
+                }
+            }
+        }
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
+        r.setType("javascript");
+
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String value = props.getProperty(key);
+                String currentKey = key.substring(14);
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new MojoExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, value);
+            }
+        }
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.build(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("JavaScript builder log:\n" + builderLog);
+                }
+                throw new MojoExecutionException("JavaScript build failed");
+            }
+            File outputZip = e.getJavaScriptOutputZip();
+            if (outputZip != null && outputZip.isFile()) {
+                File copyTo = new File(project.getBuild().getDirectory() + File.separator + project.getBuild().getFinalName() + ".zip");
+                try {
+                    FileUtils.copyFile(outputZip, copyTo);
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to copy JavaScript bundle to " + copyTo, ex);
+                }
+                projectHelper.attachArtifact(project, "zip", "webapp", copyTo);
+                getLog().info("JavaScript bundle written to " + copyTo);
+            }
+        } catch (BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("JavaScript builder log:\n" + builderLog);
+            }
+            throw new MojoExecutionException("Failed to build JavaScript app", ex);
+        } finally {
+            e.cleanup();
+        }
     }
 
     protected void afterBuild() {

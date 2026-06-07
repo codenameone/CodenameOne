@@ -14,7 +14,7 @@ author: Shai Almog
 We’ll be [migrating to the new iOS build servers](/blog/ios-server-migration-plan.html)  
 this Sunday & this does entail one major thing you need to be aware of. With the new version of xcode http  
 URL’s [are blocked by Apple](/blog/hiding-url-security-advocacy.html). We  
-blogged about this a while back but this bares repeating as it’s something a lot of you will start running into.
+blogged about this a while back but this bears repeating as it’s something a lot of you will start running into.
 
 To get an overview of the issue check out  
 [this article](http://code.tutsplus.com/articles/apple-tightens-security-with-app-transport-security—​cms-24420) or  

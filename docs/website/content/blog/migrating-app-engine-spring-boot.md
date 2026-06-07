@@ -75,7 +75,7 @@ The truly amazing thing is the queries and 3rd party tools. This has boosted our
 
 Despite the `User-Agent` issue cloudflare is a huge asset. It makes caching repeated queries trivial. Better yet, since we now proxy some downloads through the servers we can get faster/more reliable downloads thanks to cloudflare.
 
-I can’t sing the praises of Spring Boot enough, it makes this trivial. It has it’s pain points (unreadable huge stack traces) but the ease of development is amazing. We manage our own infrastructure now through IaaS. It’s easier, faster, cheaper and scales better than the previous PaaS deployment. Four out of four criteria.
+I can’t sing the praises of Spring Boot enough, it makes this trivial. It has its pain points (unreadable huge stack traces) but the ease of development is amazing. We manage our own infrastructure now through IaaS. It’s easier, faster, cheaper and scales better than the previous PaaS deployment. Four out of four criteria.
 
 While we didn’t test scaling to the full extent so far CPU utilization is flat/low. This architecture would probably scale much better than app engine ever did. Google sells App Engine as a "Google Scale" solution but anyone who worked with it will know that this only applies if you can spend "Google Sums" to pay for that. App Engine tries to scale by adding computing resources instead of just slowing down.
 
@@ -83,7 +83,7 @@ That means that if you have 10k active users you’d pay for a lot of servers to
 
 We also took the opportunity to move most of our transactional emails to mailgun. So if you get an email from us you will notice it uses a different domain. One of the big problems developers had with signup in the past was due to corporate inboxes relegating us to spam. We made some bad technical choices assuming SendGrid can help us fix these issues. This probably isn’t SendGrid’s fault as much as it’s our lack of understanding in this field.
 
-We decided to start a new leaf with a new domain for the emails. We didn’t move everything there and I’m not sure if we ever will as I’m concerned about deliverability. Regardless this is seems to be a good move as we have 100% deliverability so far.
+We decided to start a new leaf with a new domain for the emails. We didn’t move everything there and I’m not sure if we ever will as I’m concerned about deliverability. Regardless this seems to be a good move as we have 100% deliverability so far.
 
 ### How could this Impact You
 

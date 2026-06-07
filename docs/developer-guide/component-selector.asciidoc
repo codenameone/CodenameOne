@@ -2,7 +2,7 @@
 
 The `ComponentSelector` class is a new class that brings the power of jQuery to Codename One. While it isn't *actually* jQuery, it's influenced by it. If you're not familiar with jQuery, here is the 10 second intro.
 
-jQuery is a JavaScript library, created by John Resig in 2006, that has become a staple of browser-based UI development. As of March 2017, over 70% of web sites are using jQuery. The initial problem that jQuery solved was browser incompatibility issues. It provided a consistent API for most useful DOM methods so that the developer didn't have to spend all their days and nights fighting with browser compatibility issues. In a way, it did for Javascript, what Codename One does for mobile apps.
+jQuery is a JavaScript library, created by John Resig in 2006, that has become a staple of browser-based UI development. As of March 2017, over 70% of web sites are using jQuery. The initial problem that jQuery solved was browser incompatibility issues. It provided a consistent API for most useful DOM methods so that the developer didn't have to spend all their days and nights fighting with browser compatibility issues. In a way, it did for JavaScript, what Codename One does for mobile apps.
 
 The other thing that jQuery did, was provide an elegant way to select and manipulate DOM elements (that is, HTML tags in a web page). It enabled developers to form sets of elements using a CSS-like syntax, and to operate on all elements of those sets, as if they were single elements, and they provided a fluent API to enable developers to chain multiple calls together, and delay onset of carpel tunnel for at least a few extra years.
 
@@ -15,7 +15,7 @@ With the new `ComponentSelector` class, you've adopted the following aspects of 
 
 === Motivation by example
 
-The following snippet creates a button, that, when pressed, will fade itself and all its sibling components out, and then fade them back in.
+The following snippet creates a button, that, when pressed, will fade itself and all its sibling components out, and then fade them back in:
 
 [source,java]
 ----
@@ -60,7 +60,7 @@ The first thing you'll want to do with ComponentSelector, is to select the compo
 
 ==== Specifying the roots for queries
 
-You can specify the roots for a query to limit the scope of the search. If you don't provide a root, then the current form will be used as a root. If there is no current form yet, then a RuntimeException will be thrown. it's always a good idea to provide a root if you've one.
+You can specify the roots for a query to limit the scope of the search. If you don't provide a root, then the current form will be used as a root. If there is no current form yet, then a RuntimeException will be thrown. It's always a good idea to provide a root if you've one.
 
 For example, `$(`Label`, myContainer)` = The set of components with UIID="Label" inside the `myContainer`. This will scour the full subtree of `myContainer` for components that match the provided selector.
 
@@ -72,7 +72,7 @@ Finally, ComponentSelector provides a `find()` method that implicitly uses the c
 
 ==== Selector syntax
 
-far You've glossed over the selector syntax by saying it's `like CSS`. Though it's *like* CSS selectors, it's necessarily different to accommodate the differences between Codename One's component model and Javascript's DOM. Rather than go into a technical language definition, You'll use some examples to illustrate the capabilities of your syntax.
+far You've glossed over the selector syntax by saying it's `like CSS`. Though it's *like* CSS selectors, it's necessarily different to accommodate the differences between Codename One's component model and JavaScript's DOM. Rather than go into a technical language definition, You'll use some examples to illustrate the capabilities of your syntax.
 
 . `$("Label")` - The set of all components on the form with UIID "Label"
 . `$("#MyField")` - The set of all components on the form with Name `MyField`.
@@ -89,7 +89,7 @@ far You've glossed over the selector syntax by saying it's `like CSS`. Though it
 
 Some examples above mention the use of "tags." Tags are analogous to "classes" in CSS. The goal was to provide the same kind of functionality as CSS classes, but in Java the term "class" is a little busy, so the term "tag" is used instead. You can add as many tags to a component as you like. You can then use those tags to assist in your queries. Tags are added using the `addTags()` method, and they're removed using the `removeTags()` method.
 
-Here is an example that uses tags to implement table striping so that even rows are a different color than odd rows in a table.
+Here is an example that uses tags to implement table striping so that even rows are a different color than odd rows in a table:
 
 [source,java]
 ----
@@ -122,7 +122,7 @@ In the above example you add a tag to each label when you add it to the table or
 
 === Modifying styles
 
-ComponentSelector includes wrappers for most of the methods of `com.codename1.ui.plaf.Style` so that you can change the styles of selected components using a fluent API. This was demonstrated a little bit in the table striping example (`setBgColor()` and `setBgTransparency()` were called on even rows of the table). it's worth going over this in a little more detail though as Codename One styles have "state." For example, For the snippet of code:
+ComponentSelector includes wrappers for most of the methods of `com.codename1.ui.plaf.Style` so that you can change the styles of selected components using a fluent API. This was demonstrated a little bit in the table striping example (`setBgColor()` and `setBgTransparency()` were called on even rows of the table). It's worth going over this in a little more detail though as Codename One styles have "state." For example, For the snippet of code:
 
 [source,java]
 ----
@@ -140,7 +140,9 @@ for (Component c : evenComponents) {
 }
 ----
 
-If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc... What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example, [source,java]
+If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc. What if you wanted to specifically change the styles in the "pressed" state. Then you would call `selectPressedStyle()` prior calling your style mutation methods. For example:
+
+[source,java]
 ----
 $(".even", table)
     .selectPressedStyle()
@@ -180,7 +182,7 @@ As mentioned above, and demonstrated in the first example of this article, Compo
 
 Also to these basic effects, ComponentSelector wraps all the existing animation functionality of the Component and Container classes but with proper accommodations for animating multiple elements simultaneously.
 
-For example, Consider this example, that shows a button that replaces itself and all siblings with replacement labels, and then replaces them back.
+For example, Consider this example, that shows a button that replaces itself and all siblings with replacement labels, and then replaces them back:
 
 [source,java]
 ----

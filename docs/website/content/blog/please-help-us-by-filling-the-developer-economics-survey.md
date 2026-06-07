@@ -25,7 +25,7 @@ The last time we had a developer economics survey you guys really came thru and 
   
 This year the stakes are even higher and the incentive for referrals  
   
-is greater, if you want to help us promote Codename One to a people outside of the core Java developer community then please fill out this survey using this link:  
+is greater, if you want to help us promote Codename One to people outside of the core Java developer community then please fill out this survey using this link:  
 [  
 http://www.vmob.me/DE3Q14CodenameOne  
 ](http://www.vmob.me/DE3Q14CodenameOne)  

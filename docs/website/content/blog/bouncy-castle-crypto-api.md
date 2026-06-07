@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-We’ve got many requests in the past year for a cryptography API, initially we thought about adding something like this to the core but it seems somewhat niche so we decided to wrap up this great open source project and re-package it as a CodenameOne lib.The project is supported on all CodenameOne platforms right out of the box without any changes.  
+We’ve got many requests in the past year for a cryptography API, initially we thought about adding something like this to the core but it seems somewhat niche so we decided to wrap up this great open source project and re-package it as a CodenameOne lib. The project is supported on all CodenameOne platforms right out of the box without any changes.  
   
   
   
@@ -36,7 +36,7 @@ and you can download the compiled binary from here:
   
 You can learn more about bouncy castle and how to use it through the  
   
-many resources on available here:  
+many resources available here:  
 [  
 http://www.bouncycastle.org/  
 ](http://www.bouncycastle.org/)  

@@ -147,7 +147,31 @@ public class Lifecycle {
     public void destroy() {
     }
 
-    /// The current form within the application lifecycle which possibly differs from the one in the implementation
+    /// Invoked when the app is launched or resumed because the user shared content
+    /// (text, a URL, a file or an image) into it from another application. The default
+    /// implementation does nothing; override it to handle the shared payload.
+    ///
+    /// This is delivered on the EDT. File and image items are exposed as
+    /// `com.codename1.io.FileSystemStorage` paths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the shared content
+    public void onReceivedSharedContent(com.codename1.share.SharedContent content) {
+    }
+    
+    /// Returns the form currently stored by this `Lifecycle` instance for
+    /// application resume handling.
+    ///
+    /// In most application code, use `CN.getCurrentForm()` instead, as it returns
+    /// the form that is actually displayed on the screen. This method is only useful
+    /// when subclassing `Lifecycle` and you need to inspect or customize the form
+    /// remembered by `stop()` and restored by `start()`, which may differ from the
+    /// form currently displayed by the Codename One implementation.
+    ///
+    /// #### Returns
+    ///
+    /// the form stored in this lifecycle, or `null` if no form has been stored
     protected Form getCurrentForm() {
         return current;
     }

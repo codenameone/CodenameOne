@@ -26,6 +26,11 @@
 **/__pycache__/
 **/private/*
 **/.idea/*
+# The cn1app-archetype ships project-level IDE configs (run / debug
+# configurations + recommended source roots) that need to land in the
+# generated project's .idea/. Un-ignore them so they stay checked in.
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 **/build/*
 **/dist/*
 *.zip
@@ -69,6 +74,10 @@ node_modules
 **/genfiles.properties
 **/private/private.properties
 .idea/
+# Same exception as for **/.idea/* above: keep the archetype's
+# bundled IDE configs versioned.
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
+!maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 .claude/
 target
 pom.xml.versionsBackup
@@ -88,6 +97,8 @@ pom.xml.tag
 !.brokk/project.properties
 dependency-reduced-pom.xml
 
+/artifacts/
+
 # Hugo website generated artifacts
 /docs/website/.hugo_build.lock
 /docs/website/hugo_stats.json
@@ -103,3 +114,10 @@ dependency-reduced-pom.xml
 package-lock.json
 package.json
 .claude/
+
+# Local screenshot/perf bench output
+/artifacts/
+/scripts/artifacts/
+# Local diagnostic playwright scripts (sidemenu-test, initializr-test, etc.)
+/scripts/*-test.mjs
+

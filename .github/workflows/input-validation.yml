@@ -1,0 +1,196 @@
+name: Input validation gesture suite
+
+# Fast-running iOS suite that asserts physical taps / drags / long-presses
+# reach Component listeners end-to-end. Built to catch regressions in the
+# input chain (the class of bug PR #5003 fixed -- a window-level
+# UITapGestureRecognizer eating every tap was invisible to the existing
+# screenshot-only tests because none of them actually depended on a touch
+# event firing).
+#
+# Only iOS for now. The JavaScript port wires its pointer listeners from
+# inside a Web Worker via a host-bridge proxy; synthetic events from the
+# test driver don't traverse that proxy the way real OS events would, so
+# end-to-end input validation on JS needs port-side work first. See
+# scripts/input-validation-app/README.adoc for the "not yet covered" list.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/input-validation.yml'
+      - 'scripts/input-validation-app/**'
+      - 'scripts/build-ios-app.sh'
+      - 'CodenameOne/src/com/codename1/ui/Component.java'
+      - 'CodenameOne/src/com/codename1/ui/Form.java'
+      - 'CodenameOne/src/com/codename1/ui/Button.java'
+      - 'Ports/iOSPort/nativeSources/CN1TapGestureRecognizer.m'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/input-validation.yml'
+      - 'scripts/input-validation-app/**'
+      - 'scripts/build-ios-app.sh'
+  workflow_dispatch: {}
+
+jobs:
+  build-port:
+    # Reused by `ios` so the iOS port .jar / native sources are available in
+    # the cache the build-ios-app step relies on. Same reusable workflow that
+    # scripts-ios.yml depends on -- piggybacking on its cache key.
+    uses: ./.github/workflows/_build-ios-port.yml
+
+  ios:
+    needs: build-port
+    permissions:
+      contents: read
+    runs-on: macos-15
+    timeout-minutes: 35
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-ios-${{ github.ref_name }}
+      cancel-in-progress: true
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1_APP_DIR: scripts/input-validation-app
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      # Use the exact key build-port saved against (published as a job
+      # output). Recomputing the src_hash on this runner has been
+      # observed to produce a different value than build-port on the
+      # same SHA -- and even when the algorithm is identical, any new
+      # source path added to the hash here has to land in three
+      # places at once or the keys diverge.
+      - name: Restore built CN1 + iOS port artifacts
+        # Reuse the exact cache key the build-port job saved against. Locally
+        # recomputing the hash here has drifted out of sync with
+        # _build-ios-port.yml before (e.g. svg-transcoder/src/main added on
+        # one side only), causing a permanent cache miss for any PR that
+        # touches a file matching this workflow's paths filter.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build CN1 input-validation iOS Xcode project
+        id: build-ios-app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 25
+
+      - name: Build .app bundle for simulator
+        id: build-app-bundle
+        run: |
+          set -euo pipefail
+          WORKSPACE='${{ steps.build-ios-app.outputs.workspace }}'
+          SCHEME='${{ steps.build-ios-app.outputs.scheme }}'
+          DERIVED_DATA="${{ runner.temp }}/cn1iv-dd"
+          rm -rf "$DERIVED_DATA"
+          # Force ARCHS to match the host. IOSSimd.m uses ARM NEON intrinsics
+          # under #if defined(__aarch64__) -- without ONLY_ACTIVE_ARCH=YES the
+          # generic simulator destination triggers a universal build whose
+          # x86_64 slice fails to compile. Matches what run-ios-ui-tests.sh
+          # does for the hellocodenameone build.
+          HOST_ARCH="$(uname -m)"
+          case "$HOST_ARCH" in
+            arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+            *) BUILD_ARCH=arm64 ;;
+          esac
+          XCB_CONTAINER_FLAG="-workspace"
+          if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+            XCB_CONTAINER_FLAG="-project"
+          fi
+          xcodebuild $XCB_CONTAINER_FLAG "$WORKSPACE" -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA" \
+            ARCHS=$BUILD_ARCH ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="armv7 armv7s" \
+            CODE_SIGNING_ALLOWED=NO build
+          APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "Failed to locate .app bundle under $DERIVED_DATA" >&2
+            find "$DERIVED_DATA/Build/Products" -maxdepth 4 -type d -print >&2 || true
+            exit 1
+          fi
+          echo "app_bundle=$APP_BUNDLE" >> "$GITHUB_OUTPUT"
+        timeout-minutes: 15
+
+      - name: Drive gestures via XCUITest
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/input-validation-ios
+        run: |
+          mkdir -p "$ARTIFACTS_DIR"
+          ./scripts/input-validation-app/drivers/run-ios.sh \
+            '${{ steps.build-app-bundle.outputs.app_bundle }}'
+        timeout-minutes: 15
+
+      - name: Upload iOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: input-validation-ios
+          path: artifacts/input-validation-ios
+          if-no-files-found: warn
+          retention-days: 14

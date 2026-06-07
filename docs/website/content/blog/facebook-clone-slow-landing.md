@@ -11,13 +11,13 @@ author: Shai Almog
 
 ![Header Image](/blog/facebook-clone-slow-landing/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
-I mentioned before that I’m really behind on the Facebook Clone module but at least I was able to [release the first few lessons](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) by today which makes it fit into an April deadline. I’ll try to release new lessons every day so we can do have the full module out before the end of May. At that point I’ll release two new modules during June.
+I mentioned before that I’m really behind on the Facebook Clone module but at least I was able to [release the first few lessons](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) by today which makes it fit into an April deadline. I’ll try to release new lessons every day so we can have the full module out before the end of May. At that point I’ll release two new modules during June.
 
 The new Facebook Clone is similar to the Uber clone in some regards and also very different:
 
   * I didn’t do a "pixel perfect" clone – Facebook is too messy to clone properly
 
-  * I used CSS instead of the designer tool – it’s easier to tech CSS as I can go over code instead of screenshots
+  * I used CSS instead of the designer tool – it’s easier to teach CSS as I can go over code instead of screenshots
 
   * I put more logic in the server and tried to make the app more "real"
 

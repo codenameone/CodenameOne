@@ -55,27 +55,35 @@ import com.codenameone.examples.hellocodenameone.tests.accessibility.Accessibili
 
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    // Per-test deadline cap. On the JavaScript port the overall CI browser
-    // lifetime is only ~150s, so a stuck test mustn't eat the whole budget;
-    // the tight 10s cap kept the suite from being blocked by the rare hung
-    // form (e.g. KotlinUiTest's missing cn1lib). iOS / Android / JavaSE
-    // run with much longer wall budgets so a per-test cap of 30s is safe -
-    // it only matters for genuinely stuck tests, and 30s leaves headroom
-    // for theme captures whose chunked-log emission is rate-limited (Android
-    // throttles 500-byte chunks at 30ms each to keep logcat from dropping
-    // lines, so a 60KB PNG plus its preview takes ~6s per appearance, and
-    // a dual-appearance test like SpanLabelTheme legitimately needs ~12s
-    // even on a healthy device). The 30s figure also covers the iOS Metal
-    // port's mutable rendering, which allocates a temp UIImage + MTLTexture
-    // per round-rect / arc / gradient call (the CG-rasterise-then-DrawImage
-    // bridge), so FillRoundRect / DrawRoundRect and DrawImage on slow CI
-    // simulators legitimately blow past the 10s budget while still making
-    // forward progress.
+    // Per-test deadline cap. The 10s HTML5 default keeps already-
+    // hanging tests (LightweightPickerButtons, ToastBarTopPosition
+    // hitting the canvasContextWipe noCanvas path) from eating the
+    // 1740s suite-level budget. DualAppearanceBaseTest subclasses
+    // override this via {@link BaseTest#getTimeoutMs()} because they
+    // run light + dark phases serially and each phase pays
+    // registerReadyCallback's 1500ms UITimer + wait_for_ui_settle
+    // (up to ~800ms) + capture/encode + chunked emit, so the
+    // bytecode-translated path easily clears 10s on shared GHA
+    // runners. At 10s the dark phase's emit fired AFTER the test had
+    // already timed out and the runner had advanced to the next test
+    // - the late dark emit then captured whatever form happened to
+    // be on the canvas at that moment (visible symptom:
+    // ToolbarTheme_dark.png showed "TabsTheme / light"). iOS /
+    // Android / JavaSE keep their wider 30s cap because they don't
+    // share the JS port's canvas-hang failure mode.
     private static final int TEST_TIMEOUT_MS_HTML5 = 10000;
     private static final int TEST_TIMEOUT_MS_NATIVE = 30000;
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
-    private static int testTimeoutMs() {
+    private static int testTimeoutMs(BaseTest testClass) {
+        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
+        // phases serially, each paying registerReadyCallback's 1500ms + settle
+        // + capture). Other tests stay at the tighter HTML5 default so a hung
+        // test doesn't eat the suite-level budget.
+        if ("HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof DualAppearanceBaseTest) {
+            return TEST_TIMEOUT_MS_NATIVE;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;
@@ -88,6 +96,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Advertising API: renders a banner + native-ad feed via the
+            // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
+            new AdsScreenshotTest(),
             // Animation/transition grid tests: each emits a 2x3 frame grid driven
             // by the AnimationTime override so iOS/Android/JavaSE produce identical
             // pixels regardless of wall-clock pacing. Skipped on HTML5 via the
@@ -100,6 +111,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new UncoverHorizontalTransitionTest(),
             new FadeTransitionTest(),
             new FlipTransitionTest(),
+            new MorphTransitionTest(),
+            new MorphTransitionScrolledSourceTest(),
+            new MorphTransitionSnapshotTest(),
+            new TabsAnimatedIndicatorScreenshotTest(),
+            new PullToRefreshSpinnerScreenshotTest(),
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
             new AnimateUnlayoutScreenshotTest(),
@@ -179,6 +195,17 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),
+            // ChatView (new AI UI primitive). Renders an assistant
+            // conversation + typing indicator so the iOS Modern and
+            // Android Material themes have a baseline for ChatBubbleUser,
+            // ChatBubbleAssistant, ChatBubbleSystem, and ChatTypingIndicator
+            // UIIDs the moment the cn1-ai PR adds them.
+            new ChatViewScreenshotTest(),
+            // ChatInput on its own (attach + voice + send all visible) so
+            // the input-row UIIDs (ChatInput, ChatInputField, ChatSendButton,
+            // ChatAttachButton, ChatVoiceButton) have a baseline independent
+            // of the surrounding ChatView.
+            new ChatInputScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
             new TabsScreenshotTest(),
             new TextAreaAlignmentScreenshotTest(),
@@ -204,15 +231,29 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // Build-time SVG transcoder coverage: the static test renders
+            // shapes / gradients / paths, the animated test pins
+            // AnimationTime so the captured frame is deterministic.
+            new SVGStaticScreenshotTest(),
+            new SVGAnimatedScreenshotTest(),
+            // Build-time Lottie transcoder -- same pipeline as SVG, lowers
+            // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
+            new LottieAnimatedScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
+            // Exercises com.codename1.camera.* end-to-end against the
+            // JavaSE simulator's synthetic camera backend (no permission
+            // prompts). Self-skips on iOS / Android / JS where the open
+            // call would surface an OS dialog.
+            new CameraApiTest(),
             new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new StringApiTest(),
             new TimeApiTest(),
+            new NanoTimeApiTest(),
             new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
@@ -221,7 +262,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new LocalNotificationOverrideTest(),
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
-            new MutableImageReadbackTest()
+            new FileSystemStorageOpenInputStreamMissingTest(),
+            new MutableImageReadbackTest(),
+            // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
+            // and a populated list, which warms the font cache / shifts suite timing, and the
+            // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed
+            // triangle grid) paint text directly during a frame that races the async font load -
+            // running this test before them changes whether those fonts are loaded at capture
+            // time and flips their baselines. Last = the rest of the suite matches master exactly.
+            // Inert on phone/tablet ports (plain Toolbar + hamburger side menu + faded scrollbar);
+            // on the Mac native build it enables desktop mode (commands move to the native menu
+            // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
+            new DesktopModeScreenshotTest()
     };
 
     private static BaseTest prependedTest;
@@ -265,7 +317,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
-            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs());
+            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
     }
 
@@ -273,22 +325,31 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
             return false;
         }
-        // The list is intentionally an inline `||` chain rather than a static
-        // HashSet/Set field. Earlier revisions of this file used a static
-        // collection initialised via a static method call (or a method-call
-        // initializer for DEFAULT_TEST_CLASSES); both broke iOS class loading
-        // - Cn1ssDeviceRunner failed to load before runSuite() could even log
-        // a single starting test=... entry, leaving the suite to time out at
-        // the 300s end-marker deadline. Keep all skip lookups inline to avoid
-        // triggering the same static-init failure path.
+        // This list mirrors the authoritative skip set maintained in
+        // Ports/JavaScriptPort/src/main/webapp/port.js
+        // (cn1ssForcedTimeoutTestClasses + cn1ssForcedTimeoutTestNames).
+        // The Java gate runs first: anything skipped here never reaches the
+        // port.js bridge, so keep the two lists in sync. When a test gets
+        // un-parked in port.js (e.g. after a runtime fix lands), remove it
+        // here too — otherwise the suite stays silent on tests that the
+        // JS-side comments believe should now run.
+        //
+        // The list is intentionally an inline `||` chain rather than a
+        // static HashSet/Set field. Earlier revisions of this file used a
+        // static collection initialised via a static method call (or a
+        // method-call initializer for DEFAULT_TEST_CLASSES); both broke iOS
+        // class loading - Cn1ssDeviceRunner failed to load before runSuite()
+        // could even log a single starting test=... entry, leaving the suite
+        // to time out at the 300s end-marker deadline. Keep all skip lookups
+        // inline to avoid triggering the same static-init failure path.
         return isJsSkippedNativeTest(testName)
-                || isJsSkippedThemeTest(testName)
-                || isJsSkippedAnimationTest(testName)
-                || isJsSkippedScreenshotTest(testName);
+                || isJsSkippedKnownRuntimeBug(testName);
     }
 
     private static boolean isJsSkippedNativeTest(String testName) {
-        // Native APIs that aren't wired on the JavaScript port.
+        // Native APIs / platform bridges that the JavaScript port doesn't
+        // implement. These would surface as exceptions or hangs the moment
+        // the test starts; coverage stays on iOS/Android/JavaSE.
         return "MediaPlaybackScreenshotTest".equals(testName)
                 || "BytecodeTranslatorRegressionTest".equals(testName)
                 || "BackgroundThreadUiAccessTest".equals(testName)
@@ -300,137 +361,63 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // CryptoApiTest exercises AES/RSA/Signature/SecureRandom which
                 // route through CodenameOneImplementation overrides; the
                 // JavaScript port doesn't yet provide a crypto bridge.
-                || "CryptoApiTest".equals(testName);
+                || "CryptoApiTest".equals(testName)
+                // BrowserComponent's iframe ``load`` event isn't routed
+                // through the worker-callback transport, so the test waits on
+                // its own ``readyRunnable`` indefinitely. Tracked under
+                // ``browserComponentLoadEvent`` in port.js.
+                || "BrowserComponentScreenshotTest".equals(testName);
     }
 
-    private static boolean isJsSkippedThemeTest(String testName) {
-        // The native-theme fidelity tests (each emits a light+dark PNG pair)
-        // matter for iOS/Android/JavaSE where the user actually looks at
-        // visual output. The JS port run has a tight 150s browser-lifetime
-        // budget that doesn't accommodate another 13 x 2 captures; skip them
-        // here. Re-enable selectively when we move the JS port to a
-        // longer-lived harness.
-        return "ButtonThemeScreenshotTest".equals(testName)
-                || "TextFieldThemeScreenshotTest".equals(testName)
-                || "CheckBoxRadioThemeScreenshotTest".equals(testName)
-                || "SwitchThemeScreenshotTest".equals(testName)
-                || "PickerThemeScreenshotTest".equals(testName)
-                || "ToolbarThemeScreenshotTest".equals(testName)
-                || "TabsThemeScreenshotTest".equals(testName)
-                || "MultiButtonThemeScreenshotTest".equals(testName)
-                || "ListThemeScreenshotTest".equals(testName)
-                || "DialogThemeScreenshotTest".equals(testName)
-                || "FloatingActionButtonThemeScreenshotTest".equals(testName)
-                || "SpanLabelThemeScreenshotTest".equals(testName)
-                || "DarkLightShowcaseThemeScreenshotTest".equals(testName)
-                || "PaletteOverrideThemeScreenshotTest".equals(testName)
-                || "CssGradientsScreenshotTest".equals(testName)
-                || "CssFilterBlurScreenshotTest".equals(testName);
-    }
-
-    private static boolean isJsSkippedAnimationTest(String testName) {
-        // Animation grid tests render six full-form frames each. They exceed
-        // the JS port's 150s browser-lifetime budget and the value is already
-        // covered on iOS/Android/JavaSE.
-        return "SlideHorizontalTransitionTest".equals(testName)
-                || "SlideHorizontalBackTransitionTest".equals(testName)
-                || "SlideVerticalTransitionTest".equals(testName)
-                || "SlideFadeTitleTransitionTest".equals(testName)
-                || "CoverHorizontalTransitionTest".equals(testName)
-                || "UncoverHorizontalTransitionTest".equals(testName)
-                || "FadeTransitionTest".equals(testName)
-                || "FlipTransitionTest".equals(testName)
-                || "AnimateLayoutScreenshotTest".equals(testName)
-                || "AnimateHierarchyScreenshotTest".equals(testName)
-                || "AnimateUnlayoutScreenshotTest".equals(testName)
-                || "SmoothScrollScreenshotTest".equals(testName)
-                || "StickyHeaderScreenshotTest".equals(testName)
-                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
-                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
-                || "TensileBounceScreenshotTest".equals(testName)
-                || "ComponentReplaceFadeScreenshotTest".equals(testName)
-                || "ComponentReplaceSlideScreenshotTest".equals(testName)
-                || "ComponentReplaceFlipScreenshotTest".equals(testName)
-                || "MotionShowcaseScreenshotTest".equals(testName)
-                || "SheetSlideUpAnimationScreenshotTest".equals(testName);
-    }
-
-    private static boolean isJsSkippedScreenshotTest(String testName) {
-        // Screenshot-emitting tests whose chunk streams the JS port truncates
-        // under logcat-style line drops. The Cn1ssChunkTools gap-detection
-        // (added in 963dd5af "Improved image emission") correctly fails these
-        // captures because the reassembled PNG is missing bytes; this skip
-        // refuses to attempt them on HTML5 until the port emits chunks
-        // reliably. The validation stays on iOS/Android so dropped chunks
-        // still surface as failures there.
-        return "KotlinUiTest".equals(testName)
-                || "MainScreenScreenshotTest".equals(testName)
-                || "SheetScreenshotTest".equals(testName)
-                || "StatusBarTapDiagnosticScreenshotTest".equals(testName)
-                || "ImageViewerNavigationScreenshotTest".equals(testName)
-                || "TabsScreenshotTest".equals(testName)
-                || "TextAreaAlignmentScreenshotTest".equals(testName)
+    private static boolean isJsSkippedKnownRuntimeBug(String testName) {
+        // Tests parked because of specific JS-port runtime bugs. Each entry
+        // has a matching comment in port.js explaining the symptom and the
+        // working-name we track it under. When the underlying bug is fixed
+        // the matching entry is removed from BOTH lists.
+        return
+                // ``simdLargeAllocaCorrupt``: SimdLargeAllocaTest corrupts the
+                // HTML5Implementation instance state via its large-alloca
+                // pattern, propagating ``{}`` receivers into subsequent
+                // canvas / paintDirty calls. Needs its own investigation.
+                "SimdLargeAllocaTest".equals(testName)
+                // ``chatInputEmitHijack`` / ``chatViewEmitHijack``:
+                // emitChannel host-bridges to a capture of the visible
+                // browser canvas instead of the test-supplied off-screen
+                // Image, so the dual-appearance dark/light streams contain
+                // the previous test's pixels.
+                || "ChatInputScreenshotTest".equals(testName)
+                || "ChatViewScreenshotTest".equals(testName)
+                // ``canvasContextWipe``: a leftover Canvas2D state mutation
+                // from a prior test wipes the test's context once we hit
+                // the canvas-accumulation tail. The targeted no-op recovery
+                // covers most subjects but these four still hang their
+                // SCREENSHOT_DONE wait on half of CI runs.
                 || "ToastBarTopPositionScreenshotTest".equals(testName)
-                || "ValidatorLightweightPickerScreenshotTest".equals(testName)
-                || "LightweightPickerButtonsScreenshotTest".equals(testName)
-                || "StickyHeaderScreenshotTest".equals(testName)
-                || "StickyHeaderSlideTransitionScreenshotTest".equals(testName)
-                || "StickyHeaderFadeTransitionScreenshotTest".equals(testName)
-                // graphics tests
-                || "AffineScale".equals(testName)
-                || "Clip".equals(testName)
-                || "ClipUnderRotation".equals(testName)
-                || "DrawArc".equals(testName)
-                || "DrawGradient".equals(testName)
-                || "DrawGradientStops".equals(testName)
-                || "DrawImage".equals(testName)
-                || "GaussianBlur".equals(testName)
-                || "DrawLine".equals(testName)
-                || "DrawRect".equals(testName)
-                || "DrawRoundRect".equals(testName)
-                || "DrawShape".equals(testName)
-                || "DrawString".equals(testName)
-                || "DrawStringDecorated".equals(testName)
-                || "FillArc".equals(testName)
-                || "FillPolygon".equals(testName)
-                || "FillRect".equals(testName)
-                || "FillRoundRect".equals(testName)
-                || "FillShape".equals(testName)
-                || "FillTriangle".equals(testName)
-                || "InscribedTriangleGrid".equals(testName)
-                || "Rotate".equals(testName)
-                || "Scale".equals(testName)
-                || "StrokeTest".equals(testName)
-                || "TileImage".equals(testName)
-                || "TransformCamera".equals(testName)
-                || "TransformPerspective".equals(testName)
-                || "TransformRotation".equals(testName)
-                || "TransformTranslation".equals(testName)
-                // Chart screenshot tests: each ChartComponent renders ~12-30
-                // styled primitives plus axis labels and a legend, so the
-                // chunked PNG/JPEG output ends up in the 30-60KB range per
-                // test. The JS port's 150s browser-lifetime budget can't
-                // afford 14 of those on top of the existing screenshot suite
-                // -- on the previous run every chart test came back empty
-                // because the EDT had already started the suite-shutdown
-                // fast-forward by the time they were invoked. Re-enable
-                // selectively when the JS port moves to a longer-lived
-                // harness; chart-package coverage stays on iOS / Android /
-                // JavaSE in the meantime.
-                || "ChartLineScreenshotTest".equals(testName)
-                || "ChartCubicLineScreenshotTest".equals(testName)
-                || "ChartBarScreenshotTest".equals(testName)
-                || "ChartStackedBarScreenshotTest".equals(testName)
-                || "ChartRangeBarScreenshotTest".equals(testName)
-                || "ChartScatterScreenshotTest".equals(testName)
-                || "ChartBubbleScreenshotTest".equals(testName)
-                || "ChartPieScreenshotTest".equals(testName)
-                || "ChartDoughnutScreenshotTest".equals(testName)
-                || "ChartRadarScreenshotTest".equals(testName)
-                || "ChartTimeChartScreenshotTest".equals(testName)
+                || "CssGradientsScreenshotTest".equals(testName)
+                || "SheetScreenshotTest".equals(testName)
+                // ``sheetTearDownLeak``: TextAreaAlignmentStates' form
+                // renders correctly, but the screenshot captures it under
+                // a leftover Sheet overlay because Sheet teardown doesn't
+                // complete before the next test starts.
+                || "TextAreaAlignmentScreenshotTest".equals(testName)
+                // ``chartCombinedXyCapture``: ChartCombinedXY hangs the
+                // SUITE in canvasToBlob retry loop after ~88 fallback-path
+                // captures. Transform + Rotated weren't reached on the
+                // unpark-all run because CombinedXY took down the suite
+                // first; parked under the same suspicion.
                 || "ChartCombinedXYScreenshotTest".equals(testName)
                 || "ChartTransformScreenshotTest".equals(testName)
-                || "ChartRotatedScreenshotTest".equals(testName);
+                || "ChartRotatedScreenshotTest".equals(testName)
+                // ``graphicsTransform3dCanvasHang``: the 3D perspective /
+                // camera transform tests render into a canvas the worker-side
+                // screenshot path can't resolve (SCREENSHOT_START reports
+                // canvasCandidates=0), so the suite re-dispatches the same
+                // index indefinitely and never reaches the per-test deadline.
+                // The 2D transform tests (rotation, translation, affine) are
+                // unaffected and keep running. Tracked in port.js under the
+                // same name.
+                || "TransformPerspective".equals(testName)
+                || "TransformCamera".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {

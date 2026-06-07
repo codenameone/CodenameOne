@@ -53,16 +53,36 @@ public abstract class Purchase {
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
     private static final String PROCESSED_PURCHASE_KEY = "ProcessedPurchases.dat";
-    private static final Object PENDING_PURCHASE_LOCK = new Object();
-    private static final Object synchronizationLock = new Object();
-    private static final Object receiptsLock = new Object();
-    /// Boolean flag to prevent `com.codename1.util.SuccessCallback)`
-    /// re-entry.
+    /// All purchase state mutations and Storage I/O happen on the CN1
+    /// EDT.  Methods that may be invoked from off-EDT threads (notably
+    /// the static `#postReceipt(java.lang.String,java.lang.String,java.lang.String,long,java.lang.String)`
+    /// entry point called by native iOS StoreKit callbacks on the main
+    /// UI thread) auto-dispatch their work via
+    /// `Display#callSerially(java.lang.Runnable)`.  This replaces an
+    /// earlier lock-based design whose contention on the iOS main
+    /// thread froze keyboard input on iOS 26.x (issue #5010).  Public
+    /// read accessors that historically supported off-EDT invocation
+    /// continue to do so via `Display#callSeriallyAndWait`.
     private static boolean syncInProgress;
-    /// Flag to prevent `com.codename1.util.SuccessCallback)` re-entry.
     private static boolean loadInProgress;
-    private static List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks;
-    private ReceiptStore receiptStore;
+    /// Eagerly initialized (rather than lazy) so that SpotBugs doesn't
+    /// flag the now-unlocked update path as `LI_LAZY_INIT_STATIC`.
+    /// Access is EDT-only by construction, so neither the lazy-init
+    /// race nor the field assignment need synchronization.
+    private static final List<SuccessCallback<Boolean>> synchronizeReceiptsCallbacks =
+            new ArrayList<SuccessCallback<Boolean>>();
+    /// Static (shared across all `Purchase` instances) because
+    /// `Display#getInAppPurchase()` returns a fresh `Purchase` on every
+    /// call on every port (iOS `ZoozPurchase`, Android `ZoozPurchase`,
+    /// the JavaSE anonymous subclass).  A per-instance store would be
+    /// invisible to the native receipt path: StoreKit's
+    /// `paymentQueue:updatedTransactions:` enters via the static
+    /// `#postReceipt(...)` which calls `getInAppPurchase().postReceipt(r)`
+    /// on a brand-new instance whose store would be null, so the app's
+    /// `ReceiptStore` would never be invoked for auto-submitted receipts.
+    /// There is logically one IAP store per app, so a static field is the
+    /// correct scope.  Access is EDT-only by construction.
+    private static ReceiptStore receiptStore;
     private List<Receipt> receipts;
     private Date receiptsRefreshTime;
 
@@ -134,24 +154,32 @@ public abstract class Purchase {
     ///
     /// List of receipts for purchases this app.
     public final List<Receipt> getReceipts() {
-        synchronized (receiptsLock) {
-            if (receipts == null) {
-                if (Storage.getInstance().exists(RECEIPTS_KEY)) {
-                    Receipt.registerExternalizable();
-                    try {
-                        receipts = (List<Receipt>) Storage.getInstance().readObject(RECEIPTS_KEY);
-                    } catch (Exception ex) {
-                        Log.p("Failed to load receipts from " + RECEIPTS_KEY);
-                        Log.e(ex);
-                        receipts = new ArrayList<Receipt>();
-
-                    }
-                } else {
+        Display d = Display.getInstance();
+        if (!d.isEdt()) {
+            final List<Receipt>[] out = new List[]{null};
+            d.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    out[0] = getReceipts();
+                }
+            });
+            return out[0];
+        }
+        if (receipts == null) {
+            if (Storage.getInstance().exists(RECEIPTS_KEY)) {
+                Receipt.registerExternalizable();
+                try {
+                    receipts = (List<Receipt>) Storage.getInstance().readObject(RECEIPTS_KEY);
+                } catch (Exception ex) {
+                    Log.p("Failed to load receipts from " + RECEIPTS_KEY);
+                    Log.e(ex);
                     receipts = new ArrayList<Receipt>();
                 }
+            } else {
+                receipts = new ArrayList<Receipt>();
             }
-            return receipts;
         }
+        return receipts;
     }
 
     /// Sets the list of receipts.
@@ -160,11 +188,9 @@ public abstract class Purchase {
     ///
     /// - `data`
     private void setReceipts(List<Receipt> data) {
-        synchronized (receiptsLock) {
-            receipts = new ArrayList<Receipt>();
-            receipts.addAll(data);
-            Storage.getInstance().writeObject(RECEIPTS_KEY, receipts);
-        }
+        receipts = new ArrayList<Receipt>();
+        receipts.addAll(data);
+        Storage.getInstance().writeObject(RECEIPTS_KEY, receipts);
     }
 
     /// Gets all of the receipts for the specified skus.
@@ -189,16 +215,14 @@ public abstract class Purchase {
 
     /// Gets the time that receipts were last refreshed.
     private Date getReceiptsRefreshTime() {
-        synchronized (receiptsLock) {
-            if (receiptsRefreshTime == null) {
-                if (Storage.getInstance().exists(RECEIPTS_REFRESH_TIME_KEY)) {
-                    receiptsRefreshTime = (Date) Storage.getInstance().readObject(RECEIPTS_REFRESH_TIME_KEY);
-                } else {
-                    return new Date(-1L);
-                }
+        if (receiptsRefreshTime == null) {
+            if (Storage.getInstance().exists(RECEIPTS_REFRESH_TIME_KEY)) {
+                receiptsRefreshTime = (Date) Storage.getInstance().readObject(RECEIPTS_REFRESH_TIME_KEY);
+            } else {
+                return new Date(-1L);
             }
-            return receiptsRefreshTime;
         }
+        return receiptsRefreshTime;
     }
 
     /// Updates the last refresh time for receipts.
@@ -207,10 +231,8 @@ public abstract class Purchase {
     ///
     /// - `time`
     private void setReceiptsRefreshTime(Date time) {
-        synchronized (receiptsLock) {
-            receiptsRefreshTime = time;
-            Storage.getInstance().writeObject(RECEIPTS_REFRESH_TIME_KEY, receiptsRefreshTime);
-        }
+        receiptsRefreshTime = time;
+        Storage.getInstance().writeObject(RECEIPTS_REFRESH_TIME_KEY, receiptsRefreshTime);
     }
 
     /// Indicates whether the purchasing platform supports manual payments which
@@ -448,14 +470,23 @@ public abstract class Purchase {
     /// List of receipts that haven't been sent to the server.
     @SuppressWarnings("unchecked")
     public List<Receipt> getPendingPurchases() {
-        synchronized (PENDING_PURCHASE_LOCK) {
-            Storage s = Storage.getInstance();
-            Util.register(new Receipt());
-            if (s.exists(PENDING_PURCHASE_KEY)) {
-                return (List<Receipt>) s.readObject(PENDING_PURCHASE_KEY);
-            } else {
-                return new ArrayList<Receipt>();
-            }
+        Display d = Display.getInstance();
+        if (!d.isEdt()) {
+            final List<Receipt>[] out = new List[]{null};
+            d.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    out[0] = getPendingPurchases();
+                }
+            });
+            return out[0];
+        }
+        Storage s = Storage.getInstance();
+        Util.register(new Receipt());
+        if (s.exists(PENDING_PURCHASE_KEY)) {
+            return (List<Receipt>) s.readObject(PENDING_PURCHASE_KEY);
+        } else {
+            return new ArrayList<Receipt>();
         }
     }
 
@@ -472,38 +503,45 @@ public abstract class Purchase {
     /// #### Parameters
     ///
     /// - `receipt`: the receipt
-    private void addPendingPurchase(Receipt receipt) {
-        synchronized (PENDING_PURCHASE_LOCK) {
-            Storage s = Storage.getInstance();
-            String txId = receipt.getTransactionId();
-            if (txId != null) {
-                if (getProcessedTransactionIds().contains(txId)) {
+    private void addPendingPurchase(final Receipt receipt) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    addPendingPurchase(receipt);
+                }
+            });
+            return;
+        }
+        Storage s = Storage.getInstance();
+        String txId = receipt.getTransactionId();
+        if (txId != null) {
+            if (getProcessedTransactionIds().contains(txId)) {
+                return;
+            }
+            List<Receipt> pendingPurchases = getPendingPurchases();
+            for (Receipt r : pendingPurchases) {
+                if (txId.equals(r.getTransactionId())) {
                     return;
                 }
-                List<Receipt> pendingPurchases = getPendingPurchases();
-                for (Receipt r : pendingPurchases) {
-                    if (txId.equals(r.getTransactionId())) {
-                        return;
-                    }
-                }
-                pendingPurchases.add(receipt);
-                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
-            } else {
-                // Receipts without a transactionId can't be tracked in the
-                // processed set; fall back to enqueueing and let the
-                // synchronize path drain them.  receiptsMatch handles
-                // removal correctly when transactionId is null on both
-                // sides.
-                List<Receipt> pendingPurchases = getPendingPurchases();
-                pendingPurchases.add(receipt);
-                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
             }
+            pendingPurchases.add(receipt);
+            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+        } else {
+            // Receipts without a transactionId can't be tracked in the
+            // processed set; fall back to enqueueing and let the
+            // synchronize path drain them.  receiptsMatch handles
+            // removal correctly when transactionId is null on both
+            // sides.
+            List<Receipt> pendingPurchases = getPendingPurchases();
+            pendingPurchases.add(receipt);
+            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
         }
     }
 
     /// Returns the persistent list of transactionIds that have already
-    /// been successfully submitted to the `ReceiptStore`.  The caller
-    /// must hold `PENDING_PURCHASE_LOCK`.
+    /// been successfully submitted to the `ReceiptStore`.  Called only
+    /// from the EDT.
     @SuppressWarnings("unchecked")
     private List<String> getProcessedTransactionIds() {
         Storage s = Storage.getInstance();
@@ -517,16 +555,23 @@ public abstract class Purchase {
     /// successfully submitted to the `ReceiptStore`, so future
     /// `addPendingPurchase` calls with the same transactionId skip the
     /// enqueue.
-    private void recordProcessedTransactionId(String txId) {
+    private void recordProcessedTransactionId(final String txId) {
         if (txId == null) {
             return;
         }
-        synchronized (PENDING_PURCHASE_LOCK) {
-            List<String> processed = getProcessedTransactionIds();
-            if (!processed.contains(txId)) {
-                processed.add(txId);
-                Storage.getInstance().writeObject(PROCESSED_PURCHASE_KEY, processed);
-            }
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    recordProcessedTransactionId(txId);
+                }
+            });
+            return;
+        }
+        List<String> processed = getProcessedTransactionIds();
+        if (!processed.contains(txId)) {
+            processed.add(txId);
+            Storage.getInstance().writeObject(PROCESSED_PURCHASE_KEY, processed);
         }
     }
 
@@ -544,23 +589,24 @@ public abstract class Purchase {
     ///
     /// the removed receipt, or null if no matching receipt was found
     private Receipt removePendingPurchase(Receipt target) {
-        synchronized (PENDING_PURCHASE_LOCK) {
-            Storage s = Storage.getInstance();
-            List<Receipt> pendingPurchases = getPendingPurchases();
-            Receipt found = null;
-            for (Receipt r : pendingPurchases) {
-                if (receiptsMatch(r, target)) {
-                    found = r;
-                    break;
-                }
+        // Caller is always on the EDT (only invoked from the
+        // synchronizeReceipts success path, which re-dispatches its
+        // callback to the EDT).
+        Storage s = Storage.getInstance();
+        List<Receipt> pendingPurchases = getPendingPurchases();
+        Receipt found = null;
+        for (Receipt r : pendingPurchases) {
+            if (receiptsMatch(r, target)) {
+                found = r;
+                break;
             }
-            if (found != null) {
-                pendingPurchases.remove(found);
-                s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
-                return found;
-            } else {
-                return null;
-            }
+        }
+        if (found != null) {
+            pendingPurchases.remove(found);
+            s.writeObject(PENDING_PURCHASE_KEY, pendingPurchases);
+            return found;
+        } else {
+            return null;
         }
     }
 
@@ -584,23 +630,15 @@ public abstract class Purchase {
     }
 
     public final void synchronizeReceipts() {
-        if (syncInProgress) {
-            return;
-        }
         synchronizeReceipts(0, null);
     }
 
     private void fireSynchronizeReceiptsCallbacks(boolean result) {
-
-        synchronized (synchronizationLock) {
-            if (synchronizeReceiptsCallbacks == null) {
-                return;
-            }
-            for (SuccessCallback<Boolean> cb : synchronizeReceiptsCallbacks) {
-                cb.onSucess(result);
-            }
-            synchronizeReceiptsCallbacks.clear();
+        // Caller is always on the EDT.
+        for (SuccessCallback<Boolean> cb : synchronizeReceiptsCallbacks) {
+            cb.onSucess(result);
         }
+        synchronizeReceiptsCallbacks.clear();
     }
 
     /// Synchronize with receipt store.  This will try to submit any pending purchases
@@ -613,82 +651,119 @@ public abstract class Purchase {
     /// - `callback`: @param callback      Callback called when sync is done.  Will be passed true if all pending purchases were successfully
     /// submitted to the receipt store AND receipts were successfully loaded.
     public final void synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
-        synchronized (synchronizationLock) {
-            if (callback != null) {
-                if (synchronizeReceiptsCallbacks == null) {
-                    synchronizeReceiptsCallbacks = new ArrayList<SuccessCallback<Boolean>>();
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    synchronizeReceipts(ifOlderThanMs, callback);
                 }
-                synchronizeReceiptsCallbacks.add(callback);
-            }
-            if (syncInProgress) {
-                return;
-            }
-            syncInProgress = true;
+            });
+            return;
         }
 
-        synchronized (PENDING_PURCHASE_LOCK) {
+        if (callback != null) {
+            synchronizeReceiptsCallbacks.add(callback);
+        }
+        if (syncInProgress) {
+            return;
+        }
+        syncInProgress = true;
 
-            List<Receipt> pending = getPendingPurchases();
-            if (!pending.isEmpty() && receiptStore != null) {
-
-                final Receipt receipt = pending.get(0);
-                receiptStore.submitReceipt(receipt, new SuccessCallback<Boolean>() {
-
-                    @Override
-                    public void onSucess(Boolean submitSucceeded) {
-                        // Reset syncInProgress before doing any work that can
-                        // throw so that a failure here doesn't permanently
-                        // wedge synchronizeReceipts in the "in progress"
-                        // state for the rest of the app's lifetime.
-                        syncInProgress = false;
-                        if (submitSucceeded) {
-                            // Record the transactionId before removing the
-                            // receipt from pending so a parallel
-                            // postReceipt re-enqueue (e.g. iOS redelivery)
-                            // is dropped by addPendingPurchase rather than
-                            // sneaking back into the queue.
-                            recordProcessedTransactionId(receipt.getTransactionId());
-                            removePendingPurchase(receipt);
-                            // Continue draining the queue.  The original
-                            // callback is already registered in
-                            // synchronizeReceiptsCallbacks; passing null here
-                            // avoids registering it again and firing it once
-                            // per drained receipt.
-                            synchronizeReceipts(0, null);
-                        } else {
-                            fireSynchronizeReceiptsCallbacks(false);
-                        }
-                    }
-
-                });
-            } else {
-                loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-                    @Override
-                    public void onSucess(Boolean fetchSucceeded) {
-                        syncInProgress = false;
-                        fireSynchronizeReceiptsCallbacks(fetchSucceeded);
-                    }
-
-                });
-
-            }
+        List<Receipt> pending = getPendingPurchases();
+        if (!pending.isEmpty() && receiptStore != null) {
+            final Receipt receipt = pending.get(0);
+            receiptStore.submitReceipt(receipt, new SuccessCallback<Boolean>() {
+                @Override
+                public void onSucess(Boolean submitSucceeded) {
+                    // The receipt store may invoke this callback on any
+                    // thread; re-dispatch to the EDT before touching
+                    // purchase state.
+                    onSubmitReceiptComplete(receipt, submitSucceeded);
+                }
+            });
+        } else {
+            loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
+                @Override
+                public void onSucess(Boolean fetchSucceeded) {
+                    onLoadReceiptsComplete(fetchSucceeded);
+                }
+            });
         }
     }
 
-    /// Posts a receipt to be added to the receipt store.
+    /// Called from the `ReceiptStore#submitReceipt` callback to apply
+    /// the result on the EDT.  May be invoked on any thread; the body
+    /// always runs on the EDT.
+    private void onSubmitReceiptComplete(final Receipt receipt, final Boolean submitSucceeded) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    onSubmitReceiptComplete(receipt, submitSucceeded);
+                }
+            });
+            return;
+        }
+        // Reset syncInProgress before doing any work that can throw so
+        // that a failure here doesn't permanently wedge
+        // synchronizeReceipts in the "in progress" state for the rest
+        // of the app's lifetime.
+        syncInProgress = false;
+        if (Boolean.TRUE.equals(submitSucceeded)) {
+            // Record the transactionId before removing the receipt
+            // from pending so a parallel postReceipt re-enqueue
+            // (e.g. iOS redelivery) is dropped by addPendingPurchase
+            // rather than sneaking back into the queue.
+            recordProcessedTransactionId(receipt.getTransactionId());
+            removePendingPurchase(receipt);
+            // Continue draining the queue.  The original callback is
+            // already registered in synchronizeReceiptsCallbacks;
+            // passing null here avoids registering it again and firing
+            // it once per drained receipt.
+            synchronizeReceipts(0, null);
+        } else {
+            fireSynchronizeReceiptsCallbacks(false);
+        }
+    }
+
+    /// Called from the `ReceiptStore#fetchReceipts` callback (via
+    /// `#loadReceipts`) to apply the result on the EDT.  May be invoked
+    /// on any thread; the body always runs on the EDT.
+    private void onLoadReceiptsComplete(final Boolean fetchSucceeded) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    onLoadReceiptsComplete(fetchSucceeded);
+                }
+            });
+            return;
+        }
+        syncInProgress = false;
+        fireSynchronizeReceiptsCallbacks(Boolean.TRUE.equals(fetchSucceeded));
+    }
+
+    /// Posts a receipt to be added to the receipt store.  The Storage
+    /// I/O and lock-free state mutations all execute on the EDT, so
+    /// calling this from the iOS main thread (the typical
+    /// `paymentQueue:updatedTransactions:` entry path) returns
+    /// immediately without blocking the UI thread.
     ///
     /// #### Parameters
     ///
     /// - `r`: The receipt to post.
-    private void postReceipt(Receipt r) {
+    private void postReceipt(final Receipt r) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    postReceipt(r);
+                }
+            });
+            return;
+        }
         addPendingPurchase(r);
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                synchronizeReceipts();
-            }
-        });
+        synchronizeReceipts();
     }
 
     /// Synchronize receipts and wait for the sync to complete before proceeding.
@@ -724,6 +799,7 @@ public abstract class Purchase {
     /// - `callback`: @param callback      Callback called when request is complete.  Passed `true` if
     /// the data was successfully fetched.  `false` otherwise.
     private void loadReceipts(long ifOlderThanMs, final SuccessCallback<Boolean> callback) {
+        // Caller is always on the EDT.
         if (loadInProgress) {
             Log.p("Did not load receipts because another load is in progress");
             callback.onSucess(false);
@@ -740,9 +816,19 @@ public abstract class Purchase {
         }
 
         SuccessCallback<Receipt[]> onSuccess = new SuccessCallback<Receipt[]>() {
-
             @Override
-            public void onSucess(Receipt[] value) {
+            public void onSucess(final Receipt[] value) {
+                // The receipt store may invoke this on any thread;
+                // re-dispatch state mutations to the EDT.
+                if (!Display.getInstance().isEdt()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            onSucess(value);
+                        }
+                    });
+                    return;
+                }
                 if (value != null) {
                     setReceipts(Arrays.asList(value));
                     setReceiptsRefreshTime(new Date());
@@ -753,11 +839,9 @@ public abstract class Purchase {
                     callback.onSucess(Boolean.FALSE);
                 }
             }
-
         };
         if (receiptStore != null) {
             receiptStore.fetchReceipts(onSuccess);
-
         } else {
             Log.p("No receipt store is currently registered so no receipts were fetched");
             loadInProgress = false;

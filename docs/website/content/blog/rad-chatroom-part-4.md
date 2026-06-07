@@ -15,7 +15,7 @@ This is part 4 of the RAD Chatroom tutorial. You can find part 1 [here](/blog/ra
 
 ### Adding More Actions
 
-So far we’ve implemented the basic requirements of a chat room. It can display messages, show particpants, and it allows users to send new messages. Now let’s go a step further and add some more actions. CodeRAD views like ChatRoomView allow for customization in a variety of ways, but the two primary methods are:
+So far we’ve implemented the basic requirements of a chat room. It can display messages, show participants, and it allows users to send new messages. Now let’s go a step further and add some more actions. CodeRAD views like ChatRoomView allow for customization in a variety of ways, but the two primary methods are:
 
   1. Actions
 
@@ -51,7 +51,7 @@ The "Send" action was added to the `ChatRoomView.SEND_ACTION` category, but the 
 
   2. `ChatBubbleView.CHAT_BUBBLE_LONG_PRESS` – An action that will be "fired" when the user long presses a chat bubble.
 
-  3. `ChatBubbleView.CHAT_BUBBLE_CLICKED_MENU` – Actions that will be displayed in a popup-menu when the user clicks on a chat bubble. This category many include more than one action, and all of supplied actions will be included as menu items in the menu.
+  3. `ChatBubbleView.CHAT_BUBBLE_CLICKED_MENU` – Actions that will be displayed in a popup-menu when the user clicks on a chat bubble. This category may include more than one action, and all of the supplied actions will be included as menu items in the menu.
 
   4. `ChatBubbleView.CHAT_BUBBLE_CLICKED_MENU` – Actions that will be displayed in a popup-menu when the user long presses on a chat bubble.
 
@@ -125,7 +125,7 @@ Currently, clicking on the "phone" or "camera" icon doesn’t do anything becaus
     
     });
 
-In this handler we first check to see if the platform supports phone calls, and fail with a dialog if it doesn’t. Then we check if the entity in question has a phone number. This code makes use of loose-coupling as we using the `Person.telephone` tag to check for a phone number rather than a particular property. This will allow this code to work with any entity that has such a property. We also make use of the handy `Entity.isEmpty(Tag)` method, which will return true if this entity doesn’t have a matching property, or if the entity has the property, but has an "empty" value for it.
+In this handler we first check to see if the platform supports phone calls, and fail with a dialog if it doesn’t. Then we check if the entity in question has a phone number. This code makes use of loose-coupling as we are using the `Person.telephone` tag to check for a phone number rather than a particular property. This will allow this code to work with any entity that has such a property. We also make use of the handy `Entity.isEmpty(Tag)` method, which will return true if this entity doesn’t have a matching property, or if the entity has the property, but has an "empty" value for it.
 
 If you try the app out and attempt to phone any of the users, you’ll receive this dialog:
 
@@ -183,7 +183,7 @@ Adding a phone number to the George account in the view controller. We leave Kra
 
 Let’s start up the app again. There are a few things to notice here:
 
-  1. If you press on either George or Kramer’s avatar next to one of their chat bubbles, and try to phone them, they’ll both give you the "This user has no phone number" message. Thats because the avatar that appears next to the chat bubble is actually the ChatMessage.ViewModel entity, and not our ChatAccount entity. The ChatMessage.ViewModel entity doesn’t include a telephone field. The ChatAccount entities are only used to render the title component of the form.
+  1. If you press on either George or Kramer’s avatar next to one of their chat bubbles, and try to phone them, they’ll both give you the "This user has no phone number" message. That’s because the avatar that appears next to the chat bubble is actually the ChatMessage.ViewModel entity, and not our ChatAccount entity. The ChatMessage.ViewModel entity doesn’t include a telephone field. The ChatAccount entities are only used to render the title component of the form.
 
   2. If you try to phone Kramer via the title component, you’ll get the same "This user has no phone number" message. This is correct, because we didn’t give Kramer a phone number.
 

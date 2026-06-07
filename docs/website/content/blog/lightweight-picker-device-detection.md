@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/lightweight-picker-device-detection/pixel-perfect.jpg)
 
-One of the worst components in Codename One is the picker component. It’s origin lies in the migration to iOS 7 where the native picker introduced a 3d effect that was hard to replicate with our old graphics layer. We had no choice. We used a native widget for that picker and regretted that decision ever since.
+One of the worst components in Codename One is the picker component. Its origin lies in the migration to iOS 7 where the native picker introduced a 3d effect that was hard to replicate with our old graphics layer. We had no choice. We used a native widget for that picker and regretted that decision ever since.
 
 It looks bad on the simulator, it misbehaves and with every update from Apple things break. This has again proven to us the importance of the lightweight architecture of Codename One!
 
@@ -45,7 +45,7 @@ This starts as a quick bandaid to a problem & snowballs into something that’s 
 
 Having said that there are some valid use cases for device detection such as statistics & analysis. There are some edge cases that can only be solved in this way e.g. on iOS it’s often impossible to calculate the accurate device DPI without detection code.
 
-With that in mind Diamond introduced [this cn1lib](https://github.com/diamonddevgroup/CN1-Device/) which is available in the extension manager. It includes native device detection code that would you to detect the device. Hopefully this will be used for good.
+With that in mind Diamond introduced [this cn1lib](https://github.com/diamonddevgroup/CN1-Device/) which is available in the extension manager. It includes native device detection code that would allow you to detect the device. Hopefully this will be used for good.
 
 ### Facebook Clone Update
 

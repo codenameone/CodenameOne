@@ -16,7 +16,7 @@ time around I’d like to compare Codename One to the 800 pound gorilla: Xamarin
 that I [contrasted with Codename One in the past](https://forums.xamarin.com/discussion/55129/comparing-xamarin-to-other-cross-platfrom-frameworks-codename-one?)  
 but this is worth repeating.
 
-On it’s surface Xamarin might seem like a similar tool to Codename One using C# used instead of Java, but this  
+On its surface Xamarin might seem like a similar tool to Codename One using C# used instead of Java, but this  
 is misleading as the tools are so different conceptually they have very little in common.
 
 __ |  We updated this comparison after the initial publication to include the additional Property Cross section   
@@ -47,7 +47,7 @@ a problem as there are inherent insurmountable differences between the iOS/Andro
 #### Microsoft Purchase
 
 Xamarin was purchased by Microsoft in February 2016 and integrated into visual studio. Most of  
-it’s products were open sourced as part of this purchase.
+its products were open sourced as part of this purchase.
 
 ### At a Glance
 
@@ -87,17 +87,17 @@ This overhead is very noticeable when working with heavyweight widgets as the co
 and the logic needs to be very frequent. In that sense C# is less native than Codename One which is just implemented  
 directly on top of the native layer.
 
-On iOS the story is different, Xamarin implements the whole toolchain effectively hiding Apples tools  
+On iOS the story is different, Xamarin implements the whole toolchain effectively hiding Apple’s tools  
 completely. This is a very powerful abstraction but it sometimes creates another layer of complexity. E.g. when  
 Apple introduces a new idea such as bitcode or a new profiling tool Xamarin can’t fully leverage such a tool. It has  
-it’s own set of tools but they will always be second class citizens on Apples platform.
+its own set of tools but they will always be second class citizens on Apple’s platform.
 
 Codename One uses the open source [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm)  
 to translate Java bytecode to a native C xcode project on Mac OS. This effectively creates a native iOS project  
-and allows you to write native Objective-C code write into that project. In a sense this is "more native"as it ends  
+and allows you to write native Objective-C code write into that project. In a sense this is "more native" as it ends  
 up using a greater portion of the "officially supported toolchain".
 
-Xamarin isn’t needed on Windows as Microsofts native tools can be used to provide portability to that platform, there  
+Xamarin isn’t needed on Windows as Microsoft’s native tools can be used to provide portability to that platform, there  
 Microsoft is the true native leader by definition.
 
 #### Cloud Build
@@ -123,7 +123,7 @@ an advantage by the Xamarin team. This highlights the core conceptual/philosophi
   
 #### Web Deployment
 
-Xamarin supports almost all of Codename One’s supported platforms either directly or thru Microsofts Visual  
+Xamarin supports almost all of Codename One’s supported platforms either directly or thru Microsoft’s Visual  
 Studio tools. However, it doesn’t support building native JavaScript web applications.
 
 Codename One supports the process of compiling an application (threads and all) into a JavaScript application  
@@ -182,7 +182,7 @@ of Microsoft. Microsoft has repeatedly abandoned technologies in which they inve
 e.g. Windows Phone 7, Silverlight etc. It also demonstrated this recently by discarding RoboVM without the  
 curtesy of opening its source code.
 
-Xamarin is free in order to gain traction and serve Microsofts market goals. As long as those goals align with  
+Xamarin is free in order to gain traction and serve Microsoft’s market goals. As long as those goals align with  
 the goals of developers using Xamarin this is a good thing. However, since this is a market MS competes in  
 it is not an impartial player.
 
@@ -218,10 +218,10 @@ would reside in the common project
   
 This also means you will need to either use the iOS tools to build a UI or deal with the screenshots, icon resolutions  
 & DPI changes for the various device types. E.g. on iOS you would need images using the `@` notation but on  
-Android you will need to divide the images to the DPI directories creating a lot of work on resource maintenence  
+Android you will need to divide the images to the DPI directories creating a lot of work on resource maintenance  
 which just doesn’t exist in Codename One.
 
-In that sense PropertyCross is probably a poor demo as it doesn’t contain many resources that need maintenence.
+In that sense PropertyCross is probably a poor demo as it doesn’t contain many resources that need maintenance.
 
 ### Final Word
 

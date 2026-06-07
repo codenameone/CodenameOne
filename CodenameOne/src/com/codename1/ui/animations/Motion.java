@@ -490,31 +490,118 @@ public class Motion {
         if (isFinished()) {
             return destinationValue;
         }
+        // getCurrentMotionTime() is already motion-relative -- it returns
+        // currentMotionTime when set or (AnimationTime.now() - startTime)
+        // otherwise. The previous implementation then subtracted startTime
+        // twice in two duplicated `if (currentMotionTime > -1)` blocks,
+        // which produced nonsense for any motion driven by
+        // setCurrentMotionTime(). Just clamp to [0, duration]. See #1524.
         float totalTime = duration;
-        float currentTime = (int) getCurrentMotionTime();
-        if (currentMotionTime > -1) {
-            currentTime -= startTime;
-            totalTime -= startTime;
-        }
-        currentTime = Math.min(currentTime, totalTime);
-        if (currentMotionTime > -1) {
-            currentTime -= startTime;
-            totalTime -= startTime;
+        float currentTime = Math.min((int) getCurrentMotionTime(), (int) totalTime);
+        if (currentTime < 0f) {
+            currentTime = 0f;
         }
         float dis = Math.abs(destinationValue - sourceValue);
-        float p = currentTime / totalTime;
-        float a = (1 - p) * (1 - p) * (1 - p) * p0;
-        float b = 3 * (1 - p) * (1 - p) * p * p1;
-        float c = 3 * (1 - p) * p * p * p2;
-        float d = p * p * p * p3;
+        float t = currentTime / totalTime;
+
+        // CSS-style cubic-bezier(x1, y1, x2, y2): the four parameters are the
+        // X and Y coordinates of the two control points. P0=(0,0) and
+        // P3=(1,1) are implicit. The previous implementation just plugged
+        // the four floats into a 1D Bernstein basis polynomial directly,
+        // which is not the same curve -- e.g. cubic-bezier(0, 0, 0.75, 1)
+        // returned 0.41 at t=0.5 instead of the CSS-correct ~0.62. See
+        // #1524. Implement the standard solver: find u such that Bx(u) = t,
+        // then evaluate By(u).
+        float x1 = p0;
+        float y1 = p1;
+        float x2 = p2;
+        float y2 = p3;
+        float u = solveBezierForT(t, x1, x2);
+        float value = bezierAxis(u, y1, y2);
+
         int current;
         if (destinationValue > sourceValue) {
-            current = sourceValue + (int) ((a + b + c + d) * dis);
+            current = sourceValue + (int) (value * dis);
         } else {
-            int currentDis = (int) ((a + b + c + d) * dis);
-            current = sourceValue - currentDis;
+            current = sourceValue - (int) (value * dis);
         }
         return current;
+    }
+
+    /// Evaluates one coordinate of the implicit CSS cubic-bezier curve
+    /// (P0=0, P3=1, with control coordinates {@code c1} and {@code c2}) at
+    /// parameter {@code u} in [0,1]. The Bernstein-basis expansion of
+    /// {@code (1-u)^3*0 + 3*(1-u)^2*u*c1 + 3*(1-u)*u^2*c2 + u^3*1}.
+    private static float bezierAxis(float u, float c1, float c2) {
+        float omu = 1f - u;
+        return 3f * omu * omu * u * c1
+                + 3f * omu * u * u * c2
+                + u * u * u;
+    }
+
+    /// Derivative dBx/du of {@link #bezierAxis(float, float, float)}.
+    private static float bezierAxisDerivative(float u, float c1, float c2) {
+        float omu = 1f - u;
+        return 3f * omu * omu * c1
+                + 6f * omu * u * (c2 - c1)
+                + 3f * u * u * (1f - c2);
+    }
+
+    /// Solves {@code Bx(u) = t} for {@code u} using a few Newton-Raphson
+    /// iterations and falls back to bisection if Newton-Raphson stalls
+    /// (e.g. for nearly-degenerate control points whose derivative is 0).
+    /// Same general technique CSS engines use for cubic-bezier timing
+    /// functions.
+    private static float solveBezierForT(float t, float x1, float x2) {
+        if (t <= 0f) {
+            return 0f;
+        }
+        if (t >= 1f) {
+            return 1f;
+        }
+        // The CSS cubic-bezier domain requires x1 and x2 in [0,1] for a
+        // monotonic x(u); guard so a caller passing values outside that
+        // range still gets a sane curve by clamping.
+        float cx1 = Math.max(0f, Math.min(1f, x1));
+        float cx2 = Math.max(0f, Math.min(1f, x2));
+
+        float u = t;
+        for (int i = 0; i < 8; i++) {
+            float bxAtU = bezierAxis(u, cx1, cx2);
+            float diff = bxAtU - t;
+            if (Math.abs(diff) < 1e-6f) {
+                return u;
+            }
+            float deriv = bezierAxisDerivative(u, cx1, cx2);
+            if (deriv == 0f) {
+                break;
+            }
+            u -= diff / deriv;
+            if (u < 0f) {
+                u = 0f;
+            } else if (u > 1f) {
+                u = 1f;
+            }
+        }
+
+        // Bisection fallback - guaranteed to converge given Bx is
+        // monotonically non-decreasing on [0,1] when 0 <= cx1, cx2 <= 1.
+        float lo = 0f;
+        float hi = 1f;
+        u = t;
+        for (int i = 0; i < 16; i++) {
+            float bxAtU = bezierAxis(u, cx1, cx2);
+            if (Math.abs(bxAtU - t) < 1e-5f) {
+                return u;
+            }
+            if (bxAtU < t) {
+                lo = u;
+            } else {
+                hi = u;
+            }
+            u = 0.5f * (lo + hi);
+        }
+        return u;
     }
 
     /// Returns the value for the motion for the current clock time.

@@ -76,7 +76,7 @@ weight = 14
 [[menu.main]]
 parent = "developers"
 name = "Dashboard"
-url = "https://cloud.codenameone.com/secure/index.html"
+url = "https://cloud.codenameone.com/console/index.html"
 weight = 15
 
 [[menu.main]]
@@ -185,5 +185,5 @@ weight = 40
 [[menu.main]]
 identifier = "dashboard"
 name = "Dashboard"
-url = "https://cloud.codenameone.com/secure/index.html"
+url = "https://cloud.codenameone.com/console/index.html"
 weight = 90

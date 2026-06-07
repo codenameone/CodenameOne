@@ -25,7 +25,7 @@ to truly disappear you can either:
 We released an update for the Eclipse plugin but are experiencing some issues with the NetBeans update  
 center which we will hopefully resolve before the weekend.
 
-As a side note we are working hard to re-imagining the IntelliJ/IDEA plugin, but our current approach will  
+As a side note we are working hard to re-imagine the IntelliJ/IDEA plugin, but our current approach will  
 probably still rely on Ant instead of a move to gradle or maven. Both of these seem like really good ideas  
 on paper but at the moment they might not be as convenient. I’ll try to write a bit on the process as we  
 move forward and have a clearer picture on this.

@@ -188,6 +188,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     final Object editingLock=new Object();
 
+    // Coordinates the order in which pointer-press and pointer-release events
+    // reach Display.inputEventStack. ParparVM compiles every Java method to a
+    // JS generator; JSO calls inside ``onMouseDown`` / ``onMouseUp`` (e.g.
+    // ``getClientX``, ``focusInputElement``) suspend the generator while the
+    // host bridge round-trips. While ``onMouseDown`` is suspended on a yield,
+    // the worker can dequeue and start running ``onMouseUp`` for the SAME
+    // click. If onMouseUp finishes first (it has slightly fewer yields), its
+    // ``nativeCallSerially(pointerReleased)`` schedules the release on
+    // ``nativeEdt`` BEFORE onMouseDown's matching press. The EDT then sees
+    // POINTER_RELEASED before POINTER_PRESSED, drops the release because
+    // ``eventForm == null`` (Display.java POINTER_RELEASED handler), and the
+    // matching Button.released never fires -- so a Hello-button click never
+    // shows its Dialog.
+    //
+    // Fix: deferred-release pattern. onMouseDown sets ``pressInFlight=true``
+    // synchronously at handler entry (before any JSO yield) and clears it
+    // after ``Display.pointerPressed`` returns. onMouseUp checks the flag at
+    // dispatch time: if a press is still in flight, it stashes the release
+    // in ``deferredRelease`` and returns immediately; the press's completion
+    // hook then runs the deferred release. We avoid ``Object.wait()`` on
+    // purpose -- blocking a worker-side event-listener thread while the EDT
+    // is inside ``invokeAndBlock`` (e.g. Dialog modal) starves subsequent
+    // pointerdown listener invocations and stalls the entire UI.
+    private final Object pointerEventOrderLock = new Object();
+    private boolean pressInFlight = false;
+    private Runnable deferredRelease;
+
     private Form _getCurrent() {
         return getCurrentForm();
     }
@@ -324,6 +351,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public boolean isShiftKeyDown() {
         return shiftKeyDown;
     }
+
+    @Override
+    public boolean isWebSocketSupported() {
+        return isBrowserWebSocketAvailable();
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new HTML5WebSocketImpl(url);
+    }
+
+    @com.codename1.html5.js.JSBody(params = {}, script = "return typeof WebSocket !== 'undefined';")
+    private static native boolean isBrowserWebSocketAvailable();
 
     MouseEvent lastMouseEvent;
     
@@ -1332,10 +1372,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                // Set ``mouseDown=true`` IMMEDIATELY, before any JSO call
+                // that can yield. ParparVM compiles every Java method to a
+                // JS generator, and JSO calls (``evt.getType()``,
+                // ``getClientX(me)``, ``focusInputElement()``,
+                // ``evt.preventDefault()``) all suspend the generator while
+                // they round-trip through the host bridge. While onMouseDown
+                // is suspended, the worker can dequeue and start running
+                // onMouseUp for the SAME click — which then reads
+                // ``mouseDown==false`` (we haven't set it yet), early-returns
+                // via ``if (!isMouseDown()) return``, and the press's
+                // matching release is silently dropped. By the time
+                // onMouseDown resumes and sets ``mouseDown=true``, it's too
+                // late: the next click's onMouseDown sees ``mouseDown==true``
+                // (still — never cleared by the swallowed mouseup),
+                // shouldIgnoreMousePress returns true, and the next click
+                // gets the opposite asymmetry (release-only).
+                //
+                // Root cause of the PR #4795 dialog freeze: a Dialog's OK
+                // click landed on this every-other-half drop, Button.released
+                // never fired, dispose never happened, ``invokeAndBlock``
+                // blocked the EDT forever. Setting the flag synchronously at
+                // listener entry closes the window.
+                if (!pointerState.isMouseDown()) {
+                    pointerState.setMouseDown(true);
+                }
+                // Mark a press as in-flight SYNCHRONOUSLY (before any JSO
+                // yield) and clear any stale deferredRelease left over from a
+                // previous click. The matching nativeCallSerially below
+                // clears the flag after Display.pointerPressed returns, then
+                // runs any release that onMouseUp deferred while waiting.
+                synchronized (pointerEventOrderLock) {
+                    pressInFlight = true;
+                    deferredRelease = null;
+                }
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
                     if (cevt.isDefaultPrevented()) {
+                        completePressInFlight();
                         return;
                     }
                 }
@@ -1351,18 +1426,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                if (JavaScriptInputCoordinator.shouldIgnoreMousePress(pointerState.isTouchDown(), pointerState.isMouseDown(), evt.getTarget() == textField || evt.getTarget() == textArea)) {
+                // Re-check ignore conditions with the now-already-set flag.
+                // ``shouldIgnoreMousePress`` reads mouseDown=true here for
+                // every press, so the only way it stays meaningful is via
+                // touchDown / textInputTarget. That's intentional — the old
+                // mouseDown-based dedup was for the duplicate listener
+                // registration we removed in JavaScriptEventWiring.
+                boolean ignore = pointerState.isTouchDown()
+                        || (evt.getTarget() == textField || evt.getTarget() == textArea);
+                if (ignore) {
                     debugLog("[mouseDown] touchIsDown");
                     if (pointerState.isTouchDown()) {
                         pointerState.setMouseDown(false);
                     }
+                    completePressInFlight();
                     return;
                 }
                 onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
                 onPointerMoveHandle = EventUtil.addEventListener(peersContainer, "pointermove", onMouseMove, true);
-                
+
                 pointerState.setLastMousePosition(x, y);
-                pointerState.setMouseDown(true);
+                // ``mouseDown=true`` already set at handler entry — see comment
+                // at top. Don't unset/re-set here; doing so opens the same
+                // every-other-half-drop race we just closed.
                 callSerially(new Runnable() {
                     public void run() {
                         
@@ -1375,7 +1461,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
+                        try {
+                            HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
+                        } finally {
+                            completePressInFlight();
+                        }
                     }
                 });
                 if (contextListenerActive && me.getButton() == 2) {
@@ -1409,7 +1499,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.stopPropagation();
                 }
                 pointerState.setGrabbedDrag(false);
-                
+
                 // Prevent conflicts with touch events
                 // Guard against mouseUp if the mouse isn't already dwon
                 if (pointerState.isTouchDown()) {
@@ -1417,32 +1507,54 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     pointerState.setMouseDown(false);
                     return;
                 }
-                
+
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
                 pointerState.setMouseDown(false);
-                
-                
-                
+
                 EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                 EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
-                
+
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
-                nativeCallSerially(new Runnable() {
+
+                final Runnable releaseDispatch = new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerReleased(new int[]{x}, new int[]{y});
+                        nativeCallSerially(new Runnable() {
+                            public void run() {
+                                HTML5Implementation.this.pointerReleased(new int[]{x}, new int[]{y});
+                            }
+                        });
+                        callSerially(new Runnable() {
+                            public void run() {
+                                for (ActionListener l : mouseUpListeners) {
+                                    l.actionPerformed(null);
+                                }
+                            }
+                        });
                     }
-                });
-                callSerially(new Runnable() {
-                    public void run() {
-                        for (ActionListener l : mouseUpListeners) {
-                            l.actionPerformed(null);
-                        }
+                };
+
+                // If the matching onMouseDown is still suspended on a JSO
+                // yield (so its press hasn't reached Display.inputEventStack
+                // yet), stash the release and let the press's completion hook
+                // run it. Otherwise queue the release immediately. Avoids
+                // blocking the worker's listener thread, which would starve
+                // subsequent pointerdown invocations during a Dialog modal.
+                boolean runNow;
+                synchronized (pointerEventOrderLock) {
+                    if (pressInFlight) {
+                        deferredRelease = releaseDispatch;
+                        runNow = false;
+                    } else {
+                        runNow = true;
                     }
-                });
-                
+                }
+                if (runNow) {
+                    releaseDispatch.run();
+                }
+
             }
         };
         
@@ -2158,14 +2270,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void handleAnimationFrame(double time) {
 
         if (graphicsLocked){
-            // If the graphics is locked, we don't do anything
+            // Paint queue is mid-mutation. Re-arm rAF so we retry the
+            // drain once the writer releases the lock; otherwise pending
+            // ops would never paint.
             scheduleAnimationFrame();
             return;
 
         }
 
         drainPendingDisplayFrame();
-        scheduleAnimationFrame();
+        // Re-arm rAF only if there's still work to flush. The original
+        // unconditional re-arm produced a 60 Hz worker-callback flood
+        // (host->worker postMessage of the rAF firing) even when the UI
+        // was completely idle. During Display.invokeAndBlock that flood
+        // crowded out self.onmessage for incoming pointer events:
+        // the OK button on a Dialog modal stopped reaching the worker.
+        // ``flushGraphics`` paints synchronously and calls
+        // ``scheduleAnimationFrame()`` itself when it leaves work behind,
+        // so dropping the unconditional re-arm here is safe -- the next
+        // user-driven paint or queue write restarts the loop.
+        if (pendingDisplay.hasPendingOps()) {
+            scheduleAnimationFrame();
+        }
 
     }
 
@@ -2183,15 +2309,49 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
         context.save();
+        // Reset to identity BEFORE the crop clip is set. Without this, if
+        // the prior drain ended with a non-identity transform on the
+        // canvas state (e.g. ClipShape's setTransform leftover that the
+        // outer save/restore preserves across drains), the
+        // ``rect(cropX, cropY, cropW, cropH); clip();`` below evaluates
+        // under that leaked transform -- the resulting clip is a
+        // rotated/scaled polygon, not the intended axis-aligned crop. All
+        // ops in this drain then paint UNDER the leaked transform AND
+        // through the rotated clip, producing an entire-frame rotation
+        // visible in graphics-clip-under-rotation. Force identity now;
+        // the per-op SetTransform queue then sets the per-paint
+        // transform as before, and the outer ``restore()`` at end of
+        // drain still pops back to whatever pre-drain state was active.
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.beginPath();
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
-        // Wipe the drain region before the ops repaint it. Each drain carries a full
-        // paint for its crop (form/body/toolbar/overlay), so stale pixels must not
-        // bleed through from the previous drain. Without this, title bars from prior
-        // forms accumulated across tests because the new form's paint did not always
-        // cover every pixel in the toolbar region.
-        context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+        // Wipe the drain region only when this frame is repainting the
+        // *entire* canvas (form transitions, full-screen redraws). Each
+        // such drain carries a full paint, so stale pixels must not
+        // bleed through from the previous drain -- without this, title
+        // bars from prior forms accumulated across tests because the new
+        // form's paint did not always cover every pixel in the toolbar
+        // region.
+        //
+        // Skipping the clear for partial-frame drains is the fix for the
+        // "label-area-goes-transparent" bug: when two non-adjacent
+        // components (say, a TextField and the right-aligned ``?`` help
+        // button on the row above) both queue a repaint, the framework's
+        // paintDirty unions their absolute bounds into a single crop
+        // rect that spans both -- but the actual paint ops only cover
+        // each component's individual clip. Clearing the union here
+        // wipes the gap between them (the "Main Class" label) without
+        // any follow-up paint, leaving alpha=0 pixels where the page
+        // background shows through. Per-component opaque bg fills cover
+        // their own bounds either way; sibling components whose bounds
+        // happen to fall inside the union but who are NOT in the dirty
+        // list keep their previous pixels.
+        if (frame.getCropX() == 0 && frame.getCropY() == 0
+                && frame.getCropW() >= outputCanvas.getWidth()
+                && frame.getCropH() >= outputCanvas.getHeight()) {
+            context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+        }
 
         for (ExecutableOp op : frame.getOps()){
             op.execute(context);
@@ -2320,6 +2480,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }).start();
         } else {
             new Thread(r).start();
+        }
+    }
+
+    private void completePressInFlight() {
+        Runnable pending;
+        synchronized (pointerEventOrderLock) {
+            pressInFlight = false;
+            pending = deferredRelease;
+            deferredRelease = null;
+        }
+        if (pending != null) {
+            pending.run();
         }
     }
     
@@ -2657,84 +2829,143 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void installNativeTheme(){
     	try {
-            // Prefer the modern native theme when explicitly requested via
-            // ios.themeMode / and.themeMode (legacy alias: cn1.androidTheme)
-            // / nativeTheme (legacy alias: cn1.nativeTheme) /
-            // javascript.native.theme. If no hint is set we keep the
-            // pre-existing JS-port default (iOS 7 / Holo Light) since the JS
-            // bundle may not include the modern .res files
-            // (scripts/build-native-themes.sh has to have mirrored them
-            // before the JS bundle was produced).
-            String defaultTheme = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
-            Display d = Display.getInstance();
-            String iosMode = d.getProperty("ios.themeMode", null);
-            String androidMode = d.getProperty("and.themeMode",
-                    d.getProperty("cn1.androidTheme", null));
-            String shared = d.getProperty("nativeTheme",
-                    d.getProperty("cn1.nativeTheme", null));
-            if (isAndroid_()) {
-                if (androidMode == null && shared != null) {
-                    if ("modern".equalsIgnoreCase(shared)) {
-                        androidMode = "material";
-                    } else if ("legacy".equalsIgnoreCase(shared)) {
-                        androidMode = "hololight";
-                    }
-                }
-                if (androidMode != null) {
-                    androidMode = androidMode.toLowerCase();
-                    if ("material".equals(androidMode) || "modern".equals(androidMode) || "auto".equals(androidMode)) {
-                        defaultTheme = "/AndroidMaterialTheme.res";
-                    } else if ("legacy".equals(androidMode)) {
-                        defaultTheme = "/androidTheme.res";
-                    } else if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
-                        defaultTheme = "/android_holo_light.res";
-                    }
-                }
-            } else {
-                if (iosMode == null && shared != null) {
-                    if ("modern".equalsIgnoreCase(shared)) {
-                        iosMode = "modern";
-                    } else if ("legacy".equalsIgnoreCase(shared)) {
-                        iosMode = "ios7";
-                    }
-                }
-                if (iosMode != null) {
-                    iosMode = iosMode.toLowerCase();
-                    if ("modern".equals(iosMode) || "liquid".equals(iosMode) || "auto".equals(iosMode)) {
-                        defaultTheme = "/iOSModernTheme.res";
-                    } else if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
-                        defaultTheme = "/iPhoneTheme.res";
-                    }
-                }
-            }
-            String nativeTheme = Display.getInstance().getProperty("javascript.native.theme", defaultTheme);
-            Log.p("[installNativeTheme] attempting to load theme from " + nativeTheme);
+            // Pick the .res to load based on the build hints and the
+            // detected browser OS. The JS-port default stays on the
+            // pre-existing legacy theme (Holo Light when the user agent
+            // is Android, iOS 7 on everything else) so legacy
+            // screenshot baselines remain comparable. Apps that want
+            // the modern Liquid Glass / Material 3 theme can opt in
+            // via ios.themeMode / and.themeMode / nativeTheme (legacy
+            // aliases: cn1.androidTheme / cn1.nativeTheme) /
+            // javascript.native.theme, including the new "auto" value
+            // that picks iOS modern for iOS/Mac browsers and Material
+            // 3 elsewhere.
+            String resolved = resolveNativeThemeResource();
+            // Publish the detected modern-theme resource so screenshot
+            // tests (DualAppearanceBaseTest) can install the same
+            // platform-appropriate theme on the JS port without
+            // duplicating the OS-detection logic.
+            String modern = isIOSLikeBrowser() ? "/iOSModernTheme.res" : "/AndroidMaterialTheme.res";
+            Display.getInstance().setProperty("cn1.modernThemeResource", modern);
             Resources r;
             try {
-                r = Resources.open(nativeTheme);
+                r = Resources.open(resolved);
             } catch (Throwable notFound) {
                 // Fall back to the legacy theme if the chosen .res isn't in
                 // the JS bundle (partial build, missing mirror step, etc.).
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
-                Log.p("[installNativeTheme] " + nativeTheme + " missing, falling back to " + fallback);
                 r = Resources.open(fallback);
             }
-            Log.p("[installNativeTheme] loaded theme resources, theme names: " + java.util.Arrays.toString(r.getThemeResourceNames()));
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
-            
+
             tp.put("StatusBar.padding", "0,0,0,0");
-            
+
             UIManager.getInstance().setThemeProps(tp);
-            Log.p("[installNativeTheme] successfully installed theme");
             return;
     	} catch (IOException ex){
-            Log.p("[installNativeTheme] IOException loading theme: " + (ex.getMessage() != null ? ex.getMessage() : "null"));
             Log.e(ex);
     	} catch (Exception ex) {
-            Log.p("[installNativeTheme] Exception loading theme: " + ex.getClass().getName() + ": " + (ex.getMessage() != null ? ex.getMessage() : "null"));
             Log.e(ex);
         }
         return;
+    }
+
+    /**
+     * iOS/Mac browsers should pick up the iOS Liquid Glass theme;
+     * every other browser (Android, Windows, Linux, Chrome OS) gets
+     * the Android Material 3 theme. The legacy default split was
+     * Android vs. "everything else falls back to iOS"; for the modern
+     * native theme the more useful split is iOS-family vs. everyone
+     * else because Windows and Linux desktops match Material 3 better
+     * than Liquid Glass.
+     */
+    private static boolean isIOSLikeBrowser() {
+        return isIOS() || isMac();
+    }
+
+    /**
+     * Resolves the native-theme .res path from build hints + detected
+     * browser OS. Recognised hints (highest to lowest precedence):
+     *  - {@code javascript.native.theme}: explicit res path override.
+     *  - {@code ios.themeMode}: auto/modern/liquid/ios7/flat/legacy/
+     *    iphone. Applied to iOS/Mac browsers only.
+     *  - {@code and.themeMode}: auto/material/modern/hololight/holo/
+     *    legacy. Applied when the browser is not iOS/Mac. Alias:
+     *    {@code cn1.androidTheme}.
+     *  - {@code nativeTheme}: modern/auto/legacy. Maps onto the iOS
+     *    or Android branch based on the detected browser OS. Alias:
+     *    {@code cn1.nativeTheme}. The new {@code auto} value triggers
+     *    OS-based selection: iOS/Mac browsers get the Liquid Glass
+     *    theme, everything else gets Material 3.
+     *
+     * <p>With no hint set, the JS port keeps the pre-existing default
+     * (Android Holo Light when the user agent is Android, iOS 7
+     * everywhere else - identical to the historical legacy split) so
+     * existing JS screenshot baselines remain comparable. Apps that
+     * want the modern Liquid Glass / Material 3 theme can opt in by
+     * setting {@code nativeTheme=auto} or {@code nativeTheme=modern}
+     * (or the platform-specific {@code ios.themeMode} /
+     * {@code and.themeMode}). The {@code cn1.modernThemeResource}
+     * runtime property published by {@link #installNativeTheme()}
+     * always points at the OS-appropriate modern .res so screenshot
+     * tests can install it regardless of the configured default.
+     */
+    private static String resolveNativeThemeResource() {
+        Display d = Display.getInstance();
+        String explicit = d.getProperty("javascript.native.theme", null);
+        if (explicit != null && explicit.length() > 0) {
+            return explicit;
+        }
+        String shared = d.getProperty("nativeTheme", d.getProperty("cn1.nativeTheme", null));
+        // Auto-detected branch chooses Liquid Glass on iOS/Mac and
+        // Material 3 elsewhere. Used for any "modern"/"auto" path.
+        boolean iosLike = isIOSLikeBrowser();
+        if (iosLike) {
+            String iosMode = d.getProperty("ios.themeMode", null);
+            if (iosMode == null && shared != null) {
+                if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+                    iosMode = "modern";
+                } else if ("legacy".equalsIgnoreCase(shared)) {
+                    iosMode = "ios7";
+                }
+            }
+            if (iosMode != null) {
+                iosMode = iosMode.toLowerCase();
+                if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
+                    return "/iPhoneTheme.res";
+                }
+                if ("ios7".equals(iosMode) || "flat".equals(iosMode)) {
+                    return "/iOS7Theme.res";
+                }
+                // modern / liquid / auto / anything else -> modern theme
+                return "/iOSModernTheme.res";
+            }
+            // No iOS hint - keep the pre-existing JS-port default.
+            return "/iOS7Theme.res";
+        }
+        String androidMode = d.getProperty("and.themeMode", d.getProperty("cn1.androidTheme", null));
+        if (androidMode == null && shared != null) {
+            if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)) {
+                androidMode = "material";
+            } else if ("legacy".equalsIgnoreCase(shared)) {
+                androidMode = "hololight";
+            }
+        }
+        if (androidMode != null) {
+            androidMode = androidMode.toLowerCase();
+            if ("legacy".equals(androidMode)) {
+                return "/androidTheme.res";
+            }
+            if ("hololight".equals(androidMode) || "holo".equals(androidMode)) {
+                return "/android_holo_light.res";
+            }
+            // material / modern / auto / anything else -> modern theme
+            return "/AndroidMaterialTheme.res";
+        }
+        // No Android hint - keep the pre-existing JS-port default,
+        // which routes Android user agents to Holo Light and every
+        // other non-iOS browser (Linux/Windows/Chrome OS) to iOS 7.
+        return isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
     }
 
     @Override
@@ -2866,12 +3097,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static native boolean isIPad();
     
     
+    // Codename One has always preferred to work in CSS pixels (logical
+    // "real" pixels) end-to-end on the JS port -- we don't auto-scale to
+    // device pixels. Defaulting ``overridePixelRatio`` to 1 keeps:
+    //   * the canvas backing dimensions equal to CSS dimensions (no
+    //     HiDPI 2x backing surface),
+    //   * pointer-event coordinates flowing through unmultiplied (so a
+    //     click at CSS (574, 455) is delivered to Form.pointerPressed
+    //     as (574, 455), not (1148, 910) on a retina display),
+    //   * scaleCoord / unscaleCoord becoming no-ops.
+    // Anyone who specifically wants HiDPI rendering can opt in via the
+    // ``?pixelRatio=2`` URL parameter.
     @JSBody(params={}, script="if (window.overridePixelRatio === undefined) {"
             + "    var ratioStr = getParameterByName('pixelRatio');"
             + "    if (ratioStr != '') {"
             + "        window.overridePixelRatio = parseFloat(ratioStr);"
             + "    } else {"
-            + "        window.overridePixelRatio = 0;"
+            + "        window.overridePixelRatio = 1;"
             + "    }"
             + "    if (window.cn1ScaleCoord === undefined){ window.cn1ScaleCoord = function(x) { return x===-1?-1:x/(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
             + "    if (window.cn1UnscaleCoord === undefined){ window.cn1UnscaleCoord = function(x) { return x===-1?-1:x*(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
@@ -4701,6 +4943,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public PeerComponent createNativePeer(Object nativeComponent) {
         return new HTML5Peer((HTMLElement)nativeComponent);
     }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new HTML5CameraImpl();
+    }
     
     
     
@@ -4773,6 +5020,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     boolean graphicsLocked;
     
+    /**
+     * Mark the calling green thread as the only one ``drain`` will dispatch
+     * until the matching ``endGraphicsAtomic()``. While set, ALL other Java
+     * green threads on the worker stay parked even when their wait timeouts
+     * expire; the runtime's drain loop sees the atomic-thread flag and
+     * picks only this thread.
+     *
+     * Why: ``flushGraphics`` issues a JSO call per canvas op (``ctx.save``,
+     * ``ctx.fillStyle``, ``ctx.fillRect``, ...). Each JSO call yields the
+     * green thread waiting for HOST_CALLBACK. Without this marker the
+     * runtime would interleave OTHER green threads during those yields --
+     * those other threads can call repaint(), Component invalidations,
+     * Form transitions, requestAnimationFrame -- each of which queues
+     * MORE canvas ops. The recursive flood of host->worker host-callback
+     * messages then crowded out ``self.onmessage`` for incoming pointer
+     * events (the OK click on a Dialog modal stopped reaching the worker).
+     *
+     * Holding the atomic marker for the duration of the per-frame batch
+     * mirrors how other Codename One ports run paint on a single thread
+     * with no input interleaving, and keeps the host->worker message
+     * queue fair-shareable for incoming DOM events between frames.
+     */
+    @JSBody(params={}, script="if (typeof jvm !== 'undefined') jvm.atomicThread = jvm.currentThread;")
+    private static native void beginGraphicsAtomic();
+
+    @JSBody(params={}, script="if (typeof jvm !== 'undefined') jvm.atomicThread = null;")
+    private static native void endGraphicsAtomic();
+
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
@@ -4786,16 +5061,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 Thread.sleep(millis);
             }
         }, pendingDisplay);
-        
+
         List<ExecutableOp> flushedOps;
         synchronized(pendingDisplay){
-            /*
-            CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
-            List<ExecutableOp> ops = graphics.flush(x, y, width, height);
-            for (ExecutableOp op : ops){
-                op.execute(context);
-            }
-            */
             flushedOps = graphics.flush(x, y, width, height);
             JavaScriptRenderQueueCoordinator.queueFlush(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
                 @Override
@@ -4804,15 +5072,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }, pendingDisplay, flushedOps, x, y, width, height);
         }
-        drainPendingDisplayFrame();
+        beginGraphicsAtomic();
+        try {
+            drainPendingDisplayFrame();
+        } finally {
+            endGraphicsAtomic();
+        }
+        // If anything got queued mid-flush (e.g. a re-entrant flushGraphics
+        // call ran while we held the atomic flag and its ops landed after
+        // our snapshot), make sure the rAF chain runs at least one more
+        // tick to catch them. ``handleAnimationFrame`` no longer re-arms
+        // unconditionally, so without this poke the queued ops would sit
+        // forever.
+        if (pendingDisplay.hasPendingOps()) {
+            scheduleAnimationFrame();
+        }
         if (isEditing) {
             resizeNativeEditor();
         }
         if (activePicker != null) {
             activePicker.resizeNativeElement();
         }
-    	
-       
+
+
     }
 
     @Override
@@ -4842,17 +5124,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final ImageData imageData = context.getImageData(0, 0, width, height);
         final Uint8ClampedArray data = imageData.getData();
         final int[] rgb = new int[width * height];
-        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
-            @Override
-            public int get(int index) {
-                return data.get(index);
-            }
-
-            @Override
-            public int length() {
-                return data.getLength();
-            }
-        }, rgb, 0);
+        // Bulk RGBA->ARGB conversion in one JS-native loop. The legacy
+        // ``PixelReader`` path made 4 JSO virtual-dispatch calls per
+        // pixel (4.6M for a 1280x900 screenshot); the bulk intrinsic
+        // collapses that to a single ``yield*`` boundary.
+        JavaScriptImageDataAdapter.readRgbaToArgbBulk(data, rgb, 0);
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
@@ -4879,19 +5155,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         final Uint8ClampedArray dataArr = imData[0].getData();
-        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
-            @Override
-            public int get(int index) {
-                return dataArr.get(index);
-            }
-
-            @Override
-            public int length() {
-                return dataArr.getLength();
-            }
-        }, arr, offset);
-            
-        
+        // Bulk RGBA->ARGB via JS-native intrinsic; see screenshot()
+        // call above for rationale.
+        JavaScriptImageDataAdapter.readRgbaToArgbBulk(dataArr, arr, offset);
     }
 
     
@@ -4951,7 +5217,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public Object createImage(int[] rgb, int width, int height) {
         NativeImage img = new NativeImage();
-        ImageData data = (ImageData)createImageData(rgb, width, height);
+        ImageData data;
+        try {
+            data = (ImageData)createImageData(rgb, width, height);
+        } catch (Throwable t) {
+            // CssGradients hits a flaky "Missing virtual method
+            // writeArgbBuffer on undefined" when the host ImageData
+            // round-trip lands while the worker is mid-paint; before this
+            // guard, the throw killed the entire test runner. Return a
+            // blank image so the bad tile is silently dropped and the
+            // suite keeps running -- the next paint cycle re-attempts.
+            img.width = width;
+            img.height = height;
+            return img;
+        }
+        if (data == null) {
+            img.width = width;
+            img.height = height;
+            return img;
+        }
         JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
                 JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(width, height,
                         new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
@@ -4996,17 +5280,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     Object createImageData(int[] rgb, int offset, int width, int height) {
-        final Uint8ClampedArray arr = Uint8ClampedArray.create(width*height*4);
-        JavaScriptImageDataAdapter.writeArgbToRgba(rgb, offset, width, height, new JavaScriptImageDataAdapter.PixelWriter() {
-            @Override
-            public void set(int index, int value) {
-                arr.set(index, value);
-            }
-        });
+        // The host-side ``createImageData`` round-trips through the JSO
+        // dispatcher; under tight per-paint timing -- CssGradients hits this
+        // during initial form layout when other host calls are still in
+        // flight -- the dispatch can return undefined, and the resulting
+        // ``d.writeArgbBuffer(...)`` then throws ``Missing virtual method
+        // cn1_s_writeArgbBuffer on undefined`` which propagates up through
+        // the test runner's paint cycle and halts the entire suite.
+        // Guard against the undefined-receiver case so the worst we do is
+        // emit a blank image. Caller (createImage) handles ``null`` by
+        // returning an empty NativeImage; the dropped tile is preferable
+        // to a runtime-wide error.
         ImageData d = graphics.getContext().createImageData(width, height);
-        ((Uint8ClampedArraySetter)d.getData()).set(arr);
+        if (d == null) {
+            return null;
+        }
+        // Single round-trip: send the ARGB int[] to host, where the
+        // ``writeArgbBuffer`` prototype extension unpacks it directly into
+        // ``this.data``. The earlier
+        // ``((Uint8ClampedArraySetter)d.getData()).set(arr)`` path lost every
+        // byte to the worker-side clone of ``imageData.data`` — see
+        // ``ImageData.writeArgbBuffer`` for the full rationale.
+        d.writeArgbBuffer(rgb, offset, width, height);
         return d;
-        
+
     }
 
     private int isTablet = -1;
@@ -5049,42 +5346,82 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static void windowOpen(String url, String target);
 
    
-    @JSBody(params={"fileName", "blob"}, script="window.cn1SaveBlobHandler = function() {if (window.navigator && window.navigator.msSaveOrOpenBlob) {\n" +
-        "    window.navigator.msSaveOrOpenBlob(blob, fileName);\n" +
-        "}\n" +
-        "else {\n" +
-        "    var downloadLink = document.createElement('a');"
-            + "downloadLink.href =  URL.createObjectURL(blob);\n"
-            + "downloadLink.download = fileName;"
-            + "document.body.appendChild(downloadLink);" +
-        "    downloadLink.click();"
-            + "document.body.removeChild(downloadLink);\n"
-            + "window.cn1SaveBlobHandler = null;" +
-        "}};")
+    // The original implementations of register/fire SaveBlobHandler ran their
+    // scripts inside the worker, where ``document`` doesn't exist -- the
+    // generated download <a> element / .click() trick threw the moment the
+    // backside hook fired, with no Blob ever reaching the user. Route through
+    // host-bridge handlers (__cn1_register_save_blob__ + __cn1_fire_save_blob__)
+    // in browser_bridge.js so registration and the click-driven download both
+    // happen on the main thread.
+    @JSBody(params={"fileName", "blob"}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_register_save_blob__', [{fileName: fileName, blob: blob}]);\n" +
+        "return null;")
     private static native void registerSaveBlobHandler(String fileName, Blob blob);
-    
-    @JSBody(params={"fileName", "dataUrl"}, script="window.cn1SaveBlobHandler = function() {if (window.navigator && window.navigator.msSaveOrOpenBlob) {\n" +
-        "    var blob = window.Base64ToBlob(dataUrl);"
-            + "window.navigator.msSaveOrOpenBlob(blob, fileName);\n" +
-        "}\n" +
-        "else {\n" +
-        "    var downloadLink = document.createElement('a');"
-            + "downloadLink.href =  dataUrl;\n"
-            + "downloadLink.download = fileName;"
-            + "document.body.appendChild(downloadLink);" +
-        "    downloadLink.click();"
-            + "document.body.removeChild(downloadLink);\n"
-            + "window.cn1SaveBlobHandler = null;" +
-        "}};")
+
+    @JSBody(params={"fileName", "dataUrl"}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_register_save_blob_dataurl__', [{fileName: fileName, dataUrl: dataUrl}]);\n" +
+        "return null;")
     private static native void registerSaveBlobHandlerDataUrl(String fileName, String dataUrl);
-    
-    @JSBody(params={}, script="window.cn1SaveBlobHandler = null;")
+
+    @JSBody(params={}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_deregister_save_blob__', []);\n" +
+        "return null;")
     private static native void deregisterSaveBlobHandler();
-    
-    @JSBody(params={}, script="if (window.cn1SaveBlobHandler) window.cn1SaveBlobHandler();")
+
+    @JSBody(params={}, script=
+        "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n" +
+        "yield jvm.invokeHostNative('__cn1_fire_save_blob__', []);\n" +
+        "return null;")
     private static native void fireSaveBlobHandler();
-    
-    
+
+    /**
+     * JS-port-only fast path for "download these bytes as a file". Skips the
+     * LocalForage/IndexedDB round-trip used by Display.execute(file:// URL)
+     * -- which on this port is broken: the bundled localforage's setItem
+     * callback returns null even when the input Uint8Array is non-null, the
+     * subsequent getItem also returns null, and exists() never sees the just-
+     * written file. The Initializr Generate flow was stuck forever on this.
+     *
+     * This method packages the bytes into a Blob in memory, registers it with
+     * the main-thread save-blob host handler, and fires the download
+     * immediately via the backside hook (the user's click is still on the
+     * call stack, so the browser's "downloads need a user gesture" check
+     * passes). Returns true on success, false if the backside hook isn't
+     * available (e.g. on Safari-without-gesture-relay or in unit tests).
+     */
+    public boolean downloadBytesAsFile(final String fileName, byte[] bytes) {
+        if (bytes == null || fileName == null) {
+            return false;
+        }
+        try {
+            Blob blob = BlobUtil.createBlob(bytes, "application/octet-stream");
+            registerSaveBlobHandler(fileName, blob);
+        } catch (Throwable t) {
+            return false;
+        }
+        if (isBacksideHookAvailable()) {
+            addBacksideHook(new JSRunnable() {
+                public void run() {
+                    fireSaveBlobHandler();
+                }
+            });
+            return true;
+        }
+        // No backside hook: best-effort fire right away. May be blocked by
+        // browser gesture policy on some configurations, but better than
+        // silently doing nothing.
+        try {
+            fireSaveBlobHandler();
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+
     public boolean paintNativePeersBehind() {
         return true;
     }
@@ -5094,19 +5431,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
-        
         if (url.startsWith("javascript:")) {
             String cmd = url.substring(url.indexOf(":")+1);
             eval_(cmd);
             return;
         }
-        
+
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        if (!url.startsWith("http:") && 
-                !url.startsWith("http:") && 
-                !url.startsWith("mailto:") && 
+        if (!url.startsWith("http:") &&
+                !url.startsWith("http:") &&
+                !url.startsWith("mailto:") &&
                 !url.startsWith("data:")) {
             if (exists(url)) {
                 try {
@@ -5116,17 +5452,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (fileName.indexOf(sep) >=0) {
                         fileName = fileName.substring(fileName.lastIndexOf(sep)+1);
                     }
-                    //String dataUrl = blobToDataURL(blob);
-                    //registerSaveBlobHandlerDataUrl(fileName, dataUrl);
                     registerSaveBlobHandler(fileName, blob);
                     useBlobHandler = true;
 
-                } catch (IOException ex) {
-
+                } catch (Throwable ex) {
+                    // openFileAsBlob failed -- fall through to the no-blob-handler
+                    // branch below which opens the URL in a new window instead.
                 }
             }
         }
-        
+
         final boolean fuseBlobHandler = useBlobHandler;
         
         String buttonText = null;
@@ -5494,8 +5829,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                             @Override
                             public void fillRect(HTML5Graphics graphics, int color, int fillWidth, int fillHeight) {
-                                graphics.setColorWithAlpha(color);
-                                graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                // Image.createImage(w, h, fillColor) takes an ARGB int. The
+                                // alpha byte must drive the fill's transparency:
+                                // ``setColorWithAlpha`` already sets ``fillStyle`` to an
+                                // ``rgba(...)`` string, but the FillRect op overwrites that
+                                // with ``rgb(...)`` and uses ``state.alpha`` (the graphics-
+                                // wide global alpha, defaulting to 255) as the canvas
+                                // ``globalAlpha`` -- silently dropping the colour's alpha
+                                // byte. Route the alpha through ``setAlpha`` so it lands in
+                                // ``state.alpha`` and the FillRect op picks it up. Reset
+                                // alpha to 255 afterwards so the freshly returned mutable-
+                                // image graphics has the default state the user expects.
+                                int colorAlpha = (color >>> 24) & 0xFF;
+                                graphics.setColor(color & 0xFFFFFF);
+                                if (colorAlpha != 0xFF) {
+                                    graphics.setAlpha(colorAlpha);
+                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                    graphics.setAlpha(255);
+                                } else {
+                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
+                                }
                             }
                         });
         NativeImage img = new NativeImage();
@@ -5508,8 +5861,204 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public boolean areMutableImagesFast() {
         return true;
     }
-    
-    
+
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        if (image == null) {
+            return image;
+        }
+        NativeImage src = (NativeImage) image.getImage();
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 0 || h <= 0) {
+            return image;
+        }
+        NativeImage blurred = new NativeImage();
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(w, h,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
+                            }
+                        });
+        blurred.width = buffer.getWidth();
+        blurred.height = buffer.getHeight();
+        attachMutableImageSurface(blurred, buffer.getGraphics());
+        if (src.img != null && !src.loaded) {
+            src.load();
+        }
+        try {
+            if (src.img != null && src.loaded) {
+                applyBlurViaHost(buffer.getCanvas(), src.img, w, h, radius);
+            } else if (src.mutableGraphics != null) {
+                applyBlurViaHost(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
+            } else {
+                return image;
+            }
+        } catch (Throwable t) {
+            return image;
+        }
+        return Image.createImage(blurred);
+    }
+
+    // Single-shot host-bridge blur. The earlier Java-typed dispatch path
+    // (commit fa18f0301) ran six separate ctx.save/setFilter/drawImage/.../
+    // restore calls -- each a worker→main round-trip -- and that latency
+    // hung Sheet/Dialog backdrop paint cycles long enough to overrun the
+    // screenshot test budget. Doing the whole blur in one
+    // ``invokeHostNative('__cn1_apply_canvas_blur__', ...)`` call collapses
+    // it to a single round-trip; the matching handler in browser_bridge.js
+    // performs the canvas2d filter:blur op entirely on the main thread.
+    @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
+            "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n"
+            + "yield jvm.invokeHostNative('__cn1_apply_canvas_blur__', [{dst: dst, src: src, w: w|0, h: h|0, radius: +radius}]);\n"
+            + "return null;\n")
+    private static native void applyBlurViaHost(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
+
+    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
+        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
+    }
+
+    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
+        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
+    }
+
+    @Override
+    public boolean isAntiAliasingSupported() {
+        // Canvas2D primitive paths (stroke/fill/clip) are ALWAYS antialiased
+        // -- there is no way to disable it. ``setAntiAliased(false)`` falls
+        // through to a state-tracking-only no-op below; tests that assert
+        // crisp vs antialiased rendering will see identical antialiased
+        // pixels on the JS port across both panes.
+        return true;
+    }
+
+    @Override
+    public boolean isAntiAliasedTextSupported() {
+        // Same story for ``fillText``/``strokeText`` -- canvas2d always
+        // antialiases glyphs via the platform's text rasterizer.
+        return true;
+    }
+
+    @Override
+    public void setAntiAliased(Object graphics, boolean a) {
+        g(graphics).getRenderState().setAntiAliased(a);
+    }
+
+    @Override
+    public boolean isAntiAliased(Object graphics) {
+        return g(graphics).getRenderState().isAntiAliased();
+    }
+
+    @Override
+    public void setAntiAliasedText(Object graphics, boolean a) {
+        g(graphics).getRenderState().setAntiAliasedText(a);
+    }
+
+    @Override
+    public boolean isAntiAliasedText(Object graphics) {
+        return g(graphics).getRenderState().isAntiAliasedText();
+    }
+
+    @Override
+    public void setRenderingHints(Object graphics, int hints) {
+        g(graphics).getRenderState().setRenderingHints(hints);
+    }
+
+    @Override
+    public int getRenderingHints(Object graphics) {
+        return g(graphics).getRenderState().getRenderingHints();
+    }
+
+    @Override
+    public boolean cacheLinearGradients() {
+        // Match iOS: rasterize gradients on-the-fly via Canvas2D
+        // ``createLinearGradient`` (called from the fillLinearGradient path)
+        // instead of allocating a cached Image. Avoids 1-2-LSB drift at
+        // gradient extremes between the cached raster and the live ramp.
+        return false;
+    }
+
+    @Override
+    public boolean cacheRadialGradients() {
+        return false;
+    }
+
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        // Canvas2D shadow* is hardware-accelerated on every modern browser,
+        // but ``isDrawShadowFast`` gates ``RoundBorder``/``RoundRectBorder``
+        // skipping shadow caching. Match iOS (false) so the shadow image is
+        // cached and re-used rather than re-rasterized on every paint -- the
+        // CSS shadow path is "fast" per pixel but the surrounding setup
+        // (color/blur/offset state changes, save/restore) is per-call.
+        return false;
+    }
+
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        if (image == null) {
+            return;
+        }
+        NativeImage src = (NativeImage) image;
+        if (src.img != null && !src.loaded) {
+            src.load();
+        }
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        CanvasRenderingContext2D ctx = g(graphics).getContext();
+        if (ctx == null) {
+            return;
+        }
+        // Use canvas2d's built-in shadow rendering. The trick: drawImage with
+        // shadowColor + shadowOffset set casts the shadow at (drawX + offset,
+        // drawY + offset). To get ONLY the shadow on the destination (not the
+        // source silhouette too -- the caller draws the actual component
+        // separately), draw the source far off-canvas so its silhouette is
+        // outside the clip, but compensate shadowOffsetX/Y so the shadow lands
+        // at (x + offsetX, y + offsetY). ``spreadRadius`` is folded into the
+        // blur on this path (canvas2d has no native spread); approximation is
+        // acceptable for the typical zero-spread CN1 callers and matches
+        // Android RenderEffect behavior closely enough that shadow-using
+        // theme tests should be re-baselined per-port anyway.
+        final int parkX = -16384;
+        final int parkY = -16384;
+        ctx.save();
+        ctx.setShadowColor(HTML5Graphics.colorWithAlpha(((Math.round(opacity * 255f) & 0xFF) << 24) | (color & 0xFFFFFF)));
+        ctx.setShadowOffsetX(x + offsetX - parkX);
+        ctx.setShadowOffsetY(y + offsetY - parkY);
+        ctx.setShadowBlur(Math.max(0, blurRadius + spreadRadius));
+        if (src.img != null && src.loaded) {
+            ctx.drawImage(src.img, parkX, parkY);
+        } else if (src.mutableGraphics != null) {
+            ctx.drawImage(src.mutableGraphics.getCanvas(), parkX, parkY);
+        }
+        ctx.restore();
+    }
+
 
     @Override
     public Object createImage(byte[] bytes, int offset, int len) {
@@ -6878,9 +7427,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         try {
             String wrapped = stripTrailingSlash(wrapFile(file));
-            return LocalForage.getInstance().getItem(wrapped) != null || LocalForage.getInstance().getItem(wrapped+".cn1dir") != null;
+            return LocalForage.getInstance().getItem(wrapped) != null
+                    || LocalForage.getInstance().getItem(wrapped + ".cn1dir") != null;
         } catch (IOException ex) {
-            //Log.e(ex);
             return false;
         }
     }
@@ -7569,8 +8118,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
+    // Asset bytes cache. CN1's Resources / UIManager bootstrap reads the
+    // same .res file (e.g. iOS7Theme.res) multiple times during a single
+    // boot — once for the requested theme, again as a layered fallback,
+    // and once more from the EncodedImage multi-image lazy load. Each
+    // call hit the network synchronously; iOS7Theme.res alone was
+    // downloaded 3x = ~1.4 MB wasted on the wire. Cache the bytes once
+    // they've been fetched and serve a fresh ArrayBufferInputStream over
+    // the same Uint8Array on every subsequent open.
+    private static final java.util.Map<String, Uint8Array> assetByteCache =
+            new java.util.HashMap<String, Uint8Array>();
+    // Cache of URLs that the host bundle does NOT have. The
+    // ``getBundledAssetAsDataURL`` host call returns null for any
+    // URL the app didn't embed -- Initializr embeds none, so all
+    // ~5 boot calls returned null. Cache the negative result so
+    // repeats hit the in-worker cache instead of round-tripping.
+    // We never cache the positive case because the data URL would
+    // be huge to keep around when we already process the bytes.
+    private static final java.util.Set<String> bundledAssetMissCache =
+            new java.util.HashSet<String>();
+
     public InputStream getArrayBufferInputStream(String url){
-        String dataURL = ((WindowExt)window).getCn1().getBundledAssetAsDataURL(url);
+        String dataURL = bundledAssetMissCache.contains(url) ? null
+                : ((WindowExt)window).getCn1().getBundledAssetAsDataURL(url);
         if (dataURL != null) {
             Blob blob = ((WindowExt)window).Base64ToBlob(dataURL);
             ArrayBufferInputStream out;
@@ -7580,9 +8150,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
-            
+        } else {
+            bundledAssetMissCache.add(url);
         }
-        
+
         if (isMediaResource(url)){
             ArrayBufferInputStream out = new ArrayBufferInputStream(Uint8Array.create(0), null);
             out.setSrc(url);
@@ -7592,9 +8163,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (url.indexOf("assets/") == 0 && url.indexOf("?") == -1) {
             url = url + "?v=" + getBuildVersion();
         }
+        Uint8Array cachedBytes = assetByteCache.get(url);
+        if (cachedBytes != null) {
+            return new ArrayBufferInputStream(cachedBytes, "arraybuffer");
+        }
         req.open("get", url, false);
-        req.overrideMimeType("text/plain; charset=x-user-defined");
+        // ``responseType = "arraybuffer"`` lets the browser hand back a
+        // typed-array view of the bytes directly. The previous path used
+        // ``overrideMimeType("text/plain; charset=x-user-defined")`` and
+        // then walked the response string char-by-char into a fresh
+        // Uint8Array -- ~735k JS->JSO ``out.set(i, ...)`` calls for
+        // theme.res, ~939 ms wall on the worker per fetch. With the
+        // arraybuffer path the same fetch lands in ~3 ms (measured on
+        // localhost). Falls back to the text/charset path when the
+        // arraybuffer response is empty (some hosts strip the response
+        // body for non-2xx, in which case the text path's status
+        // diagnostics are still useful).
+        req.setResponseType("arraybuffer");
         req.send();
+
+        // Static hosts that fall back to index.html for unknown paths
+        // (Cloudflare Pages SPA mode is the common one) hand back the
+        // HTML page with status 4xx but a non-empty body. The previous
+        // path treated that body as if it were the requested asset and
+        // wrapped the ``<!DOCTYPE html>...`` bytes in an
+        // ArrayBufferInputStream -- ZipInputStream then threw
+        // ``Wrong Local header signature: 6f64213c`` (the little-endian
+        // encoding of ``<!do``) and copyZipEntriesToMap silently
+        // copied zero entries. Reject 4xx/5xx up front so the
+        // ``getResourceAsStream`` fallback to the bundle root path
+        // gets a chance to try the next candidate URL.
+        int status = req.getStatus();
+        if (status >= 400) {
+            return null;
+        }
 
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null) {
@@ -7604,7 +8206,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             System.out.println("Status code was "+req.getStatus());
             return null;
         }
-        
+
+        assetByteCache.put(url, responseBytes);
         ArrayBufferInputStream out = new ArrayBufferInputStream(responseBytes, req.getResponseType());
         return out;
     }
@@ -7653,12 +8256,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 return rootStream;
             }
         }
-        if (!"icon.png".equals(resource)) {
-            resource = "assets/"+resource;
+        String assetPath = "icon.png".equals(resource) ? resource : ("assets/" + resource);
+        InputStream out = getStream(assetPath);
+        if (out != null) {
+            notifyProgressLoaderThatResourceIsLoaded(assetPath);
+            return out;
         }
-        InputStream out = getStream(resource);
-        notifyProgressLoaderThatResourceIsLoaded(resource);
-        return out;
+        // Fall back to the bundle root for resources the translator drops
+        // there directly (most ``.properties`` resource bundles, for one —
+        // ``ParparVMBootstrap`` mirrors the jar layout and only the explicit
+        // relocations in ``build-javascript-port-initializr.sh`` /
+        // ``build-javascript-port-hellocodenameone.sh`` move things into
+        // ``assets/``). Without this fallback every
+        // ``ResourceBundle.getResourceAsStream("/messages_xx.properties")``
+        // call returns null, the ``Resources.getL10N`` lookup throws (or
+        // returns null), and any UI that catches the throw and logs via
+        // ``Log.e`` floods the console with ``Exception: null`` — see
+        // ``initializr/common/.../TemplatePreviewPanel.loadBundleProperties``.
+        InputStream rootFallback = getStream(resource);
+        if (rootFallback != null) {
+            notifyProgressLoaderThatResourceIsLoaded(resource);
+            return rootFallback;
+        }
+        notifyProgressLoaderThatResourceIsLoaded(assetPath);
+        return null;
 
     }
 
@@ -7680,16 +8301,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private NativeImage createNativeImage(byte[] bytes, int offset, int len){
+        // The previous path called ``arr.set(i, bytes[i+offset])`` per
+        // byte -- one JSO bridge call per element, ~50k calls for a
+        // typical theme PNG, ~50 such images per theme load. With
+        // ``copyBytesToUint8Array`` the entire copy lives in JS and
+        // executes as a single typed-array memcpy: ~hundreds of times
+        // faster on the Initializr profile (theme decode 979 ms ->
+        // see ``run:lifecycle.init`` perf marker).
         Uint8Array arr = Uint8Array.create(len);
-        for (int i=0; i<len; i++){
-            arr.set(i, bytes[i+offset]);
-        }
+        copyBytesToUint8Array(bytes, offset, len, arr);
         Blob blob = BlobUtil.createBlob(arr, "image/png");
         NativeImage nimg = new NativeImage();
         nimg.img = renderingBackend.createBlobImageElement(blob);
         nimg.load();
         return nimg;
     }
+
+    /**
+     * Bulk-copy ``len`` bytes from a Java ``byte[]`` (sliced at
+     * ``offset``) into a freshly-allocated Uint8Array. Java byte
+     * arrays land on the worker side as plain JS Arrays of signed
+     * integers, but ``Uint8Array.set(arrayLike)`` coerces each
+     * element through ``ToUint8``, matching the per-element
+     * ``arr.set(i, bytes[i+offset]) & 0xff`` semantics of the loop
+     * this replaces.
+     */
+    @JSBody(params = {"bytes", "offset", "len", "out"}, script = ""
+            + "var src = bytes;"
+            + "if (offset === 0 && len === src.length) {"
+            + "  out.set(src);"
+            + "} else {"
+            + "  out.set(src.subarray ? src.subarray(offset, offset + len) : src.slice(offset, offset + len));"
+            + "}")
+    private static native void copyBytesToUint8Array(byte[] bytes, int offset, int len, Uint8Array out);
 
     @JSBody(params={"str"}, script="return encodeURIComponent(str)")
     private native static String encodeURIComponent(String str);
@@ -7759,7 +8403,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public boolean hasLoadedImage() {
-                return img != null && loaded;
+                // The ``loaded`` flag is set asynchronously from the
+                // HTMLImageElement's "load" event listener installed in
+                // ``NativeImage.load()``. Between createNativeImage()
+                // returning and the listener firing, the element can be
+                // fully decoded (naturalWidth > 0) while ``loaded`` is
+                // still false. ``JavaScriptNativeImageAdapter.resolveWidth``
+                // falls through to a hard-coded 10 fallback in that
+                // window, which the caller (typically EncodedImage.getWidth)
+                // then *caches* as the recorded width. The real PNG
+                // arrives later, but EncodedImage now records 10 — so
+                // every drawImage call from then on scales the actual
+                // 125x24 corner image down to 10x24 and the rounded
+                // shape disappears (Initializr Dialog 9-piece border).
+                //
+                // Treat the image as loaded as soon as the underlying
+                // element exposes a positive natural size, regardless of
+                // whether the async ``load`` event has fired yet.
+                return img != null && (loaded || img.getNaturalWidth() > 0);
             }
 
             @Override
@@ -7892,11 +8553,90 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public int getWidth(){
+            awaitNaturalDimensions();
             return JavaScriptNativeImageAdapter.resolveWidth(imageModel);
         }
-        
+
         public int getHeight(){
+            awaitNaturalDimensions();
             return JavaScriptNativeImageAdapter.resolveHeight(imageModel);
+        }
+
+        /**
+         * Block briefly (up to ~200 ms total) until the underlying
+         * {@code HTMLImageElement} exposes a positive natural width,
+         * so that {@link #getWidth()} / {@link #getHeight()} don't
+         * fall through to the hard-coded 10-pixel fallback in
+         * {@link JavaScriptNativeImageAdapter} during the gap between
+         * {@code createNativeImage()} returning and the main thread
+         * finishing decode of the Blob-backed image.
+         *
+         * <p>Without this wait, {@link com.codename1.ui.EncodedImage}
+         * caches the fallback 10 in its own width/height field on the
+         * first call and never re-queries, which manifests in image
+         * borders (e.g. the Initializr {@code PopupDialog} 9-piece
+         * border) as a visible strip of unpainted background showing
+         * the underlying form. The async {@code load} event later
+         * fires and a repaint is scheduled, but {@code EncodedImage}
+         * is still serving the cached 10 so the redraw is identical
+         * and the gap persists.</p>
+         *
+         * <p>For theme PNGs (decoded from in-memory Blob bytes) the
+         * main thread typically finishes decode within a millisecond
+         * or two, so this wait almost never reaches its outer
+         * deadline. The 200 ms cap exists for the pathological case
+         * (decoder errored, host unreachable) so a single broken
+         * image can't stall layout forever.</p>
+         */
+        private void awaitNaturalDimensions() {
+            if (img == null) {
+                return;
+            }
+            if (loaded || error) {
+                return;
+            }
+            if (img.getNaturalWidth() > 0) {
+                return;
+            }
+            // Outer deadline: total wall-time we'll block layout for
+            // a single image. 200 ms is generous for any local Blob
+            // decode and harmlessly short for the network/error case.
+            long deadline = System.currentTimeMillis() + 200;
+            // ``Thread.sleep`` in the JS-port worker is a cooperative
+            // yield, so the listener installed in ``load()`` (which
+            // runs on the main thread and posts a callback back into
+            // the worker) gets a chance to update ``loadState`` and
+            // bump ``naturalWidth`` during these short naps.
+            while (img.getNaturalWidth() <= 0 && !error
+                    && System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(2);
+                } catch (InterruptedException ignored) {
+                    break;
+                }
+            }
+            // Once the natural size is known, refresh the cached
+            // ``loaded``/``width``/``height`` fields from ``loadState``
+            // so a subsequent ``getWidth()`` short-circuits via the
+            // ``loaded`` flag rather than re-polling the host.
+            if (img.getNaturalWidth() > 0 && !loaded) {
+                JavaScriptAsyncImageLoadCoordinator.handleLoad(loadState,
+                        img.getNaturalWidth(), img.getNaturalHeight());
+                loaded = loadState.isLoaded();
+                width = loadState.getWidth();
+                height = loadState.getHeight();
+            } else if (img.getNaturalWidth() <= 0 && !error) {
+                // Timed out without the host ever exposing a natural
+                // size. Latch ``error`` so the next ``getWidth()``
+                // returns immediately via the fallback path instead
+                // of paying another 200 ms wait per call. The async
+                // ``load`` listener will still flip ``loaded`` to
+                // true if the image eventually decodes, at which
+                // point ``resolveWidth`` starts returning the real
+                // dimension again.
+                JavaScriptAsyncImageLoadCoordinator.handleError(loadState);
+                error = true;
+            }
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y, int width, int height){

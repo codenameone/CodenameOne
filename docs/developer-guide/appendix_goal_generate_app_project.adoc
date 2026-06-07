@@ -7,7 +7,7 @@ Generates a Maven project using the <<cn1app-archetype>> as a basis, and applyin
 
 This goal shouldn't be run inside an existing Maven project directory. It will output a project into a directory named after the `artifactId` parameter.
 
-Because there is no existing project, you will need to provide the full maven path to the goal.
+Because there is no existing project, you will need to provide the full maven path to the goal:
 
 [source,bash]
 ----
@@ -20,7 +20,7 @@ mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-app-project \
 
 NOTE: Substitute the https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[latest Codename One plugin version] for the `$CN1VERSION` in the above example.
 
-NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
 In the above example, assuming all went well, it would output your project into a directory named `myapp`.
 
@@ -110,7 +110,7 @@ template.type=maven
 
 ==== Sample: The bare-bones Kotlin app project
 
-As a fuller example of a project template, see the https://github.com/shannah/cn1app-archetype-kotlin-template/blob/master/generate-app-project.rpf[generate-app-project.rpf] file in the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones kotlin app template].
+As a fuller example of a project template, see the https://github.com/shannah/cn1app-archetype-kotlin-template/blob/master/generate-app-project.rpf[generate-app-project.rpf] file in the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones Kotlin app template].
 
 This is the template that's used in https://www.codenameone.com/initializr[Codename One initializr] for the Bare-bones Kotlin project.
 

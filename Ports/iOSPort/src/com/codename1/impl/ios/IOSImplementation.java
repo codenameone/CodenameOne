@@ -90,6 +90,13 @@ import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.BackgroundWorker;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.push.PushAction;
 import com.codename1.push.PushActionCategory;
@@ -114,6 +121,7 @@ import com.codename1.util.Simd;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.util.Collections;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 
@@ -323,7 +331,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return nativeInstance.isTablet();
+        return isDesktop() || nativeInstance.isTablet();
+    }
+
+    @Override
+    public boolean isDesktop() {
+        return nativeInstance.isRunningOnMac();
     }
     
     @Override
@@ -355,6 +368,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         screenshotCallback = callback;
         try {
+            forceScreenRenderForCapture();
             nativeInstance.screenshot();
         } catch (Throwable t) {
             screenshotCallback = null;
@@ -365,6 +379,43 @@ public class IOSImplementation extends CodenameOneImplementation {
                     callback.onSucess(null);
                 }
             });
+        }
+    }
+
+    /// On Mac Catalyst (desktop) the native capture reads pixels back from the
+    /// Metal screenTexture (see cn1_copyMetalScreenTextureImage in IOSNative.m),
+    /// which is the genuine on-screen render target. On the headless Catalyst
+    /// window a static form's show() doesn't reliably re-drive a screen frame
+    /// (no display-link present), so the screenTexture can still hold an earlier
+    /// form. Animated screens flush continuously and are fine; static ones are
+    /// not. Force the current form through the real EDT screen-render pipeline
+    /// -- the same paintComponent-to-screen + flushGraphics that paintDirty()
+    /// runs -- so the texture reflects the live UI before we capture it. This
+    /// renders through the actual Metal draw path (not an off-screen re-paint),
+    /// so the screenshot remains a genuine test of the display pipeline.
+    private void forceScreenRenderForCapture() {
+        if (!isDesktop()) {
+            return;
+        }
+        final Runnable paintAndFlush = new Runnable() {
+            @Override
+            public void run() {
+                Form f = Display.getInstance().getCurrent();
+                if (f == null) {
+                    return;
+                }
+                Graphics wrapper = getCodenameOneGraphics();
+                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                wrapper.resetAffine();
+                wrapper.setClip(0, 0, getDisplayWidth(), getDisplayHeight());
+                f.paintComponent(wrapper, true);
+                flushGraphics();
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            paintAndFlush.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(paintAndFlush);
         }
     }
 
@@ -811,7 +862,144 @@ public class IOSImplementation extends CodenameOneImplementation {
             stopTextEditing();
         }
         super.setCurrentForm(f);
+        syncMacWindowAppearance(f);
+        syncMacDesktopChrome(f);
+        // Push the form title to the OS window for every desktop mode (unchanged from before); in
+        // "custom" mode the title bar is hidden so this is invisible but harmless.
+        if (isDesktop() && f != null && !(f instanceof Dialog)) {
+            pushMacWindowTitle(f);
+        }
+    }
 
+    @Override
+    public boolean isNativeTitle() {
+        // On Mac Catalyst, only the "native" desktop title-bar mode puts the form title into the OS
+        // window title bar (and hides the CN1 Toolbar). In "custom" mode the visible Toolbar is the
+        // title bar, so the OS title is not used. Opt-in only: defaults to toolbar (unchanged).
+        return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
+    // native call is only made when the mode actually changes.
+    private String lastMacChromeMode;
+
+    /// Applies the desktop title-bar mode to the host macOS window chrome: the {@code custom} mode
+    /// undecorates the window so the CN1 Toolbar becomes the title bar. The {@code native} and
+    /// {@code toolbar} modes leave the window chrome completely untouched, so existing Catalyst apps
+    /// are byte-for-byte unaffected. No-op off the Mac desktop.
+    private void syncMacDesktopChrome(Form f) {
+        if (f == null || !isDesktop()) {
+            return;
+        }
+        String mode = getDesktopTitleBarMode();
+        if (mode.equals(lastMacChromeMode)) {
+            return;
+        }
+        lastMacChromeMode = mode;
+        // Only the "custom" mode touches the native window. Non-custom modes never call into the
+        // native chrome, preserving the exact prior window appearance for existing apps.
+        if ("custom".equals(mode)) {
+            nativeInstance.setMacWindowUndecorated(true);
+        }
+    }
+
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        // Opt-in via the desktop.titleBar build hint (codename1.arg.desktop.titleBar), surfaced as a
+        // Display property by the generated iOS stub. Default toolbar = unchanged legacy behavior.
+        return Display.getInstance().getProperty("desktop.titleBar", "toolbar");
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        Form f = getCurrentForm();
+        if (f != null && isDesktop() && !(f instanceof Dialog)) {
+            pushMacWindowTitle(f);
+        }
+    }
+
+    private void pushMacWindowTitle(Form f) {
+        String t = f.getTitle();
+        nativeInstance.setWindowTitle(t == null ? "" : t);
+    }
+
+    // Commands currently exposed in the Mac native menu, index-aligned with the labels pushed to
+    // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
+    private static List<com.codename1.ui.Command> macNativeCommands;
+
+    @Override
+    public void setNativeCommands(Vector commands) {
+        if (!isDesktop()) {
+            return;
+        }
+        ArrayList<com.codename1.ui.Command> filtered = new ArrayList<com.codename1.ui.Command>();
+        // Encode one row per command as "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>",
+        // rows separated by '\n'. The native side groups rows into the matching standard macOS menus
+        // (App/File/Edit/View/Window/Help) or a top-level menu named by the hint; an empty hint means
+        // the default commands menu. A non-zero shortcutKeyChar produces a UIKeyCommand so the menu
+        // item shows (and responds to) the keyboard accelerator.
+        StringBuilder sb = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (!(o instanceof com.codename1.ui.Command)) {
+                    continue;
+                }
+                com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                String name = c.getCommandName();
+                if (name == null || name.length() == 0) {
+                    continue;
+                }
+                String hint = c.getDesktopMenu();
+                if (hint == null) {
+                    hint = "";
+                }
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append(hint).append('\t').append(name).append('\t')
+                        .append(c.getDesktopShortcutKeyChar()).append('\t')
+                        .append(c.getDesktopShortcutModifiers());
+                filtered.add(c);
+            }
+        }
+        macNativeCommands = filtered;
+        nativeInstance.setNativeMenuCommands(sb.toString());
+    }
+
+    /**
+     * Invoked from the native Mac menu action when the user selects the command at the given
+     * index. Dispatches the corresponding Codename One command on the EDT.
+     */
+    public static void fireMacMenuCommand(final int index) {
+        final List<com.codename1.ui.Command> cmds = macNativeCommands;
+        if (cmds == null || index < 0 || index >= cmds.size()) {
+            return;
+        }
+        final com.codename1.ui.Command c = cmds.get(index);
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                c.actionPerformed(new ActionEvent(c));
+            }
+        });
+    }
+
+    private Boolean lastMacWindowDark;
+    private void syncMacWindowAppearance(Form f) {
+        if (f == null || !isDesktop()) return;
+        int bg = f.getContentPane().getStyle().getBgColor();
+        int r = (bg >> 16) & 0xff;
+        int g = (bg >> 8) & 0xff;
+        int b = bg & 0xff;
+        int luma = (r * 299 + g * 587 + b * 114) / 1000;
+        boolean dark = luma < 128;
+        if (lastMacWindowDark != null && lastMacWindowDark.booleanValue() == dark) return;
+        lastMacWindowDark = Boolean.valueOf(dark);
+        nativeInstance.setMacWindowDarkAppearance(dark);
     }
 
     @Override
@@ -1207,6 +1395,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void flushGraphics(int x, int y, int width, int height) {
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
+        if (isDesktop()) {
+            // Form-show isn't the only path that changes dark mode -- a theme
+            // refresh or a system appearance toggle re-styles the contentPane
+            // without dropping a new Form on the EDT. Re-check after every
+            // flush so the host NSWindow titlebar tracks the live form.
+            // syncMacWindowAppearance is no-op when the state hasn't changed.
+            syncMacWindowAppearance(Display.getInstance().getCurrent());
+        }
     }
 
     private final static int[] singleDimensionX = new int[1];
@@ -1352,6 +1548,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new IOSWifiPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new IOSBonjourPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new IOSNetworkTypePlatform();
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return nativeInstance.isLargerTextEnabled();
     }
@@ -1465,7 +1676,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 InputStream in = getResourceAsStream("/iOSModernTheme.res");
                 if (in != null) {
                     r = Resources.open(in);
-                    UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    injectDesktopThemeConstants(tp);
+                    UIManager.getInstance().setThemeProps(tp);
                     return;
                 }
                 // Modern theme isn't in the jar (e.g. framework build hasn't
@@ -1477,14 +1690,34 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(!nativeInstance.isIOS7()) {
                     tp.put("TitleArea.padding", "0,0,0,0");
                 }
+                injectDesktopThemeConstants(tp);
                 UIManager.getInstance().setThemeProps(tp);
                 return;
             }
             // "legacy" / "iphone" / anything else: pre-flat iPhone theme.
             r = Resources.open("/iPhoneTheme.res");
-            UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
+            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            injectDesktopThemeConstants(tp);
+            UIManager.getInstance().setThemeProps(tp);
         } catch (IOException ex) {
             ex.printStackTrace();
+        }
+    }
+
+    /**
+     * On Mac Catalyst (isDesktop()) the app should feel like a desktop app: enable the
+     * cross-platform interactive scrollbars and the native window chrome (OS title bar +
+     * native menu bar). These theme constants are injected only on the desktop so iOS
+     * phones/tablets are unaffected. Mirrors JavaSEPort.injectDesktopThemeConstants.
+     */
+    private void injectDesktopThemeConstants(Hashtable tp) {
+        if (tp == null || !isDesktop()) {
+            return;
+        }
+        // Opt-in via the desktop.interactiveScrollbars build hint; default off so existing Catalyst
+        // apps render scrollbars exactly as before.
+        if ("true".equalsIgnoreCase(Display.getInstance().getProperty("desktop.interactiveScrollbars", "false"))) {
+            tp.put("@interactiveScrollBool", "true");
         }
     }
 
@@ -1720,8 +1953,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         Rectangle bounds = shape.getBounds();
         if ( shape.isRectangle() || bounds.getWidth() <= 0 || bounds.getHeight() <= 0){
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
-        } else if (shape.isPolygon()) {
-            int pointsSize = shape.getPointsSize();
+            return;
+        }
+        // Curved clips (anything containing QUADTO / CUBICTO) get
+        // flattened first so the polygon path below sees real polyline
+        // vertices instead of interleaved control / anchor pairs. Without
+        // this, setClip(circularPath) reaches the native side as 17 raw
+        // floats that include 8 outside-the-curve control points, and
+        // the triangle-fan stencil writer turns the circle into the
+        // visible "triangle clip" on gradient_circle.svg and
+        // clipped_badge.svg (see SVGStaticScreenshotTest).
+        ClipShape polyShape = flattenClipShapeIfNeeded(shape);
+        if (polyShape.isPolygon()) {
+            int pointsSize = polyShape.getPointsSize();
             // Reallocate when the buffer doesn't EXACTLY match -- previously
             // this only reallocated when undersized, so a smaller polygon
             // reused a larger buffer and the trailing slots retained the
@@ -1734,23 +1978,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (polygonPointsBuffer == null || polygonPointsBuffer.length != pointsSize) {
                 polygonPointsBuffer = new float[pointsSize];
             }
-            shapeToPolygon(shape, polygonPointsBuffer);
+            shapeToPolygon(polyShape, polygonPointsBuffer);
             nativeInstance.setNativeClippingPolygonGlobal(polygonPointsBuffer);
         } else {
-            
+            // The path didn't reduce to a polygon (still has multiple
+            // disjoint sub-paths or other oddities). Fall back to the
+            // alpha-mask Renderer; on the GL backend this paints the
+            // shape into the stencil, on the Metal backend the texture
+            // handle isn't compatible with MTLTexture and the bounding
+            // box is used as a coarse fallback (see ClipRect.m).
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
             if ( mask == null ){
                 mask = (TextureAlphaMask)this.createAlphaMask(shape, null);
                 textureCache.add(shape, null, mask);
             }
-            
+
            if ( mask != null ){
-               //Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
                 nativeInstance.setNativeClippingMaskGlobal(mask.getTextureName(), mask.getBounds().getX(), mask.getBounds().getY(), mask.getBounds().getWidth(), mask.getBounds().getHeight());
             } else {
                Log.p("Failed to create texture mask for clipping region");
             }
-            
+
         }
     }
 
@@ -2302,7 +2550,184 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new RuntimeException("shapeToPolygon requires out array at least the size of the points in the polygon.  Requires "+size+" but found "+pointsOut.length);
         }
         shape.getPoints(pointsOut);
-        
+
+    }
+
+    // Reusable buffer for flattening curves into a polyline GeneralPath
+    // before handing the clip down to the native polygon path. Reused
+    // across clip applications to avoid per-frame allocation.
+    private GeneralPath flattenedClipPath;
+    private ClipShape flattenedClipShape;
+
+    /// Walks `src` and builds a polyline GeneralPath in `dst` by replacing
+    /// every QUADTO / CUBICTO with a chain of straight LINETO segments
+    /// produced by midpoint subdivision. The native iOS clip pipeline
+    /// (GL ES2 FillPolygon and Metal CN1MetalApplyPolygonStencilClip) both
+    /// consume their input as a flat polygon: the only points they look
+    /// at are the (x, y) pairs in the buffer. When the source path is a
+    /// curve (e.g. a circle built from arc() emits 8 quadTos) the raw
+    /// points buffer contains alternating control / anchor pairs, and the
+    /// stencil writer treats every control point as a real polygon
+    /// vertex. The result is the degenerate "triangle clip" described in
+    /// the SVG tests on gradient_circle.svg / clipped_badge.svg. Flatten
+    /// first so only true vertices survive.
+    private void flattenShapeToPolyline(Shape src, GeneralPath dst) {
+        dst.reset();
+        PathIterator it = src.getPathIterator();
+        dst.setWindingRule(it.getWindingRule());
+        float[] coords = new float[6];
+        float curX = 0f, curY = 0f, moveX = 0f, moveY = 0f;
+        while (!it.isDone()) {
+            int seg = it.currentSegment(coords);
+            switch (seg) {
+                case PathIterator.SEG_MOVETO:
+                    dst.moveTo(coords[0], coords[1]);
+                    curX = moveX = coords[0];
+                    curY = moveY = coords[1];
+                    break;
+                case PathIterator.SEG_LINETO:
+                    dst.lineTo(coords[0], coords[1]);
+                    curX = coords[0];
+                    curY = coords[1];
+                    break;
+                case PathIterator.SEG_QUADTO:
+                    flattenQuadInto(dst, curX, curY, coords[0], coords[1], coords[2], coords[3], 0);
+                    curX = coords[2];
+                    curY = coords[3];
+                    break;
+                case PathIterator.SEG_CUBICTO:
+                    flattenCubicInto(dst, curX, curY,
+                            coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], 0);
+                    curX = coords[4];
+                    curY = coords[5];
+                    break;
+                case PathIterator.SEG_CLOSE:
+                    dst.closePath();
+                    curX = moveX;
+                    curY = moveY;
+                    break;
+            }
+            it.next();
+        }
+    }
+
+    // Squared distance threshold (in user-space units) for the
+    // subdivision flatness test. 0.25 px is well below 1 device pixel
+    // even after the typical retina upscale and matches the precision of
+    // the alpha-mask Renderer used by the rest of the iOS port.
+    private static final float FLATTEN_TOLERANCE_SQ = 0.25f * 0.25f;
+    // Safety cap on the recursion depth. 18 = 2^18 sub-segments which is
+    // far past anything a real SVG path needs; the flatness test should
+    // always converge well before this.
+    private static final int FLATTEN_MAX_DEPTH = 18;
+
+    private static void flattenQuadInto(GeneralPath dst,
+                                        float x0, float y0,
+                                        float x1, float y1,
+                                        float x2, float y2,
+                                        int depth) {
+        // Distance from the control point to the chord P0-P2. For a
+        // quadratic Bezier the maximum deviation between the curve and
+        // its chord is bounded by half the control-point-to-chord
+        // distance, so testing the control point against the threshold
+        // is a safe (slightly conservative) flatness criterion.
+        float dx = x2 - x0;
+        float dy = y2 - y0;
+        float lenSq = dx * dx + dy * dy;
+        float distSq;
+        if (lenSq < 1e-6f) {
+            distSq = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
+        } else {
+            float cross = (x1 - x0) * dy - (y1 - y0) * dx;
+            distSq = (cross * cross) / lenSq;
+        }
+        if (distSq <= FLATTEN_TOLERANCE_SQ || depth >= FLATTEN_MAX_DEPTH) {
+            dst.lineTo(x2, y2);
+            return;
+        }
+        float mx1 = (x0 + x1) * 0.5f, my1 = (y0 + y1) * 0.5f;
+        float mx2 = (x1 + x2) * 0.5f, my2 = (y1 + y2) * 0.5f;
+        float mx = (mx1 + mx2) * 0.5f, my = (my1 + my2) * 0.5f;
+        flattenQuadInto(dst, x0, y0, mx1, my1, mx, my, depth + 1);
+        flattenQuadInto(dst, mx, my, mx2, my2, x2, y2, depth + 1);
+    }
+
+    private static void flattenCubicInto(GeneralPath dst,
+                                         float x0, float y0,
+                                         float x1, float y1,
+                                         float x2, float y2,
+                                         float x3, float y3,
+                                         int depth) {
+        // Max distance from either inner control point to the chord
+        // P0-P3. A cubic curve never strays farther than its furthest
+        // control point from its chord, so the larger of the two
+        // perpendicular distances is a conservative flatness bound.
+        float dx = x3 - x0;
+        float dy = y3 - y0;
+        float lenSq = dx * dx + dy * dy;
+        float d1Sq, d2Sq;
+        if (lenSq < 1e-6f) {
+            d1Sq = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
+            d2Sq = (x2 - x0) * (x2 - x0) + (y2 - y0) * (y2 - y0);
+        } else {
+            float c1 = (x1 - x0) * dy - (y1 - y0) * dx;
+            float c2 = (x2 - x0) * dy - (y2 - y0) * dx;
+            d1Sq = (c1 * c1) / lenSq;
+            d2Sq = (c2 * c2) / lenSq;
+        }
+        float distSq = d1Sq > d2Sq ? d1Sq : d2Sq;
+        if (distSq <= FLATTEN_TOLERANCE_SQ || depth >= FLATTEN_MAX_DEPTH) {
+            dst.lineTo(x3, y3);
+            return;
+        }
+        float mx01 = (x0 + x1) * 0.5f, my01 = (y0 + y1) * 0.5f;
+        float mx12 = (x1 + x2) * 0.5f, my12 = (y1 + y2) * 0.5f;
+        float mx23 = (x2 + x3) * 0.5f, my23 = (y2 + y3) * 0.5f;
+        float mxA = (mx01 + mx12) * 0.5f, myA = (my01 + my12) * 0.5f;
+        float mxB = (mx12 + mx23) * 0.5f, myB = (my12 + my23) * 0.5f;
+        float mx = (mxA + mxB) * 0.5f, my = (myA + myB) * 0.5f;
+        flattenCubicInto(dst, x0, y0, mx01, my01, mxA, myA, mx, my, depth + 1);
+        flattenCubicInto(dst, mx, my, mxB, myB, mx23, my23, x3, y3, depth + 1);
+    }
+
+    // True if the path has only MOVETO / LINETO / CLOSE segments, i.e.
+    // it is already a polyline and flattening would just copy it.
+    private boolean isAlreadyFlat(Shape s) {
+        if (s instanceof ClipShape && ((ClipShape) s).isRect()) {
+            return true;
+        }
+        PathIterator it = s.getPathIterator();
+        float[] coords = new float[6];
+        while (!it.isDone()) {
+            int seg = it.currentSegment(coords);
+            if (seg == PathIterator.SEG_QUADTO || seg == PathIterator.SEG_CUBICTO) {
+                return false;
+            }
+            it.next();
+        }
+        return true;
+    }
+
+    // Flatten if necessary and return the ClipShape that should be sent
+    // through the native polygon clip path. When the input is already a
+    // polyline (the common case for rectangular clipRect intersections
+    // built by NativeGraphics.clipRect) the input is returned as-is. The
+    // returned ClipShape is reused across calls (not shared with the
+    // input), so callers must finish reading from it before the next
+    // clip is applied.
+    private ClipShape flattenClipShapeIfNeeded(ClipShape src) {
+        if (isAlreadyFlat(src)) {
+            return src;
+        }
+        if (flattenedClipPath == null) {
+            flattenedClipPath = new GeneralPath();
+        }
+        flattenShapeToPolyline(src, flattenedClipPath);
+        if (flattenedClipShape == null) {
+            flattenedClipShape = new ClipShape();
+        }
+        flattenedClipShape.setShape(flattenedClipPath, null);
+        return flattenedClipShape;
     }
     /*
     public void drawConvexPolygon(Object graphics, Shape shape, Stroke stroke, int color, int alpha){
@@ -3333,6 +3758,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private IOSBiometrics biometrics;
     private IOSSecureStorage secureStorage;
+    private IOSNfc nfc;
 
     @Override
     public com.codename1.security.Biometrics getBiometrics() {
@@ -3348,6 +3774,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             secureStorage = new IOSSecureStorage(nativeInstance);
         }
         return secureStorage;
+    }
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        if (nfc == null) {
+            nfc = new IOSNfc(nativeInstance);
+        }
+        return nfc;
     }
 
     public LocationManager getLocationManager() {
@@ -3454,6 +3888,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
+    }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new IOSCameraImpl();
     }
 
     @Override
@@ -5003,18 +5442,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         void setNativeClipping(ClipShape shape){
-            
+
             if (shape.isRect()) {
                 shape.getBounds(reusableRect);
                 setNativeClippingMutable(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
-                
+
             } else {
-                int commandsLen = shape.getTypesSize();
-                int pointsLen = shape.getPointsSize();
+                // The native side (setNativeClippingShapeMutableImpl in
+                // CodenameOne_GLViewController.m) ignores the commands
+                // array and treats every (x, y) pair in the points buffer
+                // as a polygon vertex. For a path with curves that means
+                // control points appear as polygon vertices, producing
+                // the SVG "triangle clip" symptom for gradient_circle.svg
+                // and clipped_badge.svg. Flatten on the Java side so the
+                // points buffer contains only true polyline vertices.
+                ClipShape polyShape = flattenClipShapeIfNeeded(shape);
+                int commandsLen = polyShape.getTypesSize();
+                int pointsLen = polyShape.getPointsSize();
                 byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
                 float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
-                shape.getTypes(commandsArr);
-                shape.getPoints(pointsArr);
+                polyShape.getTypes(commandsArr);
+                polyShape.getPoints(pointsArr);
                 nativeInstance.setNativeClippingMutable(commandsLen, commandsArr, pointsLen, pointsArr);
             }
         }
@@ -8295,7 +8743,15 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public InputStream openInputStream(Object connection) throws IOException {
         if(connection instanceof String) {
-            BufferedInputStream o = new BufferedInputStream(new NSFileInputStream((String)connection), (String)connection);
+            // Match openFileInputStream(String): if the path is missing, throw
+            // a FileNotFoundException instead of silently opening an empty
+            // NSFileInputStream (which Apple's fileHandleForReadingAtPath:
+            // returns when the file does not exist). See #1502.
+            String path = (String) connection;
+            if(!nativeInstance.fileExists(path)) {
+                throw new FileNotFoundException("File not found: " + path);
+            }
+            BufferedInputStream o = new BufferedInputStream(new NSFileInputStream(path), path);
             return o;
         }
         NetworkConnection n = (NetworkConnection)connection;
@@ -8687,7 +9143,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     public InputStream openFileInputStream(String file) throws IOException {
         file = unfile(file);
         if(!nativeInstance.fileExists(file)) {
-            throw new IOException("File not found: " + file);
+            // FileNotFoundException is more precise than IOException and
+            // matches what FileInputStream throws on JavaSE, so callers can
+            // distinguish "missing" from other I/O errors. See #1502.
+            throw new FileNotFoundException("File not found: " + file);
         }
         return new BufferedInputStream(new NSFileInputStream(file), file);
     }
@@ -8917,6 +9376,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public static void setMainClass(Object main) {
+        setCurrentApplicationInstance(main);
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
         }
@@ -9404,22 +9864,72 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){
-        if(image != null && image.length() > 0) {
+        share(text, image, mimeType, sourceRect, null);
+    }
+
+    @Override
+    public void share(String text, String image, String mimeType, Rectangle sourceRect, com.codename1.share.ShareResultListener listener) {
+        long imagePeer = 0;
+        if (image != null && image.length() > 0) {
             try {
                 Image img = Image.createImage(image);
-                if(img == null) {
-                    nativeInstance.socialShare(text, 0, sourceRect );
+                if (img != null) {
+                    NativeImage n = (NativeImage) img.getImage();
+                    imagePeer = n.peer;
+                }
+            } catch (IOException err) {
+                err.printStackTrace();
+                if (listener != null) {
+                    listener.onResult(com.codename1.share.ShareResult.failed("Error loading image: " + image));
                     return;
                 }
-                NativeImage n = (NativeImage)img.getImage();
-                nativeInstance.socialShare(text, n.peer, sourceRect);
-            } catch(IOException err) {
-                err.printStackTrace();
                 Dialog.show("Error", "Error loading image: " + image, "OK", null);
+                return;
             }
-        } else {
-            nativeInstance.socialShare(text, 0, sourceRect);
         }
+        if (listener == null) {
+            nativeInstance.socialShare(text, imagePeer, sourceRect);
+            return;
+        }
+        int callbackId = registerShareCallback(listener);
+        nativeInstance.socialShareWithCallback(text, imagePeer, sourceRect, callbackId);
+    }
+
+    // Pending share-result callbacks. Native code invokes
+    // socialShareCallback(...) once per id.
+    private static final java.util.HashMap<Integer, com.codename1.share.ShareResultListener> pendingShareCallbacks = new java.util.HashMap<Integer, com.codename1.share.ShareResultListener>();
+    private static int nextShareCallbackId = 1;
+
+    private static synchronized int registerShareCallback(com.codename1.share.ShareResultListener l) {
+        int id = nextShareCallbackId++;
+        pendingShareCallbacks.put(Integer.valueOf(id), l);
+        return id;
+    }
+
+    /// Invoked from native code with the outcome of a share. Public so the
+    /// VM-emitted symbol stays stable. `status` matches
+    /// [com.codename1.share.ShareResult]: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
+    public static void socialShareCallback(int callbackId, int status, String activityType, String errorMessage) {
+        com.codename1.share.ShareResultListener listener;
+        synchronized (IOSImplementation.class) {
+            listener = pendingShareCallbacks.remove(Integer.valueOf(callbackId));
+        }
+        if (listener == null) {
+            return;
+        }
+        com.codename1.share.ShareResult result;
+        switch (status) {
+            case 1:
+                result = com.codename1.share.ShareResult.sharedTo(activityType);
+                break;
+            case 2:
+                result = com.codename1.share.ShareResult.dismissed();
+                break;
+            default:
+                result = com.codename1.share.ShareResult.failed(errorMessage);
+                break;
+        }
+        listener.onResult(result);
     }
 
     private Purchase pur;
@@ -9860,30 +10370,257 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new IOSWebSocketImpl(url);
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        nativeInstance.writeToSocketStream(((Long)socket).longValue(), data, offset, len);
+    }
+
+    @Override
     public void splitString(String source, char separator, ArrayList<String> out) {
         nativeInstance.splitString(source, separator, out);
     }
    
     public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
-        
-        nativeInstance.sendLocalNotification(
-                n.getId(),
-                n.getAlertTitle(),
-                n.getAlertBody(),
-                n.getAlertSound(),
-                n.getBadgeNumber(),
-                firstTime,
-                repeat,
-                n.isForeground()
-        );
-        
-       
+        boolean enriched = !n.getActions().isEmpty() || n.getGroupId() != null
+                || n.isTimeSensitive() || (n.getAlertImage() != null && n.getAlertImage().length() > 0);
+        if (enriched) {
+            String categoryId = null;
+            String actionsEncoded = null;
+            if (!n.getActions().isEmpty()) {
+                categoryId = "cn1-ln-" + n.getId();
+                StringBuilder sb = new StringBuilder();
+                for (LocalNotification.Action a : n.getActions()) {
+                    if (sb.length() > 0) {
+                        sb.append('\u0002');
+                    }
+                    sb.append(nullToEmpty(a.getId())).append('\u0001')
+                      .append(nullToEmpty(a.getTitle())).append('\u0001')
+                      .append(nullToEmpty(a.getTextInputPlaceholder())).append('\u0001')
+                      .append(nullToEmpty(a.getTextInputButtonText()));
+                }
+                actionsEncoded = sb.toString();
+            }
+            nativeInstance.sendLocalNotification2(
+                    n.getId(), n.getAlertTitle(), n.getAlertBody(), n.getAlertSound(),
+                    n.getBadgeNumber(), firstTime, repeat, n.isForeground(),
+                    categoryId, n.getGroupId(), n.isTimeSensitive(), n.getAlertImage(), actionsEncoded);
+        } else {
+            nativeInstance.sendLocalNotification(
+                    n.getId(),
+                    n.getAlertTitle(),
+                    n.getAlertBody(),
+                    n.getAlertSound(),
+                    n.getBadgeNumber(),
+                    firstTime,
+                    repeat,
+                    n.isForeground()
+            );
+        }
     }
 
-   
-    
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
     public void cancelLocalNotification(String id) {
          nativeInstance.cancelLocalNotification(id);
+    }
+
+    // ---- notification permission ----
+
+    private static NotificationPermissionCallback pendingNotificationPermissionCallback;
+
+    @Override
+    public void requestNotificationPermission(NotificationPermissionRequest request, NotificationPermissionCallback callback) {
+        pendingNotificationPermissionCallback = callback;
+        nativeInstance.requestNotificationPermission(request == null ? 7 : request.toAuthorizationOptionsMask());
+    }
+
+    /// Invoked from native once the authorization request resolves. authLevel is the
+    /// ordinal of NotificationPermissionResult.AuthorizationLevel as produced by the
+    /// native UNAuthorizationStatus mapping (granted is derived from the level).
+    public static void notificationPermissionResult(final boolean granted, final int authLevel) {
+        final NotificationPermissionCallback cb = pendingNotificationPermissionCallback;
+        pendingNotificationPermissionCallback = null;
+        if (cb != null) {
+            final NotificationPermissionResult.AuthorizationLevel[] levels =
+                    NotificationPermissionResult.AuthorizationLevel.values();
+            final NotificationPermissionResult.AuthorizationLevel level =
+                    (authLevel >= 0 && authLevel < levels.length)
+                            ? levels[authLevel]
+                            : NotificationPermissionResult.AuthorizationLevel.NOT_DETERMINED;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    cb.notificationPermissionResult(new NotificationPermissionResult(level));
+                }
+            });
+        }
+    }
+
+    // ---- constraint-aware background work / processing (BGTaskScheduler) ----
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return nativeInstance.isBackgroundProcessingSupported();
+    }
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return nativeInstance.isBackgroundProcessingSupported();
+    }
+
+    @Override
+    public void scheduleBackgroundWork(WorkRequest request) {
+        // persist worker class and input so the work can be reconstructed after a cold launch
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_CLASS_" + request.getId(), request.getWorkerClass());
+        StringBuilder input = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : request.getInputData().entrySet()) {
+            if (input.length() > 0) {
+                input.append('\u0002');
+            }
+            input.append(e.getKey()).append('\u0001').append(e.getValue());
+        }
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_INPUT_" + request.getId(), input.toString());
+        com.codename1.io.Preferences.set("$$CN1_BGWORK_PERIODIC_" + request.getId(), request.isPeriodic());
+        double earliest = (System.currentTimeMillis() + Math.max(0, request.getInitialDelayMillis())) / 1000.0;
+        nativeInstance.submitBackgroundProcessingTask(request.getId(), earliest,
+                request.isRequiresNetwork() || request.isRequiresUnmeteredNetwork(), request.isRequiresCharging());
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        nativeInstance.cancelBackgroundTask(workId);
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, Runnable task) {
+        if (task != null) {
+            backgroundProcessingRunnables.put(id, task);
+        }
+        double earliest = earliestBeginEpochMs <= 0 ? System.currentTimeMillis() / 1000.0 : earliestBeginEpochMs / 1000.0;
+        nativeInstance.submitBackgroundProcessingTask(id, earliest, requiresNetwork, requiresPower);
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        backgroundProcessingRunnables.remove(id);
+        nativeInstance.cancelBackgroundTask(id);
+    }
+
+    private static final java.util.Map<String, Runnable> backgroundProcessingRunnables = new java.util.HashMap<String, Runnable>();
+
+    /// Invoked from the BGTaskScheduler launch handler. Runs the worker (reconstructed from
+    /// persisted state) or a live processing runnable for the given identifier.
+    public static void runBackgroundProcessing(final String id) {
+        Runnable live = backgroundProcessingRunnables.remove(id);
+        if (live != null) {
+            try {
+                live.run();
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+            return;
+        }
+        String workerClass = com.codename1.io.Preferences.get("$$CN1_BGWORK_CLASS_" + id, null);
+        if (workerClass == null) {
+            return;
+        }
+        try {
+            Class<?> cls = Class.forName(workerClass);
+            BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
+            java.util.Map<String, String> input = new java.util.HashMap<String, String>();
+            String enc = com.codename1.io.Preferences.get("$$CN1_BGWORK_INPUT_" + id, "");
+            if (enc != null && enc.length() > 0) {
+                for (String pair : com.codename1.io.Util.split(enc, "\u0002")) {
+                    int idx = pair.indexOf('\u0001');
+                    if (idx >= 0) {
+                        input.put(pair.substring(0, idx), pair.substring(idx + 1));
+                    }
+                }
+            }
+            final boolean periodic = com.codename1.io.Preferences.get("$$CN1_BGWORK_PERIODIC_" + id, false);
+            worker.performWork(id, input, System.currentTimeMillis() + 25000, new com.codename1.util.Callback<Boolean>() {
+                public void onSucess(Boolean value) {
+                    if (periodic) {
+                        // resubmit to approximate periodic behavior on iOS
+                        instance.nativeInstance.submitBackgroundProcessingTask(id, (System.currentTimeMillis() + 60000) / 1000.0, false, false);
+                    }
+                }
+                public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                    com.codename1.io.Log.e(err);
+                }
+            });
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    @Override
+    public void subscribeToPushTopic(String topic) {
+        com.codename1.io.Log.p("Push topics are not supported on iOS APNs; topic '" + topic
+                + "' must be handled server side");
+    }
+
+    @Override
+    public void unsubscribeFromPushTopic(String topic) {
+        com.codename1.io.Log.p("Push topics are not supported on iOS APNs; topic '" + topic
+                + "' must be handled server side");
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return true;
+    }
+
+    /// Invoked from native (on app activation) with the JSON payload written by the share
+    /// extension. Parses it into a SharedContent and dispatches to the app.
+    public static void fireSharedContentFromNative(String json) {
+        if (json == null || json.length() == 0) {
+            return;
+        }
+        try {
+            com.codename1.io.JSONParser parser = new com.codename1.io.JSONParser();
+            java.util.Map parsed = parser.parseJSON(new java.io.StringReader(json));
+            SharedContent.Builder b = SharedContent.builder();
+            Object subject = parsed.get("subject");
+            if (subject instanceof String) {
+                b.subject((String) subject);
+            }
+            Object items = parsed.get("items");
+            if (items instanceof java.util.List) {
+                for (Object o : (java.util.List) items) {
+                    if (!(o instanceof java.util.Map)) {
+                        continue;
+                    }
+                    java.util.Map item = (java.util.Map) o;
+                    String kind = (String) item.get("kind");
+                    String value = (String) item.get("value");
+                    if ("url".equals(kind)) {
+                        b.addUrl(value);
+                    } else if ("image".equals(kind)) {
+                        b.addImage(null, value, null);
+                    } else if ("file".equals(kind)) {
+                        b.addFile(null, value, null);
+                    } else {
+                        b.addText(value);
+                    }
+                }
+            }
+            if (instance != null) {
+                instance.fireSharedContentReceived(b.build());
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
     }
 
     

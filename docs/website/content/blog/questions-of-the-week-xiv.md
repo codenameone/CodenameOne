@@ -128,7 +128,7 @@ Hopefully the migration to the new GUI builder will make this process simpler.
 
 ### Macros dont working with POJOs
 
-The JSON/POJO mapping thru mirah is a one of those tools I’m totally unfamiliar with…​
+The JSON/POJO mapping thru mirah is one of those tools I’m totally unfamiliar with…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38285490/macros-dont-working-with-pojos)
 

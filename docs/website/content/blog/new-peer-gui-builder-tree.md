@@ -18,7 +18,7 @@ with one code base!
 
 ### GUI Builder UI Change
 
-With the new update of the GUI builder we will move the tree tab into it’s own space below the tabs so it will  
+With the new update of the GUI builder we will move the tree tab into its own space below the tabs so it will  
 look like this:
 
 ![New look for the GUI builder sidebar](/blog/new-peer-gui-builder-tree/gui-builder-tree.png)

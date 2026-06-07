@@ -104,6 +104,16 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.LocalNotificationCallback;
+import com.codename1.notifications.NotificationChannelBuilder;
+import com.codename1.notifications.NotificationPermissionCallback;
+import com.codename1.notifications.NotificationPermissionRequest;
+import com.codename1.notifications.NotificationPermissionResult;
+import com.codename1.background.BackgroundWorker;
+import com.codename1.background.ForegroundService;
+import com.codename1.background.WorkRequest;
+import com.codename1.share.SharedContent;
+import com.codename1.push.PushContent;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
@@ -757,6 +767,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final int GAME_KEY_CODE_RIGHT = -94;
     private static String nativeTheme;
     private static Resources nativeThemeRes;
+    // Desktop window-chrome configuration. Defaults preserve the legacy behavior (CN1 Toolbar,
+    // no interactive scrollbars); the generated desktop Stub opts a new app in.
+    private static String desktopTitleBarMode = "toolbar";
+    private static boolean desktopInteractiveScrollbars = false;
+    // Caches the last command-name signature pushed to the native menu bar to avoid rebuilding
+    // (and flickering the macOS screen menu) when an unchanged form is re-shown.
+    private String lastNativeMenuSignature;
+    // Press offset within the title bar at the start of a custom-chrome window drag.
+    private int nativeWindowDragOffsetX;
+    private int nativeWindowDragOffsetY;
+    // Guards the one-time undecoration of the desktop window in the "custom" title-bar mode.
+    private boolean desktopCustomWindowConfigured;
+    // Active edge-resize state for the undecorated "custom"-mode window (driven from the glass pane).
+    private static final int RESIZE_NORTH = 1;
+    private static final int RESIZE_SOUTH = 2;
+    private static final int RESIZE_WEST = 4;
+    private static final int RESIZE_EAST = 8;
+    private int desktopResizeEdges;
+    private java.awt.Rectangle desktopResizeStartBounds;
+    private java.awt.Point desktopResizeStartMouse;
     /**
      * The simulatorNativeTheme value that {@link #loadSkinFile(InputStream, JFrame)}
      * last applied as the native-theme override. Useful for tests that
@@ -964,67 +994,404 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Map<String,TimerTask> localNotifications = new HashMap<String,TimerTask>();
     private java.util.Timer localNotificationsTimer;
-    
+    private final Map<String,NotificationChannelBuilder> notificationChannels = new HashMap<String,NotificationChannelBuilder>();
+
     @Override
     public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
-        if (isSimulator()) {
-            if (localNotificationsTimer == null) {
-                localNotificationsTimer = new java.util.Timer();
-            }
-            TimerTask task = new TimerTask() {
-                public void run() {
-                    if (!SystemTray.isSupported()) {
-                        System.out.println("Local notification not supported on this OS!!!");
-                        return;
-                    }
-                    if (isMinimized()) {
-                        SystemTray sysTray = SystemTray.getSystemTray();
-                        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
-                        tray.setImageAutoSize(true);
-                        tray.addActionListener(new ActionListener() {
-                            @Override
-                            public void actionPerformed(ActionEvent e) {
-                                Display.getInstance().callSerially(new Runnable() {
-                                    public void run() {
-                                        Executor.startApp();
-                                        minimized = false;
-                                    }
-                                });
-                                canvas.setEnabled(true);
-                                pause.setText("Pause App");
-                            }
-                        });
-                        try {
-                            sysTray.add(tray);
-                            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                    }
+        // honored both in the simulator (rich in-canvas panel) and on a real desktop build
+        // ("Run as desktop app" / executable jar), where it surfaces as a native OS notification
+        // through the system tray
+        if (!isSimulator() && !isDesktop()) {
+            return;
+        }
+        if (localNotificationsTimer == null) {
+            localNotificationsTimer = new java.util.Timer();
+        }
+        final boolean simulator = isSimulator();
+        TimerTask task = new TimerTask() {
+            public void run() {
+                if (simulator) {
+                    SimulatorNotifications.show(JavaSEPort.this, notif);
+                } else {
+                    showDesktopNotification(notif);
                 }
-            };
-            if (localNotifications.containsKey(notif.getId())) {
-                TimerTask old = localNotifications.get(notif.getId());
-                old.cancel();
             }
-            localNotifications.put(notif.getId(), task);
-            if (repeat == LocalNotification.REPEAT_NONE) {
-                localNotificationsTimer.schedule(task, new Date(firstTime));
-            } else {
-                localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
-            }
+        };
+        if (localNotifications.containsKey(notif.getId())) {
+            TimerTask old = localNotifications.get(notif.getId());
+            old.cancel();
+        }
+        localNotifications.put(notif.getId(), task);
+        if (repeat == LocalNotification.REPEAT_NONE) {
+            localNotificationsTimer.schedule(task, new Date(firstTime));
+        } else {
+            localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
         }
     }
 
     @Override
     public void cancelLocalNotification(String notificationId) {
-        if (isSimulator()) {
-            if (localNotifications.containsKey(notificationId)) {
-                TimerTask n = localNotifications.get(notificationId);
-                n.cancel();
-                localNotifications.remove(notificationId);
-            }
+        if (!isSimulator() && !isDesktop()) {
+            return;
         }
+        if (localNotifications.containsKey(notificationId)) {
+            TimerTask n = localNotifications.get(notificationId);
+            n.cancel();
+            localNotifications.remove(notificationId);
+        }
+        if (isSimulator()) {
+            SimulatorNotifications.dismiss(notificationId);
+        }
+    }
+
+    private TrayIcon desktopNotificationTray;
+    private String lastDesktopNotificationId;
+
+    /// Surfaces a local notification on a real desktop build as a native OS notification through
+    /// the system tray (Notification Center on macOS, the notification area on Windows/Linux). A
+    /// single persistent tray icon is reused for the lifetime of the process; clicking the
+    /// notification dispatches it to the app's {@code LocalNotificationCallback}, mirroring mobile.
+    private void showDesktopNotification(final LocalNotification notif) {
+        if (!SystemTray.isSupported()) {
+            System.out.println("Local notification not supported on this OS!!!");
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (desktopNotificationTray == null) {
+                        SystemTray sysTray = SystemTray.getSystemTray();
+                        java.awt.Image icon = null;
+                        java.net.URL res = getClass().getResource("/CodenameOne_Small.png");
+                        if (res != null) {
+                            icon = Toolkit.getDefaultToolkit().getImage(res);
+                        }
+                        if (icon == null) {
+                            icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+                        }
+                        String tip = Display.getInstance().getProperty("AppName", "Codename One");
+                        TrayIcon tray = new TrayIcon(icon, tip);
+                        tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                final String id = lastDesktopNotificationId;
+                                if (id != null) {
+                                    dispatchLocalNotification(id, null, null, null);
+                                }
+                            }
+                        });
+                        sysTray.add(tray);
+                        desktopNotificationTray = tray;
+                    }
+                    lastDesktopNotificationId = notif.getId();
+                    desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
+                            TrayIcon.MessageType.INFO);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+    }
+
+    /// Returns the channel registered for the given id, or null. Used by the simulator
+    /// notification panel and the channel inspector.
+    NotificationChannelBuilder getSimulatorChannel(String id) {
+        return id == null ? null : notificationChannels.get(id);
+    }
+
+    java.util.Collection<NotificationChannelBuilder> getSimulatorChannels() {
+        return notificationChannels.values();
+    }
+
+    /// Falls back to the legacy system tray notification (used when the simulator window
+    /// is minimized and the rich panel cannot be shown over the canvas).
+    void showTrayNotification(final LocalNotification notif) {
+        if (!SystemTray.isSupported()) {
+            System.out.println("Local notification not supported on this OS!!!");
+            return;
+        }
+        SystemTray sysTray = SystemTray.getSystemTray();
+        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
+        tray.setImageAutoSize(true);
+        tray.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        Executor.startApp();
+                        minimized = false;
+                    }
+                });
+                canvas.setEnabled(true);
+                if (pause != null) {
+                    pause.setText("Pause App");
+                }
+            }
+        });
+        try {
+            sysTray.add(tray);
+            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    /// Dispatches a local notification (and any selected action / text reply) to the
+    /// running app's LocalNotificationCallback, mirroring the device behavior. Called by
+    /// the simulator notification panel when the user taps the notification or an action.
+    void dispatchLocalNotification(String notificationId, String actionId, String actionTitle, String textResponse) {
+        if (actionId != null) {
+            PushContent.setActionId(actionId);
+        }
+        if (actionTitle != null) {
+            PushContent.setActionTitle(actionTitle);
+        }
+        if (textResponse != null) {
+            PushContent.setTextResponse(textResponse);
+        }
+        Object app = CodenameOneImplementation.getCurrentApplicationInstance();
+        final String fid = notificationId;
+        if (app instanceof LocalNotificationCallback) {
+            final LocalNotificationCallback cb = (LocalNotificationCallback) app;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    cb.localNotificationReceived(fid);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void requestNotificationPermission(final NotificationPermissionRequest request, final NotificationPermissionCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                callback.notificationPermissionResult(new NotificationPermissionResult(NotificationPermissionResult.AuthorizationLevel.AUTHORIZED));
+            }
+        });
+    }
+
+    @Override
+    public void registerNotificationChannel(NotificationChannelBuilder builder) {
+        if (builder != null) {
+            notificationChannels.put(builder.getId(), builder);
+        }
+    }
+
+    @Override
+    public void deleteNotificationChannel(String channelId) {
+        notificationChannels.remove(channelId);
+    }
+
+    @Override
+    public void createNotificationChannelGroup(String groupId, String groupName) {
+        // channel groups are presentational only in the simulator
+    }
+
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return isSimulator();
+    }
+
+    // ---- Constraint-aware background work (simulator) ----
+
+    boolean simNetworkAvailable = true;
+    boolean simCharging = true;
+    boolean simDeviceIdle = true;
+    boolean simBatteryNotLow = true;
+    private final Map<String,WorkRequest> scheduledWork = new java.util.LinkedHashMap<String,WorkRequest>();
+    private final Map<String,TimerTask> scheduledWorkTasks = new HashMap<String,TimerTask>();
+    private java.util.Timer backgroundWorkTimer;
+
+    @Override
+    public boolean isBackgroundWorkSupported() {
+        return isSimulator();
+    }
+
+    Map<String,WorkRequest> getScheduledWork() {
+        return scheduledWork;
+    }
+
+    boolean constraintsSatisfied(WorkRequest r) {
+        if ((r.isRequiresNetwork() || r.isRequiresUnmeteredNetwork()) && !simNetworkAvailable) {
+            return false;
+        }
+        if (r.isRequiresCharging() && !simCharging) {
+            return false;
+        }
+        if (r.isRequiresIdle() && !simDeviceIdle) {
+            return false;
+        }
+        if (r.isRequiresBatteryNotLow() && !simBatteryNotLow) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void scheduleBackgroundWork(final WorkRequest request) {
+        if (!isSimulator()) {
+            return;
+        }
+        scheduledWork.put(request.getId(), request);
+        if (backgroundWorkTimer == null) {
+            backgroundWorkTimer = new java.util.Timer();
+        }
+        TimerTask existing = scheduledWorkTasks.remove(request.getId());
+        if (existing != null) {
+            existing.cancel();
+        }
+        TimerTask task = new TimerTask() {
+            public void run() {
+                if (constraintsSatisfied(request)) {
+                    runWorkerNow(request);
+                } else {
+                    System.out.println("[BackgroundWork] '" + request.getId() + "' deferred: constraints not satisfied");
+                }
+            }
+        };
+        scheduledWorkTasks.put(request.getId(), task);
+        long delay = Math.max(0, request.getInitialDelayMillis());
+        if (request.isPeriodic()) {
+            backgroundWorkTimer.schedule(task, delay == 0 ? 1000 : delay, Math.max(1000, request.getMinIntervalMillis()));
+        } else {
+            backgroundWorkTimer.schedule(task, delay == 0 ? 500 : delay);
+        }
+    }
+
+    void runWorkerNow(final WorkRequest request) {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Class<?> cls = Class.forName(request.getWorkerClass());
+                    final BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
+                    long deadline = System.currentTimeMillis() + 30000;
+                    worker.performWork(request.getId(), request.getInputData(), deadline, new com.codename1.util.Callback<Boolean>() {
+                        public void onSucess(Boolean value) {
+                            System.out.println("[BackgroundWork] '" + request.getId() + "' completed: success=" + value);
+                        }
+                        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                            com.codename1.io.Log.e(err);
+                        }
+                    });
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        }, "cn1-sim-background-work").start();
+    }
+
+    @Override
+    public void cancelBackgroundWork(String workId) {
+        scheduledWork.remove(workId);
+        TimerTask t = scheduledWorkTasks.remove(workId);
+        if (t != null) {
+            t.cancel();
+        }
+    }
+
+    // ---- Background processing (simulator) ----
+
+    private final Map<String,TimerTask> processingTasks = new HashMap<String,TimerTask>();
+
+    @Override
+    public boolean isBackgroundProcessingSupported() {
+        return isSimulator();
+    }
+
+    @Override
+    public void scheduleBackgroundProcessing(String id, long earliestBeginEpochMs, boolean requiresNetwork, boolean requiresPower, final Runnable task) {
+        if (!isSimulator() || task == null) {
+            return;
+        }
+        if (backgroundWorkTimer == null) {
+            backgroundWorkTimer = new java.util.Timer();
+        }
+        TimerTask existing = processingTasks.remove(id);
+        if (existing != null) {
+            existing.cancel();
+        }
+        final boolean reqNet = requiresNetwork;
+        final boolean reqPow = requiresPower;
+        final String fid = id;
+        TimerTask t = new TimerTask() {
+            public void run() {
+                if ((reqNet && !simNetworkAvailable) || (reqPow && !simCharging)) {
+                    System.out.println("[BackgroundTask] '" + fid + "' deferred: constraints not satisfied");
+                    return;
+                }
+                new Thread(task, "cn1-sim-background-task").start();
+            }
+        };
+        processingTasks.put(id, t);
+        long delay = earliestBeginEpochMs <= 0 ? 500 : Math.max(0, earliestBeginEpochMs - System.currentTimeMillis());
+        backgroundWorkTimer.schedule(t, delay);
+    }
+
+    @Override
+    public void cancelBackgroundProcessing(String id) {
+        TimerTask t = processingTasks.remove(id);
+        if (t != null) {
+            t.cancel();
+        }
+    }
+
+    // ---- Foreground service (simulator) ----
+
+    @Override
+    public boolean isForegroundServiceSupported() {
+        return isSimulator();
+    }
+
+    @Override
+    public Object startForegroundService(String channelId, String title, String body, String iconName, final ForegroundService.Task task, final ForegroundService handle) {
+        final String[] text = new String[]{title, body};
+        System.out.println("[ForegroundService] started: " + title + " - " + body);
+        SimulatorNotifications.setForegroundServiceStatus(title + " - " + body);
+        if (task != null) {
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        task.run(handle);
+                    } catch (Throwable t) {
+                        com.codename1.io.Log.e(t);
+                    } finally {
+                        SimulatorNotifications.setForegroundServiceStatus(null);
+                        System.out.println("[ForegroundService] stopped");
+                    }
+                }
+            }, "cn1-sim-foreground-service").start();
+        }
+        return text;
+    }
+
+    @Override
+    public void updateForegroundServiceNotification(Object nativeHandle, String title, String body) {
+        if (nativeHandle instanceof String[]) {
+            ((String[]) nativeHandle)[0] = title;
+            ((String[]) nativeHandle)[1] = body;
+        }
+        System.out.println("[ForegroundService] update: " + title + " - " + body);
+        SimulatorNotifications.setForegroundServiceStatus(title + " - " + body);
+    }
+
+    @Override
+    public void stopForegroundService(Object nativeHandle) {
+        System.out.println("[ForegroundService] stop requested");
+        SimulatorNotifications.setForegroundServiceStatus(null);
+    }
+
+    @Override
+    public void subscribeToPushTopic(String topic) {
+        System.out.println("[Push] subscribeToTopic: " + topic);
+    }
+
+    @Override
+    public void unsubscribeFromPushTopic(String topic) {
+        System.out.println("[Push] unsubscribeFromTopic: " + topic);
     }
     
     
@@ -1202,6 +1569,335 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
         }
+        if (isDesktopCustomTitleBarMode() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            configureDesktopCustomWindow();
+        } else if (isNativeTitle() && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            pushWindowTitle(f);
+        }
+    }
+
+    /// @return true when running on the desktop with the {@code custom} title-bar mode, where the
+    /// CN1 Toolbar acts as the window title bar on an undecorated, edge-resizable window.
+    private boolean isDesktopCustomTitleBarMode() {
+        return isDesktop() && "custom".equals(resolveDesktopTitleBarMode());
+    }
+
+    /// One-time setup for the {@code custom} desktop title-bar mode: strips the OS title bar from the
+    /// app window so the visible CN1 Toolbar becomes the window's title bar. The window stays
+    /// edge-resizable (handled by the glass-pane dispatcher) and is moved by dragging the Toolbar.
+    /// Runs on the AWT event thread; undecoration happens before the window is first shown so there
+    /// is no flON.
+    private void configureDesktopCustomWindow() {
+        if (desktopCustomWindowConfigured) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        desktopCustomWindowConfigured = true;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (frame.isUndecorated()) {
+                    return;
+                }
+                boolean wasVisible = frame.isVisible();
+                frame.dispose();
+                frame.setUndecorated(true);
+                if (wasVisible) {
+                    frame.setVisible(true);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            EventQueue.invokeLater(r);
+        }
+    }
+
+    /// Maps a point (in unscaled glass-pane / content coordinates) to the set of window edges within
+    /// the resize hot-zone, as a bitmask of {@code RESIZE_*}. Returns 0 when the point is in the
+    /// interior. Only meaningful in the {@code custom} desktop title-bar mode.
+    private int desktopResizeEdgesAt(int x, int y, int w, int h) {
+        final int margin = 6;
+        int edges = 0;
+        if (x <= margin) {
+            edges |= RESIZE_WEST;
+        } else if (x >= w - margin) {
+            edges |= RESIZE_EAST;
+        }
+        if (y <= margin) {
+            edges |= RESIZE_NORTH;
+        } else if (y >= h - margin) {
+            edges |= RESIZE_SOUTH;
+        }
+        return edges;
+    }
+
+    /// @return the AWT resize cursor for the given {@code RESIZE_*} edge bitmask, or the default
+    /// cursor when no edge is set.
+    private java.awt.Cursor desktopResizeCursor(int edges) {
+        switch (edges) {
+            case RESIZE_NORTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.N_RESIZE_CURSOR);
+            case RESIZE_SOUTH: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.S_RESIZE_CURSOR);
+            case RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.W_RESIZE_CURSOR);
+            case RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.E_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NW_RESIZE_CURSOR);
+            case RESIZE_NORTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.NE_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_WEST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SW_RESIZE_CURSOR);
+            case RESIZE_SOUTH | RESIZE_EAST: return java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.SE_RESIZE_CURSOR);
+            default: return java.awt.Cursor.getDefaultCursor();
+        }
+    }
+
+    /// Applies a live edge-resize drag to the undecorated {@code custom}-mode window, using the real
+    /// screen mouse position against the bounds captured when the drag started.
+    private void desktopApplyResize() {
+        final JFrame frame = findTopFrame();
+        if (frame == null || desktopResizeStartBounds == null || desktopResizeStartMouse == null) {
+            return;
+        }
+        java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+        if (pi == null) {
+            return;
+        }
+        java.awt.Point m = pi.getLocation();
+        int dx = m.x - desktopResizeStartMouse.x;
+        int dy = m.y - desktopResizeStartMouse.y;
+        java.awt.Rectangle b = new java.awt.Rectangle(desktopResizeStartBounds);
+        final int minW = 200;
+        final int minH = 120;
+        if ((desktopResizeEdges & RESIZE_EAST) != 0) {
+            b.width = Math.max(minW, desktopResizeStartBounds.width + dx);
+        }
+        if ((desktopResizeEdges & RESIZE_SOUTH) != 0) {
+            b.height = Math.max(minH, desktopResizeStartBounds.height + dy);
+        }
+        if ((desktopResizeEdges & RESIZE_WEST) != 0) {
+            int nw = Math.max(minW, desktopResizeStartBounds.width - dx);
+            b.x = desktopResizeStartBounds.x + (desktopResizeStartBounds.width - nw);
+            b.width = nw;
+        }
+        if ((desktopResizeEdges & RESIZE_NORTH) != 0) {
+            int nh = Math.max(minH, desktopResizeStartBounds.height - dy);
+            b.y = desktopResizeStartBounds.y + (desktopResizeStartBounds.height - nh);
+            b.height = nh;
+        }
+        frame.setBounds(b);
+        frame.validate();
+    }
+
+    @Override
+    public boolean isNativeTitle() {
+        return isDesktop() && "native".equals(resolveDesktopTitleBarMode());
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        Form f = getCurrentForm();
+        if (f != null && isNativeTitle() && !(f instanceof com.codename1.ui.Dialog)) {
+            pushWindowTitle(f);
+        }
+    }
+
+    /// Pushes the form's title to the native OS window title bar on the AWT event thread.
+    private void pushWindowTitle(final Form f) {
+        final JFrame frame = findTopFrame();
+        if (frame == null || f == null) {
+            return;
+        }
+        final String t = f.getTitle() == null ? "" : f.getTitle();
+        if (EventQueue.isDispatchThread()) {
+            frame.setTitle(t);
+        } else {
+            EventQueue.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    frame.setTitle(t);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void setNativeCommands(Vector commands) {
+        if (!isDesktopNativeChromeMode()) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        // snapshot the commands on the CN1 EDT; build Swing on the AWT EDT
+        final java.util.ArrayList<com.codename1.ui.Command> snapshot = new java.util.ArrayList<com.codename1.ui.Command>();
+        final StringBuilder sig = new StringBuilder();
+        if (commands != null) {
+            for (int i = 0; i < commands.size(); i++) {
+                Object o = commands.elementAt(i);
+                if (o instanceof com.codename1.ui.Command) {
+                    com.codename1.ui.Command c = (com.codename1.ui.Command) o;
+                    String name = c.getCommandName();
+                    if (name == null || name.length() == 0) {
+                        // skip icon-only commands (back arrow, hamburger) - nothing to label
+                        continue;
+                    }
+                    snapshot.add(c);
+                    sig.append(name).append('\n');
+                }
+            }
+        }
+        final String signature = sig.toString();
+        if (signature.equals(lastNativeMenuSignature)) {
+            return;
+        }
+        lastNativeMenuSignature = signature;
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                frame.setJMenuBar(buildNativeMenuBar(snapshot));
+                frame.revalidate();
+            }
+        });
+    }
+
+    /// Builds a Swing menu bar from the given Codename One commands, grouping them into top-level
+    /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
+    /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
+    /// Codename One EDT before invoking the command's action.
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands) {
+        JMenuBar bar = new JMenuBar();
+        if (commands.isEmpty()) {
+            return bar;
+        }
+        // preserve first-seen order of the menu groups
+        java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
+        for (int i = 0; i < commands.size(); i++) {
+            final com.codename1.ui.Command cmd = commands.get(i);
+            String group = cmd.getDesktopMenu();
+            if (group == null || group.length() == 0) {
+                group = "Commands";
+            }
+            JMenu menu = menus.get(group);
+            if (menu == null) {
+                menu = new JMenu(group);
+                menus.put(group, menu);
+                bar.add(menu);
+            }
+            JMenuItem item = new JMenuItem(cmd.getCommandName());
+            KeyStroke accelerator = acceleratorFor(cmd);
+            if (accelerator != null) {
+                item.setAccelerator(accelerator);
+            }
+            item.addActionListener(new java.awt.event.ActionListener() {
+                @Override
+                public void actionPerformed(java.awt.event.ActionEvent e) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            cmd.actionPerformed(new com.codename1.ui.events.ActionEvent(cmd));
+                        }
+                    });
+                }
+            });
+            menu.add(item);
+        }
+        return bar;
+    }
+
+    /// Builds a Swing {@link KeyStroke} from a command's desktop-shortcut hint, mapping the
+    /// platform-primary modifier to the OS menu-shortcut mask (Command on macOS, Control
+    /// elsewhere). Returns null when the command has no accelerator.
+    private static KeyStroke acceleratorFor(com.codename1.ui.Command cmd) {
+        int keyChar = cmd.getDesktopShortcutKeyChar();
+        if (keyChar == 0) {
+            return null;
+        }
+        int mods = cmd.getDesktopShortcutModifiers();
+        int awtMods = 0;
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
+            awtMods |= Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT) != 0) {
+            awtMods |= java.awt.event.InputEvent.SHIFT_DOWN_MASK;
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0) {
+            awtMods |= java.awt.event.InputEvent.ALT_DOWN_MASK;
+        }
+        return KeyStroke.getKeyStroke(Character.toUpperCase((char) keyChar), awtMods);
+    }
+
+    @Override
+    public void minimizeNativeWindow() {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                frame.setExtendedState(JFrame.ICONIFIED);
+            }
+        });
+    }
+
+    @Override
+    public void toggleMaximizeNativeWindow() {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                int s = frame.getExtendedState();
+                if ((s & JFrame.MAXIMIZED_BOTH) != 0) {
+                    frame.setExtendedState(JFrame.NORMAL);
+                } else {
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void closeNativeWindow() {
+        Display.getInstance().exitApplication();
+    }
+
+    @Override
+    public void startNativeWindowDrag(int x, int y) {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        // use the real screen mouse position rather than the CN1 pointer coordinate: the CN1
+        // coordinate is relative to the (about-to-move) content pane, which would feed back
+        java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+        java.awt.Point loc = frame.getLocationOnScreen();
+        if (pi != null) {
+            nativeWindowDragOffsetX = pi.getLocation().x - loc.x;
+            nativeWindowDragOffsetY = pi.getLocation().y - loc.y;
+        }
+    }
+
+    @Override
+    public void dragNativeWindow(final int x, final int y) {
+        final JFrame frame = findTopFrame();
+        if (frame == null) {
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+                if (pi != null) {
+                    java.awt.Point m = pi.getLocation();
+                    frame.setLocation(m.x - nativeWindowDragOffsetX, m.y - nativeWindowDragOffsetY);
+                }
+            }
+        });
     }
 
     public static void setNativeTheme(String resFile) {
@@ -1210,6 +1906,57 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public static void setNativeTheme(Resources resFile) {
         nativeThemeRes = resFile;
+    }
+
+    /// Configures the desktop title-bar mode for the generated desktop app: one of
+    /// {@code "native"} (OS title bar + native menu bar), {@code "custom"} (undecorated
+    /// window with CN1-drawn chrome) or {@code "toolbar"} (legacy CN1 Toolbar). Only takes
+    /// effect when running on the desktop. Typically called from the generated Stub.
+    public static void setDesktopTitleBarMode(String mode) {
+        desktopTitleBarMode = mode;
+    }
+
+    /// @return the configured desktop title-bar mode (defaults to {@code "toolbar"}).
+    public static String getDesktopTitleBarModeSetting() {
+        return desktopTitleBarMode;
+    }
+
+    /// The desktop title-bar mode core consults to decide whether to suppress the CN1 Toolbar.
+    /// Returns the configured mode on the desktop, {@code "toolbar"} otherwise.
+    @Override
+    public String getDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return "toolbar";
+        }
+        return resolveDesktopTitleBarMode();
+    }
+
+    /// Enables interactive (grab-able thumb, click-to-page, always-visible) desktop
+    /// scrollbars for the generated desktop app. Only takes effect when running on the
+    /// desktop. Typically called from the generated Stub.
+    public static void setDesktopInteractiveScrollbars(boolean enabled) {
+        desktopInteractiveScrollbars = enabled;
+    }
+
+    /// @return whether interactive desktop scrollbars are enabled.
+    public static boolean isDesktopInteractiveScrollbars() {
+        return desktopInteractiveScrollbars;
+    }
+
+    /// Resolves the effective desktop title-bar mode, honoring the
+    /// {@code codename1.arg.desktop.titleBar} system property fallback.
+    private String resolveDesktopTitleBarMode() {
+        return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+    }
+
+    /// @return true when running on the desktop with a title-bar mode that hides the CN1
+    /// Toolbar in favor of native chrome (native or custom).
+    private boolean isDesktopNativeChromeMode() {
+        if (!isDesktop()) {
+            return false;
+        }
+        String m = resolveDesktopTitleBarMode();
+        return "native".equals(m) || "custom".equals(m);
     }
 
     @Override
@@ -1251,14 +1998,38 @@ public class JavaSEPort extends CodenameOneImplementation {
                     safeAreaPortrait = null;
                     h.remove("@paintsTitleBarBool");
                 }
+                injectDesktopThemeConstants(h);
                 UIManager.getInstance().setThemeProps(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         } else {
             if (nativeThemeRes != null) {
-                UIManager.getInstance().setThemeProps(nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]));
+                Hashtable h = nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]);
+                injectDesktopThemeConstants(h);
+                UIManager.getInstance().setThemeProps(h);
             }
+        }
+    }
+
+    /// Injects the desktop window-chrome and interactive-scrollbar theme constants into the
+    /// native theme, but only when running on the desktop. This is the seam that keeps these
+    /// behaviors "only when isDesktop()": the core framework reads the constants but never sees
+    /// them on mobile because this method is a no-op there. Values come from the static config
+    /// (set by the generated desktop Stub) with a {@code codename1.arg.desktop.*} system-property
+    /// fallback so build hints work too.
+    private void injectDesktopThemeConstants(Hashtable h) {
+        if (h == null || !isDesktop()) {
+            return;
+        }
+        String mode = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        if (mode != null && mode.length() > 0) {
+            h.put("@desktopTitleBarMode", mode);
+        }
+        boolean interactive = desktopInteractiveScrollbars
+                || "true".equalsIgnoreCase(System.getProperty("codename1.arg.desktop.interactiveScrollbars", "false"));
+        if (interactive) {
+            h.put("@interactiveScrollBool", "true");
         }
     }
 
@@ -2770,9 +3541,161 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    
-    
-    
+    // -----------------------------------------------------------------
+    // Simulator AI helpers: Ollama detection + best-effort TTS via OS
+    // command. These run only on JavaSE; mobile platforms get proper
+    // native impls in their own ports.
+    // -----------------------------------------------------------------
+
+    private static volatile boolean cn1AiOllamaProbeStarted;
+
+    /// Fires a quick TCP probe at the loopback Ollama port. Sets the
+    /// `cn1.ai.ollamaDetected` system property to `"true"` when the
+    /// server is reachable so [com.codename1.ai.LlmClient]'s
+    /// simulator-redirect can route there automatically.
+    private static void probeOllamaAsync() {
+        if (cn1AiOllamaProbeStarted) {
+            return;
+        }
+        cn1AiOllamaProbeStarted = true;
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                java.net.Socket s = null;
+                try {
+                    s = new java.net.Socket();
+                    s.connect(new java.net.InetSocketAddress("127.0.0.1", 11434), 250);
+                    System.setProperty("cn1.ai.ollamaDetected", "true");
+                    com.codename1.io.Log.p("Ollama detected at localhost:11434 -- "
+                            + "set cn1.ai.simulatorRedirect=ollama to route LlmClient calls locally.");
+                } catch (Throwable ignored) {
+                    // Not running; that's the normal case.
+                } finally {
+                    if (s != null) {
+                        try { s.close(); } catch (Throwable ignored) {}
+                    }
+                }
+            }
+        }, "cn1-ai-ollama-probe");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    @Override
+    public boolean textToSpeechIsSupported() {
+        // On macOS the `say` binary ships with the OS. On Linux we
+        // require `espeak`/`espeak-ng` to be installed. On Windows
+        // we shell out to PowerShell's System.Speech (XP+). Detect
+        // lazily on first call so startup cost stays at zero for
+        // apps that never use TTS.
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("mac")) {
+            return true;
+        }
+        if (os.contains("win")) {
+            return true;
+        }
+        if (os.contains("linux") || os.contains("nix") || os.contains("nux")) {
+            return probeBinary("espeak") || probeBinary("espeak-ng");
+        }
+        return false;
+    }
+
+    @Override
+    public void textToSpeechSpeak(final String text, final com.codename1.media.TtsOptions options) {
+        if (text == null || text.length() == 0) {
+            return;
+        }
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+                java.util.List<String> cmd = new java.util.ArrayList<String>();
+                if (os.contains("mac")) {
+                    cmd.add("say");
+                    if (options != null && options.getVoiceId() != null) {
+                        cmd.add("-v");
+                        cmd.add(options.getVoiceId());
+                    }
+                    cmd.add(text);
+                } else if (os.contains("win")) {
+                    String escaped = text.replace("'", "''");
+                    cmd.add("powershell");
+                    cmd.add("-Command");
+                    cmd.add("Add-Type -AssemblyName System.Speech; "
+                            + "(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('"
+                            + escaped + "')");
+                } else {
+                    cmd.add(probeBinary("espeak-ng") ? "espeak-ng" : "espeak");
+                    cmd.add(text);
+                }
+                try {
+                    new ProcessBuilder(cmd).inheritIO().start().waitFor();
+                } catch (Throwable err) {
+                    com.codename1.io.Log.p("TTS failed: " + err.getMessage());
+                }
+            }
+        }, "cn1-tts");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    @Override
+    public void textToSpeechStop() {
+        // Best-effort: kill any active `say` / `espeak`. On Windows
+        // we can't reach the spawned PowerShell process easily; for
+        // most desktop workflows that's acceptable since utterances
+        // are typically short.
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        try {
+            if (os.contains("mac")) {
+                new ProcessBuilder("killall", "say").redirectErrorStream(true).start();
+            } else if (os.contains("linux") || os.contains("nix") || os.contains("nux")) {
+                new ProcessBuilder("pkill", "-x", "espeak").redirectErrorStream(true).start();
+                new ProcessBuilder("pkill", "-x", "espeak-ng").redirectErrorStream(true).start();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Override
+    public String[] textToSpeechAvailableVoices() {
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (!os.contains("mac")) {
+            // `say -v ?` is the only one of the three platforms that
+            // exposes a structured voice list. Linux espeak's list
+            // is voluminous and not portable; Windows PowerShell
+            // SAPI list query is slow. Return empty rather than
+            // pretending.
+            return new String[0];
+        }
+        try {
+            Process p = new ProcessBuilder("say", "-v", "?").redirectErrorStream(true).start();
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream(), "UTF-8"));
+            java.util.List<String> voices = new java.util.ArrayList<String>();
+            String line;
+            while ((line = r.readLine()) != null) {
+                int spaceIdx = line.indexOf(' ');
+                if (spaceIdx > 0) {
+                    voices.add(line.substring(0, spaceIdx));
+                }
+            }
+            p.waitFor();
+            return voices.toArray(new String[voices.size()]);
+        } catch (Throwable t) {
+            return new String[0];
+        }
+    }
+
+    private static boolean probeBinary(String name) {
+        try {
+            Process p = new ProcessBuilder("which", name).redirectErrorStream(true).start();
+            p.waitFor();
+            return p.exitValue() == 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private void loadSkinFile(InputStream skin, final JFrame frm) {
         try {
             ZipInputStream z = new ZipInputStream(skin);
@@ -3152,6 +4075,64 @@ public class JavaSEPort extends CodenameOneImplementation {
             updateFrameUI();
 
         }
+    }
+
+    @Override
+    public boolean isPortrait() {
+        // When setSimulatorPortrait has been called explicitly (e.g. by the
+        // @Orientation JUnit annotation), honor that flag rather than the
+        // canvas-derived inference. The canvas inherits the host window's
+        // dimensions, which in unit-test JVMs almost always read as
+        // landscape regardless of what the test asked for.
+        if (simulatorPortraitExplicit) {
+            return portrait;
+        }
+        return super.isPortrait();
+    }
+
+    /**
+     * Programmatically flips the simulator between portrait and landscape
+     * without persisting the choice to user preferences. The menu's Rotate
+     * action goes through the private {@link #setPortrait(boolean)} helper
+     * (which does persist, since it is driven by an explicit user click);
+     * this entry point is meant for runtime / test callers that want the
+     * orientation state to last only for the current JVM &mdash; in
+     * particular the {@code @Orientation} JUnit annotation.
+     *
+     * <p>Sets an explicit-override flag so that {@link #isPortrait()} returns
+     * this value instead of inferring orientation from canvas dimensions.
+     * In tests the canvas inherits the host frame's size and the inference
+     * would otherwise read "landscape" on any wide screen.
+     *
+     * @param portraitValue true for portrait, false for landscape
+     */
+    public void setSimulatorPortrait(boolean portraitValue) {
+        simulatorPortraitExplicit = true;
+        if (portrait != portraitValue) {
+            portrait = portraitValue;
+            updateFrameUI();
+        }
+    }
+
+    private boolean simulatorPortraitExplicit = false;
+
+    /**
+     * Sets the simulator's accessibility text-scale multiplier. Does not
+     * persist the value to user preferences &mdash; the Simulate &gt;
+     * Larger Text menu remains the only restart-stable source of truth.
+     * Does not refresh the active theme either; the caller decides when
+     * to redraw (the {@code @LargerText} JUnit annotation, for instance,
+     * batches several config changes and then issues one refresh).
+     *
+     * <p>A value of {@code 1.0f} restores the default size; values like
+     * {@code 1.3f}, {@code 1.6f}, {@code 2.0f} mirror the menu's
+     * "AX2 / AX3 / AX5" presets.
+     *
+     * @param scale text-scale multiplier; {@code 1.0f} for default
+     */
+    public void setSimulatorLargerTextScale(float scale) {
+        largerTextScale = scale;
+        largerTextEnabled = scale > 1.0f + 0.001f;
     }
 
 
@@ -4674,6 +5655,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         simulateMenu.add(biometricMenu);
 
+        installNfcSimulationMenu(simulateMenu, pref);
+
         // Mirrors cn1FireStatusBarTap in CodenameOne_GLViewController.m, which
         // synthesizes a tap inside CN1's StatusBar component (the bar at the
         // top of Toolbar created by Toolbar.initTitleBarStatus). The native
@@ -4980,6 +5963,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         installLargerTextMenu(simulateMenu, pref, frm);
+
+        installNotificationBackgroundSimulationMenu(simulateMenu);
 
         pause = new JMenuItem("Pause App");
         simulateMenu.addSeparator();
@@ -6037,6 +7022,383 @@ public class JavaSEPort extends CodenameOneImplementation {
         parent.add(largerTextMenu);
     }
 
+    /**
+     * Wires up the Simulate -> NFC submenu so apps that touch
+     * {@link com.codename1.nfc.Nfc} can be exercised in the simulator
+     * without an NFC device. Items:
+     * <ul>
+     *   <li>"Tap virtual tag" -- fires the configured outcome (discovery,
+     *       cancel, tag lost, timeout, read-only) on any pending
+     *       readTag() / listeners.</li>
+     *   <li>"Edit virtual tag URI..." / "Edit virtual tag text..." -- set
+     *       the NDEF message returned by the tap.</li>
+     *   <li>"Hardware Available" / "NFC Enabled" / "HCE Available" toggles
+     *       so canRead() / canHostEmulate() return the simulator-configured
+     *       value.</li>
+     *   <li>"Send APDU to HCE service..." -- pops a hex-entry dialog,
+     *       dispatches the bytes to the application's registered
+     *       HostCardEmulationService, and shows the response.</li>
+     *   <li>"Make tag read-only" -- mark the virtual tag locked so the
+     *       next write fails with READ_ONLY.</li>
+     * </ul>
+     * Preferences keys all start with "NfcSim." so they survive simulator
+     * restarts.
+     */
+    private void installNotificationBackgroundSimulationMenu(JMenu simulateMenu) {
+        JMenu menu = new JMenu("Notifications and Background");
+
+        final JCheckBoxMenuItem network = new JCheckBoxMenuItem("Network available", simNetworkAvailable);
+        network.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simNetworkAvailable = network.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem charging = new JCheckBoxMenuItem("Charging", simCharging);
+        charging.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simCharging = charging.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem idle = new JCheckBoxMenuItem("Device idle", simDeviceIdle);
+        idle.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simDeviceIdle = idle.isSelected();
+            }
+        });
+        final JCheckBoxMenuItem battery = new JCheckBoxMenuItem("Battery not low", simBatteryNotLow);
+        battery.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                simBatteryNotLow = battery.isSelected();
+            }
+        });
+        JMenu constraints = new JMenu("Background constraints");
+        constraints.add(network);
+        constraints.add(charging);
+        constraints.add(idle);
+        constraints.add(battery);
+        menu.add(constraints);
+
+        JMenuItem runWork = new JMenuItem("Run scheduled background work now");
+        runWork.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                java.util.Collection<WorkRequest> all = new java.util.ArrayList<WorkRequest>(getScheduledWork().values());
+                if (all.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "No background work is currently scheduled.");
+                    return;
+                }
+                for (WorkRequest r : all) {
+                    if (constraintsSatisfied(r)) {
+                        runWorkerNow(r);
+                    } else {
+                        System.out.println("[BackgroundWork] '" + r.getId() + "' not run: constraints not satisfied");
+                    }
+                }
+            }
+        });
+        menu.add(runWork);
+
+        JMenuItem channels = new JMenuItem("Show registered channels...");
+        channels.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                StringBuilder sb = new StringBuilder();
+                for (NotificationChannelBuilder c : getSimulatorChannels()) {
+                    sb.append(c.getName()).append(" (").append(c.getId()).append(") importance=")
+                            .append(c.getImportance());
+                    if (c.getSound() != null) {
+                        sb.append(" sound=").append(c.getSound());
+                    }
+                    sb.append('\n');
+                }
+                JOptionPane.showMessageDialog(null, sb.length() == 0 ? "No channels registered." : sb.toString());
+            }
+        });
+        menu.add(channels);
+
+        menu.addSeparator();
+
+        JMenuItem shareText = new JMenuItem("Send shared text...");
+        shareText.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String text = JOptionPane.showInputDialog(null, "Text to share into the app:", "Shared text", JOptionPane.PLAIN_MESSAGE);
+                if (text != null) {
+                    deliverSharedContent(SharedContent.builder().addText(text).build());
+                }
+            }
+        });
+        menu.add(shareText);
+
+        JMenuItem shareUrl = new JMenuItem("Send shared URL...");
+        shareUrl.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String url = JOptionPane.showInputDialog(null, "URL to share into the app:", "Shared URL", JOptionPane.PLAIN_MESSAGE);
+                if (url != null) {
+                    deliverSharedContent(SharedContent.builder().addUrl(url).build());
+                }
+            }
+        });
+        menu.add(shareUrl);
+
+        JMenuItem shareFile = new JMenuItem("Send shared file...");
+        shareFile.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                JFileChooser fc = new JFileChooser();
+                if (fc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    File f = fc.getSelectedFile();
+                    String path = f.getAbsolutePath();
+                    String lower = path.toLowerCase();
+                    boolean image = lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                            || lower.endsWith(".gif") || lower.endsWith(".webp");
+                    SharedContent.Builder b = SharedContent.builder();
+                    if (image) {
+                        b.addImage(null, "file://" + path, f.getName());
+                    } else {
+                        b.addFile(null, "file://" + path, f.getName());
+                    }
+                    deliverSharedContent(b.build());
+                }
+            }
+        });
+        menu.add(shareFile);
+
+        menu.addSeparator();
+        JLabel fgStatus = new JLabel("Foreground service: stopped");
+        fgStatus.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+        SimulatorNotifications.setForegroundServiceLabel(fgStatus);
+        menu.add(fgStatus);
+
+        simulateMenu.add(menu);
+    }
+
+    private void deliverSharedContent(final SharedContent content) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                fireSharedContentReceived(content);
+            }
+        });
+    }
+
+    private void installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu nfcMenu = new JMenu("NFC");
+
+        final JCheckBoxMenuItem hwAvailable = new JCheckBoxMenuItem(
+                "Hardware Available", pref.getBoolean("NfcSim.supported", true));
+        JavaSENfc.simSupported = hwAvailable.isSelected();
+        hwAvailable.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simSupported = hwAvailable.isSelected();
+                pref.putBoolean("NfcSim.supported", hwAvailable.isSelected());
+            }
+        });
+        nfcMenu.add(hwAvailable);
+
+        final JCheckBoxMenuItem enabled = new JCheckBoxMenuItem(
+                "NFC Enabled", pref.getBoolean("NfcSim.enabled", true));
+        JavaSENfc.simEnabled = enabled.isSelected();
+        enabled.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simEnabled = enabled.isSelected();
+                pref.putBoolean("NfcSim.enabled", enabled.isSelected());
+            }
+        });
+        nfcMenu.add(enabled);
+
+        final JCheckBoxMenuItem hce = new JCheckBoxMenuItem(
+                "HCE Available", pref.getBoolean("NfcSim.hce", true));
+        JavaSENfc.simHceSupported = hce.isSelected();
+        hce.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.simHceSupported = hce.isSelected();
+                pref.putBoolean("NfcSim.hce", hce.isSelected());
+            }
+        });
+        nfcMenu.add(hce);
+
+        nfcMenu.addSeparator();
+
+        JMenu outcomeMenu = new JMenu("Next read outcome");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        String savedOutcome = pref.get("NfcSim.outcome",
+                JavaSENfc.SimReadOutcome.DISCOVER_TAG.name());
+        try {
+            JavaSENfc.nextReadOutcome =
+                    JavaSENfc.SimReadOutcome.valueOf(savedOutcome);
+        } catch (IllegalArgumentException ex) {
+            JavaSENfc.nextReadOutcome = JavaSENfc.SimReadOutcome.DISCOVER_TAG;
+        }
+        for (final JavaSENfc.SimReadOutcome o : JavaSENfc.SimReadOutcome.values()) {
+            final JRadioButtonMenuItem item = new JRadioButtonMenuItem(o.name(),
+                    o == JavaSENfc.nextReadOutcome);
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSENfc.nextReadOutcome = o;
+                    pref.put("NfcSim.outcome", o.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        nfcMenu.add(outcomeMenu);
+
+        JMenuItem tap = new JMenuItem("Tap virtual tag");
+        tap.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                com.codename1.nfc.Nfc n = getNfc();
+                if (n instanceof JavaSENfc) {
+                    ((JavaSENfc) n).simulateTap();
+                }
+            }
+        });
+        nfcMenu.add(tap);
+
+        nfcMenu.addSeparator();
+
+        JMenuItem setUri = new JMenuItem("Set virtual tag URI...");
+        setUri.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.uri",
+                        "https://codenameone.com");
+                String uri = JOptionPane.showInputDialog(
+                        canvas,
+                        "Virtual tag URI:",
+                        def);
+                if (uri != null) {
+                    JavaSENfc.simNdef = new com.codename1.nfc.NdefMessage(
+                            com.codename1.nfc.NdefRecord.createUri(uri));
+                    pref.put("NfcSim.uri", uri);
+                }
+            }
+        });
+        nfcMenu.add(setUri);
+
+        JMenuItem setText = new JMenuItem("Set virtual tag text...");
+        setText.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.text", "Hello Codename One");
+                String t = JOptionPane.showInputDialog(
+                        canvas,
+                        "Virtual tag text:",
+                        def);
+                if (t != null) {
+                    JavaSENfc.simNdef = new com.codename1.nfc.NdefMessage(
+                            com.codename1.nfc.NdefRecord.createText("en", t));
+                    pref.put("NfcSim.text", t);
+                }
+            }
+        });
+        nfcMenu.add(setText);
+
+        final JCheckBoxMenuItem locked = new JCheckBoxMenuItem(
+                "Tag is read-only", !pref.getBoolean("NfcSim.writable", true));
+        JavaSENfc.tagWritable = !locked.isSelected();
+        locked.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSENfc.tagWritable = !locked.isSelected();
+                pref.putBoolean("NfcSim.writable", !locked.isSelected());
+            }
+        });
+        nfcMenu.add(locked);
+
+        nfcMenu.addSeparator();
+
+        JMenuItem sendApdu = new JMenuItem("Send APDU to HCE service...");
+        sendApdu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                String def = pref.get("NfcSim.apdu",
+                        "00A4040007F0010203040506");
+                String hex = JOptionPane.showInputDialog(
+                        canvas,
+                        "APDU bytes (hex):",
+                        def);
+                if (hex == null) {
+                    return;
+                }
+                byte[] command;
+                try {
+                    command = parseHex(hex);
+                } catch (RuntimeException re) {
+                    JOptionPane.showMessageDialog(canvas,
+                            "Invalid hex: " + re.getMessage());
+                    return;
+                }
+                pref.put("NfcSim.apdu", hex);
+                com.codename1.nfc.Nfc n = getNfc();
+                if (!(n instanceof JavaSENfc)) {
+                    JOptionPane.showMessageDialog(canvas,
+                            "NFC simulator unavailable.");
+                    return;
+                }
+                byte[] resp = ((JavaSENfc) n).simulateApdu(command);
+                JOptionPane.showMessageDialog(canvas,
+                        "Response: " + toHex(resp));
+            }
+        });
+        nfcMenu.add(sendApdu);
+
+        JMenuItem deactivate = new JMenuItem("Deactivate HCE field");
+        deactivate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                com.codename1.nfc.Nfc n = getNfc();
+                if (n instanceof JavaSENfc) {
+                    ((JavaSENfc) n).simulateDeactivate(
+                            com.codename1.nfc.HostCardEmulationService.DEACTIVATION_LINK_LOSS);
+                }
+            }
+        });
+        nfcMenu.add(deactivate);
+
+        simulateMenu.add(nfcMenu);
+    }
+
+    private static byte[] parseHex(String hex) {
+        if (hex == null) {
+            return new byte[0];
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < hex.length(); i++) {
+            char c = hex.charAt(i);
+            if (c != ' ' && c != ':' && c != '-') {
+                sb.append(c);
+            }
+        }
+        String clean = sb.toString();
+        if ((clean.length() & 1) != 0) {
+            throw new IllegalArgumentException("hex must have an even number of chars");
+        }
+        byte[] out = new byte[clean.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            int hi = Character.digit(clean.charAt(i * 2), 16);
+            int lo = Character.digit(clean.charAt(i * 2 + 1), 16);
+            if (hi < 0 || lo < 0) {
+                throw new IllegalArgumentException("non-hex digit at " + i);
+            }
+            out[i] = (byte) ((hi << 4) | lo);
+        }
+        return out;
+    }
+
+    private static String toHex(byte[] in) {
+        if (in == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(in.length * 2);
+        for (int i = 0; i < in.length; i++) {
+            int b = in[i] & 0xFF;
+            sb.append(Character.forDigit((b >>> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
+        }
+        return sb.toString().toUpperCase();
+    }
+
     @Override
     public boolean isLargerTextEnabled() {
         return largerTextEnabled;
@@ -6301,11 +7663,41 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /** Reflectively run the build-time SVG transcoder's registry if the
+     *  current classpath contains one. Lets desktop / simulator runs pick
+     *  up transcoded SVGs without the per-platform Stub needing an explicit
+     *  call -- the Stub call is omitted on JavaSE because the user's
+     *  ${mainName}Stub doesn't know at template-expansion time whether the
+     *  project ships any SVGs. Apps without an SVG registry are unaffected. */
+    private static boolean svgRegistryInstalled;
+    private static void installGeneratedSvgRegistry() {
+        if (svgRegistryInstalled) {
+            return;
+        }
+        try {
+            Class<?> r = Class.forName("com.codename1.generated.svg.SVGRegistry");
+            r.getMethod("installGlobal").invoke(null);
+        } catch (ClassNotFoundException noSvgs) {
+            // Project ships no SVGs -- skip silently.
+        } catch (Throwable t) {
+            // Don't take init() down if the registry blows up; surface it
+            // but let the app keep running so missing SVGs don't blank the
+            // whole UI.
+            t.printStackTrace();
+        }
+        svgRegistryInstalled = true;
+    }
+
     /**
      * @inheritDoc
      */
     public void init(Object m) {
         inInit = true;
+        installGeneratedSvgRegistry();
+
+        // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
+        // can detect a local Ollama install without blocking startup.
+        probeOllamaAsync();
 
 /*        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
         if(!updater.exists()) {
@@ -6572,7 +7964,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
             }
         }
-        if (findTopFrame() != null && retinaScale > 1.0) {
+        if (findTopFrame() != null && (retinaScale > 1.0 || isDesktopCustomTitleBarMode())) {
+            // a glass pane is required on retina (coordinate scaling) and in the desktop "custom"
+            // title-bar mode (the glass-pane dispatcher implements undecorated-window edge resize)
             findTopFrame().setGlassPane(new CN1GlassPane());
             findTopFrame().getGlassPane().setVisible(true);
         }
@@ -6763,10 +8157,52 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (m instanceof Runnable) {
             Display.getInstance().callSerially((Runnable) m);
         }
-        
+
         inInit = false;
     }
-    
+
+    @Override
+    public void postInit() {
+        super.postInit();
+        // Install the build-time-generated @Route dispatcher, if the project
+        // emitted one. JavaSE is the legitimate place for dynamic loading --
+        // it runs unobfuscated and spins its own ClassPathLoader, so
+        // Class.forName resolves reliably across both the simulator
+        // (Executor-driven entry) and desktop production runs (entry through
+        // the application stub). ParparVM iOS and Android use the per-build
+        // application-stub direct symbol reference instead. Routes' no-arg
+        // constructor self-registers via Navigation#setDispatcher.
+        try {
+            Class.forName("com.codename1.router.generated.Routes").newInstance();
+        } catch (ClassNotFoundException ignored) {
+            // No @Route in this project.
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        // Install build-time annotation-framework bootstraps. Each
+        // bootstrap class lives at a fixed FQN under cn1app.* and is
+        // generated only when the project actually uses the
+        // corresponding annotations -- ClassNotFoundException is the
+        // "feature not used" signal. JavaSE is the legitimate place
+        // for Class.forName here (matches the @Route pattern above).
+        for (String bootstrap : new String[] {
+                "cn1app.MapperBootstrap",
+                "cn1app.BinderBootstrap",
+                "cn1app.DaoBootstrap",
+                "cn1app.RestClientBootstrap",
+                "cn1app.ProtoBootstrap",
+                "cn1app.GrpcClientBootstrap",
+                "cn1app.GraphQLClientBootstrap"}) {
+            try {
+                Class.forName(bootstrap).newInstance();
+            } catch (ClassNotFoundException ignored) {
+                // Feature not used by this project.
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+        }
+    }
+
     protected void sizeChanged(int w, int h) {
         try{
             super.sizeChanged(w, h);
@@ -8288,39 +9724,45 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void popClip(Object graphics) {
         checkEDT();
         Graphics2D g2d = getGraphics(graphics);
-        
+
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
+            if (g.clipStack.isEmpty()) {
+                throw new IllegalStateException(
+                        "popClip() called with no matching pushClip(). " +
+                        "The clip stack is empty -- popping it would corrupt the graphics state. " +
+                        "This is detected only by the simulator; on devices the same mistake can " +
+                        "manifest as drift or crashes after many frames (see issue #5058).");
+            }
             Shape oldClip = g.clipStack.pop();
-            
             g2d.setClip(oldClip);
         } else {
             synchronized(clipStack) {
-                if (clipStack.containsKey(graphics)) {
-                    Shape oldClip = clipStack.get(graphics).pop();
-                    if (oldClip != null) {
-                        g2d.setClip(oldClip);
-                    }
+                LinkedList<Shape> stack = clipStack.get(graphics);
+                if (stack == null || stack.isEmpty()) {
+                    throw new IllegalStateException(
+                            "popClip() called with no matching pushClip(). " +
+                            "The clip stack is empty -- popping it would corrupt the graphics state. " +
+                            "This is detected only by the simulator; on devices the same mistake can " +
+                            "manifest as drift or crashes after many frames (see issue #5058).");
+                }
+                Shape oldClip = stack.pop();
+                if (oldClip != null) {
+                    g2d.setClip(oldClip);
                 }
             }
         }
-        
     }
 
     private final Map<Object,LinkedList<Shape>> clipStack = new HashMap<Object,LinkedList<Shape>>();
-    
+
     @Override
     public void disposeGraphics(Object graphics) {
         synchronized(clipStack) {
             clipStack.remove(graphics);
         }
     }
-    
-    
-    
-    
-    
-    
+
     /**
      * @inheritDoc
      */
@@ -11858,7 +13300,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
+    private JavaSENfc nfc;
     private boolean biometricsBuildHintsInstalled;
+    private boolean nfcBuildHintsInstalled;
 
     @Override
     public Biometrics getBiometrics() {
@@ -11876,6 +13320,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             secureStorage = new JavaSESecureStorage((JavaSEBiometrics) getBiometrics());
         }
         return secureStorage;
+    }
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        installNfcBuildHintsIfNeeded();
+        if (nfc == null) {
+            nfc = new JavaSENfc();
+        }
+        return nfc;
+    }
+
+    /**
+     * The first time the app reaches the NFC API in the simulator, write
+     * placeholders for ios.NFCReaderUsageDescription if the developer has
+     * not supplied one. Apple rejects builds that ship Core NFC without
+     * the plist entry, so this keeps simulator-developed projects buildable
+     * on iOS without the developer remembering the build hint. The
+     * placeholder should be replaced with locale-specific copy before
+     * shipping.
+     */
+    private void installNfcBuildHintsIfNeeded() {
+        if (nfcBuildHintsInstalled) {
+            return;
+        }
+        nfcBuildHintsInstalled = true;
+        Map<String, String> existing = getProjectBuildHints();
+        if (existing == null) {
+            return;
+        }
+        if (!existing.containsKey("ios.NFCReaderUsageDescription")) {
+            try {
+                setProjectBuildHint(
+                        "ios.NFCReaderUsageDescription",
+                        "Hold near an NFC tag to continue");
+            } catch (RuntimeException ignore) {
+                // codenameone_settings.properties became unwritable; not
+                // fatal -- the device builder will surface the missing hint.
+            }
+        }
     }
 
     /**
@@ -12176,6 +13659,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    protected com.codename1.io.wifi.WifiPlatform createWifiPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEWifiPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.wifi.WifiDirectPlatform createWifiDirectPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEWifiDirectPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSEBonjourPlatform();
+    }
+
+    @Override
+    protected com.codename1.io.NetworkTypePlatform createNetworkTypePlatform() {
+        return new com.codename1.impl.javase.connectivity.JavaSENetworkTypePlatform();
+    }
+
+    @Override
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
@@ -12414,6 +13917,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         checkCameraUsageDescription();
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
+    }
+
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new JavaSECameraImpl();
     }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
@@ -14022,9 +15530,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void writeToStream(byte[] param) {
+            writeToStream(param, 0, param.length);
+        }
+
+        public void writeToStream(byte[] param, int offset, int len) {
             try {
                 OutputStream os = getOutput();
-                os.write(param);
+                os.write(param, offset, len);
                 os.flush();
             } catch(IOException err) {
                 socketInstance = null;	// no longer connected
@@ -14166,6 +15678,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
         ((SocketImpl)socket).writeToStream(data);
+    }
+
+    @Override
+    public boolean isWebSocketSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.impl.WebSocketImpl createWebSocketImpl(String url) {
+        return new JavaSEWebSocketImpl(url);
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        ((SocketImpl)socket).writeToStream(data, offset, len);
     }
 
     /**
@@ -15525,10 +17052,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseMoved(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
         public void mouseDragged(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             redispatchMouseEvent(e);
         }
 
@@ -15545,12 +17078,62 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mousePressed(MouseEvent e) {
+            if (handleDesktopEdgeResize(e)) {
+                return;
+            }
             isPress = true;
             redispatchMouseEvent(e);
             isPress = false;
         }
 
+        /// In the {@code custom} desktop title-bar mode the window is undecorated, so the glass pane
+        /// implements edge-resize: while the pointer is in an edge hot-zone (or a resize drag is in
+        /// progress) the event drives the window resize instead of being redispatched to the CN1
+        /// canvas. Returns true when the event was consumed for resizing. No-op in every other mode.
+        private boolean handleDesktopEdgeResize(MouseEvent e) {
+            if (!isDesktopCustomTitleBarMode()) {
+                return false;
+            }
+            java.awt.Component comp = e.getComponent();
+            int w = comp.getWidth();
+            int h = comp.getHeight();
+            int id = e.getID();
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                if (edges != 0) {
+                    desktopResizeEdges = edges;
+                    JFrame fr = findTopFrame();
+                    if (fr != null) {
+                        desktopResizeStartBounds = fr.getBounds();
+                    }
+                    java.awt.PointerInfo pi = java.awt.MouseInfo.getPointerInfo();
+                    desktopResizeStartMouse = pi != null ? pi.getLocation() : null;
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_DRAGGED) {
+                if (desktopResizeEdges != 0) {
+                    desktopApplyResize();
+                    return true;
+                }
+                return false;
+            }
+            if (id == MouseEvent.MOUSE_MOVED) {
+                int edges = desktopResizeEdgesAt(e.getX(), e.getY(), w, h);
+                comp.setCursor(desktopResizeCursor(edges));
+                return edges != 0;
+            }
+            return false;
+        }
+
         public void mouseReleased(MouseEvent e) {
+            if (desktopResizeEdges != 0) {
+                desktopResizeEdges = 0;
+                desktopResizeStartBounds = null;
+                desktopResizeStartMouse = null;
+                return;
+            }
             redispatchMouseEvent(e);
         }
 

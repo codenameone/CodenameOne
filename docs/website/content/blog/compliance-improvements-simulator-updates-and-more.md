@@ -11,27 +11,27 @@ feed_html: '<img src="https://www.codenameone.com/blog/compliance-improvements-s
 
 ![Compliance Improvements, Simulator Updates, and More](/blog/compliance-improvements-simulator-updates-and-more.jpg)
 
-In today's update, we're finally removing Proguard from the build process with many implications for all of us.
+In today’s update, we’re finally removing Proguard from the build process with many implications for all of us.
 
 ## Compliance Checks without Proguard
 
-Codename One only supports a subset of JavaSE's API. While we're constantly trying to expand the supported set of APIs, it would always be a partial list. Initially, this created a lot of problems where developers would send a build and find out that API X wasn't supported.
+Codename One only supports a subset of JavaSE’s API. While we’re constantly trying to expand the supported set of APIs, it would always be a partial list. Initially, this created a lot of problems where developers would send a build and find out that API X wasn’t supported.
 
 To solve this problem, Steve came up with an ingenious trick. Maven builds run proguard on the finished jar, it implicitly fails if an API is missing and thus fails "compliance" before reaching the build servers. 
 
 This works well but has several problems:
 
 * Error messages are very obtuse
-* It's a bit slow
+* It’s a bit slow
 * We could do so much more 
 
 With this update, we added a new check that replaces proguard with our own custom validator.
 
 The amazing thing is that we can now support `String.split()`!
 
-### The Problem of String's `split()` 
+### The Problem of String’s `split()` 
 
-Don't use `String.split()`. It's a terrible API. I use it myself occasionally, but the feature is deeply problematic, which is why we didn't add it. 
+Don’t use `String.split()`. It’s a terrible API. I use it myself occasionally, but the feature is deeply problematic, which is why we didn’t add it. 
 
 The crux of the issue is that split() takes up a regex expression. Regex is deeply nuanced, one misplaced character can bring down an application. The parsing of regex is also challenging and fragile.  
 
@@ -43,7 +43,7 @@ As a sidenote we also added broader support for `String.format()` across runtime
 
 ### New Java Versions on Android
 
-This also means we will be able to adopt newer versions of Java past 17. Android stopped updating JVMs after JDK 17, which means newer Java language features aren't supported.
+This also means we will be able to adopt newer versions of Java past 17. Android stopped updating JVMs after JDK 17, which means newer Java language features aren’t supported.
 
 However, we can now detect if a class uses newer bytecode and compile it down to JDK 17 levels. This means we can use JDK 25 features while maintaining Android compatibility. 
 
@@ -64,7 +64,7 @@ This is a small change, but it improves the out-of-the-box experience in a very 
 
 ### Multiline `TextArea` Supports Vertical Centering
 
-Vertical alignment wasn't for multiline rendering in `TextArea` wasn't supported for a long time. We now support centering both horizontally and vertically of multiline texts.
+Vertical alignment for multiline rendering in `TextArea` wasn’t supported for a long time. We now support centering both horizontally and vertically of multiline texts.
 
 ### Android Video Thumbnail Workaround
 
@@ -84,11 +84,11 @@ Now that the Playground is part of the normal workflow, it made sense to improve
 
 The “Open in playground” links were updated to use a base64-encoded payload, which makes them more robust and less prone to breaking on larger or more awkward examples.
 
-Almost all Java code snippets in the JavaDoc now have an "open in playground" link next to them. A lot of the code might not work since the playground is still under heavy development. But we'll get there...
+Almost all Java code snippets in the JavaDoc now have an "open in playground" link next to them. A lot of the code might not work since the playground is still under heavy development. But we’ll get there...
 
 ## JavaScript Support in ParparVM
 
-This is probably the most important feature this week, but it isn't something most of you would "play with." We added support for JavaScript as a target destination in our native VM. 
+This is probably the most important feature this week, but it isn’t something most of you would "play with." We added support for JavaScript as a target destination in our native VM. 
 
 Right now this has no impact on you. When you send a build or use Playground/Initializr, you would still use TeaVM and its port. So why are we doing this?
 
@@ -100,9 +100,9 @@ The value of maintaining a single VM that supports all the non-Java ports is pow
 
 I spent a lot of time this week on the issue tracker going through old issues. Assigning, closing and classifying stuff. If you opened issues in the past, we would appreciate your help in closing or classifying these.
 
-It also stands for issues that are important to you and got buried under the mountain of issues. If there are any of those, then let us know. We won't fix a lot of those. Some issues are just out of scope, and our scope is already huge. A lot are just too old by now, and it's hard to tell what's going on. But we're doing our best to go through that list. 
+It also stands for issues that are important to you and got buried under the mountain of issues. If there are any of those, then let us know. We won’t fix a lot of those. Some issues are just out of scope, and our scope is already huge. A lot are just too old by now, and it’s hard to tell what’s going on. But we’re doing our best to go through that list. 
 
-Over this past week we closed over 30 issues, but there are still over 500 open issues. We'd appreciate your help in reducing these.
+Over this past week we closed over 30 issues, but there are still over 500 open issues. We’d appreciate your help in reducing these.
 
 ---
 

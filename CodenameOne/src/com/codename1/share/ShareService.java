@@ -9,6 +9,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 
+// ShareResult / ShareResultListener live in the same package.
+
 /// This is an abstract sharing service.
 ///
 /// @author Chen
@@ -18,6 +20,8 @@ public abstract class ShareService extends Command {
     private String image;
     private String mimeType;
     private Form original;
+    private ShareResultListener shareResultListener;
+    private boolean resultDelivered;
 
     /// Constructor with the service name and icon
     ///
@@ -106,6 +110,38 @@ public abstract class ShareService extends Command {
     public void finish() {
         if (original != null) {
             original.showBack();
+        }
+        if (!resultDelivered) {
+            deliverResult(ShareResult.sharedTo(getCommandName()));
+        }
+    }
+
+    /// Registers a listener to be notified once when the share completes.
+    ///
+    /// Set by [com.codename1.components.ShareButton] before the service
+    /// is invoked. Subclasses normally do not call this directly.
+    public void setShareResultListener(ShareResultListener listener) {
+        this.shareResultListener = listener;
+        this.resultDelivered = false;
+    }
+
+    /// Returns the registered result listener (may be null).
+    public ShareResultListener getShareResultListener() {
+        return shareResultListener;
+    }
+
+    /// Delivers a [ShareResult] to the registered listener exactly once.
+    ///
+    /// Subclasses can call this to report a `DISMISSED` (user cancelled)
+    /// or `FAILED` outcome. [#finish] already reports a default
+    /// `SHARED_TO(commandName)` if no explicit result was delivered.
+    protected void deliverResult(ShareResult result) {
+        if (resultDelivered) {
+            return;
+        }
+        resultDelivered = true;
+        if (shareResultListener != null && result != null) {
+            shareResultListener.onResult(result);
         }
     }
 

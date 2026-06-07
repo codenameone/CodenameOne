@@ -17,6 +17,8 @@
 
 package java.util;
 
+import java.util.function.UnaryOperator;
+
 
 /**
  * A {@code List} is a collection which maintains an ordering for its elements. Every
@@ -350,4 +352,32 @@ public interface List<E> extends Collection<E> {
      *                in the type of the specified array.
      */
     public <T> T[] toArray(T[] array);
+
+    /**
+     * Replaces each element of this list with the result of applying the
+     * operator to that element.
+     */
+    default void replaceAll(UnaryOperator<E> operator) {
+        if (operator == null) {
+            throw new NullPointerException();
+        }
+        ListIterator<E> it = listIterator();
+        while (it.hasNext()) {
+            it.set(operator.apply(it.next()));
+        }
+    }
+
+    /**
+     * Sorts this list according to the order induced by the specified
+     * {@code Comparator}. A {@code null} comparator sorts by natural ordering.
+     */
+    default void sort(Comparator<? super E> c) {
+        Object[] a = toArray();
+        Arrays.sort(a, (Comparator) c);
+        ListIterator<E> it = listIterator();
+        for (Object e : a) {
+            it.next();
+            it.set((E) e);
+        }
+    }
 }

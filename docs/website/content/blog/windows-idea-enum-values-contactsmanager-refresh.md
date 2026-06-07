@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/windows-idea-enum-values-contactsmanager-refresh/generic-java-1.jpg)
 
-Steve committed the [upcoming Windows port to out github repository](https://github.com/codenameone/CodenameOne/tree/master/Ports/UWP/VSProjectTemplate)  
+Steve committed the [upcoming Windows port to our github repository](https://github.com/codenameone/CodenameOne/tree/master/Ports/UWP/VSProjectTemplate)  
 it’s still work in progress so you can’t physically target it as part of the build system although we hope to move  
 this port out relatively quickly. This should be more doable thanks to the [iKVM route](/blog/new-windows-port/)  
 & the [work from Fabricio](https://github.com/Pmovil/CN1WindowsPort) both of which saved a lot of the effort in this port.

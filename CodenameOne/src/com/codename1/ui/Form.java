@@ -110,6 +110,9 @@ public class Form extends Container {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
+    // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
+    // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
+    private Component lastInteractiveScrollHover;
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
@@ -135,6 +138,9 @@ public class Form extends Container {
     private EventDispatcher commandListener;
     /// Relevant for modal forms where the previous form should be rendered underneath
     private Form previousForm;
+    /// Optional guard consulted before back/pop navigation leaves this form.
+    /// Installed with `#setPopGuard(com.codename1.router.PopGuard)`.
+    private com.codename1.router.PopGuard popGuard;
     /// Default color for the screen tint when a dialog or a menu is shown
     private int tintColor;
     /// Listeners for key release events
@@ -839,6 +845,40 @@ public class Form extends Container {
         return titleArea;
     }
 
+    /// Returns the configured desktop title-bar mode ({@code native}, {@code custom} or
+    /// {@code toolbar}). Sourced from the implementation (desktop ports report the real mode;
+    /// everything else returns {@code toolbar}).
+    String getDesktopTitleBarMode() {
+        return Display.impl.getDesktopTitleBarMode();
+    }
+
+    /// Indicates that this form runs on the desktop in a title-bar mode that bridges the Toolbar's
+    /// commands to a native menu bar ({@code native} or {@code custom}). Inert (false) on mobile
+    /// because {@link Display#isDesktop()} is false and the theme constant is absent.
+    boolean isDesktopNativeChrome() {
+        if (!Display.getInstance().isDesktop()) {
+            return false;
+        }
+        String m = getDesktopTitleBarMode();
+        return "native".equals(m) || "custom".equals(m);
+    }
+
+    /// Indicates the {@code native} desktop title-bar mode, where the CN1 Toolbar is hidden entirely:
+    /// the form title goes into the real OS window title bar and the commands are bridged to a native
+    /// menu bar. Inert (false) on mobile.
+    boolean isDesktopHideToolbar() {
+        return Display.getInstance().isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    /// Indicates the {@code custom} desktop title-bar mode, where the CN1 Toolbar stays visible and
+    /// acts as the window's title bar: the OS window is undecorated (no native title area), the
+    /// Toolbar is the drag handle that moves the window, the window is resized by dragging its edges,
+    /// and the commands appear both in the native menu bar and in the Toolbar's side menu. Inert
+    /// (false) on mobile.
+    boolean isDesktopToolbarTitle() {
+        return Display.getInstance().isDesktop() && "custom".equals(getDesktopTitleBarMode());
+    }
+
     @Override
     public UIManager getUIManager() {
         if (uiManager != null) {
@@ -1537,6 +1577,56 @@ public class Form extends Container {
         menuBar.setBackCommand(backCommand);
     }
 
+    /// Installs an optional guard that is consulted before back/pop navigation
+    /// leaves this form.
+    ///
+    /// The guard fires for:
+    /// - The back command (toolbar / menu back button).
+    /// - Hardware back (Android back button, iOS edge-swipe back).
+    /// - Programmatic `com.codename1.router.Router#pop` and `replace` calls.
+    ///
+    /// If the guard returns `false` the navigation is suppressed; the guard itself
+    /// is responsible for any follow-up UI (e.g. showing a confirm dialog and then
+    /// calling `Router.pop()` once the user accepts).
+    ///
+    /// Pass `null` to remove a previously installed guard.
+    ///
+    /// #### Since 8.0
+    ///
+    /// #### See also
+    ///
+    /// - `com.codename1.router.PopGuard`
+    public void setPopGuard(com.codename1.router.PopGuard guard) {
+        this.popGuard = guard;
+    }
+
+    /// Returns the currently installed pop guard, or null.
+    ///
+    /// #### Since 8.0
+    public com.codename1.router.PopGuard getPopGuard() {
+        return popGuard;
+    }
+
+    /// Consults the installed pop guard for the given reason. Returns `true` when
+    /// no guard is installed or the guard permits the pop. Called by `Router`, by
+    /// the back-command dispatcher, by platform back-key glue, and may be called
+    /// by developer code that implements its own back navigation and wants to
+    /// honor any pop guard installed on the form.
+    ///
+    /// #### Since 8.0
+    public boolean checkPopGuard(com.codename1.router.PopReason reason) {
+        com.codename1.router.PopGuard g = this.popGuard;
+        if (g == null) {
+            return true;
+        }
+        try {
+            return g.canPop(this, reason);
+        } catch (Throwable t) {
+            Log.e(t);
+            return true;
+        }
+    }
+
     /// This method returns the Content pane instance
     ///
     /// #### Returns
@@ -1915,6 +2005,11 @@ public class Form extends Container {
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
+            // in desktop "native" mode the toolbar is hidden; push the title to the OS window title
+            // bar instead. In "custom" mode the (visible) toolbar shows the title itself.
+            if (isDesktopHideToolbar() && Display.getInstance().getCurrent() == this) { //NOPMD CompareObjectsWithEquals
+                Display.getInstance().refreshNativeTitle();
+            }
             return;
         }
 
@@ -2414,6 +2509,19 @@ public class Form extends Container {
             return;
         }
 
+        // PopGuard hook: if the dispatched command is this form's back command and
+        // a pop guard is installed, consult it before the back actually fires. A
+        // guard that vetoes the pop also consumes the event so the back-command's
+        // own action listener never runs.
+        if (popGuard != null && cmd == menuBar.getBackCommand()) { //NOPMD CompareObjectsWithEquals
+            if (!checkPopGuard(com.codename1.router.PopReason.BACK_COMMAND)) {
+                if (ev != null) {
+                    ev.consume();
+                }
+                return;
+            }
+        }
+
         if (comboLock) {
             if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
@@ -2546,6 +2654,9 @@ public class Form extends Container {
         dragged = null;
         if (Display.getInstance().isNativeCommands()) {
             Display.impl.setNativeCommands(menuBar.getCommands());
+        } else if (isDesktopNativeChrome() && toolbar != null) {
+            // bridge the (hidden) toolbar's commands to the native desktop menu bar
+            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
         }
         if (getParent() != null) {
             Form f = getParent().getComponentForm();
@@ -3541,10 +3652,15 @@ public class Form extends Container {
             }
             cmp = LeadUtil.leadParentImpl(cmp);
 
-            LeadUtil.pointerDragged(cmp, x, y);
+            // Mirror the isEnabled() gate that pointerPressed and the
+            // sidemenu-drag branch above already apply: a disabled component
+            // must not receive drag events. See #1592.
+            if (cmp.isEnabled()) {
+                LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
-                stickyDrag = cmp;
+                if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
+                    stickyDrag = cmp;
+                }
             }
         }
     }
@@ -3611,10 +3727,15 @@ public class Form extends Container {
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
-            LeadUtil.pointerDragged(cmp, x, y);
+            // Mirror the isEnabled() gate that pointerPressed and the
+            // sidemenu-drag branch above already apply: a disabled component
+            // must not receive drag events. See #1592.
+            if (cmp.isEnabled()) {
+                LeadUtil.pointerDragged(cmp, x, y);
 
-            if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
-                stickyDrag = cmp;
+                if (cmp == pressedCmp && cmp.isStickyDrag()) { //NOPMD CompareObjectsWithEquals
+                    stickyDrag = cmp;
+                }
             }
         }
     }
@@ -3684,6 +3805,7 @@ public class Form extends Container {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
+                updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
             if (TooltipManager.getInstance() != null) {
                 String tip = cmp.getTooltip();
@@ -3694,6 +3816,26 @@ public class Form extends Container {
                 }
             }
         }
+    }
+
+    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an interactive
+    /// (desktop) scrollbar can highlight its thumb, and clears the highlight on the previously
+    /// hovered scrollable. Inert unless interactive scrollbars are enabled.
+    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
+        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
+            return;
+        }
+        Component scrollable = cmp;
+        while (scrollable != null && !scrollable.isScrollableY() && !scrollable.isScrollableX()) {
+            scrollable = scrollable.getParent();
+        }
+        if (lastInteractiveScrollHover != null && lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals
+            lastInteractiveScrollHover.clearInteractiveScrollHover();
+        }
+        if (scrollable != null) {
+            scrollable.updateInteractiveScrollHover(x, y);
+        }
+        lastInteractiveScrollHover = scrollable;
     }
 
     /// Returns true if there is only one focusable member in this form. This is useful
