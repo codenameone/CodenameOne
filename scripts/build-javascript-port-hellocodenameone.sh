@@ -178,29 +178,33 @@ fi
 # Generate the appropriate launcher based on whether TeaVM is available
 # Both launchers work - they bootstrap the implementation factory before Display.init()
 bj_log "Preparing JavaScript-port launcher"
-if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  cat > "$LAUNCHER_SRC" <<'EOF'
-import com.codename1.impl.html5.JavaScriptPortBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
-
-public final class HelloCodenameOneJavaScriptMain {
-    public static void main(String[] args) {
-        JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());
-    }
-}
-EOF
-else
-  cat > "$LAUNCHER_SRC" <<'EOF'
-import com.codename1.impl.html5.ParparVMBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
-
-public final class HelloCodenameOneJavaScriptMain {
-    public static void main(String[] args) {
-        ParparVMBootstrap.bootstrap(new HelloCodenameOne());
-    }
-}
-EOF
+# If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry,
+# the launcher must call installGlobal() so the transcoded SVG images are registered
+# (Resources.getImage returns them) AND so ParparVM's dead-code elimination keeps the
+# GeneratedSVGImage hierarchy reachable. Mirrors JavaScriptBuilder.writeLauncher().
+SVG_INIT_LINE=""
+if [ -f "$STAGE_CLASSES/com/codename1/generated/svg/SVGRegistry.class" ]; then
+  bj_log "SVGRegistry detected -- launcher will call installGlobal()"
+  SVG_INIT_LINE='        com.codename1.generated.svg.SVGRegistry.installGlobal();'
 fi
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  BOOT_IMPORT="com.codename1.impl.html5.JavaScriptPortBootstrap"
+  BOOT_CALL="JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());"
+else
+  BOOT_IMPORT="com.codename1.impl.html5.ParparVMBootstrap"
+  BOOT_CALL="ParparVMBootstrap.bootstrap(new HelloCodenameOne());"
+fi
+cat > "$LAUNCHER_SRC" <<EOF
+import ${BOOT_IMPORT};
+import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+
+public final class HelloCodenameOneJavaScriptMain {
+    public static void main(String[] args) {
+        ${BOOT_CALL}
+${SVG_INIT_LINE}
+    }
+}
+EOF
 
 # Build source list: JavaScriptPort sources plus launcher
 # JavaScriptPort now includes org.teavm.jso interfaces built-in

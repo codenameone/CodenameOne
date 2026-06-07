@@ -3470,7 +3470,7 @@ const baseTestRunTestMethodId = "cn1_s_runTest_R_boolean";
 const baseTestFailMethodId = "cn1_s_fail_java_lang_String";
 const baseTestDoneMethodId = "cn1_s_done";
 const cn1ssForcedTimeoutTestClasses = Object.freeze({
-  "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
+  // UNSKIP-PHASE2: "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
   "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
   // BrowserComponent's ``onLoad`` event never reaches the worker side
   // — the iframe ``load`` event isn't currently routed through the
@@ -3541,7 +3541,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // launcher) is correct and stays; only the runtime transform render is the
   // gap. Park until the SVG transform render is fixed so the suite stays green
   // (a delivering test with no golden fails as "Reference screenshot missing").
-  "com_codenameone_examples_hellocodenameone_tests_SVGStaticScreenshotTest": "svgTransformBlankRender",
+  // UNSKIP-PHASE2: "com_codenameone_examples_hellocodenameone_tests_SVGStaticScreenshotTest": "svgTransformBlankRender",
   // FileSystemStorageOpenInputStreamMissingTest RE-PARKED: its runTest blocks on
   // a flaky LocalForage.getItem host call. The per-test dispatch watchdog DOES
   // fire on it, but force-advancing cannot recover a DEGRADED host channel (the
@@ -3619,7 +3619,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "graphicsTransform3dCanvasHang"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
-  "MediaPlaybackScreenshotTest": "mediaPlayback",
+  // UNSKIP-PHASE2: "MediaPlaybackScreenshotTest": "mediaPlayback",
   "BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
   // SimdLargeAllocaTest hung the suite on bk76kkr50 with VIRTUAL_FAILs
   // on HTML5Impl methods (cn1_s_paintDirty / cn1_s_flushGraphics) and

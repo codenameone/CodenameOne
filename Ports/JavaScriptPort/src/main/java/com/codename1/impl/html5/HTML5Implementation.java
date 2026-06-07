@@ -3599,11 +3599,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     theEl.removeEventListener("loadedmetadata", loadedMetaDataListener);
                 }
             });
-            while (!complete[0]) {
+            // Bound the wait: a headless browser (no audio device) may never fire
+            // loadedmetadata OR error for an <audio> element, which used to hang
+            // createMedia forever (the test was force-advanced by the 90s dispatch
+            // watchdog). The media element is created either way; if metadata never
+            // arrives we return it anyway (it may still load/play later) rather
+            // than blocking the caller indefinitely.
+            final long mediaLoadDeadline = System.currentTimeMillis() + 4000;
+            while (!complete[0] && System.currentTimeMillis() < mediaLoadDeadline) {
                 invokeAndBlock(new Runnable() {
                     public void run() {
                         synchronized(complete) {
-                            Util.wait(complete);
+                            Util.wait(complete, 250);
                         }
                     }
 
@@ -3670,18 +3677,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (mimeType != null && !Objects.equals(blob.getType(), mimeType)) {
                 blob = BlobUtil.toType(blob, mimeType);
             }
-            URLBuilderFactory factory = (URLBuilderFactory)window;
-            URLBuilder urlBuilder = factory.getURL();
-        
-            String objUrl = urlBuilder.createObjectURL(blob);
-            return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);  
+            // BlobUtil.createObjectURL runs URL.createObjectURL in the worker.
+            // (URLBuilderFactory)window.getURL() returned null in the worker
+            // (window is a host-ref proxy) -> NPE in createMedia.
+            String objUrl = BlobUtil.createObjectURL(blob);
+            return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);
         } else {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Util.copy(stream, baos);
-            Blob blob = BlobUtil.createBlob(baos.toByteArray(), mimeType);
-            URLBuilderFactory factory = (URLBuilderFactory)window;
-            URLBuilder urlBuilder = factory.getURL();
-            String objUrl = urlBuilder.createObjectURL(blob);
+            // Use a self-contained data: URL (pure-Java base64) rather than a
+            // blob: object URL. BlobUtil.createObjectURL runs in the worker, so
+            // the blob: URL is worker-scoped and the main-thread <audio> element
+            // can't load it -- createMedia's blocking wait then never sees
+            // loadedmetadata/error and hangs (the dispatch watchdog force-advances
+            // the test). A data: URL is a portable string that loads anywhere.
+            String objUrl = "data:" + (mimeType == null ? "audio/wav" : mimeType)
+                    + ";base64," + com.codename1.util.Base64.encodeNoNewline(baos.toByteArray());
             return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);
         }
     }
