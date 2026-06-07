@@ -74,7 +74,11 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_resourceBytes___java_lang_S
     }
 
     HMODULE module = GetModuleHandleW(NULL);
-    HRSRC info = FindResourceW(module, MAKEINTRESOURCEW(id), RT_RCDATA);
+    /* RT_RCDATA expands to MAKEINTRESOURCE(10), which is the *narrow* (LPSTR)
+     * MAKEINTRESOURCEA when UNICODE is not forced; FindResourceW wants LPCWSTR.
+     * MSVC only warns (C4133), but clang-cl (the cross-compile path) errors, so
+     * use the wide integer-resource form explicitly. */
+    HRSRC info = FindResourceW(module, MAKEINTRESOURCEW(id), (LPCWSTR) RT_RCDATA);
     if (info == NULL) {
         return JAVA_NULL;
     }
