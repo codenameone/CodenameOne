@@ -223,21 +223,125 @@ public class JSAffineTransform {
 
 
     private JSOAffineTransform inner;
+    /// Optional 4x4 backing (column-major, OpenGL ES convention) used for the
+    /// perspective / camera / 3D-rotation path. {@code null} means this is a
+    /// pure 2D affine and every operation stays on the (unchanged, JS-backed)
+    /// {@code inner} matrix -- so non-perspective rendering is byte-for-byte
+    /// identical to before. When non-null, {@code inner} is kept in sync with
+    /// the affine projection of {@code m4} so the 2D render path (which reads
+    /// the six affine accessors) still gets a sane matrix.
+    private double[] m4;
+
     private JSAffineTransform(JSOAffineTransform jso) {
         inner = jso;
     }
+
+    /// True when this transform carries a full 4x4 matrix (perspective/camera/3D).
+    public boolean is3D() {
+        return m4 != null;
+    }
+
+    /// Replace the backing with a 4x4 matrix (column-major) and sync the
+    /// 2D affine projection onto {@code inner}.
+    public JSAffineTransform setMatrix4(double[] m16) {
+        m4 = m16;
+        syncInnerFromM4();
+        return this;
+    }
+
+    /// Return the 4x4 backing, promoting the current 2D affine to 4x4 first.
+    public double[] getMatrix4() {
+        ensure3D();
+        return m4;
+    }
+
+    private void ensure3D() {
+        if (m4 == null) {
+            m4 = JSMatrix4.fromAffine(jsoScaleX(inner), jsoShearY(inner),
+                    jsoShearX(inner), jsoScaleY(inner),
+                    jsoTranslateX(inner), jsoTranslateY(inner));
+        }
+    }
+
+    private void syncInnerFromM4() {
+        // Affine projection of the 4x4 (drops the perspective / z rows): the
+        // 2D render path consumes only these six components.
+        jsoSet(inner, m4[0], m4[1], m4[4], m4[5], m4[12], m4[13]);
+    }
+
+    /// Post-multiply by another transform in 4x4 space (this = this * o).
+    public JSAffineTransform concatenate3(JSAffineTransform o) {
+        ensure3D();
+        m4 = JSMatrix4.multiplyMM(m4, o.getMatrix4());
+        syncInnerFromM4();
+        return this;
+    }
+
+    public JSAffineTransform translate3(double x, double y, double z) {
+        ensure3D();
+        JSMatrix4.translateInPlace(m4, x, y, z);
+        syncInnerFromM4();
+        return this;
+    }
+
+    public JSAffineTransform scale3(double x, double y, double z) {
+        ensure3D();
+        JSMatrix4.scaleInPlace(m4, x, y, z);
+        syncInnerFromM4();
+        return this;
+    }
+
+    public JSAffineTransform rotate3(double angleRad, double x, double y, double z) {
+        ensure3D();
+        m4 = JSMatrix4.multiplyMM(m4, JSMatrix4.setRotate(angleRad, x, y, z));
+        syncInnerFromM4();
+        return this;
+    }
+
+    /// Project a point through the 4x4 matrix with the homogeneous divide.
+    /// {@code out} receives x,y (and z if it has room).
+    public void transformPoint3(float[] in, float[] out) {
+        ensure3D();
+        double[] v = new double[]{in[0], in[1], in.length > 2 ? in[2] : 0, 1};
+        double[] r = JSMatrix4.multiplyMV(m4, v);
+        double w = r[3];
+        if (w != 0 && w != 1) {
+            r[0] /= w; r[1] /= w; r[2] /= w;
+        }
+        out[0] = (float) r[0];
+        out[1] = (float) r[1];
+        if (out.length > 2) {
+            out[2] = (float) r[2];
+        }
+    }
+
     public boolean isIdentity() {
+        if (m4 != null) {
+            return JSMatrix4.isIdentity(m4);
+        }
         return jsoIsIdentity(inner);
     }
     public JSAffineTransform cloneTransform() {
-        return new JSAffineTransform(jsoClone(inner));
+        JSAffineTransform copy = new JSAffineTransform(jsoClone(inner));
+        if (m4 != null) {
+            copy.m4 = new double[16];
+            System.arraycopy(m4, 0, copy.m4, 0, 16);
+        }
+        return copy;
     }
     public JSAffineTransform setTransform(double m00, double m10, double m01, double m11, double m02, double m12) {
         jsoSet(inner, m00, m10, m01, m11, m02, m12);
+        m4 = null;
         return this;
     }
     public JSAffineTransform copyFrom(JSAffineTransform t) {
         jsoCopy(inner, t.inner);
+        if (t.m4 != null) {
+            m4 = new double[16];
+            System.arraycopy(t.m4, 0, m4, 0, 16);
+        } else {
+            m4 = null;
+        }
         return this;
     }
     public JSAffineTransform scale(double sx, double sy) {
@@ -302,14 +406,17 @@ public class JSAffineTransform {
     }
     public JSAffineTransform setToScale(double sx, double sy) {
         jsoSet(inner, sx, 0, 0, sy, 0, 0);
+        m4 = null;
         return this;
     }
     public JSAffineTransform setToTranslation(double tx, double ty) {
         jsoSet(inner, 1, 0, 0, 1, tx, ty);
+        m4 = null;
         return this;
     }
     public JSAffineTransform setToShear(double shx, double shy) {
         jsoSet(inner, 1, shy, shx, 1, 0, 0);
+        m4 = null;
         return this;
     }
     public JSAffineTransform setToRotation(double theta, double x, double y) {
@@ -318,10 +425,19 @@ public class JSAffineTransform {
         jsoSet(inner, cos, sin, -sin, cos,
                 x - cos * x + sin * y,
                 y - sin * x - cos * y);
+        m4 = null;
         return this;
     }
     public boolean isEqualTo(JSAffineTransform t) {
         if (t == null) return false;
+        if (m4 != null || t.m4 != null) {
+            double[] a = getMatrix4();
+            double[] b = t.getMatrix4();
+            for (int i = 0; i < 16; i++) {
+                if (a[i] != b[i]) return false;
+            }
+            return true;
+        }
         return jsoEquals(inner, t.inner);
     }
 

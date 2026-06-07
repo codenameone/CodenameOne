@@ -49,6 +49,7 @@ import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
 import com.codename1.teavm.ext.websql.WebSQL;
 import com.codename1.teavm.geom.JSAffineTransform;
+import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
 import com.codename1.teavm.jso.io.Blob;
 import com.codename1.teavm.jso.io.FileList;
@@ -6399,7 +6400,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void concatenateTransform(Object t1, Object t2) {
-        ((JSAffineTransform)t1).concatenate((JSAffineTransform)t2);
+        JSAffineTransform a = (JSAffineTransform)t1;
+        JSAffineTransform b = (JSAffineTransform)t2;
+        if (a.is3D() || b.is3D()) {
+            a.concatenate3(b);
+        } else {
+            a.concatenate(b);
+        }
     }
 
     @Override
@@ -6417,6 +6424,54 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
         ((JSAffineTransform)nativeTransform).setTransform(m00, m10, m01, m11, m02, m12);
+    }
+
+    // ---- Perspective / camera / orthographic (4x4) transforms -------------
+    // The JS port backs these with a pure-Java 4x4 matrix (JSMatrix4) carried
+    // inside JSAffineTransform; the affine projection is mirrored onto the 2D
+    // backing so ordinary rendering is unaffected. Apps that project points
+    // themselves (transformPoint) get the full homogeneous result, matching the
+    // Android port. See JSMatrix4 + JSAffineTransform.is3D().
+
+    @Override
+    public boolean isPerspectiveTransformSupported() {
+        return true;
+    }
+
+    private static JSAffineTransform make4x4(double[] m16) {
+        JSAffineTransform t = JSAffineTransform.Factory.getTranslateInstance(0, 0);
+        t.setMatrix4(m16);
+        return t;
+    }
+
+    @Override
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        return make4x4(JSMatrix4.perspective(fovy, aspect, zNear, zFar));
+    }
+
+    @Override
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.perspective(fovy, aspect, zNear, zFar));
+    }
+
+    @Override
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        return make4x4(JSMatrix4.ortho(left, right, bottom, top, near, far));
+    }
+
+    @Override
+    public void setTransformOrtho(Object nativeTransform, float left, float right, float bottom, float top, float near, float far) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.ortho(left, right, bottom, top, near, far));
+    }
+
+    @Override
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        return make4x4(JSMatrix4.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
+    }
+
+    @Override
+    public void setTransformCamera(Object nativeTransform, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
     }
 
     @Override
@@ -6481,19 +6536,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).translate(x, y);
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D() || z != 0) {
+            t.translate3(x, y, z);
+        } else {
+            t.translate(x, y);
+        }
     }
 
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).scale(x, y);
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D() || z != 1) {
+            t.scale3(x, y, z);
+        } else {
+            t.scale(x, y);
+        }
     }
 
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).rotate(angle, x, y);
+        // Transform.rotate(angle, px, py) decomposes to translate + rotate around
+        // the z axis + translate, so x,y,z here is always a rotation AXIS (never a
+        // pivot). A pure z-axis rotation collapses to the 2D affine rotate; any
+        // other axis (or an already-3D transform) needs the 4x4 path.
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        boolean zAxis = x == 0 && y == 0;
+        if (t.is3D() || !zAxis) {
+            t.rotate3(angle, x, y, z);
+        } else {
+            t.rotate(angle, 0, 0);
+        }
     }
 
     @Override
@@ -6525,11 +6600,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             return;
         }
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D()) {
+            t.transformPoint3(in, out);
+            return;
+        }
         Float64Array jsIn = Float64Array.create(2);
         jsIn.set(0, in[0]);
         jsIn.set(1, in[1]);
         Float64Array jsOut = Float64Array.create(2);
-        ((JSAffineTransform)nativeTransform).transform(jsIn, 0, jsOut, 0, 1);
+        t.transform(jsIn, 0, jsOut, 0, 1);
         out[0] = (float)jsOut.get(0);
         out[1] = (float)jsOut.get(1);
 
