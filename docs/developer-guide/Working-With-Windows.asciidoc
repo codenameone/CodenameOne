@@ -51,16 +51,27 @@ how to build it. The heavy lifting -- translate to C, generate the CMake project
 configure and build with clang-cl/Ninja, collect the `.exe` -- is handled by the
 builder, so the configuration on your side is trivial.
 
-A runnable build must happen *on Windows*: the native compile links against the
-Windows SDK (Direct2D / DirectWrite / WIC / Media Foundation / WinHTTP / Win32)
-and uses clang-cl + CMake + Ninja inside a Visual Studio developer environment.
-Direct2D/DirectWrite also need a real Windows GPU/display stack, so the rendering
-can't be validated under emulation. A Windows 11 VM (Parallels, Hyper-V, …) or a
-real machine is the development environment.
+The build can run two ways, and the builder picks automatically based on the host:
 
-Both *x64* and *arm64* are supported. clang-cl cross-compiles to either
-architecture, so you can target either architecture from the other host; pick the
-target with the `windows.arch` build hint.
+- *On a Windows host* it uses clang-cl + CMake + Ninja inside a Visual Studio
+  developer environment (the CRT and Windows SDK reach the compiler through
+  `vcvarsall`).
+- *On any other host -- for example a Linux build server* it cross-compiles with clang-cl
+  + lld-link + llvm-rc against a Windows SDK laid out by
+  https://github.com/Jake-Shadle/xwin[`xwin`]. clang is a cross-compiler, so the
+  PE it emits is identical to a Windows-host build. Point the `windows.sdkRoot`
+  build hint (or the `CN1_XWIN_SYSROOT` environment variable) at the `xwin splat`
+  directory. This is how the build cloud produces Windows binaries without a
+  Windows machine.
+
+Both *x64* and *arm64* are produced this way -- clang-cl cross-compiles to either
+architecture from either host; pick the target with the `windows.arch` build hint.
+
+What you *can't* do off Windows is **run** the result: Direct2D/DirectWrite need a
+real Windows GPU/display stack (emulation such as Wine is too incomplete to trust),
+so rendering can only be verified on Windows. A Windows 11 VM (Parallels, Hyper-V,
+…) or a real machine is therefore the place to *test* the app, even when the binary
+itself was built on Linux.
 
 === Build hints
 

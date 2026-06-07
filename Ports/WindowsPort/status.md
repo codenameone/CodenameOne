@@ -139,30 +139,33 @@ the generic peer-placement path in `WindowsImplementation` is the remaining work
 
 ## Build & toolchain — where can this be built?
 
-**Short answer: a runnable build needs Windows.** The native compile links against
-the Windows SDK (Direct2D / DirectWrite / WIC / Media Foundation / WinHTTP / Win32)
-and uses `clang-cl` (LLVM on the MSVC ABI) + CMake + Ninja inside the Visual Studio
-developer environment (`vcvarsall.bat`, located via `vswhere`). See
-`WindowsNativeBuilder.java` and `ByteCodeTranslator.writeCmakeProject`.
+**Short answer: the binary builds on Windows *or* Linux; only *running* it needs
+Windows.** The native compile links against the Windows SDK (Direct2D / DirectWrite
+/ WIC / Media Foundation / WinHTTP / Win32). `WindowsNativeBuilder` picks the
+toolchain from the host:
 
-- **CI** builds on real Windows runners: `windows-latest` (x64, the merge gate) and
-  `windows-11-arm` (arm64, experimental / non-blocking). Cross-*architecture*
-  builds work *on Windows* (e.g. arm64 from an x64 host via the VS cross
-  environment).
-- **The build orchestration is OS-independent** (arch resolution, translator
-  invocation, CMake argument assembly are unit-tested anywhere); only the final
-  `clang-cl` compile/link step is Windows-bound.
-- **Linux cross-compile:** *theoretically* possible but **not set up and not
-  recommended**. `clang-cl` can target Windows from Linux with `/winsysroot`
-  pointing at a Windows SDK + MSVC toolchain fetched by a tool like
-  [`xwin`](https://github.com/Jake-Shadle/xwin). That could give a *compile-only*
-  pre-check, but: (a) it cannot **run or validate** the result — Direct2D /
-  DirectWrite need a real Windows GPU/display stack, so rendering can only be
-  verified on Windows (a Parallels/HyperV VM or a real machine); (b) it is
-  unproven against this port's link set; (c) the MSVC headers/libs are Microsoft's
-  and you must accept their license via xwin. **Recommendation:** develop and
-  validate in a Windows 11 VM (Direct2D/DirectWrite are GPU-accelerated there);
-  let CI's two Windows legs be the authoritative gate.
+- **Windows host:** `clang-cl` (LLVM on the MSVC ABI) + CMake + Ninja inside the
+  Visual Studio developer environment (`vcvarsall.bat`, located via `vswhere`).
+- **Non-Windows host (e.g. the Linux build cloud):** cross-compiles with `clang-cl`
+  + `lld-link` + `llvm-rc` against a Windows SDK laid out by
+  [`xwin`](https://github.com/Jake-Shadle/xwin), pointed at by the `windows.sdkRoot`
+  build hint / `CN1_XWIN_SYSROOT`. clang is a cross-compiler, so the PE is identical
+  to a Windows-host build. Both `x64` and `arm64` are produced this way. The MSVC
+  headers/libs are Microsoft's — `xwin` requires accepting their license.
+
+  Prerequisites for such a host: a modern LLVM (`clang-cl`/`lld-link`/`llvm-rc`,
+  18+ known-good), CMake ≥ 3.10, Ninja, a JDK, and an `xwin splat` of the SDK. The
+  `crossCompilesWindowsExeWithXwin` test (and the `windows-cross-compile.yml` CI
+  job it backs) is the readiness check: if it links a PE, the host is good.
+
+- **CI:** Windows runners (`windows-latest` x64 + `windows-11-arm` arm64) build
+  *and run* the screenshot suite (the authoritative render gate); a separate
+  `ubuntu-latest` job cross-compiles the port to a Windows PE to prove the
+  Windows-free build path stays green.
+- **What still needs Windows:** *running* the binary. Direct2D/DirectWrite need a
+  real Windows GPU/display stack (Wine's D2D/DWrite/DXGI support is too incomplete),
+  so rendering can only be verified on Windows — a Parallels/Hyper-V VM or a real
+  machine. Build on Linux; test on Windows.
 
 ---
 

@@ -274,6 +274,19 @@ public class WindowsNativeBuilder extends Executor {
         // development. Optimizations are on in both configurations.
         boolean debugSymbols = "true".equalsIgnoreCase(request.getArg("windows.debug", "false"));
         String buildType = debugSymbols ? "RelWithDebInfo" : "Release";
+
+        // On a Windows host the build runs inside the Visual Studio developer
+        // environment (clang-cl + the MSVC CRT/SDK reach the compiler through
+        // PATH/INCLUDE/LIB via vcvarsall). On any other host -- e.g. the Linux build
+        // cloud -- there is no Visual Studio, so cross-compile with clang-cl +
+        // lld-link + llvm-rc against a Windows SDK laid out by `xwin splat` (pointed
+        // at by windows.sdkRoot / CN1_XWIN_SYSROOT). clang is a cross-compiler, so
+        // the PE is identical to a Windows-host build; this is the same toolchain the
+        // windows-cross-compile CI validates. Both x64 and arm64 targets are produced
+        // this way (the SDK arch subdir follows windows.arch).
+        boolean cross = !is_windows;
+        File xwinSysroot = cross ? resolveXwinSysroot(request) : null;
+
         List<String> configure = new ArrayList<String>();
         configure.add("cmake");
         configure.add("-S");
@@ -283,20 +296,24 @@ public class WindowsNativeBuilder extends Executor {
         configure.add("-DCMAKE_BUILD_TYPE=" + buildType);
         configure.add("-G");
         configure.add("Ninja");
-        configure.add("-DCMAKE_C_COMPILER=clang-cl");
-        configure.add("-DCMAKE_CXX_COMPILER=clang-cl");
-        configure.add("-DCMAKE_C_FLAGS=--target=" + triple);
-        configure.add("-DCMAKE_CXX_FLAGS=--target=" + triple);
+        configure.add("-DCMAKE_C_COMPILER=" + clangClExecutable());
+        configure.add("-DCMAKE_CXX_COMPILER=" + clangClExecutable());
+        if (cross) {
+            addCrossCompileConfigure(configure, triple, arch, xwinSysroot);
+        } else {
+            configure.add("-DCMAKE_C_FLAGS=--target=" + triple);
+            configure.add("-DCMAKE_CXX_FLAGS=--target=" + triple);
+        }
 
         try {
-            if (!runWindowsBuildStep(cmakeRoot, arch, configure)) {
+            if (!runBuildStep(cmakeRoot, arch, cross, configure)) {
                 return false;
             }
             List<String> buildCmd = new ArrayList<String>();
             buildCmd.add("cmake");
             buildCmd.add("--build");
             buildCmd.add(buildDir.getAbsolutePath());
-            if (!runWindowsBuildStep(cmakeRoot, arch, buildCmd)) {
+            if (!runBuildStep(cmakeRoot, arch, cross, buildCmd)) {
                 return false;
             }
         } catch (Exception ex) {
@@ -523,6 +540,102 @@ public class WindowsNativeBuilder extends Executor {
         } catch (NumberFormatException ex) {
             return -1;
         }
+    }
+
+    /** The clang-cl executable: {@code CN1_CLANG_CL} if set, else {@code clang-cl} on PATH. */
+    private static String clangClExecutable() {
+        String c = System.getenv("CN1_CLANG_CL");
+        return (c != null && !c.isEmpty()) ? c : "clang-cl";
+    }
+
+    /** The llvm-rc executable: {@code CN1_LLVM_RC} if set, else {@code llvm-rc} on PATH. */
+    private static String llvmRcExecutable() {
+        String c = System.getenv("CN1_LLVM_RC");
+        return (c != null && !c.isEmpty()) ? c : "llvm-rc";
+    }
+
+    /** The xwin SDK arch subdirectory for a (normalised) target: {@code x86_64} / {@code aarch64}. */
+    private static String sdkArchSubdir(String arch) {
+        return ARCH_ARM64.equals(normalizeArch(arch)) ? "aarch64" : "x86_64";
+    }
+
+    /** The CMake {@code CMAKE_SYSTEM_PROCESSOR} value for a target: {@code AMD64} / {@code ARM64}. */
+    private static String cmakeSystemProcessor(String arch) {
+        return ARCH_ARM64.equals(normalizeArch(arch)) ? "ARM64" : "AMD64";
+    }
+
+    /**
+     * Resolves the Windows SDK sysroot used to cross-compile on a non-Windows host:
+     * the {@code windows.sdkRoot} build hint, else the {@code CN1_XWIN_SYSROOT}
+     * environment variable. Must point at an {@code xwin splat} directory (i.e. one
+     * containing {@code crt/include} and {@code sdk/include/um}).
+     */
+    private File resolveXwinSysroot(BuildRequest request) {
+        String hint = request.getArg("windows.sdkRoot", null);
+        String path = (hint != null && !hint.isEmpty()) ? hint : System.getenv("CN1_XWIN_SYSROOT");
+        if (path == null || path.isEmpty()) {
+            throw new BuildException("Building the native Windows target on a non-Windows host (e.g. the Linux build "
+                    + "cloud) cross-compiles against a Windows SDK laid out by `xwin splat`. Point the windows.sdkRoot "
+                    + "build hint or the CN1_XWIN_SYSROOT environment variable at that directory. See the \"Working "
+                    + "with the native Windows port\" developer guide chapter.");
+        }
+        File root = new File(path);
+        if (!new File(root, "crt/include").isDirectory() || !new File(root, "sdk/include/um").isDirectory()) {
+            throw new BuildException("windows.sdkRoot / CN1_XWIN_SYSROOT does not look like an `xwin splat` output "
+                    + "(missing crt/include or sdk/include/um): " + root.getAbsolutePath());
+        }
+        return root;
+    }
+
+    /**
+     * Appends the clang-cl + xwin cross-compile flags to a CMake configure command
+     * (mirrors {@code windows-cross-compile.yml} and the {@code crossCompilesWindows-
+     * ExeWithXwin} test). {@code CMAKE_SYSTEM_NAME=Windows} makes the generated
+     * CMakeLists' {@code if(WIN32)} Direct2D/DirectWrite link set activate; {@code
+     * /imsvc} points clang-cl at the SDK headers; {@code lld-link} (via {@code
+     * -fuse-ld=lld}) links against the SDK libs; {@code llvm-rc} gets the SDK include
+     * the resource compiler would otherwise read from {@code %INCLUDE%} on Windows.
+     */
+    private void addCrossCompileConfigure(List<String> configure, String triple, String arch, File sys) {
+        String a = sdkArchSubdir(arch);
+        String inc = "--target=" + triple
+                + " /imsvc " + new File(sys, "crt/include")
+                + " /imsvc " + new File(sys, "sdk/include/ucrt")
+                + " /imsvc " + new File(sys, "sdk/include/um")
+                + " /imsvc " + new File(sys, "sdk/include/shared")
+                + " /imsvc " + new File(sys, "sdk/include/winrt");
+        String rcFlags = "-I " + new File(sys, "sdk/include/um")
+                + " -I " + new File(sys, "sdk/include/shared")
+                + " -I " + new File(sys, "crt/include")
+                + " -I " + new File(sys, "sdk/include/ucrt");
+        String linkFlags = "-fuse-ld=lld"
+                + " /libpath:" + new File(sys, "crt/lib/" + a)
+                + " /libpath:" + new File(sys, "sdk/lib/um/" + a)
+                + " /libpath:" + new File(sys, "sdk/lib/ucrt/" + a);
+        configure.add("-DCMAKE_SYSTEM_NAME=Windows");
+        configure.add("-DCMAKE_SYSTEM_PROCESSOR=" + cmakeSystemProcessor(arch));
+        // STATIC_LIBRARY so CMake's compiler-detection try_compile does not need a
+        // full link before the cross flags are fully in effect.
+        configure.add("-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY");
+        configure.add("-DCMAKE_C_FLAGS=" + inc);
+        configure.add("-DCMAKE_CXX_FLAGS=" + inc);
+        configure.add("-DCMAKE_RC_COMPILER=" + llvmRcExecutable());
+        configure.add("-DCMAKE_RC_FLAGS=" + rcFlags);
+        configure.add("-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags);
+    }
+
+    /**
+     * Runs a CMake configure/build step. A cross build (non-Windows host) runs the
+     * command directly -- clang-cl / lld-link / llvm-rc / ninja are on PATH and the
+     * SDK reaches the compiler through the explicit flags, so no environment wrapper
+     * is needed. A Windows host wraps the command in the Visual Studio developer
+     * environment via {@link #runWindowsBuildStep}.
+     */
+    private boolean runBuildStep(File dir, String targetArch, boolean cross, List<String> command) throws Exception {
+        if (cross) {
+            return exec(dir, 1800000, command.toArray(new String[0]));
+        }
+        return runWindowsBuildStep(dir, targetArch, command);
     }
 
     /**

@@ -598,6 +598,9 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |windows.debug
 |Native Windows port only. true/false (defaults to false). When `false` the `.exe` is built optimized and *stripped* -- no PDB, dead-stripped unreferenced code (`/OPT:REF`) and folded identical functions (`/OPT:ICF`) -- which is the shipping default. Set `true` to keep debug symbols (a `.pdb` next to the exe, via `RelWithDebInfo` / clang-cl `/Zi` + linker `/DEBUG`) so a native crash address can be symbolized during development. Optimizations stay on in both cases.
 
+|windows.sdkRoot
+|Native Windows port only; used when building on a *non-Windows* host (e.g. a Linux build server). Path to a Windows SDK laid out by https://github.com/Jake-Shadle/xwin[`xwin splat`] (a directory containing `crt/include` and `sdk/include/um`), used to cross-compile the `.exe` with clang-cl + lld-link instead of a Visual Studio environment. If unset, the `CN1_XWIN_SYSROOT` environment variable is used. Ignored on Windows hosts, which build through Visual Studio. The same SDK serves both `windows.arch` targets (its `x86_64` / `aarch64` lib subdirs).
+
 |===
 
 === Android permissions
