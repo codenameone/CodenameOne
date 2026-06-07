@@ -295,14 +295,17 @@ public final class WindowsNative {
     /* ------------------------------------------------- native text editing */
 
     /**
-     * Overlays a native Win32 EDIT control at the component's pixel bounds with
-     * the given text, focuses it, and returns an opaque peer (0 when there is no
-     * host window, e.g. headless). {@code singleLine} commits on Enter; a
-     * multi-line control inserts newlines and commits on focus loss. The control
-     * is created on the pump thread; the EDT polls {@link #editIsDone(long)}.
+     * Overlays a native Win32 EDIT control at the component's text-area bounds
+     * (padding already applied), styled to match the Codename One field: the same
+     * font ({@code fontPeer}, a CN1Font*), foreground/background colour (0xRRGGBB,
+     * or -1 for default) and {@code align} (0 left, 1 center, 2 right). Focuses it
+     * and returns an opaque peer (0 when there is no host window, e.g. headless).
+     * {@code singleLine} commits on Enter; a multi-line control inserts newlines
+     * and commits on focus loss. Created on the pump thread; the EDT polls
+     * {@link #editIsDone(long)}.
      */
     public static native long editStringAt(int x, int y, int w, int h, String text,
-            boolean singleLine, int maxSize);
+            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align);
 
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);

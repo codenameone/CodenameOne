@@ -382,6 +382,15 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             /* Native EDIT-control op marshaled from the EDT (cn1_windows_edit.c). */
             cn1WinEditHandleMessage(wParam, lParam);
             return 0;
+        case WM_CTLCOLOREDIT: {
+            /* Colour the native edit overlay to match the CN1 field it stands in
+             * for; fall through to default when it is not our control. */
+            HBRUSH br = cn1WinEditCtlColor((HDC) wParam, (HWND) lParam);
+            if (br != NULL) {
+                return (LRESULT) br;
+            }
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
+        }
         case WM_CLOSE:
             cn1WinPushEvent(CN1_EVENT_CLOSE, 0, 0, 0);
             DestroyWindow(hwnd);
@@ -541,7 +550,13 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     hwndProps.hwnd = cn1Win.hwnd;
     hwndProps.pixelSize.width = (UINT32) cn1Win.width;
     hwndProps.pixelSize.height = (UINT32) cn1Win.height;
-    hwndProps.presentOptions = D2D1_PRESENT_OPTIONS_NONE;
+    /* RETAIN_CONTENTS: Codename One repaints only the dirty region each frame and
+     * relies on the rest of the surface being preserved across presents. The
+     * default (PRESENT_OPTIONS_NONE) discards the back buffer after Present, so
+     * everything the EDT did not repaint that frame showed stale pixels -- the
+     * overscroll "smear" at the form edges (a window resize recreated the target
+     * and briefly hid it). Retaining the contents makes partial repaints correct. */
+    hwndProps.presentOptions = D2D1_PRESENT_OPTIONS_RETAIN_CONTENTS;
 
     if (FAILED(ID2D1Factory_CreateHwndRenderTarget(cn1Win.d2dFactory, &rtProps, &hwndProps, &g_hwndTarget))) {
         cn1WindowsLog("initDisplay: failed to create HWND render target");

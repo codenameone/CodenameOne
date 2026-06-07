@@ -1298,7 +1298,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /* ---------------------------------------------------------- input keys */
 
-    private Component currentEditing;
+    /** The native EDIT-control peer of the field currently being edited, else 0. */
+    private long editPeer;
+    /** The field currently being edited (the native EDIT stands in for it). */
+    private Component editCmp;
+    /** Polls the native control for commit (Enter / focus loss) on the EDT. */
+    private com.codename1.ui.util.UITimer editPoller;
 
     /**
      * Native input is supported: while a TextField/TextArea is edited it is
@@ -1312,66 +1317,113 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     /**
-     * Synchronous edit mode: {@link #editString} blocks (releasing the EDT via
-     * invokeAndBlock) until the native control commits, then returns the value
-     * through {@code onEditingComplete}.
+     * Asynchronous edit mode. editString returns immediately and the native
+     * control owns the keystrokes; a UITimer polls for commit and the framework
+     * calls {@link #hideTextEditor()} when the user scrolls the editing field away
+     * (Component.setScrollY) -- so the overlay never floats detached from its
+     * field. (The sync invokeAndBlock alternative would freeze the EDT and miss
+     * the scroll-hide hook.)
      */
     @Override
     public boolean isAsyncEditMode() {
-        return false;
-    }
-
-    @Override
-    public boolean isEditingText(Component c) {
-        return currentEditing == c;
-    }
-
-    @Override
-    public boolean isEditingText() {
-        return currentEditing != null;
+        return true;
     }
 
     /**
-     * Overlays a native Win32 EDIT control at the component's bounds, lets the
-     * user type (native caret / selection / IME / clipboard), and writes the
-     * result back through {@code Display.onEditingComplete} when they commit
-     * (Enter on a single-line field, or focus loss). The EDT is parked in
-     * invokeAndBlock -- so the form stays responsive and repaints -- while the
-     * control, which lives on the window's pump thread, owns the keystrokes.
+     * Overlays a native Win32 EDIT control over the field's text area (inside the
+     * field's padding so its border/background still show), styled to match the
+     * field's font and colours, and focuses it. Returns immediately (async); the
+     * value is delivered through {@code Display.onEditingComplete} when the user
+     * commits (Enter on a single-line field) or the edit ends (focus loss, the
+     * field scrolling away, or editing another field).
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        boolean singleLine = true;
-        if (cmp instanceof com.codename1.ui.TextArea) {
-            singleLine = ((com.codename1.ui.TextArea) cmp).isSingleLineTextArea();
+        // Tapping straight from one field into another: finish the first cleanly
+        // before overlaying the new one, so two controls never float at once.
+        if (editPeer != 0) {
+            commitEdit();
         }
-        int x = cmp.getAbsoluteX() + cmp.getScrollX();
-        int y = cmp.getAbsoluteY() + cmp.getScrollY();
-        int w = cmp.getWidth();
-        int h = cmp.getHeight();
-        final long peer = WindowsNative.editStringAt(x, y, w, h, text == null ? "" : text,
-                singleLine, maxSize);
+        boolean singleLine = !(cmp instanceof com.codename1.ui.TextArea)
+                || ((com.codename1.ui.TextArea) cmp).isSingleLineTextArea();
+
+        com.codename1.ui.plaf.Style s = cmp.getStyle();
+        int padL = s.getPaddingLeft(false);
+        int padR = s.getPaddingRight(false);
+        int padT = s.getPaddingTop();
+        int padB = s.getPaddingBottom();
+        int x = cmp.getAbsoluteX() + cmp.getScrollX() + padL;
+        int y = cmp.getAbsoluteY() + cmp.getScrollY() + padT;
+        int w = cmp.getWidth() - padL - padR;
+        int h = cmp.getHeight() - padT - padB;
+
+        long fontPeer = 0;
+        com.codename1.ui.Font f = s.getFont();
+        if (f != null && f.getNativeFont() instanceof Long) {
+            fontPeer = ((Long) f.getNativeFont()).longValue();
+        }
+
+        long peer = WindowsNative.editStringAt(x, y, w, h, text == null ? "" : text,
+                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0);
         if (peer == 0) {
             // No native window (headless) -> nothing to edit; complete with the
             // existing text so a caller awaiting the callback still proceeds.
             Display.getInstance().onEditingComplete(cmp, text);
             return;
         }
-        currentEditing = cmp;
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                while (!WindowsNative.editIsDone(peer)) {
-                    try {
-                        Thread.sleep(16);
-                    } catch (InterruptedException ignore) {
+        editPeer = peer;
+        editCmp = cmp;
+        com.codename1.ui.Form form = cmp.getComponentForm();
+        if (form != null) {
+            editPoller = com.codename1.ui.util.UITimer.timer(30, true, form, new Runnable() {
+                public void run() {
+                    if (editPeer != 0 && WindowsNative.editIsDone(editPeer)) {
+                        hideTextEditor();
                     }
                 }
-            }
-        });
-        String result = WindowsNative.editGetText(peer);
-        WindowsNative.editClose(peer);
-        currentEditing = null;
-        Display.getInstance().onEditingComplete(cmp, result != null ? result : text);
+            });
+        }
+    }
+
+    /**
+     * Reads the native control's text, tears it down, and delivers the value to
+     * the field via onEditingComplete. Does not touch the framework's editingText
+     * flag (the caller does) -- used both to finish the current edit before
+     * starting another and as the body of {@link #hideTextEditor()}.
+     */
+    private void commitEdit() {
+        long p = editPeer;
+        Component c = editCmp;
+        if (p == 0) {
+            return;
+        }
+        editPeer = 0;
+        editCmp = null;
+        if (editPoller != null) {
+            editPoller.cancel();
+            editPoller = null;
+        }
+        String txt = WindowsNative.editGetText(p);
+        WindowsNative.editClose(p);
+        if (c != null) {
+            Display.getInstance().onEditingComplete(c, txt != null ? txt : "");
+        }
+    }
+
+    /**
+     * Framework hook: invoked when the editing field is scrolled away
+     * (Component.setScrollY) or editing is ended. Commits and removes the native
+     * control, then clears the framework editing state via super.
+     */
+    @Override
+    public void hideTextEditor() {
+        commitEdit();
+        super.hideTextEditor();
+    }
+
+    @Override
+    public void stopTextEditing() {
+        hideTextEditor();
     }
 
     /* ----------------------------------------------------------- clipboard */

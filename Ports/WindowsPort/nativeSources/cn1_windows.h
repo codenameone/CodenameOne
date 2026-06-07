@@ -220,6 +220,8 @@ void cn1WinBrowserHandleMessage(WPARAM wParam, LPARAM lParam);
  * forwards it here. */
 #define WM_CN1_EDIT (WM_APP + 18)
 void cn1WinEditHandleMessage(WPARAM wParam, LPARAM lParam);
+/* WM_CTLCOLOREDIT hook: colours the native edit control to match the CN1 field. */
+HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control);
 
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);

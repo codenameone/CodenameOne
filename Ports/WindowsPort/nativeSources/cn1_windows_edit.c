@@ -25,14 +25,15 @@
  * Native in-place text editing for the Windows port. While a Codename One
  * TextField/TextArea is edited it is overlaid by a real Win32 EDIT control (a
  * native caret, selection, IME and keyboard), positioned at the component's
- * bounds; on commit the text is read back and the control is torn down. This is
- * the Win32 analog of the iOS native field overlay.
+ * text area and styled to match the field (same font/family/size, foreground and
+ * background colour, alignment, borderless) so it reads as the same field; on
+ * commit the text is read back and the control is torn down.
  *
  * The EDIT control must live on the thread that owns the main window and pumps
  * messages (only that thread receives the control's input), so creation,
  * teardown and focus are marshaled to the pump thread via WM_CN1_EDIT, mirroring
- * the WebView2 peer. The EDT, blocked in invokeAndBlock, polls editIsDone and
- * then reads the text with a cross-thread WM_GETTEXT (serviced by the pump).
+ * the WebView2 peer. Editing is asynchronous: the EDT polls editIsDone and reads
+ * the text with a cross-thread WM_GETTEXT (serviced by the pump).
  */
 
 #include "cn1_windows.h"
@@ -47,10 +48,28 @@ typedef struct CN1Edit {
     int x, y, w, h;
     JAVA_BOOLEAN singleLine;
     int maxSize;
+    int align;             /* 0 left, 1 center, 2 right                          */
+    void* font;            /* CN1Font* used to build the GDI font, or NULL       */
+    COLORREF fg;
+    COLORREF bg;
+    int hasColors;         /* 1 when fg/bg are valid                             */
+    HFONT gdiFont;         /* owned                                              */
+    HBRUSH bgBrush;        /* owned, for WM_CTLCOLOREDIT                          */
     WCHAR* initialText;    /* owned; set on create then freed                    */
     WNDPROC origProc;      /* subclass chain                                     */
     volatile LONG done;    /* set when the user commits (Enter / focus loss)     */
 } CN1Edit;
+
+/* The single active edit (Codename One edits one field at a time). Used by the
+ * window proc's WM_CTLCOLOREDIT to colour the control. */
+static CN1Edit* g_currentEdit = NULL;
+
+static COLORREF cn1EditColorRef(JAVA_INT rgb) {
+    int r = (rgb >> 16) & 0xff;
+    int g = (rgb >> 8) & 0xff;
+    int b = rgb & 0xff;
+    return RGB(r, g, b);
+}
 
 /*
  * Subclass proc for the EDIT control: a single-line field commits on Enter,
@@ -73,8 +92,6 @@ static LRESULT CALLBACK cn1EditSubclassProc(HWND h, UINT msg, WPARAM wp, LPARAM 
             }
             break;
         case WM_CHAR:
-            /* Swallow the Enter character on a single-line field so it does not
-             * beep after we have already consumed the key-down as a commit. */
             if (wp == VK_RETURN && e->singleLine) {
                 return 0;
             }
@@ -88,6 +105,25 @@ static LRESULT CALLBACK cn1EditSubclassProc(HWND h, UINT msg, WPARAM wp, LPARAM 
     return CallWindowProcW(e->origProc, h, msg, wp, lp);
 }
 
+/*
+ * Called by the window proc for WM_CTLCOLOREDIT: paints the control with the
+ * field's foreground/background so it matches the Codename One field. Returns a
+ * background brush, or NULL to let the default handling run.
+ */
+HBRUSH cn1WinEditCtlColor(HDC hdc, HWND control) {
+    CN1Edit* e = g_currentEdit;
+    if (e == NULL || e->hwnd != control || !e->hasColors) {
+        return NULL;
+    }
+    SetTextColor(hdc, e->fg);
+    SetBkColor(hdc, e->bg);
+    SetBkMode(hdc, OPAQUE);
+    if (e->bgBrush == NULL) {
+        e->bgBrush = CreateSolidBrush(e->bg);
+    }
+    return e->bgBrush;
+}
+
 /* Runs on the pump thread (dispatched from cn1WinWndProc on WM_CN1_EDIT). */
 void cn1WinEditHandleMessage(WPARAM op, LPARAM lp) {
     CN1Edit* e = (CN1Edit*) lp;
@@ -95,20 +131,40 @@ void cn1WinEditHandleMessage(WPARAM op, LPARAM lp) {
         return;
     }
     if (op == CN1_EDIT_OP_CREATE) {
-        DWORD style = WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_LEFT;
+        DWORD style = WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
+        style |= (e->align == 1) ? ES_CENTER : (e->align == 2 ? ES_RIGHT : ES_LEFT);
         if (!e->singleLine) {
-            style |= ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL;
+            style |= ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN;
         }
-        e->hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", style,
+        /* No WS_EX_CLIENTEDGE: the Codename One field already draws its border and
+         * background around the control's (padding-inset) text area, so the EDIT is
+         * borderless and colour-matched to blend in. */
+        e->hwnd = CreateWindowExW(0, L"EDIT", L"", style,
                 e->x, e->y, e->w, e->h, cn1Win.hwnd, NULL, GetModuleHandleW(NULL), NULL);
         if (e->hwnd != NULL) {
+            g_currentEdit = e;
             SetWindowLongPtrW(e->hwnd, GWLP_USERDATA, (LONG_PTR) e);
             e->origProc = (WNDPROC) SetWindowLongPtrW(e->hwnd, GWLP_WNDPROC,
                     (LONG_PTR) cn1EditSubclassProc);
-            SendMessageW(e->hwnd, WM_SETFONT, (WPARAM) GetStockObject(DEFAULT_GUI_FONT), TRUE);
+            /* Build a GDI font matching the field's DirectWrite font (same family
+             * and pixel size) so the overlaid text looks identical. */
+            CN1Font* f = (CN1Font*) e->font;
+            if (f != NULL && f->family != NULL && f->size > 0.0f) {
+                int px = (int) (f->size + 0.5f);
+                e->gdiFont = CreateFontW(-px, 0, 0, 0,
+                        (f->style & 1) ? FW_BOLD : FW_NORMAL,
+                        (f->style & 2) ? TRUE : FALSE,
+                        FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, f->family);
+            }
+            SendMessageW(e->hwnd, WM_SETFONT,
+                    (WPARAM) (e->gdiFont != NULL ? e->gdiFont : GetStockObject(DEFAULT_GUI_FONT)), TRUE);
             if (e->maxSize > 0) {
                 SendMessageW(e->hwnd, EM_SETLIMITTEXT, (WPARAM) e->maxSize, 0);
             }
+            /* Tighten the internal margins so the text starts where the field's
+             * own text does (the padding is already applied to the bounds). */
+            SendMessageW(e->hwnd, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(0, 0));
             if (e->initialText != NULL) {
                 SetWindowTextW(e->hwnd, e->initialText);
                 int len = (int) wcslen(e->initialText);
@@ -121,17 +177,29 @@ void cn1WinEditHandleMessage(WPARAM op, LPARAM lp) {
             e->initialText = NULL;
         }
     } else if (op == CN1_EDIT_OP_DESTROY) {
+        if (g_currentEdit == e) {
+            g_currentEdit = NULL;
+        }
         if (e->hwnd != NULL) {
             DestroyWindow(e->hwnd);
             e->hwnd = NULL;
+        }
+        if (e->gdiFont != NULL) {
+            DeleteObject(e->gdiFont);
+            e->gdiFont = NULL;
+        }
+        if (e->bgBrush != NULL) {
+            DeleteObject(e->bgBrush);
+            e->bgBrush = NULL;
         }
         free(e);
     }
 }
 
-JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_R_long(
+JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_long_int_int_int_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h,
-        JAVA_OBJECT text, JAVA_BOOLEAN singleLine, JAVA_INT maxSize) {
+        JAVA_OBJECT text, JAVA_BOOLEAN singleLine, JAVA_INT maxSize, JAVA_LONG fontPeer,
+        JAVA_INT fgColor, JAVA_INT bgColor, JAVA_INT align) {
     /* No host window (headless screenshot mode) -> no native editing surface. */
     if (cn1Win.hwnd == NULL) {
         return 0;
@@ -146,6 +214,13 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_in
     e->h = h > 0 ? h : 1;
     e->singleLine = singleLine;
     e->maxSize = maxSize;
+    e->align = align;
+    e->font = (void*) (intptr_t) fontPeer;
+    if (fgColor >= 0 && bgColor >= 0) {
+        e->fg = cn1EditColorRef(fgColor);
+        e->bg = cn1EditColorRef(bgColor);
+        e->hasColors = 1;
+    }
     if (text != JAVA_NULL) {
         e->initialText = cn1WinJavaStringToWide(threadStateData, text, NULL);
     }
