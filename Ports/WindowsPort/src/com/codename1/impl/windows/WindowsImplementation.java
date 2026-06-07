@@ -1377,17 +1377,39 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (form != null) {
             editPoller = com.codename1.ui.util.UITimer.timer(30, true, form, new Runnable() {
                 public void run() {
-                    if (editPeer != 0 && WindowsNative.editIsDone(editPeer)) {
-                        hideTextEditor();
+                    if (editPeer == 0) {
+                        return;
                     }
+                    if (WindowsNative.editIsDone(editPeer)) {
+                        hideTextEditor();
+                        return;
+                    }
+                    // Mirror the native control's text into the field as the user
+                    // types: in async edit mode TextArea.onEditComplete does NOT
+                    // write the text back (it assumes the port streams it live, as
+                    // iOS does), so the field must be kept in sync here or the edits
+                    // are lost. Fires the field's data-change listeners too.
+                    syncEditText();
                 }
             });
         }
     }
 
+    /** Pushes the native control's current text into the editing field if it changed. */
+    private void syncEditText() {
+        if (editPeer == 0 || !(editCmp instanceof com.codename1.ui.TextArea)) {
+            return;
+        }
+        String t = WindowsNative.editGetText(editPeer);
+        if (t != null && !t.equals(((com.codename1.ui.TextArea) editCmp).getText())) {
+            ((com.codename1.ui.TextArea) editCmp).setText(t);
+        }
+    }
+
     /**
-     * Reads the native control's text, tears it down, and delivers the value to
-     * the field via onEditingComplete. Does not touch the framework's editingText
+     * Reads the native control's final text, writes it back to the field (async
+     * onEditComplete does not), tears the control down, and fires the field's
+     * action/editing-complete events. Does not touch the framework's editingText
      * flag (the caller does) -- used both to finish the current edit before
      * starting another and as the body of {@link #hideTextEditor()}.
      */
@@ -1397,13 +1419,16 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (p == 0) {
             return;
         }
+        String txt = WindowsNative.editGetText(p);
+        if (txt != null && c instanceof com.codename1.ui.TextArea) {
+            ((com.codename1.ui.TextArea) c).setText(txt);
+        }
         editPeer = 0;
         editCmp = null;
         if (editPoller != null) {
             editPoller.cancel();
             editPoller = null;
         }
-        String txt = WindowsNative.editGetText(p);
         WindowsNative.editClose(p);
         if (c != null) {
             Display.getInstance().onEditingComplete(c, txt != null ? txt : "");
