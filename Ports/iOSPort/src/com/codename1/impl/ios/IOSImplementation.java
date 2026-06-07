@@ -6094,6 +6094,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(currentlyDrawingOn != this) {
                 if(currentlyDrawingOn != null) {
                     currentlyDrawingOn.associatedImage.peer = finishDrawingOnImage();
+                    // Returning to the screen after drawing into a mutable image:
+                    // on the Metal backend the mutable-image draw runs on its own
+                    // render encoder, so the screen encoder's scissor is whatever
+                    // it was last set to -- NOT necessarily the current screen
+                    // clip. clipApplied still reads true, so applyClip() would
+                    // skip re-emitting it and the next screen draw would use a
+                    // stale (often full-screen) scissor. That makes a clip set
+                    // before the mutable-image draw silently not apply to the
+                    // draw after it -> content drawn outside its clip (#5171).
+                    // Invalidate so the screen clip is re-applied for the next draw.
+                    clipApplied = false;
                 }
                 currentlyDrawingOn = null;
             }

@@ -440,28 +440,21 @@ extern BOOL isRetinaBug();
     [newStencil release];
 #endif
 
-    // Present the preserved frame immediately so the CAMetalLayer shows the
-    // last visible content (rather than its invalidated/black surface) for the
-    // duration of the rotation/resize animation, until the EDT repaint presents
-    // the correctly laid-out frame. Skipped on the very first sizing (no
-    // previous frame to show) and if no drawable is currently available.
-    if (oldScreen != nil) {
-        id<CAMetalDrawable> dr = [layer nextDrawable];
-        if (dr != nil) {
-            id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
-            id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
-            [blit copyFromTexture:self.screenTexture
-                      sourceSlice:0 sourceLevel:0
-                     sourceOrigin:MTLOriginMake(0, 0, 0)
-                       sourceSize:MTLSizeMake(pw, ph, 1)
-                        toTexture:dr.texture
-                 destinationSlice:0 destinationLevel:0
-                destinationOrigin:MTLOriginMake(0, 0, 0)];
-            [blit endEncoding];
-            [presentCb presentDrawable:dr];
-            [presentCb commit];
-        }
-    }
+    // NOTE: we deliberately do NOT acquire a drawable and present here.
+    //
+    // updateFrameBufferSize: is driven by viewWillTransitionToSize: on the main
+    // thread, i.e. from inside UIKit's rotation CATransaction. Acquiring a
+    // CAMetalLayer drawable ([layer nextDrawable]) and presenting it at that
+    // point contends with CoreAnimation's own use of the layer for the rotation
+    // animation: on a real device the render server can stall the main thread,
+    // and because the EDT renders by dispatch_sync(main) (flushBuffer ->
+    // drawFrame) the EDT then blocks forever waiting on the stalled main thread
+    // -- a hard rotation deadlock/freeze (#5171). The stretch-blit above already
+    // preserved the previous frame in screenTexture, so the next EDT repaint
+    // (which goes through the normal presentFramebuffer path, outside the
+    // rotation transaction) presents the preserved-then-corrected content. The
+    // only cost is that a fully idle app may show one extra frame of the old
+    // content during the ~0.3s rotation animation instead of the stretched one.
 #ifndef CN1_USE_ARC
     [oldScreen release];
 #endif
