@@ -486,15 +486,25 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
      * through to the unhandled-exception logger above. */
     AddVectoredExceptionHandler(1, cn1WinFaultToException);
 
-    /* The clean target links as a console subsystem app (the translator keeps
-     * stdout for the headless/test apps). For a GUI app that pops a stray console
-     * window in front of the UI, so hide it. Hiding the window does not close the
-     * stdout handle -- a test that pipes stdout (ProcessBuilder) still receives
-     * it -- so this is safe to do unconditionally when a console window exists. */
-    {
-        HWND consoleWnd = GetConsoleWindow();
-        if (consoleWnd != NULL) {
-            ShowWindow(consoleWnd, SW_HIDE);
+    /* The exe is linked as a GUI-subsystem app (see writeCmakeProject), so
+     * double-clicking it never allocates a console -- no stray window, no stdout.
+     * When launched from a console (cmd), GUI-subsystem processes do NOT get their
+     * CRT stdout/stderr wired to that console automatically, so attach to the
+     * parent console (if any) and reopen the C streams onto it. AttachConsole fails
+     * with ERROR_INVALID_HANDLE when there is no parent console (the double-click
+     * case) -- we then leave stdio alone so nothing is shown. A redirected stdout
+     * pipe (the screenshot CI harness) is already inherited and must be preserved,
+     * so only reopen a stream when it is not already redirected to a file/pipe. We
+     * must NOT touch GetConsoleWindow() here: from cmd that is the user's own
+     * window. cn1WindowsLog also mirrors to %TEMP%\cn1windows.log regardless. */
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        if (GetFileType(GetStdHandle(STD_OUTPUT_HANDLE)) == FILE_TYPE_UNKNOWN) {
+            FILE* f = NULL;
+            freopen_s(&f, "CONOUT$", "w", stdout);
+        }
+        if (GetFileType(GetStdHandle(STD_ERROR_HANDLE)) == FILE_TYPE_UNKNOWN) {
+            FILE* f = NULL;
+            freopen_s(&f, "CONOUT$", "w", stderr);
         }
     }
 

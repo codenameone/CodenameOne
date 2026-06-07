@@ -774,6 +774,12 @@ public class ByteCodeTranslator {
                 // names (llvm-symbolizer). Optimizations stay on.
                 writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
                 writer.append("    target_link_options(${PROJECT_NAME} PRIVATE /DEBUG)\n");
+                // GUI subsystem so double-clicking the exe does not pop a console
+                // window; keep main() as the entry via mainCRTStartup. The app still
+                // writes to a parent console when launched from cmd (initDisplay calls
+                // AttachConsole(ATTACH_PARENT_PROCESS)), and a redirected stdout pipe
+                // (the screenshot CI harness) is inherited regardless of subsystem.
+                writer.append("    target_link_options(${PROJECT_NAME} PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)\n");
                 writer.append("else()\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");
