@@ -73,6 +73,23 @@ so rendering can only be verified on Windows. A Windows 11 VM (Parallels, Hyper-
 …) or a real machine is therefore the place to *test* the app, even when the binary
 itself was built on Linux.
 
+=== Cloud builds (the `win32` target)
+
+On the Codename One build cloud the native Windows build is the *win32* target,
+and it builds on Linux (the Android/JavaScript build group) using the cross-compile
+above. Trigger it like any other cloud target:
+
+[source,bash]
+----
+mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device
+----
+
+or the convenience goal `mvn -pl common cn1:buildWin32`. A regular (release) build
+returns **two** binaries -- x64 and arm64, both stripped release exes. Setting the
+`windows.debug` build hint instead returns a **single** x64 exe with symbols, for
+diagnosis. (To build locally on a Windows box, use
+`-Dcodename1.buildTarget=local-windows-device`.)
+
 === Build hints
 
 The native Windows port adds the build hints below. They use the `windows.`
