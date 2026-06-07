@@ -70,7 +70,22 @@ jobs:
           arch: ${{ matrix.msvc_arch }}
 
       - name: Set up Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
 
       - name: Verify LLVM / Ninja toolchain
         shell: pwsh
@@ -204,7 +219,22 @@ jobs:
           arch: amd64
 
       - name: Set up Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
 
       # JDK 17 compiles the hellocodenameone-common Java (release 17). Set up first
       # so the JDK 8 below ends up the active JAVA_HOME.
@@ -359,7 +389,22 @@ jobs:
           arch: arm64
 
       - name: Set up Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
 
       # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
       # translator harness and builds the JavaAPI. Core + port come pre-compiled.
