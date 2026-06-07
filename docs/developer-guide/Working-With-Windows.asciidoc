@@ -84,8 +84,8 @@ above. Trigger it like any other cloud target:
 mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device
 ----
 
-or the convenience goal `mvn -pl common cn1:buildWin32`. A regular (release) build
-returns **two** binaries -- x64 and arm64, both stripped release exes. Setting the
+The convenience goal `mvn -pl common cn1:buildWin32` does the same thing. A regular
+(release) build returns **two** binaries -- x64 and arm64, both stripped release exes. Setting the
 `windows.debug` build hint instead returns a **single** x64 exe with symbols, for
 diagnosis. (To build locally on a Windows box, use
 `-Dcodename1.buildTarget=local-windows-device`.)
@@ -146,32 +146,34 @@ hints below, and each produced exe (x64 and arm64) is signed and timestamped.
 ==== Signing with a PKCS#12 certificate
 
 Put your code-signing certificate and key in a PKCS#12 (`.pfx`/`.p12`) file and
-point the build at it:
+point your project settings at it:
 
 [source,properties]
 ----
 # codenameone_settings.properties
-codename1.arg.windows.signing.pkcs12=/secure/path/codesign.p12
-codename1.arg.windows.signing.password=your-pkcs12-password
+codename1.windows.signing.certificate=/secure/path/codesign.p12
+codename1.windows.signing.password=your-pkcs12-password
+# optional signature metadata + timestamping (shown with their defaults):
 codename1.arg.windows.signing.name=Acme Corp
 codename1.arg.windows.signing.url=https://acme.example
-# optional -- these are the defaults:
 codename1.arg.windows.signing.timestampUrl=http://timestamp.digicert.com
 codename1.arg.windows.signing.digest=sha256
 ----
 
-The signature is *timestamped* (RFC 3161) by default, so it keeps verifying
-after the certificate expires; set `windows.signing.timestampUrl` empty to turn
-that off. Set `windows.signing=false` to force an unsigned build even when a
-certificate is configured. On the build cloud the certificate can instead be
-supplied through the normal build-request certificate channel, exactly like iOS.
+You configure the certificate once and it's used for *both local and cloud
+builds* -- a cloud build automatically sends it with the build request (the same
+way the iOS and Android signing certificates are uploaded), so there is nothing
+extra to do for the build cloud. The signature is *timestamped* (RFC 3161) by
+default, so it keeps verifying after the certificate expires; set
+`windows.signing.timestampUrl` empty to turn that off. Set `windows.signing=false`
+to force an unsigned build even when a certificate is configured.
 
 ==== Hardware-backed and cloud keys
 
 Since June 2023 the CA/Browser Forum requires code-signing private keys to live in
 a hardware module, so a brand-new OV/EV certificate is no longer a plain `.pfx`.
 The usual answer is a managed signing service -- *Azure Trusted Signing*, *DigiCert
-KeyLocker*, *SSL.com eSigner* -- which exposes the key through PKCS#11. `osslsigncode`
+KeyLocker*, *eSigner* from SSL.com -- which exposes the key through PKCS#11. `osslsigncode`
 speaks PKCS#11, so the build host points at the service's provider per its docs; the
 rest of the flow (digest, timestamp, the resulting signed exe) is identical. Plain
 `.pfx` signing remains fine for internal/test certificates and for certs issued
@@ -214,7 +216,8 @@ resources -- is inside; ~13 MB for the Initializr sample).
 
 |CPU architecture
 |Native x64 *and* arm64 binaries (`windows.arch`).
-|Whatever the bundled/installed JVM supports.
+|Intel x64 only -- it ships with a bundled *Intel Java 8 JRE* (no arm64 build;
+on an arm64 machine it runs through Windows' x64 emulation).
 |Whatever the installed JVM supports.
 
 |Look & rendering

@@ -1169,6 +1169,28 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, props.getProperty(key));
             }
         }
+        // Authenticode signing certificate. Configured through settings/properties
+        // (codename1.windows.signing.certificate = path to the .p12/.pfx, and
+        // codename1.windows.signing.password). This mirrors the cloud build, whose
+        // codeNameOne task uploads the same certificate into the request, so a
+        // local build and a cloud build sign from the same configuration.
+        String winCert = props.getProperty("codename1.windows.signing.certificate");
+        if (winCert != null && !winCert.isEmpty()) {
+            File certFile = new File(winCert);
+            if (!certFile.isAbsolute()) {
+                certFile = new File(getCN1ProjectDir(), winCert);
+            }
+            if (certFile.isFile()) {
+                try {
+                    r.setCertificate(certFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to read the Windows signing certificate: " + certFile, ex);
+                }
+                r.setCertificatePassword(props.getProperty("codename1.windows.signing.password"));
+            } else {
+                getLog().warn("codename1.windows.signing.certificate points at a missing file: " + certFile);
+            }
+        }
         r.setIncludeSource(true);
 
         try {

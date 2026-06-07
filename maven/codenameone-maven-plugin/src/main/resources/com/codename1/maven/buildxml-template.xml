@@ -265,6 +265,8 @@ This the Ant build script used by the CN1BuildMojo for sending to the build serv
                 subtitle="${codename1.secondaryTitle}"
 
                 targetType="${win32.targetType}"
+                certificate="${codename1.windows.signing.certificate}"
+                certPassword="${codename1.windows.signing.password}"
                 automated="${automated}"
         />
 

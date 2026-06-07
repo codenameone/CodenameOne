@@ -601,11 +601,8 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |windows.sdkRoot
 |Native Windows port only; used when building on a *non-Windows* host (for example a Linux build server). Path to a Windows SDK laid out by https://github.com/Jake-Shadle/xwin[`xwin splat`] (a directory containing `crt/include` and `sdk/include/um`), used to cross-compile the `.exe` with clang-cl + lld-link instead of a Visual Studio environment. If unset, the `CN1_XWIN_SYSROOT` environment variable is used. Ignored on Windows hosts, which build through Visual Studio. The same SDK serves both `windows.arch` targets (its `x86_64` / `aarch64` lib subdirs).
 
-|windows.signing.pkcs12
-|Native Windows port only. Path to a PKCS#12 (`.pfx`/`.p12`) file holding the code-signing certificate + key. When present (or when a certificate is supplied through the build request), the produced `.exe` is Authenticode-signed with `osslsigncode` -- which signs Windows PE files on any OS, so it works in the Linux build cloud. Without a certificate the exe ships unsigned (it runs, but shows "Unknown publisher" in UAC and trips SmartScreen on download).
-
-|windows.signing.password
-|Native Windows port only. Password for `windows.signing.pkcs12` (falls back to the build request's certificate password). Defaults to empty.
+|(signing certificate)
+|Native Windows port only. The code-signing certificate itself isn't a build-hint argument; configure it through project settings as `codename1.windows.signing.certificate` (path to a PKCS#12 `.pfx`/`.p12` file holding the certificate + key) and `codename1.windows.signing.password`. The build uses it for both local and cloud builds -- a cloud build uploads it with the build request automatically, exactly like the iOS / Android signing certificates. When a certificate is present the produced `.exe` is Authenticode-signed with `osslsigncode` (which signs Windows PE files on any OS, so it works in the Linux build cloud); without one the exe ships unsigned (it runs, but shows "Unknown publisher" in UAC and trips SmartScreen on download).
 
 |windows.signing.timestampUrl
 |Native Windows port only. RFC&#160;3161 timestamp server used when signing, so the signature stays valid after the certificate expires. Default `http://timestamp.digicert.com`; set empty to disable timestamping.
