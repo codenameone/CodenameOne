@@ -1,7 +1,7 @@
 == Working with the native Windows port
 
 The native Windows port compiles a Codename One app to a real, standalone Win32
-executable -- a single `.exe` with *no JVM and no runtime dependencies*. It is the
+executable -- a single `.exe` with *no JVM and no runtime dependencies*. It's the
 Windows analog of the iOS port: the same ParparVM pipeline that turns your Java/
 Kotlin bytecode into C and then into a native binary, here targeting Windows with
 the LLVM toolchain and rendering through Direct2D / DirectWrite.
@@ -55,17 +55,17 @@ A runnable build must happen *on Windows*: the native compile links against the
 Windows SDK (Direct2D / DirectWrite / WIC / Media Foundation / WinHTTP / Win32)
 and uses clang-cl + CMake + Ninja inside a Visual Studio developer environment.
 Direct2D/DirectWrite also need a real Windows GPU/display stack, so the rendering
-cannot be validated under emulation. A Windows 11 VM (Parallels, Hyper-V, …) or a
+can't be validated under emulation. A Windows 11 VM (Parallels, Hyper-V, …) or a
 real machine is the development environment.
 
 Both *x64* and *arm64* are supported. clang-cl cross-compiles to either
-architecture, so an arm64 host can produce an x64 binary and vice versa; pick the
+architecture, so you can target either architecture from the other host; pick the
 target with the `windows.arch` build hint.
 
 === Build hints
 
 The native Windows port adds the build hints below. They use the `windows.`
-prefix; do not confuse them with the older `win.` hints, which configure the
+prefix; don't confuse them with the older `win.` hints, which configure the
 *JVM-based Windows desktop installer* (`win.installDirName`, `win.shortcutName`,
 …) and have no effect on the native port.
 
@@ -94,10 +94,10 @@ link:#_sending_arguments_to_the_build_server[Advanced topics chapter].
 The shipping build is optimized (`/O2`) and stripped: no debug information is
 embedded, and the linker removes unused functions and folds identical ones, which
 keeps the single self-contained executable as small as the translated code allows.
-As a concrete data point, the Codename One Initializr sample builds to a roughly
-13 MB stripped `.exe` with no `.pdb`. Setting `windows.debug=true` keeps the
+As a concrete data point, the Codename One Initializr sample builds to a ~13 MB
+stripped `.exe` with no `.pdb`. Setting `windows.debug=true` keeps the
 symbols: the same app produces a ~14 MB exe *plus a ~97 MB `.pdb`* -- the
-debug data dwarfs the binary, which is exactly why it is not in the default. The
+debug data dwarfs the binary, which is exactly why it's not in the default. The
 build stays optimized either way; with the `.pdb` present a faulting address can be
 turned back into a function name and source line with `llvm-symbolizer`.
 
@@ -110,7 +110,7 @@ They trade off self-containment, size, startup and maturity differently:
 |===
 | | Native Windows `.exe` | Desktop app (JVM) | Executable jar
 
-|What it is
+|Summary
 |A real Win32 binary (ParparVM → C → native), Direct2D/DirectWrite rendering.
 |Your app running on a JVM with the Java SE port (Swing-hosted rendering),
 packaged as a Windows installer.
@@ -155,7 +155,7 @@ resources -- is inside; ~13 MB for the Initializr sample).
 
 In practical terms: reach for the *native `.exe`* when you want to ship a single
 self-contained, JVM-free, architecture-native Windows app that starts instantly;
-reach for the *desktop (JVM) app* when you want the mature, fully-featured desktop
+reach for the *desktop (JVM) app* when you want the mature, fully featured desktop
 experience and don't mind shipping (or depending on) a JVM; and reach for the
 *jar* when you want the smallest, most portable artifact for machines that already
 have a JDK.

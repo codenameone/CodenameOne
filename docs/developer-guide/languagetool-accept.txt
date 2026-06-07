@@ -559,3 +559,6 @@ espeak
 [Pp]rotobuf
 [Vv]arint
 [Ee]nums
+
+# Windows Sockets API (the native Windows port uses it for raw sockets).
+Winsock
