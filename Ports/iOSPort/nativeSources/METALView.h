@@ -42,6 +42,14 @@
     // Orthographic projection matrix sized to (framebufferWidth, framebufferHeight).
     // Rebuilt by updateFrameBufferSize:h: and uploaded to shaders as a uniform.
     simd_float4x4 projectionMatrix;
+
+    // Set by updateFrameBufferSize: when a resize preserved a previous frame in
+    // screenTexture and that frame still needs to be pushed onto the layer to
+    // avoid a rotation black flash (#5162). Consumed (cleared) either by the
+    // deferred presentPreservedFrameIfNeeded that runs on the next main-runloop
+    // turn or by the next normal presentFramebuffer -- whichever lands first.
+    // Read/written on the main thread only, so no synchronisation is needed.
+    BOOL needsResizePresent;
 }
 @property (nonatomic, retain) id<MTLCommandQueue> commandQueue;
 @property (nonatomic, retain) id<MTLCommandBuffer> commandBuffer;
@@ -72,6 +80,7 @@
 -(void)deleteFramebuffer;
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
+-(void)presentPreservedFrameIfNeeded;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;

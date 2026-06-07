@@ -264,6 +264,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
             new MutableImageReadbackTest(),
+            new MutableImageClipReadbackTest(),
             // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
             // and a populated list, which warms the font cache / shifts suite timing, and the
             // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed
