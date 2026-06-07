@@ -101,6 +101,31 @@ WebView2 SDK is present at build time (otherwise the browser natives compile as
 stubs and `isNativeBrowserComponentSupported()` is `false`). No other native peer
 components (e.g. native maps, video peer, native list).
 
+### 5a. Custom native interfaces (`@NativeInterface`) — builder binding wired
+
+`WindowsNativeBuilder` now binds app-defined native interfaces the same way the
+iOS builder does, so they resolve to the app's own C/C++ on the clean target:
+
+- It scans the app classes for `NativeInterface` implementors and generates, per
+  interface, an `XxxStub` (the `NativeLookup.register(Xxx.class, XxxStub.class)`
+  target) plus an `XxxImplCodenameOne` carrying the actual `native` methods. The
+  translator emits one C function per native method (mangled name); the app
+  defines them in its own `nativeSources` C/C++. A `PeerComponent` return is
+  bridged as a `long[]{handle}` and unwrapped via `((long[])p.getNativePeer())[0]`
+  — identical to iOS — so a returned native widget becomes a real `PeerComponent`.
+- It also generates `<MainClass>Stub` (the executable entry point) whose `main()`
+  runs the generated `NativeLookup.register(...)` calls and boots the Lifecycle app
+  windowed. The clean target auto-selects it because it is the only class with a
+  `main(String[])`. (Before this, `WindowsNativeBuilder` passed the Lifecycle main
+  class straight through and could not build a real app — the translator requires a
+  `main()`.)
+
+Verified to the plugin-compile level only. **Still to verify end-to-end** with a
+real app that declares a native interface (run through the full Maven plugin), and
+the *rendering* side of returned peers — positioning/painting a child `HWND` over
+the CN1 `PeerComponent` (only `BrowserComponent`'s WebView2 peer does this today;
+the generic peer-placement path in `WindowsImplementation` is the remaining work).
+
 ### 6. Dialog / Win11 chrome polish
 
 Dialog and some component chrome currently follow the material theme rather than a

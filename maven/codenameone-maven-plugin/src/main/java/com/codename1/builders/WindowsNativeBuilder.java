@@ -25,7 +25,13 @@ package com.codename1.builders;
 import org.apache.tools.ant.BuildException;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -80,22 +86,29 @@ public class WindowsNativeBuilder extends Executor {
         return resultDir;
     }
 
-    // Native-peer component code generation. Peer components are not wired on the
-    // Windows port yet; these provide the minimal, well-formed code the native
-    // interface generator expects and are revisited when native peers land.
     @Override
     protected String getDeviceIdCode() {
         return "\"\"";
     }
 
+    // The generated XxxImplCodenameOne class carries the native methods; a
+    // PeerComponent-returning native interface method is bridged through a
+    // long[] holding the native widget handle (HWND / native peer pointer),
+    // exactly as the iOS builder does. This is the form the translated native
+    // peer code and PeerComponent.create(Object) understand.
+    @Override
+    protected String getImplSuffix() {
+        return "ImplCodenameOne";
+    }
+
     @Override
     protected String generatePeerComponentCreationCode(String methodCallString) {
-        return "PeerComponent.create(" + methodCallString + ")";
+        return "PeerComponent.create(new long[] {" + methodCallString + "})";
     }
 
     @Override
     protected String convertPeerComponentToNative(String param) {
-        return param + ".getNativePeer()";
+        return "((long[])" + param + ".getNativePeer())[0]";
     }
 
     /**
@@ -192,6 +205,23 @@ public class WindowsNativeBuilder extends Executor {
                     + "(WindowsPort.jar + nativewindows.jar) on its classpath.", ex);
         }
 
+        // Native interface binding + app bootstrap. Scan the app classes for
+        // @NativeInterface implementors and generate, for each, an XxxStub bridge
+        // (the NativeLookup target) plus an XxxImplCodenameOne carrying the native
+        // methods the translator emits as C functions for the app's C++ to define;
+        // and generate a <MainClass>Stub whose main() registers those natives and
+        // boots the Lifecycle app windowed. The clean target auto-detects the sole
+        // main() class -- a CN1 Lifecycle has none, so the bootstrap stub is it.
+        // All generated stubs are compiled into classesDir (a translator source
+        // root), so the executable links the app, the port and the native bindings.
+        try {
+            generateNativeInterfaceAndBootstrapStubs(request, classesDir, portClasses);
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to generate native interface / bootstrap stubs", ex);
+        }
+
         String version = request.getVersion() != null ? request.getVersion() : "1.0";
         File translatedOut = new File(tmpFile, "translated");
         translatedOut.mkdirs();
@@ -280,6 +310,212 @@ public class WindowsNativeBuilder extends Executor {
         }
         log("Native Windows executable: " + windowsExecutable.getAbsolutePath() + " (" + arch + ")");
         return true;
+    }
+
+    /**
+     * Scans the app classes for native interfaces and generates the binding +
+     * bootstrap stubs into a temp source tree, then compiles them into
+     * {@code classesDir} so the translator picks them up.
+     *
+     * <p>Three kinds of class are generated:</p>
+     * <ul>
+     *   <li>{@code XxxStub} (by {@link #registerNativeImplementationsAndCreateStubs})
+     *       -- the class registered with {@code NativeLookup}; it implements the
+     *       app's {@code Xxx} interface and delegates to an {@code XxxImplCodenameOne}
+     *       instance, wrapping/unwrapping {@link com.codename1.ui.PeerComponent}s as
+     *       a {@code long[]} handle.</li>
+     *   <li>{@code XxxImplCodenameOne} -- declares the actual {@code native} methods.
+     *       The translator emits a C function per method (mangled name) that the
+     *       app's own {@code nativeSources} C/C++ defines; this is how a native
+     *       interface "resolves to actual C++ native code" on the clean target.</li>
+     *   <li>{@code <MainClass>Stub} -- the executable entry point: its {@code main()}
+     *       runs the generated {@code NativeLookup.register(...)} calls and boots the
+     *       Lifecycle app on a window (Display.init + init/start on the EDT +
+     *       runMainEventLoop).</li>
+     * </ul>
+     */
+    private void generateNativeInterfaceAndBootstrapStubs(BuildRequest request, File classesDir, File portClasses)
+            throws Exception {
+        File stubSource = new File(getBuildDirectory(), "stub");
+        stubSource.mkdirs();
+
+        // Scan classesDir for native interfaces; generates the XxxStub bridges and
+        // returns the NativeLookup.register(...) source to weave into main().
+        ClassLoader scanLoader = new URLClassLoader(
+                new URL[]{ classesDir.toURI().toURL(), portClasses.toURI().toURL() },
+                getClass().getClassLoader());
+        String registerNatives = registerNativeImplementationsAndCreateStubs(scanLoader, stubSource, classesDir);
+
+        // For every native interface, emit the XxxImplCodenameOne with the native
+        // method declarations (PeerComponent <-> long handle substitution).
+        Class[] natives = getNativeInterfaces();
+        if (natives != null) {
+            for (Class currentNative : natives) {
+                writeNativeImplCodenameOne(stubSource, currentNative);
+            }
+        }
+
+        writeBootstrapStub(request, classesDir, stubSource, registerNatives);
+
+        // Compile every generated .java into classesDir (already a translator
+        // source root) against the app classes + the Windows port classes.
+        String javacPath = System.getProperty("java.home") + "/../bin/javac";
+        if (!new File(javacPath).exists()) {
+            javacPath = System.getProperty("java.home") + "/bin/javac";
+        }
+        if (!new File(javacPath).exists()) {
+            javacPath = "javac";
+        }
+        String[] st = stubCompileSourceTarget(javacPath);
+        String cp = classesDir.getAbsolutePath() + File.pathSeparator + portClasses.getAbsolutePath();
+        if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", st[0], "-target", st[1],
+                "-classpath", cp, "-d", classesDir.getAbsolutePath())) {
+            throw new BuildException("Failed to compile the generated native interface / bootstrap stubs");
+        }
+    }
+
+    /**
+     * Writes {@code XxxImplCodenameOne}: a class with one {@code native} method per
+     * interface method. {@link com.codename1.ui.PeerComponent} returns become
+     * {@code long} (the native handle the {@code XxxStub} wraps via {@code new
+     * long[]{...}}) and PeerComponent parameters become {@code long}. The translator
+     * emits the matching C functions which the app's {@code nativeSources} define.
+     */
+    private void writeNativeImplCodenameOne(File stubSource, Class currentNative) throws Exception {
+        File folder = new File(stubSource, currentNative.getPackage().getName().replace('.', File.separatorChar));
+        folder.mkdirs();
+        String simple = currentNative.getSimpleName();
+        StringBuilder src = new StringBuilder();
+        src.append("package ").append(currentNative.getPackage().getName()).append(";\n\n");
+        src.append("public class ").append(simple).append("ImplCodenameOne {\n");
+        for (Method m : currentNative.getMethods()) {
+            String name = m.getName();
+            if (name.equals("hashCode") || name.equals("equals") || name.equals("toString")) {
+                continue;
+            }
+            Class returnType = m.getReturnType();
+            src.append("    public native ").append(nativeTypeName(returnType)).append(' ').append(name).append('(');
+            Class[] params = m.getParameterTypes();
+            for (int i = 0; i < params.length; i++) {
+                if (i > 0) {
+                    src.append(", ");
+                }
+                src.append(nativeTypeName(params[i])).append(" param").append(i);
+            }
+            src.append(");\n");
+        }
+        src.append("}\n");
+        try (OutputStream out = new FileOutputStream(new File(folder, simple + "ImplCodenameOne.java"))) {
+            out.write(src.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * The Java type used in the generated native method signature for a given
+     * interface type. PeerComponent is bridged as a {@code long} handle; every
+     * other type maps to its canonical name (arrays keep their {@code []} form).
+     */
+    private static String nativeTypeName(Class<?> type) {
+        if (type.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "long";
+        }
+        return type.getCanonicalName();
+    }
+
+    /**
+     * Writes {@code <MainClass>Stub.java} -- the executable entry point. Its
+     * {@code main()} registers the native implementations and boots the Lifecycle
+     * app windowed (the same sequence the iOS Stub and the port's own test
+     * launchers use). The clean target auto-selects this as the C {@code main}
+     * because it is the only class carrying a {@code main(String[])} method.
+     */
+    private void writeBootstrapStub(BuildRequest request, File classesDir, File stubSource, String registerNatives)
+            throws Exception {
+        String pkg = request.getPackageName();
+        String main = request.getMainClass();
+        File pkgDir = new File(stubSource, pkg.replace('.', File.separatorChar));
+        pkgDir.mkdirs();
+
+        // If the build-time SVG transcoder produced a registry, install it before
+        // the first theme is built so url(*.svg) backgrounds resolve to the real
+        // transcoded images (mirrors the iOS/Android stub weaving).
+        String svgInstall = "";
+        if (new File(classesDir, "com/codename1/generated/svg/SVGRegistry.class").isFile()) {
+            svgInstall = "        try { com.codename1.generated.svg.SVGRegistry.installGlobal(); }"
+                    + " catch (Throwable __svg) { __svg.printStackTrace(); }\n";
+        }
+
+        StringBuilder src = new StringBuilder();
+        src.append("package ").append(pkg).append(";\n\n");
+        src.append("import com.codename1.system.NativeLookup;\n");
+        src.append("import com.codename1.ui.Display;\n\n");
+        src.append("public final class ").append(main).append("Stub {\n");
+        src.append("    private ").append(main).append("Stub() { }\n\n");
+        src.append("    public static void main(String[] argv) {\n");
+        src.append(registerNatives);
+        src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
+        src.append("        Display.init(null);\n");
+        src.append(svgInstall);
+        src.append("        Display.getInstance().callSerially(new Runnable() {\n");
+        src.append("            public void run() {\n");
+        src.append("                app.init(app);\n");
+        src.append("                app.start();\n");
+        src.append("            }\n");
+        src.append("        });\n");
+        src.append("        com.codename1.impl.windows.WindowsImplementation.runMainEventLoop();\n");
+        src.append("    }\n");
+        src.append("}\n");
+        try (OutputStream out = new FileOutputStream(new File(pkgDir, main + "Stub.java"))) {
+            out.write(src.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * Picks a {@code -source}/{@code -target} pair the running javac accepts for the
+     * generated stubs (JDK 9+ dropped 1.6; fall back to 8). Mirrors the iOS builder.
+     */
+    private String[] stubCompileSourceTarget(String javacPath) {
+        int major = -1;
+        try {
+            String versionOutput = execString(getBuildDirectory(), javacPath, "-version");
+            if (versionOutput != null && versionOutput.trim().length() > 0) {
+                String[] parts = versionOutput.trim().split("\\s+");
+                major = majorJavaVersion(parts[parts.length - 1]);
+            }
+        } catch (Exception ex) {
+            debug("Failed to resolve javac version for Windows stub compile: " + ex.getMessage());
+        }
+        if (major < 0) {
+            major = majorJavaVersion(System.getProperty("java.version"));
+        }
+        if (major >= 9) {
+            return new String[]{"8", "8"};
+        }
+        return new String[]{"1.6", "1.6"};
+    }
+
+    /** Parses a Java version string ("1.8.0_292", "17.0.1", "21") to its feature number, or -1. */
+    private static int majorJavaVersion(String version) {
+        if (version == null) {
+            return -1;
+        }
+        String v = version.trim();
+        if (v.startsWith("1.")) {
+            v = v.substring(2);
+        }
+        int dot = v.indexOf('.');
+        if (dot >= 0) {
+            v = v.substring(0, dot);
+        }
+        int us = v.indexOf('_');
+        if (us >= 0) {
+            v = v.substring(0, us);
+        }
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     /**
