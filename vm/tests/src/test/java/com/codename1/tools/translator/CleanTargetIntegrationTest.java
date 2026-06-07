@@ -521,6 +521,135 @@ class CleanTargetIntegrationTest {
         return exe;
     }
 
+    /**
+     * Cross-compiles a native Windows {@code .exe} on a non-Windows host (the Linux
+     * CI pre-check, or a macOS dev box) using clang-cl + lld-link against a Windows
+     * SDK laid out by <a href="https://github.com/Jake-Shadle/xwin">xwin</a>. clang
+     * is a cross-compiler, so the binary it emits for {@code x86_64-pc-windows-msvc}
+     * is the same regardless of the host -- this validates that the port + a real
+     * Form app translate and *link* into a Windows PE off-Windows. It is compile-
+     * and-link only: the PE cannot run here (Direct2D/DirectWrite need a real
+     * Windows GPU stack), so there is no run/screenshot step.
+     *
+     * <p>Gated on {@code CN1_XWIN_SYSROOT} pointing at an {@code xwin splat}
+     * directory; skipped (assumption) otherwise, and skipped on Windows (the native
+     * path is covered by the other tests). {@code CN1_CLANG_CL} overrides the
+     * clang-cl path (default {@code clang-cl} on PATH); lld-link must be on PATH.</p>
+     */
+    @org.junit.jupiter.api.Test
+    void crossCompilesWindowsExeWithXwin() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(CompilerHelper.isWindows(),
+                "Cross-compile check is for non-Windows hosts; Windows uses the native path");
+        String sysroot = System.getenv("CN1_XWIN_SYSROOT");
+        org.junit.jupiter.api.Assumptions.assumeTrue(sysroot != null && !sysroot.trim().isEmpty(),
+                "Set CN1_XWIN_SYSROOT to an `xwin splat` directory to run the cross-compile check");
+        Path sys = Paths.get(sysroot.trim()).toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(sys.resolve("crt/include")),
+                "CN1_XWIN_SYSROOT must contain crt/include + sdk/include (run `xwin splat`): " + sys);
+        String clangCl = System.getenv().getOrDefault("CN1_CLANG_CL", "clang-cl");
+
+        Path coreClasses = Paths.get("..", "..", "maven", "core", "target", "classes").normalize().toAbsolutePath();
+        Path portClasses = Paths.get("..", "..", "maven", "windows", "target", "classes").normalize().toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(coreClasses.resolve("com/codename1/ui/Form.class")),
+                "codenameone-core must be built (maven/core/target/classes)");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(portClasses.resolve("com/codename1/impl/windows/WindowsImplementation.class")),
+                "WindowsPort must be built (maven/windows/target/classes)");
+
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        // --- translate (host-agnostic): compile a real Form app against core+port,
+        // stage the native layer, run the translator with the "windows" app type ---
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("xwin-src");
+        Path classesDir = Files.createTempDirectory("xwin-cls");
+        Path javaApiDir = Files.createTempDirectory("xwin-japi");
+        Files.write(sourceDir.resolve("WinFormApp.java"), winFormAppSource().getBytes(StandardCharsets.UTF_8));
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, Arrays.asList(
+                "-source", config.targetVersion, "-target", config.targetVersion,
+                "-classpath", coreClasses + java.io.File.pathSeparator + portClasses,
+                "-d", classesDir.toString(), sourceDir.resolve("WinFormApp.java").toString())),
+                "WinFormApp should compile:\n" + CompilerHelper.getLastErrorLog());
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        Path nativeStage = Files.createTempDirectory("xwin-native");
+        try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    Files.copy(p, nativeStage.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+        Path outputDir = Files.createTempDirectory("xwin-out");
+        String sources = classesDir + ";" + coreClasses + ";" + portClasses + ";" + javaApiDir + ";" + nativeStage;
+        runTranslatorMultiSource(sources, outputDir, "WinFormApp", "windows");
+        Path cmakeRoot = outputDir.resolve("dist");
+        assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
+
+        // --- cross-compile that dist to a Windows x64 PE with clang-cl + xwin ---
+        String target = "x86_64-pc-windows-msvc";
+        String libArch = "x86_64";
+        String inc = String.join(" ",
+                "--target=" + target,
+                imsvc(sys.resolve("crt/include")),
+                imsvc(sys.resolve("sdk/include/ucrt")),
+                imsvc(sys.resolve("sdk/include/um")),
+                imsvc(sys.resolve("sdk/include/shared")),
+                imsvc(sys.resolve("sdk/include/winrt")));
+        String linkFlags = String.join(" ",
+                "-fuse-ld=lld",
+                "/libpath:" + sys.resolve("crt/lib/" + libArch),
+                "/libpath:" + sys.resolve("sdk/lib/um/" + libArch),
+                "/libpath:" + sys.resolve("sdk/lib/ucrt/" + libArch));
+        // The resource compiler (llvm-rc) needs the SDK include path too: on a real
+        // Windows host it comes from %INCLUDE% (set by vcvarsall), which we do not
+        // have here, so cn1_resources.rc's `#include <windows.h>` fails without it.
+        String rcFlags = String.join(" ",
+                "-I", sys.resolve("sdk/include/um").toString(),
+                "-I", sys.resolve("sdk/include/shared").toString(),
+                "-I", sys.resolve("crt/include").toString(),
+                "-I", sys.resolve("sdk/include/ucrt").toString());
+        String llvmRc = System.getenv().getOrDefault("CN1_LLVM_RC", "llvm-rc");
+        Path buildDir = cmakeRoot.resolve("xbuild");
+        Files.createDirectories(buildDir);
+        runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
+                "-G", "Ninja",
+                "-DCMAKE_SYSTEM_NAME=Windows",
+                "-DCMAKE_SYSTEM_PROCESSOR=AMD64",
+                // STATIC_LIBRARY so CMake's compiler-detection try_compile does not
+                // need a full link before the toolchain flags are fully applied.
+                "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+                "-DCMAKE_C_COMPILER=" + clangCl,
+                "-DCMAKE_CXX_COMPILER=" + clangCl,
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_C_FLAGS=" + inc,
+                "-DCMAKE_CXX_FLAGS=" + inc,
+                "-DCMAKE_RC_COMPILER=" + llvmRc,
+                "-DCMAKE_RC_FLAGS=" + rcFlags,
+                "-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags), cmakeRoot);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), cmakeRoot);
+
+        Path exe = buildDir.resolve("WinFormApp.exe");
+        assertTrue(Files.exists(exe), "cross-compiled Windows executable should be produced: " + exe);
+        assertTrue(Files.size(exe) > 100_000, "PE should be non-trivial, was " + Files.size(exe) + " bytes");
+        byte[] head = new byte[2];
+        try (java.io.InputStream in = Files.newInputStream(exe)) {
+            assertEquals(2, in.read(head), "should read PE header");
+        }
+        assertEquals('M', head[0] & 0xff, "exe should start with the PE 'MZ' magic");
+        assertEquals('Z', head[1] & 0xff, "exe should start with the PE 'MZ' magic");
+        System.out.println("CN1_XWIN_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+    }
+
+    /** clang-cl system-include flag for an xwin include dir ({@code /imsvc <dir>}). */
+    static String imsvc(Path dir) {
+        return "/imsvc " + dir;
+    }
+
     /** Minimal extraction of a jar's class tree into a directory (a translator source root). */
     static void extractJar(Path jar, Path dest) throws Exception {
         try (java.util.zip.ZipInputStream zin = new java.util.zip.ZipInputStream(Files.newInputStream(jar))) {
