@@ -923,29 +923,34 @@ public class Parser extends ClassVisitor {
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
         if (CONCRETE_ANNOTATION.equals(desc)) {
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
+                private String defaultConcrete;
+                private String winConcrete;
+
                 @Override
                 public void visit(String name, Object value) {
                     if ("name".equals(name) && value instanceof String) {
-                        String concrete = (String) value;
-                        // @Concrete hints in core are baked to the iOS port (the
-                        // only prior ParparVM target). A non-iOS native build sets
-                        // cn1.concreteImplementation: the abstract platform impl is
-                        // bound to that concrete class (e.g. WindowsImplementation),
-                        // while other iOS specializations (e.g. IOSSimd) are dropped
-                        // so the usable base class is translated instead of pulling
-                        // in the absent iOS port.
-                        String override = System.getProperty("cn1.concreteImplementation");
-                        if (override != null && override.length() > 0
-                                && concrete.startsWith("com.codename1.impl.ios.")) {
-                            if (concrete.endsWith("IOSImplementation")) {
-                                cls.setConcreteClass(override.replace('.', '/'));
-                            }
-                            // else: leave concreteClass unset; use the base class.
-                        } else {
-                            cls.setConcreteClass(concrete.replace('.', '/'));
-                        }
+                        defaultConcrete = (String) value;
+                    } else if ("win".equals(name) && value instanceof String) {
+                        winConcrete = (String) value;
                     }
                     super.visit(name, value);
+                }
+
+                @Override
+                public void visitEnd() {
+                    // Pick the concrete implementation for the active translation
+                    // target: the native Windows build uses @Concrete.win(), every
+                    // other target uses @Concrete.name() (the iOS pipeline). When
+                    // building Windows and no win() is given (e.g. IOSSimd, which
+                    // has only an iOS specialization), leave the concrete unset so
+                    // the portable base class is translated instead of pulling in
+                    // the absent iOS class.
+                    String concrete = "win".equals(ByteCodeClass.getConcreteTarget())
+                            ? winConcrete : defaultConcrete;
+                    if (concrete != null && concrete.length() > 0) {
+                        cls.setConcreteClass(concrete.replace('.', '/'));
+                    }
+                    super.visitEnd();
                 }
             };
         }

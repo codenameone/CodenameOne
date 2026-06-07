@@ -232,12 +232,13 @@ public class WindowsNativeBuilder extends Executor {
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
         parparCmd.add("-Xmx768m");
-        // Bind the abstract CodenameOneImplementation to the Windows concrete
-        // impl (its @Concrete annotation otherwise names the iOS impl).
-        parparCmd.add("-Dcn1.concreteImplementation=com.codename1.impl.windows.WindowsImplementation");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
-        parparCmd.add("windows");
+        // Output type: the portable "clean" C target. The "windows" app type
+        // (passed below) specializes it -- an executable CMake project with the
+        // Win32 link set -- and binds CodenameOneImplementation to its @Concrete
+        // win() target (WindowsImplementation) during translation.
+        parparCmd.add("clean");
         // The translator takes ';'-separated source roots: app classes, the
         // WindowsPort platform classes, resources, built-in resources, and the
         // native sources (copied verbatim into the generated srcRoot).

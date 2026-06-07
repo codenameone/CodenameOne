@@ -494,19 +494,9 @@ class CleanTargetIntegrationTest {
         Path outputDir = Files.createTempDirectory("winapp-out");
         // Source roots: app classes, full core, WindowsPort classes, JavaAPI, native sources.
         String sources = classesDir + ";" + coreClasses + ";" + portClasses + ";" + javaApiDir + ";" + nativeStage;
-        // Bind the abstract platform impl to WindowsImplementation (its @Concrete
-        // is baked to the iOS impl, which we don't translate here).
-        String prevConcrete = System.getProperty("cn1.concreteImplementation");
-        System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
-        try {
-            runTranslatorMultiSource(sources, outputDir, appName, "windows");
-        } finally {
-            if (prevConcrete == null) {
-                System.clearProperty("cn1.concreteImplementation");
-            } else {
-                System.setProperty("cn1.concreteImplementation", prevConcrete);
-            }
-        }
+        // The "windows" app type binds CodenameOneImplementation to its @Concrete
+        // win() target (WindowsImplementation) during translation -- no override.
+        runTranslatorMultiSource(sources, outputDir, appName, "windows");
 
         Path cmakeRoot = outputDir.resolve("dist");
         assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
@@ -697,17 +687,9 @@ class CleanTargetIntegrationTest {
         Path outputDir = Files.createTempDirectory("winhello-out");
         String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
                 + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + adsMockClasses;
-        String prevConcrete = System.getProperty("cn1.concreteImplementation");
-        System.setProperty("cn1.concreteImplementation", "com.codename1.impl.windows.WindowsImplementation");
-        try {
-            runTranslatorMultiSource(sources, outputDir, "WinHelloMain", "windows");
-        } finally {
-            if (prevConcrete == null) {
-                System.clearProperty("cn1.concreteImplementation");
-            } else {
-                System.setProperty("cn1.concreteImplementation", prevConcrete);
-            }
-        }
+        // The "windows" app type binds CodenameOneImplementation to its @Concrete
+        // win() target (WindowsImplementation) during translation -- no override.
+        runTranslatorMultiSource(sources, outputDir, "WinHelloMain", "windows");
 
         Path cmakeRoot = outputDir.resolve("dist");
         assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");

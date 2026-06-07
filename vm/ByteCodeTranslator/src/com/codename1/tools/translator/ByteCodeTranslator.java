@@ -187,6 +187,11 @@ public class ByteCodeTranslator {
             return;
         }
         
+        // Select which @Concrete attribute the parser honours: the native Windows
+        // app type prefers Concrete.win(), every other target uses Concrete.name()
+        // (the iOS pipeline). Set before any parsing happens below.
+        ByteCodeClass.setConcreteTarget("windows".equalsIgnoreCase(appType) ? "win" : null);
+
         ByteCodeTranslator b = new ByteCodeTranslator();
         if (!recognizedOutputType) {
             handleDefaultOutput(b, sources, dest);
