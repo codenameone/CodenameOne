@@ -31,32 +31,29 @@ simulator. If a capability is not implemented here, the matching
 
 ## Gaps (in rough priority order)
 
-### 1. Native in-place text editing — CRITICAL, and untested on device
+### 1. Native in-place text editing — implemented; lacks automated coverage
 
-This is the highest-risk gap. In Codename One a `TextField` / `TextArea`, while
-being edited, is replaced by a **native editing widget** (a real OS text control
-with the native keyboard / IME / caret / selection / autocorrect), which is then
-removed when editing ends and the value is written back to the lightweight
-component. It is a subtle, stateful, async path and it is historically one of the
-most bug-prone areas of any port.
+In Codename One a `TextField` / `TextArea`, while being edited, is replaced by a
+**native editing widget** (a real OS text control with the native keyboard / IME
+/ caret / selection), removed when editing ends with the value written back to
+the lightweight component. It is a subtle, stateful, async path and historically
+one of the most bug-prone areas of any port.
 
-- **Current state:** `WindowsImplementation.editString(...)` is a stub that logs
-  `"native editing not wired yet"` and does nothing
-  (`WindowsImplementation.java:1302`). `isEditingText` / `stopEditing` /
-  `saveTextEditingState` / `setEditingText` inherit the base no-ops. Typing works
-  only through the lightweight (CN1-drawn) editor.
-- **Reference:** iOS implements the full pattern — see
-  `IOSImplementation.editString(...)` (`IOSImplementation.java:1017`), which
-  drives a native field overlay through `nativeInstance.editStringAt(...)` with
-  async/sync modes, focus tracking, bidi, keyboard toolbar, copy/paste gating,
-  etc. The Windows port needs the analogous overlay: a Win32 `EDIT`/`RichEdit`
-  (or a DirectWrite-backed control) positioned over the component, with IME
-  composition, then teardown + value write-back.
-- **Why it's dangerous:** there is **no on-device test coverage** for native
-  editing in the screenshot suite — the headless render path never exercises the
-  edit overlay, so a regression here would not be caught by CI. Building this
-  needs interactive verification on a real Windows desktop, plus new
-  device-runner coverage (focus → type → IME → commit → blur → value).
+- **Current state:** implemented. `isNativeInputSupported()` and
+  `isAsyncEditMode()` return `true`; `editString(...)` overlays a borderless
+  Win32 `EDIT` control on the component (styled to match the field — font, fg/bg,
+  padding-inset bounds), streams typed text back to the `TextArea` live (so
+  switching field / scrolling away never loses changes), and tears the control
+  down on commit. Scrolling away or editing another field commits and removes the
+  overlay (`hideTextEditor` / `stopTextEditing` overrides). Clipboard copy/paste
+  is wired. Native layer: `cn1_windows_edit.c`; Java: `WindowsImplementation`
+  `editString` / `syncEditText` / `commitEdit`. Verified interactively on a real
+  Windows desktop.
+- **Remaining work:** there is still **no automated coverage** — the headless
+  screenshot path never opens the edit overlay, so a regression would not be
+  caught by CI; a device-runner case (focus → type → commit → blur → value) is
+  needed. IME composition (CJK), bidi/RTL, and a keyboard toolbar are not yet
+  verified. A `RichEdit`-backed control may be needed for advanced cases.
 
 ### 1b. Mouse wheel scrolling — not wired
 
@@ -137,12 +134,6 @@ real app that declares a native interface (run through the full Maven plugin), a
 the *rendering* side of returned peers — positioning/painting a child `HWND` over
 the CN1 `PeerComponent` (only `BrowserComponent`'s WebView2 peer does this today;
 the generic peer-placement path in `WindowsImplementation` is the remaining work).
-
-### 6. Dialog / Win11 chrome polish
-
-Dialog and some component chrome currently follow the material theme rather than a
-Windows 11 native look. This is arguably a design choice (the port intentionally
-uses material as its native base), not a bug — listed here for visibility.
 
 ---
 
