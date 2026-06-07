@@ -209,6 +209,20 @@
       "medium": {
         "url": "https://medium.com/p/362f74616708/edit",
         "syndicated_at": "2026-06-07T15:01:52+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656699/edit.html",
+        "syndicated_at": "2026-06-07T15:18:55+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq3xhm4u000i1spq2hgddqg6",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a258bea0d543e9c5d254f2a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-07T15:20:02+00:00"
       }
     }
   }
