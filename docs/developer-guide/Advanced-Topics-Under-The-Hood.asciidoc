@@ -592,6 +592,12 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |noExtraResources
 |true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.
 
+|windows.arch
+|Native Windows port only (the `windows-native` build target -- not the JVM `win.*` desktop hints above). Target CPU architecture for the standalone `.exe`: `x64` (the default) or `arm64`. Accepts the usual synonyms (`x86_64`/`amd64`, `aarch64`). clang-cl cross-compiles to the chosen architecture from either host. See the link:#_working_with_the_native_windows_port[Working with the native Windows port chapter].
+
+|windows.debug
+|Native Windows port only. true/false (defaults to false). When `false` the `.exe` is built optimized and *stripped* -- no PDB, dead-stripped unreferenced code (`/OPT:REF`) and folded identical functions (`/OPT:ICF`) -- which is the shipping default. Set `true` to keep debug symbols (a `.pdb` next to the exe, via `RelWithDebInfo` / clang-cl `/Zi` + linker `/DEBUG`) so a native crash address can be symbolized during development. Optimizations stay on in both cases.
+
 |===
 
 === Android permissions

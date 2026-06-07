@@ -268,13 +268,19 @@ public class WindowsNativeBuilder extends Executor {
         buildDir.mkdirs();
 
         String triple = targetTriple(arch);
+        // Optimized + stripped Release by default (smallest self-contained exe, no
+        // PDB). windows.debug=true keeps the symbols (RelWithDebInfo -> /Zi+/DEBUG,
+        // a PDB next to the exe) so a native crash address can be symbolized during
+        // development. Optimizations are on in both configurations.
+        boolean debugSymbols = "true".equalsIgnoreCase(request.getArg("windows.debug", "false"));
+        String buildType = debugSymbols ? "RelWithDebInfo" : "Release";
         List<String> configure = new ArrayList<String>();
         configure.add("cmake");
         configure.add("-S");
         configure.add(cmakeRoot.getAbsolutePath());
         configure.add("-B");
         configure.add(buildDir.getAbsolutePath());
-        configure.add("-DCMAKE_BUILD_TYPE=Release");
+        configure.add("-DCMAKE_BUILD_TYPE=" + buildType);
         configure.add("-G");
         configure.add("Ninja");
         configure.add("-DCMAKE_C_COMPILER=clang-cl");

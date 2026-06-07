@@ -774,11 +774,20 @@ public class ByteCodeTranslator {
                 writer.append("        endif()\n");
                 writer.append("        target_link_libraries(${PROJECT_NAME} shlwapi version shell32 advapi32)\n");
                 writer.append("    endif()\n");
-                // Emit a PDB (clang-cl /Zi + linker /DEBUG) so native crash
-                // addresses in this dev/test executable symbolize to function
-                // names (llvm-symbolizer). Optimizations stay on.
-                writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
-                writer.append("    target_link_options(${PROJECT_NAME} PRIVATE /DEBUG)\n");
+                // Release is the shipping default: optimized (/O2 from the Release
+                // config) and stripped -- no debug info, and the linker dead-strips
+                // unreferenced functions (/OPT:REF) and folds identical COMDATs
+                // (/OPT:ICF), which meaningfully shrinks the single self-contained
+                // exe. Debug / RelWithDebInfo (a debug build, or windows.debug=true
+                // through the builder) instead emit a PDB (clang-cl /Zi + linker
+                // /DEBUG) so native crash addresses symbolize to function names
+                // (llvm-symbolizer); optimizations stay on either way.
+                writer.append("    if(CMAKE_BUILD_TYPE STREQUAL \"Debug\" OR CMAKE_BUILD_TYPE STREQUAL \"RelWithDebInfo\")\n");
+                writer.append("        target_compile_options(${PROJECT_NAME} PRIVATE /Zi)\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /DEBUG)\n");
+                writer.append("    else()\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /OPT:REF /OPT:ICF)\n");
+                writer.append("    endif()\n");
                 // GUI subsystem so double-clicking the exe does not pop a console
                 // window; keep main() as the entry via mainCRTStartup. The app still
                 // writes to a parent console when launched from cmd (initDisplay calls
