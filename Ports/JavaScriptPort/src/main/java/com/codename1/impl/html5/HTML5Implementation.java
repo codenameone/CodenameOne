@@ -8712,27 +8712,41 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         public void tile(CanvasRenderingContext2D ctx, int x, int y, int width, int height) {
-            JavaScriptNativeImageAdapter.tile(imageModel, new JavaScriptNativeImageAdapter.TileTarget() {
-                @Override
-                public Object createLoadedImagePattern() {
-                    return renderingBackend.createLoadedImagePattern(ctx, img);
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            int iw = getWidth();
+            int ih = getHeight();
+            if (iw <= 0 || ih <= 0) {
+                return;
+            }
+            // Tile by repeated drawImage rather than a CanvasPattern fill. In the
+            // surface-id render model a pattern set as fillStyle paints opaque
+            // BLACK on the display surface: the pattern is created successfully
+            // (createPattern returns non-null, and the very same pattern fills
+            // correctly on a scratch OffscreenCanvas) but the display context
+            // does not honour the pattern fill. That turned every image-border
+            // centre black -- the legacy iOS7 Toolbar/Title/StatusBar strips draw
+            // their left/right caps with drawImage (which renders fine) but the
+            // centre via tileImage, so the whole title bar came out black. The
+            // old TeaVM port rendered iOS7 correctly. drawImage IS honoured on
+            // the display surface, so tile the source image across the region.
+            long tilesX = ((long) width + iw - 1) / iw;
+            long tilesY = ((long) height + ih - 1) / ih;
+            if (tilesX * tilesY > 400L) {
+                // Pathologically fine tile over a large area: stretch instead of
+                // emitting thousands of draw ops. Visually exact for the near-
+                // uniform fills that reach this path.
+                draw(ctx, x, y, width, height);
+                return;
+            }
+            for (int ty = 0; ty < height; ty += ih) {
+                int dh = Math.min(ih, height - ty);
+                for (int tx = 0; tx < width; tx += iw) {
+                    int dw = Math.min(iw, width - tx);
+                    draw(ctx, x + tx, y + ty, dw, dh);
                 }
-
-                @Override
-                public Object createMutableSurfacePattern() {
-                    mutableGraphics.flush();
-                    return ((SurfaceCommandRecorder)ctx).createPatternFromSurface(mutableGraphics.getSurfaceId(), "repeat");
-                }
-
-                @Override
-                public void paintPattern(Object pattern, int tileX, int tileY, int tileWidth, int tileHeight) {
-                    ctx.setFillStyle((CanvasPattern)pattern);
-                    ctx.save();
-                    ctx.translate(tileX, tileY);
-                    ctx.fillRect(0, 0, tileWidth, tileHeight);
-                    ctx.restore();
-                }
-            }, x, y, width, height);
+            }
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y){

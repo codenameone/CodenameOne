@@ -288,6 +288,13 @@ Title {
 }
 MainTitle { cn1-derive: Title; }
 
+/* paintsTitleBarBool=true makes Form add a StatusBar component at the top
+   of the title area. An undefined UIID resolves to the framework default
+   Style (opaque black), so without this rule the status strip paints solid
+   black above the (white) title. Match the Toolbar surface so the status
+   strip blends into the navigation bar. */
+StatusBar { background-color: #ffffff; color: #000000; padding: 0; margin: 0; }
+
 BackCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
 
@@ -618,6 +625,7 @@ PopupContent {
     TitleArea { background-color: #000000; color: #ffffff; }
     Title { color: #ffffff; background-color: #000000; }
     MainTitle { color: #ffffff; background-color: #000000; }
+    StatusBar { background-color: #000000; color: #ffffff; }
     BackCommand { color: var(--accent-color-dark, #0a84ff); }
     TitleCommand { color: var(--accent-color-dark, #0a84ff); }
 

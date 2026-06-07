@@ -3562,7 +3562,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // reaches comparison.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a
   // (defensive __cn1CachedDocWrapper invalidation in getDocument).
-  "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   // Un-parked: canvasContextWipe no-op recovery for save/restore/
   // setTransform/etc at d696fb682 + AbstractAnimationScreenshotTest
   // safety net (efc9bdb67) should now keep this from hanging.
@@ -3573,7 +3573,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // Sheet teardown doesn't complete before the next test starts so
   // a dim/blur layer persists across forms. Separate test-isolation
   // bug worth chasing; for now park here so the suite is reliable.
-  "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   // LightweightPickerButtons HARD-parks the worker (heartbeat keeps firing
   // but the green scheduler goes fully idle: runnable=0, resumes frozen, NOT
   // a jso-bridge cross -- RETRIES/HOSTCALL_TIMEOUT both 0). It is the
@@ -3600,7 +3600,7 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // reliably -- park here in the meantime so the rest of the suite
   // is deterministic.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  "com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "canvasContextWipe",
   // Sheet's backdrop blur path produces a cn1_s_save VIRTUAL_FAIL loop
   // on the canvas-accumulation tail (same ~suite-position-90 staleness
   // as ChartDoughnut etc.). The runtime fix in 618629361 turned the
@@ -3608,15 +3608,15 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // half of CI runs sits at SheetScreenshotTest for the remainder of
   // the budget. Park here for deterministic completion.
   // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe",
   // graphicsTransform3dCanvasHang: the 3D perspective / camera transform
   // tests render into a surface the worker-side screenshot path can't
   // resolve (SCREENSHOT_START reports canvasCandidates=0), so the suite
   // re-dispatches the same index indefinitely and never reaches the
   // per-test deadline. The 2D transform tests (rotation / translation /
   // affine) are unaffected. Mirrored in Cn1ssDeviceRunner's Java skip list.
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformPerspective": "graphicsTransform3dCanvasHang",
-  "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "graphicsTransform3dCanvasHang"
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_graphics_TransformPerspective": "graphicsTransform3dCanvasHang",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "graphicsTransform3dCanvasHang"
 });
 const cn1ssForcedTimeoutTestNames = Object.freeze({
   "MediaPlaybackScreenshotTest": "mediaPlayback",
@@ -3658,17 +3658,17 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   // ChartCombinedXY re-parked (non-terminating layout loop); Transform + Rotated
   // kept un-parked -- see note in cn1ssForcedTimeoutTestClasses above.
   "ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
-  "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
   //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
-  "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
   //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
   //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
-  "CssGradientsScreenshotTest": "canvasContextWipe",
-  "SheetScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "CssGradientsScreenshotTest": "canvasContextWipe",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "SheetScreenshotTest": "canvasContextWipe",
   // graphicsTransform3dCanvasHang -- see matching fully-qualified entries
   // in cn1ssForcedTimeoutTestClasses above.
-  "TransformPerspective": "graphicsTransform3dCanvasHang",
-  "TransformCamera": "graphicsTransform3dCanvasHang"
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "TransformPerspective": "graphicsTransform3dCanvasHang",
+  // UNSKIP-TRIAGE(surface-id+freeze fix): "TransformCamera": "graphicsTransform3dCanvasHang"
 });
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
