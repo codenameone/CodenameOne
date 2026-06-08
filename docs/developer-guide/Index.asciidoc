@@ -721,19 +721,40 @@ Once all that's in place Kotlin should work. This should be possible for more JV
 
 Codename One includes a portable 3D / GPU graphics API in the `com.codename1.gpu`
 package. It's designed for games and other hardware accelerated visuals and runs
-on every supported platform from a single code base: the iOS backend renders with
-Metal, Android and the JavaScript port render with OpenGL ES / WebGL, and the
-desktop simulator renders with OpenGL through JOGL (falling back to a built in
-software rasterizer if no GL is available) so you can develop and debug 3D
-without a device.
+on every supported platform from a single code base: the iOS and Mac (Catalyst)
+backends render with Metal, Android and the JavaScript port render with OpenGL ES
+/ WebGL, the native Windows port renders with Direct3D 11, and the desktop
+simulator renders with OpenGL through JOGL (falling back to a built in software
+rasterizer if no GL is available) so you can develop and debug 3D without a
+device.
 
 The API is a hybrid of a low level command surface (vertex/index buffers,
 textures, render state and draw calls) and high level helpers (`Mesh` primitives,
 a `Camera`, materials and a model loader). The most important design choice is
 that *you never write shader code*. Instead you describe a `Material` and the
-engine generates the matching GLSL or Metal shader for the current platform. This
-is what keeps the API portable without shipping a shader translation layer in
-your app.
+engine generates the matching shader for the current platform. This is what keeps
+the API portable without shipping a shader translation layer in your app.
+
+=== Platforms and backends
+
+The same `com.codename1.gpu` code runs on every port. Only the native surface and
+the shader the engine generates for your `Material` differ between backends:
+
+[cols="2,2,2",options="header"]
+|===
+| Platform | GPU backend | Generated shader language
+| iOS and Mac (Catalyst) | Metal | Metal Shading Language
+| Android | OpenGL ES 2 | GLSL ES
+| JavaScript / Web | WebGL | GLSL ES
+| Desktop simulator (JavaSE) | OpenGL via JOGL (software fallback) | GLSL
+| Native Windows | Direct3D 11 | HLSL
+|===
+
+The engine selects the backend automatically and generates the matching Metal,
+GLSL or HLSL shader behind the scenes, so the same `Material` and `Mesh` code
+produces the same scene everywhere. Where no backend is available (for example the
+legacy iOS OpenGL ES build) `CN.isGpuSupported()` returns `false` so you can fall
+back to 2D.
 
 === Hosting 3D content
 
@@ -825,6 +846,12 @@ public void onInit(GraphicsDevice device) {
     // ... camera, light ...
 }
 ----
+
+The cube below uses an `UNLIT` material with a procedurally generated checkerboard
+texture and `NEAREST` filtering, so the texels stay crisp:
+
+.A checkerboard textured cube rendered by RenderView
+image::img/gpu-textured-cube.png[A checkerboard textured cube,scaledwidth=40%]
 
 === Loading models
 
