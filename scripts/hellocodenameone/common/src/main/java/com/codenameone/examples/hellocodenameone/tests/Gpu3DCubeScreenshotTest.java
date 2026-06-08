@@ -10,7 +10,6 @@ import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderView;
 import com.codename1.gpu.Renderer;
 import com.codename1.ui.Form;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 
@@ -55,13 +54,21 @@ public class Gpu3DCubeScreenshotTest extends BaseTest {
             public void onDispose(GraphicsDevice device) {
             }
         });
-        if (view.isSupported()) {
-            form.add(BorderLayout.CENTER, view);
-        } else {
-            form.add(BorderLayout.CENTER, new Label("3D unsupported"));
+        if (!view.isSupported()) {
+            // No GPU 3D backend on this platform (e.g. the iOS GL build); skip the
+            // screenshot (shouldTakeScreenshot() returns false) rather than gate a
+            // "3D unsupported" placeholder that has no per-platform baseline.
+            done();
+            return true;
         }
+        form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
+    }
+
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return com.codename1.ui.CN.isGpuSupported();
     }
 
     /// Force a fresh GPU frame to be rendered (and read back for capture) before
