@@ -15804,16 +15804,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             new com.codename1.impl.gpu.GpuImplementation() {
         @Override
         public com.codename1.ui.PeerComponent createPeer(com.codename1.gpu.RenderView view) {
-            // Prefer the real OpenGL (JOGL) backend. Instantiating it touches
-            // JOGL classes and a GL context, so guard against GLException AND
-            // NoClassDefFoundError (jars absent) and fall back to the software
+            // Prefer the real OpenGL (JOGL) backend. It is loaded reflectively so
+            // the JOGL types stay confined to JavaSEJoglSurface/JavaSEGLDevice:
+            // the Maven simulator ships JOGL and gets the GPU backend, while the
+            // legacy Ant port build (no JOGL on its classpath) excludes those two
+            // files entirely. Instantiating the backend touches JOGL classes and a
+            // GL context, so guard against the class being absent (Ant build),
+            // GLException, AND NoClassDefFoundError and fall back to the software
             // renderer so the simulator never fails to start over 3D.
             JavaSEGpuSurface surface;
             try {
-                surface = new JavaSEJoglSurface(view);
+                Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
+                surface = (JavaSEGpuSurface) joglSurface
+                        .getConstructor(com.codename1.gpu.RenderView.class)
+                        .newInstance(view);
             } catch (Throwable t) {
+                Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
+                        && t.getCause() != null ? t.getCause() : t;
                 System.out.println("JavaSE 3D: JOGL backend unavailable, using software renderer ("
-                        + t + ")");
+                        + cause + ")");
                 surface = new JavaSEGLSurface(view);
             }
             com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
