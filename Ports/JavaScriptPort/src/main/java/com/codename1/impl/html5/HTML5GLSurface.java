@@ -76,9 +76,11 @@ class HTML5GLSurface extends HTML5Peer {
         // call is proxied to the real main-thread context. preserveDrawingBuffer
         // keeps the drawn frame readable for the screenshot composite path.
         JSObject opts = webglContextOptions();
-        JSObject ctx = canvas.getContext("webgl", opts);
+        // Obtaining the WebGL context is the one unavoidable getContext round-trip;
+        // it runs once at creation, not per frame.
+        JSObject ctx = canvas.getContext("webgl", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time WebGL context creation
         if (ctx == null) {
-            ctx = canvas.getContext("experimental-webgl", opts);
+            ctx = canvas.getContext("experimental-webgl", opts); // LINT-ALLOW-CANVAS-BARRIER-READ: one-time legacy context creation
         }
         if (ctx == null) {
             return null;
@@ -134,15 +136,14 @@ class HTML5GLSurface extends HTML5Peer {
         if (w <= 0 || h <= 0) {
             return;
         }
-        if (canvas.getWidth() != w) {
-            canvas.setWidth(w);
-        }
-        if (canvas.getHeight() != h) {
-            canvas.setHeight(h);
-        }
         if (w != lastW || h != lastH) {
             lastW = w;
             lastH = h;
+            // The canvas pixel size is the scaled component size, tracked Java-side
+            // via lastW/lastH; it is written (fire-and-forget) but never read back
+            // off the canvas host-ref (that would be a worker<->host barrier read).
+            canvas.setWidth(w);
+            canvas.setHeight(h);
             try {
                 renderer.onResize(device, w, h);
             } catch (Throwable t) {
