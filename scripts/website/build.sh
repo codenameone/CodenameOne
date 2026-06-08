@@ -634,6 +634,13 @@ build_initializr_for_site() {
     echo "Initializr website bundle is missing index.html after extraction." >&2
     exit 1
   fi
+
+  # The Initializr page (layouts/_default/initializr.html) shows the app icon
+  # from /initializr-app/icon.png. The cloud bundle shipped one; the local
+  # ParparVM bundle does not, so copy the project icon in when it is absent.
+  if [ ! -f "${output_dir}/icon.png" ] && [ -f "${REPO_ROOT}/scripts/initializr/common/icon.png" ]; then
+    cp "${REPO_ROOT}/scripts/initializr/common/icon.png" "${output_dir}/icon.png"
+  fi
 }
 
 build_playground_for_site() {
