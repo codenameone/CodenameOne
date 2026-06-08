@@ -202,9 +202,17 @@ class HTML5GLSurface extends HTML5Peer {
         synchronized (ACTIVE) {
             peers = new java.util.ArrayList<HTML5GLSurface>(ACTIVE);
         }
+        com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
         for (HTML5GLSurface s : peers) {
             try {
                 if (s.contextLost || s.device == null) {
+                    continue;
+                }
+                // Only composite peers that belong to the form currently on
+                // screen. A peer left in ACTIVE while its (previous) form is torn
+                // down must not bleed its last frame into a later test's
+                // screenshot -- e.g. the 3D animation showing up in DesktopMode.
+                if (current == null || s.getComponentForm() != current) {
                     continue;
                 }
                 s.renderFrame();
