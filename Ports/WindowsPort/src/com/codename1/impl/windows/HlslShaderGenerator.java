@@ -107,11 +107,12 @@ public final class HlslShaderGenerator {
         sb.append("VSOutput ").append(VERTEX_FUNCTION).append("(VSInput input) {\n");
         sb.append("  VSOutput output;\n");
         sb.append("  float4 clip = mul(mvp, float4(input.position, 1.0));\n");
-        // Adapt the portable GL-convention clip space to Direct3D: flip Y (D3D's
-        // render-target origin is top-left, which also makes triangle winding
-        // match the GL/software backends so back-face culling keeps the right
-        // faces), and remap Z from GL's [-w, w] to D3D's [0, w] depth range.
-        sb.append("  clip.y = -clip.y;\n");
+        // Adapt the portable GL-convention clip space to Direct3D: only remap Z
+        // from GL's [-w, w] to D3D's [0, w] depth range. Y is NOT flipped here --
+        // the GL backend (the reference) does not flip either, and D3D's viewport
+        // already maps NDC +Y to the top of the render target, so a flip would
+        // render the scene upside down. Winding is handled by the rasterizer state
+        // in cn1_windows_d3d.cpp (front faces are counter-clockwise).
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  output.position = clip;\n");
         if (lit) {

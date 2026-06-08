@@ -542,12 +542,11 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     [enc setDepthStencilState:p.depthStencilState];
     [enc setCullMode:p.cullMode];
     // The portable API uses the GL convention (counter-clockwise front faces).
-    // The generated MSL negates clip.y to match Metal's top-left framebuffer
-    // origin, and that negation reverses on-screen winding (a CCW front face is
-    // drawn clockwise). So Metal's front-facing winding must be CLOCKWISE here;
-    // using counter-clockwise culled the front faces and kept the back faces,
-    // rendering every mesh inside-out.
-    [enc setFrontFacingWinding:MTLWindingClockwise];
+    // The generated MSL no longer negates clip.y (that flipped the scene upside
+    // down), so on-screen winding matches the portable convention directly: a CCW
+    // front face is CCW in Metal's framebuffer space too. Front-facing winding is
+    // therefore COUNTER-CLOCKWISE.
+    [enc setFrontFacingWinding:MTLWindingCounterClockwise];
     [enc setVertexBuffer:vbo offset:0 atIndex:0];
 
     JAVA_ARRAY_FLOAT *uptr = (JAVA_ARRAY_FLOAT *)((JAVA_ARRAY) uniforms)->data;

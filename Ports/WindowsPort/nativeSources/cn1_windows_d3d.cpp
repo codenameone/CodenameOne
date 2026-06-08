@@ -517,13 +517,13 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dGetOrCreatePipeline___lon
     }
     c->device->CreateBlendState(&bd, &p->blend);
 
-    // Rasterizer state. The HLSL flips Y, which reverses on-screen winding, so
-    // front faces become clockwise (FrontCounterClockwise = FALSE) to match the
-    // portable CCW-front convention of the other backends.
+    // Rasterizer state. The HLSL no longer flips Y, so on-screen winding matches
+    // the portable convention directly: front faces are counter-clockwise
+    // (FrontCounterClockwise = TRUE), as in the GL/software backends.
     D3D11_RASTERIZER_DESC rd;
     ZeroMemory(&rd, sizeof(rd));
     rd.FillMode = D3D11_FILL_SOLID;
-    rd.FrontCounterClockwise = FALSE;
+    rd.FrontCounterClockwise = TRUE;
     if (cullMode == 0) {
         rd.CullMode = D3D11_CULL_NONE;
     } else if (cullMode == 2) {

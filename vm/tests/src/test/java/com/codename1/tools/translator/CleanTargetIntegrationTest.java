@@ -1331,7 +1331,6 @@ class CleanTargetIntegrationTest {
                 "                \"VSOutput cn1_vertex_main(VSInput input) {\\n\" +\n" +
                 "                \"  VSOutput output;\\n\" +\n" +
                 "                \"  float4 clip = mul(mvp, float4(input.position, 1.0));\\n\" +\n" +
-                "                \"  clip.y = -clip.y;\\n\" +\n" +
                 "                \"  clip.z = (clip.z + clip.w) * 0.5;\\n\" +\n" +
                 "                \"  output.position = clip;\\n\" +\n" +
                 "                \"  output.worldNormal = mul(normalMatrix, float4(input.normal, 0.0)).xyz;\\n\" +\n" +
