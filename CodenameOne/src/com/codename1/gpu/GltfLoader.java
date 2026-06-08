@@ -422,9 +422,6 @@ public final class GltfLoader {
             return null;
         }
         Image img = Image.createImage(imageBytes, 0, imageBytes.length);
-        if (img == null) {
-            return null;
-        }
         Texture result = device.createTexture(img);
         result.setFilter(Texture.Filter.LINEAR);
         return result;
@@ -474,7 +471,9 @@ public final class GltfLoader {
         try {
             return new String(b, off, len, "UTF-8");
         } catch (java.io.UnsupportedEncodingException ex) {
-            return new String(b, off, len);
+            // UTF-8 is required to be present on every JVM/CN1 runtime, so this
+            // never happens; rethrow rather than fall back to the platform default.
+            throw new RuntimeException(ex);
         }
     }
 
@@ -482,7 +481,7 @@ public final class GltfLoader {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException ex) {
-            return s.getBytes();
+            throw new RuntimeException(ex);
         }
     }
 
