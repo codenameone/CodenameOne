@@ -224,6 +224,21 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-07T15:20:02+00:00"
       }
+    },
+    "build-time-codegen": {
+      "devto": {
+        "id": 3849555,
+        "url": "https://dev.to/codenameone/openapi-orm-svg-and-lottie-56ea",
+        "syndicated_at": "2026-06-08T14:32:08+00:00"
+      },
+      "foojay": {
+        "id": 124152,
+        "url": "https://foojay.io/wp-admin/post.php?post=124152&action=edit",
+        "preview_url": "https://foojay.io/?p=124152",
+        "featured_media_id": 124151,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-08T14:33:02+00:00"
+      }
     }
   }
 }
