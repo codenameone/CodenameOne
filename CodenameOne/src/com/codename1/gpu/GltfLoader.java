@@ -152,7 +152,7 @@ public final class GltfLoader {
                     new InputStreamReader(new ByteArrayInputStream(utf8Bytes(json)), "UTF-8"));
             return new Object[] { root, binChunk };
         } catch (IOException ex) {
-            throw new RuntimeException("Failed to parse glTF JSON: " + ex.getMessage());
+            throw new RuntimeException("Failed to parse glTF JSON: " + ex.getMessage(), ex);
         }
     }
 
