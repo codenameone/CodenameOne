@@ -8,6 +8,21 @@ It runs from one code base on the JavaSE simulator (OpenGL via JOGL), Android
 One UI: a 3D scene lives inside a regular component that you add to a `Form` like
 any other.
 
+[IMPORTANT]
+====
+*Your `Renderer` callbacks run on the native platform render thread -- NOT the
+Codename One EDT.* This is the single most important thing to understand before
+you write any 3D code.
+
+`onInit`, `onResize`, `onFrame` and `onDispose` are invoked on the underlying
+OS/GPU render loop (GL / Metal / Direct3D), not on the event dispatch thread.
+From inside them you must *not* touch Codename One UI components, show forms, or
+call other EDT-only APIs. To push data back to the UI (for example to update a
+HUD label or react to a game event) hop onto the EDT with `CN.callSerially(...)`.
+Conversely, treat the `GraphicsDevice` and the objects it hands you as owned by
+the render thread.
+====
+
 WARNING: 3D is a low-level, GPU dependent feature. Always guard usage with
 `CN.isGpuSupported()` (or `RenderView.isSupported()`); on a platform without a
 backend the `RenderView` reports unsupported so you can fall back to 2D.

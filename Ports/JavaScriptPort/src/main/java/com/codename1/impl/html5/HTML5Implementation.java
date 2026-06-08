@@ -2984,7 +2984,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
 
-            tp.put("StatusBar.padding", "0,0,0,0");
+            // The browser has no OS status bar / notch, so the app must not
+            // reserve a status-bar strip at the top of the Form the way iOS
+            // does. The iOS-modern theme sets paintsTitleBarBool=true to
+            // reserve that safe-area space on real devices; force it off on the
+            // JS port so the web layout starts flush at the top (otherwise the
+            // undefined StatusBar UIID would also paint an opaque strip there).
+            tp.put("@paintsTitleBarBool", "false");
 
             UIManager.getInstance().setThemeProps(tp);
             return;
