@@ -166,6 +166,17 @@ public class JavaScriptBuilder extends Executor {
     }
 
     private boolean checkUserLevel(BuildRequest request) {
+        // A logged-in Codename One account is the authorization for the local JS
+        // build, the same way it authorizes the cloud build. The credentials are
+        // written to the /com/codename1/ui preferences node by `cn1:set-user-token`
+        // (SetUserTokenMojo) -- e.g. set_cn1_user_token in the website build. Honor
+        // that login directly so the local target "just works" once you're logged in.
+        if (hasCodenameOneLogin()) {
+            log("Local JavaScript builder: authorized via logged-in Codename One account.");
+            return true;
+        }
+        // Fallback for direct CLI invocations that aren't logged in: an explicit
+        // Enterprise-or-higher user level still unlocks the build.
         String raw = firstNonEmpty(
                 request.getArg("javascript.userLevel", null),
                 request.getArg("userLevel", null),
@@ -179,10 +190,24 @@ public class JavaScriptBuilder extends Executor {
             return true;
         }
         log("ERROR: The local JavaScript build is licensed only to Enterprise and higher tier users. "
-                + "Set codename1.arg.javascript.userLevel=Enterprise (or a higher tier) in codenameone_settings.properties, "
+                + "Log in with `cn1:set-user-token -Duser=<email> -Dtoken=<token>`, "
+                + "set codename1.arg.javascript.userLevel=Enterprise (or a higher tier) in codenameone_settings.properties, "
                 + "or define the CN1_USER_LEVEL environment variable, to enable this preview. "
                 + "See https://www.codenameone.com/pricing.html for tier details.");
         return false;
+    }
+
+    private boolean hasCodenameOneLogin() {
+        try {
+            java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("/com/codename1/ui");
+            String user = prefs.get("user", null);
+            String token = prefs.get("token", null);
+            return user != null && user.trim().length() > 0
+                    && token != null && token.trim().length() > 0;
+        } catch (Exception ex) {
+            // Preferences backing store unavailable -- fall through to the userLevel path.
+            return false;
+        }
     }
 
     private static int parseUserRank(String raw) {
