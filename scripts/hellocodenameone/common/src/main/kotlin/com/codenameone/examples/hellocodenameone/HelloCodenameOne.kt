@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone
 
+import com.codename1.camera.Camera
 import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
 import com.codename1.ui.CN
@@ -15,6 +16,20 @@ open class HelloCodenameOne : Lifecycle() {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
         DefaultMethodDemo.validate()
+        // Reference the low-level camera API (com.codename1.camera.*) so the
+        // build's bytecode scanner flips IPhoneBuilder.usesCn1Camera /
+        // AiDependencyTable: this compiles the CN1Camera AVFoundation natives
+        // on iOS & Mac Catalyst and pulls in CameraX on Android. Without an app
+        // exercising this API, that native code is gated out of every CI build
+        // and never gets compiled. isSupported()/getCameras() never open a
+        // session, so no runtime permission prompt is triggered.
+        try {
+            val cameraSupported = Camera.isSupported()
+            val cameraCount = if (cameraSupported) Camera.getCameras().size else 0
+            System.out.println("CN1SS:CAMERA_DIAG supported=$cameraSupported cameras=$cameraCount")
+        } catch (t: Throwable) {
+            System.out.println("CN1SS:CAMERA_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
+        }
         try {
             NativeInterfaceLanguageValidator.validate()
         } catch (t: Throwable) {

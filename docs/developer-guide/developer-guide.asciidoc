@@ -81,6 +81,8 @@ include::performance.asciidoc[]
 
 include::Testing-with-JUnit.adoc[]
 
+include::Advertising.asciidoc[]
+
 include::Monetization.asciidoc[]
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
@@ -119,6 +121,8 @@ include::Working-With-Javascript.asciidoc[]
 include::Working-with-Mac-OS-X.asciidoc[]
 
 include::Desktop-Integration.asciidoc[]
+
+include::Working-With-Windows.asciidoc[]
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
 

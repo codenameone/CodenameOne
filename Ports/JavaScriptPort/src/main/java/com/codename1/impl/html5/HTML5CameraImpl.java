@@ -168,7 +168,7 @@ public class HTML5CameraImpl extends CameraImpl {
                     Window.current().getDocument().createElement("canvas");
             canvas.setAttribute("width", String.valueOf(w));
             canvas.setAttribute("height", String.valueOf(h));
-            CanvasRenderingContext2D ctx = (CanvasRenderingContext2D) canvas.getContext("2d");
+            CanvasRenderingContext2D ctx = (CanvasRenderingContext2D) canvas.getContext("2d"); // LINT-ALLOW-CANVAS-BARRIER-READ: one-shot camera frame capture (host-side canvas, not render path)
             ctx.drawImage((CanvasImageSource) video, 0, 0, w, h);
             String dataUrl = canvasToJpegDataUrl(canvas, opts.getJpegQuality() / 100.0);
             byte[] jpeg = decodeBase64DataUrl(dataUrl);
@@ -239,7 +239,7 @@ public class HTML5CameraImpl extends CameraImpl {
             scratchCanvas.setAttribute("width", String.valueOf(w));
             scratchCanvas.setAttribute("height", String.valueOf(h));
             CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)
-                    scratchCanvas.getContext("2d");
+                    scratchCanvas.getContext("2d"); // LINT-ALLOW-CANVAS-BARRIER-READ: one-shot camera frame capture
             ctx.drawImage((CanvasImageSource) video, 0, 0, w, h);
             String dataUrl = canvasToJpegDataUrl(scratchCanvas, 0.8);
             byte[] jpeg = decodeBase64DataUrl(dataUrl);

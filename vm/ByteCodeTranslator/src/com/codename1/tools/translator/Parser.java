@@ -923,12 +923,34 @@ public class Parser extends ClassVisitor {
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
         if (CONCRETE_ANNOTATION.equals(desc)) {
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
+                private String defaultConcrete;
+                private String winConcrete;
+
                 @Override
                 public void visit(String name, Object value) {
                     if ("name".equals(name) && value instanceof String) {
-                        cls.setConcreteClass(((String)value).replace('.', '/'));
+                        defaultConcrete = (String) value;
+                    } else if ("win".equals(name) && value instanceof String) {
+                        winConcrete = (String) value;
                     }
                     super.visit(name, value);
+                }
+
+                @Override
+                public void visitEnd() {
+                    // Pick the concrete implementation for the active translation
+                    // target: the native Windows build uses @Concrete.win(), every
+                    // other target uses @Concrete.name() (the iOS pipeline). When
+                    // building Windows and no win() is given (e.g. IOSSimd, which
+                    // has only an iOS specialization), leave the concrete unset so
+                    // the portable base class is translated instead of pulling in
+                    // the absent iOS class.
+                    String concrete = "win".equals(ByteCodeClass.getConcreteTarget())
+                            ? winConcrete : defaultConcrete;
+                    if (concrete != null && concrete.length() > 0) {
+                        cls.setConcreteClass(concrete.replace('.', '/'));
+                    }
+                    super.visitEnd();
                 }
             };
         }

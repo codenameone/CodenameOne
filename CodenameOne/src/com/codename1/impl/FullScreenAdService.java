@@ -45,7 +45,13 @@ import java.util.TimerTask;
 /// Abstract class for fullscreen ads that appear before and possibly after application
 /// execution as well as randomly between application screen transitions.
 ///
+/// @deprecated superseded by the modern advertising API; use
+/// [com.codename1.ads.InterstitialAd] together with
+/// [com.codename1.ads.AdManager#bindInterstitialOnTransition] and
+/// [com.codename1.ads.AppOpenAd] instead.
+///
 /// @author Shai Almog
+@Deprecated
 public abstract class FullScreenAdService {
     private static final Object LOCK = new Object();
     private boolean allowWithoutNetwork = true;

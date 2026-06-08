@@ -95,9 +95,26 @@ public class CodenameOneActivity extends Activity {
         return null;
     }
 
+    /**
+     * Test-only injection point for the billing implementation.  The generated
+     * application stub overrides {@link #createBillingSupport()} to return the
+     * real Google Play {@code BillingSupport} whenever the app uses the Purchase
+     * API, which shadows any subclass override.  Instrumentation tests that need
+     * a fake (there is no local Play Billing sandbox) set this before the
+     * activity resumes so {@link #getBillingSupport()} returns the fake instead.
+     * Not used in production.
+     */
+    private static IBillingSupport billingSupportTestOverride;
+
+    public static void setBillingSupportTestOverride(IBillingSupport support) {
+        billingSupportTestOverride = support;
+    }
+
     private IBillingSupport getBillingSupport() {
         if (billingSupport == null) {
-            billingSupport = createBillingSupport();
+            billingSupport = billingSupportTestOverride != null
+                    ? billingSupportTestOverride
+                    : createBillingSupport();
         }
         return billingSupport;
     }

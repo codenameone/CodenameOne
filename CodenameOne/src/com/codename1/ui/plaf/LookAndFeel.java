@@ -107,6 +107,10 @@ public abstract class LookAndFeel {
     /// track that pages on click. Enabled via the {@code interactiveScrollBool} theme
     /// constant which the desktop port injects only when running on the desktop.
     private boolean interactiveScroll;
+    /// Minimum length (in pixels) of an interactive scrollbar thumb so it stays grabbable even
+    /// when the content is much taller/wider than the viewport. Resolved from the
+    /// {@code scrollThumbMinSizeInt} theme constant, defaulting to roughly 4mm.
+    private int interactiveScrollThumbMin;
     private int fadeScrollBarSpeed = 5;
     private int fadeScrollEdgeLength = 15;
     private Image fadeScrollTop;
@@ -557,7 +561,25 @@ public abstract class LookAndFeel {
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
 
-        scroll.paintComponent(g);
+        if (interactiveScroll) {
+            // Draw the always-visible track directly rather than via the orphan scroll component's
+            // paintComponent: a component that was never attached to a form does not reliably render
+            // its background on every port (notably the iOS/Metal Mac-native pipeline). A direct fill
+            // is renderer-agnostic. Only the interactive (desktop) path is affected, which has no
+            // pre-existing baselines.
+            int trackBgAlpha = scrollStyle.getBgTransparency() & 0xff;
+            if (trackBgAlpha > 0) {
+                int prevColor = g.getColor();
+                int prevAlpha = g.getAlpha();
+                g.setColor(scrollStyle.getBgColor());
+                g.setAlpha(trackBgAlpha);
+                g.fillRect(x, y, width, height);
+                g.setAlpha(prevAlpha);
+                g.setColor(prevColor);
+            }
+        } else {
+            scroll.paintComponent(g);
+        }
 
         marginLeft = scrollThumbStyle.getMarginLeft(c.isRTL());
         marginTop = scrollThumbStyle.getMarginTop();
@@ -571,10 +593,41 @@ public abstract class LookAndFeel {
 
         if (isVertical) {
             blockSize = (int) (c.getHeight() * blockSizeRatio) + 2;
-            offset = (int) ((c.getHeight()) * offsetRatio);
         } else {
             blockSize = (int) (c.getWidth() * blockSizeRatio) + 2;
-            offset = (int) ((c.getWidth()) * offsetRatio);
+        }
+
+        if (interactiveScroll) {
+            // keep the desktop thumb at least interactiveScrollThumbMin pixels long so it stays
+            // grabbable on very long content, then remap the offset into the reduced travel so the
+            // enlarged thumb never overshoots the track (and stays the inverse of dragScrollThumb).
+            // trackPixels uses the thumb-margin-reduced dimension so the thumb stays inside the track.
+            int trackPixels = isVertical ? height : width;
+            int minBlock = interactiveScrollThumbMin;
+            if (minBlock > trackPixels) {
+                minBlock = trackPixels;
+            }
+            if (blockSize < minBlock) {
+                blockSize = minBlock;
+            }
+            float denom = 1f - blockSizeRatio;
+            float norm = denom > 0f ? offsetRatio / denom : 0f;
+            if (norm < 0f) {
+                norm = 0f;
+            } else if (norm > 1f) {
+                norm = 1f;
+            }
+            int travel = trackPixels - blockSize;
+            if (travel < 0) {
+                travel = 0;
+            }
+            offset = (int) (travel * norm);
+        } else {
+            if (isVertical) {
+                offset = (int) ((c.getHeight()) * offsetRatio);
+            } else {
+                offset = (int) ((c.getWidth()) * offsetRatio);
+            }
         }
 
         if (isVertical) {
@@ -589,8 +642,47 @@ public abstract class LookAndFeel {
             scrollThumb.setHeight(height);
         }
 
+        if (interactiveScroll && scrollThumb instanceof InteractiveScrollThumb) {
+            // push the hover/drag highlight state so the thumb paints its selected/pressed style
+            int st = THUMB_STATE_NORMAL;
+            if (isVertical) {
+                if (c.isVScrollThumbGrabbed()) {
+                    st = THUMB_STATE_PRESSED;
+                } else if (c.isVScrollThumbHover()) {
+                    st = THUMB_STATE_HOVER;
+                }
+            } else {
+                if (c.isHScrollThumbGrabbed()) {
+                    st = THUMB_STATE_PRESSED;
+                } else if (c.isHScrollThumbHover()) {
+                    st = THUMB_STATE_HOVER;
+                }
+            }
+            ((InteractiveScrollThumb) scrollThumb).visualState = st;
+        }
+
         g.setClip(cx, cy, cw, ch);
-        scrollThumb.paintComponent(g);
+        if (interactiveScroll) {
+            // Direct fill (see the track comment above) so the always-visible thumb renders on every
+            // port. getStyle() resolves the unselected/hover/pressed style via the visual state set
+            // just above; cn1-round-border thumbs become a pill via the arc radius.
+            Style thumbState = scrollThumb.getStyle();
+            int tAlpha = thumbState.getBgTransparency() & 0xff;
+            if (tAlpha > 0) {
+                int prevColor = g.getColor();
+                int prevAlpha = g.getAlpha();
+                int tw = scrollThumb.getWidth();
+                int th = scrollThumb.getHeight();
+                g.setColor(thumbState.getBgColor());
+                g.setAlpha(tAlpha);
+                // fillRect (not fillRoundRect) so it renders identically on every port's Graphics
+                g.fillRect(scrollThumb.getX(), scrollThumb.getY(), tw, th);
+                g.setAlpha(prevAlpha);
+                g.setColor(prevColor);
+            }
+        } else {
+            scrollThumb.paintComponent(g);
+        }
         g.setClip(cx, cy, cw, ch);
         if (fade) {
             scrollStyle.setBgTransparency(alpha, true);
@@ -984,16 +1076,19 @@ public abstract class LookAndFeel {
     private void initScroll() {
         verticalScroll = new Label();
         horizontalScroll = new Label();
-        verticalScrollThumb = new Label();
-        horizontalScrollThumb = new Label();
         if (interactiveScroll) {
             // desktop scrollbars use dedicated UIIDs so the mobile Scroll/ScrollThumb styling is
-            // never affected and platform conventions can be themed separately
+            // never affected and platform conventions can be themed separately. The thumb is an
+            // InteractiveScrollThumb so it can render hover (selected) / drag (pressed) states.
+            verticalScrollThumb = new InteractiveScrollThumb();
+            horizontalScrollThumb = new InteractiveScrollThumb();
             verticalScroll.setUIID("DesktopScroll");
             horizontalScroll.setUIID("DesktopHorizontalScroll");
             verticalScrollThumb.setUIID("DesktopScrollThumb");
             horizontalScrollThumb.setUIID("DesktopHorizontalScrollThumb");
         } else {
+            verticalScrollThumb = new Label();
+            horizontalScrollThumb = new Label();
             verticalScroll.setUIID("Scroll");
             horizontalScroll.setUIID("HorizontalScroll");
             verticalScrollThumb.setUIID("ScrollThumb");
@@ -1014,6 +1109,8 @@ public abstract class LookAndFeel {
         fadeScrollLeft = null;
         // must be resolved before initScroll() so the correct scroll UIIDs are applied
         interactiveScroll = manager.isThemeConstant("interactiveScrollBool", false);
+        interactiveScrollThumbMin = manager.getThemeConstant("scrollThumbMinSizeInt",
+                Display.getInstance().convertToPixels(4f));
         initScroll();
         if (menuRenderer != null) {
             if (menuRenderer instanceof Component) {
@@ -1556,6 +1653,34 @@ public abstract class LookAndFeel {
     /// true if interactive desktop scrollbars are enabled
     public boolean isInteractiveScroll() {
         return interactiveScroll;
+    }
+
+    /// Scrollbar thumb used for interactive desktop scrollbars. It renders its selected style
+    /// when the pointer hovers the thumb and its pressed style while the thumb is being dragged,
+    /// giving the desktop-conventional highlight feedback. The visual state is pushed in by the
+    /// look and feel right before the thumb is painted (see {@code drawScroll}).
+    private static final int THUMB_STATE_NORMAL = 0;
+    private static final int THUMB_STATE_HOVER = 1;
+    private static final int THUMB_STATE_PRESSED = 2;
+
+    private static final class InteractiveScrollThumb extends Label {
+        int visualState = THUMB_STATE_NORMAL;
+
+        InteractiveScrollThumb() {
+            super("");
+        }
+
+        @Override
+        public Style getStyle() {
+            switch (visualState) {
+                case THUMB_STATE_PRESSED:
+                    return getPressedStyle();
+                case THUMB_STATE_HOVER:
+                    return getSelectedStyle();
+                default:
+                    return getUnselectedStyle();
+            }
+        }
     }
 
     /// Indicates if the bg image of a style should determine the minimum preferred size according to the theme

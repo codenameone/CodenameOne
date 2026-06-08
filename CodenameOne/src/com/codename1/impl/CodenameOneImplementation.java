@@ -128,7 +128,7 @@ import java.util.Vector;
 /// Display specifically for key, pointer events and screen resolution.
 ///
 /// @author Shai Almog
-@Concrete(name = "com.codename1.impl.ios.IOSImplementation")
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;
@@ -179,7 +179,10 @@ public abstract class CodenameOneImplementation {
     private BrowserComponent sharedJavascriptContext;
     private Dimension initialWindowSizeHintPercent;
 
-    static void setOnCurrentFormChange(Runnable on) {
+    /// Set a task to be executed every time the current form changes (e.g. on
+    /// navigation). Used by the advertising layer to show interstitials on
+    /// transitions; see [com.codename1.ads.AdManager#bindInterstitialOnTransition].
+    public static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
 

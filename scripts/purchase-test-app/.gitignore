@@ -1,0 +1,4 @@
+app/*/target/
+app/**/target/
+app/common/androidCerts/
+*.ks

@@ -592,6 +592,30 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |noExtraResources
 |true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.
 
+|windows.arch
+|Native Windows port only (the `windows-native` build target -- not the JVM `win.*` desktop hints above). Target CPU architecture for the standalone `.exe`: `x64` (the default) or `arm64`. Accepts the usual synonyms (`x86_64`/`amd64`, `aarch64`). clang-cl cross-compiles to the chosen architecture from either host. See the link:#_working_with_the_native_windows_port[Working with the native Windows port chapter].
+
+|windows.debug
+|Native Windows port only. true/false (defaults to false). When `false` the `.exe` is built optimized and *stripped* -- no PDB, dead-stripped unreferenced code (`/OPT:REF`) and folded identical functions (`/OPT:ICF`) -- which is the shipping default. Set `true` to keep debug symbols (a `.pdb` next to the exe, via `RelWithDebInfo` / clang-cl `/Zi` + linker `/DEBUG`) so a native crash address can be symbolized during development. Optimizations stay on in both cases.
+
+|windows.sdkRoot
+|Native Windows port only; used when building on a *non-Windows* host (for example a Linux build server). Path to a Windows SDK laid out by https://github.com/Jake-Shadle/xwin[`xwin splat`] (a directory containing `crt/include` and `sdk/include/um`), used to cross-compile the `.exe` with clang-cl + lld-link instead of a Visual Studio environment. If unset, the `CN1_XWIN_SYSROOT` environment variable is used. Ignored on Windows hosts, which build through Visual Studio. The same SDK serves both `windows.arch` targets (its `x86_64` / `aarch64` lib subdirs).
+
+|(signing certificate)
+|Native Windows port only. The code-signing certificate itself isn't a build-hint argument; configure it through project settings as `codename1.windows.signing.certificate` (path to a PKCS#12 `.pfx`/`.p12` file holding the certificate + key) and `codename1.windows.signing.password`. The build uses it for both local and cloud builds -- a cloud build uploads it with the build request automatically, exactly like the iOS / Android signing certificates. When a certificate is present the produced `.exe` is Authenticode-signed with `osslsigncode` (which signs Windows PE files on any OS, so it works in the Linux build cloud); without one the exe ships unsigned (it runs, but shows "Unknown publisher" in UAC and trips SmartScreen on download).
+
+|windows.signing.timestampUrl
+|Native Windows port only. RFC&#160;3161 timestamp server used when signing, so the signature stays valid after the certificate expires. Default `http://timestamp.digicert.com`; set empty to disable timestamping.
+
+|windows.signing.digest
+|Native Windows port only. Signature digest algorithm. Default `sha256`.
+
+|windows.signing.name / windows.signing.url
+|Native Windows port only. The description and URL embedded in the signature (the "More info" shown by Windows). Default: the app's display name, and no URL.
+
+|windows.signing
+|Native Windows port only. `true`/`false` (default `true`). Set `false` to force an unsigned build even when a certificate is available.
+
 |===
 
 === Android permissions

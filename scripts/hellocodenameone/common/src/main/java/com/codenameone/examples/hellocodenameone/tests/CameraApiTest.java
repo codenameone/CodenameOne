@@ -66,10 +66,14 @@ public class CameraApiTest extends BaseTest {
     @Override
     public boolean runTest() {
         String platform = Display.getInstance().getPlatformName();
-        // The simulator's JavaSECameraImpl is synthetic-only -- safe in CI.
-        // Real-camera ports would require runtime permissions; skip there.
+        // Only the JavaSE simulator ships a synthetic JavaSECameraImpl, so only it
+        // can assert the Camera API end to end in CI. Real-camera ports (ios/and)
+        // need runtime permission, and native desktop ports that do not implement
+        // host webcam capture (win) honestly report Camera.isSupported() == false
+        // rather than fabricating frames -- both skip here.
         boolean isSimulator = !"ios".equals(platform)
                 && !"and".equals(platform)
+                && !"win".equals(platform)
                 && !"HTML5".equals(platform);
         if (!isSimulator) {
             System.out.println("CN1SS:INFO:test=CameraApiTest status=SKIPPED reason=needs-runtime-permission-on-" + platform);

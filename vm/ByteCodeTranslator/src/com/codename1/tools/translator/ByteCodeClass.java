@@ -102,6 +102,21 @@ public class ByteCodeClass {
         mainClass = null;
         preferredMainClass = null;
         saveUnitTests = false;
+        concreteTarget = null;
+    }
+
+    /// Selects which {@code @Concrete} attribute the parser honours: {@code "win"}
+    /// for the native Windows build (use {@code Concrete.win()}), {@code null}/
+    /// anything else for the default iOS pipeline (use {@code Concrete.name()}).
+    /// Set once per translation run from the app type (see ByteCodeTranslator).
+    private static String concreteTarget;
+
+    static void setConcreteTarget(String target) {
+        concreteTarget = target;
+    }
+
+    static String getConcreteTarget() {
+        return concreteTarget;
     }
     
     /**

@@ -330,6 +330,12 @@ Title {
 }
 MainTitle { cn1-derive: Title; }
 
+/* paintsTitleBarBool=true makes Form add a StatusBar component at the top
+   of the title area. An undefined UIID resolves to the framework default
+   Style (opaque black), so without this rule the status strip paints solid
+   black above the title. Match the Toolbar surface. */
+StatusBar { background-color: #fef7ff; color: #1d1b20; padding: 0; margin: 0; }
+
 BackCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 TitleCommand { cn1-derive: Button; background-color: transparent; color: var(--accent-color, #6750a4); padding: 1mm 2mm 1mm 2mm; }
 
@@ -349,6 +355,21 @@ DesktopScrollThumb {
     padding: 0;
     margin: 0;
 }
+/* hover (pointer over the thumb) and drag (thumb grabbed) darken the thumb.
+   Properties are re-declared rather than cn1-derive'd from the base UIID,
+   which would be a self-referential derive cycle. */
+DesktopScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed {
+    background-color: #49454f;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
 DesktopHorizontalScroll {
     background-color: #e7e0ec;
     padding: 1.2mm 0 1.2mm 0;
@@ -356,6 +377,18 @@ DesktopHorizontalScroll {
 }
 DesktopHorizontalScrollThumb {
     background-color: #79747e;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.selected {
+    background-color: #5f5b66;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopHorizontalScrollThumb.pressed {
+    background-color: #49454f;
     cn1-background-type: cn1-round-border;
     padding: 0;
     margin: 0;
@@ -402,6 +435,12 @@ SideCommand.pressed { background-color: var(--accent-container-color, #eaddff); 
 List { background-color: #fef7ff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 1.5mm 2mm 1.5mm 2mm; }
+/* Selection needs an explicit style: without it the row falls back to the
+   default theme's white selection, unreadable against the dark-mode light text.
+   Use the Material accent container as the selection surface with its
+   on-container text so the row stays legible selected in both appearances. */
+ListRenderer.selected { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); }
+ListRenderer.pressed { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); }
 
 /* MultiButton is a list-row component with multi-line content, NOT a
    bordered pill. Don't cn1-derive from Button - that pulls in
@@ -569,6 +608,7 @@ PopupContent {
     TitleArea { background-color: #141218; color: #e6e0e9; }
     Title { color: #e6e0e9; background-color: #141218; }
     MainTitle { color: #e6e0e9; background-color: #141218; }
+    StatusBar { background-color: #141218; color: #e6e0e9; }
     BackCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
     TitleCommand { color: var(--accent-color-dark, #d0bcff); background-color: transparent; }
 
@@ -576,8 +616,12 @@ PopupContent {
        re-declared so the round primitive carries into dark mode. */
     DesktopScroll { background-color: #2b2930; }
     DesktopScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
     DesktopHorizontalScroll { background-color: #2b2930; }
     DesktopHorizontalScrollThumb { background-color: #938f99; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.selected { background-color: #aea9b4; cn1-background-type: cn1-round-border; }
+    DesktopHorizontalScrollThumb.pressed { background-color: #cac4d0; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: #141218; }
     TabsContainer { background-color: #141218; color: #e6e0e9; }
@@ -596,6 +640,8 @@ PopupContent {
 
     List { background-color: #141218; }
     ListRenderer { color: #e6e0e9; background-color: transparent; }
+    ListRenderer.selected { background-color: var(--accent-container-color-dark, #4a4458); color: var(--accent-on-container-color-dark, #e6e0e9); }
+    ListRenderer.pressed { background-color: var(--accent-container-color-dark, #4a4458); color: var(--accent-on-container-color-dark, #e6e0e9); }
     MultiButton { background-color: #141218; color: #e6e0e9; }
     MultiButton.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); }
     MultiLine1 { color: #e6e0e9; }

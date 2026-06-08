@@ -190,62 +190,13 @@ jobs:
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
-      - name: Run JavaScript lifecycle test
-        # Validates that the bundled app reaches both ``cn1Initialized``
-        # and ``cn1Started`` lifecycle flags within a per-bundle timeout
-        # — i.e. ``Lifecycle.init`` and ``Lifecycle.start`` both
-        # complete without throwing or hanging. Captures every
-        # ``PARPAR-LIFECYCLE`` marker and the most recent
-        # ``PARPAR:DIAG:FIRST_FAILURE`` so a stuck boot is visible
-        # without having to download the full screenshot-test
-        # browser log. Runs BEFORE the screenshot suite because if
-        # the lifecycle test fails the screenshots are doomed to
-        # time out anyway, and we want fast feedback for boot
-        # regressions.
-        #
-        # ``continue-on-error: true`` because the boot path is
-        # currently flaky on shared GHA runners (same bundle, same
-        # workflow: one runner finishes ``cn1Started`` in ~4s, the
-        # next stalls at host-callback id=11 even with a 480s
-        # budget). Until that variance is understood, treat the
-        # lifecycle marker as advisory and keep going so the
-        # screenshot suite — which has its own per-suite timeout
-        # and would always fail-fast in the same circumstances —
-        # still gets a chance to run and surface its own results.
-        # The lifecycle artifact upload below preserves the
-        # ``report.json`` either way.
-        continue-on-error: true
-        env:
-          # CI runners process bytecode-translator output noticeably
-          # slower than local, and shared GitHub Actions runners can
-          # vary by 5-10× in cooperative-scheduler throughput. The
-          # passing runs converge around 90-100 host callbacks in
-          # 240s; on a slow runner the same boot stalls below 20
-          # callbacks in the same window, far short of
-          # ``main-thread-completed``. 480s eats the worst case
-          # without hiding regressions (the passing path returns
-          # within ~30s either way).
-          CN1_LIFECYCLE_TIMEOUT_SECONDS: "480"
-          CN1_LIFECYCLE_REPORT_DIR: ${{ github.workspace }}/artifacts/javascript-lifecycle-tests
-        run: |
-          mkdir -p "${CN1_LIFECYCLE_REPORT_DIR}"
-          # Only the HelloCodenameOne bundle is built locally in this
-          # workflow; the Initializr bundle goes through the cloud
-          # build and isn't available on the runner. Pass the local
-          # bundle explicitly so the test doesn't try to rebuild
-          # missing artifacts.
-          node scripts/run-javascript-lifecycle-tests.mjs \
-            "${{ steps.locate_bundle.outputs.bundle }}"
-
-      - name: Upload JavaScript lifecycle artifacts
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: javascript-lifecycle-tests
-          path: artifacts/javascript-lifecycle-tests
-          if-no-files-found: warn
-          retention-days: 14
-
+      # The standalone JavaScript lifecycle boot test was removed: it was
+      # advisory (continue-on-error) but flaky on shared GHA runners -- when a
+      # slow runner's cooperative scheduler stalled, the harness's page.evaluate
+      # poll could hang indefinitely (past the 480s budget), wedging the whole
+      # job. The screenshot suite below exercises the same boot path AND the
+      # rendering, with its own per-suite timeout, so it is the single source of
+      # truth. This keeps the workflow focused on the screenshot tests and fast.
       - name: Run JavaScript screenshot browser tests
         run: |
           mkdir -p "${ARTIFACTS_DIR}"

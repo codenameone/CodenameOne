@@ -110,6 +110,9 @@ public class Form extends Container {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
+    // Last component whose interactive scrollbar showed a hover highlight, so the highlight can be
+    // cleared when the pointer moves to a different scrollable (desktop interactive scrollbars only)
+    private Component lastInteractiveScrollHover;
     private boolean enableCursors;
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
@@ -3802,6 +3805,7 @@ public class Form extends Container {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
+                updateInteractiveScrollHover(cmp, x[0], y[0]);
             }
             if (TooltipManager.getInstance() != null) {
                 String tip = cmp.getTooltip();
@@ -3812,6 +3816,26 @@ public class Form extends Container {
                 }
             }
         }
+    }
+
+    /// Routes a hover to the nearest scrollable ancestor of the hovered component so an interactive
+    /// (desktop) scrollbar can highlight its thumb, and clears the highlight on the previously
+    /// hovered scrollable. Inert unless interactive scrollbars are enabled.
+    private void updateInteractiveScrollHover(Component cmp, int x, int y) {
+        if (!getUIManager().getLookAndFeel().isInteractiveScroll()) {
+            return;
+        }
+        Component scrollable = cmp;
+        while (scrollable != null && !scrollable.isScrollableY() && !scrollable.isScrollableX()) {
+            scrollable = scrollable.getParent();
+        }
+        if (lastInteractiveScrollHover != null && lastInteractiveScrollHover != scrollable) { //NOPMD CompareObjectsWithEquals
+            lastInteractiveScrollHover.clearInteractiveScrollHover();
+        }
+        if (scrollable != null) {
+            scrollable.updateInteractiveScrollHover(x, y);
+        }
+        lastInteractiveScrollHover = scrollable;
     }
 
     /// Returns true if there is only one focusable member in this form. This is useful

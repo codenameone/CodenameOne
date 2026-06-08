@@ -44,7 +44,14 @@ public class ClipShape implements ExecutableOp {
             context.restore();
         }
         if (transform != null) {
-            JSAffineTransform.Factory.setTransform(context, transform);
+            // Apply via the CanvasRenderingContext2D interface, not the canvas-only
+            // @JSBody Factory.setTransform -- in the surface-id model ``context`` is a
+            // SurfaceCommandRecorder, and the raw-JS @JSBody call throws
+            // (undefined.apply), aborting the drain and freezing clip-with-transform
+            // tests. See SetTransform.execute for the full root-cause note.
+            context.setTransform(transform.getScaleX(), transform.getShearY(),
+                    transform.getShearX(), transform.getScaleY(),
+                    transform.getTranslateX(), transform.getTranslateY());
         }
         clipState.set(true);
         context.save();

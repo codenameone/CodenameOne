@@ -147,17 +147,21 @@ public class CompilerHelper {
     }
 
     /**
-     * CMake configure flags selecting the C toolchain for the clean target. On
-     * Windows we drive LLVM via the MSVC ABI (clang-cl) through the Ninja
+     * CMake configure flags selecting the C/C++ toolchain for the clean target.
+     * On Windows we drive LLVM via the MSVC ABI (clang-cl) through the Ninja
      * generator, since the default Visual Studio generator would otherwise pick
-     * MSVC's cl.exe and place binaries under a Release/ subdirectory. Elsewhere
-     * we keep the existing clang invocation.
+     * MSVC's cl.exe and place binaries under a Release/ subdirectory. A C++
+     * compiler is always selected too: the "windows" app type emits a
+     * {@code LANGUAGES C CXX} project (its COM layer is C++), so cmake needs a
+     * CXX compiler even when the particular app contributes no .cpp itself.
      */
     public static List<String> cmakeToolchainArgs() {
         if (isWindows()) {
-            return Arrays.asList("-G", "Ninja", "-DCMAKE_C_COMPILER=clang-cl");
+            return Arrays.asList("-G", "Ninja",
+                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl");
         }
-        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_OBJC_COMPILER=clang");
+        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",
+                "-DCMAKE_OBJC_COMPILER=clang");
     }
 
     public static List<CompilerConfig> getAvailableCompilers(String targetVersion) {
