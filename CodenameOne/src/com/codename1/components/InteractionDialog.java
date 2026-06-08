@@ -90,6 +90,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     /// Whether the interaction dialog uses the form layered pane of the regular layered pane
     private boolean formMode;
+
+    /// Opt-in "special mode" (see `#setStackable(boolean)`) that makes dispose remove
+    /// only this dialog's own component from the shared layered pane instead of clearing
+    /// the whole layer.
+    private static boolean stackable;
+
+    /// Records the `formMode` value used by the most recent `#show(int, int, int, int)`
+    /// so dispose cleans up the matching layered pane even if `formMode` is toggled in
+    /// between (e.g. by `#showPopupDialog(Component)`).
+    private boolean shownInFormMode;
+
     private boolean pressedOutOfBounds;
     private ActionListener pressedListener;
     private ActionListener releasedListener;
@@ -270,6 +281,22 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private void cleanupLayer(Form f) {
+        if (stackable) {
+            // Stackable mode: several InteractionDialogs can share the class
+            // layer at once (layered by show() order). Tearing the whole layer
+            // down here would wipe the sibling dialogs that are still showing
+            // (#5193). Remove the shared layer only once the last dialog has
+            // left it, so it neither nukes siblings nor lingers empty. Use the
+            // mode captured at show() time so we clean the pane the dialog was
+            // actually added to even if formMode changed in the meantime.
+            Container c = shownInFormMode
+                    ? f.getFormLayeredPane(InteractionDialog.class, true)
+                    : f.getLayeredPane(InteractionDialog.class, true);
+            if (c.getComponentCount() == 0) {
+                c.remove();
+            }
+            return;
+        }
         if (formMode) {
             Container c = f.getFormLayeredPane(InteractionDialog.class, true);
             c.removeAll();
@@ -363,6 +390,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
         Form f = Display.getInstance().getCurrent();
+        shownInFormMode = formMode;
         Style unselectedStyle = getUnselectedStyle();
 
         unselectedStyle.setMargin(TOP, top);
@@ -563,7 +591,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
                                 Container pp = getLayeredPane(f);
                                 remove();
                                 p.remove();
-                                pp.removeAll();
+                                if (!stackable) {
+                                    // In stackable mode removeAll() would wipe
+                                    // the other dialogs sharing this layer; the
+                                    // remove()/p.remove() above already detached
+                                    // just this dialog (#5193).
+                                    pp.removeAll();
+                                }
                                 pp.revalidate();
                                 cleanupLayer(f);
                             }
@@ -577,8 +611,19 @@ public class InteractionDialog extends Container implements AbstractDialog {
                     Container pp = getLayeredPane(f);
                     remove();
                     p.remove();
-                    pp.removeAll();
+                    if (!stackable) {
+                        // See the animated branch above: removeAll() would
+                        // discard sibling dialogs sharing this layer (#5193).
+                        pp.removeAll();
+                    }
                     pp.revalidate();
+                    if (stackable) {
+                        // Unlike the animated branch, this path never called
+                        // cleanupLayer(). With removeAll() now skipped we must
+                        // still tear the shared layer down once it is empty so
+                        // layers don't accumulate (#5193).
+                        cleanupLayer(f);
+                    }
                     if (onFinish != null) {
                         onFinish.run();
                     }
@@ -1208,6 +1253,41 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `formMode`: the formMode to set
     public void setFormMode(boolean formMode) {
         this.formMode = formMode;
+    }
+
+    /// Whether `InteractionDialog` is in the global "stackable" mode. See
+    /// `#setStackable(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true if stackable mode is enabled
+    public static boolean isStackable() {
+        return stackable;
+    }
+
+    /// Opt-in robustness mode for applications that show several
+    /// `InteractionDialog`s at the same time (for example a step-by-step
+    /// walkthrough that highlights different components).
+    ///
+    /// All `InteractionDialog` instances share a single layered pane keyed by
+    /// the class. In the default (historical) behavior, disposing one dialog
+    /// clears that whole layer (`removeAll()` / layer removal), which also wipes
+    /// any sibling dialog still showing in it -- so when dialogs overlap one of
+    /// them can silently fail to appear (#5193). When stackable mode is enabled
+    /// dispose removes only the disposed dialog's own component; remaining
+    /// dialogs stay visible, layered by the order in which `#show(int, int, int, int)`
+    /// was called (later shows render on top). The shared layer container is
+    /// removed only once it becomes empty, so layers do not accumulate as
+    /// dialogs come and go.
+    ///
+    /// This is a global, app-wide setting (it must be on for every dialog that
+    /// participates) and defaults to false to preserve backwards compatibility.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stackable`: true to enable stackable/concurrent dialog support
+    public static void setStackable(boolean stackable) {
+        InteractionDialog.stackable = stackable;
     }
 
     /// {@inheritDoc}
