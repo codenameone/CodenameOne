@@ -617,6 +617,19 @@ build_initializr_for_site() {
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
 
+  # The cloud result.zip is flat (index.html at the root), but the local
+  # ParparVM build (codename1.buildTarget=local-javascript) wraps the bundle in
+  # a single top-level directory (e.g. Initializr-js/). Flatten that wrapper so
+  # the served layout is identical regardless of which builder produced the zip.
+  if [ ! -f "${output_dir}/index.html" ]; then
+    local inner_dir
+    inner_dir="$(find "${output_dir}" -mindepth 1 -maxdepth 1 -type d | head -n1 || true)"
+    if [ -n "${inner_dir}" ] && [ -f "${inner_dir}/index.html" ]; then
+      ( cd "${inner_dir}" && tar cf - . ) | ( cd "${output_dir}" && tar xf - )
+      rm -rf "${inner_dir}"
+    fi
+  fi
+
   if [ ! -f "${output_dir}/index.html" ]; then
     echo "Initializr website bundle is missing index.html after extraction." >&2
     exit 1
