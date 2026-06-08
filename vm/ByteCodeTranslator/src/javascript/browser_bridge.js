@@ -1769,6 +1769,14 @@
         if (!g || !(g.width | 0) || !(g.height | 0)) {
           continue;
         }
+        // Only composite canvases rendered for this capture cycle. A peer left in
+        // the DOM by a torn-down form is not re-rendered, so it lacks the fresh
+        // flag and must not bleed its stale frame (e.g. the 3D animation showing
+        // up in a later DesktopMode capture). Consume the flag after drawing.
+        if (!g.hasAttribute || !g.hasAttribute('data-cn1gl3d-fresh')) {
+          continue;
+        }
+        g.removeAttribute('data-cn1gl3d-fresh');
         var dx = 0;
         var dy = 0;
         var dw = g.width;

@@ -173,6 +173,12 @@ class HTML5GLSurface extends HTML5Peer {
         syncSize();
         try {
             renderer.onFrame(device);
+            // Mark the canvas as freshly rendered for this capture cycle. The
+            // host-side screenshot composite (browser_bridge.js) only draws GL
+            // canvases carrying this flag and clears it afterwards, so a peer left
+            // in the DOM by a torn-down form (which is not re-rendered) cannot
+            // bleed its last frame into a later test's screenshot.
+            canvas.setAttribute("data-cn1gl3d-fresh", "1");
         } catch (Throwable t) {
             t.printStackTrace();
         }
