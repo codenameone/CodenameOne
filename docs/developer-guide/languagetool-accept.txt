@@ -559,3 +559,10 @@ espeak
 [Pp]rotobuf
 [Vv]arint
 [Ee]nums
+
+# Windows Sockets API (the native Windows port uses it for raw sockets).
+Winsock
+
+# SSL.com's cloud code-signing service, named alongside Azure Trusted Signing
+# and DigiCert KeyLocker in the native Windows code-signing section.
+eSigner

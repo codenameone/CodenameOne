@@ -718,18 +718,48 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
 
-    for(int iter = threadStateData->callStackOffset - 1 ; iter >= 0 ; iter--) {
-        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, indent);
-
+    int cn1StackOff = threadStateData->callStackOffset;
+    if(cn1StackOff < 0 || cn1StackOff > CN1_MAX_STACK_CALL_DEPTH) {
+        fprintf(stderr, "CN1_STACKGUARD bad callStackOffset=%d max=%d\n", cn1StackOff, CN1_MAX_STACK_CALL_DEPTH);
+        fflush(stderr);
+        cn1StackOff = (cn1StackOff < 0) ? 0 : CN1_MAX_STACK_CALL_DEPTH;
+    }
+    for(int iter = cn1StackOff - 1 ; iter >= 0 ; iter--) {
         int classId = threadStateData->callStackClass[iter];
         int methodId = threadStateData->callStackMethod[iter];
         int line = threadStateData->callStackLine[iter];
-        
-        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(classId));
+
+        /* Defensive: a corrupt/out-of-range frame id must never crash stack-trace
+         * printing (which itself runs while reporting another failure). Skip it. */
+        if(classId < 0 || classId >= CN1_CONSTANT_POOL_SIZE ||
+           methodId < 0 || methodId >= CN1_CONSTANT_POOL_SIZE) {
+            fprintf(stderr, "CN1_STACKGUARD bad frame iter=%d off=%d classId=%d methodId=%d line=%d poolSize=%d\n",
+                iter, cn1StackOff, classId, methodId, line, (int)CN1_CONSTANT_POOL_SIZE);
+            fflush(stderr);
+            continue;
+        }
+
+        /* A resolved constant-pool entry can be transiently NULL (observed on the
+         * native Windows clean target). Appending a NULL String dereferences it
+         * (count at offset 0x3C) and crashes the very stack-trace printer that is
+         * reporting another failure -- so guard every append against NULL. */
+        JAVA_OBJECT clsStr = STRING_FROM_CONSTANT_POOL_OFFSET(classId);
+        JAVA_OBJECT mtdStr = STRING_FROM_CONSTANT_POOL_OFFSET(methodId);
+        if(clsStr == JAVA_NULL || mtdStr == JAVA_NULL) {
+            fprintf(stderr, "CN1_STACKGUARD null pool string iter=%d off=%d classId=%d(%s) methodId=%d(%s) line=%d\n",
+                iter, cn1StackOff, classId, clsStr == JAVA_NULL ? "null" : "ok",
+                methodId, mtdStr == JAVA_NULL ? "null" : "ok", line);
+            fflush(stderr);
+            continue;
+        }
+
+        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, indent);
+
+        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, clsStr);
 
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, dot);
 
-        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, STRING_FROM_CONSTANT_POOL_OFFSET(methodId));
+        java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, mtdStr);
 
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, colon);
 
@@ -1627,7 +1657,11 @@ void* threadRunner(void *x)
     d->currentThreadObject = t;
     
    // printf("launching thread %d",(int)d->threadId);
-    java_lang_Thread_runImpl___long(d, t, (long)d); // pass the actual structure as threadid
+    // Pass the struct pointer as the thread id. Cast through intptr_t, not long:
+    // on Windows (LLP64) `long` is 32-bit while pointers are 64-bit, so `(long)d`
+    // truncates + sign-extends the pointer, and freeing it later in
+    // releaseThreadNativeResources corrupts memory / crashes.
+    java_lang_Thread_runImpl___long(d, t, (JAVA_LONG)(intptr_t)d); // pass the actual structure as threadid
    // printf("terminate thread %d",(int)d->threadId);
     
     // we remove the thread here since this is the only place we can do this
@@ -2065,8 +2099,53 @@ JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_
 
     return str;
 #else
-    // TODO: Implement stub
-    return JAVA_NULL; // Stub
+    /* Clean target (Windows / Linux native): format via the C library so that
+     * Date.toString() (which routes here through DateFormat) returns a real
+     * string rather than NULL. A NULL here propagates into callers such as
+     * DateSpinner3D, which do formatDateLongStyle(new Date()).substring(0,1)
+     * and crash on the null receiver. Styles: FULL=0, LONG=1, MEDIUM=2,
+     * SHORT=3; a negative style means that component is omitted (NONE). */
+    struct obj__java_text_DateFormat* df = (struct obj__java_text_DateFormat*)__cn1ThisObject;
+    struct obj__java_util_Date* dateObj = (struct obj__java_util_Date*)__cn1Arg1;
+    if (dateObj == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    time_t secs = (time_t)(dateObj->java_util_Date_date / 1000);
+    struct tm tmv;
+#ifdef _WIN32
+    if (localtime_s(&tmv, &secs) != 0) { memset(&tmv, 0, sizeof(tmv)); }
+#else
+    localtime_r(&secs, &tmv);
+#endif
+    int dateStyle = df->java_text_DateFormat_dateStyle;
+    int timeStyle = df->java_text_DateFormat_timeStyle;
+    char datePart[128]; datePart[0] = '\0';
+    char timePart[128]; timePart[0] = '\0';
+    char out[300];
+    if (dateStyle >= 0) {
+        const char* dfmt;
+        switch (dateStyle) {
+            case 1:  dfmt = "%B %d, %Y"; break;     /* LONG */
+            case 2:  dfmt = "%b %d, %Y"; break;     /* MEDIUM */
+            case 3:  dfmt = "%m/%d/%y"; break;      /* SHORT */
+            default: dfmt = "%A, %B %d, %Y"; break; /* FULL */
+        }
+        strftime(datePart, sizeof(datePart), dfmt, &tmv);
+    }
+    if (timeStyle >= 0) {
+        const char* tfmt = (timeStyle == 3) ? "%I:%M %p" : "%I:%M:%S %p";
+        strftime(timePart, sizeof(timePart), tfmt, &tmv);
+    }
+    if (datePart[0] != '\0' && timePart[0] != '\0') {
+        snprintf(out, sizeof(out), "%s %s", datePart, timePart);
+    } else if (datePart[0] != '\0') {
+        snprintf(out, sizeof(out), "%s", datePart);
+    } else if (timePart[0] != '\0') {
+        snprintf(out, sizeof(out), "%s", timePart);
+    } else {
+        snprintf(out, sizeof(out), "%lld", (long long)(dateObj->java_util_Date_date));
+    }
+    return newStringFromCString(threadStateData, out);
 #endif
 }
 

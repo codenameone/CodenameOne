@@ -1,0 +1,109 @@
+# Cross-compiles the native Windows port to a Windows x64 .exe on a *Linux*
+# runner, using clang-cl + lld-link + llvm-rc against a Windows SDK laid out by
+# xwin. clang is a cross-compiler, so the PE it emits for x86_64-pc-windows-msvc
+# is the same one a Windows host would produce -- this is a fast, Windows-free
+# pre-check that the port + a real Form app translate and *link* into a Windows
+# binary. It is compile-and-link only (Direct2D/DirectWrite need a real Windows
+# GPU stack to run), so there is no run/screenshot step; the authoritative
+# run/render gate stays on the Windows runners (parparvm-tests-windows.yml).
+name: Windows cross-compile (Linux)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-cross-compile.yml'
+      - 'vm/**'
+      - 'Ports/WindowsPort/**'
+      - 'maven/windows/**'
+      - '!vm/**/README.md'
+      - '!vm/**/readme.md'
+      - '!vm/**/docs/**'
+  push:
+    branches: [ master, main ]
+    paths:
+      - '.github/workflows/windows-cross-compile.yml'
+      - 'vm/**'
+      - 'Ports/WindowsPort/**'
+      - 'maven/windows/**'
+
+concurrency:
+  group: windows-cross-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-compile:
+    name: cross-compile (x64 PE on Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install LLVM cross toolchain + CMake/Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm cmake ninja-build
+
+      # Ubuntu ships some LLVM driver names versioned; expose the unversioned
+      # clang-cl / lld-link / llvm-rc the harness expects on PATH.
+      - name: Resolve LLVM tool names
+        run: |
+          set -e
+          LLVMBIN=$(dirname "$(readlink -f "$(command -v clang)")")
+          echo "LLVM bin dir: $LLVMBIN"
+          for t in clang-cl lld-link llvm-rc; do
+            if command -v "$t" >/dev/null 2>&1; then continue; fi
+            cand=""
+            [ -x "$LLVMBIN/$t" ] && cand="$LLVMBIN/$t"
+            [ -z "$cand" ] && cand=$(ls /usr/bin/${t}-* /usr/lib/llvm-*/bin/$t 2>/dev/null | sort -V | tail -1 || true)
+            if [ -n "$cand" ]; then sudo ln -sf "$cand" /usr/local/bin/$t; echo "linked $t -> $cand"; fi
+          done
+          clang-cl --version
+          command -v lld-link
+          llvm-rc --version 2>&1 | head -1 || true
+
+      # JDK matrix the translator harness auto-discovers (JDK_*_HOME). JDK 8 is
+      # restored last so it is the active JAVA_HOME (it builds codename1-core and
+      # is what CompilerHelper translates with).
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '11' }
+      - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as the active JDK
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Install xwin + lay out the Windows SDK (x64)
+        run: |
+          set -e
+          cargo install xwin --version 0.9.0 --locked
+          xwin --accept-license --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk"
+          echo "Sysroot:"; ls "$RUNNER_TEMP/xwin-sdk"
+          test -d "$RUNNER_TEMP/xwin-sdk/crt/include"
+          test -f "$RUNNER_TEMP/xwin-sdk/sdk/include/um/d2d1.h"
+
+      - name: Build codename1-core + the Windows port (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
+            '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+          test -f core/target/classes/com/codename1/ui/Form.class
+          test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
+
+      - name: Cross-compile the native Windows .exe (clang-cl + xwin)
+        env:
+          CN1_XWIN_SYSROOT: ${{ runner.temp }}/xwin-sdk
+          CN1_CLANG_CL: clang-cl
+          CN1_LLVM_RC: llvm-rc
+        run: |
+          cd vm
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
+            '-Dtest=CleanTargetIntegrationTest#crossCompilesWindowsExeWithXwin' \
+            '-Dsurefire.failIfNoSpecifiedTests=false'
