@@ -2905,22 +2905,29 @@ public class CSSTheme {
         return getBackgroundImage(styles, (ScaledUnit)styles.get("border-image"));
     }
 
-    /// 1x1 transparent PNG (43 bytes) -- used to satisfy the EditableResources
-    /// image slot when a CSS rule references an SVG by URL. The runtime
+    /// Valid 1x1 transparent RGBA PNG (68 bytes) -- used to satisfy the
+    /// EditableResources image slot when a CSS rule references an SVG or Lottie
+    /// (.json) asset by URL. The runtime
     /// {@code com.codename1.generated.svg.SVGRegistry} (emitted by the SVG
     /// transcoder mojo when the project contains any SVGs) replaces the
     /// placeholder with the transcoded image when its {@code installGlobal()}
     /// runs at startup.
+    ///
+    /// Must be a fully-decodable PNG: CSSTheme.save() calls EncodedImage.getWidth
+    /// on it, which rasterizes the bytes -- an invalid stream there throws
+    /// "create image failed", leaving an incomplete image entry in the .res that
+    /// corrupts the heap when the resource is loaded (notably on the ParparVM
+    /// clean target). The previous hand-written bytes had a malformed IDAT chunk.
     private static final byte[] SVG_PLACEHOLDER_PNG = new byte[] {
             (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
             0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
             0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, (byte)0xC4,
-            (byte)0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
-            0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
-            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, (byte)0xB4, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, (byte)0xAE,
-            0x42, 0x60, (byte)0x82
+            (byte)0x89, 0x00, 0x00, 0x00, 0x0B, 0x49, 0x44, 0x41,
+            0x54, 0x78, (byte)0xDA, 0x63, 0x60, 0x00, 0x02, 0x00,
+            0x00, 0x05, 0x00, 0x01, (byte)0xE9, (byte)0xFA, (byte)0xDC, (byte)0xD8,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+            (byte)0xAE, 0x42, 0x60, (byte)0x82
     };
 
     private Image registerSVGPlaceholder(String imageIdStr) {
@@ -2928,8 +2935,13 @@ public class CSSTheme {
         if (existing != null) {
             return existing;
         }
+        // Create with explicit 1x1 dimensions: EncodedImage.getWidth/getHeight
+        // return the cached values without rasterizing (getInternalImpl()), which
+        // would otherwise fail headlessly ("create image failed", no graphics
+        // implementation in the no-cef CLI) and write an incomplete image entry
+        // that corrupts the resource on load.
         com.codename1.ui.EncodedImage placeholder =
-                com.codename1.ui.EncodedImage.create(SVG_PLACEHOLDER_PNG);
+                com.codename1.ui.EncodedImage.create(SVG_PLACEHOLDER_PNG, 1, 1, false);
         res.setImage(imageIdStr, placeholder);
         return placeholder;
     }
@@ -2948,15 +2960,19 @@ public class CSSTheme {
                 fileName = fileName.substring(fileName.lastIndexOf("/")+1);
             }
 
-            // SVG references handled by the build-time transcoder land here too.
-            // We don't rasterize them at CSS compile time: the SVG XML can't go
-            // through ImageIO and the actual image instance is a Java class
-            // emitted by codenameone-svg-transcoder. Drop a 1x1 transparent
-            // EncodedImage placeholder into the resource under the SVG filename
-            // so the theme references it by name; the runtime
+            // SVG and Lottie (.json) references handled by the build-time
+            // transcoders land here too. We don't rasterize them at CSS compile
+            // time: neither the SVG XML nor the Lottie JSON can go through
+            // ImageIO (EncodedImage.create would wrap the raw text and then
+            // crash on getWidth() during save, writing a malformed image entry
+            // that corrupts the resource on load). The actual image instance is
+            // a Java class emitted by codenameone-svg-transcoder. Drop a 1x1
+            // transparent EncodedImage placeholder into the resource under the
+            // file name so the theme references it by name; the runtime
             // com.codename1.generated.svg.SVGRegistry (when present) then
             // overrides the entry with the transcoded image during init().
-            if (fileName.toLowerCase().endsWith(".svg")) {
+            String lowerName = fileName.toLowerCase();
+            if (lowerName.endsWith(".svg") || lowerName.endsWith(".json")) {
                 Image placeholder = registerSVGPlaceholder(fileName);
                 if (placeholder != null) {
                     loadedImages.put(url, placeholder);

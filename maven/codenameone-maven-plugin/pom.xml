@@ -239,6 +239,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- WindowsPort 'bundle' (WindowsPort.jar + nativewindows.jar) supplies the
+             native Windows platform classes and C/C++ sources to WindowsNativeBuilder
+             as classpath resources, the same way the parparvm bundle does. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-windows</artifactId>
+            <classifier>bundle</classifier>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <dependency>
             <groupId>net.orfjackal.retrolambda</groupId>
             <artifactId>retrolambda</artifactId>

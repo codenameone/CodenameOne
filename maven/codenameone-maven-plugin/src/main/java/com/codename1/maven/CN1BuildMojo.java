@@ -38,6 +38,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_XCODE_PROJECT = Executor.BUILD_TARGET_XCODE_PROJECT;
     public static final String BUILD_TARGET_ANDROID_PROJECT = Executor.BUILD_TARGET_ANDROID_PROJECT;
+    public static final String BUILD_TARGET_WINDOWS_NATIVE = Executor.BUILD_TARGET_WINDOWS_NATIVE;
+    public static final String BUILD_TARGET_WINDOWS_NATIVE_PROJECT = Executor.BUILD_TARGET_WINDOWS_NATIVE_PROJECT;
 
     private String serverMustProvideKotlinVersion;
 
@@ -316,7 +318,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private boolean isLocalBuildTarget(String buildTarget) {
         return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget));
+                || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget));
     }
 
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException {
@@ -598,7 +602,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
             if (isLocalBuildTarget(buildTarget)) {
                 automated = false;
-                if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                if (BUILD_TARGET_WINDOWS_NATIVE.equals(buildTarget) || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                        || "local-windows-device".equals(buildTarget)) {
+                    // Native ParparVM Windows build (clang-cl). Distinct from the
+                    // JVM-bundled "windows-desktop" (javase) target.
+                    doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
                     // mac-source rides the iOS pipeline with the macNative.enabled
@@ -1126,6 +1135,85 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             e.cleanup();
         }
 
+    }
+
+    /**
+     * Local native Windows build via {@link WindowsNativeBuilder}: translates the
+     * app with ParparVM's windows target and compiles it with clang-cl for the
+     * selected architecture ({@code windows.arch}). Mirrors the iOS local-build
+     * wiring. The native compile only succeeds on Windows with the MSVC/clang-cl
+     * toolchain present; elsewhere the builder fails fast with a clear message.
+     */
+    private void doWindowsNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        WindowsNativeBuilder e = new WindowsNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "windows-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setType("windows");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new MojoExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        // Authenticode signing certificate. Configured through settings/properties
+        // (codename1.windows.signing.certificate = path to the .p12/.pfx, and
+        // codename1.windows.signing.password). This mirrors the cloud build, whose
+        // codeNameOne task uploads the same certificate into the request, so a
+        // local build and a cloud build sign from the same configuration.
+        String winCert = props.getProperty("codename1.windows.signing.certificate");
+        if (winCert != null && !winCert.isEmpty()) {
+            File certFile = new File(winCert);
+            if (!certFile.isAbsolute()) {
+                certFile = new File(getCN1ProjectDir(), winCert);
+            }
+            if (certFile.isFile()) {
+                try {
+                    r.setCertificate(certFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to read the Windows signing certificate: " + certFile, ex);
+                }
+                r.setCertificatePassword(props.getProperty("codename1.windows.signing.password"));
+            } else {
+                getLog().warn("codename1.windows.signing.certificate points at a missing file: " + certFile);
+            }
+        }
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.build(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("Windows builder log:\n" + builderLog);
+                }
+                throw new MojoExecutionException("Windows native build failed");
+            }
+            if (e.getWindowsExecutable() != null) {
+                getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
+            }
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("Windows builder log:\n" + builderLog);
+            }
+            throw new MojoExecutionException("Failed to build Windows app", ex);
+        } finally {
+            e.cleanup();
+        }
     }
 
     // Local ParparVM-backed JavaScript build target. Enterprise-gated; see

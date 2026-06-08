@@ -120,6 +120,8 @@ include::Working-with-Mac-OS-X.asciidoc[]
 
 include::Desktop-Integration.asciidoc[]
 
+include::Working-With-Windows.asciidoc[]
+
 include::Working-With-CodenameOne-Sources.asciidoc[]
 
 include::Skin-Designer.asciidoc[]

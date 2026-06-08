@@ -1,0 +1,291 @@
+name: Purchase E2E (IAP)
+
+# Focused, path-gated check for the In-App-Purchase / ReceiptStore stack.
+# Triggers only when the purchase surface changes so it pages reviewers fast
+# instead of waiting for the full PR matrix.
+#
+# Layers:
+#   - core-tests     : JavaSE-simulator unit tests of the cross-platform receipt
+#                      sync state machine (Purchase / ReceiptStore), including the
+#                      #5186 regression guard that the store is shared across the
+#                      fresh Purchase instances every port hands out.
+#   - native-ios     : hosted XCTest + StoreKitTest SKTestSession driving a
+#                      simulated purchase through the real StoreKit observer into
+#                      the recording ReceiptStore.
+#   - native-android : instrumentation test injecting a fake IBillingSupport and
+#                      asserting the bridge drives the Java Purchase flow.
+#
+# native-ios / native-android build a DEDICATED minimal IAP app
+# (scripts/purchase-test-app/app) rather than the shared hellocodenameone
+# sample, so IAP wiring (StoreKit / Play Billing) never ripples into the
+# screenshot / notification CI workflows.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/payment/**'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
+      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
+      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
+      - 'scripts/purchase-test-app/**'
+      - 'scripts/ios/purchase-tests/**'
+      - 'scripts/run-ios-purchase-tests.sh'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/build-android-app.sh'
+      - '.github/workflows/purchase-e2e.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'CodenameOne/src/com/codename1/payment/**'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java'
+      - 'Ports/Android/src/com/codename1/impl/android/BillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/ZoozPurchase.java'
+      - 'Ports/Android/src/com/codename1/impl/android/IBillingSupport.java'
+      - 'Ports/Android/src/com/codename1/impl/android/CodenameOneActivity.java'
+      - 'maven/core-unittests/src/test/java/com/codename1/payment/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/testing/TestCodenameOneImplementation.java'
+      - 'scripts/purchase-test-app/**'
+      - 'scripts/ios/purchase-tests/**'
+      - 'scripts/run-ios-purchase-tests.sh'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/build-android-app.sh'
+      - '.github/workflows/purchase-e2e.yml'
+
+permissions:
+  contents: read
+  # Required to pull the pr-ci-container image from ghcr.io.
+  packages: read
+
+concurrency:
+  group: purchase-e2e-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: Core receipt-sync unit tests (JavaSE)
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select JDK 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
+          echo "${JAVA_HOME_8}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-purchase-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-purchase-
+            ${{ runner.os }}-m2-
+
+      - name: Run Purchase / ReceiptStore unit tests
+        working-directory: maven
+        run: |
+          set -euo pipefail
+          mvn -B -Dmaven.javadoc.skip=true \
+              -DunitTests=true \
+              -Plocal-dev-javase \
+              -P unittests \
+              -pl core-unittests -am \
+              test \
+              -Dtest='PurchaseTest,ProductTest,ApplePromotionalOfferTest' \
+              -Dsurefire.failIfNoSpecifiedTests=false
+
+  build-port:
+    uses: ./.github/workflows/_build-ios-port.yml
+
+  native-ios:
+    name: iOS StoreKitTest purchase (simulator)
+    needs: build-port
+    permissions:
+      contents: read
+    runs-on: macos-15
+    timeout-minutes: 45
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Restore built CN1 + iOS port artifacts
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/iOSPort/nativeSources
+          key: ${{ needs.build-port.outputs.cn1_built_cache_key }}
+          fail-on-cache-miss: true
+
+      - name: Build dedicated IAP app (StoreKit compiled in)
+        id: build_ios_app
+        env:
+          CN1_APP_DIR: scripts/purchase-test-app/app
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run iOS StoreKitTest purchase test (XCTest)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/native-ios-purchase-tests
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-purchase-tests.sh \
+            "${{ steps.build_ios_app.outputs.workspace }}" \
+            "${{ steps.build_ios_app.outputs.scheme }}"
+        timeout-minutes: 25
+
+      - name: Upload native iOS purchase artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-purchase-tests
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+  native-android:
+    name: Android billing-bridge purchase (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-android-purchase-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-android-purchase-
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-purchase-${{ hashFiles('scripts/purchase-test-app/**/build.gradle*', 'Ports/Android/build.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-purchase-
+            ${{ runner.os }}-gradle-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Build dedicated IAP app (Android)
+        id: build-android-app
+        env:
+          CN1_APP_DIR: scripts/purchase-test-app/app
+          CN1_ANDROID_TEST_SOURCE_DIR: scripts/purchase-test-app/android-test-src
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-android-app.sh -q -DskipTests
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Android purchase instrumentation test (targeted)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          # android-emulator-runner runs each script line in its own shell, so
+          # cd + gradlew must be a single `&&` line. Runs ONLY the purchase test
+          # (it self-asserts by scraping logcat for CN1SS:IAP:SUBMITTED).
+          script: cd "${{ steps.build-android-app.outputs.gradle_project_dir }}" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.codenameone.examples.purchasetest.PurchaseBillingInstrumentationTest
+      - name: Upload Android purchase test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-purchase-tests
+          path: ${{ steps.build-android-app.outputs.gradle_project_dir }}/app/build/reports/androidTests
+          if-no-files-found: warn
+          retention-days: 14

@@ -163,7 +163,12 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_
     }
     s->start = start_routine;
     s->arg = arg;
-    h = _beginthreadex(NULL, 0, cn1_thread_trampoline, s, 0, &tid);
+    /* The ParparVM clean target generates large per-method C stack frames, so
+     * deep Codename One paint/layout recursion (complex forms, nested containers,
+     * text wrapping in ChatView/TextArea) overflows the Win32 default 1MB thread
+     * stack -> access violation. Reserve a generous 16MB stack for spawned
+     * threads (notably the EDT, which performs the rendering). */
+    h = _beginthreadex(NULL, (unsigned)(16 * 1024 * 1024), cn1_thread_trampoline, s, 0, &tid);
     if (h == 0) {
         free(s);
         return EAGAIN;

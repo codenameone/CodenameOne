@@ -38,6 +38,15 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Concrete {
     /// The fully-qualified class name of the concrete implementation to prefer
-    /// during ParparVM native translation.
+    /// during ParparVM native translation (the iOS pipeline, historically the
+    /// only native target).
     String name();
+
+    /// The fully-qualified class name of the concrete implementation to prefer
+    /// when translating for the native Windows port. When empty (the default),
+    /// the native Windows build falls back to the annotated (portable) base
+    /// class rather than the iOS {@link #name()} target -- so a type that has no
+    /// Windows specialization (e.g. a SIMD helper) translates to its software
+    /// base instead of pulling in the absent iOS class.
+    String win() default "";
 }

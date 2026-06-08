@@ -435,6 +435,12 @@ SideCommand.pressed { background-color: var(--accent-container-color, #eaddff); 
 List { background-color: #fef7ff; padding: 0; margin: 0; }
 
 ListRenderer { cn1-derive: Label; padding: 1.5mm 2mm 1.5mm 2mm; }
+/* Selection needs an explicit style: without it the row falls back to the
+   default theme's white selection, unreadable against the dark-mode light text.
+   Use the Material accent container as the selection surface with its
+   on-container text so the row stays legible selected in both appearances. */
+ListRenderer.selected { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); }
+ListRenderer.pressed { background-color: var(--accent-container-color, #eaddff); color: var(--accent-on-container-color, #21005d); }
 
 /* MultiButton is a list-row component with multi-line content, NOT a
    bordered pill. Don't cn1-derive from Button - that pulls in
@@ -634,6 +640,8 @@ PopupContent {
 
     List { background-color: #141218; }
     ListRenderer { color: #e6e0e9; background-color: transparent; }
+    ListRenderer.selected { background-color: var(--accent-container-color-dark, #4a4458); color: var(--accent-on-container-color-dark, #e6e0e9); }
+    ListRenderer.pressed { background-color: var(--accent-container-color-dark, #4a4458); color: var(--accent-on-container-color-dark, #e6e0e9); }
     MultiButton { background-color: #141218; color: #e6e0e9; }
     MultiButton.pressed { background-color: var(--accent-pressed-color-dark, #4f378b); }
     MultiLine1 { color: #e6e0e9; }
