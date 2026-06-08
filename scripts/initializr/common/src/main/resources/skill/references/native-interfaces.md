@@ -70,7 +70,7 @@ mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
 
 # JavaScript — produces a web bundle; open dev tools and confirm the JS impl is included.
-mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript
+mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 
 # Desktop simulator — just run cn1:run and observe the bridge boots without errors.
 mvn -pl common cn1:run
