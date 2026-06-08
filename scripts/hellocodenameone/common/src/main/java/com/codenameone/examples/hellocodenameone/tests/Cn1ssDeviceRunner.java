@@ -244,12 +244,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
-            // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube,
-            // a textured cube, and a behavioral animation-loop test.
-            new Gpu3DCubeScreenshotTest(),
-            new Gpu3DTexturedCubeScreenshotTest(),
-            new Gpu3DModelScreenshotTest(),
-            new Gpu3DAnimationTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open
@@ -280,7 +274,24 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Inert on phone/tablet ports (plain Toolbar + hamburger side menu + faded scrollbar);
             // on the Mac native build it enables desktop mode (commands move to the native menu
             // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
-            new DesktopModeScreenshotTest()
+            new DesktopModeScreenshotTest(),
+            // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
+            // textured cube, a loaded glTF model, and a behavioral animation-loop
+            // test. Placed LAST (after DesktopMode) on purpose: each shows a 3D
+            // RenderView form, and on iOS a form shown after a GPU peer (like a
+            // form shown after the orientation change in OrientationLock) keeps
+            // the previous form's drawable on screen for one capture -- a
+            // pre-existing iOS present quirk unrelated to this API. Running the
+            // 3D forms before DesktopMode would make DesktopMode capture a 3D
+            // form instead of its documented predecessor; keeping them last
+            // leaves DesktopMode's predecessor (OrientationLock) unchanged from
+            // master so every existing baseline still matches. The 3D tests
+            // render through their own Metal peer and capture correctly
+            // regardless of what precedes them.
+            new Gpu3DCubeScreenshotTest(),
+            new Gpu3DTexturedCubeScreenshotTest(),
+            new Gpu3DModelScreenshotTest(),
+            new Gpu3DAnimationTest()
     };
 
     private static BaseTest prependedTest;
