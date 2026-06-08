@@ -1142,6 +1142,244 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
+    /**
+     * End-to-end Direct3D 11 render check for the portable 3D API on Windows.
+     * Translates a tiny app that drives the WindowsNative.gl3d* bridge to render a
+     * Phong-lit cube into an offscreen D3D render target, plus Matrix4 + the native
+     * layer (cn1_windows_d3d.cpp). On Windows it builds with clang-cl, runs the exe
+     * (WARP software D3D is fine when there is no GPU) and verifies the PNG; on
+     * other hosts it cross-compiles the exe with clang-cl + xwin so the native D3D
+     * layer is at least compile/link checked (set CN1_XWIN_SYSROOT to run that leg).
+     */
+    @org.junit.jupiter.api.Test
+    void rendersOffscreenToPngWithDirect3D() throws Exception {
+        java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
+        for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
+            configs.addAll(CompilerHelper.getAvailableCompilers(v));
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
+        CompilerHelper.CompilerConfig config = configs.get(0);
+
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("win3d-sources");
+        Path classesDir = Files.createTempDirectory("win3d-classes");
+        Path javaApiDir = Files.createTempDirectory("win3d-japi");
+        Files.write(sourceDir.resolve("WinGfx3DTest.java"), winGfx3DTestSource().getBytes(StandardCharsets.UTF_8));
+        Path windowsNativeSrc = Paths.get("..", "..", "Ports", "WindowsPort", "src",
+                "com", "codename1", "impl", "windows", "WindowsNative.java").normalize().toAbsolutePath();
+        Path matrix4Src = Paths.get("..", "..", "CodenameOne", "src",
+                "com", "codename1", "gpu", "Matrix4.java").normalize().toAbsolutePath();
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        List<String> compileArgs = new java.util.ArrayList<>();
+        compileArgs.add("-source"); compileArgs.add(config.targetVersion);
+        compileArgs.add("-target"); compileArgs.add(config.targetVersion);
+        if (CompilerHelper.useClasspath(config)) {
+            compileArgs.add("-classpath"); compileArgs.add(javaApiDir.toString());
+        } else {
+            compileArgs.add("-bootclasspath"); compileArgs.add(javaApiDir.toString());
+            compileArgs.add("-Xlint:-options");
+        }
+        compileArgs.add("-d"); compileArgs.add(classesDir.toString());
+        compileArgs.add(sourceDir.resolve("WinGfx3DTest.java").toString());
+        compileArgs.add(windowsNativeSrc.toString());
+        compileArgs.add(matrix4Src.toString());
+        assertEquals(0, CompilerHelper.compile(config.jdkHome, compileArgs), "WinGfx3DTest + Matrix4 + WindowsNative should compile");
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+
+        Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
+        try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    Files.copy(p, classesDir.resolve(p.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        Path outputDir = Files.createTempDirectory("win3d-out");
+        runTranslator(classesDir, outputDir, "WinGfx3DTest", "windows");
+        Path distDir = outputDir.resolve("dist");
+
+        if (CompilerHelper.isWindows()) {
+            Path buildDir = distDir.resolve("build");
+            Files.createDirectories(buildDir);
+            runCommand(Arrays.asList("cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
+                    "-DCMAKE_BUILD_TYPE=Release", "-G", "Ninja",
+                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"), distDir);
+            runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+            Path exe = buildDir.resolve(CompilerHelper.executableName("WinGfx3DTest"));
+            String out = runCommand(Arrays.asList(exe.toString()), buildDir);
+            Path png = buildDir.resolve("cn1_render.png");
+            assertTrue(out.contains("RENDER_OK"), "D3D render app should report success, output:\n" + out);
+            assertTrue(Files.exists(png), "a PNG frame should be written");
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(png.toFile());
+            assertNotNull(img, "PNG should decode");
+            assertEquals(400, img.getWidth());
+            assertEquals(300, img.getHeight());
+            // The lit blue cube must cover the centre; the corners stay the dark clear color.
+            int centre = img.getRGB(200, 150) & 0xffffff;
+            int corner = img.getRGB(5, 5) & 0xffffff;
+            assertTrue((centre & 0xff) > 0x50, "expected a lit blue cube pixel at the centre, was " + Integer.toHexString(centre));
+            assertTrue(corner < 0x202030, "expected the dark clear color in the corner, was " + Integer.toHexString(corner));
+            return;
+        }
+
+        // Non-Windows: cross-compile the dist (incl. cn1_windows_d3d.cpp) to a
+        // Windows PE with clang-cl + xwin, so the native D3D layer is compile/link
+        // checked. Running the PE (render verification) happens on Windows.
+        String sysroot = System.getenv("CN1_XWIN_SYSROOT");
+        org.junit.jupiter.api.Assumptions.assumeTrue(sysroot != null && !sysroot.trim().isEmpty(),
+                "Set CN1_XWIN_SYSROOT to an `xwin splat` directory to cross-compile the D3D check off-Windows");
+        Path sys = Paths.get(sysroot.trim()).toAbsolutePath();
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(sys.resolve("crt/include")),
+                "CN1_XWIN_SYSROOT must contain crt/include + sdk/include (run `xwin splat`): " + sys);
+        String clangCl = System.getenv().getOrDefault("CN1_CLANG_CL", "clang-cl");
+        String llvmRc = System.getenv().getOrDefault("CN1_LLVM_RC", "llvm-rc");
+        String inc = String.join(" ", "--target=x86_64-pc-windows-msvc",
+                imsvc(sys.resolve("crt/include")), imsvc(sys.resolve("sdk/include/ucrt")),
+                imsvc(sys.resolve("sdk/include/um")), imsvc(sys.resolve("sdk/include/shared")),
+                imsvc(sys.resolve("sdk/include/winrt")));
+        String linkFlags = String.join(" ", "-fuse-ld=lld",
+                "/libpath:" + sys.resolve("crt/lib/x86_64"),
+                "/libpath:" + sys.resolve("sdk/lib/um/x86_64"),
+                "/libpath:" + sys.resolve("sdk/lib/ucrt/x86_64"));
+        String rcFlags = String.join(" ", "-I", sys.resolve("sdk/include/um").toString(),
+                "-I", sys.resolve("sdk/include/shared").toString(),
+                "-I", sys.resolve("crt/include").toString(),
+                "-I", sys.resolve("sdk/include/ucrt").toString());
+        Path buildDir = distDir.resolve("xbuild");
+        Files.createDirectories(buildDir);
+        runCommand(Arrays.asList("cmake", "-S", distDir.toString(), "-B", buildDir.toString(),
+                "-G", "Ninja", "-DCMAKE_SYSTEM_NAME=Windows", "-DCMAKE_SYSTEM_PROCESSOR=AMD64",
+                "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+                "-DCMAKE_C_COMPILER=" + clangCl, "-DCMAKE_CXX_COMPILER=" + clangCl,
+                "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_C_FLAGS=" + inc, "-DCMAKE_CXX_FLAGS=" + inc,
+                "-DCMAKE_RC_COMPILER=" + llvmRc, "-DCMAKE_RC_FLAGS=" + rcFlags,
+                "-DCMAKE_EXE_LINKER_FLAGS=" + linkFlags), distDir);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+        Path exe = buildDir.resolve("WinGfx3DTest.exe");
+        assertTrue(Files.exists(exe) && Files.size(exe) > 100_000, "cross-compiled D3D PE should be produced: " + exe);
+        System.out.println("CN1_GPU_XWIN_EXE=" + exe.toAbsolutePath());
+    }
+
+    static String winGfx3DTestSource() {
+        return "import com.codename1.impl.windows.WindowsNative;\n" +
+                "import com.codename1.gpu.Matrix4;\n" +
+                "public class WinGfx3DTest {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        int W = 400, H = 300;\n" +
+                "        long ctx = WindowsNative.gl3dCreateContext();\n" +
+                "        if (ctx == 0) { System.out.println(\"RENDER_FAIL_NOCTX\"); return; }\n" +
+                "        WindowsNative.gl3dBeginFrame(ctx, W, H);\n" +
+                "        WindowsNative.gl3dSetViewport(ctx, 0, 0, W, H);\n" +
+                "        float[] verts = {\n" +
+                "            -0.8f, -0.8f, 0.8f, 0f, 0f, 1f, 0f, 1f,\n" +
+                "            0.8f, -0.8f, 0.8f, 0f, 0f, 1f, 1f, 1f,\n" +
+                "            0.8f, 0.8f, 0.8f, 0f, 0f, 1f, 1f, 0f,\n" +
+                "            -0.8f, 0.8f, 0.8f, 0f, 0f, 1f, 0f, 0f,\n" +
+                "            0.8f, -0.8f, -0.8f, 0f, 0f, -1f, 0f, 1f,\n" +
+                "            -0.8f, -0.8f, -0.8f, 0f, 0f, -1f, 1f, 1f,\n" +
+                "            -0.8f, 0.8f, -0.8f, 0f, 0f, -1f, 1f, 0f,\n" +
+                "            0.8f, 0.8f, -0.8f, 0f, 0f, -1f, 0f, 0f,\n" +
+                "            -0.8f, -0.8f, -0.8f, -1f, 0f, 0f, 0f, 1f,\n" +
+                "            -0.8f, -0.8f, 0.8f, -1f, 0f, 0f, 1f, 1f,\n" +
+                "            -0.8f, 0.8f, 0.8f, -1f, 0f, 0f, 1f, 0f,\n" +
+                "            -0.8f, 0.8f, -0.8f, -1f, 0f, 0f, 0f, 0f,\n" +
+                "            0.8f, -0.8f, 0.8f, 1f, 0f, 0f, 0f, 1f,\n" +
+                "            0.8f, -0.8f, -0.8f, 1f, 0f, 0f, 1f, 1f,\n" +
+                "            0.8f, 0.8f, -0.8f, 1f, 0f, 0f, 1f, 0f,\n" +
+                "            0.8f, 0.8f, 0.8f, 1f, 0f, 0f, 0f, 0f,\n" +
+                "            -0.8f, 0.8f, 0.8f, 0f, 1f, 0f, 0f, 1f,\n" +
+                "            0.8f, 0.8f, 0.8f, 0f, 1f, 0f, 1f, 1f,\n" +
+                "            0.8f, 0.8f, -0.8f, 0f, 1f, 0f, 1f, 0f,\n" +
+                "            -0.8f, 0.8f, -0.8f, 0f, 1f, 0f, 0f, 0f,\n" +
+                "            -0.8f, -0.8f, -0.8f, 0f, -1f, 0f, 0f, 1f,\n" +
+                "            0.8f, -0.8f, -0.8f, 0f, -1f, 0f, 1f, 1f,\n" +
+                "            0.8f, -0.8f, 0.8f, 0f, -1f, 0f, 1f, 0f,\n" +
+                "            -0.8f, -0.8f, 0.8f, 0f, -1f, 0f, 0f, 0f\n" +
+                "        };\n" +
+                "        short[] idx = new short[36];\n" +
+                "        for (int face = 0; face < 6; face++) {\n" +
+                "            int b = face * 4, o = face * 6;\n" +
+                "            idx[o] = (short) b; idx[o+1] = (short) (b+1); idx[o+2] = (short) (b+2);\n" +
+                "            idx[o+3] = (short) b; idx[o+4] = (short) (b+2); idx[o+5] = (short) (b+3);\n" +
+                "        }\n" +
+                "        long vbo = WindowsNative.gl3dCreateFloatBuffer(verts, verts.length);\n" +
+                "        long ibo = WindowsNative.gl3dCreateShortBuffer(idx, idx.length);\n" +
+                "        String hlsl =\n" +
+                "                \"cbuffer CN1Uniforms : register(b0) {\\n\" +\n" +
+                "                \"  float4x4 mvp;\\n\" +\n" +
+                "                \"  float4x4 model;\\n\" +\n" +
+                "                \"  float4x4 normalMatrix;\\n\" +\n" +
+                "                \"  float4 color;\\n\" +\n" +
+                "                \"  float4 lightDir;\\n\" +\n" +
+                "                \"  float4 lightColor;\\n\" +\n" +
+                "                \"  float4 ambient;\\n\" +\n" +
+                "                \"  float4 eye;\\n\" +\n" +
+                "                \"  float shininess;\\n\" +\n" +
+                "                \"};\\n\" +\n" +
+                "                \"struct VSInput {\\n\" +\n" +
+                "                \"  float3 position : POSITION;\\n\" +\n" +
+                "                \"  float3 normal : NORMAL;\\n\" +\n" +
+                "                \"  float2 texcoord : TEXCOORD0;\\n\" +\n" +
+                "                \"};\\n\" +\n" +
+                "                \"struct VSOutput {\\n\" +\n" +
+                "                \"  float4 position : SV_Position;\\n\" +\n" +
+                "                \"  float3 worldNormal : TEXCOORD1;\\n\" +\n" +
+                "                \"  float3 worldPos : TEXCOORD2;\\n\" +\n" +
+                "                \"};\\n\" +\n" +
+                "                \"VSOutput cn1_vertex_main(VSInput input) {\\n\" +\n" +
+                "                \"  VSOutput output;\\n\" +\n" +
+                "                \"  float4 clip = mul(mvp, float4(input.position, 1.0));\\n\" +\n" +
+                "                \"  clip.y = -clip.y;\\n\" +\n" +
+                "                \"  clip.z = (clip.z + clip.w) * 0.5;\\n\" +\n" +
+                "                \"  output.position = clip;\\n\" +\n" +
+                "                \"  output.worldNormal = mul(normalMatrix, float4(input.normal, 0.0)).xyz;\\n\" +\n" +
+                "                \"  output.worldPos = mul(model, float4(input.position, 1.0)).xyz;\\n\" +\n" +
+                "                \"  return output;\\n\" +\n" +
+                "                \"}\\n\" +\n" +
+                "                \"float4 cn1_fragment_main(VSOutput input) : SV_Target {\\n\" +\n" +
+                "                \"  float4 base = color;\\n\" +\n" +
+                "                \"  float3 n = normalize(input.worldNormal);\\n\" +\n" +
+                "                \"  float3 l = normalize(-lightDir.xyz);\\n\" +\n" +
+                "                \"  float ndotl = max(dot(n, l), 0.0);\\n\" +\n" +
+                "                \"  float3 lighting = ambient.xyz + lightColor.xyz * ndotl;\\n\" +\n" +
+                "                \"  float3 rgb = base.rgb * lighting;\\n\" +\n" +
+                "                \"  if (ndotl > 0.0) {\\n\" +\n" +
+                "                \"    float3 v = normalize(eye.xyz - input.worldPos);\\n\" +\n" +
+                "                \"    float3 h = normalize(l + v);\\n\" +\n" +
+                "                \"    float spec = pow(max(dot(n, h), 0.0), shininess);\\n\" +\n" +
+                "                \"    rgb += lightColor.xyz * spec;\\n\" +\n" +
+                "                \"  }\\n\" +\n" +
+                "                \"  return float4(rgb, base.a);\\n\" +\n" +
+                "                \"}\\n\";\n" +
+                "        long pipe = WindowsNative.gl3dGetOrCreatePipeline(ctx, \"cube\", hlsl, 0, 1, 1, 1);\n" +
+                "        if (pipe == 0) { System.out.println(\"RENDER_FAIL_PIPE\"); return; }\n" +
+                "        float[] proj = Matrix4.perspective((float) Math.toRadians(45), (float) W / H, 0.1f, 100f);\n" +
+                "        float[] view = Matrix4.lookAt(2.6f, 2.1f, 3.4f, 0f, 0f, 0f, 0f, 1f, 0f);\n" +
+                "        float[] vp = Matrix4.identity(); Matrix4.multiply(proj, view, vp);\n" +
+                "        float[] model = Matrix4.rotation((float) Math.toRadians(25), 0.35f, 1f, 0.12f);\n" +
+                "        float[] mvp = Matrix4.identity(); Matrix4.multiply(vp, model, mvp);\n" +
+                "        float[] nm = Matrix4.normalMatrix(model);\n" +
+                "        float[] u = new float[72];\n" +
+                "        int p = 0;\n" +
+                "        for (int i = 0; i < 16; i++) u[p++] = mvp[i];\n" +
+                "        for (int i = 0; i < 16; i++) u[p++] = model[i];\n" +
+                "        for (int i = 0; i < 16; i++) u[p++] = nm[i];\n" +
+                "        u[p++] = 0x33/255f; u[p++] = 0x66/255f; u[p++] = 0xff/255f; u[p++] = 1f;\n" +
+                "        u[p++] = -0.4f; u[p++] = -1f; u[p++] = -0.55f; u[p++] = 0f;\n" +
+                "        u[p++] = 1f; u[p++] = 1f; u[p++] = 1f; u[p++] = 1f;\n" +
+                "        u[p++] = 0.25f; u[p++] = 0.25f; u[p++] = 0.25f; u[p++] = 1f;\n" +
+                "        u[p++] = 2.6f; u[p++] = 2.1f; u[p++] = 3.4f; u[p++] = 1f;\n" +
+                "        u[p++] = 24f;\n" +
+                "        WindowsNative.gl3dClear(ctx, 0xff101018, true, true);\n" +
+                "        WindowsNative.gl3dDrawIndexed(ctx, pipe, vbo, 32, ibo, 36, 3, u, 72, 0L, 0, 0);\n" +
+                "        boolean ok = WindowsNative.gl3dCaptureToFile(ctx, \"cn1_render.png\");\n" +
+                "        System.out.println(ok ? \"RENDER_OK\" : \"RENDER_FAIL\");\n" +
+                "    }\n" +
+                "}\n";
+    }
+
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         runTranslator(classesDir, outputDir, appName, "ios");
     }

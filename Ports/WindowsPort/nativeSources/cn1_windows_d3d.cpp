@@ -153,6 +153,56 @@ static const char* cn1D3DStringToUtf8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str
     return stringToUTF8(threadStateData, str);
 }
 
+// Copies the offscreen render target to a CPU-readable staging texture and wraps
+// its BGRA pixels in a WIC bitmap (caller releases it). Returns NULL on failure.
+static IWICBitmap* cn1D3DCaptureWicBitmap(CN1D3DContext* c) {
+    if (!c || !c->rtTex || c->width <= 0 || c->height <= 0) {
+        return NULL;
+    }
+    int w = c->width;
+    int h = c->height;
+    D3D11_TEXTURE2D_DESC sd;
+    ZeroMemory(&sd, sizeof(sd));
+    sd.Width = (UINT) w;
+    sd.Height = (UINT) h;
+    sd.MipLevels = 1;
+    sd.ArraySize = 1;
+    sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    sd.SampleDesc.Count = 1;
+    sd.Usage = D3D11_USAGE_STAGING;
+    sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    ID3D11Texture2D* staging = NULL;
+    if (FAILED(c->device->CreateTexture2D(&sd, NULL, &staging))) {
+        return NULL;
+    }
+    c->ctx->CopyResource(staging, c->rtTex);
+    D3D11_MAPPED_SUBRESOURCE mapped;
+    if (FAILED(c->ctx->Map(staging, 0, D3D11_MAP_READ, 0, &mapped))) {
+        staging->Release();
+        return NULL;
+    }
+    std::vector<unsigned char> pixels((size_t) w * h * 4);
+    for (int row = 0; row < h; row++) {
+        memcpy(&pixels[(size_t) row * w * 4],
+                (unsigned char*) mapped.pData + (size_t) row * mapped.RowPitch,
+                (size_t) w * 4);
+    }
+    c->ctx->Unmap(staging, 0);
+    staging->Release();
+
+    IWICImagingFactory* wic = cn1D3DWicFactory(c);
+    if (!wic) {
+        return NULL;
+    }
+    IWICBitmap* bitmap = NULL;
+    // WIC copies the pixel buffer, so the local vector can go out of scope after.
+    if (FAILED(wic->CreateBitmapFromMemory((UINT) w, (UINT) h, GUID_WICPixelFormat32bppBGRA,
+            (UINT) (w * 4), (UINT) pixels.size(), pixels.data(), &bitmap))) {
+        return NULL;
+    }
+    return bitmap;
+}
+
 } // namespace
 
 // The buffer/texture creation natives do not receive the context handle (mirroring
@@ -567,53 +617,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dDrawArrays___long_long_lo
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_gl3dCaptureFrame___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
     CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
-    if (!c || !c->rtTex || c->width <= 0 || c->height <= 0) {
-        return JAVA_NULL;
-    }
-    int w = c->width;
-    int h = c->height;
-
-    // Copy the render target into a CPU-readable staging texture.
-    D3D11_TEXTURE2D_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
-    sd.Width = (UINT) w;
-    sd.Height = (UINT) h;
-    sd.MipLevels = 1;
-    sd.ArraySize = 1;
-    sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    sd.SampleDesc.Count = 1;
-    sd.Usage = D3D11_USAGE_STAGING;
-    sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    ID3D11Texture2D* staging = NULL;
-    if (FAILED(c->device->CreateTexture2D(&sd, NULL, &staging))) {
-        return JAVA_NULL;
-    }
-    c->ctx->CopyResource(staging, c->rtTex);
-
-    D3D11_MAPPED_SUBRESOURCE mapped;
-    if (FAILED(c->ctx->Map(staging, 0, D3D11_MAP_READ, 0, &mapped))) {
-        staging->Release();
-        return JAVA_NULL;
-    }
-
-    // Tightly pack the BGRA rows (the mapped pitch may include padding).
-    std::vector<unsigned char> pixels((size_t) w * h * 4);
-    for (int row = 0; row < h; row++) {
-        memcpy(&pixels[(size_t) row * w * 4],
-                (unsigned char*) mapped.pData + (size_t) row * mapped.RowPitch,
-                (size_t) w * 4);
-    }
-    c->ctx->Unmap(staging, 0);
-    staging->Release();
-
-    // Encode the BGRA buffer to an in-memory PNG via WIC and return as byte[].
     IWICImagingFactory* wic = cn1D3DWicFactory(c);
-    if (!wic) {
-        return JAVA_NULL;
-    }
-    IWICBitmap* bitmap = NULL;
-    if (FAILED(wic->CreateBitmapFromMemory((UINT) w, (UINT) h, GUID_WICPixelFormat32bppBGRA,
-            (UINT) (w * 4), (UINT) pixels.size(), pixels.data(), &bitmap))) {
+    IWICBitmap* bitmap = cn1D3DCaptureWicBitmap(c);
+    if (!wic || !bitmap) {
         return JAVA_NULL;
     }
 
@@ -653,6 +659,42 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_gl3dCaptureFrame___long_R_b
     if (stream) stream->Release();
     bitmap->Release();
     return result;
+}
+
+// Captures the current frame and writes it as a PNG file. A headless-screenshot
+// convenience (and the hook the Direct3D render test uses to dump a frame).
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dCaptureToFile___long_java_lang_String_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_OBJECT path) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    IWICImagingFactory* wic = cn1D3DWicFactory(c);
+    IWICBitmap* bitmap = cn1D3DCaptureWicBitmap(c);
+    if (!wic || !bitmap || path == JAVA_NULL) {
+        if (bitmap) bitmap->Release();
+        return JAVA_FALSE;
+    }
+    WCHAR* wpath = cn1WinJavaStringToWide(threadStateData, path, NULL);
+    JAVA_BOOLEAN ok = JAVA_FALSE;
+    IWICStream* stream = NULL;
+    IWICBitmapEncoder* encoder = NULL;
+    IWICBitmapFrameEncode* frame = NULL;
+    if (wpath != NULL &&
+            SUCCEEDED(wic->CreateStream(&stream)) &&
+            SUCCEEDED(stream->InitializeFromFilename(wpath, GENERIC_WRITE)) &&
+            SUCCEEDED(wic->CreateEncoder(GUID_ContainerFormatPng, NULL, &encoder)) &&
+            SUCCEEDED(encoder->Initialize(stream, WICBitmapEncoderNoCache)) &&
+            SUCCEEDED(encoder->CreateNewFrame(&frame, NULL)) &&
+            SUCCEEDED(frame->Initialize(NULL)) &&
+            SUCCEEDED(frame->WriteSource((IWICBitmapSource*) bitmap, NULL)) &&
+            SUCCEEDED(frame->Commit()) &&
+            SUCCEEDED(encoder->Commit())) {
+        ok = JAVA_TRUE;
+    }
+    if (frame) frame->Release();
+    if (encoder) encoder->Release();
+    if (stream) stream->Release();
+    bitmap->Release();
+    if (wpath) free(wpath);
+    return ok;
 }
 
 } // extern "C"

@@ -455,6 +455,8 @@ public final class WindowsNative {
     public static native void gl3dBeginFrame(long contextPeer, int width, int height);
     /** Resolves the current frame's render target and returns it encoded as PNG bytes. */
     public static native byte[] gl3dCaptureFrame(long contextPeer);
+    /** Writes the current frame to a PNG file (headless-screenshot convenience). */
+    public static native boolean gl3dCaptureToFile(long contextPeer, String path);
 
     /** Uploads interleaved vertex floats into an immutable D3D vertex buffer. */
     public static native long gl3dCreateFloatBuffer(float[] data, int floatCount);
