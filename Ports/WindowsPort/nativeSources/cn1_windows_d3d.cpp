@@ -20,9 +20,8 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <wincodec.h>
-#include <vector>
-#include <string>
-#include <cstring>
+#include <stdlib.h>
+#include <string.h>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -181,9 +180,15 @@ static IWICBitmap* cn1D3DCaptureWicBitmap(CN1D3DContext* c) {
         staging->Release();
         return NULL;
     }
-    std::vector<unsigned char> pixels((size_t) w * h * 4);
+    size_t pixelsLen = (size_t) w * h * 4;
+    unsigned char* pixels = (unsigned char*) malloc(pixelsLen);
+    if (!pixels) {
+        c->ctx->Unmap(staging, 0);
+        staging->Release();
+        return NULL;
+    }
     for (int row = 0; row < h; row++) {
-        memcpy(&pixels[(size_t) row * w * 4],
+        memcpy(pixels + (size_t) row * w * 4,
                 (unsigned char*) mapped.pData + (size_t) row * mapped.RowPitch,
                 (size_t) w * 4);
     }
@@ -192,12 +197,15 @@ static IWICBitmap* cn1D3DCaptureWicBitmap(CN1D3DContext* c) {
 
     IWICImagingFactory* wic = cn1D3DWicFactory(c);
     if (!wic) {
+        free(pixels);
         return NULL;
     }
     IWICBitmap* bitmap = NULL;
-    // WIC copies the pixel buffer, so the local vector can go out of scope after.
-    if (FAILED(wic->CreateBitmapFromMemory((UINT) w, (UINT) h, GUID_WICPixelFormat32bppBGRA,
-            (UINT) (w * 4), (UINT) pixels.size(), pixels.data(), &bitmap))) {
+    // WIC copies the pixel buffer, so the local buffer can be freed right after.
+    HRESULT hr = wic->CreateBitmapFromMemory((UINT) w, (UINT) h, GUID_WICPixelFormat32bppBGRA,
+            (UINT) (w * 4), (UINT) pixelsLen, pixels, &bitmap);
+    free(pixels);
+    if (FAILED(hr)) {
         return NULL;
     }
     return bitmap;
@@ -349,7 +357,8 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dCreateTexture___int_1ARRA
     JAVA_ARRAY_INT* px = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) argb).data;
     int count = width * height;
     // Convert packed ARGB (0xAARRGGBB) to RGBA byte order for DXGI_FORMAT_R8G8B8A8.
-    std::vector<unsigned char> rgba((size_t) count * 4);
+    unsigned char* rgba = (unsigned char*) malloc((size_t) count * 4);
+    if (!rgba) return 0;
     for (int i = 0; i < count; i++) {
         int c = px[i];
         rgba[i * 4] = (unsigned char) ((c >> 16) & 0xff);
@@ -369,10 +378,12 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dCreateTexture___int_1ARRA
     td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA init;
     ZeroMemory(&init, sizeof(init));
-    init.pSysMem = rgba.data();
+    init.pSysMem = rgba;
     init.SysMemPitch = (UINT) (width * 4);
     ID3D11Texture2D* tex = NULL;
-    if (FAILED(dev->CreateTexture2D(&td, &init, &tex))) return 0;
+    HRESULT texHr = dev->CreateTexture2D(&td, &init, &tex);
+    free(rgba);
+    if (FAILED(texHr)) return 0;
     ID3D11ShaderResourceView* srv = NULL;
     if (FAILED(dev->CreateShaderResourceView(tex, NULL, &srv))) {
         tex->Release();
@@ -449,22 +460,27 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dGetOrCreatePipeline___lon
             __uuidof(ID3D11ShaderReflection), (void**) &refl))) {
         D3D11_SHADER_DESC sd;
         refl->GetDesc(&sd);
-        std::vector<D3D11_INPUT_ELEMENT_DESC> elems;
-        std::vector<std::string> names;
-        names.reserve(sd.InputParameters);
+        // The generated VSInput has at most a handful of attributes (POSITION,
+        // NORMAL, TEXCOORD0). A small fixed array avoids any C++ STL dependency
+        // (the cross-compile toolchain's MSVC STL headers reject older clang).
+        // pd.SemanticName points into the reflection object's string table, which
+        // stays valid until refl->Release() below -- after CreateInputLayout -- so
+        // the descriptors can reference it directly without copying.
+        enum { MAX_INPUT_ELEMS = 16 };
+        D3D11_INPUT_ELEMENT_DESC elems[MAX_INPUT_ELEMS];
+        UINT elemCount = 0;
         UINT offset = 0;
-        for (UINT i = 0; i < sd.InputParameters; i++) {
+        for (UINT i = 0; i < sd.InputParameters && elemCount < MAX_INPUT_ELEMS; i++) {
             D3D11_SIGNATURE_PARAMETER_DESC pd;
             refl->GetInputParameterDesc(i, &pd);
-            names.push_back(std::string(pd.SemanticName));
             D3D11_INPUT_ELEMENT_DESC e;
             ZeroMemory(&e, sizeof(e));
-            e.SemanticName = names.back().c_str();
+            e.SemanticName = pd.SemanticName;
             e.SemanticIndex = pd.SemanticIndex;
             e.InputSlot = 0;
             e.AlignedByteOffset = offset;
             e.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-            bool isTexcoord = names.back() == "TEXCOORD";
+            bool isTexcoord = pd.SemanticName != NULL && strcmp(pd.SemanticName, "TEXCOORD") == 0;
             if (isTexcoord) {
                 e.Format = DXGI_FORMAT_R32G32_FLOAT;
                 offset += 8;
@@ -472,10 +488,10 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dGetOrCreatePipeline___lon
                 e.Format = DXGI_FORMAT_R32G32B32_FLOAT;
                 offset += 12;
             }
-            elems.push_back(e);
+            elems[elemCount++] = e;
         }
-        if (!elems.empty()) {
-            c->device->CreateInputLayout(elems.data(), (UINT) elems.size(),
+        if (elemCount > 0) {
+            c->device->CreateInputLayout(elems, elemCount,
                     vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &p->layout);
         }
         refl->Release();
