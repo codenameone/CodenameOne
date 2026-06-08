@@ -19,17 +19,8 @@ public interface JavaScriptRenderingBackend {
     HTMLImageElement createImageElement();
     HTMLImageElement createCrossOriginImageElement(String sourceUrl);
     HTMLImageElement createBlobImageElement(Blob blob);
-    HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas);
-    CanvasRenderingContext2D getContext(HTMLCanvasElement canvas);
     void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height);
-    void drawMutableSurface(CanvasRenderingContext2D context, HTMLCanvasElement canvas, int x, int y, int width, int height);
     CanvasPattern createLoadedImagePattern(CanvasRenderingContext2D context, HTMLImageElement image);
-    CanvasPattern createMutableSurfacePattern(CanvasRenderingContext2D context, HTMLCanvasElement canvas);
-    ImageData readLoadedImageData(HTMLImageElement image, int x, int y, int width, int height);
-    ImageData readMutableSurfaceData(HTMLCanvasElement canvas, int x, int y, int width, int height);
-    void writeImageData(HTMLCanvasElement canvas, ImageData imageData, int width, int height);
-    void scaleLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
-    void scaleMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
     Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException;
     void repaintCurrentForm();
 }

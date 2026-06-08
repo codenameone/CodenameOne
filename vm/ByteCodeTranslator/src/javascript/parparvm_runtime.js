@@ -118,32 +118,22 @@ function emitVmMessage(message) {
   global.postMessage(safeMessage);
 }
 // --- Host-ref lifecycle (worker side) --------------------------------------
-// browser_bridge.js retains every host object (canvas / image / DOM node) the
-// worker references in a strong ``hostRefById`` map that never evicts. The
-// per-test off-screen screenshot / mutable-image canvases (~4 MB backing store
-// each) piled up for the life of the page, so by ~test 66 the main thread was
-// thrashing: canvas.toBlob stalled, the worker<->host bridge began returning
-// degenerate receivers ("Missing JS member ...", chartDocumentStaleness) and
-// the suite wedged. We close the leak by telling the host to drop a host ref
-// once the LAST worker-side wrapper for it has been garbage-collected.
-// ``jsObjectWrappers`` is a WeakMap, so a wrapper becomes collectable when its
-// owning Java object dies; a FinalizationRegistry then fires and we post a
-// batched ``releaseHostRef``.
+// The host (browser_bridge.js) keeps a HARD reference to every host object
+// (canvas / image / DOM node) in hostRefById and -- exactly like the C/iOS
+// backend, which has no GC on the native side -- never garbage-collects on its
+// own. Cleanup is the JAVA side's responsibility: when a Java object that OWNS
+// a host resource (a NativeImage's backing canvas/image) is collected, its
+// finalizer releases the one host id it owns. We implement that finalizer with
+// a FinalizationRegistry keyed on the OWNING Java object: ``registerNativeResource``
+// is called from the JS-port image natives at creation time, and on the owner's
+// collection we post a batched ``releaseHostRef`` for its id.
 //
-// The GC signal is the crucial property: a canvas that is still REUSED (a
-// cached theme image, a pooled scratch buffer) keeps a live Java reference, so
-// its wrapper is never collected and it is never released -- only genuinely
-// dead canvases are reclaimed. (Time-idle reclamation, by contrast, cannot
-// tell "done" from "idle but reused" and corrupts the bridge.)
-//
-// Multiple wrappers can transiently exist for one host id (the host keeps a
-// stable id per object via its own WeakMap, but each postMessage receipt
-// deserialises a fresh proxy -> fresh wrapper). We refcount per id and only
-// release when the count reaches zero, so a still-live wrapper can never have
-// its ref pulled out from under it. The host side additionally releases ONLY
-// canvases, so a non-canvas ref whose raw ``__jsValue`` marker outlived its
-// wrapper (some @JSBody natives stash the unwrapped marker) is never dropped.
-const hostRefWorkerCount = typeof Object.create === "function" ? Object.create(null) : {};
+// Keying on the owner (not on JSO wrappers) is the correct altitude: the owner
+// is the SOLE holder of that resource's id, so releasing when it dies can never
+// pull a ref out from under a live user. (The earlier wrapper-refcount approach
+// raced: the host dedups one id across many re-created worker wrappers, and a
+// raw ``__jsValue`` marker could outlive the wrappers, so refcount-zero
+// released canvases that were still referenced -> "Missing host receiver".)
 let pendingHostRefReleases = [];
 let hostRefReleaseFlushScheduled = false;
 function flushHostRefReleases() {
@@ -168,31 +158,142 @@ function scheduleHostRefReleaseFlush() {
     flushHostRefReleases();
   }
 }
-const hostRefFinalizer = (typeof FinalizationRegistry === "function")
+const nativeResourceFinalizer = (typeof FinalizationRegistry === "function")
   ? new FinalizationRegistry(function(hostId) {
-      const count = hostRefWorkerCount[hostId];
-      if (count == null) {
+      if (hostId == null || hostId === 0) {
         return;
       }
-      if (count <= 1) {
-        delete hostRefWorkerCount[hostId];
-        pendingHostRefReleases.push(hostId);
-        scheduleHostRefReleaseFlush();
-      } else {
-        hostRefWorkerCount[hostId] = count - 1;
-      }
+      pendingHostRefReleases.push(hostId);
+      scheduleHostRefReleaseFlush();
     })
   : null;
-function trackHostRefWrapper(wrapper, value) {
-  if (!hostRefFinalizer || value == null) {
+// Register that ``owner`` (a Java object) owns the host resource identified by
+// ``hostId`` (or by the host-ref marker / wrapper ``hostResource``). When the
+// owner is GC'd the host id is released. Idempotent-safe: registering the same
+// owner twice just arms two finalizer callbacks for (possibly) different ids.
+function registerNativeResource(owner, hostResource) {
+  if (!nativeResourceFinalizer || owner == null || typeof owner !== "object") {
     return;
   }
-  const hostId = value.__cn1HostRef;
+  let hostId = null;
+  if (typeof hostResource === "number") {
+    hostId = hostResource;
+  } else if (hostResource != null && typeof hostResource === "object") {
+    if (hostResource.__cn1HostRef != null) {
+      hostId = hostResource.__cn1HostRef;
+    } else if (hostResource.__jsValue != null && hostResource.__jsValue.__cn1HostRef != null) {
+      hostId = hostResource.__jsValue.__cn1HostRef;
+    }
+  }
   if (hostId == null || hostId === 0) {
     return;
   }
-  hostRefWorkerCount[hostId] = (hostRefWorkerCount[hostId] || 0) + 1;
-  hostRefFinalizer.register(wrapper, hostId);
+  nativeResourceFinalizer.register(owner, hostId);
+}
+// Object-returning JSO methods that are SAFE to re-issue when their result
+// comes back degraded (see invokeJsoBridge). All are side-effect-free reads or
+// create a fresh detached/standalone object (no DOM mutation, no state change),
+// so repeating one on the rare crossed-response path can't corrupt anything.
+const JSO_RETRYABLE_READ_METHODS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getElementById: true,
+  querySelector: true, getBoundingClientRect: true, getComputedStyle: true,
+  createPattern: true, createLinearGradient: true, createRadialGradient: true,
+  // canvas -> PNG/data-URL encode used by the screenshot emit path. A cross on
+  // the canvas receiver throws "Missing JS member toDataURL" / returns a
+  // degraded value; encoding is a pure read (no canvas mutation) so re-issuing
+  // is safe. Not covering it let an emit-time cross escape and deadlock the EDT.
+  toDataURL: true, toBlob: true
+};
+// Max re-issues for a degraded idempotent read before giving up. A response
+// CROSS comes in BURSTS (a cluster of concurrent numeric getters whose replies
+// cross object reads); 4 was too few to outlast a sustained burst (createElement
+// observed exhausting all 4 in CI). With a backoff sleep between tries -- which
+// lets the in-flight numeric getters finish so they can't re-cross -- a dozen
+// tries clears realistic bursts while staying bounded (only on the degraded
+// path, ~0.5s worst case).
+const JSO_MAX_RETRY = 12;
+// Lost-response watchdog timeouts, keyed by host-call symbol (see the watchdog
+// armed in dispatchYield). Only BOUNDED host natives are listed: a fast
+// JSO-bridge DOM/canvas read (resolves in <100ms), the screenshot UI-settle
+// wait (a bounded rAF loop, ~maxFrames), and the canvas->PNG capture (rAF +
+// encode, sub-second). If the host channel drops their response the worker
+// would otherwise park forever; on expiry we resume the thread with a transient
+// error so the caller recovers (JSO reads re-issue via the retry; capture/
+// settle callers catch and emit a placeholder / advance). UNBOUNDED natives
+// (image load over the network, fetch, the screenshot WebSocket) are
+// deliberately ABSENT -- they legitimately run as long as the app/network
+// needs and must never be aborted by a timer.
+const HOST_CALL_WATCHDOG_MS = {
+  "__cn1_jso_bridge__": 2000,
+  "__cn1_dom_window_current__": 5000,
+  "__cn1_create_custom_event__": 5000,
+  "__cn1_hide_splash__": 5000,
+  "__cn1_load_truetype_font__": 15000,
+  "__cn1_wait_for_ui_settle__": 8000,
+  "__cn1_capture_canvas_png__": 10000,
+  // Surface pixel read-backs (getRGB / image-encode). Like every other read
+  // here, a dropped host response must FAIL FAST (resume the caller with a
+  // transient error) rather than park the worker forever -- these were the only
+  // reads missing a bound. Host-side they are a synchronous getImageData /
+  // toDataURL, so a healthy channel resolves in well under a second.
+  "__cn1_surface_read__": 4000,
+  "__cn1_image_read__": 4000,
+  "__cn1_surface_to_dataurl__": 6000
+};
+// Retryable reads that can NEVER legitimately return null/undefined: for these
+// a null result is itself a degraded read (a lost/crossed response delivered
+// null instead of the element/context) and must be re-issued. createElement on
+// a real document always returns an element; getContext('2d') always returns a
+// context; createPattern/createLinearGradient/createRadialGradient always
+// return an object; getImageData/measureText/getBoundingClientRect always
+// return their result object. getElementById/querySelector are deliberately
+// EXCLUDED -- null is their legitimate "not found" answer.
+const JSO_NEVER_NULL_READS = {
+  createElement: true, createElementNS: true, getContext: true,
+  getImageData: true, measureText: true, getBoundingClientRect: true,
+  getComputedStyle: true,
+  createLinearGradient: true, createRadialGradient: true,
+  toDataURL: true
+};
+// A degraded object read: a NUMBER where an object was expected (a crossed
+// numeric getter response), a truthy empty {} that lost its host-ref marker on
+// the round-trip, OR null/undefined from a method that can never legitimately
+// return null (see JSO_NEVER_NULL_READS -- this is the transport-cross case
+// where createElement resumed with another call's null/void response). A plain
+// null from a nullable read (getElementById, a getter) is NOT degraded and
+// passes through untouched.
+function isDegradedObjectResult(r, bridge) {
+  if (typeof r === "number") {
+    return true;
+  }
+  if (r && typeof r === "object" && !Array.isArray(r)
+      && r.__cn1HostRef == null
+      && Object.getOwnPropertyNames(r).length === 0) {
+    return true;
+  }
+  if (r == null && bridge && bridge.kind === "method"
+      && JSO_NEVER_NULL_READS[bridge.member] === true) {
+    return true;
+  }
+  return false;
+}
+// A transient host-bridge error worth re-issuing an idempotent read for: the
+// host momentarily failed to resolve the receiver (its host-ref crossed with a
+// concurrent call and pointed at a degraded value), so a member lookup / method
+// call threw rather than running. The same read usually succeeds once the
+// crossed response drains. Matches the exact throw strings the host bridge
+// emits (browser_bridge.js: "Missing JS member ...", "Missing host receiver
+// ...") plus the generic "is not a function" a degraded receiver produces.
+function isTransientHostBridgeError(e) {
+  const m = e == null ? "" : (e.message != null ? String(e.message) : String(e));
+  if (!m) {
+    return false;
+  }
+  return m.indexOf("Missing JS member") >= 0
+      || m.indexOf("Missing host receiver") >= 0
+      || m.indexOf("is not a function") >= 0
+      || m.indexOf("host call timed out") >= 0;
 }
 // An entry in ``cls.methods`` may be either a function (the common
 // case) or a STRING naming another translated function. Inherited
@@ -288,6 +389,21 @@ function shouldEnableDiag() {
   return false;
 }
 const VM_DIAG_ENABLED = shouldEnableDiag();
+// Opt-in (URL ?cn1DisableSelfHeal=1) kill switch for the worker's stalled-timer
+// SELF-HEAL recovery backstop. Self-heal masks a real wedge non-deterministically
+// (sometimes it re-arms the lost timer before the suite watchdog, sometimes not),
+// which hides the deterministic root cause. With it OFF a lost/stalled timer
+// STAYS stalled, so the failure is reproducible and trackable. Lazy because the
+// URL search is forwarded from the main thread on START (after this file loads).
+function cn1SelfHealDisabled() {
+  try {
+    return typeof self !== "undefined"
+      && typeof self.getParameterByName === "function"
+      && self.getParameterByName("cn1DisableSelfHeal") === "1";
+  } catch (_e) {
+    return false;
+  }
+}
 
 // Event forwarding (worker-side functions becoming real listeners on the
 // main thread) defaults on because production apps need user input to
@@ -657,6 +773,20 @@ const jvm = {
   // Form-transition logic from interleaving with a frame's canvas-op
   // chain and recursively producing more canvas ops.
   atomicThread: null,
+  // Screenshot-capture serialization. While a green thread is reading the
+  // visible canvas (the cn1ss emit's ``__cn1_wait_for_ui_settle__`` +
+  // ``__cn1_capture_canvas_png__`` host round-trips, which span up to ~24 rAF
+  // frames on the host), ANY other green thread that paints would draw onto
+  // codenameone-canvas mid-capture and the sampled PNG would show the wrong
+  // (next/previous) form -- the screenshot "off-by-one" that forces dual-stream
+  // tests (ChatInput/ChatView dual-appearance) to be parked. Unlike the dead
+  // ``atomicThread`` flag, this gate is set ONLY for the brief capture window
+  // (see beginCaptureGate/endCaptureGate) and is deadlock-safe: the owner parks
+  // solely on the host (never on a monitor held by a deferred thread), and the
+  // form present runs BEFORE the gate is taken, so the owner acquires no monitor
+  // while holding it. When null (the steady state) drain() behaves exactly as
+  // before -- the gate is inert outside captures.
+  captureGateOwner: null,
   pendingHostCalls: Object.create(null),
   // Batched fire-and-forget JSO bridge ops. Every canvas/DOM setter or
   // void method call inside a paint frame produces a HOST_CALL that
@@ -930,7 +1060,7 @@ const jvm = {
             // suspended; if one ever does land here it will just
             // misbehave, same as before).
             if (step.value && (
-                (step.value.op === "sleep" && (step.value.millis | 0) > 0)
+                (step.value.op === "sleep" && (_LtoNum(step.value.millis) | 0) > 0)
                 || step.value.op === "wait")) {
               throw new Error("Blocking static initializers are not supported in javascript backend");
             }
@@ -1398,14 +1528,81 @@ const jvm = {
         // A round-trip is about to fire; the host must see all
         // previously-queued fire-and-forget ops first to keep
         // canvas state consistent.
-        self.flushPendingFireAndForget();
-        const hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [{
+        const jsoRequest = {
           receiver: receiver,
           receiverClass: (receiver && receiver.__cn1HostClass) ? receiver.__cn1HostClass : className,
           kind: bridge.kind,
           member: bridge.member,
           args: transferableArgs
-        }]);
+        };
+        const __retRC = bridge.returnClass;
+        const __expectsObject = __retRC != null && __retRC !== "int" && __retRC !== "byte"
+            && __retRC !== "short" && __retRC !== "char" && __retRC !== "long"
+            && __retRC !== "float" && __retRC !== "double" && __retRC !== "boolean"
+            && __retRC !== "void" && __retRC !== "v";
+        const __retryableRead = bridge.kind === "getter"
+            || (bridge.kind === "method" && JSO_RETRYABLE_READ_METHODS[bridge.member] === true);
+        // DEGRADED-READ RECOVERY (the getDocument-null / canvasContextWipe /
+        // "Missing JS member getContext" family). A round-trip object read for
+        // an IDEMPOTENT member can come back corrupted four ways when its
+        // response crosses with a concurrent host call in a dense paint burst:
+        // (a) a NUMBER where an object was expected, (b) an empty {} that lost
+        // its host-ref marker, (c) null/undefined from a never-null method
+        // (createElement/getContext), or (d) a THROWN "Missing JS member" /
+        // "Missing host receiver" because the receiver momentarily resolved to
+        // a degraded value on the host. All four are transient -- RE-ISSUE the
+        // identical read; the re-issue is another suspend/resume so the crossed
+        // response drains first. Idempotent reads have no observable side
+        // effect (createElement just makes a throwaway detached node) so
+        // repeating is safe. Bounded: a genuinely persistent failure falls
+        // through to substitute-null below or re-throws, and never loops.
+        let hostResult;
+        let __attempt = 0;
+        for (;;) {
+          if (__attempt > 0) {
+            // Backoff before re-issuing: yield long enough for the concurrent
+            // numeric getters whose responses crossed into this read to finish,
+            // so the re-issue isn't immediately re-crossed by the same in-flight
+            // burst. Grows with the attempt (capped) so a sustained storm gets
+            // progressively more room to drain.
+            yield { op: "sleep", millis: Math.min(8 * __attempt, 64) };
+          }
+          let __threw = null;
+          try {
+            // The host must see all previously-queued fire-and-forget ops
+            // first to keep canvas state consistent before this round-trip.
+            self.flushPendingFireAndForget();
+            hostResult = yield self.invokeHostNative("__cn1_jso_bridge__", [jsoRequest]);
+          } catch (__hostErr) {
+            __threw = __hostErr;
+          }
+          if (__threw != null) {
+            // A transient throw ("Missing JS member"/"Missing host receiver"/
+            // timeout) means the host call NEVER EXECUTED -- the receiver
+            // momentarily resolved to a degraded value -- so re-issuing is safe
+            // for ANY round-trip method (not just the idempotent-read allowlist;
+            // nothing ran, so there's no side effect to repeat). This is what
+            // catches an emit-time canvas.toDataURL() cross that would otherwise
+            // escape and deadlock the EDT.
+            if (__attempt < JSO_MAX_RETRY && isTransientHostBridgeError(__threw)) {
+              __attempt++;
+              if (VM_DIAG_ENABLED) {
+                try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":throw:attempt=" + __attempt); } catch (_e) {}
+              }
+              continue;
+            }
+            throw __threw;
+          }
+          if (__expectsObject && __retryableRead && __attempt < JSO_MAX_RETRY
+              && isDegradedObjectResult(hostResult, bridge)) {
+            __attempt++;
+            if (VM_DIAG_ENABLED) {
+              try { vmDiag("JSO_RETRY", "member", String(bridge.member) + ":attempt=" + __attempt); } catch (_e) {}
+            }
+            continue;
+          }
+          break;
+        }
         // canvasContextWipe RECOVERY: when hostResult is a NUMBER but
         // the expected return class is an object type, substitute null.
         // The downstream code would otherwise treat the number as a
@@ -1822,6 +2019,9 @@ const jvm = {
       value.__nativeString = out;
       return out;
     }
+    if (value.__l === 1) {
+      return _LtoStr(value); // hi/lo Long object -> exact decimal
+    }
     return "" + value;
   },
   toNativeJsArgs(args) {
@@ -1998,11 +2198,6 @@ const jvm = {
     if (jsObjectWrappers) {
       jsObjectWrappers.set(value, wrapper);
     }
-    // Track this wrapper so the host can release the underlying host ref once
-    // every worker-side wrapper for it has been GC'd (see the host-ref
-    // lifecycle block near emitVmMessage). Only host-backed values (carrying
-    // ``__cn1HostRef``) are tracked; pure worker objects never leak.
-    trackHostRefWrapper(wrapper, value);
     this.enhanceJsWrapper(wrapper, resolvedClass);
     if (expectedClass && expectedClass !== resolvedClass) {
       this.enhanceJsWrapper(wrapper, expectedClass);
@@ -2105,10 +2300,21 @@ const jvm = {
   invokeHostNative(symbol, args) {
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
   },
+  // Arm the owning-object finalizer so the host releases ``hostResource``'s id
+  // when the Java ``owner`` is GC'd. See the host-ref lifecycle block above.
+  registerNativeResource(owner, hostResource) {
+    registerNativeResource(owner, hostResource);
+  },
   resolveHostCall(id, success, value, error) {
     const pending = this.pendingHostCalls[id];
     if (!pending) {
       return false;
+    }
+    // Disarm the lost-response watchdog (if this was a JSO-bridge round-trip) --
+    // the response arrived, so the timeout must not later fire a false abort.
+    if (pending.timeoutEntry) {
+      this._removeTimedWakeup(pending.timeoutEntry);
+      pending.timeoutEntry = null;
     }
     // Main-thread host callbacks fire on every async bridge call (image
     // load, fetch, BrowserComponent, etc.). The :ok branch is gated
@@ -2373,6 +2579,27 @@ const jvm = {
     this.runnable.push(thread);
     this.drain();
   },
+  // Take the screenshot-capture gate for the CURRENT thread. Called
+  // synchronously (not yielded) by the cn1ss emit in port.js, immediately
+  // before the ``__cn1_wait_for_ui_settle__`` / ``__cn1_capture_canvas_png__``
+  // host round-trips and AFTER the form has already been presented. While held,
+  // drain() defers every other green thread so none can paint onto the canvas
+  // being sampled. Idempotent / last-writer-wins (captures are serialized by the
+  // runner, so re-entrancy shouldn't occur, but guarding costs nothing).
+  beginCaptureGate() {
+    this.captureGateOwner = this.currentThread || null;
+  },
+  // Release the capture gate. MUST be called from a finally so a watchdog-aborted
+  // or throwing capture still frees it. Re-arms drain so the threads deferred
+  // during the capture window get to run.
+  endCaptureGate() {
+    if (this.captureGateOwner && this.captureGateOwner !== this.currentThread) {
+      // A different thread is mid-capture; don't steal its gate.
+      return;
+    }
+    this.captureGateOwner = null;
+    this.scheduleDrain();
+  },
   schedulerNow() {
     if (typeof global.performance !== "undefined" && global.performance
             && typeof global.performance.now === "function") {
@@ -2398,11 +2625,23 @@ const jvm = {
     this.draining = true;
     const deadline = this.schedulerNow() + 8;
     let steps = 0;
+    // Threads held aside while the capture gate is owned by another thread (see
+    // captureGateOwner). They are NOT lost: restored to runnable in the finally,
+    // and endCaptureGate()/scheduleDrain re-runs them once the gate clears. Stays
+    // null on every non-capture drain, so the steady-state hot path is untouched.
+    let captureDeferred = null;
     try {
       while (this.runnable.length) {
         if (steps++ > 2048 || this.schedulerNow() >= deadline) {
           this.scheduleDrain();
           break;
+        }
+        // While a screenshot capture is reading the canvas, defer any OTHER
+        // thread so it can't paint mid-capture (the off-by-one race). The owner
+        // itself is never deferred, and the gate is null outside captures.
+        if (this.captureGateOwner && this.runnable[0] !== this.captureGateOwner) {
+          (captureDeferred || (captureDeferred = [])).push(this.runnable.shift());
+          continue;
         }
         // Atomic-thread mode (set by flushGraphics' begin/endGraphicsAtomic
         // pair) used to suppress dispatch of every other green thread.
@@ -2421,6 +2660,16 @@ const jvm = {
           continue;
         }
         this.currentThread = thread;
+        // Worker-liveness probe feeding the heartbeat timer below: a frozen
+        // resume count with a live heartbeat means parked/starved, a stopped
+        // heartbeat means a synchronous infinite loop in this step. The resume
+        // counter is a trivial increment; the (string-building) label is only
+        // recorded under diag so production pays nothing.
+        this.__cn1ResumeCount = (this.__cn1ResumeCount | 0) + 1;
+        if (VM_DIAG_ENABLED) {
+          this.__cn1LastResumeLabel = thread.id + ":" + threadDebugLabel(thread.object);
+          this.__cn1LastResumeTs = this.schedulerNow();
+        }
         if (!thread.__cn1LoggedFirstStep && shouldTraceThread(thread)) {
           thread.__cn1LoggedFirstStep = true;
           vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
@@ -2432,49 +2681,101 @@ const jvm = {
         // ``_Y`` / ``__cn1TickReset`` block at the top of this
         // file for the rationale.
         __cn1TickReset();
-        if (thread.resumeError) {
-          const resumeError = thread.resumeError;
-          thread.resumeError = null;
-          result = thread.generator.throw(resumeError);
-        } else {
-          result = thread.generator.next(thread.resumeValue);
-        }
-        thread.resumeValue = undefined;
-        if (result.done) {
-          thread.done = true;
-          // Always-on lifecycle log: when the MAIN thread completes,
-          // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
-          // lifecycle.start, and runApp() all returned. We post a
-          // ``lifecycle`` VM message back to the main-thread bridge
-          // so it can flip ``window.cn1Started = true`` (the @JSBody-
-          // driven flag set inside ParparVMBootstrap.setStarted lives
-          // on the WORKER's window, not the main thread's, so the
-          // headless-test ``page.evaluate(() => window.cn1Started)``
-          // would never see it without this round trip).
-          if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
-            vmLifecycle("main-thread-completed");
-            emitVmMessage({
-              type: this.protocol.messages.LIFECYCLE || "lifecycle",
-              phase: "started"
-            });
+        try {
+          if (thread.resumeError) {
+            const resumeError = thread.resumeError;
+            thread.resumeError = null;
+            result = thread.generator.throw(resumeError);
+          } else {
+            result = thread.generator.next(thread.resumeValue);
           }
+          thread.resumeValue = undefined;
+          if (result.done) {
+            thread.done = true;
+            // Always-on lifecycle log: when the MAIN thread completes,
+            // ParparVMBootstrap.run() has finished — i.e. lifecycle.init,
+            // lifecycle.start, and runApp() all returned. We post a
+            // ``lifecycle`` VM message back to the main-thread bridge
+            // so it can flip ``window.cn1Started = true`` (the @JSBody-
+            // driven flag set inside ParparVMBootstrap.setStarted lives
+            // on the WORKER's window, not the main thread's, so the
+            // headless-test ``page.evaluate(() => window.cn1Started)``
+            // would never see it without this round trip).
+            if (thread === this.mainThread || (this.mainThreadObject && thread.object === this.mainThreadObject)) {
+              vmLifecycle("main-thread-completed");
+              emitVmMessage({
+                type: this.protocol.messages.LIFECYCLE || "lifecycle",
+                phase: "started"
+              });
+            }
+            if (thread.object) {
+              thread.object[CN1_THREAD_ALIVE] = 0;
+              this.notifyAll(thread.object);
+            }
+            continue;
+          }
+          this.handleYield(thread, result.value);
+        } catch (threadErr) {
+          // An uncaught exception in a green thread TERMINATES THAT THREAD
+          // (Java semantics: Thread.run() unwinds, other threads keep running)
+          // -- it must NOT halt the whole cooperative scheduler. The previous
+          // behaviour let the error propagate out of the drain loop into the
+          // outer catch -> fail(), which stopped dispatch entirely and wedged
+          // the worker (frozen=1/runnable=0): a single __cn1_jso_bridge__
+          // watchdog timeout (main thread briefly blocked by a heavy capture),
+          // resumed into the parked thread as an uncaught RuntimeException, took
+          // down the ENTIRE screenshot suite with no error surfaced to the host.
+          // Terminate just this thread, wake any joiners, record the failure for
+          // diagnostics, and continue draining the rest.
+          thread.done = true;
+          thread.resumeError = null;
+          thread.resumeValue = undefined;
           if (thread.object) {
             thread.object[CN1_THREAD_ALIVE] = 0;
             this.notifyAll(thread.object);
           }
+          this.fail(threadErr);
           continue;
         }
-        this.handleYield(thread, result.value);
       }
     } catch (err) {
       this.fail(err);
     } finally {
       this.currentThread = null;
       this.draining = false;
+      // Restore any threads deferred for the capture gate. They go back to the
+      // FRONT (preserving their relative order) so they don't lose their place
+      // behind threads enqueued during this burst. If the gate has since cleared
+      // (endCaptureGate ran while the owner resumed) re-arm a drain so they run;
+      // otherwise they sit harmlessly in runnable until the gate's own
+      // scheduleDrain (or the owner's host callback) fires.
+      if (captureDeferred && captureDeferred.length) {
+        for (let i = captureDeferred.length - 1; i >= 0; i--) {
+          this.runnable.unshift(captureDeferred[i]);
+        }
+        if (!this.captureGateOwner) {
+          this.scheduleDrain();
+        }
+      }
       // Drain burst is over -- ship any queued fire-and-forget JSO
       // ops to the host as a single batch postMessage. Saves
       // hundreds of structured-clone roundtrips per paint frame.
       this.flushPendingFireAndForget();
+      // SCHEDULER INVARIANT: drain() must NEVER return with runnable threads
+      // and no drain pending. A stranded runnable thread (observed at boot as
+      // runnable>=1, draining=0, drainScheduled=0 with a live heartbeat -- the
+      // worker freezes mid-boot) means some enqueue path raced the drain-loop
+      // exit: enqueue() calls drain() directly, which no-ops under the
+      // re-entrancy guard, and if that enqueue landed as the loop was tearing
+      // down, nothing re-arms. This is the correct backstop (not a timeout /
+      // self-heal): re-schedule so the thread actually runs. The DIAG line keeps
+      // the strand visible so the racing enqueue path can still be isolated.
+      if (this.runnable.length && !this.captureGateOwner && !this.drainScheduled) {
+        if (VM_DIAG_ENABLED) {
+          vmTrace("DIAG:DRAIN_RESTRAND:runnable=" + this.runnable.length);
+        }
+        this.scheduleDrain();
+      }
     }
   },
   // Cooperative scheduler bookkeeping: see field comments above.
@@ -2514,7 +2815,13 @@ const jvm = {
     this._wakeupTimer = setTimeout(function() {
       self._wakeupTimer = null;
       self._wakeupAt = Infinity;
-      self._processExpiredTimedWakeups();
+      // ALWAYS reschedule remaining wakeups, even if processing one throws --
+      // otherwise an exception here breaks the single-timer chain and any other
+      // pending sleep/wait never fires, wedging the worker (no green thread is
+      // running to re-arm it). _processExpiredTimedWakeups refreshes on its own
+      // success path; the finally guarantees it on the throw path too.
+      try { self._processExpiredTimedWakeups(); }
+      finally { if (self._wakeupTimer == null) self._refreshTimedWakeupTimer(); }
     }, delay);
   },
   _processExpiredTimedWakeups() {
@@ -2536,13 +2843,75 @@ const jvm = {
     expired.reverse();  // restore registration order for FIFO fairness
     for (let i = 0; i < expired.length; i++) {
       const w = expired[i];
+      // RE-CHECK cancelled. Processing an earlier entry below calls enqueue ->
+      // drain, which runs green threads synchronously; one of them can notify a
+      // monitor and cancel a LATER wait/sleep entry already collected in this
+      // same `expired` batch. Without this re-check we would still fire that
+      // cancelled entry's resumeWaiter for a waiter whose thread has ALREADY
+      // resumed and parked elsewhere (typically a host-call round-trip read) --
+      // resuming it with the wrong value (undefined) so the read returns null.
+      // That was the surface-encode/getRGB "lost response", the flaky transition
+      // wedge, and the encode-fail cascade.
+      if (w.cancelled) {
+        continue;
+      }
       if (w.kind === "sleep") {
         this.enqueue(w.thread);
       } else if (w.kind === "wait") {
         this.resumeWaiter(w.waiter);
+      } else if (w.kind === "hostcall") {
+        // A JSO-bridge round-trip whose host response never arrived (see the
+        // watchdog armed in dispatchYield). If it is still pending, fail it
+        // with a transient error so the parked thread resumes and the
+        // invokeJsoBridge retry re-issues the read. If it already resolved,
+        // resolveHostCall cancelled this entry, so this is a no-op.
+        if (this.pendingHostCalls[w.id]) {
+          if (VM_DIAG_ENABLED) {
+            try { vmDiag("HOSTCALL_TIMEOUT", "id", String(w.id)); } catch (_e) {}
+          }
+          this.resolveHostCall(w.id, false, null, "host call timed out (jso bridge)");
+        }
       }
     }
     this._refreshTimedWakeupTimer();
+  },
+  // Snapshot every live green thread and WHAT it is blocked on. Used by the
+  // dispatch watchdog to isolate a stall deterministically (without a JS
+  // debugger attaching to the worker): a deadlock shows up as the EDT parked on
+  // a monitor/capture-gate whose owner is itself parked. Pure read; safe to call
+  // from a stalled state.
+  dumpThreadStates() {
+    var out = [];
+    var ths = this.threads || [];
+    for (var i = 0; i < ths.length; i++) {
+      var t = ths[i];
+      if (t.done) continue;
+      var w = t.waiting;
+      var desc;
+      if (!w) {
+        desc = "RUNNABLE";
+      } else if (w.op === "monitor_enter") {
+        desc = "monitor_enter";
+      } else if (w.op === "sleep") {
+        desc = "sleep:dueIn=" + (w.entry ? Math.round((w.entry.wakeAt | 0) - this.schedulerNow()) : "?");
+      } else if (w.op === "wait") {
+        desc = "obj.wait";
+      } else if (w.id != null) {
+        var pc = this.pendingHostCalls[w.id];
+        desc = "hostcall:" + (pc && pc.symbol ? pc.symbol : "?")
+          + (pc && pc.jso ? ("{" + pc.jso + "}") : "");
+      } else {
+        desc = String(w.op || "?");
+      }
+      var label;
+      try { label = threadDebugLabel(t.object); } catch (e) { void e; label = "?"; }
+      out.push("t" + t.id + "[" + label + "]:" + desc);
+    }
+    return "THREAD_DUMP:live=" + out.length
+      + ":runnable=" + (this.runnable ? this.runnable.length : -1)
+      + ":captureGateOwner=" + (this.captureGateOwner ? ("t" + this.captureGateOwner.id) : "none")
+      + ":draining=" + (this.draining ? 1 : 0)
+      + " " + out.join(" ");
   },
   handleYield(thread, yielded) {
     if (shouldTraceThread(thread)) {
@@ -2555,7 +2924,9 @@ const jvm = {
       return;
     }
     if (yielded.op === "sleep") {
-      const millis = Math.max(0, yielded.millis | 0);
+      // millis originates from Thread.sleep(long) -> BigInt; coerce to a Number
+      // before the scheduler's Number-domain timer arithmetic (avoids BigInt mix).
+      const millis = Math.max(0, _LtoNum(yielded.millis) | 0);
       if (millis === 0) {
         // Thread.yield / Thread.sleep(0) is just a co-operative hand-off
         // to the next runnable green thread; no real-time delay needed.
@@ -2570,8 +2941,10 @@ const jvm = {
     if (yielded.op === "wait") {
       const waiter = { thread: thread, monitor: yielded.monitor, reentryCount: yielded.reentryCount };
       yielded.monitor.__monitor.waiters.push(waiter);
-      if (yielded.timeout > 0) {
-        const entry = { kind: "wait", waiter: waiter, wakeAt: this.schedulerNow() + yielded.timeout, cancelled: false };
+      // timeout originates from Object.wait(long) -> BigInt; coerce to Number.
+      const waitTimeout = _LtoNum(yielded.timeout) | 0;
+      if (waitTimeout > 0) {
+        const entry = { kind: "wait", waiter: waiter, wakeAt: this.schedulerNow() + waitTimeout, cancelled: false };
         waiter.timedEntry = entry;
         this._scheduleTimedWakeup(entry);
       }
@@ -2580,7 +2953,10 @@ const jvm = {
     }
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
-      this.pendingHostCalls[yielded.id] = { thread: thread };
+      var __jsoReq = (yielded.symbol === "__cn1_jso_bridge__" && yielded.args && yielded.args[0]) ? yielded.args[0] : null;
+      this.pendingHostCalls[yielded.id] = { thread: thread, symbol: yielded.symbol,
+        jso: __jsoReq ? ((__jsoReq.kind || "?") + "." + (__jsoReq.member || "?")
+          + "@" + (__jsoReq.receiverClass || (__jsoReq.receiver && __jsoReq.receiver.__cn1HostClass) || "?")) : null };
       const rawArgs = yielded.args || [];
       const safeArgs = new Array(rawArgs.length);
       for (let i = 0; i < rawArgs.length; i++) {
@@ -2591,6 +2967,27 @@ const jvm = {
       // op against an out-of-date canvas state.
       this.flushPendingFireAndForget();
       emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: safeArgs });
+      // LOST-RESPONSE WATCHDOG. The host is a thin, dumb pixel sink (mirroring
+      // the C/iOS native backend) and the worker<->host postMessage channel can
+      // drop or never deliver a callback under load -- when it does, this green
+      // thread parks on pendingHostCalls[id] forever and the whole suite wedges
+      // with no error (the lightweight-popup / DualAppearance capture hangs).
+      // For BOUNDED host natives only (see HOST_CALL_WATCHDOG_MS), arm a timeout
+      // matched to that op's worst-case latency: on expiry resume the thread
+      // with a transient error so the caller recovers (JSO reads re-issue via
+      // invokeJsoBridge's retry; capture/settle callers catch and advance).
+      // Unbounded natives (image load, fetch, the screenshot WebSocket) are not
+      // in the map, so they are never aborted. On a healthy channel the call
+      // resolves well within the timeout and this never fires.
+      const __watchdogMs = HOST_CALL_WATCHDOG_MS[yielded.symbol];
+      if (__watchdogMs != null) {
+        const pendingEntry = this.pendingHostCalls[yielded.id];
+        if (pendingEntry) {
+          const timeoutEntry = { kind: "hostcall", id: yielded.id, wakeAt: this.schedulerNow() + __watchdogMs, cancelled: false };
+          pendingEntry.timeoutEntry = timeoutEntry;
+          this._scheduleTimedWakeup(timeoutEntry);
+        }
+      }
       return;
     }
     if (yielded.op === "monitor_enter") {
@@ -2687,7 +3084,7 @@ const jvm = {
       monitor.count = next.reentryCount;
       this.enqueue(next.thread, next.resumeValue);
     }
-    return { op: "wait", monitor: obj, timeout: timeout | 0, reentryCount: reentryCount };
+    return { op: "wait", monitor: obj, timeout: _LtoNum(timeout) | 0, reentryCount: reentryCount };
   },
   notifyOne(obj) {
     const monitor = obj.__monitor || (obj.__monitor = this.createMonitor());
@@ -3067,6 +3464,204 @@ global._A = jvm.aL;
 global._T = jvm.aS;
 global._N = jvm.aN;
 global._F = jvm.fr;
+// === Exact 64-bit Java long arithmetic (long == {__l, l, h} hi/lo pair) =======
+// The JS port historically modelled ``long`` as a double (53-bit), so 64-bit
+// math (SHA-384/512, bit twiddling) lost precision and bitwise long ops
+// truncated to 32 bits. BigInt is exact but ~10-50x slower and hung the
+// animation/timing hot paths, so longs are a single {__l, l, h} object instead
+// (the goog.math.Long representation: l = low 32 bits, h = high 32 bits, both
+// signed int32). One object = one value, preserving the one-slot model, and all
+// math is plain Number arithmetic. ``_Lc`` coerces anything entering a long op
+// to a Long: an existing Long (passthrough), a Number (int sharing the long
+// value space, or a leaked double), or null (uninitialised long[]/field).
+const _TWO_PWR_32 = 4294967296;
+function _LL(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
+const _L0 = _LL(0, 0);
+const _L1 = _LL(1, 0);
+const _LMIN = _LL(0, -2147483648);          // 0x8000000000000000
+const _LMAX = _LL(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
+const _LintCache = new Array(384); // cache small int->long (-128..255) to cut hot-path allocation
+function _LfromInt(v) {
+  v = v | 0;
+  if (v >= -128 && v <= 255) {
+    let c = _LintCache[v + 128];
+    if (c === undefined) { c = _LintCache[v + 128] = _LL(v, v < 0 ? -1 : 0); }
+    return c;
+  }
+  return _LL(v, v < 0 ? -1 : 0);
+}
+function _LfromNumber(v) {
+  v = Number(v);
+  if (isNaN(v)) return _L0;
+  if (v <= -9223372036854775808) return _LMIN;
+  if (v + 1 >= 9223372036854775808) return _LMAX;
+  if (v < 0) return _Lneg(_LfromNumber(-v));
+  return _LL((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
+}
+function _LtoNumber(a) { return a.h * _TWO_PWR_32 + (a.l >>> 0); }
+function _Lc(x) {
+  if (x && x.__l === 1) return x;
+  if (x == null) return _L0;
+  if (typeof x === 'number') return _LfromNumber(x);
+  if (typeof x === 'bigint') return _LfromNumber(Number(x)); // defensive legacy
+  return _L0;
+}
+function _LtoNum(x) { return (x && x.__l === 1) ? _LtoNumber(x) : Number(x); } // Long|Number -> Number
+function _LisZero(a) { return a.h === 0 && a.l === 0; }
+function _LisNeg(a) { return a.h < 0; }
+function _Leq(a, b) { return a.h === b.h && a.l === b.l; }
+function _Ladd(a, b) {
+  a = _Lc(a); b = _Lc(b);
+  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
+  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+  let c00 = a00 + b00, c16 = 0, c32 = 0, c48 = 0;
+  c16 += c00 >>> 16; c00 &= 0xFFFF;
+  c16 += a16 + b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
+  c32 += a32 + b32; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c48 += a48 + b48; c48 &= 0xFFFF;
+  return _LL((c16 << 16) | c00, (c48 << 16) | c32);
+}
+function _Lneg(a) { a = _Lc(a); return _Leq(a, _LMIN) ? _LMIN : _Ladd(_LL(~a.l, ~a.h), _L1); }
+function _Lsub(a, b) {
+  // a - b = a + ~b + 1, inlined as a single 16-bit add chain (one allocation
+  // instead of _Lneg+_Ladd's two) -- LSUB is hot in timing/loops.
+  a = _Lc(a); b = _Lc(b);
+  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
+  const nl = ~b.l, nh = ~b.h;
+  const b48 = nh >>> 16, b32 = nh & 0xFFFF, b16 = nl >>> 16, b00 = nl & 0xFFFF;
+  let c00 = a00 + b00 + 1, c16 = 0, c32 = 0, c48 = 0; // +1 = the two's-complement carry-in
+  c16 += c00 >>> 16; c00 &= 0xFFFF;
+  c16 += a16 + b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
+  c32 += a32 + b32; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c48 += a48 + b48; c48 &= 0xFFFF;
+  return _LL((c16 << 16) | c00, (c48 << 16) | c32);
+}
+function _Lmul(a, b) {
+  a = _Lc(a); b = _Lc(b);
+  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
+  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+  let c00 = 0, c16 = 0, c32 = 0, c48 = 0;
+  c00 += a00 * b00; c16 += c00 >>> 16; c00 &= 0xFFFF;
+  c16 += a16 * b00; c32 += c16 >>> 16; c16 &= 0xFFFF;
+  c16 += a00 * b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
+  c32 += a32 * b00; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c32 += a16 * b16; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c32 += a00 * b32; c48 += c32 >>> 16; c32 &= 0xFFFF;
+  c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48; c48 &= 0xFFFF;
+  return _LL((c16 << 16) | c00, (c48 << 16) | c32);
+}
+function _Lcmp(a, b) {
+  a = _Lc(a); b = _Lc(b);
+  // Allocation-free: the high word is signed, so it orders the full value; on a
+  // tie compare the low words as unsigned. Comparisons dominate loops/timing, so
+  // avoiding the _Lsub object churn here is the main hi/lo perf win.
+  if (a.h !== b.h) return a.h < b.h ? -1 : 1;
+  const al = a.l >>> 0, bl = b.l >>> 0;
+  return al === bl ? 0 : (al < bl ? -1 : 1);
+}
+function _Ldiv(a, b) {
+  a = _Lc(a); b = _Lc(b);
+  if (_LisZero(b)) { throw new Error("/ by zero"); }
+  if (_LisZero(a)) return _L0;
+  if (_Leq(a, _LMIN)) {
+    if (_Leq(b, _L1) || _Leq(b, _LL(-1, -1))) return _LMIN;
+    if (_Leq(b, _LMIN)) return _L1;
+    const approx = _Lshl(_Ldiv(_Lshr(a, 1), b), 1);
+    if (_LisZero(approx)) return _LisNeg(b) ? _L1 : _LL(-1, -1);
+    const rem = _Lsub(a, _Lmul(b, approx));
+    return _Ladd(approx, _Ldiv(rem, b));
+  }
+  if (_Leq(b, _LMIN)) return _L0;
+  if (_LisNeg(a)) return _LisNeg(b) ? _Ldiv(_Lneg(a), _Lneg(b)) : _Lneg(_Ldiv(_Lneg(a), b));
+  if (_LisNeg(b)) return _Lneg(_Ldiv(a, _Lneg(b)));
+  let res = _L0, rem = a;
+  while (_Lcmp(rem, b) >= 0) {
+    let approx = Math.max(1, Math.floor(_LtoNumber(rem) / _LtoNumber(b)));
+    const log2 = Math.ceil(Math.log(approx) / Math.LN2);
+    const delta = (log2 <= 48) ? 1 : Math.pow(2, log2 - 48);
+    let approxRes = _LfromNumber(approx);
+    let approxRem = _Lmul(approxRes, b);
+    while (_LisNeg(approxRem) || _Lcmp(approxRem, rem) > 0) {
+      approx -= delta;
+      approxRes = _LfromNumber(approx);
+      approxRem = _Lmul(approxRes, b);
+    }
+    if (_LisZero(approxRes)) approxRes = _L1;
+    res = _Ladd(res, approxRes);
+    rem = _Lsub(rem, approxRem);
+  }
+  return res;
+}
+function _Lrem(a, b) { a = _Lc(a); b = _Lc(b); return _Lsub(a, _Lmul(_Ldiv(a, b), b)); }
+function _Land(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l & b.l, a.h & b.h); }
+function _Lor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l | b.l, a.h | b.h); }
+function _Lxor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l ^ b.l, a.h ^ b.h); }
+function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
+  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+  if (n < 32) return _LL(a.l << n, (a.h << n) | (a.l >>> (32 - n)));
+  return _LL(0, a.l << (n - 32));
+}
+function _Lshr(a, n) { // arithmetic right shift
+  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+  if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >> n);
+  return _LL(a.h >> (n - 32), a.h >= 0 ? 0 : -1);
+}
+function _Lushr(a, n) { // logical right shift
+  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+  if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >>> n);
+  if (n === 32) return _LL(a.h, 0);
+  return _LL(a.h >>> (n - 32), 0);
+}
+function _Ll2i(x) { return _Lc(x).l | 0; } // low 32 bits as signed int (Number)
+function _LtoStr(a, radix) {
+  a = _Lc(a); radix = (radix | 0) || 10;
+  if (_LisZero(a)) return "0";
+  if (_LisNeg(a)) {
+    if (_Leq(a, _LMIN)) {
+      const r = _LfromInt(radix);
+      const div = _Ldiv(a, r);
+      const rem = _Lsub(_Lmul(div, r), a);
+      return _LtoStr(div, radix) + (_Ll2i(rem) >>> 0).toString(radix);
+    }
+    return "-" + _LtoStr(_Lneg(a), radix);
+  }
+  let rem = a, result = "";
+  const radixToPower = _LfromNumber(Math.pow(radix, 6));
+  for (;;) {
+    const remDiv = _Ldiv(rem, radixToPower);
+    const intval = (_Ll2i(_Lsub(rem, _Lmul(remDiv, radixToPower)))) >>> 0;
+    let digits = intval.toString(radix);
+    rem = remDiv;
+    if (_LisZero(rem)) return digits + result;
+    while (digits.length < 6) digits = "0" + digits;
+    result = digits + result;
+  }
+}
+global._Lc = _Lc;
+global._LtoNum = _LtoNum;
+global._LtoStr = _LtoStr;
+global._LisLong = (x) => !!(x && x.__l === 1);
+global._L0 = _L0;
+global._L1 = _L1;
+global._Llit = _LL;                          // long literal: _Llit(lowInt, highInt)
+global._LfromNumber = _LfromNumber;
+global._Ladd = _Ladd;
+global._Lsub = _Lsub;
+global._Lmul = _Lmul;
+global._Ldiv = _Ldiv;
+global._Lrem = _Lrem;
+global._Lneg = _Lneg;
+global._Land = _Land;
+global._Lor = _Lor;
+global._Lxor = _Lxor;
+global._Lshl = _Lshl;
+global._Lshr = _Lshr;
+global._Lushr = _Lushr;
+global._Lcmp = _Lcmp;
+global._Li2l = (x) => _LfromInt(x | 0);      // int -> long
+global._Ll2i = _Ll2i;                        // long -> int
+global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> float/double
+global._Ld2l = (x) => _LfromNumber(x);       // float/double -> long
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration
 // (1590 calls, 3-char savings).
@@ -3599,10 +4194,9 @@ function* runtimeFormatTokenValue(token, value) {
   }
   if (token === "%d" || token === "%i") {
     const primitive = runtimeBoxedPrimitiveValue(value);
-    if (primitive != null) {
-      return String(Math.trunc(Number(primitive)));
-    }
-    return String(Math.trunc(Number(value == null ? 0 : value)));
+    const numeric = primitive != null ? primitive : (value == null ? 0 : value);
+    // A long is a BigInt -- print it exactly; Number(bigint) would lose >2^53.
+    return (numeric && numeric.__l === 1) ? _LtoStr(numeric) : String(Math.trunc(Number(numeric)));
   }
   if (token === "%f") {
     const primitive = runtimeBoxedPrimitiveValue(value);
@@ -3652,17 +4246,18 @@ function floatFromIntBits(bits) {
 }
 function longBitsFromDouble(value) {
   const view = new DataView(new ArrayBuffer(8));
-  view.setFloat64(0, value, false);
+  view.setFloat64(0, Number(value), false);
   const hi = view.getUint32(0, false);
   const lo = view.getUint32(4, false);
-  return (hi * 4294967296) + lo;
+  // long == hi/lo Long: the two 32-bit halves map directly onto h/l (exact;
+  // the old double ``hi*2^32+lo`` could not hold the full 64-bit SHA-512 word).
+  return _LL(lo | 0, hi | 0);
 }
 function doubleFromLongBits(bits) {
-  const hi = Math.floor(bits / 4294967296);
-  const lo = bits >>> 0;
+  const lng = _Lc(bits);
   const view = new DataView(new ArrayBuffer(8));
-  view.setUint32(0, hi >>> 0, false);
-  view.setUint32(4, lo, false);
+  view.setUint32(0, lng.h >>> 0, false);
+  view.setUint32(4, lng.l >>> 0, false);
   return view.getFloat64(0, false);
 }
 function defaultTimeZoneId() {
@@ -3679,6 +4274,7 @@ function normalizeTimeZoneId(name) {
   return value ? value : defaultTimeZoneId();
 }
 function timezoneDateParts(timeZone, millis) {
+  millis = _LtoNum(millis); // millis may be a Java long (Long object); Date needs a Number
   const format = new Intl.DateTimeFormat("en-US", {
     timeZone: timeZone,
     year: "numeric",
@@ -3699,6 +4295,7 @@ function timezoneDateParts(timeZone, millis) {
   return out;
 }
 function timezoneOffsetMillis(timeZone, millis) {
+  millis = _LtoNum(millis); // millis may be a Java long (Long object)
   if (timeZone === "GMT" || typeof Intl === "undefined" || !Intl.DateTimeFormat) {
     return 0;
   }
@@ -4125,7 +4722,7 @@ bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___lon
 bindNative(["cn1_java_lang_Thread_setPriorityImpl_int", "cn1_java_lang_Thread_setPriorityImpl___int"], function*() { return null; });
 bindNative(["cn1_java_lang_Thread_interrupt0", "cn1_java_lang_Thread_interrupt0__"], function*(__cn1ThisObject) { jvm.interruptThread(__cn1ThisObject); return null; });
 bindNative(["cn1_java_lang_Thread_isInterrupted_boolean_R_boolean", "cn1_java_lang_Thread_isInterrupted___boolean_R_boolean"], function*(__cn1ThisObject, clearInterrupted) { const value = __cn1ThisObject && __cn1ThisObject.__interrupted ? 1 : 0; if (clearInterrupted && __cn1ThisObject) __cn1ThisObject.__interrupted = 0; return value; });
-bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return jvm.currentThread ? jvm.currentThread.id : 0; });
+bindNative(["cn1_java_lang_Thread_getNativeThreadId_R_long", "cn1_java_lang_Thread_getNativeThreadId___R_long"], function*() { return _LfromInt(jvm.currentThread ? jvm.currentThread.id : 0); });
 bindNative(["cn1_java_lang_Thread_releaseThreadNativeResources_long", "cn1_java_lang_Thread_releaseThreadNativeResources___long"], function*() { return null; });
 bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], function*(__cn1ThisObject) {
   const tid = jvm.nextThreadId;
@@ -4152,15 +4749,17 @@ bindNative(["cn1_java_lang_Thread_start", "cn1_java_lang_Thread_start__"], funct
   jvm.spawn(__cn1ThisObject, generator);
   return null;
 });
-bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return Date.now(); });
+bindNative(["cn1_java_lang_System_currentTimeMillis_R_long", "cn1_java_lang_System_currentTimeMillis___R_long"], function*() { return _LfromNumber(Date.now()); });
 bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTime___R_long"], function*() {
   // performance.now() is a high-resolution monotonic clock (sub-millisecond,
   // in fractional milliseconds) and is available in both window and worker
-  // scopes. Fall back to the wall clock if it is somehow absent.
+  // scopes. Fall back to the wall clock if it is somehow absent. This branch's
+  // exact-64-bit-long migration requires long-returning natives to hand back a
+  // _LfromNumber-wrapped value rather than a raw JS number.
   if (typeof performance !== "undefined" && performance && typeof performance.now === "function") {
-    return Math.floor(performance.now() * 1e6);
+    return _LfromNumber(Math.floor(performance.now() * 1e6));
   }
-  return Date.now() * 1e6;
+  return _LfromNumber(Date.now() * 1e6);
 });
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function*(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function*(src, srcOffset, dst, dstOffset, length) {
@@ -4171,8 +4770,8 @@ bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], f
 bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function*() { return null; });
 bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function*() { return 0; });
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function*(status) { jvm.finish(status); return null; });
-bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return 67108864; });
-bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return 33554432; });
+bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function*() { return _LfromNumber(67108864); });
+bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function*() { return _LfromNumber(33554432); });
 bindNative(["cn1_java_lang_Throwable_fillInStack"], function*(__cn1ThisObject) {
   const prevLimit = Error.stackTraceLimit;
   try { Error.stackTraceLimit = 200; } catch (_l) {}
@@ -4184,17 +4783,17 @@ bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function*(__
 bindNative(["cn1_java_lang_Math_abs_double_R_double"], function*(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_float_R_float"], function*(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_int_R_int"], function*(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { return Math.abs(v); });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function*(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
 bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function*(v) { return Math.ceil(v); });
 bindNative(["cn1_java_lang_Math_floor_double_R_double"], function*(v) { return Math.floor(v); });
 bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function*(a, b) { return Math.max(a, b); });
 bindNative(["cn1_java_lang_Math_max_float_float_R_float"], function*(a, b) { return Math.max(a, b); });
 bindNative(["cn1_java_lang_Math_max_int_int_R_int"], function*(a, b) { return Math.max(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { return Math.max(a, b); });
+bindNative(["cn1_java_lang_Math_max_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) >= 0 ? _Lc(a) : _Lc(b); });
 bindNative(["cn1_java_lang_Math_min_double_double_R_double"], function*(a, b) { return Math.min(a, b); });
 bindNative(["cn1_java_lang_Math_min_float_float_R_float"], function*(a, b) { return Math.min(a, b); });
 bindNative(["cn1_java_lang_Math_min_int_int_R_int"], function*(a, b) { return Math.min(a | 0, b | 0); });
-bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { return Math.min(a, b); });
+bindNative(["cn1_java_lang_Math_min_long_long_R_long"], function*(a, b) { return _Lcmp(a, b) <= 0 ? _Lc(a) : _Lc(b); });
 bindNative(["cn1_java_lang_Math_pow_double_double_R_double"], function*(a, b) { return Math.pow(a, b); });
 bindNative(["cn1_java_lang_Math_cos_double_R_double"], function*(v) { return Math.cos(v); });
 bindNative(["cn1_java_lang_Math_sin_double_R_double"], function*(v) { return Math.sin(v); });
@@ -4203,7 +4802,7 @@ bindNative(["cn1_java_lang_Math_tan_double_R_double"], function*(v) { return Mat
 bindNative(["cn1_java_lang_Math_atan_double_R_double"], function*(v) { return Math.atan(v); });
 bindNative(["cn1_java_lang_Integer_toString_int_R_java_lang_String"], function*(v) { return createJavaString(String(v | 0)); });
 bindNative(["cn1_java_lang_Integer_toString_int_int_R_java_lang_String"], function*(v, radix) { return createJavaString((v | 0).toString((radix | 0) || 10)); });
-bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(Math.trunc(v).toString((radix | 0) || 10)); });
+bindNative(["cn1_java_lang_Long_toString_long_int_R_java_lang_String"], function*(v, radix) { return createJavaString(_LtoStr(v, (radix | 0) || 10)); });
 bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function*(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function*(v) { return intBitsFromFloat(v); });
@@ -4214,7 +4813,7 @@ bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function*(bi
 bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function*(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
-bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(Math.trunc(value))); });
+bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function*(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
 bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function*(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
@@ -4552,4 +5151,98 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
   const event = jvm.eventQueue.shift();
   return event && event.code != null ? (event.code | 0) : -1;
 });
+
+// Worker liveness heartbeat (diag-only). If the worker wedges in a synchronous
+// green-thread step this timer CANNOT fire (single-threaded) and the heartbeat
+// STOPS; if the worker is merely parked/starved (idle, a host callback not
+// delivered) the heartbeat keeps firing with runnable==0 and a frozen resume
+// count. The timer is created ONLY under diag so production has no perpetual
+// wakeup.
+if (VM_DIAG_ENABLED && typeof setInterval === "function") {
+  let __cn1HbLastResumes = -1;
+  let __cn1HbFrozenStreak = 0;
+  setInterval(function() {
+    try {
+      const rc = jvm.__cn1ResumeCount | 0;
+      const frozen = rc === __cn1HbLastResumes;
+      __cn1HbLastResumes = rc;
+      __cn1HbFrozenStreak = frozen ? (__cn1HbFrozenStreak + 1) : 0;
+      vmTrace("DIAG:WORKER_HB:resumes=" + rc
+        + ":runnable=" + (jvm.runnable ? jvm.runnable.length : -1)
+        + ":draining=" + (jvm.draining ? 1 : 0)
+        + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0)
+        + ":frozen=" + (frozen ? 1 : 0)
+        + ":captureGate=" + (jvm.captureGateOwner ? 1 : 0)
+        + ":sinceStepMs=" + (jvm.__cn1LastResumeTs != null ? Math.round(jvm.schedulerNow() - jvm.__cn1LastResumeTs) : -1)
+        + ":lastThread=" + String(jvm.__cn1LastResumeLabel));
+      // When the worker is wedged (frozen with nothing runnable) every green
+      // thread is parked. Dump WHAT they are parked on so the lost-response /
+      // deadlock can be isolated without worker-internal tracing (which
+      // Playwright can't attach to). Only fire after a SUSTAINED freeze (>=5
+      // consecutive ~1.5s heartbeats = ~7.5s) so legitimate multi-second waits
+      // (__cn1_delay__ transitions, dual-appearance settle) don't pollute the
+      // signal -- a true wedge never recovers, so it keeps dumping.
+      if (frozen && __cn1HbFrozenStreak >= 5 && (jvm.runnable ? jvm.runnable.length : 0) === 0) {
+        var pend = jvm.pendingHostCalls || {};
+        var counts = {};
+        var pk = Object.keys(pend);
+        for (var i = 0; i < pk.length; i++) {
+          var sym = (pend[pk[i]] && pend[pk[i]].symbol) ? String(pend[pk[i]].symbol) : "unknown";
+          counts[sym] = (counts[sym] | 0) + 1;
+        }
+        var parts = [];
+        var ck = Object.keys(counts);
+        for (var j = 0; j < ck.length; j++) {
+          parts.push(ck[j] + "x" + counts[ck[j]]);
+        }
+        // Dump each pending timed-wakeup: kind + how overdue/early it is +
+        // cancelled flag. With pendingHostCalls=0 the wedge is a timed-wakeup
+        // that never fires -- if its wakeAt is in the PAST (overdue) while the
+        // backing setTimeout is gone, the scheduler's _refreshTimedWakeupTimer
+        // lost the timer (a scheduler bug, not a lost host response).
+        var twNow = jvm.schedulerNow();
+        var twParts = [];
+        var tws = jvm.timedWakeups || [];
+        for (var t = 0; t < tws.length; t++) {
+          var w = tws[t];
+          twParts.push(String(w.kind || "?") + ":dueIn=" + Math.round((w.wakeAt | 0) - twNow)
+            + (w.cancelled ? ":cancelled" : ""));
+        }
+        vmTrace("DIAG:WORKER_HB_FROZEN:pendingHostCalls=" + pk.length
+          + ":symbols=" + (parts.length ? parts.join(",") : "none")
+          + ":timedWakeups=" + tws.length
+          + ":wakeups=[" + twParts.join(",") + "]"
+          + ":wakeupTimerSet=" + (jvm._wakeupTimer != null ? 1 : 0)
+          + ":wakeupAtIn=" + (jvm._wakeupAt != null && jvm._wakeupAt !== Infinity ? Math.round(jvm._wakeupAt - twNow) : "inf")
+          + ":drainScheduled=" + (jvm.drainScheduled ? 1 : 0));
+        // Recovery backstop -- ONLY when a wakeup is genuinely OVERDUE (wakeAt is
+        // in the past but the timer did not fire), i.e. a true lost/stalled timer.
+        // A "frozen" heartbeat with only FUTURE wakeups is NOT a wedge: the worker
+        // is just waiting on a long legitimate sleep (e.g. NetworkManager's idle
+        // timeout-poll Thread.sleep(timeout/10), 12-30s). Firing the recovery on
+        // those is pure churn (clearTimeout + scheduleDrain every 1.5s) that only
+        // adds main-thread overhead, so gate it strictly on overdue.
+        var anyOverdue = false;
+        for (var ov = 0; ov < tws.length; ov++) {
+          if (!tws[ov].cancelled && (tws[ov].wakeAt | 0) <= twNow + 1) { anyOverdue = true; break; }
+        }
+        if (anyOverdue && cn1SelfHealDisabled()) {
+          // Self-heal disabled: leave the lost timer stalled so the wedge is
+          // deterministic + trackable instead of silently recovered.
+          vmTrace("DIAG:WORKER_HB_FROZEN:recovery=SKIPPED(selfHealDisabled) " + jvm.dumpThreadStates());
+        } else if (anyOverdue) {
+          try {
+            if (jvm._wakeupTimer != null) { clearTimeout(jvm._wakeupTimer); jvm._wakeupTimer = null; jvm._wakeupAt = Infinity; }
+            jvm._processExpiredTimedWakeups();
+            jvm._refreshTimedWakeupTimer();
+            if (typeof jvm.scheduleDrain === "function") jvm.scheduleDrain();
+            vmTrace("DIAG:WORKER_HB_FROZEN:recovery=rearmed-overdue-timer");
+          } catch (_rec) { void _rec; }
+        }
+      }
+    } catch (e) {
+      void e;
+    }
+  }, 1500);
+}
 })(self);
