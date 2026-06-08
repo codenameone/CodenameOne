@@ -86,6 +86,18 @@ public class Gpu3DModelScreenshotTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
+    @Override
+    public void cleanup() {
+        // Detach the RenderView so its GPU peer (canvas/native view) is torn
+        // down before the next test runs, preventing a stale 3D frame from
+        // bleeding into a later test's screenshot.
+        if (view != null) {
+            view.remove();
+            view = null;
+        }
+        super.cleanup();
+    }
+
     private GltfLoader.GltfModel loadBoomBox(GraphicsDevice device) {
         InputStream in = Display.getInstance().getResourceAsStream(getClass(), "/boombox.glb");
         if (in == null) {

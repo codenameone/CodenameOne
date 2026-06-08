@@ -96,6 +96,18 @@ public class Gpu3DAnimationTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
+    @Override
+    public void cleanup() {
+        // Detach the RenderView so its GPU peer (canvas/native view) is torn
+        // down before the next test runs, preventing a stale 3D frame from
+        // bleeding into a later test's screenshot.
+        if (view != null) {
+            view.remove();
+            view = null;
+        }
+        super.cleanup();
+    }
+
     /// Force a fresh GPU frame to be rendered before the screenshot fires, so a
     /// cold GL surface that has not drawn yet cannot produce a blank capture.
     @Override

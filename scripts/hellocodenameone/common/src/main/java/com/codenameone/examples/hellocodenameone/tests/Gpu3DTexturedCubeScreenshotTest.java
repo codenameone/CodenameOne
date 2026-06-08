@@ -70,6 +70,18 @@ public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
+    @Override
+    public void cleanup() {
+        // Detach the RenderView so its GPU peer (canvas/native view) is torn
+        // down before the next test runs, preventing a stale 3D frame from
+        // bleeding into a later test's screenshot.
+        if (view != null) {
+            view.remove();
+            view = null;
+        }
+        super.cleanup();
+    }
+
     /// Force a fresh GPU frame before the screenshot so a cold GL surface cannot
     /// produce a blank capture. See Gpu3DCubeScreenshotTest.
     @Override
