@@ -159,14 +159,34 @@ public class SpriteRenderer implements Renderer {
         this.controls = controls;
     }
 
+    /// Sets the logical coordinate space the scene is drawn in, in Codename One
+    /// component pixels. Game logic (sprite positions, the joystick, touch handling)
+    /// all work in this space, which can differ from the GPU framebuffer size (the GL
+    /// surface is sized in device pixels and may be scaled by the display's backing
+    /// factor). The renderer maps one world unit to one logical pixel while the GL
+    /// viewport still covers the full framebuffer, so the picture fills the surface
+    /// without the two coordinate spaces drifting apart. `GameView` calls this every
+    /// frame with its own size.
+    void setLogicalSize(int width, int height) {
+        if (width > 0 && height > 0) {
+            viewWidth = width;
+            viewHeight = height;
+        }
+    }
+
     @Override
     public void onInit(GraphicsDevice device) {
         quad = Primitives.quad(device, 1f);
         // 2D: ignore depth entirely (draw order wins). 3D: still alpha blended with
         // no depth write, but depth-test against opaque 3D models so closer geometry
         // occludes the billboards.
-        spriteState2D = RenderState.transparent().setDepthTest(false);
-        spriteState3D = RenderState.transparent().setDepthTest(true);
+        // Sprites are flat quads (billboards in 3D); never cull a face, otherwise a
+        // sprite flipped to face the other way (negative scaleX/scaleY) reverses its
+        // winding and vanishes.
+        spriteState2D = RenderState.transparent().setDepthTest(false)
+                .setCullMode(RenderState.CullMode.NONE);
+        spriteState3D = RenderState.transparent().setDepthTest(true)
+                .setCullMode(RenderState.CullMode.NONE);
         material = new Material(Material.Type.SPRITE).setRenderState(spriteState2D);
         textures = new HashMap();
         labelImages = new HashMap();
@@ -180,8 +200,15 @@ public class SpriteRenderer implements Renderer {
 
     @Override
     public void onResize(GraphicsDevice device, int width, int height) {
-        viewWidth = width;
-        viewHeight = height;
+        // width/height are the GL framebuffer size in device pixels: use them for the
+        // viewport (which must cover the whole framebuffer) but NOT for the coordinate
+        // mapping -- that comes from setLogicalSize() in component pixels. Until the
+        // host sets a logical size, fall back to the framebuffer size so a bare
+        // RenderView still renders.
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            viewWidth = width;
+            viewHeight = height;
+        }
         device.setViewport(0, 0, width, height);
     }
 
@@ -278,21 +305,36 @@ public class SpriteRenderer implements Renderer {
         device.draw(quad, material, model);
     }
 
-    /// A white disc with a centered label, cached per label string.
+    /// A white disc with a centered label, cached per label string. The font is
+    /// scaled down until the label fits inside the disc, so multi-letter labels
+    /// (e.g. "Jump") are not clipped.
     private Image labelDisc(String label) {
         Image img = (Image) labelImages.get(label);
         if (img == null) {
             int size = 128;
+            float maxTextWidth = size * 0.74f;
             img = circleTexture(size, 0f, 1f);
             com.codename1.ui.Graphics g = img.getGraphics();
             g.setAntiAliased(true);
             g.setAntiAliasedText(true);
-            com.codename1.ui.Font f = com.codename1.ui.Font.createSystemFont(
-                    com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
-                    com.codename1.ui.Font.SIZE_LARGE);
+            int[] fontSizes = {
+                com.codename1.ui.Font.SIZE_LARGE,
+                com.codename1.ui.Font.SIZE_MEDIUM,
+                com.codename1.ui.Font.SIZE_SMALL
+            };
+            com.codename1.ui.Font f = null;
+            int tw = 0;
+            for (int fontSize : fontSizes) {
+                f = com.codename1.ui.Font.createSystemFont(
+                        com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
+                        fontSize);
+                tw = f.stringWidth(label);
+                if (tw <= maxTextWidth) {
+                    break;
+                }
+            }
             g.setFont(f);
             g.setColor(0x303030);
-            int tw = f.stringWidth(label);
             int th = f.getHeight();
             g.drawString(label, (size - tw) / 2, (size - th) / 2);
             labelImages.put(label, img);

@@ -35,8 +35,8 @@ package com.codename1.gaming;
 /// Positions and sizes are in the `GameView`'s pixel coordinates (origin at the top
 /// left).
 public class VirtualJoystick {
-    private final float centerX;
-    private final float centerY;
+    private float centerX;
+    private float centerY;
     private final float radius;
     private float knobRadius;
     private float deadZone = 0.2f;
@@ -47,6 +47,12 @@ public class VirtualJoystick {
     private float axisX;
     private float axisY;
 
+    private boolean anchored;
+    private int anchorH;
+    private int anchorV;
+    private float marginX;
+    private float marginY;
+
     VirtualJoystick(float centerX, float centerY, float radius) {
         this.centerX = centerX;
         this.centerY = centerY;
@@ -54,6 +60,40 @@ public class VirtualJoystick {
         this.knobRadius = radius * 0.45f;
         this.knobX = centerX;
         this.knobY = centerY;
+    }
+
+    /// Pins this stick to a corner of the view's safe area (using `TouchControls#LEFT`
+    /// etc.); `TouchControls` recomputes its center as the view resizes or rotates.
+    /// `marginX`/`marginY` are the gaps from the safe-area edges to the stick's edge.
+    void setAnchor(int hAlign, int vAlign, float marginX, float marginY) {
+        this.anchored = true;
+        this.anchorH = hAlign;
+        this.anchorV = vAlign;
+        this.marginX = marginX;
+        this.marginY = marginY;
+    }
+
+    /// Repositions an anchored stick within the given safe-area rectangle (view-local
+    /// pixels). No-op for an absolutely positioned stick.
+    void applyAnchor(int sx, int sy, int sw, int sh) {
+        if (!anchored) {
+            return;
+        }
+        float cx = anchorH <= 0 ? sx + marginX + radius
+                : anchorH >= 2 ? sx + sw - marginX - radius : sx + sw / 2f;
+        float cy = anchorV <= 0 ? sy + marginY + radius
+                : anchorV >= 2 ? sy + sh - marginY - radius : sy + sh / 2f;
+        setCenter(cx, cy);
+    }
+
+    /// Moves the stick's center; the resting knob follows when not being dragged.
+    void setCenter(float x, float y) {
+        this.centerX = x;
+        this.centerY = y;
+        if (!active) {
+            this.knobX = x;
+            this.knobY = y;
+        }
     }
 
     /// The fraction of the radius that registers as no input (0..1, default 0.2).

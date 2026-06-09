@@ -45,6 +45,17 @@ import java.util.List;
 /// Multi-touch is supported, so the player can steer with the stick and press a
 /// button at the same time.
 public class TouchControls {
+    /// Horizontal anchor: pin to the left safe-area edge.
+    public static final int LEFT = 0;
+    /// Horizontal/vertical anchor: center on the safe area.
+    public static final int CENTER = 1;
+    /// Horizontal anchor: pin to the right safe-area edge.
+    public static final int RIGHT = 2;
+    /// Vertical anchor: pin to the top safe-area edge.
+    public static final int TOP = 0;
+    /// Vertical anchor: pin to the bottom safe-area edge.
+    public static final int BOTTOM = 2;
+
     private final GameInput input;
     private VirtualJoystick joystick;
     private final List buttons = new ArrayList();
@@ -67,12 +78,45 @@ public class TouchControls {
         return joystick;
     }
 
+    /// Adds (or replaces) the analog joystick anchored to a corner of the view's safe
+    /// area, so it stays clear of notches and home indicators and follows rotation
+    /// automatically (the framework repositions it; you never recompute coordinates).
+    /// `hAlign` is one of `#LEFT` / `#CENTER` / `#RIGHT`, `vAlign` one of `#TOP` /
+    /// `#CENTER` / `#BOTTOM`, and `margin` is the gap from the safe-area edges.
+    public VirtualJoystick addJoystick(float radius, int hAlign, int vAlign, float margin) {
+        joystick = new VirtualJoystick(0, 0, radius);
+        joystick.setAnchor(hAlign, vAlign, margin, margin);
+        return joystick;
+    }
+
     /// Adds a button mapped to the given key code. Use
     /// `com.codename1.ui.Display#getKeyCode(int)` to map a game action.
     public VirtualButton addButton(int keyCode, float centerX, float centerY, float radius) {
         VirtualButton b = new VirtualButton(keyCode, centerX, centerY, radius);
         buttons.add(b);
         return b;
+    }
+
+    /// Adds a button anchored to a corner of the view's safe area (see
+    /// `#addJoystick(float, int, int, float)`), so it stays inside the safe area and
+    /// follows rotation automatically.
+    public VirtualButton addButton(int keyCode, float radius, int hAlign, int vAlign, float margin) {
+        VirtualButton b = new VirtualButton(keyCode, 0, 0, radius);
+        b.setAnchor(hAlign, vAlign, margin, margin);
+        buttons.add(b);
+        return b;
+    }
+
+    /// Repositions every anchored control within the given safe-area rectangle (in
+    /// view-local pixels). Called by `GameView` each frame; absolutely positioned
+    /// controls are left untouched.
+    void relayout(int safeX, int safeY, int safeW, int safeH) {
+        if (joystick != null) {
+            joystick.applyAnchor(safeX, safeY, safeW, safeH);
+        }
+        for (Object b : buttons) {
+            ((VirtualButton) b).applyAnchor(safeX, safeY, safeW, safeH);
+        }
     }
 
     /// Whether the controls are drawn and active. Hide them on platforms with a real

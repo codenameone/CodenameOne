@@ -33,18 +33,47 @@ package com.codename1.gaming;
 /// The position and radius are in the `GameView`'s pixel coordinates.
 public class VirtualButton {
     private final int keyCode;
-    private final float centerX;
-    private final float centerY;
+    private float centerX;
+    private float centerY;
     private final float radius;
     private String label;
     private int color = 0xc0ffffff;
     private boolean pressed;
+
+    private boolean anchored;
+    private int anchorH;
+    private int anchorV;
+    private float marginX;
+    private float marginY;
 
     VirtualButton(int keyCode, float centerX, float centerY, float radius) {
         this.keyCode = keyCode;
         this.centerX = centerX;
         this.centerY = centerY;
         this.radius = radius;
+    }
+
+    /// Pins this button to a corner of the view's safe area (using `TouchControls#LEFT`
+    /// etc.); `TouchControls` recomputes its center as the view resizes or rotates.
+    /// `marginX`/`marginY` are the gaps from the safe-area edges to the button's edge.
+    void setAnchor(int hAlign, int vAlign, float marginX, float marginY) {
+        this.anchored = true;
+        this.anchorH = hAlign;
+        this.anchorV = vAlign;
+        this.marginX = marginX;
+        this.marginY = marginY;
+    }
+
+    /// Repositions an anchored button within the given safe-area rectangle (view-local
+    /// pixels). No-op for an absolutely positioned button.
+    void applyAnchor(int sx, int sy, int sw, int sh) {
+        if (!anchored) {
+            return;
+        }
+        centerX = anchorH <= 0 ? sx + marginX + radius
+                : anchorH >= 2 ? sx + sw - marginX - radius : sx + sw / 2f;
+        centerY = anchorV <= 0 ? sy + marginY + radius
+                : anchorV >= 2 ? sy + sh - marginY - radius : sy + sh / 2f;
     }
 
     /// Optional short label drawn on the button (for example "A" or "Fire").

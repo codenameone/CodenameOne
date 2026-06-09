@@ -25,6 +25,10 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
+import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
 
 /// A GPU accelerated game surface: a `com.codename1.gpu.RenderView` that hosts a
 /// `SpriteRenderer` over a `Scene` and calls your `#update(double)` once per frame.
@@ -74,6 +78,10 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private static final int MAX_FIXED_STEPS = 8;
     private final GameInput input = new GameInput();
     private final TouchControls controls;
+    private ActionListener pressListener;
+    private ActionListener dragListener;
+    private ActionListener releaseListener;
+    private boolean formListenersAdded;
 
     public GameView() {
         super(new SpriteRenderer());
@@ -211,20 +219,92 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         return interpolationAlpha;
     }
 
-    /// {@inheritDoc} Re-applies the running state once the GPU peer exists.
+    /// {@inheritDoc} Re-applies the running state once the GPU peer exists and starts
+    /// listening for pointer events at the form level.
     @Override
     protected void initComponent() {
         super.initComponent();
+        addFormPointerListeners();
         if (running) {
             setContinuous(true);
             requestFocus();
         }
     }
 
+    /// {@inheritDoc} Stops listening for pointer events when detached.
+    @Override
+    protected void deinitialize() {
+        removeFormPointerListeners();
+        super.deinitialize();
+    }
+
+    /// The GPU surface is hosted in a native peer that swallows the platform's
+    /// pointer events before they reach this component, so the usual
+    /// `#pointerPressed(int[], int[])` callbacks never fire over the surface. Instead
+    /// we listen at the form level (those listeners fire for every pointer event,
+    /// regardless of which component is hit) and route the touches to the on-screen
+    /// controls ourselves.
+    private void addFormPointerListeners() {
+        if (formListenersAdded) {
+            return;
+        }
+        Form f = getComponentForm();
+        if (f == null) {
+            return;
+        }
+        if (pressListener == null) {
+            pressListener = new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    routeFormTouch(e.getX(), e.getY(), true, true, false);
+                }
+            };
+            dragListener = new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    routeFormTouch(e.getX(), e.getY(), true, false, false);
+                }
+            };
+            releaseListener = new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    routeFormTouch(e.getX(), e.getY(), false, false, true);
+                }
+            };
+        }
+        f.addPointerPressedListener(pressListener);
+        f.addPointerDraggedListener(dragListener);
+        f.addPointerReleasedListener(releaseListener);
+        formListenersAdded = true;
+    }
+
+    private void removeFormPointerListeners() {
+        if (!formListenersAdded) {
+            return;
+        }
+        Form f = getComponentForm();
+        if (f != null && pressListener != null) {
+            f.removePointerPressedListener(pressListener);
+            f.removePointerDraggedListener(dragListener);
+            f.removePointerReleasedListener(releaseListener);
+        }
+        formListenersAdded = false;
+    }
+
+    /// Routes a single form-level pointer event (in absolute coordinates) to the
+    /// on-screen controls and the raw pointer state, in view-local pixels.
+    private void routeFormTouch(int x, int y, boolean down, boolean pressed, boolean released) {
+        int lx = x - getAbsoluteX();
+        int ly = y - getAbsoluteY();
+        controls.onTouches(new int[]{lx}, new int[]{ly}, down);
+        input.pointer(lx, ly, down, pressed, released);
+    }
+
     /// {@inheritDoc} Drives game logic each frame -- invoked by the `SpriteRenderer`
     /// before the scene is drawn.
     @Override
     public void frame(double deltaSeconds) {
+        // Keep the renderer's coordinate space in sync with this component's logical
+        // size so sprites, the joystick and touch (all in component pixels) line up
+        // with what is drawn, regardless of the GPU framebuffer's device-pixel size.
+        ((SpriteRenderer) getRenderer()).setLogicalSize(getWidth(), getHeight());
         if (running && !paused) {
             if (fixedTimestep <= 0) {
                 update(deltaSeconds);
@@ -243,7 +323,37 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
                 interpolationAlpha = accumulator / fixedTimestep;
             }
         }
+        relayoutControls();
         input.clearFrameEdges();
+    }
+
+    /// Repositions any anchored on-screen controls inside the current safe area, so a
+    /// joystick or button pinned to a corner clears notches/home indicators and tracks
+    /// rotation without the game recomputing coordinates.
+    private void relayoutControls() {
+        int sx = 0;
+        int sy = 0;
+        int sw = getWidth();
+        int sh = getHeight();
+        Form f = getComponentForm();
+        if (f != null) {
+            Rectangle safe = f.getSafeArea();
+            if (safe != null && safe.getWidth() > 0 && safe.getHeight() > 0) {
+                int ax = getAbsoluteX();
+                int ay = getAbsoluteY();
+                int left = Math.max(0, safe.getX() - ax);
+                int top = Math.max(0, safe.getY() - ay);
+                int right = Math.min(getWidth(), safe.getX() + safe.getWidth() - ax);
+                int bottom = Math.min(getHeight(), safe.getY() + safe.getHeight() - ay);
+                if (right > left && bottom > top) {
+                    sx = left;
+                    sy = top;
+                    sw = right - left;
+                    sh = bottom - top;
+                }
+            }
+        }
+        controls.relayout(sx, sy, sw, sh);
     }
 
     // ---- input capture ---------------------------------------------------

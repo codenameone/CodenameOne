@@ -15862,9 +15862,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             JavaSEGpuSurface surface;
             try {
                 Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
-                surface = (JavaSEGpuSurface) joglSurface
-                        .getConstructor(com.codename1.gpu.RenderView.class)
-                        .newInstance(view);
+                // JavaSEJoglSurface and its constructor are package-private, so
+                // getConstructor() (public-only) cannot see it; use the declared
+                // constructor and make it accessible.
+                java.lang.reflect.Constructor<?> ctor =
+                        joglSurface.getDeclaredConstructor(com.codename1.gpu.RenderView.class);
+                ctor.setAccessible(true);
+                surface = (JavaSEGpuSurface) ctor.newInstance(view);
             } catch (Throwable t) {
                 Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
                         && t.getCause() != null ? t.getCause() : t;
