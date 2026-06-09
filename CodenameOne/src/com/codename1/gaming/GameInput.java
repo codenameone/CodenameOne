@@ -57,8 +57,17 @@ public class GameInput {
     private boolean pointerPressedEdge;
     private boolean pointerReleasedEdge;
 
+    private float axisX;
+    private float axisY;
+
     /// Package private -- only `GameView` constructs the input.
     GameInput() {
+    }
+
+    /// Set by a `TouchControls` analog `VirtualJoystick`.
+    void setAxis(float x, float y) {
+        axisX = x;
+        axisY = y;
     }
 
     void keyDown(int keyCode) {
@@ -161,5 +170,17 @@ public class GameInput {
     /// Returns true during the single frame in which the pointer was released.
     public boolean wasPointerReleased() {
         return pointerReleasedEdge;
+    }
+
+    /// The horizontal analog value, -1 (left) to 1 (right), from an on-screen
+    /// `VirtualJoystick`. 0 when there is no joystick or it is centered.
+    public float getAxisX() {
+        return axisX;
+    }
+
+    /// The vertical analog value, -1 (up) to 1 (down the screen), from an on-screen
+    /// `VirtualJoystick`. 0 when there is no joystick or it is centered.
+    public float getAxisY() {
+        return axisY;
     }
 }

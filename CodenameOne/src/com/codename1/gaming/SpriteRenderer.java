@@ -78,11 +78,15 @@ public class SpriteRenderer implements Renderer {
     private final Camera camera = new Camera();
     private final Light light = new Light();
     private final List models = new ArrayList();
+    private TouchControls controls;
     private Mesh quad;
     private Material material;
     private RenderState spriteState2D;
     private RenderState spriteState3D;
     private Map textures;
+    private Image discImage;
+    private Image ringImage;
+    private Map labelImages;
     private int viewWidth;
     private int viewHeight;
     private long lastTime;
@@ -149,6 +153,12 @@ public class SpriteRenderer implements Renderer {
         this.updatable = updatable;
     }
 
+    /// Sets the on-screen `TouchControls` this renderer draws as a screen-space
+    /// overlay (set by `GameView`).
+    void setControls(TouchControls controls) {
+        this.controls = controls;
+    }
+
     @Override
     public void onInit(GraphicsDevice device) {
         quad = Primitives.quad(device, 1f);
@@ -159,6 +169,9 @@ public class SpriteRenderer implements Renderer {
         spriteState3D = RenderState.transparent().setDepthTest(true);
         material = new Material(Material.Type.SPRITE).setRenderState(spriteState2D);
         textures = new HashMap();
+        labelImages = new HashMap();
+        discImage = circleTexture(128, 0f, 1f);
+        ringImage = circleTexture(128, 0.72f, 1f);
         hasLast = false;
         if (updatable != null) {
             updatable.setup(device);
@@ -216,6 +229,112 @@ public class SpriteRenderer implements Renderer {
             material.setTexture(t).setColor(s.getColor());
             device.draw(quad, material, modelMatrix(s));
         }
+
+        drawControls(device);
+    }
+
+    /// Draws the on-screen `TouchControls` as a 2D screen-space overlay on top of the
+    /// scene, regardless of whether the game camera is 2D or perspective.
+    private void drawControls(GraphicsDevice device) {
+        if (controls == null || !controls.isVisible() || !controls.hasControls()) {
+            return;
+        }
+        // dedicated pixel-space orthographic camera so controls sit in screen space
+        camera.setOrthographic(viewHeight, -1000f, 1000f)
+                .setAspect((float) viewWidth / Math.max(1, viewHeight))
+                .setPosition(0f, 0f, 1f)
+                .setTarget(0f, 0f, 0f)
+                .setUp(0f, 1f, 0f);
+        device.setCamera(camera);
+        material.setRenderState(spriteState2D);
+
+        VirtualJoystick j = controls.getJoystick();
+        if (j != null) {
+            screenQuad(device, ringImage, j.getCenterX(), j.getCenterY(),
+                    j.getRadius() * 2, j.getRadius() * 2, 0x80ffffff);
+            screenQuad(device, discImage, j.getKnobX(), j.getKnobY(),
+                    j.getKnobRadius() * 2, j.getKnobRadius() * 2,
+                    j.isActive() ? 0xd0ffffff : 0x90ffffff);
+        }
+        int bn = controls.getButtonCount();
+        for (int i = 0; i < bn; i++) {
+            VirtualButton b = controls.getButton(i);
+            Image face = b.getLabel() == null ? discImage : labelDisc(b.getLabel());
+            int col = b.isPressed() ? brighten(b.getColor()) : b.getColor();
+            screenQuad(device, face, b.getCenterX(), b.getCenterY(),
+                    b.getRadius() * 2, b.getRadius() * 2, col);
+        }
+    }
+
+    /// Draws a textured quad centered at the given screen pixel position.
+    private void screenQuad(GraphicsDevice device, Image image, float cx, float cy,
+            float w, float h, int color) {
+        Texture t = texture(device, image);
+        material.setTexture(t).setColor(color);
+        float worldX = cx - viewWidth / 2f;
+        float worldY = viewHeight / 2f - cy;
+        Matrix4.multiply(Matrix4.translation(worldX, worldY, 0f),
+                Matrix4.scaling(w, h, 1f), model);
+        device.draw(quad, material, model);
+    }
+
+    /// A white disc with a centered label, cached per label string.
+    private Image labelDisc(String label) {
+        Image img = (Image) labelImages.get(label);
+        if (img == null) {
+            int size = 128;
+            img = circleTexture(size, 0f, 1f);
+            com.codename1.ui.Graphics g = img.getGraphics();
+            g.setAntiAliased(true);
+            g.setAntiAliasedText(true);
+            com.codename1.ui.Font f = com.codename1.ui.Font.createSystemFont(
+                    com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
+                    com.codename1.ui.Font.SIZE_LARGE);
+            g.setFont(f);
+            g.setColor(0x303030);
+            int tw = f.stringWidth(label);
+            int th = f.getHeight();
+            g.drawString(label, (size - tw) / 2, (size - th) / 2);
+            labelImages.put(label, img);
+        }
+        return img;
+    }
+
+    /// Builds a soft-edged white circle (or ring) texture as an ARGB image. Pixels
+    /// whose normalized radius is between `innerFrac` and `outerFrac` are opaque
+    /// white; the rest is transparent, with ~1px antialiased edges.
+    private static Image circleTexture(int size, float innerFrac, float outerFrac) {
+        int[] px = new int[size * size];
+        float c = (size - 1) / 2f;
+        float rOut = outerFrac * c;
+        float rIn = innerFrac * c;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                float dx = x - c;
+                float dy = y - c;
+                float d = (float) Math.sqrt(dx * dx + dy * dy);
+                float a = clamp01(rOut - d + 0.5f);
+                if (innerFrac > 0f) {
+                    a = Math.min(a, clamp01(d - rIn + 0.5f));
+                }
+                int alpha = (int) (a * 255);
+                px[y * size + x] = (alpha << 24) | 0xffffff;
+            }
+        }
+        return Image.createImage(px, size, size);
+    }
+
+    private static float clamp01(float v) {
+        return v < 0f ? 0f : (v > 1f ? 1f : v);
+    }
+
+    /// Lightens an ARGB color toward white (used to show a pressed button).
+    private static int brighten(int argb) {
+        int a = (argb >>> 24) & 0xff;
+        int r = Math.min(255, ((argb >> 16) & 0xff) + 60);
+        int g = Math.min(255, ((argb >> 8) & 0xff) + 60);
+        int b = Math.min(255, (argb & 0xff) + 60);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     @Override

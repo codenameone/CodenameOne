@@ -73,12 +73,15 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     private double interpolationAlpha = 1;
     private static final int MAX_FIXED_STEPS = 8;
     private final GameInput input = new GameInput();
+    private final TouchControls controls;
 
     public GameView() {
         super(new SpriteRenderer());
         SpriteRenderer r = (SpriteRenderer) getRenderer();
         r.setUpdatable(this);
         this.scene = r.getScene();
+        this.controls = new TouchControls(input);
+        r.setControls(controls);
         setFocusable(true);
     }
 
@@ -94,6 +97,13 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     /// The pollable input state for this view.
     public GameInput getInput() {
         return input;
+    }
+
+    /// The on-screen touch controls for this view (a virtual joystick and buttons).
+    /// Add controls to it to make the game playable on touch devices; whatever you
+    /// add feeds the same `GameInput` your keyboard handling already reads.
+    public TouchControls getControls() {
+        return controls;
     }
 
     /// The camera this view renders through. It starts in 2D mode; call
@@ -256,17 +266,35 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     }
 
     @Override
-    public void pointerPressed(int x, int y) {
-        input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), true, true, false);
+    public void pointerPressed(int[] x, int[] y) {
+        routeTouches(x, y, true, true, false);
     }
 
     @Override
-    public void pointerDragged(int x, int y) {
-        input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), true, false, false);
+    public void pointerDragged(int[] x, int[] y) {
+        routeTouches(x, y, true, false, false);
     }
 
     @Override
-    public void pointerReleased(int x, int y) {
-        input.pointer(x - getAbsoluteX(), y - getAbsoluteY(), false, false, true);
+    public void pointerReleased(int[] x, int[] y) {
+        routeTouches(x, y, false, false, true);
+    }
+
+    /// Converts the absolute multi-touch points to view-local pixels, feeds them to
+    /// the on-screen `TouchControls` and updates the raw pointer state from the first
+    /// touch.
+    private void routeTouches(int[] x, int[] y, boolean down, boolean pressed, boolean released) {
+        int ox = getAbsoluteX();
+        int oy = getAbsoluteY();
+        int[] lx = new int[x.length];
+        int[] ly = new int[y.length];
+        for (int i = 0; i < x.length; i++) {
+            lx[i] = x[i] - ox;
+            ly[i] = y[i] - oy;
+        }
+        controls.onTouches(lx, ly, down);
+        if (x.length > 0) {
+            input.pointer(lx[0], ly[0], down, pressed, released);
+        }
     }
 }
