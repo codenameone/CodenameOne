@@ -216,6 +216,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean autoUpdateDefaultResourceBundle;
     private float largerTextScale = 1.0f;
     private boolean largerTextEnabled = false;
+    // Set once we've warned the developer that the running app hasn't opted into
+    // font scaling, so the Larger Text menu only nags them a single time per session.
+    private boolean largerTextOptInWarningShown = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
     // Floor below which any persisted window dimension is treated as the
@@ -7014,12 +7017,40 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // Theme-only refresh so the app's CSS-compiled theme survives; see
                     // refreshThemeOnly() for why refreshSkin breaks the app theme + canvas size.
                     refreshThemeOnly();
+                    warnIfLargerTextScaleIgnored(frm);
                 }
             });
             group.add(item);
             largerTextMenu.add(item);
         }
         parent.add(largerTextMenu);
+    }
+
+    /// The Larger Text menu only changes the on-screen fonts when the running app
+    /// has opted into font scaling -- either through the `useLargerTextScaleBool`
+    /// theme constant or a `UIManager.setUseLargerTextScale(true)` call at startup.
+    /// Without that opt-in, `UIManager`'s effective scale clamps back to 1.0 and the
+    /// menu selection has no visible effect, which historically read as "the
+    /// simulator doesn't refresh" (issue #4963). Surface a one-time explanation so
+    /// the developer understands why the text didn't grow and how to enable it,
+    /// instead of being left to guess that the refresh is broken.
+    private void warnIfLargerTextScaleIgnored(JFrame frm) {
+        if (largerTextOptInWarningShown || !largerTextEnabled) {
+            return;
+        }
+        if (UIManager.getInstance().isUseLargerTextScale()) {
+            return;
+        }
+        largerTextOptInWarningShown = true;
+        JOptionPane.showMessageDialog(frm,
+                "This app has not enabled larger text scaling, so the size you picked\n"
+                + "won't change the on-screen fonts.\n\n"
+                + "To preview Dynamic Type sizing, enable scaling in your app by either:\n"
+                + "  - adding the theme constant  useLargerTextScaleBool = true,  or\n"
+                + "  - calling  UIManager.getInstance().setUseLargerTextScale(true)\n"
+                + "    during app startup.",
+                "Larger Text scaling not enabled",
+                JOptionPane.WARNING_MESSAGE);
     }
 
     /**
@@ -15796,7 +15827,64 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
     }
-    
+
+    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGpuSurface> glSurfaces =
+            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGpuSurface>();
+
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public com.codename1.ui.PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            // Prefer the real OpenGL (JOGL) backend. It is loaded reflectively so
+            // the JOGL types stay confined to JavaSEJoglSurface/JavaSEGLDevice:
+            // the Maven simulator ships JOGL and gets the GPU backend, while the
+            // legacy Ant port build (no JOGL on its classpath) excludes those two
+            // files entirely. Instantiating the backend touches JOGL classes and a
+            // GL context, so guard against the class being absent (Ant build),
+            // GLException, AND NoClassDefFoundError and fall back to the software
+            // renderer so the simulator never fails to start over 3D.
+            JavaSEGpuSurface surface;
+            try {
+                Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
+                surface = (JavaSEGpuSurface) joglSurface
+                        .getConstructor(com.codename1.gpu.RenderView.class)
+                        .newInstance(view);
+            } catch (Throwable t) {
+                Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
+                        && t.getCause() != null ? t.getCause() : t;
+                System.out.println("JavaSE 3D: JOGL backend unavailable, using software renderer ("
+                        + cause + ")");
+                surface = new JavaSEGLSurface(view);
+            }
+            com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
+            if (peer != null) {
+                glSurfaces.put(peer, surface);
+            }
+            return peer;
+        }
+
+        @Override
+        public void setContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(com.codename1.ui.PeerComponent peer) {
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
+
+    @Override
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
+    }
+
     public Image gaussianBlurImage(Image image, float radius) {
         GaussianFilter gf = new GaussianFilter(radius);
         Image bim = Image.createImage(image.getWidth(), image.getHeight());

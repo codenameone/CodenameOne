@@ -3472,6 +3472,15 @@ const baseTestDoneMethodId = "cn1_s_done";
 const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // UNSKIP-PHASE2: "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
   "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
+  // The 3D model test loads a ~6K-triangle glTF model with a decoded JPEG
+  // base-color texture. The heavy onInit (glTF parse + image decode + a large
+  // getRGB upload) reliably wedges the headless SwiftShader WebGL path before
+  // the capture window, and a curved, bilinearly-textured model would not match
+  // a stored golden across the ARM/x64 SwiftShader rasterizers anyway. It is
+  // validated on the real-GPU platforms (iOS Metal) and in the simulator
+  // instead; the geometry path is still covered on JS by Gpu3DCube /
+  // Gpu3DTexturedCube / Gpu3DAnimation, which capture reliably.
+  "com_codenameone_examples_hellocodenameone_tests_Gpu3DModelScreenshotTest": "gpu3dModelHeadlessGl",
   // BrowserComponent's ``onLoad`` event never reaches the worker side
   // — the iframe ``load`` event isn't currently routed through the
   // worker-callback transport, so ``loaded = true`` never gets set

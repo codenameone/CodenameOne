@@ -438,4 +438,53 @@ public final class WindowsNative {
 
     /** Stops playback, frees the engine and deletes the temp file. */
     public static native void mediaDestroy(long peer);
+
+    // ---------------------------------------------------------------------
+    // 3D / Direct3D 11 backend (com.codename1.gpu). Implemented in
+    // nativeSources/cn1_windows_d3d.cpp. Every peer is an opaque long (a D3D
+    // object pointer cast to long); 0 means none / unsupported. The render model
+    // is offscreen: the device renders one frame into an off-screen render target
+    // and gl3dCaptureFrame reads it back as a PNG for the peer-image path.
+    // ---------------------------------------------------------------------
+
+    /** Creates the D3D11 context (device + offscreen render target manager); 0 if Direct3D is unavailable. */
+    public static native long gl3dCreateContext();
+    /** Destroys the context and all GPU objects it still owns. */
+    public static native void gl3dDestroyContext(long contextPeer);
+    /** (Re)sizes the offscreen render target to width x height and begins a frame. */
+    public static native void gl3dBeginFrame(long contextPeer, int width, int height);
+    /** Resolves the current frame's render target and returns it encoded as PNG bytes. */
+    public static native byte[] gl3dCaptureFrame(long contextPeer);
+    /** Writes the current frame to a PNG file (headless-screenshot convenience). */
+    public static native boolean gl3dCaptureToFile(long contextPeer, String path);
+
+    /** Uploads interleaved vertex floats into an immutable D3D vertex buffer. */
+    public static native long gl3dCreateFloatBuffer(float[] data, int floatCount);
+    public static native void gl3dUpdateFloatBuffer(long bufferPeer, float[] data, int floatCount);
+    /** Uploads 16-bit indices into a D3D index buffer. */
+    public static native long gl3dCreateShortBuffer(short[] data, int indexCount);
+    public static native void gl3dUpdateShortBuffer(long bufferPeer, short[] data, int indexCount);
+    /** Uploads packed ARGB pixels into an RGBA D3D texture + SRV. */
+    public static native long gl3dCreateTexture(int[] argb, int width, int height);
+    public static native void gl3dDisposeBuffer(long bufferPeer);
+    public static native void gl3dDisposeTexture(long texturePeer);
+    public static native void gl3dDisposePipeline(long pipelinePeer);
+
+    /**
+     * Compiles the supplied HLSL source (D3DCompile vs_4_0 / ps_4_0) once and
+     * builds the input layout + blend/rasterizer/depth state for the given render
+     * state. Returns the pipeline handle or 0.
+     */
+    public static native long gl3dGetOrCreatePipeline(long contextPeer, String key, String hlslSource,
+            int blendMode, int cullMode, int depthTest, int depthWrite);
+
+    public static native void gl3dClear(long contextPeer, int argbColor, boolean clearColor, boolean clearDepth);
+    public static native void gl3dSetViewport(long contextPeer, int x, int y, int width, int height);
+
+    public static native void gl3dDrawIndexed(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
+            long iboPeer, int indexCount, int primitive, float[] uniforms, int uniformFloats,
+            long texturePeer, int texFilter, int texWrap);
+    public static native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
+            int vertexCount, int primitive, float[] uniforms, int uniformFloats,
+            long texturePeer, int texFilter, int texWrap);
 }

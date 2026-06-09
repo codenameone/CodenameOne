@@ -253,6 +253,8 @@ public final class IOSNative {
     
     native void setBrowserUserAgent(long browserPeer, String ua);
     native void setBrowserFollowTargetBlank(long browserPeer, boolean follow);
+    // style: 0 = unspecified/auto (follow device), 1 = light, 2 = dark
+    native void setBrowserInterfaceStyle(long browserPeer, int style);
     
     native void browserBack(long browserPeer);
     native void browserStop(long browserPeer);
@@ -447,6 +449,48 @@ public final class IOSNative {
     native void cn1CameraPause(long sessionPeer);
     native void cn1CameraResume(long sessionPeer);
     native void cn1CameraClose(long sessionPeer);
+
+    // ---------------------------------------------------------------------
+    // Portable 3D API (com.codename1.gpu) Metal backend. Backed by CN1GL3D.m.
+    // Buffers are created over SIMD aligned Java arrays so Metal can wrap them
+    // with newBufferWithBytesNoCopy (zero copy) where possible. Handles are the
+    // corresponding Objective-C / Metal object pointers cast to long.
+    // ---------------------------------------------------------------------
+
+    // Creates the native Metal 3D context hosting an MTKView; returns a context
+    // handle (CN1GL3D pointer cast to long) or 0 if Metal is unavailable.
+    native long gl3dCreateContext();
+    // Returns the UIView peer handle for the context's MTKView, hosted as a
+    // NativeIPhoneView peer.
+    native long gl3dGetViewPeer(long contextPeer);
+    native void gl3dDestroyContext(long contextPeer);
+    native void gl3dSetContinuous(long contextPeer, boolean continuous);
+    native void gl3dRequestRender(long contextPeer);
+
+    // Resource creation / update. floatCount / indexCount are element counts.
+    native long gl3dCreateFloatBuffer(float[] data, int floatCount);
+    native void gl3dUpdateFloatBuffer(long bufferPeer, float[] data, int floatCount);
+    native long gl3dCreateShortBuffer(short[] data, int indexCount);
+    native void gl3dUpdateShortBuffer(long bufferPeer, short[] data, int indexCount);
+    native long gl3dCreateTexture(int[] argb, int width, int height);
+    native void gl3dDisposeBuffer(long bufferPeer);
+    native void gl3dDisposeTexture(long texturePeer);
+    native void gl3dDisposePipeline(long pipelinePeer);
+
+    // Compiles the supplied MSL source (once) and builds a MTLRenderPipelineState
+    // for the given blend/cull/depth state. Returns the pipeline handle or 0.
+    native long gl3dGetOrCreatePipeline(long contextPeer, String key, String mslSource,
+            int blendMode, int cullMode, int depthTest, int depthWrite);
+
+    native void gl3dClear(long contextPeer, int argbColor, boolean clearColor, boolean clearDepth);
+    native void gl3dSetViewport(long contextPeer, int x, int y, int width, int height);
+
+    native void gl3dDrawIndexed(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
+            long iboPeer, int indexCount, int primitive, float[] uniforms, int uniformFloats,
+            long texturePeer, int texFilter, int texWrap);
+    native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
+            int vertexCount, int primitive, float[] uniforms, int uniformFloats,
+            long texturePeer, int texFilter, int texWrap);
 
     native void destroyAudioUnit(long peer);
 

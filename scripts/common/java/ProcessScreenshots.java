@@ -83,7 +83,13 @@ public class ProcessScreenshots {
                 try {
                     PNGImage actual = loadPngWithRetry(actualPath);
                     PNGImage expected = loadPngWithRetry(expectedPath);
-                    Map<String, Object> outcome = compareImages(expected, actual, maxChannelDelta, maxMismatchPercent);
+                    // Per-test tolerance override: an optional "<test>.tolerance"
+                    // file next to the reference raises the allowed pixel variance
+                    // for inherently non-deterministic captures (e.g. the GPU 3D
+                    // tests, whose software-renderer output differs by ~1% between
+                    // CI runners). Deterministic 2D tests keep the tight defaults.
+                    double[] tol = readTolerance(referenceDir, testName, maxChannelDelta, maxMismatchPercent);
+                    Map<String, Object> outcome = compareImages(expected, actual, (int) tol[0], tol[1]);
                     if (Boolean.TRUE.equals(outcome.get("equal"))) {
                         record.put("status", "equal");
                     } else {
@@ -324,6 +330,42 @@ public class ProcessScreenshots {
 
     private static int clamp(int value) {
         return Math.max(0, Math.min(255, value));
+    }
+
+    /// Reads an optional per-test tolerance override from
+    /// "<referenceDir>/<testName>.tolerance" (simple key=value lines:
+    /// maxChannelDelta and/or maxMismatchPercent). Returns
+    /// {channelDelta, mismatchPercent}, falling back to the supplied defaults for
+    /// any key the file omits or when the file is absent.
+    private static double[] readTolerance(Path referenceDir, String testName,
+            int defChannelDelta, double defMismatchPercent) {
+        double[] t = { defChannelDelta, defMismatchPercent };
+        Path tolPath = referenceDir.resolve(testName + ".tolerance");
+        if (!Files.exists(tolPath)) {
+            return t;
+        }
+        try {
+            for (String line : Files.readAllLines(tolPath)) {
+                String s = line.trim();
+                if (s.isEmpty() || s.startsWith("#")) {
+                    continue;
+                }
+                int eq = s.indexOf('=');
+                if (eq <= 0) {
+                    continue;
+                }
+                String key = s.substring(0, eq).trim();
+                String val = s.substring(eq + 1).trim();
+                if (key.equals("maxChannelDelta")) {
+                    t[0] = Integer.parseInt(val);
+                } else if (key.equals("maxMismatchPercent")) {
+                    t[1] = Double.parseDouble(val);
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("Warning: could not read tolerance " + tolPath + ": " + ex.getMessage());
+        }
+        return t;
     }
 
     private static Map<String, Object> compareImages(PNGImage expected, PNGImage actual, int maxChannelDelta, double maxMismatchPercent) {

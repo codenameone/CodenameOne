@@ -239,6 +239,28 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Build-time Lottie transcoder -- same pipeline as SVG, lowers
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
+            // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
+            // textured cube, a loaded glTF model, and a behavioral animation-loop
+            // test. Positioned immediately before OrientationLock on purpose, to
+            // satisfy two constraints at once:
+            //   - iOS: a 2D form shown right after a GPU peer keeps the previous
+            //     form's drawable for one capture (a pre-existing iOS present
+            //     quirk). OrientationLock is the one test that recovers from this
+            //     -- it forces a full-screen orientation change + revalidate
+            //     before capturing -- so it absorbs the staleness cleanly, and
+            //     DesktopMode (the last screenshot test) still sees OrientationLock
+            //     as its predecessor exactly like on master, so every baseline
+            //     matches.
+            //   - JavaScript: the glTF model is the heaviest 3D capture; running
+            //     it here (rather than dead last) keeps it out of the JS port's
+            //     late-suite worker-barrier danger zone where it intermittently
+            //     failed to emit.
+            // The 3D tests render through their own GPU peer and capture correctly
+            // regardless of what precedes them.
+            new Gpu3DCubeScreenshotTest(),
+            new Gpu3DTexturedCubeScreenshotTest(),
+            new Gpu3DModelScreenshotTest(),
+            new Gpu3DAnimationTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),

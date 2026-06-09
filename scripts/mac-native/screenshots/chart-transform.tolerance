@@ -1,0 +1,8 @@
+# ChartTransform renders a chart through Graphics.setTransform, so the latency
+# line and axes are drawn as antialiased diagonals. Metal antialiases those
+# edges slightly differently between mac CI runners (measured ~0.23% of pixels
+# over channelDelta 8, max single-channel delta on a line edge ~86) while the
+# chart content is otherwise identical. Widen tolerance so this sub-pixel GPU
+# noise does not fail the build -- same approach as the Gpu3D* sidecars.
+maxChannelDelta=8
+maxMismatchPercent=3.0

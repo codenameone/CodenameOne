@@ -5027,6 +5027,20 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Returns the platform's GPU backend for the portable 3D API
+    /// (`com.codename1.gpu.RenderView`), or null on platforms without a 3D
+    /// backend. Returning a single backend object (rather than scattering
+    /// individual peer-lifecycle methods across the implementation) lets each
+    /// port keep all of its GPU wiring in one place. A non-null return is what
+    /// `Display.isGpuSupported()` reports.
+    ///
+    /// #### Returns
+    ///
+    /// the platform GPU backend, or null if the 3D GPU API is unsupported
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return null;
+    }
+
     /// Some platforms require that you enable pinch to zoom explicitly. This method has no
     /// effect if pinch to zoom isn't supported by the platform
     ///

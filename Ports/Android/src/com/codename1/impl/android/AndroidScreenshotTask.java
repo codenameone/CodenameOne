@@ -63,6 +63,7 @@ class AndroidScreenshotTask implements Runnable {
                         @Override
                         public void onPixelCopyFinished(int copyResult) {
                             if (copyResult == PixelCopy.SUCCESS) {
+                                compositeGLPeers(target, loc[0], loc[1]);
                                 postSuccess(target);
                             } else {
                                 // Fallback if PixelCopy fails (e.g., transient surface state)
@@ -107,15 +108,57 @@ class AndroidScreenshotTask implements Runnable {
 
                 // Draw the parent view hierarchy (includes PeerComponents as siblings)
                 parentView.draw(canvas);
+                compositeGLPeers(bmp, viewLoc[0], viewLoc[1]);
             } else {
                 // Fallback: draw only the view if no parent found
                 viewToDraw.draw(canvas);
+                final int[] viewLoc = new int[2];
+                viewToDraw.getLocationInWindow(viewLoc);
+                compositeGLPeers(bmp, viewLoc[0], viewLoc[1]);
             }
 
             postSuccess(bmp);
         } catch (Throwable t) {
             Log.e(t);
             postError(t);
+        }
+    }
+
+    /// Composites the most recent GPU-read-back frame of every live GL peer onto
+    /// the captured screenshot. `originX`/`originY` are the window coordinates of
+    /// the captured bitmap's top-left corner, so peer positions (also in window
+    /// coordinates) can be made relative to it.
+    private void compositeGLPeers(Bitmap target, int originX, int originY) {
+        java.util.List<AndroidGLSurface> peers;
+        synchronized (AndroidGLSurface.ACTIVE) {
+            peers = new java.util.ArrayList<AndroidGLSurface>(AndroidGLSurface.ACTIVE);
+        }
+        if (peers.isEmpty()) {
+            return;
+        }
+        Canvas canvas = new Canvas(target);
+        for (AndroidGLSurface peer : peers) {
+            try {
+                // Only composite peers on the form currently on screen. isShown()
+                // can still be true for a beat while a previous form is torn down,
+                // which bled e.g. the 3D animation frame into DesktopMode's capture.
+                if (!peer.isShown() || !peer.isOnCurrentForm()) {
+                    continue;
+                }
+                Bitmap frame = peer.getLastFrame();
+                if (frame == null) {
+                    continue;
+                }
+                int[] ploc = new int[2];
+                peer.getLocationInWindow(ploc);
+                int dx = ploc[0] - originX;
+                int dy = ploc[1] - originY;
+                android.graphics.Rect dst = new android.graphics.Rect(
+                        dx, dy, dx + peer.getWidth(), dy + peer.getHeight());
+                canvas.drawBitmap(frame, null, dst, null);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
