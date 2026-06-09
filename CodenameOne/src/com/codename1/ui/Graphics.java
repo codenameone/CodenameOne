@@ -416,9 +416,20 @@ public final class Graphics {
     /// }
     /// ```
     ///
-    /// Note: shape-clipped graphics ([#setClip(Shape)]) and arbitrary
-    /// affine transforms fall back to the bounding rectangle of the clip;
-    /// this matches the precision actually used by the platform draw calls.
+    /// When a non-identity affine transform is in effect (see [#setTransform]),
+    /// the four corners of the rectangle are mapped through the current
+    /// transform and the axis-aligned bounding box of the result is tested
+    /// against the clip. This means a rotated/scaled rectangle is judged by
+    /// where it actually lands on screen rather than by its untransformed
+    /// coordinates. The integer translate ([#translate]) is intentionally not
+    /// added here: [#getClipX]/[#getClipY] are already reported in the same
+    /// untranslated coordinate space you pass to draw calls, so the translation
+    /// cancels out.
+    ///
+    /// Note: shape-clipped graphics ([#setClip(Shape)]) fall back to the
+    /// bounding rectangle of the clip, and perspective (3D) transforms are
+    /// approximated by their 2D corner projection; this matches the precision
+    /// actually used by the platform draw calls.
     ///
     /// #### Parameters
     ///
@@ -443,6 +454,46 @@ public final class Graphics {
         int ch = getClipHeight();
         if (cw <= 0 || ch <= 0) {
             return false;
+        }
+        // If a non-trivial transform is in effect, map the rectangle's corners
+        // through it and test the resulting bounding box. Only the matrix is
+        // applied -- the integer translate cancels against getClipX/getClipY,
+        // which already subtract it back out.
+        if (isTransformSupported()) {
+            Transform t = getTransform();
+            if (t != null && !t.isIdentity()) {
+                try {
+                    float[] pts = new float[]{
+                            x, y,
+                            x + w, y,
+                            x + w, y + h,
+                            x, y + h
+                    };
+                    t.transformPoints(2, pts, 0, pts, 0, 4);
+                    float minX = pts[0], maxX = pts[0];
+                    float minY = pts[1], maxY = pts[1];
+                    for (int i = 2; i < pts.length; i += 2) {
+                        float px = pts[i];
+                        float py = pts[i + 1];
+                        if (px < minX) {
+                            minX = px;
+                        }
+                        if (px > maxX) {
+                            maxX = px;
+                        }
+                        if (py < minY) {
+                            minY = py;
+                        }
+                        if (py > maxY) {
+                            maxY = py;
+                        }
+                    }
+                    return minX < cx + cw && minY < cy + ch && maxX > cx && maxY > cy;
+                } catch (RuntimeException err) {
+                    // Some ports throw when the transform isn't backed natively;
+                    // fall back to the untransformed rectangle test below.
+                }
+            }
         }
         return x < cx + cw && y < cy + ch && x + w > cx && y + h > cy;
     }
@@ -1157,9 +1208,33 @@ public final class Graphics {
 
     /// Gets the transformation matrix that is currently applied to this graphics context.
     ///
+    /// Unlike `java.awt.Graphics2D.getTransform()`, the matrix returned here does
+    /// **not** include the integer translation set via `#translate(int, int)`.
+    /// Codename One keeps that translation as a separate accumulator
+    /// (`#getTranslateX()` / `#getTranslateY()`) that is applied independently of
+    /// the affine matrix, so a freshly-translated context still reports the
+    /// identity transform. This split is deliberate: `#setTransform` /
+    /// `getTransform` / `#transform(com.codename1.ui.Transform)` round-trip
+    /// correctly only because the translate is excluded here -- folding it in
+    /// would cause it to be counted twice (once in the matrix, once in the
+    /// drawing pipeline).
+    ///
+    /// Consequently, to map a point from the current drawing coordinate space to
+    /// the context's device coordinates you must add the translation yourself:
+    ///
+    /// ```java
+    /// float[] pt = { x + g.getTranslateX(), y + g.getTranslateY() };
+    /// g.getTransform().transformPoint(pt, pt);
+    /// // pt now holds the transformed device coordinates
+    /// ```
+    ///
+    /// If you only need to know whether a rectangle would be drawn on screen,
+    /// prefer `#isVisible(int, int, int, int)`, which performs this mapping
+    /// (translate + transform) internally and tests it against the clip.
+    ///
     /// #### Returns
     ///
-    /// The current transformation matrix.
+    /// The current transformation matrix, excluding the integer translate.
     ///
     /// #### Deprecated
     ///
@@ -1168,6 +1243,10 @@ public final class Graphics {
     /// #### See also
     ///
     /// - #setTransform
+    ///
+    /// - #getTranslateX
+    ///
+    /// - #isVisible(int, int, int, int)
     public Transform getTransform() {
         if (userTransform != null) {
             return userTransform.copy();
@@ -1227,6 +1306,11 @@ public final class Graphics {
     }
 
     /// Loads the provided transform with the current transform applied to this graphics context.
+    ///
+    /// As with `#getTransform()`, the loaded matrix does not include the integer
+    /// translation set via `#translate(int, int)`; add `#getTranslateX()` /
+    /// `#getTranslateY()` to a point before transforming it if you need device
+    /// coordinates.
     ///
     /// #### Parameters
     ///
