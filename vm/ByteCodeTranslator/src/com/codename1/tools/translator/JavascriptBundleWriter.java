@@ -265,6 +265,45 @@ final class JavascriptBundleWriter {
         // override targets, by name) -- more reliable than scanning runtime JS text.
         excluded.addAll(JavascriptMethodGenerator.NATIVE_METHOD_IDENTIFIERS);
         defs.removeAll(excluded);
+        // Prefix protection: some bridge names are CONSTRUCTED at runtime by string
+        // concatenation, so the full identifier never appears as a literal -- only
+        // its stem does. The screenshot runner (port.js) builds
+        //   "cn1_..._Cn1ssDeviceRunner_lambda_" + methodName + "_" + i + "_" + sig
+        // so the scanned literal is the stem ".._lambda_" while the generated def is
+        // ".._lambda_runNextTest_2_<sig>". Treat every scanned cn1_ string token as a
+        // prefix and protect any def that extends it at an identifier-segment boundary
+        // (the next char is '_', or the stem already ends in '_'), so the constructed
+        // name still resolves after minification. Over-protecting only forgoes size;
+        // under-protecting breaks a name-resolved bridge -> wedge.
+        // Only class-qualified stems are eligible as prefixes. The generic
+        // construction roots "cn1_" (4, completes to ___INIT__/___CLINIT__, already
+        // skipped above) and "cn1_s_" (6, dispatch-ids resolved via the _qX table,
+        // never a function def) are short and would over-match -- "cn1_" as a prefix
+        // matches EVERY def and would disable all minification. A length floor keeps
+        // those out while admitting genuine fully-qualified stems (the only real one,
+        // the screenshot runner's lambda stem, is 77 chars).
+        final int MIN_PREFIX_PROTECT_LEN = 16;
+        if (!defs.isEmpty()) {
+            java.util.List<String> prefixTokens = new java.util.ArrayList<String>();
+            for (String t : stringTokens) {
+                if (t.length() >= MIN_PREFIX_PROTECT_LEN) {
+                    prefixTokens.add(t);
+                }
+            }
+            if (!prefixTokens.isEmpty()) {
+                java.util.Iterator<String> it = defs.iterator();
+                while (it.hasNext()) {
+                    String d = it.next();
+                    for (String t : prefixTokens) {
+                        if (d.length() > t.length() && d.startsWith(t)
+                                && (t.endsWith("_") || d.charAt(t.length()) == '_')) {
+                            it.remove();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         if (defs.isEmpty()) {
             return;
         }
