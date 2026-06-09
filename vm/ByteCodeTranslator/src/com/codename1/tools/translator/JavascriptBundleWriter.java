@@ -179,10 +179,48 @@ final class JavascriptBundleWriter {
         for (int i = 0; i < leadCount; i++) {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
             Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
-                    hoistStringConstants(chunks.get(i).toString()).getBytes(StandardCharsets.UTF_8));
+                    minifyJs(hoistStringConstants(chunks.get(i).toString())).getBytes(StandardCharsets.UTF_8));
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                hoistStringConstants(tail.toString()).getBytes(StandardCharsets.UTF_8));
+                minifyJs(hoistStringConstants(tail.toString())).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Strips the translator's pretty-printing indentation and blank lines from the
+     * emitted application JS. The translator emits one statement per line with
+     * generous indentation for readability; for a deployed bundle that is ~20% dead
+     * weight that the browser must still download and parse. We keep one statement
+     * per line (newlines preserved) so the transform is safe regardless of ASI or
+     * {@code //} comments -- only leading/trailing line whitespace and empty lines
+     * are removed. Set {@code -Dparparvm.js.pretty=true} to keep the readable form
+     * for debugging the generated code.
+     */
+    private static String minifyJs(String code) {
+        if (System.getProperty("parparvm.js.pretty") != null) {
+            return code;
+        }
+        int n = code.length();
+        StringBuilder out = new StringBuilder(n);
+        int i = 0;
+        while (i < n) {
+            int eol = code.indexOf('\n', i);
+            if (eol < 0) {
+                eol = n;
+            }
+            int start = i;
+            int end = eol;
+            while (start < end && code.charAt(start) <= ' ') {
+                start++;
+            }
+            while (end > start && code.charAt(end - 1) <= ' ') {
+                end--;
+            }
+            if (end > start) {
+                out.append(code, start, end).append('\n');
+            }
+            i = eol + 1;
+        }
+        return out.toString();
     }
 
     /**
