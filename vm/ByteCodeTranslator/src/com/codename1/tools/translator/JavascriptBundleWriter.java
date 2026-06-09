@@ -175,14 +175,251 @@ final class JavascriptBundleWriter {
         // (they're all independent class definitions so the relative order
         // among them doesn't matter for correctness, but stable ordering
         // keeps debug output deterministic).
-        int leadCount = chunks.size() - 1;
+        // Materialise every chunk, then minify the long generated function
+        // identifiers across the WHOLE bundle with one shared mapping (a function
+        // defined in one chunk may be called from another). esbuild is not in the
+        // pipeline, so without this the ``cn1_<pkg>_<Class>_<method>_<sig>``
+        // identifiers (avg ~45 chars, the largest single contributor to bundle
+        // size) ship verbatim at every definition and call site.
+        java.util.List<String> chunkStrings = new java.util.ArrayList<String>(chunks.size());
+        for (StringBuilder c : chunks) {
+            chunkStrings.add(c.toString());
+        }
+        minifyGeneratedIdentifiers(chunkStrings);
+
+        int leadCount = chunkStrings.size() - 1;
         for (int i = 0; i < leadCount; i++) {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
             Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
-                    minifyJs(hoistStringConstants(chunks.get(i).toString())).getBytes(StandardCharsets.UTF_8));
+                    minifyJs(hoistStringConstants(chunkStrings.get(i))).getBytes(StandardCharsets.UTF_8));
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
-                minifyJs(hoistStringConstants(tail.toString())).getBytes(StandardCharsets.UTF_8));
+                minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1))).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Renames the translator's generated function identifiers
+     * ({@code cn1_<pkg>_<Class>_<method>_<sig>}) to short {@code $M*} symbols,
+     * consistently across every chunk. These are bundle-internal: definitions,
+     * direct/static/special call sites, and method-table values. The only
+     * string reference is {@code jvm.setMain("...","cn1_..._main_...")} consumed
+     * via {@code global[this.mainMethod]} -- the whole-token rewrite updates that
+     * string in lockstep with its definition, so dispatch still resolves.
+     *
+     * <p>Safe because: the renamed set is exactly the identifiers that have a
+     * {@code function[*] cn1_X(} definition in the bundle (so runtime-provided
+     * natives, which are bindNative'd and never defined here, keep their names);
+     * virtual dispatch keys are the distinct {@code cn1_s_*} strings (not in the
+     * set); field names carry no signature suffix and are never function
+     * definitions; and {@code $M} is a fresh prefix the mangler never emits.
+     * Kill switch: {@code -Dparparvm.js.minify.idents.off}.
+     */
+    private static void minifyGeneratedIdentifiers(java.util.List<String> chunkStrings) {
+        if (System.getProperty("parparvm.js.minify.idents.off") != null) {
+            return;
+        }
+        java.util.regex.Pattern defPattern = java.util.regex.Pattern.compile(
+                "function\\*?\\s+(cn1_[A-Za-z0-9_]+)\\s*\\(");
+        java.util.TreeSet<String> defs = new java.util.TreeSet<String>();
+        for (String chunk : chunkStrings) {
+            java.util.regex.Matcher m = defPattern.matcher(chunk);
+            while (m.find()) {
+                String name = m.group(1);
+                // Constructors / class initialisers are reconstructed by string at
+                // runtime (global["cn1_"+className+"___INIT__"], the clinit id, etc.,
+                // in parparvm_runtime.js), so renaming them would break global[]
+                // resolution. Keep their conventional names.
+                if (name.contains("___INIT__") || name.contains("___CLINIT__")) {
+                    continue;
+                }
+                defs.add(name);
+            }
+        }
+        if (defs.isEmpty()) {
+            return;
+        }
+        // Any cn1_ token referenced as a string literal must NOT be renamed:
+        //  - in the app bundle: jvm.setMain's main method, field-list manifests;
+        //  - in the runtime/port JS: bindNative([...]) override targets and any
+        //    global["cn1_..."] / nativeMethods[...] lookup. The JS<->worker bridge
+        //    overrides native methods by reassigning the global of that exact name
+        //    (CN1 has no reflection/serialization; this naming IS the binding), so
+        //    a renamed static native stub would bypass its override and return its
+        //    placeholder (e.g. null) -> NPE. Scan the bundle AND the runtime sources
+        //    so every bridge-resolved name keeps its canonical identifier.
+        java.util.List<String> stringScanSources = new java.util.ArrayList<String>(chunkStrings);
+        for (String runtimeSrc : loadRuntimeNameSources()) {
+            stringScanSources.add(runtimeSrc);
+        }
+        java.util.Set<String> stringTokens = collectStringLiteralCn1Tokens(stringScanSources);
+        // installNativeBindings overrides BOTH global[name] and the CONSTRUCTED
+        // global[name + "__impl"] (the static-method body) -- see parparvm_runtime.js.
+        // The "__impl" variant never appears as a literal string, so add it for every
+        // protected base name; otherwise a renamed static-native body bypasses its
+        // override and returns its placeholder (e.g. null) -> NPE.
+        java.util.Set<String> excluded = new java.util.HashSet<String>(stringTokens);
+        for (String t : stringTokens) {
+            excluded.add(t + "__impl");
+        }
+        defs.removeAll(excluded);
+        if (defs.isEmpty()) {
+            return;
+        }
+        java.util.Map<String, String> map = new java.util.HashMap<String, String>(defs.size() * 2);
+        int idx = 0;
+        for (String d : defs) {
+            map.put(d, shortIdentifier(idx++));
+        }
+        for (int i = 0; i < chunkStrings.size(); i++) {
+            chunkStrings.set(i, renameTokens(chunkStrings.get(i), map));
+        }
+    }
+
+    /** {@code $M} + base-26 (a..z, aa..) — a prefix the bytecode mangler never produces. */
+    private static String shortIdentifier(int n) {
+        StringBuilder sb = new StringBuilder();
+        do {
+            sb.insert(0, (char) ('a' + (n % 26)));
+            n = n / 26 - 1;
+        } while (n >= 0);
+        return "$M" + sb;
+    }
+
+    /**
+     * Single O(n) pass replacing each maximal identifier token present in
+     * {@code map}, but NEVER inside a string/template literal -- string-referenced
+     * names are excluded from {@code map} (see caller) and their string spellings
+     * must be left intact. Tokens are {@code [A-Za-z0-9_$]} runs.
+     */
+    private static String renameTokens(String src, java.util.Map<String, String> map) {
+        int n = src.length();
+        StringBuilder out = new StringBuilder(n);
+        int i = 0;
+        char inString = 0;
+        while (i < n) {
+            char c = src.charAt(i);
+            if (inString != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < n) {
+                    out.append(src.charAt(i + 1));
+                    i += 2;
+                    continue;
+                }
+                if (c == inString) {
+                    inString = 0;
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'' || c == '`') {
+                inString = c;
+                out.append(c);
+                i++;
+                continue;
+            }
+            boolean idStart = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$';
+            if (idStart) {
+                int j = i + 1;
+                while (j < n) {
+                    char d = src.charAt(j);
+                    if ((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z')
+                            || (d >= '0' && d <= '9') || d == '_' || d == '$') {
+                        j++;
+                    } else {
+                        break;
+                    }
+                }
+                String token = src.substring(i, j);
+                String repl = map.get(token);
+                out.append(repl != null ? repl : token);
+                i = j;
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Collect every {@code cn1_*} identifier token that appears inside a string or
+     * template literal across all chunks. These are names referenced by string at
+     * runtime (setMain's main method, serialized field manifests, reflection), so
+     * they must not be renamed in code.
+     */
+    private static java.util.Set<String> collectStringLiteralCn1Tokens(java.util.List<String> chunkStrings) {
+        java.util.Set<String> tokens = new java.util.HashSet<String>();
+        for (String src : chunkStrings) {
+            int n = src.length();
+            int i = 0;
+            char inString = 0;
+            while (i < n) {
+                char c = src.charAt(i);
+                if (inString != 0) {
+                    if (c == '\\' && i + 1 < n) {
+                        i += 2;
+                        continue;
+                    }
+                    if (c == inString) {
+                        inString = 0;
+                        i++;
+                        continue;
+                    }
+                    if (c == 'c' && src.startsWith("cn1_", i)
+                            && (i == 0 || !isIdentChar(src.charAt(i - 1)))) {
+                        int j = i + 4;
+                        while (j < n && isIdentChar(src.charAt(j))) {
+                            j++;
+                        }
+                        tokens.add(src.substring(i, j));
+                        i = j;
+                        continue;
+                    }
+                    i++;
+                    continue;
+                }
+                if (c == '"' || c == '\'' || c == '`') {
+                    inString = c;
+                }
+                i++;
+            }
+        }
+        return tokens;
+    }
+
+    /**
+     * Returns the JS sources that resolve translated functions by name (the
+     * worker-side runtime + JS port) so their referenced {@code cn1_*} names are
+     * protected from renaming. Missing sources are skipped -- protecting fewer
+     * names only forgoes some size, it never produces an unsafe rename (the app
+     * bundle's own string scan still covers anything it references).
+     */
+    private static java.util.List<String> loadRuntimeNameSources() {
+        java.util.List<String> sources = new java.util.ArrayList<String>();
+        for (String res : new String[]{ "parparvm_runtime.js", "browser_bridge.js" }) {
+            try {
+                sources.add(loadResource(res));
+            } catch (IOException ignore) {
+                // resource absent -- skip
+            }
+        }
+        try {
+            Path webApp = locateJavaScriptPortWebApp();
+            if (webApp != null) {
+                Path portJs = webApp.resolve("port.js");
+                if (java.nio.file.Files.exists(portJs)) {
+                    sources.add(new String(java.nio.file.Files.readAllBytes(portJs), StandardCharsets.UTF_8));
+                }
+            }
+        } catch (Exception ignore) {
+            // port.js unavailable -- skip
+        }
+        return sources;
+    }
+
+    private static boolean isIdentChar(char d) {
+        return (d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z')
+                || (d >= '0' && d <= '9') || d == '_' || d == '$';
     }
 
     /**
