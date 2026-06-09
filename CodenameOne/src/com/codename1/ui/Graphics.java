@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -470,8 +471,10 @@ public final class Graphics {
                             x, y + h
                     };
                     t.transformPoints(2, pts, 0, pts, 0, 4);
-                    float minX = pts[0], maxX = pts[0];
-                    float minY = pts[1], maxY = pts[1];
+                    float minX = pts[0];
+                    float maxX = pts[0];
+                    float minY = pts[1];
+                    float maxY = pts[1];
                     for (int i = 2; i < pts.length; i += 2) {
                         float px = pts[i];
                         float py = pts[i + 1];
@@ -492,6 +495,7 @@ public final class Graphics {
                 } catch (RuntimeException err) {
                     // Some ports throw when the transform isn't backed natively;
                     // fall back to the untransformed rectangle test below.
+                    Log.e(err);
                 }
             }
         }
