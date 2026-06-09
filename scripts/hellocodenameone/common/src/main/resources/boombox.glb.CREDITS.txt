@@ -1,0 +1,10 @@
+boombox.glb is derived from the Khronos glTF Sample Model "BoomBox" by Microsoft.
+
+Source: https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/BoomBox
+License: CC0 1.0 Universal (public domain dedication).
+  To the extent possible under law, Microsoft has waived all copyright and
+  related or neighboring rights to this asset.
+
+Modifications for the Codename One 3D screenshot test: stripped to geometry
+(POSITION/NORMAL/TEXCOORD_0 + indices) plus the base-color texture resized to
+512x512 JPEG, and the other PBR maps removed, to keep the bundled asset small.

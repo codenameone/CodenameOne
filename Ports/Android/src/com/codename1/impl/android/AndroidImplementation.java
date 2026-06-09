@@ -4353,6 +4353,81 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new AndroidImplementation.AndroidPeer((View) nativeComponent);
     }
 
+    private final java.util.Map<PeerComponent, AndroidGLSurface> glSurfaces =
+            new java.util.IdentityHashMap<PeerComponent, AndroidGLSurface>();
+
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public PeerComponent createPeer(final com.codename1.gpu.RenderView view) {
+            final CodenameOneActivity a = getActivity();
+            if (a == null) {
+                return null;
+            }
+            // The GLSurfaceView must be constructed on the UI thread; block until
+            // it exists so we can wrap and return its peer to the caller.
+            final AndroidGLSurface[] holder = new AndroidGLSurface[1];
+            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            a.runOnUiThread(new Runnable() {
+                public void run() {
+                    try {
+                        holder[0] = new AndroidGLSurface(a, view);
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            });
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            AndroidGLSurface surface = holder[0];
+            if (surface == null) {
+                return null;
+            }
+            PeerComponent peer = createNativePeer(surface);
+            if (peer != null) {
+                glSurfaces.put(peer, surface);
+            }
+            return peer;
+        }
+
+        @Override
+        public void setContinuous(PeerComponent peer, final boolean continuous) {
+            final AndroidGLSurface surface = glSurfaces.get(peer);
+            if (surface == null) {
+                return;
+            }
+            final CodenameOneActivity a = getActivity();
+            if (a == null) {
+                return;
+            }
+            a.runOnUiThread(new Runnable() {
+                public void run() {
+                    surface.setRenderMode(continuous
+                            ? android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                            : android.opengl.GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+                }
+            });
+        }
+
+        @Override
+        public void requestRender(PeerComponent peer) {
+            AndroidGLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
+
+    @Override
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
+    }
+
     private void blockNativeFocusAll(boolean block) {
         synchronized (this.nativePeers) {
             final int size = this.nativePeers.size();

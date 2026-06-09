@@ -279,6 +279,40 @@ public class WindowsImplementation extends CodenameOneImplementation {
         ((WindowsBrowserComponent) browserPeer).execute(javaScript);
     }
 
+    // Direct3D 11 backend for the portable 3D API (com.codename1.gpu). The
+    // surface reports unsupported (createPeer returns null) when Direct3D cannot
+    // be initialized, matching the port's "real data or unsupported" rule.
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public com.codename1.ui.PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            WindowsGLSurface surface = new WindowsGLSurface(view);
+            if (surface.getContextPeer() == 0) {
+                return null;
+            }
+            return surface;
+        }
+
+        @Override
+        public void setContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
+            if (peer instanceof WindowsGLSurface) {
+                ((WindowsGLSurface) peer).setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(com.codename1.ui.PeerComponent peer) {
+            if (peer instanceof WindowsGLSurface) {
+                ((WindowsGLSurface) peer).requestRender();
+            }
+        }
+    };
+
+    @Override
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
+    }
+
     @Override
     public int getDisplayWidth() {
         return WindowsNative.getDisplayWidth();

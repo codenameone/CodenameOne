@@ -110,6 +110,7 @@ import java.util.Date;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
@@ -2983,7 +2984,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
 
-            tp.put("StatusBar.padding", "0,0,0,0");
+            // The browser has no OS status bar / notch, so the app must not
+            // reserve a status-bar strip at the top of the Form the way iOS
+            // does. The iOS-modern theme sets paintsTitleBarBool=true to
+            // reserve that safe-area space on real devices; force it off on the
+            // JS port so the web layout starts flush at the top (otherwise the
+            // undefined StatusBar UIID would also paint an opaque strip there).
+            tp.put("@paintsTitleBarBool", "false");
 
             UIManager.getInstance().setThemeProps(tp);
             return;
@@ -5105,6 +5112,43 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public PeerComponent createNativePeer(Object nativeComponent) {
         return new HTML5Peer((HTMLElement)nativeComponent);
+    }
+
+    private final java.util.Map<PeerComponent, HTML5GLSurface> glSurfaces =
+            new IdentityHashMap<PeerComponent, HTML5GLSurface>();
+
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            HTML5GLSurface surface = HTML5GLSurface.create(view);
+            if (surface == null) {
+                return null;
+            }
+            glSurfaces.put(surface, surface);
+            return surface;
+        }
+
+        @Override
+        public void setContinuous(PeerComponent peer, boolean continuous) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(PeerComponent peer) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
+
+    @Override
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
     }
 
     @Override

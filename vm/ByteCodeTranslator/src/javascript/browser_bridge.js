@@ -736,6 +736,19 @@
         receiver[args[0] | 0] = args[1];
         value = null;
       } else {
+        // WebGL bulk-data calls receive their payload as a plain JS number
+        // array (the only way a Java primitive array survives the worker->main
+        // bridge intact -- a worker-built typed array arrives here as an empty
+        // object). Re-wrap it in the typed array WebGL requires before the call.
+        // ELEMENT_ARRAY_BUFFER == 0x8893 takes Uint16Array; everything else
+        // (vertex data) takes Float32Array.
+        if (member === 'bufferData' && Array.isArray(args[1])) {
+          args[1] = (args[0] === 0x8893) ? new Uint16Array(args[1]) : new Float32Array(args[1]);
+        } else if (member === 'uniformMatrix4fv' && Array.isArray(args[2])) {
+          args[2] = new Float32Array(args[2]);
+        } else if (member === 'texImage2D' && Array.isArray(args[args.length - 1])) {
+          args[args.length - 1] = new Uint8Array(args[args.length - 1]);
+        }
         var fn = receiver[member];
         if (typeof fn === 'function') {
           value = fn.apply(receiver, args);
@@ -1718,7 +1731,76 @@
     return meta;
   }
 
+  // 3D RenderView peers render to their own WebGL canvas overlaid on the output
+  // canvas; they are DOM overlays, so the output canvas the screenshot scores and
+  // encodes does not contain them. Before each capture, draw every such canvas
+  // (marked data-cn1gl3d, created with preserveDrawingBuffer so its frame is
+  // readable) onto the main output canvas IN PLACE at its on-screen position.
+  // Doing it before candidate scoring means the output canvas scores as non-empty
+  // and the encoded snapshot includes the 3D content. No-op when there are no GL
+  // peers; failures are swallowed so a normal capture is never affected. (The
+  // output canvas is repainted on the next frame, so this only affects capture.)
+  function cn1CompositeGLPeersOntoOutput() {
+    try {
+      var doc = global.document;
+      if (!doc || typeof doc.querySelectorAll !== 'function') {
+        return;
+      }
+      var gls = doc.querySelectorAll('canvas[data-cn1gl3d]');
+      if (!gls || !gls.length) {
+        return;
+      }
+      var base = global.__cn1LastPaintCanvas || global.__cn1LastDrawCanvas || null;
+      if (!base && typeof doc.querySelector === 'function') {
+        base = doc.querySelector('canvas:not([data-cn1gl3d])');
+      }
+      if (!base || typeof base.getContext !== 'function') {
+        return;
+      }
+      var ctx = base.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      var baseRect = (typeof base.getBoundingClientRect === 'function') ? base.getBoundingClientRect() : null;
+      var sx = (baseRect && baseRect.width) ? (base.width / baseRect.width) : 1;
+      var sy = (baseRect && baseRect.height) ? (base.height / baseRect.height) : 1;
+      for (var i = 0; i < gls.length; i++) {
+        var g = gls[i];
+        if (!g || !(g.width | 0) || !(g.height | 0)) {
+          continue;
+        }
+        // Only composite canvases rendered for this capture cycle. A peer left in
+        // the DOM by a torn-down form is not re-rendered, so it lacks the fresh
+        // flag and must not bleed its stale frame (e.g. the 3D animation showing
+        // up in a later DesktopMode capture). Consume the flag after drawing.
+        if (!g.hasAttribute || !g.hasAttribute('data-cn1gl3d-fresh')) {
+          continue;
+        }
+        g.removeAttribute('data-cn1gl3d-fresh');
+        var dx = 0;
+        var dy = 0;
+        var dw = g.width;
+        var dh = g.height;
+        if (baseRect && typeof g.getBoundingClientRect === 'function') {
+          var gr = g.getBoundingClientRect();
+          dx = (gr.left - baseRect.left) * sx;
+          dy = (gr.top - baseRect.top) * sy;
+          dw = gr.width * sx;
+          dh = gr.height * sy;
+        }
+        try {
+          ctx.drawImage(g, dx, dy, dw, dh);
+        } catch (_drawErr) {
+          // Skip an unreadable GL canvas rather than fail the whole capture.
+        }
+      }
+    } catch (_compositeErr) {
+      // Never let GL compositing break a normal screenshot.
+    }
+  }
+
   function pickBestCanvasSnapshot(includeDataUrl, previousSignature) {
+    cn1CompositeGLPeersOntoOutput();
     function pushCanvas(list, seen, canvas, source) {
       if (!canvas || !isCanvasLike(canvas)) {
         return;

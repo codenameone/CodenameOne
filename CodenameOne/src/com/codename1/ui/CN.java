@@ -1038,6 +1038,12 @@ public class CN extends CN1Constants {
         return Display.getInstance().getSimd();
     }
 
+    /// Returns true if the current platform provides a hardware accelerated 3D
+    /// GPU backend for `com.codename1.gpu.RenderView`.
+    public static boolean isGpuSupported() {
+        return Display.getInstance().isGpuSupported();
+    }
+
 
     /// Opens the device Dialer application with the given phone number
     ///
