@@ -182,6 +182,71 @@ boom.setLooping(false);
 getScene().add(boom);
 ----
 
+=== 3D and perspective
+
+`GameView` renders on the GPU through the <<3D Graphics and Shaders,`com.codename1.gpu`>>
+package, so the same scene can be shown in 3D. Every view has a
+https://www.codenameone.com/javadoc/com/codename1/gaming/GameCamera.html[`GameCamera`]
+that starts in 2D mode; switching it to perspective turns flat sprites into
+camera-facing billboards in a 3D world and lets you draw 3D meshes alongside them.
+That's the basis for deeper gameplay modes -- an over-the-shoulder racer, an
+isometric or top-down view with real depth, a 2.5D shooter.
+
+==== Perspective camera and billboard sprites
+
+Call `GameCamera#setPerspective(float, float, float)` and position the camera with
+`setPosition` / `setTarget`. Once in perspective mode a `Sprite` is placed in world
+space with `Sprite#setPosition(double, double, double)` and is drawn as a billboard
+that always faces the camera, so your existing 2D art keeps working in 3D:
+
+[source,java]
+----
+getCamera()
+    .setPerspective(60, 0.1f, 500f)   // vertical FOV, near, far
+    .setPosition(0, 6, 12)            // eye
+    .setTarget(0, 0, 0);             // look-at
+
+Sprite tree = new Sprite(treeImage);
+tree.setPosition(0, 1, 0);            // world coordinates, y up
+tree.setSize(2, 4);                   // size is now in world units, not pixels
+getScene().add(tree);
+----
+
+World coordinates are right-handed with y up (the `com.codename1.gpu` convention),
+and a sprite's size is world units rather than pixels -- use `Sprite#setSize(float,
+float)` or `Sprite#setScale(float)` to pick a world-space size. Move the camera each
+frame in `update(double)` to follow the player.
+
+==== 3D models
+
+https://www.codenameone.com/javadoc/com/codename1/gaming/Model.html[`Model`] draws a
+real 3D mesh -- a `com.codename1.gpu.Material` plus a position, rotation, and scale.
+Because GPU meshes need the `com.codename1.gpu.GraphicsDevice`, build them in
+`GameView#onSetup(com.codename1.gpu.GraphicsDevice)`, the render-thread hook that
+runs once before the first frame:
+
+[source,java]
+----
+protected void onSetup(GraphicsDevice device) {
+    Mesh cubeMesh = Primitives.cube(device, 1f);
+    Material gold = new Material(Material.Type.PHONG).setColor(0xffffcc33).setShininess(32);
+    crate = new Model(cubeMesh, gold).setPosition(0, 0.5f, 0);
+    addModel(crate);
+
+    getLight().setDirection(-1, -1, -0.5f);   // shade the lit material
+}
+
+protected void update(double dt) {
+    crate.setRotation(0, crate.getRotationY() + (float) (60 * dt), 0);  // spin
+}
+----
+
+`onSetup` is also where you load real assets with `com.codename1.gpu.GltfLoader`
+(glTF `.glb`/`.gltf` models). Models are drawn opaque and depth-written before the
+alpha-blended billboards, and the billboards depth-test against them, so closer
+geometry correctly hides what's behind it. `GameView#getLight()` controls the
+directional light that shades lit material types.
+
 === Low latency audio: `SoundPool`
 
 Music and video use the regular `MediaManager`, but rapid overlapping sound
