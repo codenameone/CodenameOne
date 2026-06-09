@@ -13,6 +13,37 @@ layout system render them -- the techniques in the <<Animations>> chapter are
 often a better fit. Reach for `com.codename1.gaming` when you want a frame driven
 loop and GPU sprite rendering.
 
+=== Three sample games
+
+The samples project ships three runnable starting points. Each is a single file
+built entirely from art generated at runtime -- no asset files -- so you can copy
+one and start changing it immediately. The rest of this chapter draws on them to
+show how the pieces fit together.
+
+[cols="1a,1a,1a", frame=none, grid=none]
+|===
+| image::img/game-casual.png[Casual arena demo,240]
+| image::img/game-scroller.png[Side scroller demo,240]
+| image::img/game-3d.png[3D world demo,240]
+
+| *`CasualGameSample`* +
+A top-down arena: fly a thruster ship with the on-screen joystick, scoop up
+spinning gems and dodge drifting asteroids. Many sprites in a `Scene`, per-sprite
+animation, collision, particle bursts and a twinkling starfield.
+| *`ScrollerGameSample`* +
+A side-scroller: an `AnimatedSprite` runner with a walk cycle that flips to face
+its direction, a sun/cloud/hill parallax backdrop, hand-rolled jump physics, and a
+joystick + JUMP button.
+| *`Gaming3DDemoSample`* +
+A 3D world: a spinning multi-cube monument on a textured grid ground, ringed by
+colored `Model` buildings and billboarded coins, lit and orbited by a perspective
+camera.
+|===
+
+All three are driven by the joystick and buttons in <<On-screen touch controls>>,
+so they're equally playable on a touch device and in the desktop simulator (where
+the arrow keys and mouse stand in for the stick).
+
 === The game loop: `GameView`
 
 https://www.codenameone.com/javadoc/com/codename1/gaming/GameView.html[`GameView`]
@@ -115,6 +146,52 @@ if (in.isGameKeyDown(Display.GAME_FIRE)) { fire(); }
 if (in.wasPointerPressed()) { spawnAt(in.getPointerX(), in.getPointerY()); }
 ----
 
+=== On-screen touch controls
+
+A keyboard is fine in the simulator, but a phone has no arrow keys. Every
+`GameView` comes with a https://www.codenameone.com/javadoc/com/codename1/gaming/TouchControls.html[`TouchControls`]
+(from `getControls()`) that draws an on-screen *virtual joystick* and *buttons* and
+feeds them into the same `GameInput` -- so the input code you already wrote for
+the keyboard works untouched on touch devices.
+
+* The *joystick* reports analog direction through `GameInput#getAxisX()` /
+`getAxisY()` (each -1 to 1), and at the same time presses the digital game actions
+`GAME_LEFT` / `GAME_RIGHT` / `GAME_UP` / `GAME_DOWN` once it crosses its dead zone,
+so `isGameKeyDown(...)` keeps working.
+* A *button* holds down a key code while it's pressed, so `isKeyDown(int)` and
+`wasKeyPressed(int)` report it exactly like a hardware key. Map it to a game action
+with `Display.getInstance().getKeyCode(Display.GAME_FIRE)`, or to any key code of
+your own.
+
+Anchor controls to a corner of the view's *safe area* with the alignment constants
+(`TouchControls.LEFT` / `CENTER` / `RIGHT` and `TOP` / `CENTER` / `BOTTOM`) and a
+margin. The framework keeps them clear of notches and home indicators and
+repositions them automatically when the view resizes or the device rotates -- you
+never recompute coordinates:
+
+[source,java]
+----
+TouchControls c = getControls();
+
+// analog stick, bottom-left, 80px radius, 24px in from the safe-area edges
+c.addJoystick(80, TouchControls.LEFT, TouchControls.BOTTOM, 24);
+
+// a JUMP button, bottom-right, mapped to GAME_FIRE
+int jumpKey = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+c.addButton(jumpKey, 55, TouchControls.RIGHT, TouchControls.BOTTOM, 30)
+        .setLabel("Jump").setColor(0xc0ff7043);
+
+// then read input exactly as you would for a keyboard:
+float ax = getInput().getAxisX();                 // analog steering
+boolean jump = getInput().wasKeyPressed(jumpKey);  // or GAME_UP, etc.
+----
+
+The joystick (bottom-left) and JUMP button (bottom-right) are visible in the
+<<Three sample games,sample screenshots>> above. There are also absolutely
+positioned overloads (`addJoystick(centerX, centerY, radius)`), and
+`setVisible(false)` hides the overlay -- handy when a real keyboard is attached.
+Multi-touch is supported, so the player can steer and press a button at once.
+
 === Sprites
 
 A https://www.codenameone.com/javadoc/com/codename1/gaming/Sprite.html[`Sprite`]
@@ -182,6 +259,34 @@ boom.setLooping(false);
 getScene().add(boom);
 ----
 
+image::img/game-spritesheet.png[A six-frame run cycle laid out as a sprite sheet,640]
+
+A sprite sheet is just a strip (or grid) of frames like the run cycle above: the
+arms and legs swing a little further each frame, and playing them in sequence reads
+as motion. `AnimatedSprite` also accepts a plain `com.codename1.ui.Image[]` when you
+build the frames yourself, which is what `ScrollerGameSample`'s runner does:
+
+[source,java]
+----
+AnimatedSprite hero = new AnimatedSprite(runFrames, 0.09);   // Image[6], 90ms each
+hero.play();
+getScene().add(hero);
+
+// in update(double dt):
+if (moving) {
+    hero.play();
+    hero.setScale(facing, 1);     // facing is -1 (left) or 1 (right)
+} else {
+    hero.pause();
+    hero.setCurrentFrame(0);      // standing pose
+}
+----
+
+Setting a *negative scale* flips the sprite horizontally, so a single set of frames
+faces both ways -- no mirrored art needed (sprites are drawn double-sided for
+exactly this reason). `play()`, `pause()`, `stop()`, `setLooping(boolean)` and
+`setCurrentFrame(int)` control playback.
+
 === 3D and perspective
 
 `GameView` renders on the GPU through the <<3D Graphics and Shaders,`com.codename1.gpu`>>
@@ -191,6 +296,12 @@ that starts in 2D mode; switching it to perspective turns flat sprites into
 camera-facing billboards in a 3D world and lets you draw 3D meshes alongside them.
 That's the basis for deeper gameplay modes -- an over-the-shoulder racer, an
 isometric or top-down view with real depth, a 2.5D shooter.
+
+image::img/game-3d.png[The 3D sample: a textured grid ground, stacked cube models, ringed buildings and billboarded coins,250]
+
+`Gaming3DDemoSample` (above) is built entirely from the primitives this section
+describes -- a textured ground plane, lit cube `Model` meshes, and billboarded
+`Sprite` coins and trees, all orbited by a perspective camera.
 
 ==== Perspective camera and billboard sprites
 
@@ -246,6 +357,33 @@ protected void update(double dt) {
 alpha-blended billboards, and the billboards depth-test against them, so closer
 geometry correctly hides what's behind it. `GameView#getLight()` controls the
 directional light that shades lit material types.
+
+==== Meshes and textures
+
+The built-in meshes are `com.codename1.gpu.Primitives#cube(GraphicsDevice, float)`
+and `Primitives#quad(GraphicsDevice, float)`; a quad rotated flat makes a ground or
+a wall. `Model#setScale(float, float, float)` reshapes one cube mesh into crates,
+pillars or buildings of any proportion, so a whole skyline can share a single mesh.
+Lit materials multiply their base color by a texture, so you can detail a surface --
+a grid on the ground for depth, say -- by drawing an `com.codename1.ui.Image` and
+uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.ui.Image)`:
+
+[source,java]
+----
+Mesh ground = Primitives.quad(device, 64f);
+Texture grid = device.createTexture(makeGridImage());      // any Image you draw
+Material mat = new Material(Material.Type.LAMBERT)
+        .setColor(0xff3f7d4f).setTexture(grid);
+Model floor = new Model(ground, mat).setRotation(-90, 0, 0); // lay the quad flat
+addModel(floor);
+
+// one cube mesh, scaled into buildings of varying height:
+Model tower = new Model(cubeMesh, brick).setScale(1.5f, 4f, 1.5f).setPosition(9, 2, 0);
+addModel(tower);
+----
+
+For richer geometry, load glTF (`.glb`/`.gltf`) assets with
+`com.codename1.gpu.GltfLoader` from `onSetup`.
 
 === Low latency audio: `SoundPool`
 
@@ -366,14 +504,33 @@ If you need a feature the wrapper doesn't expose, `PhysicsWorld.getNativeWorld()
 and `PhysicsBody.getNativeBody()` give you the underlying engine objects (which
 work in meters, y up).
 
-=== Putting it together
+=== Putting it together: Anatomy of a game
 
-The `GamingDemoSample` in the samples project ties the whole package together in
-under 200 lines: a `GameView` running a `PhysicsWorld` with a floor and walls,
-tap-to-drop balls that bounce, each ball a `Sprite` linked to its body, and a
-`SoundPool` blip whose pitch varies per drop. It generates its sprite images and
-its sound at runtime, so it needs no assets -- a compact, copyable starting point
-for your own game.
+Every sample follows the same shape, which is the recipe for your own game:
+
+. *Subclass `GameView`* and, in its constructor, create your `Sprite` and
+`AnimatedSprite` objects and add them to `getScene()`.
+. *Allocate GPU resources in `onSetup(GraphicsDevice)`* -- meshes, textures and 3D
+`Model` objects -- because those need the device.
+. *Add controls* (a joystick and buttons) once the view has a size.
+. *Advance the world in `update(double dt)`*: read `getInput()`, move sprites or step
+a `PhysicsWorld`, scale all movement by `dt`, and trigger `SoundPool` effects.
+. *Show it*: add the view to a `Form` and call `start()`.
+
+The samples project has four runnable examples to copy from:
+
+* *`CasualGameSample`* -- sprites, per-sprite animation, collision and particle bursts
+in a top-down arena (see <<Three sample games>>).
+* *`ScrollerGameSample`* -- an `AnimatedSprite` walk cycle, a parallax backdrop and a
+scrolling `Scene` camera.
+* *`Gaming3DDemoSample`* -- lit cube `Model` objects, a textured ground and
+billboarded sprites under a perspective camera.
+* *`GamingDemoSample`* -- the physics tour, built on a `PhysicsWorld` with a floor and walls,
+tap-to-drop balls that bounce (each `Sprite` linked to its body) and a `SoundPool`
+blip whose pitch varies per drop.
+
+Each is a single self-contained file that generates its art at runtime, so it needs
+no assets -- a compact starting point you can copy and reshape.
 
 === Performance notes
 

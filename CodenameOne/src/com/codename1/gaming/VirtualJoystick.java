@@ -143,7 +143,6 @@ public class VirtualJoystick {
         if (dist > radius && dist > 0) {
             dx = dx / dist * radius;
             dy = dy / dist * radius;
-            dist = radius;
         }
         knobX = centerX + dx;
         knobY = centerY + dy;
