@@ -61,6 +61,9 @@ public class Gaming3DDemoSample {
 
         private Model cube;
         private double time;
+        private double orbit;
+        private float camHeight = 6f;
+        private boolean controlsReady;
 
         World3DView() {
             setClearColor(0xff101824);
@@ -104,10 +107,23 @@ public class Gaming3DDemoSample {
             if (cube != null) {
                 cube.setRotation(0f, (float) (time * 60), 0f);   // spin around Y
             }
-            // slowly orbit the camera around the scene
+            if (!controlsReady && getWidth() > 0) {
+                getControls().addJoystick(110, getHeight() - 110, 80);
+                controlsReady = true;
+            }
+            // the joystick orbits the camera (x) and raises/lowers it (y); when
+            // untouched the camera drifts on its own.
+            float ax = getInput().getAxisX();
+            float ay = getInput().getAxisY();
+            orbit += (ax != 0 ? ax * 1.5 : 0.3) * dt;
+            camHeight = clamp(camHeight + ay * 6f * (float) dt, 1.5f, 14f);
             float r = 12f;
-            getCamera().setPosition((float) (Math.sin(time * 0.3) * r), 6f,
-                    (float) (Math.cos(time * 0.3) * r));
+            getCamera().setPosition((float) (Math.sin(orbit) * r), camHeight,
+                    (float) (Math.cos(orbit) * r));
+        }
+
+        private static float clamp(float v, float lo, float hi) {
+            return v < lo ? lo : (v > hi ? hi : v);
         }
     }
 
