@@ -29,6 +29,7 @@ import com.codename1.impl.html5.components.ContextMenu;
 import com.codename1.impl.html5.database.DatabaseImpl;
 import com.codename1.impl.html5.graphics.ClipRect;
 import com.codename1.impl.html5.graphics.ExecutableOp;
+import com.codename1.impl.html5.graphics.SurfaceCommandRecorder;
 import com.codename1.impl.html5.videojs.JSVideoCaptureConstraintsCompiler;
 import com.codename1.impl.html5.videojs.VideoJS;
 
@@ -36,6 +37,7 @@ import com.codename1.impl.html5.videojs.VideoJS;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.util.Base64;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -47,6 +49,7 @@ import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
 import com.codename1.teavm.ext.websql.WebSQL;
 import com.codename1.teavm.geom.JSAffineTransform;
+import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
 import com.codename1.teavm.jso.io.Blob;
 import com.codename1.teavm.jso.io.FileList;
@@ -186,7 +189,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // responses intermittently crossed into concurrent object reads
     // (getDocument/getContext returning a width/height number). The host stays
     // dumb; the Java side keeps and reuses what it already knows.
-    private CanvasRenderingContext2D outputContext;
     private int displayWidth;
     private int displayHeight;
     private final JavaScriptRenderingBackend renderingBackend = new BrowserDomRenderingBackend();
@@ -292,63 +294,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
-        public HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas, int width, int height) {
-            return new HTML5Graphics(implementation, canvas, width, height);
-        }
-
-        @Override
-        public CanvasRenderingContext2D getContext(HTMLCanvasElement canvas) {
-            return (CanvasRenderingContext2D)canvas.getContext("2d");
-        }
-
-        @Override
         public void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height) {
             context.drawImage(image, x, y, width, height);
         }
 
         @Override
-        public void drawMutableSurface(CanvasRenderingContext2D context, HTMLCanvasElement canvas, int x, int y, int width, int height) {
-            context.drawImage(canvas, x, y, width, height);
-        }
-
-        @Override
         public CanvasPattern createLoadedImagePattern(CanvasRenderingContext2D context, HTMLImageElement image) {
             return context.createPattern(image, "repeat");
-        }
-
-        @Override
-        public CanvasPattern createMutableSurfacePattern(CanvasRenderingContext2D context, HTMLCanvasElement canvas) {
-            return context.createPattern(canvas, "repeat");
-        }
-
-        @Override
-        public ImageData readLoadedImageData(HTMLImageElement image, int x, int y, int width, int height) {
-            HTMLCanvasElement canvas = createCanvas(width, height);
-            CanvasRenderingContext2D context = getContext(canvas);
-            context.drawImage(image, x, y, width, height, 0, 0, width, height);
-            return context.getImageData(0, 0, width, height);
-        }
-
-        @Override
-        public ImageData readMutableSurfaceData(HTMLCanvasElement canvas, int x, int y, int width, int height) {
-            return getContext(canvas).getImageData(x, y, width, height);
-        }
-
-        @Override
-        public void writeImageData(HTMLCanvasElement canvas, ImageData imageData, int width, int height) {
-            CanvasRenderingContext2D context = getContext(canvas);
-            context.clearRect(0, 0, width, height);
-            context.putImageData(imageData, 0, 0, 0, 0, width, height);
-        }
-
-        @Override
-        public void scaleLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
-            getContext(canvas).drawImage(image, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
-        }
-
-        @Override
-        public void scaleMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
-            getContext(canvas).drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
         }
 
         @Override
@@ -460,6 +412,105 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={"owner", "resource"}, script="")
     private native static void registerImageResource(Object owner, JSObject resource);
 
+    // ===================================================================
+    // SURFACE BRIDGE natives (surface-id render model).
+    // -------------------------------------------------------------------
+    // The worker holds opaque worker-assigned surface ids; these natives carry
+    // PURE DATA (ids + flat command buffers) to the host, which keeps the
+    // id->{canvas,ctx} table and replays the stream (browser_bridge.js
+    // __cn1_surface_*). Only readRGB returns pixels. Empty @JSBody bodies are
+    // the translate-time linkage; the real implementations are the port.js
+    // bindNative generators that route to the host bridge. See
+    // SurfaceCommandRecorder for the command encoding.
+
+    /** Display surface id; mirrors browser_bridge.js SURF_DISPLAY_ID. */
+    static final int DISPLAY_SURFACE_ID = 1;
+
+    /** Create (or resize+clear) the backing canvas for a surface id. */
+    @JSBody(params={"id", "w", "h"}, script="")
+    static native void nativeSurfaceCreate(int id, int w, int h);
+
+    /**
+     * Replay a recorded command batch onto a surface. ``ops[0..opCount)`` are
+     * opcodes; nums/objs are consumed positionally per opcode (see the
+     * SurfaceCommandRecorder OP_* contract). ``w``/``h`` let the host lazily
+     * create the surface if a flush races ahead of create.
+     */
+    @JSBody(params={"id", "w", "h", "ops", "opCount", "nums", "numCount", "objs", "objCount"}, script="")
+    static native void nativeSurfaceFlush(int id, int w, int h,
+            int[] ops, int opCount, double[] nums, int numCount, Object[] objs, int objCount);
+
+    /** Read back an ARGB pixel rectangle (getRGB) into ``dest``. */
+    @JSBody(params={"id", "x", "y", "w", "h", "dest"}, script="")
+    static native void nativeSurfaceReadRGB(int id, int x, int y, int w, int h, int[] dest);
+
+    /** Encode a surface to a base64 data URL (PNG/JPEG export + screenshot save). */
+    @JSBody(params={"id", "mime", "quality"}, script="")
+    static native String nativeSurfaceToDataUrl(int id, String mime, double quality);
+
+    /** Release a surface's backing canvas when its owning Java image is GC'd. */
+    @JSBody(params={"id"}, script="")
+    static native void nativeSurfaceDispose(int id);
+
+    /** Write a raw ARGB pixel rectangle onto a surface (createImage(int[])). */
+    @JSBody(params={"id", "argb", "w", "h"}, script="")
+    static native void nativeSurfaceWritePixels(int id, int[] argb, int w, int h);
+
+    /**
+     * Read back an ARGB pixel rectangle from a LOADED image (an HTMLImageElement
+     * host resource) into ``dest`` -- the loaded-image getRGB path. The host
+     * draws the image onto a scratch canvas and reads its pixels.
+     */
+    @JSBody(params={"image", "x", "y", "w", "h", "dest"}, script="")
+    static native void nativeReadImagePixels(JSObject image, int x, int y, int w, int h, int[] dest);
+
+    /**
+     * Append a surface's backing canvas into a host DOM element and style it to
+     * the given CSS width/height (native widgets that embed a CN1-rendered image
+     * directly in the DOM). The worker holds no canvas, so the host resolves it
+     * from the surface table by id.
+     */
+    @JSBody(params={"id", "element", "cssWidth", "cssHeight"}, script="")
+    static native void nativeAttachSurfaceToElement(int id, JSObject element, String cssWidth, String cssHeight);
+
+    /**
+     * Embed a CN1 mutable image's rendered surface directly in a host DOM
+     * element, styled to {@code cssWidth}/{@code cssHeight} (native widgets).
+     * Flushes the surface first so the host canvas has its pixels. Public so the
+     * media-ext native widgets (file/photo pickers) can reach it across packages.
+     */
+    public static void attachImageToElement(NativeImage img, JSObject element, String cssWidth, String cssHeight) {
+        HTML5Graphics mg = img.getMutableGraphics();
+        mg.flush();
+        nativeAttachSurfaceToElement(mg.getSurfaceId(), element, cssWidth, cssHeight);
+    }
+
+    /**
+     * Arm the worker finalizer that releases a surface when its owning Java image
+     * is GC'd. ``owner`` MUST be the long-lived image (not a transient wrapper);
+     * the port.js binding registers it in a FinalizationRegistry that disposes
+     * the host surface id on collection. Empty @JSBody linkage; bound in port.js.
+     */
+    @JSBody(params={"owner", "surfaceId"}, script="")
+    static native void registerSurfaceDisposal(Object owner, int surfaceId);
+
+    // Worker-assigned surface ids. Start above the display id; these never
+    // collide with the host's hostRefNextId because surfaces live in a separate
+    // host table keyed by this id.
+    private static int nextSurfaceId = DISPLAY_SURFACE_ID + 1;
+
+    static synchronized int allocSurfaceId() {
+        return nextSurfaceId++;
+    }
+
+    // Allocate a host surface of the given size and return a graphics that
+    // records onto it. The single creation point for every mutable image.
+    HTML5Graphics createSurfaceGraphics(int width, int height) {
+        int id = allocSurfaceId();
+        nativeSurfaceCreate(id, width, height);
+        return new HTML5Graphics(this, id, width, height);
+    }
+
     private int getClientX(MouseEvent evt) {
         int x = evt.getClientX();
         if (x == -1) {
@@ -478,22 +529,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private boolean hitTest(int x, int y) {
-         if (outputCanvas != null) {
-            CanvasRenderingContext2D ctx = getOutputContext();
-            if (ctx != null) {
-                try {
-                    ImageData p = ctx.getImageData(x, y, 1, 1);
-                    int pixelLen = p.getData().getLength();
-                    if (pixelLen == 4) {
-                        if (p.getData().get(3) == 0) {
-                            return false;
-                        }
-                    }
-                } catch (Exception ex){}
-            }
+        if (outputCanvas != null) {
+            // Single-pixel alpha probe of the display surface. A fully
+            // transparent pixel means the pointer falls through (no component
+            // painted here). One round-trip per hit-test (pointer events only).
+            try {
+                int[] px = new int[1];
+                nativeSurfaceReadRGB(DISPLAY_SURFACE_ID, x, y, 1, 1, px);
+                if (((px[0] >>> 24) & 0xFF) == 0) {
+                    return false;
+                }
+            } catch (Exception ex){}
         }
-                
-        return true;       
+
+        return true;
                 
     }
     
@@ -1195,7 +1244,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         //outputCanvas.getStyle().setProperty("opacity", "0.5");
         updateCanvasSize();
         defaultFont = (NativeFont)createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
-        graphics = new BufferedGraphics(this, canvas, getDisplayWidth(), getDisplayHeight());
+        graphics = new BufferedGraphics(this, getDisplayWidth(), getDisplayHeight());
         
         // Normalize browser locale
         String blang = getBrowserLanguage();
@@ -1292,7 +1341,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                             @Override
                             public void sizeChanged() {
-                                HTML5Implementation.this.sizeChanged(canvas.getWidth(), canvas.getHeight());
+                                // updateCanvasSize() (the sibling callback) already
+                                // recorded the new size Java-side; use it rather than
+                                // reading canvas.getWidth() back across the barrier.
+                                HTML5Implementation.this.sizeChanged(getDisplayWidth(), getDisplayHeight());
                             }
 
                             @Override
@@ -2316,31 +2368,41 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @SuppressSyncErrors
     public void handleAnimationFrame(double time) {
-
-        if (graphicsLocked){
-            // Paint queue is mid-mutation. Re-arm rAF so we retry the
-            // drain once the writer releases the lock; otherwise pending
-            // ops would never paint.
-            scheduleAnimationFrame();
-            return;
-
-        }
-
-        drainPendingDisplayFrame();
-        // Re-arm rAF only if there's still work to flush. The original
-        // unconditional re-arm produced a 60 Hz worker-callback flood
-        // (host->worker postMessage of the rAF firing) even when the UI
-        // was completely idle. During Display.invokeAndBlock that flood
-        // crowded out self.onmessage for incoming pointer events:
-        // the OK button on a Dialog modal stopped reaching the worker.
-        // ``flushGraphics`` paints synchronously and calls
-        // ``scheduleAnimationFrame()`` itself when it leaves work behind,
-        // so dropping the unconditional re-arm here is safe -- the next
-        // user-driven paint or queue write restarts the loop.
-        if (pendingDisplay.hasPendingOps()) {
-            scheduleAnimationFrame();
-        }
-
+        // This rAF callback is dispatched on a SPAWNED, non-EDT green thread
+        // (port.js requestAnimationFrameNative -> spawnVirtualCallback ->
+        // jvm.spawn). ``drainPendingDisplayFrame`` mutates ``pendingDisplay`` --
+        // a single render frame OWNED by the EDT, which produces into it via
+        // ``flushGraphics`` -> queueFlush -> ``JavaScriptRenderQueueState.replace``
+        // (a destructive clear+addAll) and consumes via ``snapshotAndClear``.
+        // Draining from this thread races the EDT: an interleaved replace/snapshot
+        // drops a queued frame before it ships, so the canvas keeps a stale frame
+        // and a run of screenshot tests freeze on it. Marshal the whole
+        // drain+re-arm onto the EDT with callSerially so ALL pendingDisplay
+        // mutation is single-threaded; the per-op ``graphicsLocked`` flag then
+        // only ever guards re-entrancy within the one (EDT) thread.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (graphicsLocked) {
+                    // Paint queue is mid-mutation. Re-arm rAF so we retry the
+                    // drain once the writer releases the lock; otherwise pending
+                    // ops would never paint.
+                    scheduleAnimationFrame();
+                    return;
+                }
+                drainPendingDisplayFrame();
+                // Re-arm rAF only if there's still work to flush. An
+                // unconditional re-arm produced a 60 Hz worker-callback flood
+                // (host->worker postMessage of the rAF firing) even when the UI
+                // was completely idle, which during Display.invokeAndBlock
+                // crowded out self.onmessage for incoming pointer events.
+                // ``flushGraphics`` paints synchronously and re-arms itself when
+                // it leaves work behind, so this conditional re-arm is enough.
+                if (pendingDisplay.hasPendingOps()) {
+                    scheduleAnimationFrame();
+                }
+            }
+        });
     }
 
     private boolean drainPendingDisplayFrame() {
@@ -2355,7 +2417,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (frame.isEmpty()) {
             return false;
         }
-        CanvasRenderingContext2D context = getOutputContext();
+        // Record the whole frame into the display surface's command buffer (the
+        // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
+        // flush. The host replays it onto the output canvas -- the worker never
+        // touches a canvas/context proxy.
+        CanvasRenderingContext2D context = graphics.getContext();
         context.save();
         // Reset to identity BEFORE the crop clip is set. Without this, if
         // the prior drain ended with a non-identity transform on the
@@ -2402,10 +2468,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         for (ExecutableOp op : frame.getOps()){
-            op.execute(context);
+            try {
+                op.execute(context);
+            } catch (Throwable __opt) {
+                System.out.println("PARPAR:DIAG:OPTHROW:op=" + op.getClass().getName()
+                        + ":cls=" + __opt.getClass().getName() + ":msg=" + __opt.getMessage());
+            }
         }
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();
+        graphics.flush();
         return true;
     }
 
@@ -2912,7 +2984,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
 
-            tp.put("StatusBar.padding", "0,0,0,0");
+            // The browser has no OS status bar / notch, so the app must not
+            // reserve a status-bar strip at the top of the Form the way iOS
+            // does. The iOS-modern theme sets paintsTitleBarBool=true to
+            // reserve that safe-area space on real devices; force it off on the
+            // JS port so the web layout starts flush at the top (otherwise the
+            // undefined StatusBar UIID would also paint an opaque strip there).
+            tp.put("@paintsTitleBarBool", "false");
 
             UIManager.getInstance().setThemeProps(tp);
             return;
@@ -3188,31 +3266,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public int getDisplayWidth() {
-        // Cached Java-side (updateCanvasSize); only fall back to a single
-        // barrier read if queried before the first layout.
-        if (displayWidth <= 0) {
-            displayWidth = canvas.getWidth();
-        }
-        return displayWidth;
+        // Pure synchronous read of the Java-cached size (set in updateCanvasSize,
+        // which runs at init and on resize). MUST NOT read canvas.getWidth() back
+        // across the barrier (degrades -> wedge) and MUST NOT call updateCanvasSize
+        // here: that yields (barrier reads) and its repaint side effect recurses
+        // back into getDisplayWidth -> synchronous wedge. A pre-layout query just
+        // gets the safe minimum until the first updateCanvasSize lands.
+        return displayWidth > 0 ? displayWidth : 1;
     }
 
     @Override
     public int getDisplayHeight() {
-        if (displayHeight <= 0) {
-            displayHeight = canvas.getHeight();
-        }
-        return displayHeight;
+        return displayHeight > 0 ? displayHeight : 1;
     }
 
-    // Lazily cache and reuse the output canvas 2D context. getContext('2d')
-    // returns the same context object for a canvas across its lifetime (a
-    // resize resets the context state but not its identity), so there is no
-    // reason to re-request it across the barrier on every paint frame.
-    private CanvasRenderingContext2D getOutputContext() {
-        if (outputContext == null && outputCanvas != null) {
-            outputContext = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
-        }
-        return outputContext;
+    /** Cross-package access to the (Java-cached) display size, so callers in
+     *  other packages size native widgets without reading canvas.getWidth()
+     *  back across the barrier. */
+    public static int displayWidthPx() {
+        return instance != null ? instance.getDisplayWidth() : 1;
+    }
+
+    public static int displayHeightPx() {
+        return instance != null ? instance.getDisplayHeight() : 1;
     }
 
     // Cached document accessor. Never re-query doc() across the
@@ -3531,11 +3607,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     theEl.removeEventListener("loadedmetadata", loadedMetaDataListener);
                 }
             });
-            while (!complete[0]) {
+            // Bound the wait: a headless browser (no audio device) may never fire
+            // loadedmetadata OR error for an <audio> element, which used to hang
+            // createMedia forever (the test was force-advanced by the 90s dispatch
+            // watchdog). The media element is created either way; if metadata never
+            // arrives we return it anyway (it may still load/play later) rather
+            // than blocking the caller indefinitely.
+            final long mediaLoadDeadline = System.currentTimeMillis() + 4000;
+            while (!complete[0] && System.currentTimeMillis() < mediaLoadDeadline) {
                 invokeAndBlock(new Runnable() {
                     public void run() {
                         synchronized(complete) {
-                            Util.wait(complete);
+                            Util.wait(complete, 250);
                         }
                     }
 
@@ -3602,18 +3685,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (mimeType != null && !Objects.equals(blob.getType(), mimeType)) {
                 blob = BlobUtil.toType(blob, mimeType);
             }
-            URLBuilderFactory factory = (URLBuilderFactory)window;
-            URLBuilder urlBuilder = factory.getURL();
-        
-            String objUrl = urlBuilder.createObjectURL(blob);
-            return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);  
+            // BlobUtil.createObjectURL runs URL.createObjectURL in the worker.
+            // (URLBuilderFactory)window.getURL() returned null in the worker
+            // (window is a host-ref proxy) -> NPE in createMedia.
+            String objUrl = BlobUtil.createObjectURL(blob);
+            return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);
         } else {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Util.copy(stream, baos);
-            Blob blob = BlobUtil.createBlob(baos.toByteArray(), mimeType);
-            URLBuilderFactory factory = (URLBuilderFactory)window;
-            URLBuilder urlBuilder = factory.getURL();
-            String objUrl = urlBuilder.createObjectURL(blob);
+            // Use a self-contained data: URL (pure-Java base64) rather than a
+            // blob: object URL. BlobUtil.createObjectURL runs in the worker, so
+            // the blob: URL is worker-scoped and the main-thread <audio> element
+            // can't load it -- createMedia's blocking wait then never sees
+            // loadedmetadata/error and hangs (the dispatch watchdog force-advances
+            // the test). A data: URL is a portable string that loads anywhere.
+            String objUrl = "data:" + (mimeType == null ? "audio/wav" : mimeType)
+                    + ";base64," + com.codename1.util.Base64.encodeNoNewline(baos.toByteArray());
             return createMedia(objUrl, mimeType.indexOf("video")!=-1, mimeType, onCompletion, blocking);
         }
     }
@@ -5030,35 +5117,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private final java.util.Map<PeerComponent, HTML5GLSurface> glSurfaces =
             new IdentityHashMap<PeerComponent, HTML5GLSurface>();
 
-    @Override
-    public boolean isOpenGLSupported() {
-        return true;
-    }
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            HTML5GLSurface surface = HTML5GLSurface.create(view);
+            if (surface == null) {
+                return null;
+            }
+            glSurfaces.put(surface, surface);
+            return surface;
+        }
+
+        @Override
+        public void setContinuous(PeerComponent peer, boolean continuous) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(PeerComponent peer) {
+            HTML5GLSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
 
     @Override
-    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
-        HTML5GLSurface surface = HTML5GLSurface.create(view);
-        if (surface == null) {
-            return null;
-        }
-        glSurfaces.put(surface, surface);
-        return surface;
-    }
-
-    @Override
-    public void glSetContinuous(PeerComponent peer, boolean continuous) {
-        HTML5GLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.setContinuous(continuous);
-        }
-    }
-
-    @Override
-    public void glRequestRender(PeerComponent peer) {
-        HTML5GLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.requestRender();
-        }
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
     }
 
     @Override
@@ -5216,8 +5306,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void flushGraphics() {
-    	flushGraphics(0,0,canvas.getWidth(), canvas.getHeight());
-        
+        flushGraphics(0, 0, getDisplayWidth(), getDisplayHeight());
     }
 
     @Override
@@ -5230,54 +5319,52 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         flushGraphics();
-        final int width = outputCanvas.getWidth();
-        final int height = outputCanvas.getHeight();
+        final int width = getDisplayWidth();
+        final int height = getDisplayHeight();
         if (width <= 0 || height <= 0) {
             super.screenshot(callback);
             return;
         }
         drainPendingDisplayFrame();
-        final CanvasRenderingContext2D context = (CanvasRenderingContext2D) outputCanvas.getContext("2d");
-        // 3D peers render to their own WebGL canvases overlaid on the output
-        // canvas; composite their current frames in so screenshots capture them.
-        HTML5GLSurface.compositeInto((com.codename1.html5.js.JSObject) context);
-        final ImageData imageData = context.getImageData(0, 0, width, height);
-        final Uint8ClampedArray data = imageData.getData();
+        // Read the display SURFACE pixels by id (the one legitimate pixel
+        // read-back) instead of getContext().getImageData() on the canvas
+        // host-ref. nativeSurfaceReadRGB returns ARGB straight into ``rgb``.
         final int[] rgb = new int[width * height];
-        // Bulk RGBA->ARGB conversion in one JS-native loop. The legacy
-        // ``PixelReader`` path made 4 JSO virtual-dispatch calls per
-        // pixel (4.6M for a 1280x900 screenshot); the bulk intrinsic
-        // collapses that to a single ``yield*`` boundary.
-        JavaScriptImageDataAdapter.readRgbaToArgbBulk(data, rgb, 0);
+        nativeSurfaceReadRGB(DISPLAY_SURFACE_ID, 0, 0, width, height, rgb);
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
     @Override
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
-    	NativeImage im = (NativeImage)nativeImage;
+    	final NativeImage im = (NativeImage)nativeImage;
         if (im.img != null && !im.loaded) {
             im.load();
         }
-        final ImageData[] imData = new ImageData[1];
+        // The host computes ARGB and writes it straight into ``dest`` -- the one
+        // legitimate pixel read-back across the barrier. Read into ``arr``
+        // directly when offset is 0, else into a temp then splice.
+        final int[] dest = (offset == 0) ? arr : new int[width * height];
+        final boolean[] ok = new boolean[1];
         JavaScriptNativeImageAdapter.readPixels(im.getImageModel(), new JavaScriptNativeImageAdapter.PixelReadTarget() {
             @Override
             public void readLoadedImage() {
-                imData[0] = renderingBackend.readLoadedImageData(im.img, x, y, width, height);
+                nativeReadImagePixels(im.img, x, y, width, height, dest);
+                ok[0] = true;
             }
 
             @Override
             public void readMutableSurface() {
-                imData[0] = renderingBackend.readMutableSurfaceData(im.mutableGraphics.getCanvas(), x, y, width, height);
+                im.mutableGraphics.flush();
+                nativeSurfaceReadRGB(im.mutableGraphics.getSurfaceId(), x, y, width, height, dest);
+                ok[0] = true;
             }
         });
-        if (imData[0] == null) {
+        if (!ok[0]) {
             throw new RuntimeException("Failed to get RGB data.  Image not loaded " + nativeImage);
         }
-
-        final Uint8ClampedArray dataArr = imData[0].getData();
-        // Bulk RGBA->ARGB via JS-native intrinsic; see screenshot()
-        // call above for rationale.
-        JavaScriptImageDataAdapter.readRgbaToArgbBulk(dataArr, arr, offset);
+        if (offset != 0) {
+            System.arraycopy(dest, 0, arr, offset, width * height);
+        }
     }
 
     
@@ -5307,15 +5394,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
 
             private void saveImage(NativeImage nimg, OutputStream response, String format, int width, int height, float quality) throws IOException {
-                HTMLCanvasElement canvas = renderingBackend.createCanvas(width, height);
-                CanvasRenderingContext2D ctx = renderingBackend.getContext(canvas);
-                nimg.draw(ctx, 0, 0, width, height);
-                Blob blob = renderingBackend.toImageBlob(canvas, "image/"+format, quality);
-                InputStream blobInput = BlobUtil.openInputStream(blob);
-                Util.copy(blobInput, response);
-                Util.cleanup(blobInput);
-                
-                
+                // Encode straight from the host-side surface canvas: a mutable
+                // image IS a surface, so flush it and read its PNG/JPEG data URL.
+                // A loaded image is rendered onto a scratch surface first. This
+                // replaces the old createCanvas + nimg.draw(realCtx) + toBlob path
+                // which no longer works -- nimg.draw targets a SurfaceCommandRecorder,
+                // not a live canvas context.
+                int surfaceId;
+                if (nimg.mutableGraphics != null) {
+                    nimg.mutableGraphics.flush();
+                    surfaceId = nimg.mutableGraphics.getSurfaceId();
+                } else {
+                    HTML5Graphics scratch = createSurfaceGraphics(width, height);
+                    nimg.draw((CanvasRenderingContext2D)scratch.getContext(), 0, 0, width, height);
+                    scratch.flush();
+                    surfaceId = scratch.getSurfaceId();
+                }
+                String dataUrl = nativeSurfaceToDataUrl(surfaceId, "image/"+format, quality);
+                if (dataUrl == null) {
+                    throw new IOException("Failed to encode surface "+surfaceId+" to image/"+format);
+                }
+                int comma = dataUrl.indexOf(',');
+                String b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
+                response.write(Base64.decode(b64.getBytes()));
             }
             
             @Override
@@ -5336,49 +5437,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createImage(int[] rgb, int width, int height) {
+        // An ARGB int[] becomes a mutable surface: allocate it and write the
+        // pixels host-side in one fire-and-forget op. No ImageData host-ref and
+        // no per-pixel writeArgbBuffer round-trip.
         NativeImage img = new NativeImage();
-        ImageData data;
-        try {
-            data = (ImageData)createImageData(rgb, width, height);
-        } catch (Throwable t) {
-            // CssGradients hits a flaky "Missing virtual method
-            // writeArgbBuffer on undefined" when the host ImageData
-            // round-trip lands while the worker is mid-paint; before this
-            // guard, the throw killed the entire test runner. Return a
-            // blank image so the bad tile is silently dropped and the
-            // suite keeps running -- the next paint cycle re-attempts.
-            img.width = width;
-            img.height = height;
-            return img;
-        }
-        if (data == null) {
-            img.width = width;
-            img.height = height;
-            return img;
-        }
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(width, height,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
-                            }
-                        });
-        attachMutableImageSurface(img, buffer.getGraphics());
-        renderingBackend.writeImageData(buffer.getCanvas(), data, width, height);
-        //System.out.println("Created image from rgb "+img);
-        
+        HTML5Graphics graphics = createSurfaceGraphics(width, height);
+        attachMutableImageSurface(img, graphics);
+        nativeSurfaceWritePixels(graphics.getSurfaceId(), rgb, width, height);
         return img;
-        
     }
 
     @Override
@@ -5395,36 +5461,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
-    private Object createImageData(int[] rgb, int width, int height){
-        return createImageData(rgb, 0, width, height);
-    }
-    
-    Object createImageData(int[] rgb, int offset, int width, int height) {
-        // The host-side ``createImageData`` round-trips through the JSO
-        // dispatcher; under tight per-paint timing -- CssGradients hits this
-        // during initial form layout when other host calls are still in
-        // flight -- the dispatch can return undefined, and the resulting
-        // ``d.writeArgbBuffer(...)`` then throws ``Missing virtual method
-        // cn1_s_writeArgbBuffer on undefined`` which propagates up through
-        // the test runner's paint cycle and halts the entire suite.
-        // Guard against the undefined-receiver case so the worst we do is
-        // emit a blank image. Caller (createImage) handles ``null`` by
-        // returning an empty NativeImage; the dropped tile is preferable
-        // to a runtime-wide error.
-        ImageData d = graphics.getContext().createImageData(width, height);
-        if (d == null) {
-            return null;
-        }
-        // Single round-trip: send the ARGB int[] to host, where the
-        // ``writeArgbBuffer`` prototype extension unpacks it directly into
-        // ``this.data``. The earlier
-        // ``((Uint8ClampedArraySetter)d.getData()).set(arr)`` path lost every
-        // byte to the worker-side clone of ``imageData.data`` — see
-        // ``ImageData.writeArgbBuffer`` for the full rationale.
-        d.writeArgbBuffer(rgb, offset, width, height);
-        return d;
-
-    }
 
     private int isTablet = -1;
 
@@ -5695,11 +5731,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private void attachMutableImageSurface(final NativeImage image, HTML5Graphics graphics) {
         image.mutableGraphics = graphics;
-        // Single chokepoint for every mutable-image backing canvas. Tie the
-        // host canvas's lifetime to this Java image: when the image is GC'd the
-        // worker finalizer releases the canvas's host id (the ~4MB backing
-        // store). The host never reclaims on its own.
-        registerImageResource(image, graphics.getCanvas());
+        // The host owns the surface's backing canvas (keyed by surface id in the
+        // surface table); when this Java image is GC'd the worker finalizer
+        // releases it via nativeSurfaceDispose -- the host never reclaims on its
+        // own. registerSurfaceDisposal arms that finalizer on the owning image.
+        registerSurfaceDisposal(image, graphics.getSurfaceId());
         image.mutableGraphics.setMutationListener(new Runnable() {
             @Override
             public void run() {
@@ -5708,7 +5744,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         });
     }
 
-    
+
     
     @Override
     public void downloadImageToCache(String _url, final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail) {
@@ -5943,45 +5979,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createMutableBuffer(width, height, fillColor,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int color, int fillWidth, int fillHeight) {
-                                // Image.createImage(w, h, fillColor) takes an ARGB int. The
-                                // alpha byte must drive the fill's transparency:
-                                // ``setColorWithAlpha`` already sets ``fillStyle`` to an
-                                // ``rgba(...)`` string, but the FillRect op overwrites that
-                                // with ``rgb(...)`` and uses ``state.alpha`` (the graphics-
-                                // wide global alpha, defaulting to 255) as the canvas
-                                // ``globalAlpha`` -- silently dropping the colour's alpha
-                                // byte. Route the alpha through ``setAlpha`` so it lands in
-                                // ``state.alpha`` and the FillRect op picks it up. Reset
-                                // alpha to 255 afterwards so the freshly returned mutable-
-                                // image graphics has the default state the user expects.
-                                int colorAlpha = (color >>> 24) & 0xFF;
-                                graphics.setColor(color & 0xFFFFFF);
-                                if (colorAlpha != 0xFF) {
-                                    graphics.setAlpha(colorAlpha);
-                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
-                                    graphics.setAlpha(255);
-                                } else {
-                                    graphics.fillRect(0, 0, fillWidth, fillHeight);
-                                }
-                            }
-                        });
+        // A mutable image is a host-side SURFACE: the worker holds only its id +
+        // dimensions and records draw ops into the surface's command buffer.
+        // There is no canvas/context proxy and no getContext() round-trip --
+        // which is what removed the per-mutable-image "Number 667" host-ref
+        // staleness that wedged the suite. Only getRGB ever reads pixels back.
+        HTML5Graphics graphics = createSurfaceGraphics(width, height);
+        // Seed the fill exactly as the canvas path did. Image.createImage(w, h,
+        // fillColor) takes an ARGB int whose alpha byte drives transparency;
+        // route the alpha through setAlpha so the recorded FillRect op picks it
+        // up (it uses state.alpha as globalAlpha), then restore the default 255
+        // so the returned graphics has the state the caller expects.
+        int colorAlpha = (fillColor >>> 24) & 0xFF;
+        graphics.setColor(fillColor & 0xFFFFFF);
+        if (colorAlpha != 0xFF) {
+            graphics.setAlpha(colorAlpha);
+            graphics.fillRect(0, 0, width, height);
+            graphics.setAlpha(255);
+        } else {
+            graphics.fillRect(0, 0, width, height);
+        }
         NativeImage img = new NativeImage();
-        attachMutableImageSurface(img, buffer.getGraphics());
+        attachMutableImageSurface(img, graphics);
         return img;
 
     }
@@ -6008,64 +6027,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return image;
         }
         NativeImage blurred = new NativeImage();
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(w, h,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
-                            }
-                        });
-        blurred.width = buffer.getWidth();
-        blurred.height = buffer.getHeight();
-        attachMutableImageSurface(blurred, buffer.getGraphics());
+        blurred.width = w;
+        blurred.height = h;
+        HTML5Graphics blurGraphics = createSurfaceGraphics(w, h);
+        attachMutableImageSurface(blurred, blurGraphics);
         if (src.img != null && !src.loaded) {
             src.load();
         }
-        try {
-            if (src.img != null && src.loaded) {
-                applyBlurViaHost(buffer.getCanvas(), src.img, w, h, radius);
-            } else if (src.mutableGraphics != null) {
-                applyBlurViaHost(buffer.getCanvas(), src.mutableGraphics.getCanvas(), w, h, radius);
-            } else {
-                return image;
-            }
-        } catch (Throwable t) {
+        // The host applies the canvas2d filter:blur in one op onto the
+        // destination surface, reading from either the loaded image host
+        // resource or another surface (by id). -1 srcSurfaceId means use the
+        // image; otherwise the source surface must be flushed first.
+        if (src.img != null && src.loaded) {
+            nativeSurfaceBlur(blurGraphics.getSurfaceId(), src.img, -1, w, h, radius);
+        } else if (src.mutableGraphics != null) {
+            src.mutableGraphics.flush();
+            nativeSurfaceBlur(blurGraphics.getSurfaceId(), null, src.mutableGraphics.getSurfaceId(), w, h, radius);
+        } else {
             return image;
         }
         return Image.createImage(blurred);
     }
 
-    // Single-shot host-bridge blur. The earlier Java-typed dispatch path
-    // (commit fa18f0301) ran six separate ctx.save/setFilter/drawImage/.../
-    // restore calls -- each a worker→main round-trip -- and that latency
-    // hung Sheet/Dialog backdrop paint cycles long enough to overrun the
-    // screenshot test budget. Doing the whole blur in one
-    // ``invokeHostNative('__cn1_apply_canvas_blur__', ...)`` call collapses
-    // it to a single round-trip; the matching handler in browser_bridge.js
-    // performs the canvas2d filter:blur op entirely on the main thread.
-    @JSBody(params = {"dst", "src", "w", "h", "radius"}, script =
-            "if (typeof jvm === 'undefined' || typeof jvm.invokeHostNative !== 'function') return null;\n"
-            + "yield jvm.invokeHostNative('__cn1_apply_canvas_blur__', [{dst: dst, src: src, w: w|0, h: h|0, radius: +radius}]);\n"
-            + "return null;\n")
-    private static native void applyBlurViaHost(HTMLCanvasElement dst, JSObject src, int w, int h, float radius);
-
-    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLImageElement src, int w, int h, float radius) {
-        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
-    }
-
-    private void applyBlurViaHost(HTMLCanvasElement dst, HTMLCanvasElement src, int w, int h, float radius) {
-        applyBlurViaHost(dst, (JSObject)src, w, h, radius);
-    }
+    /**
+     * Apply a canvas2d gaussian blur onto a destination surface in one host op,
+     * reading from a loaded image (``srcImage``, ``srcSurfaceId`` == -1) or
+     * another surface (``srcSurfaceId`` >= 0).
+     */
+    @JSBody(params = {"dstId", "srcImage", "srcSurfaceId", "w", "h", "radius"}, script="")
+    private static native void nativeSurfaceBlur(int dstId, JSObject srcImage, int srcSurfaceId, int w, int h, float radius);
 
     @Override
     public boolean isAntiAliasingSupported() {
@@ -6183,7 +6173,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (src.img != null && src.loaded) {
             ctx.drawImage(src.img, parkX, parkY);
         } else if (src.mutableGraphics != null) {
-            ctx.drawImage(src.mutableGraphics.getCanvas(), parkX, parkY);
+            src.mutableGraphics.flush();
+            ((SurfaceCommandRecorder)ctx).blitSurface(src.mutableGraphics.getSurfaceId(), parkX, parkY, -1, -1);
         }
         ctx.restore();
     }
@@ -6209,43 +6200,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         NativeImage img = (NativeImage)nativeImage;
         
         NativeImage scaled = new NativeImage();
-        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
-                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(width, height,
-                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
-                            @Override
-                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
-                            }
-                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
-                            @Override
-                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas, int width, int height) {
-                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas, width, height);
-                            }
-
-                            @Override
-                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
-                            }
-                        });
-        scaled.width = buffer.getWidth();
-        scaled.height = buffer.getHeight();
-        attachMutableImageSurface(scaled, buffer.getGraphics());
+        scaled.width = width;
+        scaled.height = height;
+        HTML5Graphics target = createSurfaceGraphics(width, height);
+        attachMutableImageSurface(scaled, target);
+        SurfaceCommandRecorder ctx = (SurfaceCommandRecorder)target.getContext();
         if (img.img != null && !img.loaded) {
             img.load();
         }
         if (img.img != null && img.loaded) {
             int srcW = img.img.getNaturalWidth();
             int srcH = img.img.getNaturalHeight();
-            if (srcW >0 && srcH > 0) {
-                renderingBackend.scaleLoadedImageToCanvas(buffer.getCanvas(), img.img, srcW, srcH, width, height);
+            if (srcW > 0 && srcH > 0) {
+                ctx.drawImage(img.img, 0, 0, srcW, srcH, 0, 0, width, height);
             } else {
                 String msg = "Failed to scale image because the width or height is non-positive. "+srcW+"x"+srcH;
                 _log(msg);
             }
         } else if (img.mutableGraphics != null) {
-            renderingBackend.scaleMutableSurfaceToCanvas(buffer.getCanvas(), img.mutableGraphics.getCanvas(), img.getWidth(), img.getHeight(), width, height);
+            img.mutableGraphics.flush();
+            ctx.blitSurface(img.mutableGraphics.getSurfaceId(), 0, 0, img.getWidth(), img.getHeight(), 0, 0, width, height);
         }
-        
-        
+        target.flush();
         return scaled;
     }
 
@@ -6468,7 +6444,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void concatenateTransform(Object t1, Object t2) {
-        ((JSAffineTransform)t1).concatenate((JSAffineTransform)t2);
+        JSAffineTransform a = (JSAffineTransform)t1;
+        JSAffineTransform b = (JSAffineTransform)t2;
+        if (a.is3D() || b.is3D()) {
+            a.concatenate3(b);
+        } else {
+            a.concatenate(b);
+        }
     }
 
     @Override
@@ -6486,6 +6468,54 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
         ((JSAffineTransform)nativeTransform).setTransform(m00, m10, m01, m11, m02, m12);
+    }
+
+    // ---- Perspective / camera / orthographic (4x4) transforms -------------
+    // The JS port backs these with a pure-Java 4x4 matrix (JSMatrix4) carried
+    // inside JSAffineTransform; the affine projection is mirrored onto the 2D
+    // backing so ordinary rendering is unaffected. Apps that project points
+    // themselves (transformPoint) get the full homogeneous result, matching the
+    // Android port. See JSMatrix4 + JSAffineTransform.is3D().
+
+    @Override
+    public boolean isPerspectiveTransformSupported() {
+        return true;
+    }
+
+    private static JSAffineTransform make4x4(double[] m16) {
+        JSAffineTransform t = JSAffineTransform.Factory.getTranslateInstance(0, 0);
+        t.setMatrix4(m16);
+        return t;
+    }
+
+    @Override
+    public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
+        return make4x4(JSMatrix4.perspective(fovy, aspect, zNear, zFar));
+    }
+
+    @Override
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.perspective(fovy, aspect, zNear, zFar));
+    }
+
+    @Override
+    public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
+        return make4x4(JSMatrix4.ortho(left, right, bottom, top, near, far));
+    }
+
+    @Override
+    public void setTransformOrtho(Object nativeTransform, float left, float right, float bottom, float top, float near, float far) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.ortho(left, right, bottom, top, near, far));
+    }
+
+    @Override
+    public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        return make4x4(JSMatrix4.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
+    }
+
+    @Override
+    public void setTransformCamera(Object nativeTransform, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        ((JSAffineTransform)nativeTransform).setMatrix4(JSMatrix4.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
     }
 
     @Override
@@ -6550,19 +6580,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).translate(x, y);
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D() || z != 0) {
+            t.translate3(x, y, z);
+        } else {
+            t.translate(x, y);
+        }
     }
 
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).scale(x, y);
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D() || z != 1) {
+            t.scale3(x, y, z);
+        } else {
+            t.scale(x, y);
+        }
     }
 
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
         if (nativeTransform == null) return;
-        ((JSAffineTransform)nativeTransform).rotate(angle, x, y);
+        // Transform.rotate(angle, px, py) decomposes to translate + rotate around
+        // the z axis + translate, so x,y,z here is always a rotation AXIS (never a
+        // pivot). A pure z-axis rotation collapses to the 2D affine rotate; any
+        // other axis (or an already-3D transform) needs the 4x4 path.
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        boolean zAxis = x == 0 && y == 0;
+        if (t.is3D() || !zAxis) {
+            t.rotate3(angle, x, y, z);
+        } else {
+            t.rotate(angle, 0, 0);
+        }
     }
 
     @Override
@@ -6594,11 +6644,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             return;
         }
+        JSAffineTransform t = (JSAffineTransform)nativeTransform;
+        if (t.is3D()) {
+            t.transformPoint3(in, out);
+            return;
+        }
         Float64Array jsIn = Float64Array.create(2);
         jsIn.set(0, in[0]);
         jsIn.set(1, in[1]);
         Float64Array jsOut = Float64Array.create(2);
-        ((JSAffineTransform)nativeTransform).transform(jsIn, 0, jsOut, 0, 1);
+        t.transform(jsIn, 0, jsOut, 0, 1);
         out[0] = (float)jsOut.get(0);
         out[1] = (float)jsOut.get(1);
 
@@ -8570,12 +8625,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public int getMutableSurfaceWidth() {
-                return mutableGraphics.getCanvas().getWidth();
+                // Java-side dimension: never read canvas.getWidth() back across
+                // the barrier (those number reads are exactly what crossed with
+                // getContext() object reads -> "Number 667" staleness). Also
+                // avoids rasterizing a deferred image just to measure it.
+                return mutableGraphics.getCanvasWidth();
             }
 
             @Override
             public int getMutableSurfaceHeight() {
-                return mutableGraphics.getCanvas().getHeight();
+                return mutableGraphics.getCanvasHeight();
             }
 
             @Override
@@ -8778,32 +8837,51 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 @Override
                 public void drawMutableSurface(int drawX, int drawY, int drawWidth, int drawHeight) {
-                    renderingBackend.drawMutableSurface(ctx, mutableGraphics.getCanvas(), drawX, drawY, drawWidth, drawHeight);
+                    // The source is another surface: flush its pending commands
+                    // (so the host has its pixels) then record a blit by id onto
+                    // the target surface. No canvas host-ref crosses.
+                    mutableGraphics.flush();
+                    ((SurfaceCommandRecorder)ctx).blitSurface(mutableGraphics.getSurfaceId(), drawX, drawY, drawWidth, drawHeight);
                 }
             }, x, y, width, height);
         }
-        
+
         public void tile(CanvasRenderingContext2D ctx, int x, int y, int width, int height) {
-            JavaScriptNativeImageAdapter.tile(imageModel, new JavaScriptNativeImageAdapter.TileTarget() {
-                @Override
-                public Object createLoadedImagePattern() {
-                    return renderingBackend.createLoadedImagePattern(ctx, img);
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            int iw = getWidth();
+            int ih = getHeight();
+            if (iw <= 0 || ih <= 0) {
+                return;
+            }
+            // Tile by repeated drawImage rather than a CanvasPattern fill. In the
+            // surface-id render model a pattern set as fillStyle paints opaque
+            // BLACK on the display surface: the pattern is created successfully
+            // (createPattern returns non-null, and the very same pattern fills
+            // correctly on a scratch OffscreenCanvas) but the display context
+            // does not honour the pattern fill. That turned every image-border
+            // centre black -- the legacy iOS7 Toolbar/Title/StatusBar strips draw
+            // their left/right caps with drawImage (which renders fine) but the
+            // centre via tileImage, so the whole title bar came out black. The
+            // old TeaVM port rendered iOS7 correctly. drawImage IS honoured on
+            // the display surface, so tile the source image across the region.
+            long tilesX = ((long) width + iw - 1) / iw;
+            long tilesY = ((long) height + ih - 1) / ih;
+            if (tilesX * tilesY > 400L) {
+                // Pathologically fine tile over a large area: stretch instead of
+                // emitting thousands of draw ops. Visually exact for the near-
+                // uniform fills that reach this path.
+                draw(ctx, x, y, width, height);
+                return;
+            }
+            for (int ty = 0; ty < height; ty += ih) {
+                int dh = Math.min(ih, height - ty);
+                for (int tx = 0; tx < width; tx += iw) {
+                    int dw = Math.min(iw, width - tx);
+                    draw(ctx, x + tx, y + ty, dw, dh);
                 }
-
-                @Override
-                public Object createMutableSurfacePattern() {
-                    return renderingBackend.createMutableSurfacePattern(ctx, mutableGraphics.getCanvas());
-                }
-
-                @Override
-                public void paintPattern(Object pattern, int tileX, int tileY, int tileWidth, int tileHeight) {
-                    ctx.setFillStyle((CanvasPattern)pattern);
-                    ctx.save();
-                    ctx.translate(tileX, tileY);
-                    ctx.fillRect(0, 0, tileWidth, tileHeight);
-                    ctx.restore();
-                }
-            }, x, y, width, height);
+            }
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y){
@@ -9177,15 +9255,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
         public int fontAscent() {
             if (ascent == 0) {
-                HTMLCanvasElement canvas = getCanvasBuffer(100,100);
-                CanvasRenderingContext2D context = (CanvasRenderingContext2D)canvas.getContext("2d");
-                String oldFont = context.getFont();
-                context.setFont(((NativeFont)this).getCSS());
-                //this.canvas.getStyle().setProperty("font", nativeFont+"");
-                //ascent = (int)Math.round(((JSOImplementations.JSFontMetrics)context.measureText(alphabet)).getAscent());
+                // Ascent is derived purely from fontHeight()/fontLeading() and a
+                // family ratio -- the old canvas.getContext()/getFont() probe here
+                // was dead (its result was never used) and a forbidden barrier
+                // read, so it's gone.
                 ascent = (int)((fontHeight()-fontLeading()) * measureAscent(getCSSFontFamily()));
-                //context.setFont(oldFont);
-                
             }
             return ascent;
         }
@@ -9276,8 +9350,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         btn.getStyle().setProperty("position", "absolute");
         btn.getStyle().setProperty("top", "0");
         btn.getStyle().setProperty("left", "0");
-        btn.getStyle().setProperty("width", ""+scaleCoord(HTML5Implementation.instance.canvas.getWidth())+"px");
-        btn.getStyle().setProperty("height", ""+scaleCoord(HTML5Implementation.instance.canvas.getHeight())+"px");
+        btn.getStyle().setProperty("width", ""+scaleCoord(instance.getDisplayWidth())+"px");
+        btn.getStyle().setProperty("height", ""+scaleCoord(instance.getDisplayHeight())+"px");
         btn.getStyle().setProperty("padding", "0");
         btn.getStyle().setProperty("margin", "0");
         btn.getStyle().setProperty("font-size", "2em");
@@ -9577,8 +9651,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         btn.getStyle().setProperty("position", "absolute");
         btn.getStyle().setProperty("top", "0");
         btn.getStyle().setProperty("left", "0");
-        btn.getStyle().setProperty("width", ""+scaleCoord(canvas.getWidth())+"px");
-        btn.getStyle().setProperty("height", ""+scaleCoord(canvas.getHeight())+"px");
+        btn.getStyle().setProperty("width", ""+scaleCoord(getDisplayWidth())+"px");
+        btn.getStyle().setProperty("height", ""+scaleCoord(getDisplayHeight())+"px");
         btn.getStyle().setProperty("padding", "0");
         btn.getStyle().setProperty("margin", "0");
         //btn.getStyle().setProperty("font-size", "2em");
@@ -9588,11 +9662,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         //_logObj(((NativeImage)im.getImage()).getImg());
         nativeButton.setWidth(nativeButton.getPreferredW());
         nativeButton.setHeight(nativeButton.getPreferredH());
-        HTMLCanvasElement cv = ((HTML5Implementation.NativeImage)nativeButton.toImage().getImage()).getMutableGraphics().getCanvas();
-        cv.getStyle().setProperty("width", scaleCoord(nativeButton.getWidth())+"px");
-        cv.getStyle().setProperty("height", scaleCoord(nativeButton.getHeight())+"px");
-        btn.appendChild(cv);
-        //btn.appendChild(((NativeImage)(nativeButton.toImage().getImage())).mutableGraphics.getCanvas());
+        HTML5Graphics mg = ((HTML5Implementation.NativeImage)nativeButton.toImage().getImage()).getMutableGraphics();
+        mg.flush();
+        nativeAttachSurfaceToElement(mg.getSurfaceId(), btn,
+                scaleCoord(nativeButton.getWidth())+"px", scaleCoord(nativeButton.getHeight())+"px");
         //btn.click();
         nativeBtn = btn;
         
@@ -10111,9 +10184,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             hbtn.btn.setHeight(hbtn.btn.getPreferredH());
         }
         if (hbtn.btn.getWidth() == 0 || hbtn.btn.getHeight() == 0) {
-            
+
         } else {
-            el.appendChild(setStyleSize(((NativeImage)hbtn.btn.toImage().getImage()).getMutableGraphics().getCanvas(), hbtn.btn));
+            HTML5Graphics mg = ((NativeImage)hbtn.btn.toImage().getImage()).getMutableGraphics();
+            mg.flush();
+            nativeAttachSurfaceToElement(mg.getSurfaceId(), el,
+                    scaleCoord(hbtn.btn.getWidth())+"px", scaleCoord(hbtn.btn.getHeight())+"px");
         }
         Window.current().getDocument().getBody().appendChild(el);
     }
@@ -10134,13 +10210,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
-    private static HTMLCanvasElement setStyleSize(HTMLCanvasElement cv, Component cmp) {
-        
-            cv.getStyle().setProperty("width", scaleCoord(cmp.getWidth())+"px");
-            cv.getStyle().setProperty("height", scaleCoord(cmp.getHeight())+"px");
-            return cv;
-    }
-
     @JSBody(params={}, script="return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)")
     private static native boolean isDarkMode_();
     

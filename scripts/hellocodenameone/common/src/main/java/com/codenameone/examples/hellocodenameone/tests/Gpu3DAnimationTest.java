@@ -9,46 +9,38 @@ import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderView;
 import com.codename1.gpu.Renderer;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
-import com.codename1.util.SuccessCallback;
 
 /// Animation test for the portable 3D API. Like the other hellocodenameone
-/// animation tests it captures the various stages of an animation into a single
-/// deterministic grid rather than one timing-dependent frame: it spins a cube
-/// through six fixed rotation angles, capturing the live GPU `RenderView` at each
-/// angle (cropped out of a real device screenshot) and composing the six frames
-/// into a 2x3 grid. Each angle is pinned, so the capture is reproducible.
+/// animation tests it captures the stages of an animation into a single
+/// deterministic grid rather than one timing-dependent frame. Here the six
+/// fixed rotation stages are drawn together in a single GPU frame: the cube is
+/// rendered six times, once into each cell of a 2x3 grid of viewports, each at a
+/// pinned rotation angle. Because the whole grid is one real GPU frame it is
+/// captured by the standard screenshot path (no per-frame device screenshots),
+/// so it is reproducible and portable across every backend.
+///
+/// Sub-viewport rectangles use the GL convention (origin bottom-left); each
+/// platform compares against its own baseline, so a backend whose native
+/// viewport origin differs only flips the vertical cell order.
 public class Gpu3DAnimationTest extends BaseTest {
     private static final int FRAMES = 6;
+    private static final int COLS = 2;
+    private static final int ROWS = 3;
 
     private RenderView view;
-    private Form form;
-    private volatile float angle;
-    private final Image[] frames = new Image[FRAMES];
-
-    @Override
-    public boolean shouldTakeScreenshot() {
-        // We emit a composed grid image ourselves rather than a single capture.
-        return false;
-    }
 
     @Override
     public boolean runTest() {
-        if (!Display.getInstance().isOpenGLSupported()) {
-            done();
-            return true;
-        }
-        form = new Form("3D Animation", new BorderLayout());
+        Form form = createForm("3D Animation", new BorderLayout(), "Gpu3DAnimation");
         view = new RenderView(new Renderer() {
             private final Camera camera = new Camera();
             private Mesh cube;
             private Material material;
+            private int surfaceW;
+            private int surfaceH;
 
             public void onInit(GraphicsDevice device) {
                 cube = Primitives.cube(device, 1.6f);
@@ -62,99 +54,58 @@ public class Gpu3DAnimationTest extends BaseTest {
             }
 
             public void onResize(GraphicsDevice device, int width, int height) {
-                camera.setAspect((float) width / Math.max(1, height));
-                device.setViewport(0, 0, width, height);
+                surfaceW = width;
+                surfaceH = height;
             }
 
             public void onFrame(GraphicsDevice device) {
                 device.clear(0xff101018, true, true);
                 device.setCamera(camera);
-                device.draw(cube, material, Matrix4.rotation(angle, 0.35f, 1f, 0.12f));
+                int cellW = Math.max(1, surfaceW / COLS);
+                int cellH = Math.max(1, surfaceH / ROWS);
+                camera.setAspect((float) cellW / cellH);
+                for (int i = 0; i < FRAMES; i++) {
+                    int col = i % COLS;
+                    int row = i / COLS;
+                    int vx = col * cellW;
+                    // GL viewport origin is bottom-left; place row 0 at the top.
+                    int vy = surfaceH - (row + 1) * cellH;
+                    device.setViewport(vx, vy, cellW, cellH);
+                    float angle = (float) Math.toRadians(i * (360.0 / FRAMES));
+                    device.draw(cube, material, Matrix4.rotation(angle, 0.35f, 1f, 0.12f));
+                }
             }
 
             public void onDispose(GraphicsDevice device) {
             }
         });
         if (!view.isSupported()) {
-            form.add(BorderLayout.CENTER, new Label("3D unsupported"));
-            form.show();
+            // No GPU 3D backend on this platform (e.g. the iOS GL build); skip the
+            // screenshot (shouldTakeScreenshot() returns false) rather than gate a
+            // "3D unsupported" placeholder that has no per-platform baseline.
             done();
             return true;
         }
         form.add(BorderLayout.CENTER, view);
         form.show();
-        // Let the peer come up, then capture each pinned rotation stage.
-        UITimer.timer(1200, false, form, new Runnable() {
-            public void run() {
-                captureStage(0);
-            }
-        });
         return true;
     }
 
-    private void captureStage(final int i) {
-        if (i >= FRAMES) {
-            emitGrid();
-            return;
-        }
-        angle = (float) Math.toRadians(i * (360.0 / FRAMES));
-        view.requestRender();
-        UITimer.timer(300, false, form, new Runnable() {
-            public void run() {
-                Display.getInstance().screenshot(new SuccessCallback<Image>() {
-                    public void onSucess(Image full) {
-                        try {
-                            if (full != null) {
-                                int x = Math.max(0, view.getAbsoluteX());
-                                int y = Math.max(0, view.getAbsoluteY());
-                                int w = Math.min(view.getWidth(), full.getWidth() - x);
-                                int h = Math.min(view.getHeight(), full.getHeight() - y);
-                                if (w > 0 && h > 0) {
-                                    frames[i] = full.subImage(x, y, w, h, true);
-                                }
-                            }
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                        }
-                        captureStage(i + 1);
-                    }
-                });
-            }
-        });
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return com.codename1.ui.CN.isGpuSupported();
     }
 
-    private void emitGrid() {
-        int fw = 0;
-        int fh = 0;
-        for (int i = 0; i < FRAMES; i++) {
-            if (frames[i] != null) {
-                fw = frames[i].getWidth();
-                fh = frames[i].getHeight();
-                break;
-            }
-        }
-        if (fw <= 0 || fh <= 0) {
-            fw = Math.max(1, view.getWidth());
-            fh = Math.max(1, view.getHeight());
-        }
-        int cellW = 200;
-        int cellH = Math.max(1, cellW * fh / Math.max(1, fw));
-        int cols = 2;
-        int rows = (FRAMES + cols - 1) / cols;
-        Image grid = Image.createImage(cols * cellW, rows * cellH, 0xff101010);
-        Graphics g = grid.getGraphics();
-        for (int i = 0; i < FRAMES; i++) {
-            if (frames[i] == null) {
-                continue;
-            }
-            int col = i % cols;
-            int row = i / cols;
-            Image scaled = frames[i].scaled(cellW, cellH);
-            g.drawImage(scaled, col * cellW, row * cellH);
-        }
-        Cn1ssDeviceRunnerHelper.emitImage(grid, "Gpu3DAnimation", new Runnable() {
+    /// Force a fresh GPU frame to be rendered before the screenshot fires, so a
+    /// cold GL surface that has not drawn yet cannot produce a blank capture.
+    @Override
+    protected void registerReadyCallback(Form parent, final Runnable run) {
+        UITimer.timer(1000, false, parent, new Runnable() {
             public void run() {
-                done();
+                if (view != null) {
+                    view.requestRender();
+                }
+                UITimer.timer(500, false, parent, run);
             }
         });
     }

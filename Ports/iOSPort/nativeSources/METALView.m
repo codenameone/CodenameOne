@@ -376,7 +376,38 @@ extern BOOL isRetinaBug();
     clearPass.colorAttachments[0].loadAction = MTLLoadActionClear;
     clearPass.colorAttachments[0].storeAction = MTLStoreActionStore;
     clearPass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+    // The preserve draw below binds a CN1MetalPipelineCache pipeline, and every
+    // pipeline in that cache declares stencilAttachmentPixelFormat=Stencil8
+    // (polygon-clip #3921). A render pass that binds such a pipeline MUST attach
+    // a Stencil8 texture or Metal aborts in setRenderPipelineState: with a
+    // pixel-format mismatch (#5103): "For stencil attachment, the
+    // renderPipelineState pixelFormat must be MTLPixelFormatInvalid, as no
+    // texture is set." Under MTL_DEBUG_LAYER=assert (the CI Metal screenshot
+    // job) that abort is a SIGABRT on the first resize, which drops every
+    // screenshot after it. Attach a throwaway clear-on-load stencil exactly
+    // like the seed draw in CN1Metalcompat.m -- the preserve draw never engages
+    // the stencil test, so its contents are irrelevant. Only needed when there
+    // is a previous frame to draw (the plain black clear binds no pipeline).
+    id<MTLTexture> clearStencilTex = nil;
+    if (oldScreen != nil) {
+        MTLTextureDescriptor *clearStencilDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+            width:pw height:ph mipmapped:NO];
+        clearStencilDesc.usage = MTLTextureUsageRenderTarget;
+        clearStencilDesc.storageMode = MTLStorageModePrivate;
+        clearStencilTex = [layer.device newTextureWithDescriptor:clearStencilDesc];
+        if (clearStencilTex != nil) {
+            clearPass.stencilAttachment.texture = clearStencilTex;
+            clearPass.stencilAttachment.loadAction = MTLLoadActionClear;
+            clearPass.stencilAttachment.storeAction = MTLStoreActionDontCare;
+            clearPass.stencilAttachment.clearStencil = 0;
+        }
+    }
     id<MTLRenderCommandEncoder> clearEnc = [clearCb renderCommandEncoderWithDescriptor:clearPass];
+#ifndef CN1_USE_ARC
+    // renderCommandEncoderWithDescriptor: retains the attachment for the pass.
+    [clearStencilTex release];
+#endif
     if (oldScreen != nil) {
         [clearEnc setViewport:(MTLViewport){ 0.0, 0.0, (double)pw, (double)ph, 0.0, 1.0 }];
         CN1MetalBeginFrame(clearEnc, projectionMatrix, pw, ph);
@@ -409,31 +440,83 @@ extern BOOL isRetinaBug();
     [newStencil release];
 #endif
 
-    // Present the preserved frame immediately so the CAMetalLayer shows the
-    // last visible content (rather than its invalidated/black surface) for the
-    // duration of the rotation/resize animation, until the EDT repaint presents
-    // the correctly laid-out frame. Skipped on the very first sizing (no
-    // previous frame to show) and if no drawable is currently available.
+    // Push the preserved frame onto the layer so the rotation never shows
+    // black (#5162) -- but NOT synchronously here. updateFrameBufferSize: runs
+    // from viewWillTransitionToSize: on the main thread, inside UIKit's
+    // rotation CATransaction, with the layer.drawableSize change above still
+    // pending/uncommitted in that transaction. Calling [layer nextDrawable]
+    // now blocks: the layer cannot vend a drawable until the resize transaction
+    // commits, and that transaction cannot commit until viewWillTransitionToSize:
+    // returns -- which it cannot, because we are blocked in nextDrawable. On the
+    // simulator CoreAnimation tolerates this (which is why the original #5162
+    // fix, verified only in the simulator, appeared to work); on a real device
+    // the render server wedges and, because the EDT renders via
+    // dispatch_sync(main), the EDT blocks on the stalled main thread forever --
+    // the hard rotation freeze (#5171).
+    //
+    // Deferring the present to the next main-runloop turn breaks the cycle: by
+    // then viewWillTransitionToSize: has returned and the implicit drawableSize
+    // transaction has committed, so nextDrawable vends a correctly-sized
+    // drawable exactly as the normal presentFramebuffer path does -- no
+    // in-transaction wedge, no freeze. The needsResizePresent guard makes this
+    // self-tuning: when the app is idle (the #5162 case) the EDT is asleep, so
+    // the deferred block runs and fills the rotation gap with the preserved
+    // frame; when the app is actively painting (the #5171 case) the EDT repaints
+    // first, presentFramebuffer clears the guard, and the deferred block becomes
+    // a no-op -- so it never contends for a drawable in exactly the scenario
+    // that used to deadlock.
     if (oldScreen != nil) {
-        id<CAMetalDrawable> dr = [layer nextDrawable];
-        if (dr != nil) {
-            id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
-            id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
-            [blit copyFromTexture:self.screenTexture
-                      sourceSlice:0 sourceLevel:0
-                     sourceOrigin:MTLOriginMake(0, 0, 0)
-                       sourceSize:MTLSizeMake(pw, ph, 1)
-                        toTexture:dr.texture
-                 destinationSlice:0 destinationLevel:0
-                destinationOrigin:MTLOriginMake(0, 0, 0)];
-            [blit endEncoding];
-            [presentCb presentDrawable:dr];
-            [presentCb commit];
-        }
+        needsResizePresent = YES;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self presentPreservedFrameIfNeeded];
+        });
     }
 #ifndef CN1_USE_ARC
     [oldScreen release];
 #endif
+}
+
+// Push the frame currently held in screenTexture (the stretched previous frame
+// preserved across a resize by updateFrameBufferSize:) onto the CAMetalLayer,
+// so an idle rotation shows the last content rather than the layer's black
+// background until the EDT repaints (#5162). A no-op once needsResizePresent
+// has been cleared -- either because a normal presentFramebuffer already put a
+// real frame up, or because a later resize superseded this one. Runs on the
+// main thread (scheduled via dispatch_async from updateFrameBufferSize:),
+// outside the rotation CATransaction, so nextDrawable here behaves exactly like
+// the normal present path and cannot deadlock (#5171).
+-(void)presentPreservedFrameIfNeeded {
+    if (!needsResizePresent) {
+        return;
+    }
+    needsResizePresent = NO;
+    if (self.screenTexture == nil) {
+        return;
+    }
+    // An encoder may be mid-frame if the EDT started painting between the resize
+    // and this turn; in that case the normal present path owns the drawable and
+    // will have cleared needsResizePresent already, so we would have returned
+    // above. Guard anyway: never present while an encoder is open.
+    if (self.renderCommandEncoder != nil) {
+        return;
+    }
+    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+    id<CAMetalDrawable> dr = [layer nextDrawable];
+    if (dr == nil) {
+        return;
+    }
+    id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture
+              sourceSlice:0 sourceLevel:0
+             sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
+                toTexture:dr.texture
+         destinationSlice:0 destinationLevel:0
+        destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    [presentCb presentDrawable:dr];
+    [presentCb commit];
 }
 
 -(void)createRenderPassDescriptor {
@@ -496,10 +579,17 @@ extern BOOL isRetinaBug();
 {
     if (self.renderCommandEncoder == nil) {
         // Nothing was encoded (setFramebuffer was not called after the
-        // previous present). Nothing to do.
+        // previous present). Nothing to do. Leave needsResizePresent set: the
+        // gap-filler is still wanted because no real frame is being presented.
         self.commandBuffer = nil;
         return NO;
     }
+    // A real, correctly-laid-out frame is about to reach the layer, so the
+    // post-resize gap-filler is no longer needed; clear the guard so the
+    // deferred presentPreservedFrameIfNeeded does not later present the stale
+    // stretched frame on top of this one (which would look like a backwards
+    // flicker). See updateFrameBufferSize: (#5162/#5171).
+    needsResizePresent = NO;
     CN1MetalEndFrame();
     [self.renderCommandEncoder endEncoding];
     self.renderCommandEncoder = nil;

@@ -96,6 +96,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Advertising API: renders a banner + native-ad feed via the
+            // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
+            new AdsScreenshotTest(),
             // Animation/transition grid tests: each emits a 2x3 frame grid driven
             // by the AnimationTime override so iOS/Android/JavaSE produce identical
             // pixels regardless of wall-clock pacing. Skipped on HTML5 via the
@@ -236,6 +239,28 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Build-time Lottie transcoder -- same pipeline as SVG, lowers
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
+            // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
+            // textured cube, a loaded glTF model, and a behavioral animation-loop
+            // test. Positioned immediately before OrientationLock on purpose, to
+            // satisfy two constraints at once:
+            //   - iOS: a 2D form shown right after a GPU peer keeps the previous
+            //     form's drawable for one capture (a pre-existing iOS present
+            //     quirk). OrientationLock is the one test that recovers from this
+            //     -- it forces a full-screen orientation change + revalidate
+            //     before capturing -- so it absorbs the staleness cleanly, and
+            //     DesktopMode (the last screenshot test) still sees OrientationLock
+            //     as its predecessor exactly like on master, so every baseline
+            //     matches.
+            //   - JavaScript: the glTF model is the heaviest 3D capture; running
+            //     it here (rather than dead last) keeps it out of the JS port's
+            //     late-suite worker-barrier danger zone where it intermittently
+            //     failed to emit.
+            // The 3D tests render through their own GPU peer and capture correctly
+            // regardless of what precedes them.
+            new Gpu3DCubeScreenshotTest(),
+            new Gpu3DTexturedCubeScreenshotTest(),
+            new Gpu3DModelScreenshotTest(),
+            new Gpu3DAnimationTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -255,6 +280,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new StreamApiTest(),
             new StringApiTest(),
             new TimeApiTest(),
+            new NanoTimeApiTest(),
             new CryptoApiTest(),
             new Java17Tests(),
             new BackgroundThreadUiAccessTest(),
@@ -264,7 +290,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Base64NativePerformanceTest(),
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
-            new MutableImageReadbackTest()
+            new MutableImageReadbackTest(),
+            new MutableImageClipReadbackTest(),
+            // Desktop integration demo. Placed LAST on purpose: it shows a Toolbar with text
+            // and a populated list, which warms the font cache / shifts suite timing, and the
+            // earlier graphics screenshot tests (DrawString, DrawStringDecorated, inscribed
+            // triangle grid) paint text directly during a frame that races the async font load -
+            // running this test before them changes whether those fonts are loaded at capture
+            // time and flips their baselines. Last = the rest of the suite matches master exactly.
+            // Inert on phone/tablet ports (plain Toolbar + hamburger side menu + faded scrollbar);
+            // on the Mac native build it enables desktop mode (commands move to the native menu
+            // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
+            new DesktopModeScreenshotTest()
     };
 
     private static BaseTest prependedTest;

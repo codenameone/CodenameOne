@@ -216,6 +216,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean autoUpdateDefaultResourceBundle;
     private float largerTextScale = 1.0f;
     private boolean largerTextEnabled = false;
+    // Set once we've warned the developer that the running app hasn't opted into
+    // font scaling, so the Larger Text menu only nags them a single time per session.
+    private boolean largerTextOptInWarningShown = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
 
     // Floor below which any persisted window dimension is treated as the
@@ -998,38 +1001,100 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
-        if (isSimulator()) {
-            if (localNotificationsTimer == null) {
-                localNotificationsTimer = new java.util.Timer();
-            }
-            TimerTask task = new TimerTask() {
-                public void run() {
+        // honored both in the simulator (rich in-canvas panel) and on a real desktop build
+        // ("Run as desktop app" / executable jar), where it surfaces as a native OS notification
+        // through the system tray
+        if (!isSimulator() && !isDesktop()) {
+            return;
+        }
+        if (localNotificationsTimer == null) {
+            localNotificationsTimer = new java.util.Timer();
+        }
+        final boolean simulator = isSimulator();
+        TimerTask task = new TimerTask() {
+            public void run() {
+                if (simulator) {
                     SimulatorNotifications.show(JavaSEPort.this, notif);
+                } else {
+                    showDesktopNotification(notif);
                 }
-            };
-            if (localNotifications.containsKey(notif.getId())) {
-                TimerTask old = localNotifications.get(notif.getId());
-                old.cancel();
             }
-            localNotifications.put(notif.getId(), task);
-            if (repeat == LocalNotification.REPEAT_NONE) {
-                localNotificationsTimer.schedule(task, new Date(firstTime));
-            } else {
-                localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
-            }
+        };
+        if (localNotifications.containsKey(notif.getId())) {
+            TimerTask old = localNotifications.get(notif.getId());
+            old.cancel();
+        }
+        localNotifications.put(notif.getId(), task);
+        if (repeat == LocalNotification.REPEAT_NONE) {
+            localNotificationsTimer.schedule(task, new Date(firstTime));
+        } else {
+            localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
         }
     }
 
     @Override
     public void cancelLocalNotification(String notificationId) {
+        if (!isSimulator() && !isDesktop()) {
+            return;
+        }
+        if (localNotifications.containsKey(notificationId)) {
+            TimerTask n = localNotifications.get(notificationId);
+            n.cancel();
+            localNotifications.remove(notificationId);
+        }
         if (isSimulator()) {
-            if (localNotifications.containsKey(notificationId)) {
-                TimerTask n = localNotifications.get(notificationId);
-                n.cancel();
-                localNotifications.remove(notificationId);
-            }
             SimulatorNotifications.dismiss(notificationId);
         }
+    }
+
+    private TrayIcon desktopNotificationTray;
+    private String lastDesktopNotificationId;
+
+    /// Surfaces a local notification on a real desktop build as a native OS notification through
+    /// the system tray (Notification Center on macOS, the notification area on Windows/Linux). A
+    /// single persistent tray icon is reused for the lifetime of the process; clicking the
+    /// notification dispatches it to the app's {@code LocalNotificationCallback}, mirroring mobile.
+    private void showDesktopNotification(final LocalNotification notif) {
+        if (!SystemTray.isSupported()) {
+            System.out.println("Local notification not supported on this OS!!!");
+            return;
+        }
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (desktopNotificationTray == null) {
+                        SystemTray sysTray = SystemTray.getSystemTray();
+                        java.awt.Image icon = null;
+                        java.net.URL res = getClass().getResource("/CodenameOne_Small.png");
+                        if (res != null) {
+                            icon = Toolkit.getDefaultToolkit().getImage(res);
+                        }
+                        if (icon == null) {
+                            icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+                        }
+                        String tip = Display.getInstance().getProperty("AppName", "Codename One");
+                        TrayIcon tray = new TrayIcon(icon, tip);
+                        tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                final String id = lastDesktopNotificationId;
+                                if (id != null) {
+                                    dispatchLocalNotification(id, null, null, null);
+                                }
+                            }
+                        });
+                        sysTray.add(tray);
+                        desktopNotificationTray = tray;
+                    }
+                    lastDesktopNotificationId = notif.getId();
+                    desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
+                            TrayIcon.MessageType.INFO);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
     }
 
     /// Returns the channel registered for the given id, or null. Used by the simulator
@@ -1724,6 +1789,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(menu);
             }
             JMenuItem item = new JMenuItem(cmd.getCommandName());
+            KeyStroke accelerator = acceleratorFor(cmd);
+            if (accelerator != null) {
+                item.setAccelerator(accelerator);
+            }
             item.addActionListener(new java.awt.event.ActionListener() {
                 @Override
                 public void actionPerformed(java.awt.event.ActionEvent e) {
@@ -1738,6 +1807,28 @@ public class JavaSEPort extends CodenameOneImplementation {
             menu.add(item);
         }
         return bar;
+    }
+
+    /// Builds a Swing {@link KeyStroke} from a command's desktop-shortcut hint, mapping the
+    /// platform-primary modifier to the OS menu-shortcut mask (Command on macOS, Control
+    /// elsewhere). Returns null when the command has no accelerator.
+    private static KeyStroke acceleratorFor(com.codename1.ui.Command cmd) {
+        int keyChar = cmd.getDesktopShortcutKeyChar();
+        if (keyChar == 0) {
+            return null;
+        }
+        int mods = cmd.getDesktopShortcutModifiers();
+        int awtMods = 0;
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0) {
+            awtMods |= Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT) != 0) {
+            awtMods |= java.awt.event.InputEvent.SHIFT_DOWN_MASK;
+        }
+        if ((mods & com.codename1.ui.Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0) {
+            awtMods |= java.awt.event.InputEvent.ALT_DOWN_MASK;
+        }
+        return KeyStroke.getKeyStroke(Character.toUpperCase((char) keyChar), awtMods);
     }
 
     @Override
@@ -6926,12 +7017,40 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // Theme-only refresh so the app's CSS-compiled theme survives; see
                     // refreshThemeOnly() for why refreshSkin breaks the app theme + canvas size.
                     refreshThemeOnly();
+                    warnIfLargerTextScaleIgnored(frm);
                 }
             });
             group.add(item);
             largerTextMenu.add(item);
         }
         parent.add(largerTextMenu);
+    }
+
+    /// The Larger Text menu only changes the on-screen fonts when the running app
+    /// has opted into font scaling -- either through the `useLargerTextScaleBool`
+    /// theme constant or a `UIManager.setUseLargerTextScale(true)` call at startup.
+    /// Without that opt-in, `UIManager`'s effective scale clamps back to 1.0 and the
+    /// menu selection has no visible effect, which historically read as "the
+    /// simulator doesn't refresh" (issue #4963). Surface a one-time explanation so
+    /// the developer understands why the text didn't grow and how to enable it,
+    /// instead of being left to guess that the refresh is broken.
+    private void warnIfLargerTextScaleIgnored(JFrame frm) {
+        if (largerTextOptInWarningShown || !largerTextEnabled) {
+            return;
+        }
+        if (UIManager.getInstance().isUseLargerTextScale()) {
+            return;
+        }
+        largerTextOptInWarningShown = true;
+        JOptionPane.showMessageDialog(frm,
+                "This app has not enabled larger text scaling, so the size you picked\n"
+                + "won't change the on-screen fonts.\n\n"
+                + "To preview Dynamic Type sizing, enable scaling in your app by either:\n"
+                + "  - adding the theme constant  useLargerTextScaleBool = true,  or\n"
+                + "  - calling  UIManager.getInstance().setUseLargerTextScale(true)\n"
+                + "    during app startup.",
+                "Larger Text scaling not enabled",
+                JOptionPane.WARNING_MESSAGE);
     }
 
     /**
@@ -15725,38 +15844,61 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
     }
 
-    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGLSurface> glSurfaces =
-            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGLSurface>();
+    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGpuSurface> glSurfaces =
+            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGpuSurface>();
 
-    @Override
-    public boolean isOpenGLSupported() {
-        return true;
-    }
-
-    @Override
-    public com.codename1.ui.PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
-        JavaSEGLSurface surface = new JavaSEGLSurface(view);
-        com.codename1.ui.PeerComponent peer = createNativePeer(surface);
-        if (peer != null) {
-            glSurfaces.put(peer, surface);
+    private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
+            new com.codename1.impl.gpu.GpuImplementation() {
+        @Override
+        public com.codename1.ui.PeerComponent createPeer(com.codename1.gpu.RenderView view) {
+            // Prefer the real OpenGL (JOGL) backend. It is loaded reflectively so
+            // the JOGL types stay confined to JavaSEJoglSurface/JavaSEGLDevice:
+            // the Maven simulator ships JOGL and gets the GPU backend, while the
+            // legacy Ant port build (no JOGL on its classpath) excludes those two
+            // files entirely. Instantiating the backend touches JOGL classes and a
+            // GL context, so guard against the class being absent (Ant build),
+            // GLException, AND NoClassDefFoundError and fall back to the software
+            // renderer so the simulator never fails to start over 3D.
+            JavaSEGpuSurface surface;
+            try {
+                Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
+                surface = (JavaSEGpuSurface) joglSurface
+                        .getConstructor(com.codename1.gpu.RenderView.class)
+                        .newInstance(view);
+            } catch (Throwable t) {
+                Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
+                        && t.getCause() != null ? t.getCause() : t;
+                System.out.println("JavaSE 3D: JOGL backend unavailable, using software renderer ("
+                        + cause + ")");
+                surface = new JavaSEGLSurface(view);
+            }
+            com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
+            if (peer != null) {
+                glSurfaces.put(peer, surface);
+            }
+            return peer;
         }
-        return peer;
-    }
+
+        @Override
+        public void setContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.setContinuous(continuous);
+            }
+        }
+
+        @Override
+        public void requestRender(com.codename1.ui.PeerComponent peer) {
+            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            if (surface != null) {
+                surface.requestRender();
+            }
+        }
+    };
 
     @Override
-    public void glSetContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
-        JavaSEGLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.setContinuous(continuous);
-        }
-    }
-
-    @Override
-    public void glRequestRender(com.codename1.ui.PeerComponent peer) {
-        JavaSEGLSurface surface = glSurfaces.get(peer);
-        if (surface != null) {
-            surface.requestRender();
-        }
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return gpuImpl;
     }
 
     public Image gaussianBlurImage(Image image, float radius) {

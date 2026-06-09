@@ -13,14 +13,12 @@ public class OrientationLockScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            // Browsers expose only Screen Orientation API, which requires fullscreen
-            // in a worker-hosted Codename One app the port cannot satisfy. Skip with
-            // no screenshot rather than producing a broken capture.
-            System.out.println("CN1SS:INFO:test=OrientationLockScreenshotTest status=SKIPPED reason=platform-unsupported");
-            done();
-            return true;
-        }
+        // The JS port cannot lock orientation (the Screen Orientation API needs
+        // fullscreen, which a worker-hosted app can't request). CN.lockOrientation
+        // is a harmless no-op there, so the form simply stays in its current
+        // (portrait) position -- exactly like Mac Native, which has no orientation
+        // changing either. We still run the test and capture the "landscape"
+        // screenshot in the current position rather than skipping it.
         Form hi = new Form("Orientation Lock", new BoxLayout(BoxLayout.Y_AXIS)) {
             @Override
             protected void onShowCompleted() {

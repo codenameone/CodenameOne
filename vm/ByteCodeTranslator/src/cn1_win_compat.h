@@ -55,8 +55,13 @@ typedef struct { int detachstate; } pthread_attr_t;
 
 struct sched_param { int sched_priority; };
 
-/* <sys/time.h> replacement (windows.h's winsock timeval is excluded there). */
+/* <sys/time.h> replacement. The Windows port's socket translation unit pulls in
+ * winsock2.h, which already defines struct timeval; skip our definition when any
+ * winsock header (or another timeval provider) is present in the translation
+ * unit to avoid a redefinition. */
+#if !defined(_TIMEVAL_DEFINED) && !defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
 struct timeval { long tv_sec; long tv_usec; };
+#endif
 
 /* --- mutex --- */
 int pthread_mutex_init(pthread_mutex_t* mutex, const void* attr);

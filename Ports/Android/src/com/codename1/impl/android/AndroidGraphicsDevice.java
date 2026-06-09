@@ -12,7 +12,6 @@ package com.codename1.impl.android;
 import android.opengl.GLES20;
 
 import com.codename1.gpu.Camera;
-import com.codename1.gpu.GlslShaderGenerator;
 import com.codename1.gpu.GpuCapabilities;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.IndexBuffer;
@@ -26,6 +25,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
 import java.nio.ByteBuffer;

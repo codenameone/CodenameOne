@@ -1,21 +1,8 @@
 == Monetization
 
-Codename One integrates many built-in monetization options such as ad network support and in-app purchases.
+Codename One integrates many built-in monetization options such as in-app purchases and subscriptions. Advertising is covered in its own chapter; see <<_advertising,Advertising>>.
 
 Many monetization options are available as third-party https://www.codenameone.com/cn1libs.html[cn1libs] that you can install through the Codename One website.
-
-=== Google play ads
-
-The simplest banner-ad support is often the easiest network to use. To enable mobile ads, create an ad unit in AdMob's website. You should end up with a key like this:
-
-`ca-app-pub-8610616152754010/3413603324`
-
-To enable this for Android, define `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments. For iOS, use the same value in `ios.googleAdUnitId`. The rest is automatic: the correct ad appears at the bottom of the screen, and the form shrinks to fit the ad. iOS and Android implement that shrinking differently because of platform constraints, but the result should work well with device rotation.
-
-.Google Play ads
-image::img/google-play-ads.png[Google Play ads,scaledwidth=20%]
-
-A special ad unit ID exists for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you get test ads during development. This matters because you aren't allowed to click your own ads. When it's time for a production release, replace it with the real value you generated in AdMob.
 
 === In-app purchase
 
@@ -440,9 +427,8 @@ In order for your app to provide you with current data about the user's subscrip
 The following methods can be used for synchronization:
 
 . `synchronizeReceipts()` - Asynchronously synchronizes receipts in the background. You won't be notified when it's complete.
-. `synchronizeReceiptsSync()` - Synchronously synchronizes receipts, and blocks until it's complete. This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
 . `synchronizeReceipts(final long ifOlderThanMs, final SuccessCallback<Boolean> callback)` - Asynchronously synchronizes receipts, but only if they haven't been synchronized in the specified time. For example, In your start() method you might decide that you only want to synchronize receipts once per day. This also includes a callback that will be called when synchronization is complete.
-. `synchronizeReceiptsSync(long ifOlderThanMs)` - A synchronous version that will only refetch if data is older than given time.
+. `synchronizeReceiptsSync(long ifOlderThanMs)` - Synchronously synchronizes receipts, blocking until it's complete, and will only refetch if data is older than the given time (pass `0` to always refetch). This is safe to use on the EDT as it employs `invokeAndBlock` under the covers.
 
 In your hello world app you synchronize the subscriptions in a few places.
 
@@ -591,7 +577,7 @@ public void itemPurchaseError(String sku, String errorMessage) {
 }
 ----
 
-Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync()` but this is just to ensure that your toast message has the new expiry date loaded already.
+Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync(0)` but this is just to ensure that your toast message has the new expiry date loaded already.
 
 ==== Screenshots
 

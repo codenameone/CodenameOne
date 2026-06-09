@@ -15,7 +15,7 @@ import com.codename1.gpu.VertexFormat;
 
 /// Runtime generator of Metal Shading Language (MSL) source for the iOS 3D
 /// backend. This mirrors the logic of the portable GLSL generator
-/// (com.codename1.gpu.GlslShaderGenerator) but emits a single MSL source string
+/// (com.codename1.impl.gpu.GlslShaderGenerator) but emits a single MSL source string
 /// containing both the vertex and fragment functions for a given Material and
 /// VertexFormat. The native side compiles the string once with
 /// newLibraryWithSource and caches the resulting MTLRenderPipelineState by the
@@ -110,11 +110,12 @@ public final class IOSMetalShaderGenerator {
         sb.append("    constant CN1Uniforms& u [[buffer(1)]]) {\n");
         sb.append("  CN1VertexOut out;\n");
         sb.append("  float4 clip = u.mvp * float4(in.position, 1.0);\n");
-        // Adapt the portable GL-convention clip space to Metal: flip Y (Metal's
-        // framebuffer origin is top-left, which also makes triangle winding match
-        // the GL/software backends so back-face culling keeps the right faces),
-        // and remap Z from GL's [-w, w] to Metal's [0, w] depth range.
-        sb.append("  clip.y = -clip.y;\n");
+        // Adapt the portable GL-convention clip space to Metal: only remap Z from
+        // GL's [-w, w] to Metal's [0, w] depth range. Y is NOT flipped here -- the
+        // GL backend (the reference) does not flip either, and Metal's viewport
+        // already maps NDC +Y to the top of the framebuffer, so a flip would render
+        // the scene upside down. Winding is handled in CN1GL3D.m (front faces are
+        // counter-clockwise to match the portable convention).
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  out.position = clip;\n");
         if (lit) {

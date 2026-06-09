@@ -147,17 +147,21 @@ public class CompilerHelper {
     }
 
     /**
-     * CMake configure flags selecting the C toolchain for the clean target. On
-     * Windows we drive LLVM via the MSVC ABI (clang-cl) through the Ninja
+     * CMake configure flags selecting the C/C++ toolchain for the clean target.
+     * On Windows we drive LLVM via the MSVC ABI (clang-cl) through the Ninja
      * generator, since the default Visual Studio generator would otherwise pick
-     * MSVC's cl.exe and place binaries under a Release/ subdirectory. Elsewhere
-     * we keep the existing clang invocation.
+     * MSVC's cl.exe and place binaries under a Release/ subdirectory. A C++
+     * compiler is always selected too: the "windows" app type emits a
+     * {@code LANGUAGES C CXX} project (its COM layer is C++), so cmake needs a
+     * CXX compiler even when the particular app contributes no .cpp itself.
      */
     public static List<String> cmakeToolchainArgs() {
         if (isWindows()) {
-            return Arrays.asList("-G", "Ninja", "-DCMAKE_C_COMPILER=clang-cl");
+            return Arrays.asList("-G", "Ninja",
+                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl");
         }
-        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_OBJC_COMPILER=clang");
+        return Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",
+                "-DCMAKE_OBJC_COMPILER=clang");
     }
 
     public static List<CompilerConfig> getAvailableCompilers(String targetVersion) {
@@ -184,6 +188,29 @@ public class CompilerHelper {
         }
 
         return compilers;
+    }
+
+    // Diagonal compiler set: each supported bytecode target compiled only by the
+    // JDK whose major version matches that target (8->8, 11->11, 17->17, 21->21,
+    // 25->25). The translator consumes bytecode, which is governed by the target
+    // level, so the full (compiler x target) cross-product mostly re-tests the
+    // same bytecode shapes. Restricting to the diagonal keeps every target level
+    // exercised while cutting the per-method parameter count from up to 15 to 5.
+    // A target whose matching JDK is not installed locally is simply skipped
+    // (CI installs all five). Pairs use {target, jdkMajor}; "1.8" maps to JDK 8.
+    public static List<CompilerConfig> getDiagonalCompilers() {
+        String[][] pairs = { {"1.8", "8"}, {"11", "11"}, {"17", "17"}, {"21", "21"}, {"25", "25"} };
+        List<CompilerConfig> out = new ArrayList<>();
+        for (String[] pair : pairs) {
+            int wantMajor = parseJavaMajor(pair[1]);
+            for (CompilerConfig config : getAvailableCompilers(pair[0])) {
+                if (getJdkMajor(config) == wantMajor) {
+                    out.add(config);
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     private static boolean canCompile(String compilerVersion, String targetVersion) {
@@ -381,7 +408,35 @@ public class CompilerHelper {
         }
     }
 
+    // The compiled JavaAPI is identical for a given (jdkVersion, targetVersion),
+    // yet it was previously re-compiled (a ~259-source javac run) on every
+    // parameterized test invocation -- hundreds of times across the suite. Cache
+    // the compiled output per combo and copy it into each caller's outputDir
+    // instead. This removes the dominant repeated cost with zero change to what
+    // is tested. Within a surefire fork tests run sequentially, so the only
+    // contention is the compile-once guard below.
+    private static final java.util.Map<String, Path> JAVA_API_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     public static void compileJavaAPI(Path outputDir, CompilerConfig config) throws IOException, InterruptedException {
+        Files.createDirectories(outputDir);
+        copyDirectory(getCachedJavaApi(config), outputDir);
+    }
+
+    private static synchronized Path getCachedJavaApi(CompilerConfig config) throws IOException, InterruptedException {
+        String key = config.jdkVersion + "->" + config.targetVersion;
+        Path cached = JAVA_API_CACHE.get(key);
+        if (cached != null && Files.isDirectory(cached)) {
+            return cached;
+        }
+        Path cacheDir = Files.createTempDirectory(
+                "java-api-cache-" + config.jdkVersion + "-" + config.targetVersion.replaceAll("[^A-Za-z0-9]", "_") + "-");
+        compileJavaApiInto(cacheDir, config);
+        JAVA_API_CACHE.put(key, cacheDir);
+        return cacheDir;
+    }
+
+    private static void compileJavaApiInto(Path outputDir, CompilerConfig config) throws IOException, InterruptedException {
         Files.createDirectories(outputDir);
         Path javaApiRoot = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
         List<String> sources = new ArrayList<>();

@@ -54,9 +54,10 @@ import java.util.Vector;
 ///
 /// @author Chen
 ///
-/// #### Deprecated
-///
-/// we recommend developers check out newer ad options in the cn1lib section of the Codename One website
+/// @deprecated this legacy HTML banner component targets the defunct InnerActive
+/// network. Use [com.codename1.ads.BannerAd] from the modern advertising API
+/// (see [com.codename1.ads.AdManager]) instead.
+@Deprecated
 public class Ads extends Container implements HTMLCallback {
 
     private long elapsed;

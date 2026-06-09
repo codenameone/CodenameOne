@@ -1040,8 +1040,8 @@ public class CN extends CN1Constants {
 
     /// Returns true if the current platform provides a hardware accelerated 3D
     /// GPU backend for `com.codename1.gpu.RenderView`.
-    public static boolean isOpenGLSupported() {
-        return Display.getInstance().isOpenGLSupported();
+    public static boolean isGpuSupported() {
+        return Display.getInstance().isGpuSupported();
     }
 
 

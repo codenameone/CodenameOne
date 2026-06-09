@@ -167,6 +167,12 @@ final class JavascriptNameUtil {
         }
         char type = desc.charAt(0);
         switch (type) {
+            // Java long == hi/lo Long object: a long field/local/array default is the
+            // shared zero Long (_L0), so reads of an uninitialised long never enter long
+            // arithmetic as a bare Number (the _Lc coercion also tolerates it, but _L0
+            // keeps the representation uniform).
+            case 'J':
+                return "_L0";
             case 'Z':
             case 'C':
             case 'F':
@@ -174,7 +180,6 @@ final class JavascriptNameUtil {
             case 'B':
             case 'S':
             case 'I':
-            case 'J':
                 return "0";
             default:
                 return "null";

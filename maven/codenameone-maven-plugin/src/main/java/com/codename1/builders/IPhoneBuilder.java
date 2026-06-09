@@ -97,6 +97,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesCn1Camera;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -727,6 +728,14 @@ public class IPhoneBuilder extends Executor {
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
                             usesNfcHce = true;
                         }
+                    }
+                    // Low-level camera API (com.codename1.camera.*). Gated on
+                    // actual usage -- NOT on the camera privacy description --
+                    // so the old modal Capture API (which only sets
+                    // INCLUDE_CAMERA_USAGE) does not pull in the new
+                    // AVFoundation-based CN1Camera natives.
+                    if (!usesCn1Camera && cls.indexOf("com/codename1/camera/") == 0) {
+                        usesCn1Camera = true;
                     }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
@@ -1958,6 +1967,25 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_NFC", ex);
+                }
+            }
+
+            // Uncomment INCLUDE_CN1_CAMERA in CodenameOne_GLViewController.h
+            // so the com.codename1.camera native bridge (CN1Camera.{h,m})
+            // compiles in. This is deliberately independent of
+            // INCLUDE_CAMERA_USAGE (the old modal Capture API): the new
+            // AVFoundation natives are only built when the app actually
+            // references com.codename1.camera.*, matching the AVFoundation
+            // framework injection driven by the same scan via AiDependencyTable.
+            if (usesCn1Camera) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_CAMERA",
+                            "#define INCLUDE_CN1_CAMERA");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_CAMERA", ex);
                 }
             }
 

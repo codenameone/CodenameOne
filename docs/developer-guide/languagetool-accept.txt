@@ -560,6 +560,25 @@ espeak
 [Vv]arint
 [Ee]nums
 
+# Windows Sockets API (the native Windows port uses it for raw sockets).
+Winsock
+
+# SSL.com's cloud code-signing service, named alongside Azure Trusted Signing
+# and DigiCert KeyLocker in the native Windows code-signing section.
+eSigner
+
 # 3D graphics / shader chapter (com.codename1.gpu). "Phong" is the
-# standard name of the Phong/Blinn-Phong lighting model.
+# standard name of the Phong/Blinn-Phong lighting model. "Khronos" is the
+# standards body behind glTF/OpenGL, "BoomBox" is the Khronos glTF sample
+# model used in the model test, and "JOGL" is the OpenGL binding the desktop
+# simulator renders through. "Direct3D" and "HLSL" are the native Windows GPU
+# backend and its shader language, "Catalyst" is Apple's Mac Catalyst target,
+# and "texels" are texture pixels (the standard graphics term).
 [Pp]hong
+Khronos
+BoomBox
+JOGL
+Direct3D
+HLSL
+Catalyst
+texels

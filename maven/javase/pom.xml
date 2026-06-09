@@ -104,6 +104,21 @@
             <artifactId>filters</artifactId>
             <version>2.0.235-1</version>
         </dependency>
+        <!-- JOGL provides the real OpenGL backend for the simulator's 3D
+             (com.codename1.gpu) API. The "-main" meta artifacts pull in the
+             cross-platform native jars. The 3D backend creates JavaSEJoglSurface
+             inside a try/catch, so a missing or failed JOGL native never breaks
+             simulator startup; it falls back to the software renderer. -->
+        <dependency>
+            <groupId>org.jogamp.jogl</groupId>
+            <artifactId>jogl-all-main</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jogamp.gluegen</groupId>
+            <artifactId>gluegen-rt-main</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
         <dependency>
             <groupId>javax.media</groupId>
             <artifactId>jmf</artifactId>
@@ -126,8 +141,14 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
         <src.dir>../../Ports/JavaSE/src</src.dir>
-
+        <!-- JOGL 2.6.0 is on Maven Central and ships a universal (Intel + Apple
+             Silicon) macOS natives jar (natives-macosx-universal), so it covers
+             arm64 without the JogAmp repository. Earlier 2.5.0 had the arm64
+             natives but only on jogamp.org, whose intermittent timeouts flaked
+             the build; 2.3.2 on Central is Intel-only. -->
+        <jogl.version>2.6.0</jogl.version>
     </properties>
+
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>
         <resources>

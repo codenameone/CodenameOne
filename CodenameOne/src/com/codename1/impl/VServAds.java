@@ -45,7 +45,11 @@ import java.util.Vector;
 
 /// The v-serv ad service implements full screen ads
 ///
+/// @deprecated the V-Serv ad network is defunct. Use the modern advertising API
+/// in [com.codename1.ads.AdManager] instead.
+///
 /// @author Shai Almog
+@Deprecated
 public class VServAds extends FullScreenAdService {
     public static final int CAT_ID_ACTION_ADVENTURE = 18;
     public static final int CAT_ID_SPORTS = 19;

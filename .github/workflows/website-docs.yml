@@ -20,6 +20,9 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The Hugo build embeds JavaDocs produced by this script, so a change
+      # to how the docs are generated must redeploy the website too.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -34,8 +37,18 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The Hugo build embeds JavaDocs produced by this script, so a change
+      # to how the docs are generated must redeploy the website too.
+      - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
+  # Daily production rebuild so future-dated blog posts (the daily release
+  # follow-ups) publish on their own date with no manual push. Production
+  # builds keep HUGO_BUILD_FUTURE=false, so a post only appears once its date
+  # has arrived (UTC; hugo.toml sets no timeZone). Runs at 00:15 UTC; GitHub
+  # may delay scheduled runs under load, but the post still surfaces same-day.
+  schedule:
+    - cron: '15 0 * * *'
 
 permissions:
   contents: read
@@ -429,12 +442,12 @@ jobs:
           done < /tmp/cf_deployments_to_delete.txt
 
       - name: Check Cloudflare deploy credentials
-        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_TOKEN == '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN == '' }}
         run: |
           echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
 
       - name: Deploy to Cloudflare Pages
-        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_TOKEN != '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         env:
           # Keep these env vars explicit so Wrangler can authenticate in non-interactive CI.

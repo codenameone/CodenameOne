@@ -22,9 +22,18 @@ on:
     types:
       - published
 
+concurrency:
+  # Cancel superseded runs of this workflow for the same PR branch
+  # (github.head_ref is set on pull_request events). On push to master
+  # head_ref is empty, so the group falls back to the unique run_id and
+  # every master commit is still tested in full -- no coverage lost.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   vm-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -186,6 +195,7 @@ jobs:
   release-jars:
     if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:

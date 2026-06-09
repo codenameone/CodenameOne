@@ -128,7 +128,7 @@ import java.util.Vector;
 /// Display specifically for key, pointer events and screen resolution.
 ///
 /// @author Shai Almog
-@Concrete(name = "com.codename1.impl.ios.IOSImplementation")
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;
@@ -179,7 +179,10 @@ public abstract class CodenameOneImplementation {
     private BrowserComponent sharedJavascriptContext;
     private Dimension initialWindowSizeHintPercent;
 
-    static void setOnCurrentFormChange(Runnable on) {
+    /// Set a task to be executed every time the current form changes (e.g. on
+    /// navigation). Used by the advertising layer to show interstitials on
+    /// transitions; see [com.codename1.ads.AdManager#bindInterstitialOnTransition].
+    public static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
     }
 
@@ -5044,49 +5047,18 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
-    /// An implementation can return true if it provides a hardware accelerated 3D
-    /// rendering backend for `com.codename1.gpu.RenderView`. The default returns
-    /// false and `RenderView` falls back to a placeholder.
+    /// Returns the platform's GPU backend for the portable 3D API
+    /// (`com.codename1.gpu.RenderView`), or null on platforms without a 3D
+    /// backend. Returning a single backend object (rather than scattering
+    /// individual peer-lifecycle methods across the implementation) lets each
+    /// port keep all of its GPU wiring in one place. A non-null return is what
+    /// `Display.isGpuSupported()` reports.
     ///
     /// #### Returns
     ///
-    /// true if the implementation supports the 3D GPU API
-    public boolean isOpenGLSupported() {
-        return false;
-    }
-
-    /// Creates the native GPU peer that backs a `RenderView`. The peer owns the
-    /// platform GPU context and drives the view's `Renderer`. Returns null on
-    /// platforms without a 3D backend.
-    ///
-    /// #### Parameters
-    ///
-    /// - `view`: the render view requesting a peer
-    ///
-    /// #### Returns
-    ///
-    /// the native GPU peer or null if unsupported
-    public PeerComponent createGLPeer(com.codename1.gpu.RenderView view) {
+    /// the platform GPU backend, or null if the 3D GPU API is unsupported
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
         return null;
-    }
-
-    /// Sets whether a GPU peer renders continuously or only on demand.
-    ///
-    /// #### Parameters
-    ///
-    /// - `peer`: a peer previously returned from `createGLPeer`
-    ///
-    /// - `continuous`: true to render every frame
-    public void glSetContinuous(PeerComponent peer, boolean continuous) {
-    }
-
-    /// Requests that a GPU peer render a single frame. No effect in continuous
-    /// mode or on unsupported platforms.
-    ///
-    /// #### Parameters
-    ///
-    /// - `peer`: a peer previously returned from `createGLPeer`
-    public void glRequestRender(PeerComponent peer) {
     }
 
     /// Some platforms require that you enable pinch to zoom explicitly. This method has no

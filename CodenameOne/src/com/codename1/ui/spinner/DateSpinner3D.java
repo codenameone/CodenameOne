@@ -578,6 +578,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     @Override
     public void setValue(Object value) {
+        if (value == null) {
+            // A null value (e.g. Picker.setDate(null) while the popup is on
+            // screen) has no meaningful representation on the date wheels, so
+            // leave the current selection untouched rather than NPE'ing on the
+            // cast/setTime below. Mirrors TimeSpinner3D's null tolerance. #5069
+            return;
+        }
         Date dt = (Date) value;
         Calendar cld = Calendar.getInstance();
         cld.setTime(dt);

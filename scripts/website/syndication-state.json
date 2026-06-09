@@ -125,6 +125,138 @@
         "canonical_set": true,
         "syndicated_at": "2026-06-02T01:34:44+00:00"
       }
+    },
+    "metal-default-new-build-cloud-and-a-new-format": {
+      "devto": {
+        "id": 3828546,
+        "url": "https://dev.to/codenameone/metal-default-a-new-build-cloud-and-a-new-format-11hg",
+        "syndicated_at": "2026-06-05T13:58:05+00:00"
+      },
+      "foojay": {
+        "id": 124128,
+        "url": "https://foojay.io/wp-admin/post.php?post=124128&action=edit",
+        "preview_url": "https://foojay.io/?p=124128",
+        "featured_media_id": 124127,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-05T13:59:11+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/1945f698dd28/edit",
+        "syndicated_at": "2026-06-05T15:01:09+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3658581/edit.html",
+        "syndicated_at": "2026-06-05T15:02:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq120nmg001h1sq14zpg0q1j",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a22e50abdc172ef8847e8b0",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-05T15:03:31+00:00"
+      }
+    },
+    "developer-workflow-debug-and-junit": {
+      "devto": {
+        "id": 3835213,
+        "url": "https://dev.to/codenameone/on-device-debugging-and-junit-5-245",
+        "syndicated_at": "2026-06-06T13:32:21+00:00"
+      },
+      "foojay": {
+        "id": 124137,
+        "url": "https://foojay.io/wp-admin/post.php?post=124137&action=edit",
+        "preview_url": "https://foojay.io/?p=124137",
+        "featured_media_id": 124136,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-06T13:33:29+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/57036bf1aeaf/edit",
+        "syndicated_at": "2026-06-06T15:01:49+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq2hhs3v00031spqd70cf2w9",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a2436bae769bc0019e10426",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-06T15:04:35+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656694/edit.html",
+        "syndicated_at": "2026-06-06T15:14:17+00:00"
+      }
+    },
+    "platform-apis-in-the-core": {
+      "devto": {
+        "id": 3841163,
+        "url": "https://dev.to/codenameone/ai-oauth-and-other-platform-apis-in-the-core-nd2",
+        "syndicated_at": "2026-06-07T13:32:48+00:00"
+      },
+      "foojay": {
+        "id": 124141,
+        "url": "https://foojay.io/wp-admin/post.php?post=124141&action=edit",
+        "preview_url": "https://foojay.io/?p=124141",
+        "featured_media_id": 124140,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-07T13:33:49+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/362f74616708/edit",
+        "syndicated_at": "2026-06-07T15:01:52+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656699/edit.html",
+        "syndicated_at": "2026-06-07T15:18:55+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq3xhm4u000i1spq2hgddqg6",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a258bea0d543e9c5d254f2a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-07T15:20:02+00:00"
+      }
+    },
+    "build-time-codegen": {
+      "devto": {
+        "id": 3849555,
+        "url": "https://dev.to/codenameone/openapi-orm-svg-and-lottie-56ea",
+        "syndicated_at": "2026-06-08T14:32:08+00:00"
+      },
+      "foojay": {
+        "id": 124152,
+        "url": "https://foojay.io/wp-admin/post.php?post=124152&action=edit",
+        "preview_url": "https://foojay.io/?p=124152",
+        "featured_media_id": 124151,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-06-08T14:33:02+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ab7837351417/edit",
+        "syndicated_at": "2026-06-08T15:01:39+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3656726/edit.html",
+        "syndicated_at": "2026-06-08T15:02:43+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmq5ccmj900000bjehn2p1zvu",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a26d99db1bc3cdb83ac9ac3",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-06-08T15:03:50+00:00"
+      }
     }
   }
 }

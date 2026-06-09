@@ -41,7 +41,7 @@ public final class Long extends Number implements Comparable<Long> {
      * The smallest value of type long.
      * See Also:Constant Field Values
      */
-    public static final long MIN_VALUE=-9223372036854775807l;
+    public static final long MIN_VALUE=-9223372036854775808l;
 
     private long value;
     

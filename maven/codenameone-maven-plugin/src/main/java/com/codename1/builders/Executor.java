@@ -78,6 +78,10 @@ public abstract class Executor {
     public static final String BUILD_TARGET_XCODE_PROJECT = "ios-source";
     public static final String BUILD_TARGET_ANDROID_PROJECT = "android-source";
     public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = "mac-source";
+    // Native Windows (ParparVM -> clang-cl) target; distinct from the JVM-bundled
+    // "windows-desktop" (javase) target.
+    public static final String BUILD_TARGET_WINDOWS_NATIVE = "windows-device";
+    public static final String BUILD_TARGET_WINDOWS_NATIVE_PROJECT = "windows-source";
     private String buildTarget;
 
     private static boolean disableDelete;

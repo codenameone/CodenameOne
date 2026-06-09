@@ -269,6 +269,8 @@ public final class IOSNative {
     
     native void setBrowserUserAgent(long browserPeer, String ua);
     native void setBrowserFollowTargetBlank(long browserPeer, boolean follow);
+    // style: 0 = unspecified/auto (follow device), 1 = light, 2 = dark
+    native void setBrowserInterfaceStyle(long browserPeer, int style);
     
     native void browserBack(long browserPeer);
     native void browserStop(long browserPeer);

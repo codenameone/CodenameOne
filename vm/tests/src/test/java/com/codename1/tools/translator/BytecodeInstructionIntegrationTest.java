@@ -39,14 +39,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BytecodeInstructionIntegrationTest {
 
+    // Shared @MethodSource for the integration suites (RuntimeSemantics, Target,
+    // Bytecode, CleanTarget, Smoke, NativeAudit, FileClass, ...). Uses the
+    // diagonal compiler set -- each bytecode target compiled by its matching JDK
+    // (8->8 .. 25->25) -- rather than the full (compiler x target) cross-product,
+    // which re-tested the same bytecode shapes. See CompilerHelper.getDiagonalCompilers.
     static Stream<CompilerHelper.CompilerConfig> provideCompilerConfigs() {
-        List<CompilerHelper.CompilerConfig> configs = new ArrayList<>();
-        configs.addAll(CompilerHelper.getAvailableCompilers("1.8"));
-        configs.addAll(CompilerHelper.getAvailableCompilers("11"));
-        configs.addAll(CompilerHelper.getAvailableCompilers("17"));
-        configs.addAll(CompilerHelper.getAvailableCompilers("21"));
-        configs.addAll(CompilerHelper.getAvailableCompilers("25"));
-        return configs.stream();
+        return CompilerHelper.getDiagonalCompilers().stream();
     }
 
     @ParameterizedTest

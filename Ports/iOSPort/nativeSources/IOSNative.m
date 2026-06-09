@@ -3182,6 +3182,29 @@ void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean
     });
 }
 
+// Pin the appearance of the native web widget independently of the device-wide
+// setting. style: 0 = unspecified/auto (follow device), 1 = light, 2 = dark.
+// Setting overrideUserInterfaceStyle on the WKWebView feeds the trait collection
+// that drives the page's prefers-color-scheme media query and the UA rendering of
+// default backgrounds / form controls, so a page that adapts to dark mode can be
+// kept light (or dark) regardless of the user's system appearance.
+void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT style) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if (@available(iOS 13.0, *)) {
+            UIView* w = (BRIDGE_CAST UIView*)((void *)peer);
+            UIUserInterfaceStyle uiStyle = UIUserInterfaceStyleUnspecified;
+            if (style == 1) {
+                uiStyle = UIUserInterfaceStyleLight;
+            } else if (style == 2) {
+                uiStyle = UIUserInterfaceStyleDark;
+            }
+            w.overrideUserInterfaceStyle = uiStyle;
+        }
+        POOL_END();
+    });
+}
+
 
 void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
     dispatch_sync(dispatch_get_main_queue(), ^{

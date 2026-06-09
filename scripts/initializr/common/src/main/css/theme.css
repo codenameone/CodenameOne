@@ -2,6 +2,9 @@
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
+    /* Keep the application scrollbar permanently visible (don't fade it out)
+       so the single scrolling column reads like a desktop/web app. */
+    fadeScrollBarBool: false;
 }
 
 /** Style for Button class */
@@ -94,6 +97,34 @@ SideCommandDark {
     }
 }
 
+/* ==========================================================================
+   Initializr - Codename One design language
+   Font: Inter (bundled under css/fonts). Borders use 2px so they read on the
+   high-DPI simulator skin; radii are deliberately subtle (the design uses 6-8px).
+   Light tokens:  bg-app #F3F4F7  panel #FFFFFF  border #D2D9E6  text #112247
+                  muted #7F8AA3   soft  #A0A8BA  accent #2F6BFF  accent-soft #E8F0FF
+   Dark tokens:   bg-app #071B4D  panel #102B66  border #2F508F  text #F5F8FF
+                  muted #A8B8DA   soft  #7E93BC  accent #4D86FF  accent-soft #15336B
+   ========================================================================== */
+
+@font-face {
+    font-family: "Inter";
+    src: url("fonts/Inter-Regular.ttf");
+}
+@font-face {
+    font-family: "Inter Medium";
+    src: url("fonts/Inter-Medium.ttf");
+}
+@font-face {
+    font-family: "Inter SemiBold";
+    src: url("fonts/Inter-SemiBold.ttf");
+}
+@font-face {
+    font-family: "Inter Bold";
+    src: url("fonts/Inter-Bold.ttf");
+}
+
+/* ---------- App shell ---------- */
 InitializrForm {
     background-color: #F3F4F7;
 }
@@ -103,237 +134,419 @@ InitializrFormDark {
 }
 
 InitializrRoot {
-    padding: 2.2mm;
+    padding: 1.4mm;
+    background-color: #F3F4F7;
 }
 
 InitializrRootDark {
-    padding: 2.2mm;
+    padding: 1.4mm;
+    background-color: #071B4D;
 }
 
-InitializrHeaderCard {
-    background-color: #F7F8FB;
-    padding: 2.5mm;
-    margin: 1.2mm;
+InitializrColumn {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
 }
 
-InitializrHeaderCardDark {
-    background-color: #163575;
-    padding: 2.5mm;
-    margin: 1.2mm;
+InitializrColumnDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
 }
 
-InitializrCard {
-    background-color: #ffffff;
-    padding: 2.5mm;
-    margin: 1.2mm;
+/* ---------- Top bar ---------- */
+InitializrTopbar {
+    background-color: #FFFFFF;
+    border-bottom: 2px solid #D2D9E6;
+    padding: 2.4mm 3mm;
 }
 
-InitializrCardDark {
+InitializrTopbarDark {
     background-color: #102B66;
-    padding: 2.5mm;
-    margin: 1.2mm;
+    border-bottom: 2px solid #2F508F;
+    padding: 2.4mm 3mm;
+}
+
+InitializrWordmark {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter Bold";
+    font-size: 4.8mm;
+}
+
+InitializrWordmarkDark {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "Inter Bold";
+    font-size: 4.8mm;
+}
+
+/* ---------- Hero ---------- */
+InitializrHero {
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    padding: 3mm 2.8mm;
+    margin: 1.1mm;
+}
+
+InitializrHeroDark {
+    background-color: #102B66;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    padding: 3mm 2.8mm;
+    margin: 1.1mm;
 }
 
 InitializrHeroTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 4.5mm;
+    font-family: "Inter Bold";
+    font-size: 4.6mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 4.5mm;
+    font-family: "Inter Bold";
+    font-size: 4.6mm;
     padding: 0 0 1mm 0;
 }
 
 InitializrHeroSubtitle {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.8mm;
+    padding: 0;
 }
 
 InitializrHeroSubtitleDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.8mm;
+    padding: 0;
 }
 
-InitializrSectionTitle {
+InitializrPill {
+    background-color: #E8F0FF;
+    border: none;
+    border-radius: 2mm;
+    padding: 0.8mm 2.4mm;
+}
+
+InitializrPillDark {
+    background-color: #15336B;
+    border: none;
+    border-radius: 2mm;
+    padding: 0.8mm 2.4mm;
+}
+
+InitializrPillDot {
+    background-color: transparent;
+    color: #4D86FF;
+    border: none;
+    padding: 0;
+    margin: 0 0.6mm 0 0;
+}
+
+InitializrPillDotDark {
+    background-color: transparent;
+    color: #4D86FF;
+    border: none;
+    padding: 0;
+    margin: 0 0.6mm 0 0;
+}
+
+InitializrPillText {
+    background-color: transparent;
+    color: #2F6BFF;
+    font-family: "Inter Bold";
+    font-size: 2.2mm;
+    padding: 0;
+}
+
+InitializrPillTextDark {
+    background-color: transparent;
+    color: #6FA0FF;
+    font-family: "Inter Bold";
+    font-size: 2.2mm;
+    padding: 0;
+}
+
+/* ---------- Collapsible panel (card) ---------- */
+InitializrPanel {
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 0;
+}
+
+InitializrPanelDark {
+    background-color: #102B66;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 0;
+}
+
+InitializrPanelHeader {
+    background-color: transparent;
+    border: none;
+    padding: 2.2mm 2.8mm;
+    margin: 0;
+}
+
+InitializrPanelHeaderDark {
+    background-color: transparent;
+    border: none;
+    padding: 2.2mm 2.8mm;
+    margin: 0;
+}
+
+InitializrPanelTitle {
+    background-color: transparent;
     color: #112247;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
+    padding: 0;
+}
+
+InitializrPanelTitleDark {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
+    padding: 0;
+}
+
+InitializrPanelSubtitle {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 0 0 0 1.6mm;
+}
+
+InitializrPanelSubtitleDark {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 0 0 0 1.6mm;
+}
+
+InitializrPanelChevron {
+    cn1-derive: Button;
+    color: #A0A8BA;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.4mm;
+}
+
+InitializrPanelChevronDark {
+    cn1-derive: Button;
+    color: #7E93BC;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.4mm;
+}
+
+InitializrPanelBody {
+    background-color: transparent;
+    border-top: 2px solid #E5EAF2;
+    padding: 1.6mm 2.8mm 2.6mm 2.8mm;
+}
+
+InitializrPanelBodyDark {
+    background-color: transparent;
+    border-top: 2px solid #20407D;
+    padding: 1.6mm 2.8mm 2.6mm 2.8mm;
+}
+
+/* ---------- Section title (Essentials, non-collapsible) ---------- */
+InitializrSectionTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrSectionTitleDark {
+    background-color: transparent;
     color: #F5F8FF;
-    font-family: "native:MainBold";
-    font-size: 3.4mm;
+    font-family: "Inter SemiBold";
+    font-size: 3.3mm;
     padding: 0 0 1.2mm 0;
 }
 
+/* ---------- Fields ---------- */
 InitializrFieldLabel {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
-    font-size: 2.4mm;
-    padding: 0.4mm 0;
+    font-family: "Inter Medium";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.8mm 0.2mm;
 }
 
 InitializrFieldLabelDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
-    font-size: 2.4mm;
-    padding: 0.4mm 0;
+    font-family: "Inter Medium";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.8mm 0.2mm;
 }
 
 InitializrField, InitializrFieldHint {
     color: #112247;
-    font-family: "native:MainRegular";
-    font-size: 2.8mm;
-    background-color: #ffffff;
-    border: 1px solid #D9DEE8;
-    padding: 1.1mm;
-    margin: 0 0 1.4mm 0;
+    font-family: "Inter";
+    font-size: 2.9mm;
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    padding: 1.6mm;
+    margin: 0 0 1.6mm 0;
 }
 
 InitializrFieldDark, InitializrFieldHintDark {
     color: #F5F8FF;
-    font-family: "native:MainRegular";
-    font-size: 2.8mm;
+    font-family: "Inter";
+    font-size: 2.9mm;
     background-color: #0E2A61;
-    border: 1px solid #4C6EA8;
-    padding: 1.1mm;
-    margin: 0 0 1.4mm 0;
+    border: 2px solid #3A5694;
+    border-radius: 0.8mm;
+    padding: 1.6mm;
+    margin: 0 0 1.6mm 0;
 }
 
 InitializrChoicesGrid {
+    background-color: transparent;
     margin: 0 0 1.2mm 0;
 }
 
-AccordionItemDark {
-    cn1-derive: Button;
-    color: #F5F8FF;
-    background-color: #163575;
-    border: 1px solid #4C6EA8;
-    margin: 0.6mm 0;
-    padding: 1.2mm;
-}
-
-AccordionItemDark.pressed {
-    cn1-derive: Button;
-    color: #F5F8FF;
-    background-color: #112F70;
-    border: 1px solid #7390C0;
-}
-
-AccordionContentDark {
-    cn1-derive: Container;
-    background-color: #102B66;
-    border: 1px solid #4C6EA8;
-    padding: 1.2mm;
-}
-
-AccordionArrowDark {
-    cn1-derive: AccordionArrow;
-    color: #F5F8FF;
-    background-color: #163575;
-}
-
-AccordionOpenCloseIconDark {
-    cn1-derive: AccordionOpenCloseIcon;
-    color: #A8B8DA;
+InitializrChoicesGridDark {
     background-color: transparent;
+    margin: 0 0 1.2mm 0;
 }
 
+/* ---------- Choice toggles ---------- */
 InitializrChoice {
-    color: #112247;
-    background-color: #E8F0FF;
-    font-family: "native:MainRegular";
-    font-size: 2.6mm;
-    border: 1px solid #D9DEE8;
-    margin: 0.7mm;
-    padding: 1.1mm;
+    color: #5B6680;
+    background-color: #FFFFFF;
+    font-family: "Inter SemiBold";
+    font-size: 2.7mm;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    margin: 0.6mm;
+    padding: 1.7mm;
     text-align: center;
 }
 
 InitializrChoice.pressed {
-    color: #ffffff;
+    color: #FFFFFF;
     background-color: #2F6BFF;
-    border: 1px solid #2F6BFF;
+    border: 2px solid #2F6BFF;
     text-align: center;
 }
 
 InitializrChoiceDark {
-    color: #F5F8FF;
-    background-color: #163575;
-    font-family: "native:MainRegular";
-    font-size: 2.6mm;
-    border: 1px solid #4C6EA8;
-    margin: 0.7mm;
-    padding: 1.1mm;
+    color: #A8B8DA;
+    background-color: #0E2A61;
+    font-family: "Inter SemiBold";
+    font-size: 2.7mm;
+    border: 2px solid #3A5694;
+    border-radius: 0.8mm;
+    margin: 0.6mm;
+    padding: 1.7mm;
     text-align: center;
 }
 
 InitializrChoiceDark.pressed {
-    color: #ffffff;
+    color: #FFFFFF;
     background-color: #4D86FF;
-    border: 1px solid #4D86FF;
+    border: 2px solid #4D86FF;
     text-align: center;
 }
 
+/* ---------- Summary / current settings ---------- */
 InitializrSummary {
     color: #112247;
-    font-family: "native:MainRegular";
-    font-size: 2.7mm;
-    background-color: #FAFAFC;
-    border: 1px solid #D9DEE8;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    background-color: #F3F4F7;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    padding: 1.8mm;
+    margin: 1mm 0 0 0;
 }
 
 InitializrSummaryDark {
-    color: #F5F8FF;
-    font-family: "native:MainRegular";
-    font-size: 2.7mm;
-    background-color: #112F70;
-    border: 1px solid #4C6EA8;
-    padding: 1.4mm;
-    margin: 0 0 1.4mm 0;
+    color: #DCE6FB;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    background-color: #0B2459;
+    border: 2px solid #2F508F;
+    border-radius: 0.8mm;
+    padding: 1.8mm;
+    margin: 1mm 0 0 0;
+}
+
+InitializrSummaryText {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter";
+    font-size: 2.6mm;
+}
+
+InitializrSummaryTextDark {
+    background-color: transparent;
+    color: #DCE6FB;
+    font-family: "Inter";
+    font-size: 2.6mm;
 }
 
 InitializrTip {
+    background-color: transparent;
     color: #7F8AA3;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrTipDark {
+    background-color: transparent;
     color: #A8B8DA;
-    font-family: "native:MainRegular";
+    font-family: "Inter";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
 }
 
 InitializrValidationError {
-    color: #b42318;
-    font-family: "native:MainRegular";
-    font-size: 2.2mm;
-    padding: 0 0 0.8mm 0;
+    background-color: transparent;
+    color: #B42318;
+    font-family: "Inter";
+    font-size: 2.3mm;
+    padding: 0 0 0.8mm 0.2mm;
 }
 
 InitializrValidationErrorDark {
-    color: #f87171;
-    font-family: "native:MainRegular";
-    font-size: 2.2mm;
-    padding: 0 0 0.8mm 0;
+    background-color: transparent;
+    color: #F87171;
+    font-family: "Inter";
+    font-size: 2.3mm;
+    padding: 0 0 0.8mm 0.2mm;
 }
 
 InitializrHelpButton {
     cn1-derive: Button;
-    color: #7F8AA3;
+    color: #A0A8BA;
     background-color: transparent;
     border: none;
     margin: 0;
@@ -342,50 +555,270 @@ InitializrHelpButton {
 
 InitializrHelpButtonDark {
     cn1-derive: Button;
-    color: #A8B8DA;
+    color: #7E93BC;
     background-color: transparent;
     border: none;
     margin: 0;
     padding: 0.2mm;
 }
 
+/* ---------- Field help popup (InteractionDialog) ---------- */
+InitializrHelpPopup {
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+}
+
+InitializrHelpPopupDark {
+    background-color: #102B66;
+    border: 2px solid #2F508F;
+    border-radius: 1.5mm;
+    padding: 0.5mm;
+}
+
+InitializrHelpPopupTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter SemiBold";
+    font-size: 2.9mm;
+    text-align: center;
+}
+
+InitializrHelpPopupTitleDark {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "Inter SemiBold";
+    font-size: 2.9mm;
+    text-align: center;
+}
+
+InitializrHelpPopupBody {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 1.6mm;
+}
+
+InitializrHelpPopupBodyDark {
+    background-color: transparent;
+    color: #DCE6FB;
+    font-family: "Inter";
+    font-size: 2.6mm;
+    padding: 1.6mm;
+}
+
+/* ---------- Generate bar + primary button ---------- */
+InitializrGenerateBar {
+    background-color: #F3F4F7;
+    border-top: 2px solid #D2D9E6;
+    padding: 1.8mm 2.4mm;
+}
+
+InitializrGenerateBarDark {
+    background-color: #071B4D;
+    border-top: 2px solid #20407D;
+    padding: 1.8mm 2.4mm;
+}
+
+InitializrGenerateInfo {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-family: "Inter";
+    font-size: 2.5mm;
+}
+
+InitializrGenerateInfoDark {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-family: "Inter";
+    font-size: 2.5mm;
+}
+
+InitializrPrimaryButton {
+    color: #1A2614;
+    background-color: #B8D532;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 2.2mm 3.6mm;
+    margin: 0;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+InitializrPrimaryButton.pressed {
+    color: #1A2614;
+    background-color: #A2BF2C;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+InitializrPrimaryButton.disabled {
+    color: #8A9472;
+    background-color: #DDE6BC;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark {
+    color: #1A2614;
+    background-color: #B8D532;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 2.2mm 3.6mm;
+    margin: 0;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark.pressed {
+    color: #1A2614;
+    background-color: #A2BF2C;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+InitializrPrimaryButtonDark.disabled {
+    color: #5E6B49;
+    background-color: #5C6B2A;
+    border: none;
+    border-radius: 0.8mm;
+    text-align: center;
+}
+
+/* ---------- Live preview panel ---------- */
+InitializrPreviewWrap {
+    background-color: #FFFFFF;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 2.6mm;
+}
+
+InitializrPreviewWrapDark {
+    background-color: #102B66;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    margin: 1.1mm;
+    padding: 2.6mm;
+}
+
+InitializrPhoneStage {
+    background-color: #F1F3F8;
+    border: 2px solid #E5EAF2;
+    border-radius: 1mm;
+    padding: 2.4mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrPhoneStageDark {
+    background-color: #0B2459;
+    border: 2px solid #20407D;
+    border-radius: 1mm;
+    padding: 2.4mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrPreviewTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 0 0 0 1.2mm;
+}
+
+InitializrPreviewTitleDark {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "Inter SemiBold";
+    font-size: 3mm;
+    padding: 0 0 0 1.2mm;
+}
+
+InitializrLiveDot {
+    color: #8FB81E;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+InitializrLiveDotDark {
+    color: #B8D532;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+InitializrCard {
+    background-color: #FAFAFC;
+    border: 2px solid #D2D9E6;
+    border-radius: 0.8mm;
+    padding: 2mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrCardDark {
+    background-color: #112F70;
+    border: 2px solid #2F508F;
+    border-radius: 0.8mm;
+    padding: 2mm;
+    margin: 1.2mm 0 0 0;
+}
+
+InitializrPreviewHolder {
+    background-color: transparent;
+    padding: 0;
+}
+
+InitializrPreviewHolderDark {
+    background-color: transparent;
+    padding: 0;
+}
+
+/* ---------- Application scrollbar ----------
+   The scrollbar UIID is global (set by the look-and-feel, not in the component
+   tree the dark re-skin walks), so use one neutral slate thumb that reads on
+   both the light and the dark surface, with a transparent track. */
+Scroll {
+    background-color: transparent;
+    padding: 0 0.4mm 0 0.4mm;
+    margin: 0;
+}
+
+ScrollThumb {
+    background-color: #9AA7C0;
+    border-radius: 1mm;
+    padding: 0 0.6mm 0 0.6mm;
+    margin: 0;
+}
+
+/* ---------- Live (phone) preview internals ---------- */
 Images {
     background-image: url(images/grub.png),
         url(images/tweet.png);
 }
 
-InitializrPrimaryButton {
-    color: #ffffff;
-    background-color: #B8D532;
-    font-family: "native:MainBold";
-    font-size: 2.9mm;
-    padding: 1.7mm;
-    margin: 1.4mm 1.2mm;
-    border: none;
-    text-align: center;
-}
-
-InitializrPrimaryButton.pressed {
-    color: #ffffff;
-    background-color: #A2BF2C;
-    border: 1px solid #A2BF2C;
-    text-align: center;
-}
-
-InitializrSecondaryButton {
-    color: #112247;
-    background-color: #F7F8FB;
-    font-family: "native:MainRegular";
-    font-size: 2.6mm;
-    padding: 1.3mm;
-    margin: 0.8mm 0 0 0;
-    border: 1px solid #D9DEE8;
-}
-
 InitializrLiveFrame {
-    margin: 0 0 1.2mm 0;
-    border: 1px solid #D9DEE8;
-    padding: 2mm;
+    margin: 0;
+    border: 2px solid #D2D9E6;
+    border-radius: 1mm;
+    padding: 0;
+    background-color: transparent;
+}
+
+InitializrLiveFrameDark {
+    cn1-derive: Container;
+    margin: 0;
+    border: 2px solid #2F508F;
+    border-radius: 1mm;
+    padding: 0;
+    background-color: transparent;
 }
 
 InitializrLiveContentDark {
@@ -403,11 +836,13 @@ InitializrLiveToolbarDark {
 InitializrLiveTitleDark {
     cn1-derive: Title;
     color: #F5F8FF;
+    background-color: transparent;
 }
 
 InitializrLiveMenuDark {
     cn1-derive: Command;
     color: #F5F8FF;
+    background-color: transparent;
 }
 
 InitializrLiveButtonDarkClean {

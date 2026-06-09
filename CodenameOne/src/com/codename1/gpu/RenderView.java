@@ -75,7 +75,7 @@ public class RenderView extends Container {
         this.renderer = renderer;
         setLayout(new BorderLayout());
         placeholder = new Container();
-        if (!Display.getInstance().isOpenGLSupported()) {
+        if (!Display.getInstance().isGpuSupported()) {
             placeholder.setLayout(new BorderLayout());
             placeholder.add(BorderLayout.CENTER, new Label("3D not supported"));
         }
@@ -88,9 +88,9 @@ public class RenderView extends Container {
     }
 
     /// Returns true if the current platform provides a 3D backend. Equivalent to
-    /// `Display.getInstance().isOpenGLSupported()`.
+    /// `Display.getInstance().isGpuSupported()`.
     public boolean isSupported() {
-        return Display.getInstance().isOpenGLSupported();
+        return Display.getInstance().isGpuSupported();
     }
 
     /// Returns true if the view continuously renders frames.
@@ -112,7 +112,7 @@ public class RenderView extends Container {
     public RenderView setContinuous(boolean continuous) {
         this.continuous = continuous;
         if (internal != null) {
-            Display.getInstance().glSetContinuous(internal, continuous);
+            Display.getInstance().gpuSetContinuous(internal, continuous);
         }
         return this;
     }
@@ -121,7 +121,7 @@ public class RenderView extends Container {
     /// in continuous mode or when 3D is unsupported.
     public void requestRender() {
         if (internal != null) {
-            Display.getInstance().glRequestRender(internal);
+            Display.getInstance().gpuRequestRender(internal);
         }
     }
 
@@ -134,13 +134,13 @@ public class RenderView extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        if (internal == null && Display.getInstance().isOpenGLSupported()) {
-            PeerComponent c = Display.getInstance().createGLPeer(this);
+        if (internal == null && Display.getInstance().isGpuSupported()) {
+            PeerComponent c = Display.getInstance().createGpuPeer(this);
             if (c != null) {
                 internal = c;
                 removeComponent(placeholder);
                 addComponent(BorderLayout.CENTER, internal);
-                Display.getInstance().glSetContinuous(internal, continuous);
+                Display.getInstance().gpuSetContinuous(internal, continuous);
                 Container parent = getParent();
                 if (parent != null) {
                     parent.revalidate();

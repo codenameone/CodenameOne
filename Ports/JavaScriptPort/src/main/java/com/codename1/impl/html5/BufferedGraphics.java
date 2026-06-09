@@ -82,8 +82,10 @@ public class BufferedGraphics extends HTML5Graphics {
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
     
-    public BufferedGraphics(HTML5Implementation impl, HTMLCanvasElement canvas, int width, int height) {
-        super(impl, canvas, width, height);
+    public BufferedGraphics(HTML5Implementation impl, int width, int height) {
+        // The display draws onto the well-known display surface; the host binds
+        // it lazily to the output canvas. No worker-side canvas/context proxy.
+        super(impl, HTML5Implementation.DISPLAY_SURFACE_ID, width, height);
     }
 
     @Override

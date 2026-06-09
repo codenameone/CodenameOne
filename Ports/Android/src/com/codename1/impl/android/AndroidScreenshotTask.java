@@ -139,7 +139,10 @@ class AndroidScreenshotTask implements Runnable {
         Canvas canvas = new Canvas(target);
         for (AndroidGLSurface peer : peers) {
             try {
-                if (!peer.isShown()) {
+                // Only composite peers on the form currently on screen. isShown()
+                // can still be true for a beat while a previous form is torn down,
+                // which bled e.g. the 3D animation frame into DesktopMode's capture.
+                if (!peer.isShown() || !peer.isOnCurrentForm()) {
                     continue;
                 }
                 Bitmap frame = peer.getLastFrame();

@@ -51,6 +51,13 @@ class CalendarPicker extends Container implements InternalPickerWidget {
 
     @Override
     public void setValue(Object value) {
+        if (value == null) {
+            // A null value (e.g. Picker.setDate(null) while the popup is on
+            // screen) has no meaningful representation; leave the current
+            // selection untouched instead of NPE'ing. Mirrors TimeSpinner3D's
+            // null tolerance. #5069
+            return;
+        }
         Date dt = (Date) value;
         calendar.setDate(dt);
 

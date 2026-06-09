@@ -736,6 +736,19 @@
         receiver[args[0] | 0] = args[1];
         value = null;
       } else {
+        // WebGL bulk-data calls receive their payload as a plain JS number
+        // array (the only way a Java primitive array survives the worker->main
+        // bridge intact -- a worker-built typed array arrives here as an empty
+        // object). Re-wrap it in the typed array WebGL requires before the call.
+        // ELEMENT_ARRAY_BUFFER == 0x8893 takes Uint16Array; everything else
+        // (vertex data) takes Float32Array.
+        if (member === 'bufferData' && Array.isArray(args[1])) {
+          args[1] = (args[0] === 0x8893) ? new Uint16Array(args[1]) : new Float32Array(args[1]);
+        } else if (member === 'uniformMatrix4fv' && Array.isArray(args[2])) {
+          args[2] = new Float32Array(args[2]);
+        } else if (member === 'texImage2D' && Array.isArray(args[args.length - 1])) {
+          args[args.length - 1] = new Uint8Array(args[args.length - 1]);
+        }
         var fn = receiver[member];
         if (typeof fn === 'function') {
           value = fn.apply(receiver, args);
@@ -804,6 +817,434 @@
       }
     }
     return hostResult(value);
+  });
+
+  // ===================================================================
+  // SURFACE BRIDGE  (surface-id render model)
+  // -------------------------------------------------------------------
+  // The worker (Java) side holds opaque, WORKER-ASSIGNED surface ids -- never
+  // canvas / CanvasRenderingContext2D host-refs. It records draw calls into a
+  // flat command stream (see SurfaceCommandRecorder.java) and flushes them
+  // fire-and-forget. This host keeps the id->{canvas,ctx} table and replays the
+  // stream. Only ``__cn1_surface_read__`` (getRGB) ever returns pixels. The
+  // opcodes below MUST mirror SurfaceCommandRecorder.OP_* exactly.
+  var SURF = {
+    SAVE: 1, RESTORE: 2, SCALE: 3, ROTATE: 4, TRANSLATE: 5, TRANSFORM: 6,
+    SET_TRANSFORM: 7, SET_GLOBAL_ALPHA: 8, SET_GCO: 9, SET_FILL_COLOR: 10,
+    SET_STROKE_COLOR: 11, SET_LINE_WIDTH: 12, SET_LINE_CAP: 13, SET_LINE_JOIN: 14,
+    SET_MITER_LIMIT: 15, SET_FONT: 16, SET_TEXT_ALIGN: 17, SET_TEXT_BASELINE: 18,
+    SET_SHADOW_COLOR: 19, SET_SHADOW_BLUR: 20, SET_SHADOW_OFFX: 21, SET_SHADOW_OFFY: 22,
+    SET_FILTER: 23, CLEAR_RECT: 24, FILL_RECT: 25, STROKE_RECT: 26, BEGIN_PATH: 27,
+    CLOSE_PATH: 28, MOVE_TO: 29, LINE_TO: 30, QUAD_TO: 31, BEZIER_TO: 32, ARC: 33,
+    ARC_TO: 34, ELLIPSE: 35, RECT: 36, FILL: 37, STROKE: 38, CLIP: 39,
+    FILL_TEXT: 40, STROKE_TEXT: 41, SET_LINE_DASH_OFFSET: 42, SET_LINE_DASH: 43,
+    CREATE_LINEAR_GRADIENT: 50, CREATE_RADIAL_GRADIENT: 51, ADD_COLOR_STOP: 52,
+    SET_FILL_GRADIENT: 53, SET_STROKE_GRADIENT: 54, CREATE_PATTERN: 55, SET_FILL_PATTERN: 56,
+    CREATE_PATTERN_SURFACE: 57,
+    DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
+    BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72
+  };
+  // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
+  var SURF_DISPLAY_ID = 1;
+  var surfaceTable = {};
+
+  function surfaceImageSource(marker) {
+    // A drawImage source: either a host-ref marker (a loaded image / canvas
+    // that stays a host-side resource) or already a real element.
+    var resolved = resolveHostRef(marker);
+    if (resolved != null) {
+      return resolved;
+    }
+    return marker;
+  }
+
+  function getSurface(id, createW, createH) {
+    var s = surfaceTable[id];
+    if (s) {
+      return s;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Bind the display surface to the real output canvas lazily.
+      var doc = global.document || (global.window && global.window.document);
+      var out = doc ? doc.getElementById('codenameone-canvas') : null;
+      if (!out) {
+        return null;
+      }
+      s = { canvas: out, ctx: out.getContext('2d') };
+      surfaceTable[id] = s;
+      return s;
+    }
+    if (createW == null) {
+      return null;
+    }
+    var d2 = global.document || (global.window && global.window.document);
+    if (!d2 || !d2.createElement) {
+      return null;
+    }
+    var cv = d2.createElement('canvas');
+    cv.width = createW | 0;
+    cv.height = createH | 0;
+    s = { canvas: cv, ctx: cv.getContext('2d') };
+    surfaceTable[id] = s;
+    return s;
+  }
+
+  // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
+  function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
+    var ni = 0; // num cursor
+    var oi = 0; // obj cursor
+    var curGradient = null;
+    var curPattern = null;
+    for (var k = 0; k < opCount; k++) {
+      var code = ops[k];
+      switch (code) {
+        case SURF.SAVE: ctx.save(); break;
+        case SURF.RESTORE: ctx.restore(); break;
+        case SURF.SCALE: ctx.scale(nums[ni++], nums[ni++]); break;
+        case SURF.ROTATE: ctx.rotate(nums[ni++]); break;
+        case SURF.TRANSLATE: ctx.translate(nums[ni++], nums[ni++]); break;
+        case SURF.TRANSFORM: ctx.transform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_TRANSFORM: ctx.setTransform(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.SET_GLOBAL_ALPHA: ctx.globalAlpha = nums[ni++]; break;
+        case SURF.SET_GCO: ctx.globalCompositeOperation = objs[oi++]; break;
+        case SURF.SET_FILL_COLOR: ctx.fillStyle = objs[oi++]; break;
+        case SURF.SET_STROKE_COLOR: ctx.strokeStyle = objs[oi++]; break;
+        case SURF.SET_LINE_WIDTH: ctx.lineWidth = nums[ni++]; break;
+        case SURF.SET_LINE_CAP: ctx.lineCap = objs[oi++]; break;
+        case SURF.SET_LINE_JOIN: ctx.lineJoin = objs[oi++]; break;
+        case SURF.SET_MITER_LIMIT: ctx.miterLimit = nums[ni++]; break;
+        case SURF.SET_FONT: ctx.font = objs[oi++]; break;
+        case SURF.SET_TEXT_ALIGN: ctx.textAlign = objs[oi++]; break;
+        case SURF.SET_TEXT_BASELINE: ctx.textBaseline = objs[oi++]; break;
+        case SURF.SET_SHADOW_COLOR: ctx.shadowColor = objs[oi++]; break;
+        case SURF.SET_SHADOW_BLUR: ctx.shadowBlur = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFX: ctx.shadowOffsetX = nums[ni++]; break;
+        case SURF.SET_SHADOW_OFFY: ctx.shadowOffsetY = nums[ni++]; break;
+        case SURF.SET_FILTER: try { ctx.filter = objs[oi++]; } catch (_ef) {} break;
+        case SURF.CLEAR_RECT: ctx.clearRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL_RECT: ctx.fillRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.STROKE_RECT: ctx.strokeRect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEGIN_PATH: ctx.beginPath(); break;
+        case SURF.CLOSE_PATH: ctx.closePath(); break;
+        case SURF.MOVE_TO: ctx.moveTo(nums[ni++], nums[ni++]); break;
+        case SURF.LINE_TO: ctx.lineTo(nums[ni++], nums[ni++]); break;
+        case SURF.QUAD_TO: ctx.quadraticCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.BEZIER_TO: ctx.bezierCurveTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ARC: {
+          var ax = nums[ni++], ay = nums[ni++], ar = nums[ni++], a0 = nums[ni++], a1 = nums[ni++], accw = nums[ni++];
+          ctx.arc(ax, ay, ar, a0, a1, accw !== 0);
+          break;
+        }
+        case SURF.ARC_TO: ctx.arcTo(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.ELLIPSE: ctx.ellipse(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.RECT: ctx.rect(nums[ni++], nums[ni++], nums[ni++], nums[ni++]); break;
+        case SURF.FILL: ctx.fill(); break;
+        case SURF.STROKE: ctx.stroke(); break;
+        case SURF.CLIP: ctx.clip(); break;
+        case SURF.FILL_TEXT: {
+          var fx = nums[ni++], fy = nums[ni++], fmw = nums[ni++], ftext = objs[oi++];
+          if (fmw >= 0) { ctx.fillText(ftext, fx, fy, fmw); } else { ctx.fillText(ftext, fx, fy); }
+          break;
+        }
+        case SURF.STROKE_TEXT: {
+          var sx0 = nums[ni++], sy0 = nums[ni++], smw = nums[ni++], stext = objs[oi++];
+          if (smw >= 0) { ctx.strokeText(stext, sx0, sy0, smw); } else { ctx.strokeText(stext, sx0, sy0); }
+          break;
+        }
+        case SURF.SET_LINE_DASH_OFFSET: ctx.lineDashOffset = nums[ni++]; break;
+        case SURF.SET_LINE_DASH: {
+          var dn = nums[ni++] | 0, seg = new Array(dn);
+          for (var di = 0; di < dn; di++) { seg[di] = nums[ni++]; }
+          if (ctx.setLineDash) { ctx.setLineDash(seg); }
+          break;
+        }
+        case SURF.CREATE_LINEAR_GRADIENT:
+          curGradient = ctx.createLinearGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.CREATE_RADIAL_GRADIENT:
+          curGradient = ctx.createRadialGradient(nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]);
+          break;
+        case SURF.ADD_COLOR_STOP: {
+          var off = nums[ni++], col = objs[oi++];
+          if (curGradient) { curGradient.addColorStop(off, col); }
+          break;
+        }
+        case SURF.SET_FILL_GRADIENT: if (curGradient) { ctx.fillStyle = curGradient; } break;
+        case SURF.SET_STROKE_GRADIENT: if (curGradient) { ctx.strokeStyle = curGradient; } break;
+        case SURF.CREATE_PATTERN: {
+          var pimg = surfaceImageSource(objs[oi++]), prep = objs[oi++];
+          try { curPattern = ctx.createPattern(pimg, prep); } catch (_ep) { curPattern = null; }
+          break;
+        }
+        case SURF.CREATE_PATTERN_SURFACE: {
+          var psurf = surfaceTable[nums[ni++]], prep2 = objs[oi++];
+          try { curPattern = (psurf && psurf.canvas) ? ctx.createPattern(psurf.canvas, prep2) : null; } catch (_eps) { curPattern = null; }
+          break;
+        }
+        case SURF.SET_FILL_PATTERN: if (curPattern) { ctx.fillStyle = curPattern; } break;
+        case SURF.DRAW_IMAGE_XY: {
+          var i1 = surfaceImageSource(objs[oi++]);
+          if (i1) { ctx.drawImage(i1, nums[ni++], nums[ni++]); } else { ni += 2; }
+          break;
+        }
+        case SURF.DRAW_IMAGE_XYWH: {
+          var i2 = surfaceImageSource(objs[oi++]);
+          if (i2) { ctx.drawImage(i2, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          break;
+        }
+        case SURF.DRAW_IMAGE_SRCDST: {
+          var i3 = surfaceImageSource(objs[oi++]);
+          if (i3) { ctx.drawImage(i3, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_XY: {
+          var b1 = surfaceTable[nums[ni++]];
+          if (b1 && b1.canvas) { ctx.drawImage(b1.canvas, nums[ni++], nums[ni++]); } else { ni += 2; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_XYWH: {
+          var b2 = surfaceTable[nums[ni++]];
+          if (b2 && b2.canvas) { ctx.drawImage(b2.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          break;
+        }
+        case SURF.BLIT_SURFACE_SRCDST: {
+          var b3 = surfaceTable[nums[ni++]];
+          if (b3 && b3.canvas) { ctx.drawImage(b3.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        default:
+          if (global.console && global.console.warn) {
+            global.console.warn('surface replay: unknown opcode ' + code);
+          }
+          break;
+      }
+    }
+  }
+
+  // Create / resize a surface. Fire-and-forget. Idempotent: an existing surface
+  // of the same id is resized (which also clears it, matching a fresh image).
+  hostBridge.register('__cn1_surface_create__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var w = r.w | 0;
+    var h = r.h | 0;
+    var s = surfaceTable[id];
+    if (!s) {
+      getSurface(id, w, h);
+    } else if (s.canvas && (s.canvas.width !== w || s.canvas.height !== h)) {
+      s.canvas.width = w;
+      s.canvas.height = h;
+    }
+    return null;
+  });
+
+  // Replay a command batch onto a surface. Fire-and-forget.
+  hostBridge.register('__cn1_surface_flush__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    var s = getSurface(id, r.w | 0, r.h | 0);
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var ops = r.ops || [];
+    var opCount = r.opCount | 0;
+    if (id === SURF_DISPLAY_ID) {
+      // Give the DISPLAY context a clean baseline before replaying this frame.
+      // A draw op (e.g. a decorated drawString or a gradient) can record an
+      // unbalanced save/clip/transform; the recorded frame's single save/restore
+      // then pops the wrong level and leaks a clip that INTERSECTS into every
+      // later frame -- the drawable region shrinks to nothing and the display
+      // freezes (observed: the whole graphics/chart/theme block captured a stale
+      // frame after DrawStringDecorated). Popping any outstanding saves and
+      // forcing identity here defeats that leak; the recorded ops re-establish
+      // the crop. restore() on an empty stack is a no-op, and this resets context
+      // STATE only -- pixels are untouched so partial-frame updates still
+      // composite correctly.
+      for (var __ri = 0; __ri < 64; __ri++) {
+        s.ctx.restore();
+      }
+      s.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    replaySurfaceCommands(s.ctx, ops, opCount, r.nums || [], r.objs || []);
+    // Surface flushes replay straight onto the canvas context, bypassing the
+    // jso-bridge ``noteDrawTarget`` path that tracks per-canvas paintCount /
+    // lastPaintSeq. The screenshot capture + UI-settle heuristics rely on those
+    // counters to know the display painted; without this nudge they wait forever
+    // for a paint that "never happened" (the display surface renders but reads as
+    // paintCount=0). Mark the display canvas painted and advance the render-queue
+    // sequence so canvas-pick / settle see the frame.
+    if (id === SURF_DISPLAY_ID && opCount > 0) {
+      noteCanvasOperation(s.canvas, 'method', 'fill', true, null);
+      global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+    }
+    return null;
+  });
+
+  // Read back pixels as ARGB ints (getRGB). The ONE surface op that returns
+  // data. ``dest`` is filled in place to avoid re-allocating a large array.
+  hostBridge.register('__cn1_surface_read__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.ctx) {
+      return null;
+    }
+    var x = r.x | 0, y = r.y | 0, w = r.w | 0, h = r.h | 0;
+    var img;
+    try {
+      img = s.ctx.getImageData(x, y, w, h);
+    } catch (_er) {
+      return null;
+    }
+    var data = img.data;
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Encode a surface's backing canvas to a base64 data URL (PNG/JPEG export +
+  // the animation-grid screenshot path). The image bytes read-back path.
+  hostBridge.register('__cn1_surface_to_dataurl__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    if (!s || !s.canvas || typeof s.canvas.toDataURL !== 'function') {
+      return null;
+    }
+    try {
+      var q = (typeof r.quality === 'number' && r.quality >= 0 && r.quality <= 1) ? r.quality : undefined;
+      var url = s.canvas.toDataURL(r.mime || 'image/png', q);
+      if (!url || url.length < 32) {
+        return null;
+      }
+      return url;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Release a surface's backing canvas when its owning Java image is GC'd.
+  hostBridge.register('__cn1_surface_dispose__', function(request) {
+    var r = request || {};
+    var id = r.id | 0;
+    if (id !== SURF_DISPLAY_ID) {
+      delete surfaceTable[id];
+    }
+    return null;
+  });
+
+  // Write a raw ARGB pixel rectangle onto a surface (createImage(int[])).
+  hostBridge.register('__cn1_surface_write__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var s = getSurface(r.id | 0, w, h);
+    if (!s || !s.ctx || w <= 0 || h <= 0) {
+      return null;
+    }
+    var argb = r.argb || [];
+    var img = s.ctx.createImageData(w, h);
+    var data = img.data;
+    var n = w * h;
+    for (var i = 0; i < n; i++) {
+      var v = argb[i] | 0;
+      var p = i << 2;
+      data[p] = (v >>> 16) & 0xff;
+      data[p + 1] = (v >>> 8) & 0xff;
+      data[p + 2] = v & 0xff;
+      data[p + 3] = (v >>> 24) & 0xff;
+    }
+    s.ctx.putImageData(img, 0, 0);
+    return null;
+  });
+
+  // Read back an ARGB pixel rectangle from a LOADED image host resource. The
+  // image is drawn onto a scratch canvas (the worker holds no canvas) and its
+  // pixels read + packed ARGB. The one read-back for loaded-image getRGB.
+  hostBridge.register('__cn1_image_read__', function(request) {
+    var r = request || {};
+    var image = resolveHostRef(r.image);
+    var w = r.w | 0, h = r.h | 0;
+    if (!image || w <= 0 || h <= 0) {
+      return null;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.createElement) {
+      return null;
+    }
+    var cv = doc.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    var ctx = cv.getContext('2d');
+    var data;
+    try {
+      ctx.drawImage(image, r.x | 0, r.y | 0, w, h, 0, 0, w, h);
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (_eir) {
+      return null;
+    }
+    var n = w * h;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = i << 2;
+      out[i] = ((data[p + 3] & 0xff) << 24)
+        | ((data[p] & 0xff) << 16)
+        | ((data[p + 1] & 0xff) << 8)
+        | (data[p + 2] & 0xff);
+    }
+    return out;
+  });
+
+  // Gaussian blur from a loaded image (srcSurfaceId < 0) or another surface,
+  // onto a destination surface, in one canvas2d filter:blur op.
+  hostBridge.register('__cn1_surface_blur__', function(request) {
+    var r = request || {};
+    var w = r.w | 0, h = r.h | 0;
+    var dst = getSurface(r.dstId | 0, w, h);
+    if (!dst || !dst.ctx) {
+      return null;
+    }
+    var src;
+    if ((r.srcSurfaceId | 0) >= 0) {
+      var ss = surfaceTable[r.srcSurfaceId | 0];
+      src = ss && ss.canvas;
+    } else {
+      src = resolveHostRef(r.srcImage);
+    }
+    if (!src) {
+      return null;
+    }
+    try {
+      dst.ctx.save();
+      dst.ctx.clearRect(0, 0, w, h);
+      dst.ctx.filter = 'blur(' + (+r.radius) + 'px)';
+      dst.ctx.drawImage(src, 0, 0, w, h);
+      dst.ctx.restore();
+    } catch (_eb) {}
+    return null;
+  });
+
+  // Append a surface's backing canvas into a DOM element and style it (native
+  // widgets that embed a CN1-rendered image directly in the page).
+  hostBridge.register('__cn1_attach_surface_to_element__', function(request) {
+    var r = request || {};
+    var s = surfaceTable[r.id | 0];
+    var el = resolveHostRef(r.element);
+    if (!s || !s.canvas || !el) {
+      return null;
+    }
+    if (r.cssWidth != null && s.canvas.style) {
+      s.canvas.style.width = r.cssWidth;
+    }
+    if (r.cssHeight != null && s.canvas.style) {
+      s.canvas.style.height = r.cssHeight;
+    }
+    try { el.appendChild(s.canvas); } catch (_ea) {}
+    return null;
   });
 
   // Hide the splash element on the main thread. The translated
@@ -1023,14 +1464,30 @@
         return;
       }
       function step() {
-        raf(function() {
+        // Race rAF against a setTimeout fallback. Headless Chromium throttles
+        // and ultimately STOPS firing requestAnimationFrame when the page idles
+        // (no compositing) -- which happens right after a form transition
+        // completes and the worker's EDT parks on __cn1_wait_for_ui_settle__,
+        // leaving nothing to drive a frame. Without the fallback this runFrame
+        // chain never resolves, the host never replies, and the EDT parks
+        // forever (the SlideHorizontalTransitionTest wall). The fallback
+        // guarantees forward progress; when rAF is healthy it wins the race so
+        // steady-state timing is unchanged.
+        var advanced = false;
+        function tick() {
+          if (advanced) {
+            return;
+          }
+          advanced = true;
           remaining--;
           if (remaining <= 0) {
             resolve();
             return;
           }
           step();
-        });
+        }
+        raf(tick);
+        setTimeout(tick, 32);
       }
       step();
     });
@@ -1274,7 +1731,76 @@
     return meta;
   }
 
+  // 3D RenderView peers render to their own WebGL canvas overlaid on the output
+  // canvas; they are DOM overlays, so the output canvas the screenshot scores and
+  // encodes does not contain them. Before each capture, draw every such canvas
+  // (marked data-cn1gl3d, created with preserveDrawingBuffer so its frame is
+  // readable) onto the main output canvas IN PLACE at its on-screen position.
+  // Doing it before candidate scoring means the output canvas scores as non-empty
+  // and the encoded snapshot includes the 3D content. No-op when there are no GL
+  // peers; failures are swallowed so a normal capture is never affected. (The
+  // output canvas is repainted on the next frame, so this only affects capture.)
+  function cn1CompositeGLPeersOntoOutput() {
+    try {
+      var doc = global.document;
+      if (!doc || typeof doc.querySelectorAll !== 'function') {
+        return;
+      }
+      var gls = doc.querySelectorAll('canvas[data-cn1gl3d]');
+      if (!gls || !gls.length) {
+        return;
+      }
+      var base = global.__cn1LastPaintCanvas || global.__cn1LastDrawCanvas || null;
+      if (!base && typeof doc.querySelector === 'function') {
+        base = doc.querySelector('canvas:not([data-cn1gl3d])');
+      }
+      if (!base || typeof base.getContext !== 'function') {
+        return;
+      }
+      var ctx = base.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      var baseRect = (typeof base.getBoundingClientRect === 'function') ? base.getBoundingClientRect() : null;
+      var sx = (baseRect && baseRect.width) ? (base.width / baseRect.width) : 1;
+      var sy = (baseRect && baseRect.height) ? (base.height / baseRect.height) : 1;
+      for (var i = 0; i < gls.length; i++) {
+        var g = gls[i];
+        if (!g || !(g.width | 0) || !(g.height | 0)) {
+          continue;
+        }
+        // Only composite canvases rendered for this capture cycle. A peer left in
+        // the DOM by a torn-down form is not re-rendered, so it lacks the fresh
+        // flag and must not bleed its stale frame (e.g. the 3D animation showing
+        // up in a later DesktopMode capture). Consume the flag after drawing.
+        if (!g.hasAttribute || !g.hasAttribute('data-cn1gl3d-fresh')) {
+          continue;
+        }
+        g.removeAttribute('data-cn1gl3d-fresh');
+        var dx = 0;
+        var dy = 0;
+        var dw = g.width;
+        var dh = g.height;
+        if (baseRect && typeof g.getBoundingClientRect === 'function') {
+          var gr = g.getBoundingClientRect();
+          dx = (gr.left - baseRect.left) * sx;
+          dy = (gr.top - baseRect.top) * sy;
+          dw = gr.width * sx;
+          dh = gr.height * sy;
+        }
+        try {
+          ctx.drawImage(g, dx, dy, dw, dh);
+        } catch (_drawErr) {
+          // Skip an unreadable GL canvas rather than fail the whole capture.
+        }
+      }
+    } catch (_compositeErr) {
+      // Never let GL compositing break a normal screenshot.
+    }
+  }
+
   function pickBestCanvasSnapshot(includeDataUrl, previousSignature) {
+    cn1CompositeGLPeersOntoOutput();
     function pushCanvas(list, seen, canvas, source) {
       if (!canvas || !isCanvasLike(canvas)) {
         return;

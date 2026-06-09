@@ -70,6 +70,15 @@ class AndroidGLSurface extends GLSurfaceView {
         return lastFrame;
     }
 
+    /// True only when this peer's RenderView belongs to the form currently on
+    /// screen. The native View can stay attached/shown for a beat while a form is
+    /// torn down, so the screenshot composite uses this instead of isShown() to
+    /// avoid bleeding a previous test's 3D frame into a later capture.
+    boolean isOnCurrentForm() {
+        return view != null
+                && view.getComponentForm() == com.codename1.ui.Display.getInstance().getCurrent();
+    }
+
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();

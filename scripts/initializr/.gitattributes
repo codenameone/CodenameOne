@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Bundled fonts are binary - do not normalize line endings
+*.ttf binary
+*.otf binary
